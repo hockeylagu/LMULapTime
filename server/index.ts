@@ -14,8 +14,12 @@ app.use(cors());
 app.use(express.json());
 
 // Default LMU Paths
-const DEFAULT_RESULTS_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\LOG\\Results';
-const DEFAULT_REPLAYS_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
+const DEFAULT_RESULTS_DIR = process.env.NODE_ENV === 'test'
+  ? path.join(process.cwd(), 'test', 'fixtures', 'results')
+  : 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\LOG\\Results';
+const DEFAULT_REPLAYS_DIR = process.env.NODE_ENV === 'test'
+  ? path.join(process.cwd(), 'test', 'fixtures', 'replays')
+  : 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
 
 let currentResultsDir = DEFAULT_RESULTS_DIR;
 let currentReplaysDir = DEFAULT_REPLAYS_DIR;
@@ -266,6 +270,11 @@ app.post('/api/reference-laptimes/refresh', async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
+  });
+}
+
+export { app, loadSessions };
+

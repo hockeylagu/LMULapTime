@@ -186,8 +186,8 @@ export function normalizeTrackName(venue: string = '', course: string = ''): str
     return 'Sebring';
   }
   if (combined.includes('silverstone')) {
-    if (combined.includes('national')) return 'Silverstone (National)';
     if (combined.includes('international')) return 'Silverstone (International)';
+    if (combined.includes('national')) return 'Silverstone (National)';
     return 'Silverstone (GP)';
   }
   if (combined.includes('bahrain')) {
