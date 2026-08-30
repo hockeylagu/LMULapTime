@@ -5,6 +5,8 @@ import {
   isSessionEmpty,
   getDisplayTrackName,
   matchesSessionType,
+  parseDateStringToTimestamp,
+  computeTheoreticalBest,
 } from '../../src/utils/formatters';
 
 describe('formatters utility', () => {
@@ -130,6 +132,30 @@ describe('formatters utility', () => {
     it('matches custom fallback filter strings', () => {
       expect(matchesSessionType('Special Event', 'Session 1', 'Special')).toBe(true);
       expect(matchesSessionType('Warmup', 'W1', 'Warmup')).toBe(true);
+    });
+  });
+
+  describe('parseDateStringToTimestamp', () => {
+    it('returns 0 for empty or undefined strings', () => {
+      expect(parseDateStringToTimestamp('')).toBe(0);
+      expect(parseDateStringToTimestamp(undefined)).toBe(0);
+    });
+
+    it('parses valid date strings with slashes or dashes', () => {
+      expect(parseDateStringToTimestamp('2026/05/28 14:00')).toBeGreaterThan(0);
+      expect(parseDateStringToTimestamp('2026-05-28 14:00')).toBeGreaterThan(0);
+    });
+  });
+
+  describe('computeTheoreticalBest', () => {
+    it('returns null if any sector is null', () => {
+      expect(computeTheoreticalBest(null, 30.0, 40.0)).toBeNull();
+      expect(computeTheoreticalBest(25.0, null, 40.0)).toBeNull();
+      expect(computeTheoreticalBest(25.0, 30.0, null)).toBeNull();
+    });
+
+    it('sums valid sector times correctly', () => {
+      expect(computeTheoreticalBest(25.100, 32.200, 41.300)).toBeCloseTo(98.6);
     });
   });
 });

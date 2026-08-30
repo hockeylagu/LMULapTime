@@ -5,6 +5,7 @@ import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
 import { FileUploader } from './components/FileUploader';
+import { getHashRouteAndParams, updateHashParams } from './utils/urlParams';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'sessions' | 'settings'>('dashboard');
@@ -26,16 +27,7 @@ export default function App() {
 
   // Helper to parse location hash and query parameters for routing and filter state
   const parseUrlState = () => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
-
-    const params = new URLSearchParams(searchPart);
-    const filterTrack = params.get('track') || 'All';
-    const filterCarClass = params.get('carClass') || 'All';
-    const filterTypeVal = params.get('type') || 'All';
-    const filterSearchVal = params.get('q') || '';
+    const { path: pathPart, params } = getHashRouteAndParams();
 
     let tab: 'dashboard' | 'tracks' | 'sessions' | 'settings' = 'dashboard';
     let sessionId: string | null = null;
@@ -55,54 +47,32 @@ export default function App() {
       sessionId,
       trackRouteName,
       filters: {
-        track: filterTrack,
-        carClass: filterCarClass,
-        type: filterTypeVal,
-        q: filterSearchVal,
+        track: params.get('track') || 'All',
+        carClass: params.get('carClass') || 'All',
+        type: params.get('type') || 'All',
+        q: params.get('q') || '',
       },
     };
   };
 
-  const updateUrlFilters = (updates: { track?: string; carClass?: string; type?: string; q?: string }) => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const currentPath = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
-
-    const currentFilters = parseUrlState().filters;
-    const track = updates.track !== undefined ? updates.track : currentFilters.track;
-    const carClass = updates.carClass !== undefined ? updates.carClass : currentFilters.carClass;
-    const type = updates.type !== undefined ? updates.type : currentFilters.type;
-    const q = updates.q !== undefined ? updates.q : currentFilters.q;
-
-    const params = new URLSearchParams();
-    if (track && track !== 'All') params.set('track', track);
-    if (carClass && carClass !== 'All') params.set('carClass', carClass);
-    if (type && type !== 'All') params.set('type', type);
-    if (q && q.trim() !== '') params.set('q', q.trim());
-
-    const paramStr = params.toString();
-    const newHash = `#/${currentPath}${paramStr ? `?${paramStr}` : ''}`;
-    window.history.replaceState(null, '', newHash);
-  };
-
   const setSelectedTrack = (track: string) => {
     setSelectedTrackState(track);
-    updateUrlFilters({ track });
+    updateHashParams({ track });
   };
 
   const setSelectedCarClass = (carClass: string) => {
     setSelectedCarClassState(carClass);
-    updateUrlFilters({ carClass });
+    updateHashParams({ carClass });
   };
 
   const setFilterType = (type: string) => {
     setFilterTypeState(type);
-    updateUrlFilters({ type });
+    updateHashParams({ type });
   };
 
   const setSearchQuery = (q: string) => {
     setSearchQueryState(q);
-    updateUrlFilters({ q });
+    updateHashParams({ q });
   };
 
   const handleHashChange = useCallback(() => {

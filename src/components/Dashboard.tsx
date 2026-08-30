@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Calendar, Car, Zap, FileText, ChevronRight, ChevronDown, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
-import { isSessionEmpty, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
+import { isSessionEmpty, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
+import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams';
 import { PaceCategory } from '../../server/types';
 
 interface BestRefLapInfo {
@@ -82,50 +83,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showMoreCars, setShowMoreCars] = useState<boolean>(false);
   const [showMoreBenchmarks, setShowMoreBenchmarks] = useState<boolean>(false);
 
-  const getInitialDashboardParams = () => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
-    const params = new URLSearchParams(searchPart);
-    return {
-      sort: (params.get('sort') as DashboardSortOption) || 'date-desc',
-      hideEmpty: params.get('hideEmpty') !== 'false',
-    };
-  };
-
-  const initialParams = getInitialDashboardParams();
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.hideEmpty);
-  const [sortBy, setSortByState] = useState<DashboardSortOption>(initialParams.sort);
-
-  const updateDashboardUrl = (updates: { sort?: DashboardSortOption; hideEmpty?: boolean }) => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
-    const params = new URLSearchParams(searchPart);
-
-    if (updates.sort !== undefined) {
-      if (updates.sort === 'date-desc') params.delete('sort');
-      else params.set('sort', updates.sort);
-    }
-    if (updates.hideEmpty !== undefined) {
-      if (updates.hideEmpty) params.delete('hideEmpty');
-      else params.set('hideEmpty', 'false');
-    }
-
-    const paramStr = params.toString();
-    const newHash = `#/${pathPart}${paramStr ? `?${paramStr}` : ''}`;
-    window.history.replaceState(null, '', newHash);
-  };
+  const { params: initialParams } = getHashRouteAndParams();
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.get('hideEmpty') !== 'false');
+  const [sortBy, setSortByState] = useState<DashboardSortOption>(
+    (initialParams.get('sort') as DashboardSortOption) || 'date-desc'
+  );
 
   const setSortBy = (sort: DashboardSortOption) => {
     setSortByState(sort);
-    updateDashboardUrl({ sort });
+    updateHashParams({ sort });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateDashboardUrl({ hideEmpty: hide });
+    updateHashParams({ hideEmpty: hide });
   };
 
   // Extract unique track layout variations sorted alphabetically
@@ -152,14 +123,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Sorted sessions by Date / Benchmark Pace %
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-      const parseTimestamp = (str: string) => {
-        if (!str) return 0;
-        const clean = str.replace(/\//g, '-');
-        const time = new Date(clean).getTime();
-        return isNaN(time) ? 0 : time;
-      };
-      const timeA = parseTimestamp(a.timeString);
-      const timeB = parseTimestamp(b.timeString);
+      const timeA = parseDateStringToTimestamp(a.timeString);
+      const timeB = parseDateStringToTimestamp(b.timeString);
       return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
     } else {
       const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;

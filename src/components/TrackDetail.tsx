@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Zap, ChevronRight, FileText, Car, ArrowUpDown, Video, AlertCircle, FilterX } from 'lucide-react';
-import { formatTime, getDisplayTrackName, matchesSessionType } from '../utils/formatters.js';
-import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory.js';
+import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters.js';
+import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
+import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
 
@@ -56,27 +57,15 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
-  const getInitialParams = () => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
-    const params = new URLSearchParams(searchPart);
-    return {
-      sort: (params.get('sort') as TrackDetailSortOption) || 'date-desc',
-      model: params.get('model') || 'All',
-      type: params.get('type') || 'All',
-      q: params.get('q') || '',
-      hideEmpty: params.get('hideEmpty') !== 'false',
-    };
-  };
-
-  const initialParams = getInitialParams();
+  const { params: initialParams } = getHashRouteAndParams();
   const [loading, setLoading] = useState<boolean>(true);
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.hideEmpty);
-  const [selectedCarModel, setSelectedCarModelState] = useState<string>(initialParams.model);
-  const [filterType, setFilterTypeState] = useState<string>(initialParams.type);
-  const [searchQuery, setSearchQueryState] = useState<string>(initialParams.q);
-  const [sortBy, setSortByState] = useState<TrackDetailSortOption>(initialParams.sort);
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.get('hideEmpty') !== 'false');
+  const [selectedCarModel, setSelectedCarModelState] = useState<string>(initialParams.get('model') || 'All');
+  const [filterType, setFilterTypeState] = useState<string>(initialParams.get('type') || 'All');
+  const [searchQuery, setSearchQueryState] = useState<string>(initialParams.get('q') || '');
+  const [sortBy, setSortByState] = useState<TrackDetailSortOption>(
+    (initialParams.get('sort') as TrackDetailSortOption) || 'date-desc'
+  );
   const [data, setData] = useState<{
     trackName: string;
     normalizedTrackName: string;
@@ -88,73 +77,29 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const selectedClass = selectedCarClass;
   const setSelectedClass = setSelectedCarClass;
 
-  const updateUrlParam = (updates: {
-    sort?: TrackDetailSortOption;
-    model?: string;
-    type?: string;
-    q?: string;
-    hideEmpty?: boolean;
-    carClass?: string;
-  }) => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
-    const params = new URLSearchParams(searchPart);
-
-    if (updates.sort !== undefined) {
-      if (updates.sort === 'date-desc') params.delete('sort');
-      else params.set('sort', updates.sort);
-    }
-    if (updates.model !== undefined) {
-      if (updates.model === 'All' || !updates.model) params.delete('model');
-      else params.set('model', updates.model);
-    }
-    if (updates.type !== undefined) {
-      if (updates.type === 'All' || !updates.type) params.delete('type');
-      else params.set('type', updates.type);
-    }
-    if (updates.q !== undefined) {
-      if (!updates.q.trim()) params.delete('q');
-      else params.set('q', updates.q.trim());
-    }
-    if (updates.hideEmpty !== undefined) {
-      if (updates.hideEmpty) params.delete('hideEmpty');
-      else params.set('hideEmpty', 'false');
-    }
-    if (updates.carClass !== undefined) {
-      if (updates.carClass === 'All' || !updates.carClass) params.delete('carClass');
-      else params.set('carClass', updates.carClass);
-    }
-
-    const paramStr = params.toString();
-    const newHash = `#/${pathPart}${paramStr ? `?${paramStr}` : ''}`;
-    window.history.replaceState(null, '', newHash);
-  };
-
   const setSortBy = (val: TrackDetailSortOption) => {
     setSortByState(val);
-    updateUrlParam({ sort: val });
+    updateHashParams({ sort: val });
   };
 
   const setSelectedCarModel = (model: string) => {
     setSelectedCarModelState(model);
-    updateUrlParam({ model });
+    updateHashParams({ model });
   };
 
   const setFilterType = (type: string) => {
     setFilterTypeState(type);
-    updateUrlParam({ type });
+    updateHashParams({ type });
   };
 
   const setSearchQuery = (q: string) => {
     setSearchQueryState(q);
-    updateUrlParam({ q });
+    updateHashParams({ q });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateUrlParam({ hideEmpty: hide });
+    updateHashParams({ hideEmpty: hide });
   };
 
   useEffect(() => {
@@ -293,14 +238,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   // Sorted sessions by Date / Benchmark Pace % / Best Lap Time
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-      const parseTimestamp = (str: string) => {
-        if (!str) return 0;
-        const clean = str.replace(/\//g, '-');
-        const time = new Date(clean).getTime();
-        return isNaN(time) ? 0 : time;
-      };
-      const timeA = parseTimestamp(a.timeString);
-      const timeB = parseTimestamp(b.timeString);
+      const timeA = parseDateStringToTimestamp(a.timeString);
+      const timeB = parseDateStringToTimestamp(b.timeString);
       return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
     } else if (sortBy === 'lap-asc') {
       const lapA = a.playerDriver?.bestLapTime ?? 99999;
@@ -316,18 +255,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   // 1. Helper to calculate pace category & percentage against a reference entry
   const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null) => {
     if (!lapTime || !refEntry || !refEntry.target100Sec) return null;
-
-    const ratio = lapTime / refEntry.target100Sec;
-    const pct = ratio * 100;
-
-    let category: PaceCategory = 'Offline';
-    if (pct <= 100.5) category = 'Alien';
-    else if (pct <= 101.5) category = 'Competitive';
-    else if (pct <= 103.5) category = 'Good';
-    else if (pct <= 105.5) category = 'Midpack';
-    else if (pct <= 107.0) category = 'Tail-ender';
-
-    return { category, pct };
+    const pct = (lapTime / refEntry.target100Sec) * 100;
+    return { category: getPaceCategoryFromPercentage(pct), pct };
   };
 
   // 2. Find driver's overall best lap in filtered sessions for this track

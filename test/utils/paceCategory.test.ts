@@ -5,6 +5,9 @@ import {
   normalizeCarClassGroup,
   matchesCarClass,
   normalizeTrackName,
+  getPaceCategoryFromPercentage,
+  findMatchingTrackBenchmarkEntries,
+  findReferenceEntry,
   PACE_CATEGORY_STYLES,
   VEHICLE_CLASS_OPTIONS,
 } from '../../src/utils/paceCategory';
@@ -191,6 +194,46 @@ describe('paceCategory utility', () => {
       expect(ids).toContain('LMP2elms');
       expect(ids).toContain('LMP2wec');
       expect(ids).toContain('GTE');
+    });
+  });
+
+  describe('getPaceCategoryFromPercentage', () => {
+    it('categorizes percentage correctly', () => {
+      expect(getPaceCategoryFromPercentage(100.2)).toBe('Alien');
+      expect(getPaceCategoryFromPercentage(101.0)).toBe('Competitive');
+      expect(getPaceCategoryFromPercentage(102.5)).toBe('Good');
+      expect(getPaceCategoryFromPercentage(104.5)).toBe('Midpack');
+      expect(getPaceCategoryFromPercentage(106.5)).toBe('Tail-ender');
+      expect(getPaceCategoryFromPercentage(110.0)).toBe('Offline');
+    });
+  });
+
+  describe('findMatchingTrackBenchmarkEntries and findReferenceEntry', () => {
+    const mockEntries: any[] = [
+      { trackName: 'Spa', carClass: 'LMH', target100Sec: 120.0 },
+      { trackName: 'Spa', carClass: 'LMGT3', target100Sec: 135.0 },
+      { trackName: 'Monza', carClass: 'LMH', target100Sec: 95.0 },
+    ];
+
+    it('finds track benchmark entries matching track name', () => {
+      const matches = findMatchingTrackBenchmarkEntries(mockEntries, 'Circuit de Spa-Francorchamps');
+      expect(matches.length).toBe(2);
+    });
+
+    it('returns empty array when no track matches', () => {
+      const matches = findMatchingTrackBenchmarkEntries(mockEntries, 'Nonexistent Track');
+      expect(matches.length).toBe(0);
+    });
+
+    it('finds specific reference entry by track and class', () => {
+      const entry = findReferenceEntry(mockEntries, 'Spa', 'GP', 'LMGT3', 'Porsche 911');
+      expect(entry?.carClass).toBe('LMGT3');
+      expect(entry?.target100Sec).toBe(135.0);
+    });
+
+    it('returns null when no track matches', () => {
+      const entry = findReferenceEntry(mockEntries, 'Unknown Track', '', 'LMH', '');
+      expect(entry).toBeNull();
     });
   });
 });

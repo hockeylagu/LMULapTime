@@ -1,19 +1,32 @@
 import fs from 'fs';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
-import { DetailedSession, DriverData, LapData, SessionMetadata, SessionProgressionPoint, SessionWeather, TrackSummary } from './types.js';
-import { formatTime, parseTimeStringToSeconds } from '../src/utils/formatters.js';
+import {
+  DetailedSession,
+  DriverData,
+  LapData,
+  SessionMetadata,
+  SessionProgressionPoint,
+  SessionWeather,
+  TrackSummary,
+} from './types.js';
+import {
+  formatTime,
+  parseTimeStringToSeconds,
+  getDisplayTrackName,
+  computeTheoreticalBest,
+} from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
 
-const defaultOptions = {
+export { getDisplayTrackName };
+
+const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  parseNodeValue: true,
+  parseTagValue: true,
   parseAttributeValue: true,
   trimValues: true,
-};
-
-const xmlParser = new XMLParser(defaultOptions);
+});
 
 interface ReplayFileEntry {
   name: string;
@@ -23,6 +36,9 @@ interface ReplayFileEntry {
   sessionCode: string; // e.g. P1, Q1, R1
   mtime: number;
 }
+
+const updateMinTime = (current: number | null, next: number | null): number | null =>
+  next !== null && next > 0 && (current === null || next < current) ? next : current;
 
 export class LmuParser {
   private replaysMap: ReplayFileEntry[] = [];
@@ -72,7 +88,7 @@ export class LmuParser {
           }
         }
       }
-    } catch (err) {
+    } catch {
       // Ignore fallback
     }
   }
@@ -109,7 +125,7 @@ export class LmuParser {
     try {
       const xmlContent = fs.readFileSync(filePath, 'utf-8');
       const parsed = xmlParser.parse(xmlContent);
-      if (!parsed || !parsed.rFactorXML || !parsed.rFactorXML.RaceResults) {
+      if (!parsed?.rFactorXML?.RaceResults) {
         return null;
       }
 
@@ -140,7 +156,6 @@ export class LmuParser {
         sessionName = 'P1';
         sessionDataNode = raceResults.Practice1 || raceResults.Practice;
       } else {
-        // Infer from filename suffix e.g. 2026_05_28_12_55_30-39P1.xml
         const fnMatch = filename.match(/([PQR]\d+)\.xml$/i);
         if (fnMatch) {
           sessionName = fnMatch[1].toUpperCase();
@@ -151,12 +166,9 @@ export class LmuParser {
       }
 
       // Parse Drivers
-      let rawDrivers = sessionDataNode?.Driver || raceResults.Driver || [];
-      if (!Array.isArray(rawDrivers)) {
-        rawDrivers = [rawDrivers];
-      }
-
-      const drivers: DriverData[] = rawDrivers.map((d: any) => this.parseDriver(d)).filter(Boolean);
+      const rawDrivers = sessionDataNode?.Driver || raceResults.Driver || [];
+      const driversList = Array.isArray(rawDrivers) ? rawDrivers : [rawDrivers];
+      const drivers: DriverData[] = driversList.map((d: any) => this.parseDriver(d)).filter(Boolean);
 
       // Compute Pace Categories for each lap and driver best lap
       drivers.forEach(driver => {
@@ -180,7 +192,7 @@ export class LmuParser {
         }
       });
 
-      // Identify Player driver dynamically (matching profile name from LMU settings.json if available, or first isPlayer === 1)
+      // Identify Player driver dynamically
       const targetName = this.configuredPlayerName.toLowerCase().trim();
       let mainPlayerDriver = targetName
         ? drivers.find(d => d.name.toLowerCase().includes(targetName) || targetName.includes(d.name.toLowerCase()))
@@ -254,34 +266,20 @@ export class LmuParser {
   }
 
   public parseWeather(timeString: string, drivers: DriverData[]): SessionWeather {
-    let hasWetTires = false;
-    for (const d of drivers) {
-      if (!d.laps) continue;
-      for (const l of d.laps) {
-        const fComp = (l.fCompound || '').toLowerCase();
-        const rComp = (l.rCompound || '').toLowerCase();
-        if (fComp.includes('wet') || fComp.includes('rain') || fComp.includes('inter') ||
-            rComp.includes('wet') || rComp.includes('rain') || rComp.includes('inter')) {
-          hasWetTires = true;
-          break;
-        }
-      }
-      if (hasWetTires) break;
-    }
+    const isWet = (comp?: string) => /wet|rain|inter/i.test(comp || '');
+    const hasWetTires = drivers.some(d =>
+      d.laps?.some(l => isWet(l.fCompound) || isWet(l.rCompound))
+    );
 
     const condition: 'Dry' | 'Wet' = hasWetTires ? 'Wet' : 'Dry';
 
-    let timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night' = 'Daytime';
     let hourNum = 14;
     if (timeString) {
-      const parts = timeString.split(' ');
-      if (parts[1]) {
-        const timeParts = parts[1].split(':');
-        hourNum = parseInt(timeParts[0], 10);
-        if (isNaN(hourNum)) hourNum = 14;
-      }
+      const match = timeString.match(/\s(\d{1,2}):/);
+      if (match) hourNum = parseInt(match[1], 10);
     }
 
+    let timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night' = 'Daytime';
     if (hourNum >= 5 && hourNum < 9) timeOfDay = 'Morning';
     else if (hourNum >= 9 && hourNum < 18) timeOfDay = 'Daytime';
     else if (hourNum >= 18 && hourNum < 21) timeOfDay = 'Evening';
@@ -307,12 +305,9 @@ export class LmuParser {
     const position = parseInt(d.Position, 10) || 0;
     const classPosition = parseInt(d.ClassPosition, 10) || 0;
 
-    let rawLaps = d.Lap || [];
-    if (!Array.isArray(rawLaps)) {
-      rawLaps = [rawLaps];
-    }
-
-    const laps: LapData[] = rawLaps.map((l: any, idx: number) => this.parseLap(l, idx + 1));
+    const rawLaps = d.Lap || [];
+    const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
+    const laps: LapData[] = lapsList.map((l: any, idx: number) => this.parseLap(l, idx + 1));
 
     // Best Laps & Sectors
     let bestLapTime: number | null = parseTimeStringToSeconds(d.BestLapTime);
@@ -322,24 +317,14 @@ export class LmuParser {
 
     laps.forEach(lap => {
       if (lap.isValid && lap.lapTime) {
-        if (bestLapTime === null || lap.lapTime < bestLapTime) {
-          bestLapTime = lap.lapTime;
-        }
+        bestLapTime = updateMinTime(bestLapTime, lap.lapTime);
       }
-      if (lap.s1 !== null && (bestS1 === null || lap.s1 < bestS1)) {
-        bestS1 = lap.s1;
-      }
-      if (lap.s2 !== null && (bestS2 === null || lap.s2 < bestS2)) {
-        bestS2 = lap.s2;
-      }
-      if (lap.s3 !== null && (bestS3 === null || lap.s3 < bestS3)) {
-        bestS3 = lap.s3;
-      }
+      bestS1 = updateMinTime(bestS1, lap.s1);
+      bestS2 = updateMinTime(bestS2, lap.s2);
+      bestS3 = updateMinTime(bestS3, lap.s3);
     });
 
-    const theoreticalBest = (bestS1 !== null && bestS2 !== null && bestS3 !== null)
-      ? parseFloat((bestS1 + bestS2 + bestS3).toFixed(3))
-      : null;
+    const theoreticalBest = computeTheoreticalBest(bestS1, bestS2, bestS3);
 
     const validLaps = laps.filter(l => l.isValid && l.lapTime);
     let avgLapTime: number | null = null;
@@ -378,7 +363,6 @@ export class LmuParser {
     const lapNum = parseInt(l['@_num'], 10) || fallbackNum;
     const position = parseInt(l['@_p'], 10) || 0;
 
-    // Body value can be lap time e.g. "141.4429" or "--.----"
     const bodyVal = typeof l === 'object' && l['#text'] ? l['#text'] : (typeof l === 'string' || typeof l === 'number' ? String(l) : '');
     const lapTime = parseTimeStringToSeconds(bodyVal);
 
@@ -390,7 +374,6 @@ export class LmuParser {
     const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop() || String(l['@_rcompound']) : '';
     const isPitStop = l['@_pit'] === '1' || l['@_pit'] === 1 || l['@_et'] === '--.---';
 
-    // A lap is valid if it has a valid time string and no pit/cut disqualification
     const isValid = lapTime !== null && lapTime > 0;
 
     return {
@@ -420,32 +403,23 @@ export class LmuParser {
     const normXmlTrack = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
     const normSession = sessionCode.toLowerCase();
 
-    // Filter candidate VCR files within a reasonable timestamp window (10 min max)
-    const candidates = this.replaysMap.filter(v => {
-      const timeDiff = Math.abs(v.mtime - sessionTimestampMs);
-      const mtimeDiff = Math.abs(v.mtime - xmlFileMtimeMs);
-      const minDiff = Math.min(timeDiff, mtimeDiff);
+    const getMinDiff = (v: ReplayFileEntry) =>
+      Math.min(Math.abs(v.mtime - sessionTimestampMs), Math.abs(v.mtime - xmlFileMtimeMs));
 
-      // Must be recorded within 10 minutes (600,000 ms) of XML creation/session timestamp
+    const candidates = this.replaysMap.filter(v => {
+      const minDiff = getMinDiff(v);
       if (minDiff > 600000) return false;
 
       const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
       const trackMatches = normXmlTrack.includes(normVcrTrack) || normVcrTrack.includes(normXmlTrack);
       const sessionMatches = v.sessionCode.toLowerCase() === normSession;
 
-      // Require track match AND (session code match OR close time window < 3 mins)
       return trackMatches && (sessionMatches || minDiff < 180000);
     });
 
     if (candidates.length === 0) return undefined;
 
-    // Pick candidate closest in timestamp to XML
-    candidates.sort((a, b) => {
-      const aDiff = Math.min(Math.abs(a.mtime - sessionTimestampMs), Math.abs(a.mtime - xmlFileMtimeMs));
-      const bDiff = Math.min(Math.abs(b.mtime - sessionTimestampMs), Math.abs(b.mtime - xmlFileMtimeMs));
-      return aDiff - bDiff;
-    });
-
+    candidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
     return candidates[0];
   }
 }
@@ -454,11 +428,9 @@ export class LmuParser {
  * Computes chronological session-over-session improvement points for a driver or overall.
  */
 export function computeProgression(sessions: DetailedSession[], targetDriverName?: string): SessionProgressionPoint[] {
-  // Sort sessions chronologically
   const sorted = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
 
   return sorted.map(s => {
-    // Find driver or default player
     let driver = targetDriverName
       ? s.drivers.find(d => d.name.toLowerCase() === targetDriverName.toLowerCase())
       : s.playerDriver || s.drivers[0];
@@ -503,53 +475,6 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
   });
 }
 
-export function getDisplayTrackName(venue: string = '', course: string = ''): string {
-  if (!course || course.trim() === '') {
-    return venue;
-  }
-
-  const vNorm = venue.toLowerCase();
-  const cNorm = course.toLowerCase().trim();
-
-  // If course is generic GP/Grand Prix/Full/WEC, omit layout string
-  if (cNorm === 'gp' || cNorm === 'grand prix' || cNorm === 'full' || cNorm === 'wec') {
-    return venue;
-  }
-
-  // If venue already includes the full course string
-  if (vNorm.includes(cNorm)) {
-    return venue;
-  }
-
-  let cleanCourse = course.trim();
-
-  // Remove leading venue name or prefix e.g. "Paul Ricard - 1A-V2-Short" -> "1A-V2-Short"
-  cleanCourse = cleanCourse.replace(/^[a-zA-Z\s]+-\s*/, (match) => {
-    const matchNorm = match.toLowerCase();
-    if (vNorm.split(' ').some(word => word.length > 2 && matchNorm.includes(word))) {
-      return '';
-    }
-    return match;
-  });
-
-  // Filter out redundant venue location words from course string
-  const venueWords = venue.split(/[\s\-_]+/).map(w => w.toLowerCase()).filter(w => w.length > 2);
-  const courseWords = cleanCourse.split(/[\s\-_]+/);
-
-  const filteredWords = courseWords.filter(word => {
-    const wordLower = word.toLowerCase();
-    return !venueWords.some(vw => vw === wordLower && !['circuit', 'course', 'layout'].includes(vw));
-  });
-
-  cleanCourse = filteredWords.join(' ').replace(/^-\s*/, '').trim();
-
-  if (!cleanCourse) {
-    return venue;
-  }
-
-  return `${venue} (${cleanCourse})`;
-}
-
 /**
  * Aggregates summary statistics per track.
  */
@@ -589,20 +514,12 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
         summary.bestLapDriver = p.name;
         summary.bestLapCar = p.carType;
       }
-      if (p.bestS1 && (summary.bestS1 === null || p.bestS1 < summary.bestS1)) {
-        summary.bestS1 = p.bestS1;
-      }
-      if (p.bestS2 && (summary.bestS2 === null || p.bestS2 < summary.bestS2)) {
-        summary.bestS2 = p.bestS2;
-      }
-      if (p.bestS3 && (summary.bestS3 === null || p.bestS3 < summary.bestS3)) {
-        summary.bestS3 = p.bestS3;
-      }
+      summary.bestS1 = updateMinTime(summary.bestS1, p.bestS1);
+      summary.bestS2 = updateMinTime(summary.bestS2, p.bestS2);
+      summary.bestS3 = updateMinTime(summary.bestS3, p.bestS3);
     }
 
-    if (summary.bestS1 && summary.bestS2 && summary.bestS3) {
-      summary.theoreticalBest = parseFloat((summary.bestS1 + summary.bestS2 + summary.bestS3).toFixed(3));
-    }
+    summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);
   });
 
   return map;

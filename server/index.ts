@@ -6,6 +6,7 @@ import { LmuParser, computeProgression, computeTrackSummaries } from './parser.j
 import { DetailedSession } from './types.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { getDisplayTrackName } from '../src/utils/formatters.js';
+import { findMatchingTrackBenchmarkEntries } from '../src/utils/paceCategory.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -216,25 +217,7 @@ app.get('/api/track/:trackName', (req, res) => {
   const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
   const normTrack = normalizeTrackName(decoded, sampleCourse);
   const refCache = loadReferenceLaptimesFromCache();
-  let benchmarks: any[] = [];
-
-  if (refCache) {
-    const normClean = normTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
-    let matches = Object.values(refCache.entries).filter(entry => {
-      const entryNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-      const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return entryNorm === normClean || entryRaw === normClean;
-    });
-
-    if (matches.length === 0) {
-      matches = Object.values(refCache.entries).filter(entry => {
-        const entryNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-        return entryNorm.includes(normClean) || normClean.includes(entryNorm);
-      });
-    }
-
-    benchmarks = matches;
-  }
+  const benchmarks = refCache ? findMatchingTrackBenchmarkEntries(refCache.entries, decoded, sampleCourse) : [];
 
   res.json({
     trackName: decoded,
