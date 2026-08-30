@@ -577,7 +577,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       {/* Detailed Lap Table */}
       <div className="glass-panel p-5 rounded-2xl">
         <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center justify-between">
-          <span>Lap Telemetry Table ({selectedDriver?.laps.length || 0} Laps)</span>
+          <span>Lap Telemetry Table ({selectedDriver?.laps?.length || 0} Laps)</span>
           <span className="text-xs font-normal text-lmu-muted">Deltas compared to driver's session best</span>
         </h3>
 
@@ -599,7 +599,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </tr>
             </thead>
             <tbody className="divide-y divide-lmu-border/50 font-mono">
-              {selectedDriver?.laps.map(l => {
+              {(selectedDriver?.laps || []).map(l => {
                 const isSessionBest = l.lapTime !== null && selectedDriver.bestLapTime !== null &&
                   Math.abs(l.lapTime - selectedDriver.bestLapTime) < 0.0005;
                 const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
