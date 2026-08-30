@@ -73,14 +73,27 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       return Object.values(tracksMap).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
     }
 
-    const filteredSessions = sessions.filter(s =>
-      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass)
-    );
+    const minTime = (current: number | null, next: number | null | undefined): number | null =>
+      next !== null && next !== undefined && next > 0 && (current === null || next < current) ? next : current;
 
-    const trackVenues = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, (s as any).trackCourse)))).filter(Boolean);
+    // Group filtered sessions by display track name in a single pass
+    const sessionsByVenue = new Map<string, SessionSummary[]>();
+    const allVenues = new Set<string>();
 
-    const list = trackVenues.map(venue => {
-      const venueSessions = filteredSessions.filter(s => getDisplayTrackName(s.trackVenue, (s as any).trackCourse) === venue);
+    sessions.forEach(s => {
+      const venue = getDisplayTrackName(s.trackVenue, (s as any).trackCourse);
+      if (!venue) return;
+      allVenues.add(venue);
+      if (matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass)) {
+        const group = sessionsByVenue.get(venue) || [];
+        group.push(s);
+        sessionsByVenue.set(venue, group);
+      }
+    });
+
+    const list = Array.from(allVenues).map(venue => {
+      const venueSessions = sessionsByVenue.get(venue) || [];
+      const fallback = tracksMap[venue];
 
       let bestLapTime: number | null = null;
       let bestLapDriver = '';
@@ -91,66 +104,45 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       let bestS3: number | null = null;
       let totalLaps = 0;
       const carsUsedSet = new Set<string>();
+      let lastSessionTimestamp = 0;
 
       venueSessions.forEach(s => {
-        if (s.playerDriver) {
-          const p = s.playerDriver;
+        const timestamp = parseDateStringToTimestamp(s.timeString);
+        if (timestamp > lastSessionTimestamp) lastSessionTimestamp = timestamp;
+
+        const p = s.playerDriver;
+        if (p) {
           totalLaps += p.lapsCount || 0;
           if (p.carType) carsUsedSet.add(p.carType);
 
-          if (p.bestLapTime) {
-            if (bestLapTime === null || p.bestLapTime < bestLapTime) {
-              bestLapTime = p.bestLapTime;
-              bestLapDriver = p.name;
-              bestLapCar = p.carType;
-              bestLapClass = p.carClass || '';
-            }
+          if (p.bestLapTime && (bestLapTime === null || p.bestLapTime < bestLapTime)) {
+            bestLapTime = p.bestLapTime;
+            bestLapDriver = p.name;
+            bestLapCar = p.carType;
+            bestLapClass = p.carClass || '';
           }
-          if (p.bestS1) {
-            if (bestS1 === null || p.bestS1 < bestS1) bestS1 = p.bestS1;
-          }
-          if (p.bestS2) {
-            if (bestS2 === null || p.bestS2 < bestS2) bestS2 = p.bestS2;
-          }
-          if (p.bestS3) {
-            if (bestS3 === null || p.bestS3 < bestS3) bestS3 = p.bestS3;
-          }
+          bestS1 = minTime(bestS1, p.bestS1);
+          bestS2 = minTime(bestS2, p.bestS2);
+          bestS3 = minTime(bestS3, p.bestS3);
         }
       });
 
-      const theoreticalBest = computeTheoreticalBest(bestS1, bestS2, bestS3);
-
-      const lastSessionTimestamp = venueSessions.length > 0
-        ? Math.max(...venueSessions.map(s => parseDateStringToTimestamp(s.timeString)))
-        : 0;
-
-      const fallback = tracksMap[venue] || {
-        trackVenue: venue,
-        sessionsCount: 0,
-        totalLaps: 0,
-        bestLapTime: null,
-        bestLapDriver: '',
-        bestLapCar: '',
-        bestS1: null,
-        bestS2: null,
-        bestS3: null,
-        theoreticalBest: null,
-        carsUsed: [],
-      };
+      const hasVenueSessions = venueSessions.length > 0;
+      const useFallback = !hasVenueSessions && selectedCarClass === 'All' && fallback;
 
       return {
         trackVenue: venue,
         sessionsCount: venueSessions.length,
-        totalLaps: venueSessions.length > 0 ? totalLaps : (selectedCarClass === 'All' ? fallback.totalLaps : 0),
-        bestLapTime: bestLapTime !== null ? bestLapTime : (selectedCarClass === 'All' ? fallback.bestLapTime : null),
-        bestLapDriver: bestLapDriver || (selectedCarClass === 'All' ? fallback.bestLapDriver : ''),
-        bestLapCar: bestLapCar || (selectedCarClass === 'All' ? fallback.bestLapCar : ''),
+        totalLaps: hasVenueSessions ? totalLaps : (useFallback ? fallback.totalLaps : 0),
+        bestLapTime: bestLapTime ?? (useFallback ? fallback.bestLapTime : null),
+        bestLapDriver: bestLapDriver || (useFallback ? fallback.bestLapDriver : ''),
+        bestLapCar: bestLapCar || (useFallback ? fallback.bestLapCar : ''),
         bestLapClass: bestLapClass || '',
-        bestS1: bestS1 !== null ? bestS1 : (selectedCarClass === 'All' ? fallback.bestS1 : null),
-        bestS2: bestS2 !== null ? bestS2 : (selectedCarClass === 'All' ? fallback.bestS2 : null),
-        bestS3: bestS3 !== null ? bestS3 : (selectedCarClass === 'All' ? fallback.bestS3 : null),
-        theoreticalBest: theoreticalBest !== null ? theoreticalBest : (selectedCarClass === 'All' ? fallback.theoreticalBest : null),
-        carsUsed: carsUsedSet.size > 0 ? Array.from(carsUsedSet) : (selectedCarClass === 'All' ? fallback.carsUsed : []),
+        bestS1: bestS1 ?? (useFallback ? fallback.bestS1 : null),
+        bestS2: bestS2 ?? (useFallback ? fallback.bestS2 : null),
+        bestS3: bestS3 ?? (useFallback ? fallback.bestS3 : null),
+        theoreticalBest: computeTheoreticalBest(bestS1, bestS2, bestS3) ?? (useFallback ? fallback.theoreticalBest : null),
+        carsUsed: carsUsedSet.size > 0 ? Array.from(carsUsedSet) : (useFallback ? fallback.carsUsed : []),
         lastSessionTimestamp,
       };
     });

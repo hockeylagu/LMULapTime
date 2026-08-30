@@ -133,38 +133,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   });
 
-  // Calculate overall metrics & top3 aggregations
+  // Calculate overall metrics & top3 aggregations in a single pass
   let totalLaps = 0;
   const trackLapsMap: Record<string, number> = {};
   const carLapsMap: Record<string, number> = {};
-  const allRefLaps: BestRefLapInfo[] = [];
+  const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
 
-  sessions.forEach(s => {
-    if (s.playerDriver) {
-      const p = s.playerDriver;
-      const lapCount = p.lapsCount || 0;
-      totalLaps += lapCount;
+  for (const s of sessions) {
+    const p = s.playerDriver;
+    if (!p) continue;
 
-      if (s.trackVenue && lapCount > 0) {
-        trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + lapCount;
-      }
+    const lapCount = p.lapsCount || 0;
+    totalLaps += lapCount;
 
-      if (p.carType && lapCount > 0) {
-        carLapsMap[p.carType] = (carLapsMap[p.carType] || 0) + lapCount;
-      }
+    if (s.trackVenue && lapCount > 0) {
+      trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + lapCount;
+    }
 
-      if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
-        allRefLaps.push({
+    if (p.carType && lapCount > 0) {
+      carLapsMap[p.carType] = (carLapsMap[p.carType] || 0) + lapCount;
+    }
+
+    if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
+      const track = getDisplayTrackName(s.trackVenue, s.trackCourse);
+      const currentBest = uniqueTrackRefLapsMap[track];
+      if (!currentBest || p.bestLapPacePercentage < currentBest.percentage) {
+        uniqueTrackRefLapsMap[track] = {
           sessionId: s.id,
           percentage: p.bestLapPacePercentage,
           category: p.bestLapPaceCategory,
           lapTimeString: p.bestLapTimeString,
-          track: getDisplayTrackName(s.trackVenue, s.trackCourse),
+          track,
           car: p.carType,
-        });
+        };
       }
     }
-  });
+  }
 
   // Ranked Tracks by Laps
   const rankedTracks = Object.entries(trackLapsMap)
@@ -179,13 +183,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const visibleCars = showMoreCars ? rankedCars : rankedCars.slice(0, 3);
 
   // Ranked Reference Laps (lowest percentage relative to reference benchmark)
-  const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
-  allRefLaps.forEach(item => {
-    if (!uniqueTrackRefLapsMap[item.track] || item.percentage < uniqueTrackRefLapsMap[item.track].percentage) {
-      uniqueTrackRefLapsMap[item.track] = item;
-    }
-  });
-
   const rankedRefLaps = Object.values(uniqueTrackRefLapsMap)
     .sort((a, b) => a.percentage - b.percentage);
   const visibleRefLaps = showMoreBenchmarks ? rankedRefLaps : rankedRefLaps.slice(0, 3);

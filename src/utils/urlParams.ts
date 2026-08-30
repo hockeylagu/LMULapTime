@@ -36,3 +36,11 @@ export function updateHashParams(updates: Record<string, string | boolean | null
   const newHash = `#/${path}${paramStr ? `?${paramStr}` : ''}`;
   window.history.replaceState(null, '', newHash);
 }
+
+export function setHashRoute(newPath: string, preserveParams = true): void {
+  if (typeof window === 'undefined') return;
+  const { params } = getHashRouteAndParams();
+  const paramStr = preserveParams ? params.toString() : '';
+  const cleanPath = newPath.replace(/^#?\/?/, '');
+  window.location.hash = `#/${cleanPath}${paramStr ? `?${paramStr}` : ''}`;
+}

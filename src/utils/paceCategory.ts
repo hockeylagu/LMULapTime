@@ -121,86 +121,119 @@ export function matchesCarClass(carClass: string = '', carType: string = '', tar
   const combined = `${carClass} ${carType}`.toLowerCase();
   const target = targetClass.toLowerCase();
 
-  if (target === 'lmh' || target === 'hypercar' || target === 'hyper' || target === 'lmdh') {
-    return combined.includes('hyper') || combined.includes('lmh') || combined.includes('lmdh');
+  switch (target) {
+    case 'lmh':
+    case 'hypercar':
+    case 'hyper':
+    case 'lmdh':
+      return /hyper|lmh|lmdh/.test(combined);
+    case 'lmgt3':
+    case 'gt3':
+      return /gt3|lmgt3/.test(combined);
+    case 'lmp2elms':
+    case 'lmp2 (elms)':
+    case 'lmp2_elms':
+    case 'elms':
+      return /elms|lmp2_elms/.test(combined);
+    case 'lmp2wec':
+    case 'lmp2 (wec)':
+    case 'lmp2':
+    case 'wec':
+      return combined.includes('lmp2') && !combined.includes('elms');
+    case 'lmp3':
+      return combined.includes('lmp3');
+    case 'gte':
+      return combined.includes('gte');
+    default:
+      return combined.includes(target);
   }
-
-  if (target === 'lmgt3' || target === 'gt3') {
-    return combined.includes('gt3') || combined.includes('lmgt3');
-  }
-
-  if (target === 'lmp2elms' || target === 'lmp2 (elms)' || target === 'lmp2_elms' || target === 'elms') {
-    return combined.includes('elms') || combined.includes('lmp2_elms');
-  }
-
-  if (target === 'lmp2wec' || target === 'lmp2 (wec)' || target === 'lmp2' || target === 'wec') {
-    return combined.includes('lmp2') && !combined.includes('elms');
-  }
-
-  if (target === 'lmp3') {
-    return combined.includes('lmp3');
-  }
-
-  if (target === 'gte') {
-    return combined.includes('gte');
-  }
-
-  return combined.includes(target);
 }
+
+interface TrackRule {
+  match: RegExp;
+  layouts?: { match: RegExp; name: string }[];
+  default: string;
+}
+
+const TRACK_RULES: TrackRule[] = [
+  {
+    match: /paul ricard|ricard/,
+    layouts: [
+      { match: /short|v2 short|1a v2 short/, name: 'Paul Ricard (1A v2 short)' },
+      { match: /1a v2/, name: 'Paul Ricard (1A v2)' },
+      { match: /1a/, name: 'Paul Ricard (1A)' },
+      { match: /3a/, name: 'Paul Ricard (3A)' },
+    ],
+    default: 'Paul Ricard (1A v2)',
+  },
+  { match: /\bspa\b/, default: 'Spa' },
+  {
+    match: /monza/,
+    layouts: [{ match: /curva|grande/, name: 'Monza (curvagrande)' }],
+    default: 'Monza',
+  },
+  { match: /barcelona|catalunya/, default: 'Barcelona' },
+  {
+    match: /sarthe|mans/,
+    layouts: [{ match: /straight|chicaneless/, name: 'Circuit de la Sarthe (straight)' }],
+    default: 'Circuit de la Sarthe',
+  },
+  {
+    match: /cota|americas/,
+    layouts: [{ match: /national/, name: 'COTA (national)' }],
+    default: 'COTA',
+  },
+  { match: /daytona/, default: 'Daytona' },
+  {
+    match: /fuji/,
+    layouts: [{ match: /classic/, name: 'Fuji (classic)' }],
+    default: 'Fuji (chicane)',
+  },
+  { match: /imola|ferrari/, default: 'Imola' },
+  { match: /interlagos|pace/, default: 'Interlagos' },
+  { match: /laguna|seca/, default: 'Laguna Seca' },
+  { match: /portimao|algarve/, default: 'Portimao' },
+  {
+    match: /qatar|lusail/,
+    layouts: [{ match: /short/, name: 'Qatar (short)' }],
+    default: 'Qatar',
+  },
+  {
+    match: /sebring/,
+    layouts: [{ match: /school/, name: 'Sebring (school)' }],
+    default: 'Sebring',
+  },
+  {
+    match: /silverstone/,
+    layouts: [
+      { match: /international/, name: 'Silverstone (International)' },
+      { match: /national/, name: 'Silverstone (National)' },
+    ],
+    default: 'Silverstone (GP)',
+  },
+  {
+    match: /bahrain/,
+    layouts: [
+      { match: /endurance/, name: 'Bahrain (endurance)' },
+      { match: /outer/, name: 'Bahrain (outer)' },
+      { match: /paddock/, name: 'Bahrain (paddock)' },
+    ],
+    default: 'Bahrain (wec)',
+  },
+];
 
 export function normalizeTrackName(venue: string = '', course: string = ''): string {
   const combined = `${venue} ${course}`.toLowerCase().trim();
 
-  if (combined.includes('paul ricard') || combined.includes('ricard')) {
-    if (combined.includes('short') || combined.includes('v2 short') || combined.includes('1a v2 short')) {
-      return 'Paul Ricard (1A v2 short)';
+  for (const rule of TRACK_RULES) {
+    if (rule.match.test(combined)) {
+      if (rule.layouts) {
+        for (const layout of rule.layouts) {
+          if (layout.match.test(combined)) return layout.name;
+        }
+      }
+      return rule.default;
     }
-    if (combined.includes('1a v2')) return 'Paul Ricard (1A v2)';
-    if (combined.includes('1a')) return 'Paul Ricard (1A)';
-    if (combined.includes('3a')) return 'Paul Ricard (3A)';
-    return 'Paul Ricard (1A v2)';
-  }
-  if (combined.includes('spa')) return 'Spa';
-  if (combined.includes('monza')) {
-    if (combined.includes('curva') || combined.includes('grande')) return 'Monza (curvagrande)';
-    return 'Monza';
-  }
-  if (combined.includes('barcelona') || combined.includes('catalunya')) return 'Barcelona';
-  if (combined.includes('sarthe') || combined.includes('mans')) {
-    if (combined.includes('straight') || combined.includes('chicaneless')) return 'Circuit de la Sarthe (straight)';
-    return 'Circuit de la Sarthe';
-  }
-  if (combined.includes('cota') || combined.includes('americas')) {
-    if (combined.includes('national')) return 'COTA (national)';
-    return 'COTA';
-  }
-  if (combined.includes('daytona')) return 'Daytona';
-  if (combined.includes('fuji')) {
-    if (combined.includes('classic')) return 'Fuji (classic)';
-    return 'Fuji (chicane)';
-  }
-  if (combined.includes('imola') || combined.includes('ferrari')) return 'Imola';
-  if (combined.includes('interlagos') || combined.includes('pace')) return 'Interlagos';
-  if (combined.includes('laguna') || combined.includes('seca')) return 'Laguna Seca';
-  if (combined.includes('portimao') || combined.includes('algarve')) return 'Portimao';
-  if (combined.includes('qatar') || combined.includes('lusail')) {
-    if (combined.includes('short')) return 'Qatar (short)';
-    return 'Qatar';
-  }
-  if (combined.includes('sebring')) {
-    if (combined.includes('school')) return 'Sebring (school)';
-    return 'Sebring';
-  }
-  if (combined.includes('silverstone')) {
-    if (combined.includes('international')) return 'Silverstone (International)';
-    if (combined.includes('national')) return 'Silverstone (National)';
-    return 'Silverstone (GP)';
-  }
-  if (combined.includes('bahrain')) {
-    if (combined.includes('endurance')) return 'Bahrain (endurance)';
-    if (combined.includes('outer')) return 'Bahrain (outer)';
-    if (combined.includes('paddock')) return 'Bahrain (paddock)';
-    return 'Bahrain (wec)';
   }
 
   return venue;

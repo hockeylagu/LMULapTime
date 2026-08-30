@@ -40,6 +40,13 @@ interface ReplayFileEntry {
 const updateMinTime = (current: number | null, next: number | null): number | null =>
   next !== null && next > 0 && (current === null || next < current) ? next : current;
 
+const computeAverageLapTime = (laps: LapData[]): number | null => {
+  const valid = laps.filter(l => l.isValid && l.lapTime);
+  if (valid.length === 0) return null;
+  const sum = valid.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+  return parseFloat((sum / valid.length).toFixed(3));
+};
+
 export class LmuParser {
   private replaysMap: ReplayFileEntry[] = [];
   public configuredPlayerName: string = '';
@@ -325,14 +332,7 @@ export class LmuParser {
     });
 
     const theoreticalBest = computeTheoreticalBest(bestS1, bestS2, bestS3);
-
-    const validLaps = laps.filter(l => l.isValid && l.lapTime);
-    let avgLapTime: number | null = null;
-    if (validLaps.length > 0) {
-      const sum = validLaps.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-      avgLapTime = parseFloat((sum / validLaps.length).toFixed(3));
-    }
-
+    const avgLapTime = computeAverageLapTime(laps);
     const top3LapsCount = laps.filter(l => l.isValid && l.position > 0 && l.position <= 3).length;
 
     return {
@@ -439,15 +439,9 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       driver = s.drivers[0];
     }
 
-    const validLaps = driver?.laps.filter(l => l.isValid && l.lapTime) || [];
-    const cleanLapsCount = validLaps.length;
+    const cleanLapsCount = driver?.laps.filter(l => l.isValid && l.lapTime).length || 0;
     const totalLapsCount = driver?.lapsCount || 0;
-
-    let avgLapTime: number | null = null;
-    if (cleanLapsCount > 0) {
-      const sum = validLaps.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-      avgLapTime = parseFloat((sum / cleanLapsCount).toFixed(3));
-    }
+    const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
 
     return {
       sessionId: s.id,

@@ -5,7 +5,7 @@ import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
 import { FileUploader } from './components/FileUploader';
-import { getHashRouteAndParams, updateHashParams } from './utils/urlParams';
+import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'sessions' | 'settings'>('dashboard');
@@ -144,18 +144,11 @@ export default function App() {
   };
 
   const handleTabChange = (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
-    const queryPart = searchPart ? `?${searchPart}` : '';
-    window.location.hash = tab === 'dashboard' ? `dashboard${queryPart}` : `${tab}${queryPart}`;
+    setHashRoute(tab);
   };
 
   const handleSelectTrack = (trackName: string) => {
-    const fullHash = window.location.hash.replace(/^#\/?/, '');
-    const qIndex = fullHash.indexOf('?');
-    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
-    window.location.hash = `track/${encodeURIComponent(trackName)}${searchPart ? `?${searchPart}` : ''}`;
+    setHashRoute(`track/${encodeURIComponent(trackName)}`);
   };
 
   return (
