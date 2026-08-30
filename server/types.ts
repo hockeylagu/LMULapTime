@@ -70,9 +70,17 @@ export interface DriverData {
   theoreticalBestString: string;
   bestLapPaceCategory?: PaceCategory | null;
   bestLapPacePercentage?: number | null;
+  avgLapTime?: number | null;
+  avgLapTimeString?: string;
   top3LapsCount?: number;
   lapsCount: number;
   laps: LapData[];
+}
+
+export interface SessionWeather {
+  condition: 'Dry' | 'Wet' | 'Damp';
+  timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night';
+  weatherString: string;
 }
 
 export interface SessionMetadata {
@@ -88,6 +96,7 @@ export interface SessionMetadata {
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string; // e.g. "P1", "Q1", "R1"
   weatherInfo?: string;
+  weather?: SessionWeather;
   gameVersion?: string;
   driversCount: number;
   playerDriver?: DriverData;
@@ -113,7 +122,11 @@ export interface SessionProgressionPoint {
   timestamp: number;
   dateString: string;
   sessionType: string;
+  sessionName?: string;
   trackVenue: string;
+  trackCourse?: string;
+  displayTrack?: string;
+  weatherInfo?: string;
   carType: string;
   carClass: string;
   driverName: string;

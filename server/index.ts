@@ -5,6 +5,7 @@ import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries } from './parser.js';
 import { DetailedSession } from './types.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
+import { getDisplayTrackName } from '../src/utils/formatters.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -202,11 +203,11 @@ app.get('/api/track/:trackName', (req, res) => {
   const { trackName } = req.params;
   const decoded = decodeURIComponent(trackName);
   const allSessions = loadSessions();
-  const trackSessions = allSessions.filter(s =>
-    s.trackVenue.toLowerCase().includes(decoded.toLowerCase()) ||
-    s.trackCourse.toLowerCase().includes(decoded.toLowerCase()) ||
-    decoded.toLowerCase().includes(s.trackVenue.toLowerCase())
-  );
+  const trackSessions = allSessions.filter(s => {
+    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
+    return display.toLowerCase() === decoded.toLowerCase() ||
+      s.trackVenue.toLowerCase() === decoded.toLowerCase();
+  });
 
   const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
   const normTrack = normalizeTrackName(decoded, sampleCourse);

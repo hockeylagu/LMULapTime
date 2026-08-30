@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { DetailedSession, ReferenceLaptimeEntry } from '../../server/types.js';
+import { DetailedSession, ReferenceLaptimeEntry, SessionProgressionPoint } from '../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, normalizeTrackName } from '../utils/paceCategory.js';
 
@@ -22,6 +22,7 @@ interface SessionDetailProps {
 export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack }) => {
   const [session, setSession] = useState<DetailedSession | null>(null);
   const [refCache, setRefCache] = useState<any>(null);
+  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
@@ -32,10 +33,14 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     Promise.all([
       fetch(`/api/session/${sessionId}`).then(res => res.json()),
       fetch('/api/reference-laptimes').then(res => res.json()).catch(() => null),
+      fetch('/api/progression').then(res => res.json()).catch(() => []),
     ])
-      .then(([sessionData, refData]) => {
+      .then(([sessionData, refData, progData]) => {
         setSession(sessionData);
         setRefCache(refData);
+        if (Array.isArray(progData)) {
+          setProgression(progData);
+        }
         if (sessionData.playerDriver) {
           setSelectedDriverName(sessionData.playerDriver.name);
         } else if (sessionData.drivers && sessionData.drivers.length > 0) {
@@ -73,6 +78,36 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   }
 
   const selectedDriver = session.drivers.find(d => d.name === selectedDriverName) || session.drivers[0];
+
+  // All-time Personal Best for this specific driver, track, and vehicle category (LMGT3, Hypercar, LMP2, GTE, etc.)
+  const allTimeCategoryTrackPB = (() => {
+    if (!session || !selectedDriver || progression.length === 0) return null;
+    const normTrack = getDisplayTrackName(session.trackVenue, session.trackCourse).toLowerCase();
+    const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
+    const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
+
+    const matchingProg = progression.filter(p => {
+      const pTrack = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase();
+      const isTrack = pTrack === normTrack || p.trackVenue.toLowerCase() === session.trackVenue.toLowerCase();
+      const isClass = matchesCarClass(p.carClass, p.carType, driverClass) ||
+        matchesCarClass(driverClass, selectedDriver.carType, p.carClass);
+      const isDriver = !driverNorm || (p.driverName || '').toLowerCase().trim() === driverNorm ||
+        (p.driverName || '').toLowerCase().includes(driverNorm) ||
+        driverNorm.includes((p.driverName || '').toLowerCase());
+      return isTrack && isClass && isDriver && p.bestLapTime !== null && p.bestLapTime > 0;
+    });
+
+    if (matchingProg.length === 0) return selectedDriver.bestLapTime;
+    return matchingProg.reduce<number | null>((min, p) => {
+      if (p.bestLapTime === null) return min;
+      if (min === null || p.bestLapTime < min) return p.bestLapTime;
+      return min;
+    }, null);
+  })();
+
+  const isCurrentSessionAllTimePB = selectedDriver?.bestLapTime !== null &&
+    allTimeCategoryTrackPB !== null &&
+    Math.abs((selectedDriver?.bestLapTime || 0) - allTimeCategoryTrackPB) < 0.0005;
 
   const refEntry = (() => {
     if (!refCache?.entries || !session || !selectedDriver) return null;
@@ -180,6 +215,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 {session.sessionName} ({session.sessionType})
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
+              {(session.weatherInfo || (session as any).weather?.weatherString) && (
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-lmu-bg border border-lmu-border text-white flex items-center gap-1">
+                  {session.weatherInfo || (session as any).weather?.weatherString}
+                </span>
+              )}
             </div>
             <h2
               onClick={() => {
@@ -258,19 +298,26 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       {selectedDriver && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="glass-panel p-4 rounded-xl relative overflow-hidden">
-            <p className="text-xs text-lmu-muted uppercase font-semibold">Best Lap Time</p>
+            <p className={`text-xs uppercase font-semibold ${isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold flex items-center gap-1' : 'text-lmu-muted'}`}>
+              {isCurrentSessionAllTimePB ? `⭐ Personal Best (${selectedDriver.carClass || 'Class'})` : 'Session Best Lap'}
+            </p>
             <div className="flex items-baseline gap-2 mt-1">
-              <h4 className="text-2xl font-extrabold text-lmu-gold font-mono">
+              <h4 className={`text-2xl font-extrabold font-mono ${isCurrentSessionAllTimePB ? 'text-lmu-gold' : 'text-white'}`}>
                 {selectedDriver.bestLapTimeString}
               </h4>
             </div>
             {selectedDriver.bestLapPaceCategory && (
-              <div className="mt-1.5">
+              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).badgeClass}`}>
                   <span>{getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).emoji}</span>
                   <span>{selectedDriver.bestLapPaceCategory}</span>
                   <span className="opacity-80 text-[10px]">({formatPacePercentage(selectedDriver.bestLapPacePercentage)})</span>
                 </span>
+                {!isCurrentSessionAllTimePB && allTimeCategoryTrackPB && (
+                  <span className="text-[11px] text-lmu-muted" title={`Driver's all-time personal best for this track in ${selectedDriver.carClass || 'this class'}`}>
+                    Class PB: <strong className="text-lmu-gold font-mono">{formatTime(allTimeCategoryTrackPB)}</strong>
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -520,11 +567,17 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
             </thead>
             <tbody className="divide-y divide-lmu-border/50 font-mono">
               {selectedDriver?.laps.map(l => {
-                const isBest = l.lapTime === selectedDriver.bestLapTime;
+                const isSessionBest = l.lapTime === selectedDriver.bestLapTime;
+                const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
+                
                 let deltaStr = '--';
                 if (l.lapTime && selectedDriver.bestLapTime) {
                   const delta = l.lapTime - selectedDriver.bestLapTime;
-                  deltaStr = delta === 0 ? 'PERSONAL BEST' : `+${delta.toFixed(3)}s`;
+                  if (delta === 0) {
+                    deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
+                  } else {
+                    deltaStr = `+${delta.toFixed(3)}s`;
+                  }
                 }
 
                 const isS1Best = l.s1 === selectedDriver.bestS1;
@@ -534,13 +587,15 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 return (
                   <tr
                     key={l.lapNum}
-                    className={`hover:bg-lmu-card/50 transition-colors ${isBest ? 'bg-lmu-gold/10' : ''
-                      }`}
+                    className={`hover:bg-lmu-card/50 transition-colors ${
+                      isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-blue/10' : ''
+                    }`}
                   >
                     <td className="px-3 py-2.5 font-bold text-white">{l.lapNum}</td>
                     <td className="px-3 py-2.5 text-lmu-muted">{l.position || '-'}</td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${isBest ? 'text-lmu-gold' : 'text-white'
-                      }`}>
+                    <td className={`px-3 py-2.5 text-right font-bold ${
+                      isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue' : 'text-white'
+                    }`}>
                       {l.lapTimeString}
                     </td>
                     <td className="px-3 py-2.5 text-center font-sans">
@@ -554,8 +609,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         <span className="text-lmu-muted text-xs">-</span>
                       )}
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-semibold text-xs ${isBest ? 'text-lmu-gold' : 'text-lmu-muted'
-                      }`}>
+                    <td className={`px-3 py-2.5 text-right font-semibold text-xs ${
+                      isLapAllTimePB ? 'text-lmu-gold font-bold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-lmu-muted'
+                    }`}>
                       {deltaStr}
                     </td>
                     <td className={`px-3 py-2.5 text-right ${isS1Best ? 'text-lmu-gold font-bold' : ''

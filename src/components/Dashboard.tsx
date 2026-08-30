@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Car, Zap, FileText, ChevronRight, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
-import { isSessionEmpty, getDisplayTrackName } from '../utils/formatters';
+import { isSessionEmpty, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types';
 
@@ -21,6 +21,7 @@ interface SessionSummary {
   timeString: string;
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string;
+  weatherInfo?: string;
   driversCount: number;
   playerDriver?: {
     name: string;
@@ -63,6 +64,8 @@ interface DashboardProps {
   setSearchQuery: (query: string) => void;
 }
 
+export type DashboardSortOption = 'date-desc' | 'date-asc' | 'pace-asc' | 'pace-desc';
+
 export const Dashboard: React.FC<DashboardProps> = ({
   sessions,
   onSelectSession,
@@ -76,7 +79,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setSearchQuery,
 }) => {
   const [hideEmpty, setHideEmpty] = useState<boolean>(true);
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [sortBy, setSortBy] = useState<DashboardSortOption>('date-desc');
 
   // Extract unique track layout variations sorted alphabetically
   const tracks = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, s.trackCourse)))).filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -88,7 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const filteredSessions = sessions.filter(s => {
     const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
     const matchesTrack = selectedTrack === 'All' || displayTrack === selectedTrack || s.trackVenue === selectedTrack;
-    const matchesType = filterType === 'All' || s.sessionType.toLowerCase() === filterType.toLowerCase();
+    const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
     const isMatchingCarClass = matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass);
     const matchesSearch = searchQuery === '' ||
       displayTrack.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -99,18 +102,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return matchesTrack && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty;
   });
 
-  // Sorted sessions by Date (desc / asc)
+  // Sorted sessions by Date / Benchmark Pace %
   const sortedSessions = [...filteredSessions].sort((a, b) => {
-    const parseTimestamp = (str: string) => {
-      if (!str) return 0;
-      const clean = str.replace(/\//g, '-');
-      const time = new Date(clean).getTime();
-      return isNaN(time) ? 0 : time;
-    };
-    const timeA = parseTimestamp(a.timeString);
-    const timeB = parseTimestamp(b.timeString);
-
-    return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    if (sortBy === 'date-desc' || sortBy === 'date-asc') {
+      const parseTimestamp = (str: string) => {
+        if (!str) return 0;
+        const clean = str.replace(/\//g, '-');
+        const time = new Date(clean).getTime();
+        return isNaN(time) ? 0 : time;
+      };
+      const timeA = parseTimestamp(a.timeString);
+      const timeB = parseTimestamp(b.timeString);
+      return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
+    } else {
+      const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
+      const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
+      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    }
   });
 
   // Calculate overall metrics & top3 aggregations
@@ -375,15 +383,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </button>
 
-          {/* Date Sort Order Toggle */}
-          <button
-            onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-lmu-border bg-lmu-bg text-xs font-semibold text-white hover:border-lmu-accent transition-all shrink-0"
-            title={`Currently sorted by date ${sortOrder === 'desc' ? 'descending (newest first)' : 'ascending (oldest first)'}. Click to switch.`}
-          >
+          {/* Sort Dropdown (Date / Benchmark Pace) */}
+          <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
             <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
-            <span>Date: {sortOrder === 'desc' ? 'Newest First (Desc)' : 'Oldest First (Asc)'}</span>
-          </button>
+            <span className="text-lmu-muted font-medium">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as DashboardSortOption)}
+              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="date-desc" className="bg-lmu-card text-white">Date (Newest First)</option>
+              <option value="date-asc" className="bg-lmu-card text-white">Date (Oldest First)</option>
+              <option value="pace-asc" className="bg-lmu-card text-white">Benchmark (Best Pace %)</option>
+              <option value="pace-desc" className="bg-lmu-card text-white">Benchmark (Slowest Pace %)</option>
+            </select>
+          </div>
         </div>
 
       </div>
@@ -430,6 +444,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           }`}>
                           {s.sessionName || s.sessionType}
                         </span>
+                        {s.weatherInfo && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-lmu-bg/80 border border-lmu-border/60 text-lmu-muted">
+                            {s.weatherInfo}
+                          </span>
+                        )}
                         {empty && (
                           <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" /> Empty

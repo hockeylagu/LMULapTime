@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Flag, Trophy } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Flag, Trophy, ArrowUpDown } from 'lucide-react';
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle, normalizeTrackName } from '../utils/paceCategory.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
+
+export type TracksSortOption = 'name-asc' | 'name-desc' | 'pace-asc' | 'last-session-desc';
 
 interface SessionSummary {
   id: string;
@@ -57,6 +59,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   setSelectedCarClass,
 }) => {
   const [refCache, setRefCache] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<TracksSortOption>('name-asc');
 
   useEffect(() => {
     fetch('/api/reference-laptimes')
@@ -119,6 +122,14 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         ? bestS1 + bestS2 + bestS3
         : null;
 
+      const lastSessionTimestamp = venueSessions.length > 0
+        ? Math.max(...venueSessions.map(s => {
+            const clean = (s.timeString || '').replace(/\//g, '-');
+            const time = new Date(clean).getTime();
+            return isNaN(time) ? 0 : time;
+          }))
+        : 0;
+
       const fallback = tracksMap[venue] || {
         trackVenue: venue,
         sessionsCount: 0,
@@ -146,6 +157,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         bestS3: bestS3 !== null ? bestS3 : (selectedCarClass === 'All' ? fallback.bestS3 : null),
         theoreticalBest: theoreticalBest !== null ? theoreticalBest : (selectedCarClass === 'All' ? fallback.theoreticalBest : null),
         carsUsed: carsUsedSet.size > 0 ? Array.from(carsUsedSet) : (selectedCarClass === 'All' ? fallback.carsUsed : []),
+        lastSessionTimestamp,
       };
     });
 
@@ -212,6 +224,30 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     return { category, pct };
   };
 
+  const sortedTrackList = useMemo(() => {
+    return [...trackList].sort((a, b) => {
+      if (sortBy === 'name-asc') {
+        return a.trackVenue.localeCompare(b.trackVenue);
+      }
+      if (sortBy === 'name-desc') {
+        return b.trackVenue.localeCompare(a.trackVenue);
+      }
+      if (sortBy === 'last-session-desc') {
+        const lastA = (a as any).lastSessionTimestamp || 0;
+        const lastB = (b as any).lastSessionTimestamp || 0;
+        return lastB - lastA;
+      }
+      if (sortBy === 'pace-asc') {
+        const refA = getRefEntryForTrack(a.trackVenue, a.bestLapCar, a.bestLapClass);
+        const refB = getRefEntryForTrack(b.trackVenue, b.bestLapCar, b.bestLapClass);
+        const paceA = getPaceCategoryForLap(a.bestLapTime, refA)?.pct ?? 999;
+        const paceB = getPaceCategoryForLap(b.bestLapTime, refB)?.pct ?? 999;
+        return paceA - paceB;
+      }
+      return 0;
+    });
+  }, [trackList, sortBy, refCache, selectedCarClass]);
+
   return (
     <div className="space-y-6">
 
@@ -220,34 +256,52 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         <div>
           <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
             <Flag className="w-6 h-6 text-lmu-gold" />
-            Track Records & Benchmarks ({trackList.length} Tracks)
+            Track Records & Benchmarks ({sortedTrackList.length} Tracks)
           </h2>
           <p className="text-xs text-lmu-muted mt-1">
             Aggregated personal best lap times, theoretical limits, and car stats filtered by category
           </p>
         </div>
 
-        {/* Car Class Filter Buttons */}
-        <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto shrink-0">
-          {VEHICLE_CLASS_OPTIONS.map(cls => (
-            <button
-              key={cls.id}
-              onClick={() => setSelectedCarClass(cls.id)}
-              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                selectedCarClass === cls.id
-                  ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                  : 'text-lmu-muted hover:text-white'
-              }`}
+        <div className="flex items-center gap-3 flex-wrap shrink-0">
+          {/* Sort Dropdown (Name, Pace, Last Session) */}
+          <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
+            <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
+            <span className="text-lmu-muted font-medium">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as TracksSortOption)}
+              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
             >
-              {cls.label}
-            </button>
-          ))}
+              <option value="name-asc" className="bg-lmu-card text-white">Name (A-Z)</option>
+              <option value="name-desc" className="bg-lmu-card text-white">Name (Z-A)</option>
+              <option value="pace-asc" className="bg-lmu-card text-white">Pace / Benchmark (Best First)</option>
+              <option value="last-session-desc" className="bg-lmu-card text-white">Last Session (Newest First)</option>
+            </select>
+          </div>
+
+          {/* Car Class Filter Buttons */}
+          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto shrink-0">
+            {VEHICLE_CLASS_OPTIONS.map(cls => (
+              <button
+                key={cls.id}
+                onClick={() => setSelectedCarClass(cls.id)}
+                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                  selectedCarClass === cls.id
+                    ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                    : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                {cls.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Grid of Tracks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {trackList.map(t => {
+        {sortedTrackList.map(t => {
           const refEntry = getRefEntryForTrack(t.trackVenue, t.bestLapCar, t.bestLapClass);
           const paceInfo = getPaceCategoryForLap(t.bestLapTime, refEntry);
 

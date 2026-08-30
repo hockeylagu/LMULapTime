@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
-import { DetailedSession, DriverData, LapData, SessionMetadata, SessionProgressionPoint, TrackSummary } from './types.js';
+import { DetailedSession, DriverData, LapData, SessionMetadata, SessionProgressionPoint, SessionWeather, TrackSummary } from './types.js';
 import { formatTime, parseTimeStringToSeconds } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
 
@@ -213,6 +213,9 @@ export class LmuParser {
         }
       });
 
+      // Compute weather and track conditions
+      const weather = this.parseWeather(timeString, drivers);
+
       // Match replay file
       const xmlFileMtime = fs.statSync(filePath).mtime.getTime();
       const matchingReplay = this.findMatchingReplay(trackVenue, sessionName, timestamp, xmlFileMtime);
@@ -231,6 +234,8 @@ export class LmuParser {
         timestamp,
         sessionType,
         sessionName,
+        weather,
+        weatherInfo: weather.weatherString,
         gameVersion: raceResults.GameVersion || '',
         driversCount: drivers.length,
         drivers,
@@ -246,6 +251,50 @@ export class LmuParser {
       console.error(`Failed to parse XML file ${filePath}:`, err);
       return null;
     }
+  }
+
+  public parseWeather(timeString: string, drivers: DriverData[]): SessionWeather {
+    let hasWetTires = false;
+    for (const d of drivers) {
+      if (!d.laps) continue;
+      for (const l of d.laps) {
+        const fComp = (l.fCompound || '').toLowerCase();
+        const rComp = (l.rCompound || '').toLowerCase();
+        if (fComp.includes('wet') || fComp.includes('rain') || fComp.includes('inter') ||
+            rComp.includes('wet') || rComp.includes('rain') || rComp.includes('inter')) {
+          hasWetTires = true;
+          break;
+        }
+      }
+      if (hasWetTires) break;
+    }
+
+    const condition: 'Dry' | 'Wet' = hasWetTires ? 'Wet' : 'Dry';
+
+    let timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night' = 'Daytime';
+    let hourNum = 14;
+    if (timeString) {
+      const parts = timeString.split(' ');
+      if (parts[1]) {
+        const timeParts = parts[1].split(':');
+        hourNum = parseInt(timeParts[0], 10);
+        if (isNaN(hourNum)) hourNum = 14;
+      }
+    }
+
+    if (hourNum >= 5 && hourNum < 9) timeOfDay = 'Morning';
+    else if (hourNum >= 9 && hourNum < 18) timeOfDay = 'Daytime';
+    else if (hourNum >= 18 && hourNum < 21) timeOfDay = 'Evening';
+    else timeOfDay = 'Night';
+
+    const conditionIcon = condition === 'Wet' ? '🌧️' : timeOfDay === 'Night' ? '🌙' : timeOfDay === 'Evening' ? '🌇' : timeOfDay === 'Morning' ? '🌅' : '☀️';
+    const weatherString = `${conditionIcon} ${condition} • ${timeOfDay}`;
+
+    return {
+      condition,
+      timeOfDay,
+      weatherString,
+    };
   }
 
   private parseDriver(d: any): DriverData {
@@ -292,6 +341,13 @@ export class LmuParser {
       ? parseFloat((bestS1 + bestS2 + bestS3).toFixed(3))
       : null;
 
+    const validLaps = laps.filter(l => l.isValid && l.lapTime);
+    let avgLapTime: number | null = null;
+    if (validLaps.length > 0) {
+      const sum = validLaps.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+      avgLapTime = parseFloat((sum / validLaps.length).toFixed(3));
+    }
+
     const top3LapsCount = laps.filter(l => l.isValid && l.position > 0 && l.position <= 3).length;
 
     return {
@@ -310,6 +366,8 @@ export class LmuParser {
       bestS3,
       theoreticalBest,
       theoreticalBestString: formatTime(theoreticalBest),
+      avgLapTime,
+      avgLapTimeString: formatTime(avgLapTime),
       top3LapsCount,
       lapsCount: laps.length,
       laps,
@@ -424,7 +482,11 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       timestamp: s.timestamp,
       dateString: s.timeString,
       sessionType: s.sessionType,
+      sessionName: s.sessionName,
       trackVenue: s.trackVenue,
+      trackCourse: s.trackCourse,
+      displayTrack: getDisplayTrackName(s.trackVenue, s.trackCourse),
+      weatherInfo: s.weatherInfo,
       carType: driver?.carType || 'Unknown Car',
       carClass: driver?.carClass || 'General',
       driverName: driver?.name || 'Unknown',

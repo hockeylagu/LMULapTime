@@ -82,3 +82,21 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   return `${venue} (${cleanCourse})`;
 }
 
+export function matchesSessionType(sessionType: string = '', sessionName: string = '', filterType: string = 'All'): boolean {
+  if (!filterType || filterType === 'All') return true;
+  const f = filterType.toLowerCase().trim();
+  const t = (sessionType || '').toLowerCase().trim();
+  const n = (sessionName || '').toLowerCase().trim();
+
+  if (f === 'practice') {
+    return t === 'practice' || n.startsWith('p') || n.includes('practice');
+  }
+  if (f === 'qualifying') {
+    return t === 'qualifying' || t === 'qualify' || n.startsWith('q') || n.includes('qual');
+  }
+  if (f === 'race') {
+    return t === 'race' || n.startsWith('r') || n.includes('race');
+  }
+  return t === f || n === f || n.includes(f) || t.includes(f);
+}
+

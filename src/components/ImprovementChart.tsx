@@ -9,16 +9,21 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { TrendingUp, Zap, Trophy, Clock, FilterX } from 'lucide-react';
-import { formatTime } from '../utils/formatters';
-import { matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
+import { TrendingUp, Zap, Trophy, Clock } from 'lucide-react';
+import { formatTime, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
+import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
+import { PaceCategory } from '../../server/types.js';
 
 export interface SessionProgressionPoint {
   sessionId: string;
   timestamp: number;
   dateString: string;
   sessionType: string;
+  sessionName?: string;
   trackVenue: string;
+  trackCourse?: string;
+  displayTrack?: string;
+  weatherInfo?: string;
   carType: string;
   carClass: string;
   driverName: string;
@@ -39,10 +44,19 @@ interface ImprovementChartProps {
   setSelectedTrack: (track: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
+  selectedCarModel?: string;
+  filterType?: string;
+  searchQuery?: string;
   tracks: string[];
   hideEmpty?: boolean;
   setHideEmpty?: (hide: boolean) => void;
   embedded?: boolean;
+  yourBest?: {
+    timeStr: string;
+    paceCat?: PaceCategory | null;
+    pacePct?: number | null;
+  };
+  onSelectSession?: (sessionId: string) => void;
 }
 
 export const ImprovementChart: React.FC<ImprovementChartProps> = ({
@@ -51,63 +65,162 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   setSelectedTrack,
   selectedCarClass,
   setSelectedCarClass,
+  selectedCarModel = 'All',
+  filterType = 'All',
+  searchQuery = '',
   tracks,
-  hideEmpty: externalHideEmpty,
-  setHideEmpty: externalSetHideEmpty,
+  hideEmpty = true,
   embedded = false,
+  yourBest,
+  onSelectSession,
 }) => {
   const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical'>('bestLap');
-  const [internalHideEmpty, setInternalHideEmpty] = useState<boolean>(true);
 
-  const hideEmpty = externalHideEmpty !== undefined ? externalHideEmpty : internalHideEmpty;
-  const setHideEmpty = externalSetHideEmpty || setInternalHideEmpty;
-
-  // Filter progression by selected track, vehicle class & optional empty filter
+  // Filter progression by selected track, vehicle class, car model, session type, search & empty filter
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
-  const rawTrackData = progression.filter(p =>
-    p.trackVenue === activeTrack && matchesCarClass(p.carClass, p.carType, selectedCarClass)
-  );
-  const emptyCount = rawTrackData.filter(p => p.totalLapsCount === 0 || p.bestLapTime === null).length;
+  const rawTrackData = progression.filter(p => {
+    const display = p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue;
+    const activeNorm = activeTrack.toLowerCase().trim();
+    const matchesTrack = activeTrack === 'All' ||
+      display.toLowerCase().trim() === activeNorm ||
+      p.trackVenue.toLowerCase().trim() === activeNorm ||
+      activeNorm.includes(p.trackVenue.toLowerCase().trim()) ||
+      p.trackVenue.toLowerCase().trim().includes(activeNorm);
+
+    const matchesClass = matchesCarClass(p.carClass, p.carType, selectedCarClass);
+    const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;
+
+    const matchesType = matchesSessionType(p.sessionType, p.sessionName, filterType);
+
+    const q = (searchQuery || '').toLowerCase().trim();
+    const matchesSearch = q === '' ||
+      p.carType.toLowerCase().includes(q) ||
+      p.driverName.toLowerCase().includes(q) ||
+      p.sessionType.toLowerCase().includes(q) ||
+      (p.sessionName || '').toLowerCase().includes(q) ||
+      (p.weatherInfo || '').toLowerCase().includes(q);
+
+    return matchesTrack && matchesClass && matchesModel && matchesType && matchesSearch;
+  });
+
   const trackData = rawTrackData.filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null));
 
   // Calculate improvement stats
-  const firstValidSession = trackData.find(p => p.bestLapTime !== null);
-  const lastValidSession = [...trackData].reverse().find(p => p.bestLapTime !== null);
+  const sessionsWithValidLaps = trackData.filter(p => p.bestLapTime !== null);
+  const firstValidSession = sessionsWithValidLaps[0];
+  const bestLapTimeInTrack = trackData.reduce<number | null>((min, curr) => {
+    if (curr.bestLapTime === null) return min;
+    if (min === null || curr.bestLapTime < min) return curr.bestLapTime;
+    return min;
+  }, null);
 
   let totalImprovement: number | null = null;
-  if (firstValidSession?.bestLapTime && lastValidSession?.bestLapTime) {
-    totalImprovement = parseFloat((firstValidSession.bestLapTime - lastValidSession.bestLapTime).toFixed(3));
+  if (firstValidSession?.bestLapTime && bestLapTimeInTrack !== null && sessionsWithValidLaps.length > 1) {
+    totalImprovement = parseFloat((firstValidSession.bestLapTime - bestLapTimeInTrack).toFixed(3));
   }
 
-  // Format chart data
-  const chartData = trackData.map((p, idx) => ({
-    session: `${p.sessionType} #${idx + 1}`,
-    date: p.dateString ? p.dateString.split(' ')[0] : `Session ${idx + 1}`,
-    fullDate: p.dateString,
-    car: p.carType,
-    bestLap: p.bestLapTime,
-    bestLapStr: formatTime(p.bestLapTime),
-    theoretical: p.theoreticalBest,
-    theoreticalStr: formatTime(p.theoreticalBest),
-    s1: p.bestS1,
-    s1Str: formatTime(p.bestS1),
-    s2: p.bestS2,
-    s2Str: formatTime(p.bestS2),
-    s3: p.bestS3,
-    s3Str: formatTime(p.bestS3),
-    avgLap: p.avgLapTime,
-    avgLapStr: formatTime(p.avgLapTime),
-    cleanLaps: p.cleanLapsCount,
-    replay: p.matchingReplayFile,
-  }));
+  // Format chart data with rolling 3-session moving average
+  const validLapsQueue: number[] = [];
+  const chartData = trackData.map((p, idx) => {
+    const labelSession = p.sessionName || p.sessionType || `Session #${idx + 1}`;
+
+    let movingAvg: number | null = null;
+    if (p.bestLapTime !== null && p.bestLapTime > 0) {
+      validLapsQueue.push(p.bestLapTime);
+      if (validLapsQueue.length > 3) {
+        validLapsQueue.shift();
+      }
+      const sum = validLapsQueue.reduce((a, b) => a + b, 0);
+      movingAvg = parseFloat((sum / validLapsQueue.length).toFixed(3));
+    }
+
+    return {
+      sessionId: p.sessionId,
+      session: `${labelSession} #${idx + 1}`,
+      shortSession: `#${idx + 1} ${labelSession}`,
+      date: p.dateString ? p.dateString.split(' ')[0] : `Session ${idx + 1}`,
+      fullDate: p.dateString,
+      car: p.carType,
+      weather: p.weatherInfo,
+      bestLap: p.bestLapTime,
+      bestLapStr: formatTime(p.bestLapTime),
+      movingAvg,
+      movingAvgStr: formatTime(movingAvg),
+      theoretical: p.theoreticalBest,
+      theoreticalStr: formatTime(p.theoreticalBest),
+      s1: p.bestS1,
+      s1Str: formatTime(p.bestS1),
+      s2: p.bestS2,
+      s2Str: formatTime(p.bestS2),
+      s3: p.bestS3,
+      s3Str: formatTime(p.bestS3),
+      avgLap: p.avgLapTime,
+      avgLapStr: formatTime(p.avgLapTime),
+      cleanLaps: p.cleanLapsCount,
+      replay: p.matchingReplayFile,
+    };
+  });
 
   // Min / Max domain calculation for chart Y axis
-  const validTimes = trackData
-    .map(p => p.bestLapTime)
-    .filter((t): t is number => t !== null && t > 0);
+  const validTimes = [
+    ...trackData.map(p => p.bestLapTime),
+    ...trackData.map(p => p.avgLapTime),
+    ...chartData.map(p => p.movingAvg),
+    ...(metric === 'theoretical' ? trackData.map(p => p.theoreticalBest) : []),
+    ...(metric === 'sectors' ? [
+      ...trackData.map(p => p.bestS1),
+      ...trackData.map(p => p.bestS2),
+      ...trackData.map(p => p.bestS3),
+    ] : []),
+  ].filter((t): t is number => t !== null && t !== undefined && t > 0);
 
   const minTime = validTimes.length > 0 ? Math.floor(Math.min(...validTimes) - 2) : 0;
   const maxTime = validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
+
+  // Custom rich tooltip
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-lmu-card/95 backdrop-blur-md border border-lmu-border p-3.5 rounded-xl shadow-xl space-y-2 text-xs min-w-[210px]">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-white text-sm">{data.session}</span>
+              {data.weather && (
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-lmu-bg border border-lmu-border/60 text-lmu-cyan">
+                  {data.weather}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-lmu-muted mt-0.5">{data.fullDate}</p>
+            <p className="text-xs text-lmu-gold font-medium mt-0.5 truncate max-w-[200px]" title={data.car}>
+              {data.car}
+            </p>
+          </div>
+
+          <div className="border-t border-lmu-border/60 pt-2 space-y-1">
+            {payload.map((entry: any, index: number) => (
+              <div key={`item-${index}`} className="flex items-center justify-between text-xs font-mono">
+                <span style={{ color: entry.color }} className="font-sans font-medium text-[11px]">
+                  {entry.name}:
+                </span>
+                <span className="font-bold text-white">
+                  {entry.value !== null && entry.value !== undefined ? formatTime(Number(entry.value)) : '-'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {onSelectSession && (
+            <p className="text-[10px] text-lmu-accent pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
+              Click dot to view session telemetry &rarr;
+            </p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -164,18 +277,34 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             <div>
               <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions Parsed</p>
               <h4 className="text-2xl font-extrabold text-white mt-0.5">{trackData.length}</h4>
+              <p className="text-[11px] text-lmu-muted mt-0.5">
+                {selectedCarModel !== 'All' ? `${selectedCarModel}` : `${selectedCarClass === 'All' ? 'All Classes' : selectedCarClass}`}
+              </p>
             </div>
             <Clock className="w-8 h-8 text-lmu-blue opacity-50" />
           </div>
 
           <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
             <div>
-              <p className="text-xs text-lmu-muted uppercase font-semibold">Current Personal Best</p>
-              <h4 className="text-2xl font-extrabold text-lmu-gold font-mono mt-0.5">
-                {lastValidSession?.bestLapTime ? formatTime(lastValidSession.bestLapTime) : '--:--.---'}
-              </h4>
+              <p className="text-xs text-lmu-muted uppercase font-semibold">
+                Your Best ({selectedCarModel !== 'All' ? selectedCarModel : (selectedCarClass === 'All' ? 'Overall' : selectedCarClass)})
+              </p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h4 className="text-2xl font-extrabold text-lmu-gold font-mono">
+                  {yourBest?.timeStr || (bestLapTimeInTrack ? formatTime(bestLapTimeInTrack) : '--:--.---')}
+                </h4>
+              </div>
+              {yourBest?.paceCat && (
+                <div className="mt-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(yourBest.paceCat).badgeClass}`}>
+                    <span>{getPaceCategoryStyle(yourBest.paceCat).emoji}</span>
+                    <span>{yourBest.paceCat}</span>
+                    <span className="opacity-80 text-[10px]">({formatPacePercentage(yourBest.pacePct)})</span>
+                  </span>
+                </div>
+              )}
             </div>
-            <Trophy className="w-8 h-8 text-lmu-gold opacity-50" />
+            <Trophy className="w-8 h-8 text-lmu-gold opacity-50 shrink-0" />
           </div>
 
           <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
@@ -185,8 +314,15 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                 }`}>
                 {totalImprovement !== null
                   ? `${totalImprovement > 0 ? '-' : '+'}${Math.abs(totalImprovement).toFixed(3)}s`
-                  : 'N/A'}
+                  : sessionsWithValidLaps.length === 1 ? '0.000s' : 'N/A'}
               </h4>
+              <p className="text-[11px] text-lmu-muted mt-0.5">
+                {sessionsWithValidLaps.length > 1 && totalImprovement !== null && totalImprovement > 0
+                  ? `Baseline ${formatTime(firstValidSession.bestLapTime)} → PB ${formatTime(bestLapTimeInTrack)}`
+                  : sessionsWithValidLaps.length === 1
+                  ? 'Initial baseline session recorded'
+                  : 'Session progression tracking'}
+              </p>
             </div>
             <Zap className="w-8 h-8 text-lmu-green opacity-50" />
           </div>
@@ -210,7 +346,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                   metric === 'bestLap' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
                 }`}
               >
-                Lap Pace
+                Lap Pace (Best, Trend & Avg)
               </button>
               <button
                 onClick={() => setMetric('sectors')}
@@ -229,38 +365,28 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                 Theoretical Best
               </button>
             </div>
-
-            {/* Hide Empty Toggle */}
-            <button
-              onClick={() => setHideEmpty(!hideEmpty)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                hideEmpty
-                  ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
-                  : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-              }`}
-              title={hideEmpty ? "Hiding empty sessions. Click to show all." : "Showing all sessions. Click to filter out empty results."}
-            >
-              <FilterX className="w-3.5 h-3.5" />
-              <span>Hide Empty Results</span>
-              {emptyCount > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                  hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
-                }`}>
-                  {emptyCount}
-                </span>
-              )}
-            </button>
           </div>
         </div>
 
         {chartData.length === 0 ? (
           <div className="py-16 text-center text-lmu-muted">
-            No session data found for this track.
+            No session data found for this track matching current filters.
           </div>
         ) : (
           <div className="w-full h-80 pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 25 }}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 10, right: 30, left: 10, bottom: 25 }}
+                onClick={(e: any) => {
+                  if (e && e.activePayload && e.activePayload.length > 0) {
+                    const sId = e.activePayload[0].payload.sessionId;
+                    if (sId && onSelectSession) {
+                      onSelectSession(sId);
+                    }
+                  }
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#232A36" />
                 <XAxis dataKey="session" stroke="#8D99AE" tick={{ fill: '#8D99AE', fontSize: 12 }} />
                 <YAxis
@@ -269,19 +395,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                   tick={{ fill: '#8D99AE', fontSize: 12 }}
                   tickFormatter={(val) => formatTime(val)}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#151A23',
-                    borderColor: '#232A36',
-                    borderRadius: '12px',
-                    color: '#F8F9FA',
-                  }}
-                  formatter={(value: any) => [formatTime(Number(value)), '']}
-                  labelFormatter={(label, items) => {
-                    const item = items[0]?.payload;
-                    return item ? `${label} (${item.fullDate}) - ${item.car}` : label;
-                  }}
-                />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '15px' }} />
 
                 {metric === 'bestLap' && (
@@ -292,8 +406,19 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       name="Best Lap Time"
                       stroke="#E63946"
                       strokeWidth={3}
-                      dot={{ r: 5, fill: '#E63946' }}
-                      activeDot={{ r: 8 }}
+                      dot={{ r: 5, fill: '#E63946', cursor: onSelectSession ? 'pointer' : 'default' }}
+                      activeDot={{ r: 8, cursor: onSelectSession ? 'pointer' : 'default' }}
+                      connectNulls={true}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="movingAvg"
+                      name="3-Session Moving Avg"
+                      stroke="#F59E0B"
+                      strokeWidth={2.5}
+                      strokeDasharray="6 4"
+                      dot={{ r: 3.5, fill: '#F59E0B' }}
+                      connectNulls={true}
                     />
                     <Line
                       type="monotone"
@@ -301,8 +426,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       name="Session Avg Lap"
                       stroke="#8ECAE6"
                       strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={{ r: 4, fill: '#8ECAE6' }}
+                      strokeDasharray="3 3"
+                      dot={{ r: 3.5, fill: '#8ECAE6' }}
+                      connectNulls={true}
                     />
                   </>
                 )}
@@ -315,7 +441,19 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       name="Actual Best Lap"
                       stroke="#E63946"
                       strokeWidth={3}
-                      dot={{ r: 5 }}
+                      dot={{ r: 5, cursor: onSelectSession ? 'pointer' : 'default' }}
+                      activeDot={{ r: 8, cursor: onSelectSession ? 'pointer' : 'default' }}
+                      connectNulls={true}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="movingAvg"
+                      name="3-Session Moving Avg"
+                      stroke="#F59E0B"
+                      strokeWidth={2.5}
+                      strokeDasharray="6 4"
+                      dot={{ r: 3.5, fill: '#F59E0B' }}
+                      connectNulls={true}
                     />
                     <Line
                       type="monotone"
@@ -325,6 +463,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       strokeWidth={3}
                       strokeDasharray="3 3"
                       dot={{ r: 5, fill: '#2A9D8F' }}
+                      connectNulls={true}
                     />
                   </>
                 )}
@@ -366,3 +505,4 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     </div>
   );
 };
+
