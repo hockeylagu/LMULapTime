@@ -107,7 +107,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   const isCurrentSessionAllTimePB = selectedDriver?.bestLapTime !== null &&
     allTimeCategoryTrackPB !== null &&
-    Math.abs((selectedDriver?.bestLapTime || 0) - allTimeCategoryTrackPB) < 0.0005;
+    (selectedDriver?.bestLapTime || 0) <= allTimeCategoryTrackPB + 0.0005;
 
   const refEntry = (() => {
     if (!refCache?.entries || !session || !selectedDriver) return null;
@@ -413,6 +413,35 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           );
         };
 
+        const sessionChartTimes = (() => {
+          if (chartMetric === 'lapTime') {
+            return sessionChartData.map(d => d.lapTime).filter((v): v is number => v !== null && v > 0);
+          }
+          if (chartMetric === 'sectors') {
+            return [
+              ...sessionChartData.map(d => d.s1),
+              ...sessionChartData.map(d => d.s2),
+              ...sessionChartData.map(d => d.s3),
+            ].filter((v): v is number => v !== null && v > 0);
+          }
+          if (chartMetric === 'topSpeed') {
+            return sessionChartData.map(d => d.topSpeed).filter((v): v is number => v !== null && v > 0);
+          }
+          return [];
+        })();
+
+        const yDomainMin = sessionChartTimes.length > 0
+          ? (chartMetric === 'topSpeed'
+              ? Math.max(0, Math.floor(Math.min(...sessionChartTimes) - 5))
+              : Math.max(0, Math.floor(Math.min(...sessionChartTimes) - 1)))
+          : 'auto';
+
+        const yDomainMax = sessionChartTimes.length > 0
+          ? (chartMetric === 'topSpeed'
+              ? Math.ceil(Math.max(...sessionChartTimes) + 5)
+              : Math.ceil(Math.max(...sessionChartTimes) + 1))
+          : 'auto';
+
         return (
           <div className="glass-panel p-5 rounded-2xl space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
@@ -464,15 +493,19 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </div>
             </div>
 
-            <div className="h-72 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sessionChartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+            <div className="h-72 min-h-[288px] w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+                <LineChart
+                  key={`session-chart-${chartMetric}-${sessionChartData.length}`}
+                  data={sessionChartData}
+                  margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.5} />
                   <XAxis dataKey="lapNum" stroke="#718096" tick={{ fill: '#A0AEC0', fontSize: 11 }} />
                   <YAxis
                     stroke="#718096"
                     tick={{ fill: '#A0AEC0', fontSize: 11 }}
-                    domain={['auto', 'auto']}
+                    domain={[yDomainMin, yDomainMax]}
                     tickFormatter={(val) => chartMetric === 'topSpeed' ? `${val}` : formatTime(val)}
                   />
                   <Tooltip content={<CustomTooltip />} />

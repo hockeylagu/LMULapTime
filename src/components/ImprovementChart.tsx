@@ -89,8 +89,13 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
   const rawTrackData = progression.filter(p => {
     const display = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
+    const pVenue = (p.trackVenue || '').toLowerCase().trim();
     const activeNorm = activeTrack.toLowerCase().trim();
-    const matchesTrack = activeTrack === 'All' || display === activeNorm;
+    const matchesTrack = activeTrack === 'All' ||
+      display === activeNorm ||
+      pVenue === activeNorm ||
+      (activeNorm.length > 3 && pVenue.includes(activeNorm)) ||
+      (pVenue.length > 3 && activeNorm.includes(pVenue));
 
     const matchesClass = matchesCarClass(p.carClass, p.carType, selectedCarClass);
     const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;
@@ -192,20 +197,31 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     };
   });
 
-  // Min / Max domain calculation for chart Y axis
-  const validTimes = [
-    ...trackData.map(p => p.bestLapTime),
-    ...trackData.map(p => p.avgLapTime),
-    ...chartData.map(p => p.movingAvg),
-    ...(metric === 'theoretical' ? trackData.map(p => p.theoreticalBest) : []),
-    ...(metric === 'sectors' ? [
-      ...trackData.map(p => p.bestS1),
-      ...trackData.map(p => p.bestS2),
-      ...trackData.map(p => p.bestS3),
-    ] : []),
-  ].filter((t): t is number => t !== null && t !== undefined && t > 0);
+  // Min / Max domain calculation for chart Y axis based on active metric
+  const validTimes = (() => {
+    if (metric === 'sectors') {
+      return [
+        ...trackData.map(p => p.bestS1),
+        ...trackData.map(p => p.bestS2),
+        ...trackData.map(p => p.bestS3),
+      ];
+    }
+    if (metric === 'theoretical') {
+      return [
+        ...trackData.map(p => p.bestLapTime),
+        ...chartData.map(p => p.movingAvg),
+        ...trackData.map(p => p.theoreticalBest),
+      ];
+    }
+    // bestLap
+    return [
+      ...trackData.map(p => p.bestLapTime),
+      ...trackData.map(p => p.avgLapTime),
+      ...chartData.map(p => p.movingAvg),
+    ];
+  })().filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
 
-  const minTime = validTimes.length > 0 ? Math.floor(Math.min(...validTimes) - 2) : 0;
+  const minTime = validTimes.length > 0 ? Math.max(0, Math.floor(Math.min(...validTimes) - 2)) : 0;
   const maxTime = validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
 
   // Custom rich tooltip
@@ -432,10 +448,10 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             No session data found for this track matching current filters.
           </div>
         ) : (
-          <div className="w-full h-84 pt-2">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full h-80 min-h-[320px] pt-2">
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <LineChart
-                key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}`}
+                key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}-${metric}`}
                 data={chartData}
                 margin={{ top: 10, right: 25, left: 10, bottom: chartData.length > 5 ? 35 : 15 }}
                 onClick={(e: any) => {
@@ -544,24 +560,30 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       dataKey="s1"
                       name="Sector 1"
                       stroke="#FFB703"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: '#FFB703' }}
+                      activeDot={{ r: 7 }}
+                      connectNulls={true}
                     />
                     <Line
                       type="monotone"
                       dataKey="s2"
                       name="Sector 2"
                       stroke="#219EBC"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: '#219EBC' }}
+                      activeDot={{ r: 7 }}
+                      connectNulls={true}
                     />
                     <Line
                       type="monotone"
                       dataKey="s3"
                       name="Sector 3"
                       stroke="#2A9D8F"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: '#2A9D8F' }}
+                      activeDot={{ r: 7 }}
+                      connectNulls={true}
                     />
                   </>
                 )}

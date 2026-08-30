@@ -1,7 +1,9 @@
-export function formatTime(seconds: number | null): string {
-  if (seconds === null || isNaN(seconds) || seconds <= 0) return '--:--.---';
-  const mins = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(3);
+export function formatTime(seconds: number | string | null | undefined): string {
+  if (seconds === null || seconds === undefined || seconds === '') return '--:--.---';
+  const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
+  if (isNaN(num) || num <= 0) return '--:--.---';
+  const mins = Math.floor(num / 60);
+  const secs = (num % 60).toFixed(3);
   const secsPadded = parseFloat(secs) < 10 ? `0${secs}` : secs;
   return `${mins}:${secsPadded}`;
 }
