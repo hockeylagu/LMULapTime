@@ -138,18 +138,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   })();
 
   // Calculate improvement stats
-  const sessionsWithValidLaps = trackData.filter(p => p.bestLapTime !== null);
+  const sessionsWithValidLaps = trackData.filter(p => p.bestLapTime !== null && p.bestLapTime > 0);
   const firstValidSession = sessionsWithValidLaps[0];
-  const bestLapTimeInTrack = trackData.reduce<number | null>((min, curr) => {
-    if (curr.bestLapTime === null) return min;
-    if (min === null || curr.bestLapTime < min) return curr.bestLapTime;
-    return min;
-  }, null);
-
-  let totalImprovement: number | null = null;
-  if (firstValidSession?.bestLapTime && bestLapTimeInTrack !== null && sessionsWithValidLaps.length > 1) {
-    totalImprovement = parseFloat((firstValidSession.bestLapTime - bestLapTimeInTrack).toFixed(3));
-  }
+  const bestLapTimeInTrack = sessionsWithValidLaps.length > 0
+    ? Math.min(...sessionsWithValidLaps.map(p => p.bestLapTime as number))
+    : null;
+  const totalImprovement = (firstValidSession?.bestLapTime && bestLapTimeInTrack !== null && sessionsWithValidLaps.length > 1)
+    ? parseFloat((firstValidSession.bestLapTime - bestLapTimeInTrack).toFixed(3))
+    : null;
 
   // Format chart data with rolling 3-session moving average
   const validLapsQueue: number[] = [];

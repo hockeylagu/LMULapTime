@@ -10,9 +10,9 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { DetailedSession, ReferenceLaptimeEntry, SessionProgressionPoint } from '../../server/types.js';
+import { DetailedSession, SessionProgressionPoint } from '../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
-import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, normalizeTrackName } from '../utils/paceCategory.js';
+import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, findReferenceEntry } from '../utils/paceCategory.js';
 
 interface SessionDetailProps {
   sessionId: string;
@@ -109,37 +109,15 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     allTimeCategoryTrackPB !== null &&
     (selectedDriver?.bestLapTime || 0) <= allTimeCategoryTrackPB + 0.0005;
 
-  const refEntry = (() => {
-    if (!refCache?.entries || !session || !selectedDriver) return null;
-    const entries: ReferenceLaptimeEntry[] = Object.values(refCache.entries);
-
-    const normTrack = normalizeTrackName(session.trackVenue, session.trackCourse).toLowerCase().replace(/[^a-z0-9]/g, '');
-
-    // 1. Try exact normalized track matches first
-    let trackMatches = entries.filter(e => {
-      const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-      const eRaw = e.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return eNorm === normTrack || eRaw === normTrack;
-    });
-
-    // 2. Fallback to substring matching if no exact matches exist
-    if (trackMatches.length === 0) {
-      trackMatches = entries.filter(e => {
-        const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-        const eRaw = e.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return eNorm.includes(normTrack) || normTrack.includes(eNorm) || eRaw.includes(normTrack) || normTrack.includes(eRaw);
-      });
-    }
-
-    if (trackMatches.length > 0) {
-      const classMatch = trackMatches.find(e =>
-        matchesCarClass(e.carClass, e.carClass, selectedDriver.carClass || selectedDriver.carType) ||
-        matchesCarClass(selectedDriver.carClass || selectedDriver.carType, selectedDriver.carType, e.carClass)
-      );
-      return classMatch || trackMatches[0];
-    }
-    return null;
-  })();
+  const refEntry = refCache?.entries && session && selectedDriver
+    ? findReferenceEntry(
+        refCache.entries,
+        session.trackVenue,
+        session.trackCourse || '',
+        selectedDriver.carClass || selectedDriver.carType,
+        selectedDriver.carType
+      )
+    : null;
 
   const handleCopyReplayPath = () => {
     if (session.matchingReplayFile) {

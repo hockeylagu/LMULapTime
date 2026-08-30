@@ -102,3 +102,17 @@ export function matchesSessionType(sessionType: string = '', sessionName: string
   return t === f || n === f || n.includes(f) || t.includes(f);
 }
 
+export function parseDateStringToTimestamp(dateStr?: string): number {
+  if (!dateStr) return 0;
+  const clean = dateStr.replace(/\//g, '-');
+  const time = new Date(clean).getTime();
+  return isNaN(time) ? 0 : time;
+}
+
+export function computeTheoreticalBest(s1: number | null, s2: number | null, s3: number | null): number | null {
+  if (s1 !== null && s2 !== null && s3 !== null) {
+    return parseFloat((s1 + s2 + s3).toFixed(3));
+  }
+  return null;
+}
+

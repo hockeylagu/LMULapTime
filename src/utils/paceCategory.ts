@@ -1,4 +1,4 @@
-import { PaceCategory } from '../../server/types';
+import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types';
 
 export interface PaceCategoryStyle {
   category: PaceCategory;
@@ -72,6 +72,15 @@ export function getPaceCategoryStyle(category?: PaceCategory | null): PaceCatego
     return PACE_CATEGORY_STYLES.Offline;
   }
   return PACE_CATEGORY_STYLES[category];
+}
+
+export function getPaceCategoryFromPercentage(percentage: number): PaceCategory {
+  if (percentage <= 100.5) return 'Alien';
+  if (percentage <= 101.5) return 'Competitive';
+  if (percentage <= 103.5) return 'Good';
+  if (percentage <= 105.5) return 'Midpack';
+  if (percentage <= 107.0) return 'Tail-ender';
+  return 'Offline';
 }
 
 export function formatPacePercentage(percentage?: number | null): string {
@@ -195,4 +204,62 @@ export function normalizeTrackName(venue: string = '', course: string = ''): str
   }
 
   return venue;
+}
+
+/**
+ * Finds all matching benchmark entries for a given track venue and optional course.
+ */
+export function findMatchingTrackBenchmarkEntries(
+  entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[],
+  trackVenue: string = '',
+  course: string = ''
+): ReferenceLaptimeEntry[] {
+  const entryList: ReferenceLaptimeEntry[] = Array.isArray(entries) ? entries : Object.values(entries || {});
+  if (entryList.length === 0) return [];
+
+  const normTrack = normalizeTrackName(trackVenue, course);
+  const normClean = normTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // 1. Try exact normalized match first
+  let matches = entryList.filter(e => {
+    const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const eRaw = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return eNorm === normClean || eRaw === normClean;
+  });
+
+  // 2. Fallback to substring matching
+  if (matches.length === 0) {
+    matches = entryList.filter(e => {
+      const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const eRaw = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return eNorm.includes(normClean) || normClean.includes(eNorm) || eRaw.includes(normClean) || normClean.includes(eRaw);
+    });
+  }
+
+  return matches;
+}
+
+/**
+ * Finds the single best matching benchmark entry for a track and car class/type.
+ */
+export function findReferenceEntry(
+  entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[],
+  venue: string = '',
+  course: string = '',
+  carClass: string = '',
+  carType: string = ''
+): ReferenceLaptimeEntry | null {
+  const trackMatches = findMatchingTrackBenchmarkEntries(entries, venue, course);
+  if (trackMatches.length === 0) return null;
+
+  const targetClass = carClass || carType || '';
+  if (targetClass && targetClass !== 'All') {
+    const classMatch = trackMatches.find(e =>
+      matchesCarClass(e.carClass, e.carClass, targetClass) ||
+      matchesCarClass(targetClass, carType, e.carClass)
+    );
+    if (classMatch) return classMatch;
+  }
+
+  return trackMatches[0];
 }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Flag, Trophy, ArrowUpDown } from 'lucide-react';
-import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
-import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle, normalizeTrackName } from '../utils/paceCategory.js';
-import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
+import { formatTime, getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp } from '../utils/formatters.js';
+import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
+import { ReferenceLaptimeEntry } from '../../server/types.js';
 
 export type TracksSortOption = 'name-asc' | 'name-desc' | 'pace-asc' | 'last-session-desc';
 
@@ -118,16 +118,10 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         }
       });
 
-      const theoreticalBest = (bestS1 !== null && bestS2 !== null && bestS3 !== null)
-        ? bestS1 + bestS2 + bestS3
-        : null;
+      const theoreticalBest = computeTheoreticalBest(bestS1, bestS2, bestS3);
 
       const lastSessionTimestamp = venueSessions.length > 0
-        ? Math.max(...venueSessions.map(s => {
-            const clean = (s.timeString || '').replace(/\//g, '-');
-            const time = new Date(clean).getTime();
-            return isNaN(time) ? 0 : time;
-          }))
+        ? Math.max(...venueSessions.map(s => parseDateStringToTimestamp(s.timeString)))
         : 0;
 
       const fallback = tracksMap[venue] || {
@@ -166,62 +160,14 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
 
   const getRefEntryForTrack = (trackName: string, carType?: string, carClass?: string): ReferenceLaptimeEntry | null => {
     if (!refCache?.entries) return null;
-
-    const normTrack = normalizeTrackName(trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normCar = (carType || '').toLowerCase();
-    const normClass = (carClass || '').toLowerCase();
-
-    // 1. Exact normalized track matches first
-    let trackEntries = Object.values(refCache.entries).filter((entry: any) => {
-      const entryTrackNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-      const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return entryTrackNorm === normTrack || entryRaw === normTrack;
-    });
-
-    // 2. Fallback to substring match if no exact matches exist
-    if (trackEntries.length === 0) {
-      trackEntries = Object.values(refCache.entries).filter((entry: any) => {
-        const entryTrackNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-        const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normTrack.includes(entryTrackNorm) || entryTrackNorm.includes(normTrack) || normTrack.includes(entryRaw) || entryRaw.includes(normTrack);
-      });
-    }
-
-    if (trackEntries.length === 0) return null;
-
-    // 3. Match vehicle class
-    if (selectedCarClass && selectedCarClass !== 'All') {
-      const classMatch = trackEntries.find((entry: any) =>
-        matchesCarClass(entry.carClass, entry.carClass, selectedCarClass)
-      );
-      if (classMatch) return classMatch as ReferenceLaptimeEntry;
-    }
-
-    if (normCar || normClass) {
-      const classMatch = trackEntries.find((entry: any) =>
-        matchesCarClass(normClass || normCar, normCar, entry.carClass) ||
-        matchesCarClass(entry.carClass, entry.carClass, normClass || normCar)
-      );
-      if (classMatch) return classMatch as ReferenceLaptimeEntry;
-    }
-
-    return trackEntries[0] as ReferenceLaptimeEntry;
+    const targetClass = selectedCarClass !== 'All' ? selectedCarClass : carClass || carType || '';
+    return findReferenceEntry(refCache.entries, trackName, '', targetClass, carType || '');
   };
 
   const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null) => {
     if (!lapTime || !refEntry || !refEntry.target100Sec) return null;
-
-    const ratio = lapTime / refEntry.target100Sec;
-    const pct = ratio * 100;
-
-    let category: PaceCategory = 'Offline';
-    if (pct <= 100.5) category = 'Alien';
-    else if (pct <= 101.5) category = 'Competitive';
-    else if (pct <= 103.5) category = 'Good';
-    else if (pct <= 105.5) category = 'Midpack';
-    else if (pct <= 107.0) category = 'Tail-ender';
-
-    return { category, pct };
+    const pct = (lapTime / refEntry.target100Sec) * 100;
+    return { category: getPaceCategoryFromPercentage(pct), pct };
   };
 
   const sortedTrackList = useMemo(() => {
