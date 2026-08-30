@@ -56,12 +56,27 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
+  const getInitialParams = () => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
+    const params = new URLSearchParams(searchPart);
+    return {
+      sort: (params.get('sort') as TrackDetailSortOption) || 'date-desc',
+      model: params.get('model') || 'All',
+      type: params.get('type') || 'All',
+      q: params.get('q') || '',
+      hideEmpty: params.get('hideEmpty') !== 'false',
+    };
+  };
+
+  const initialParams = getInitialParams();
   const [loading, setLoading] = useState<boolean>(true);
-  const [hideEmpty, setHideEmpty] = useState<boolean>(true);
-  const [selectedCarModel, setSelectedCarModel] = useState<string>('All');
-  const [filterType, setFilterType] = useState<string>('All');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortBy, setSortBy] = useState<TrackDetailSortOption>('date-desc');
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.hideEmpty);
+  const [selectedCarModel, setSelectedCarModelState] = useState<string>(initialParams.model);
+  const [filterType, setFilterTypeState] = useState<string>(initialParams.type);
+  const [searchQuery, setSearchQueryState] = useState<string>(initialParams.q);
+  const [sortBy, setSortByState] = useState<TrackDetailSortOption>(initialParams.sort);
   const [data, setData] = useState<{
     trackName: string;
     normalizedTrackName: string;
@@ -72,6 +87,75 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const selectedClass = selectedCarClass;
   const setSelectedClass = setSelectedCarClass;
+
+  const updateUrlParam = (updates: {
+    sort?: TrackDetailSortOption;
+    model?: string;
+    type?: string;
+    q?: string;
+    hideEmpty?: boolean;
+    carClass?: string;
+  }) => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
+    const params = new URLSearchParams(searchPart);
+
+    if (updates.sort !== undefined) {
+      if (updates.sort === 'date-desc') params.delete('sort');
+      else params.set('sort', updates.sort);
+    }
+    if (updates.model !== undefined) {
+      if (updates.model === 'All' || !updates.model) params.delete('model');
+      else params.set('model', updates.model);
+    }
+    if (updates.type !== undefined) {
+      if (updates.type === 'All' || !updates.type) params.delete('type');
+      else params.set('type', updates.type);
+    }
+    if (updates.q !== undefined) {
+      if (!updates.q.trim()) params.delete('q');
+      else params.set('q', updates.q.trim());
+    }
+    if (updates.hideEmpty !== undefined) {
+      if (updates.hideEmpty) params.delete('hideEmpty');
+      else params.set('hideEmpty', 'false');
+    }
+    if (updates.carClass !== undefined) {
+      if (updates.carClass === 'All' || !updates.carClass) params.delete('carClass');
+      else params.set('carClass', updates.carClass);
+    }
+
+    const paramStr = params.toString();
+    const newHash = `#/${pathPart}${paramStr ? `?${paramStr}` : ''}`;
+    window.history.replaceState(null, '', newHash);
+  };
+
+  const setSortBy = (val: TrackDetailSortOption) => {
+    setSortByState(val);
+    updateUrlParam({ sort: val });
+  };
+
+  const setSelectedCarModel = (model: string) => {
+    setSelectedCarModelState(model);
+    updateUrlParam({ model });
+  };
+
+  const setFilterType = (type: string) => {
+    setFilterTypeState(type);
+    updateUrlParam({ type });
+  };
+
+  const setSearchQuery = (q: string) => {
+    setSearchQueryState(q);
+    updateUrlParam({ q });
+  };
+
+  const setHideEmpty = (hide: boolean) => {
+    setHideEmptyState(hide);
+    updateUrlParam({ hideEmpty: hide });
+  };
 
   useEffect(() => {
     setSelectedCarModel('All');

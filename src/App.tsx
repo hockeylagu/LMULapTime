@@ -174,15 +174,18 @@ export default function App() {
   };
 
   const handleTabChange = (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => {
-    const paramStr = new URLSearchParams(parseUrlState().filters).toString();
-    const queryPart = paramStr ? `?${paramStr}` : '';
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
+    const queryPart = searchPart ? `?${searchPart}` : '';
     window.location.hash = tab === 'dashboard' ? `dashboard${queryPart}` : `${tab}${queryPart}`;
   };
 
   const handleSelectTrack = (trackName: string) => {
-    const paramStr = new URLSearchParams(parseUrlState().filters).toString();
-    const queryPart = paramStr ? `?${paramStr}` : '';
-    window.location.hash = `track/${encodeURIComponent(trackName)}${queryPart}`;
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
+    window.location.hash = `track/${encodeURIComponent(trackName)}${searchPart ? `?${searchPart}` : ''}`;
   };
 
   return (

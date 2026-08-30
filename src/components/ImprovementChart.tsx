@@ -9,10 +9,12 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { TrendingUp, Zap, Trophy, Clock } from 'lucide-react';
+import { TrendingUp, Zap, Trophy, Clock, Calendar } from 'lucide-react';
 import { formatTime, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types.js';
+
+export type TimeRangeFilter = 'all' | 'last-5' | 'last-10' | 'last-20' | 'week' | 'month' | 'year';
 
 export interface SessionProgressionPoint {
   sessionId: string;
@@ -57,6 +59,8 @@ interface ImprovementChartProps {
     pacePct?: number | null;
   };
   onSelectSession?: (sessionId: string) => void;
+  timeRange?: TimeRangeFilter;
+  onTimeRangeChange?: (range: TimeRangeFilter) => void;
 }
 
 export const ImprovementChart: React.FC<ImprovementChartProps> = ({
@@ -73,8 +77,13 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   embedded = false,
   yourBest,
   onSelectSession,
+  timeRange,
+  onTimeRangeChange,
 }) => {
   const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical'>('bestLap');
+  const [internalTimeRange, setInternalTimeRange] = useState<TimeRangeFilter>('all');
+  const activeRange = timeRange !== undefined ? timeRange : internalTimeRange;
+  const setRange = onTimeRangeChange || setInternalTimeRange;
 
   // Filter progression by selected track, vehicle class, car model, session type, search & empty filter
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
@@ -103,7 +112,29 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     return matchesTrack && matchesClass && matchesModel && matchesType && matchesSearch;
   });
 
-  const trackData = rawTrackData.filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null));
+  const allTrackData = rawTrackData.filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null));
+
+  // Apply Date Range / Session Count filter
+  const trackData = (() => {
+    if (activeRange === 'all') return allTrackData;
+    if (activeRange === 'last-5') return allTrackData.slice(-5);
+    if (activeRange === 'last-10') return allTrackData.slice(-10);
+    if (activeRange === 'last-20') return allTrackData.slice(-20);
+
+    if (allTrackData.length === 0) return [];
+    const validTimestamps = allTrackData.map(p => p.timestamp).filter(t => !isNaN(t) && t > 0);
+    if (validTimestamps.length === 0) return allTrackData;
+    const latestTimestamp = Math.max(...validTimestamps);
+
+    let durationMs = 0;
+    if (activeRange === 'week') durationMs = 7 * 24 * 60 * 60 * 1000;
+    else if (activeRange === 'month') durationMs = 30 * 24 * 60 * 60 * 1000;
+    else if (activeRange === 'year') durationMs = 365 * 24 * 60 * 60 * 1000;
+
+    const cutoff = latestTimestamp - durationMs;
+    const filtered = allTrackData.filter(p => p.timestamp >= cutoff);
+    return filtered.length > 0 ? filtered : allTrackData;
+  })();
 
   // Calculate improvement stats
   const sessionsWithValidLaps = trackData.filter(p => p.bestLapTime !== null);
@@ -122,7 +153,11 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   // Format chart data with rolling 3-session moving average
   const validLapsQueue: number[] = [];
   const chartData = trackData.map((p, idx) => {
-    const labelSession = p.sessionName || p.sessionType || `Session #${idx + 1}`;
+    const sessionDate = p.dateString ? p.dateString.split(' ')[0] : '';
+    const dateParts = sessionDate.split('/');
+    const shortDate = dateParts.length === 3 ? `${dateParts[1]}/${dateParts[2]}` : sessionDate;
+    const labelSession = p.sessionName || p.sessionType || `S#${idx + 1}`;
+    const shortSessionLabel = shortDate ? `${labelSession} (${shortDate})` : `#${idx + 1} ${labelSession}`;
 
     let movingAvg: number | null = null;
     if (p.bestLapTime !== null && p.bestLapTime > 0) {
@@ -136,9 +171,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
     return {
       sessionId: p.sessionId,
-      session: `${labelSession} #${idx + 1}`,
-      shortSession: `#${idx + 1} ${labelSession}`,
-      date: p.dateString ? p.dateString.split(' ')[0] : `Session ${idx + 1}`,
+      session: `${labelSession} #${idx + 1}${sessionDate ? ` (${sessionDate})` : ''}`,
+      shortSession: shortSessionLabel,
+      date: sessionDate || `Session ${idx + 1}`,
       fullDate: p.dateString,
       car: p.carType,
       weather: p.weatherInfo,
@@ -331,13 +366,41 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
       {/* Main Chart Card with Integrated Controls */}
       <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
-          <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-lmu-accent" />
-            <span>Progression Timeline — {activeTrack}</span>
-          </h3>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
+          <div>
+            <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-lmu-accent" />
+              <span>Progression Timeline — {activeTrack}</span>
+            </h3>
+            <span className="text-xs text-lmu-muted">
+              Displaying {trackData.length} of {allTrackData.length} recorded sessions
+            </span>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Range & Session Count Selector */}
+            <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-lmu-accent" />
+              <span className="text-lmu-muted font-medium">History:</span>
+              <select
+                value={activeRange}
+                onChange={(e) => setRange(e.target.value as TimeRangeFilter)}
+                className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+              >
+                <optgroup label="Session Count" className="bg-lmu-card text-white font-semibold">
+                  <option value="all" className="bg-lmu-card text-white">All Sessions ({allTrackData.length})</option>
+                  <option value="last-5" className="bg-lmu-card text-white">Last 5 Sessions</option>
+                  <option value="last-10" className="bg-lmu-card text-white">Last 10 Sessions</option>
+                  <option value="last-20" className="bg-lmu-card text-white">Last 20 Sessions</option>
+                </optgroup>
+                <optgroup label="Date Range" className="bg-lmu-card text-white font-semibold">
+                  <option value="week" className="bg-lmu-card text-white">Last Week (7 Days)</option>
+                  <option value="month" className="bg-lmu-card text-white">Last Month (30 Days)</option>
+                  <option value="year" className="bg-lmu-card text-white">Last Year (365 Days)</option>
+                </optgroup>
+              </select>
+            </div>
+
             {/* Metric Toggle */}
             <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
               <button
@@ -373,11 +436,12 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             No session data found for this track matching current filters.
           </div>
         ) : (
-          <div className="w-full h-80 pt-2">
+          <div className="w-full h-84 pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
+                key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}`}
                 data={chartData}
-                margin={{ top: 10, right: 30, left: 10, bottom: 25 }}
+                margin={{ top: 10, right: 25, left: 10, bottom: chartData.length > 5 ? 35 : 15 }}
                 onClick={(e: any) => {
                   if (e && e.activePayload && e.activePayload.length > 0) {
                     const sId = e.activePayload[0].payload.sessionId;
@@ -388,7 +452,16 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#232A36" />
-                <XAxis dataKey="session" stroke="#8D99AE" tick={{ fill: '#8D99AE', fontSize: 12 }} />
+                <XAxis
+                  dataKey="shortSession"
+                  stroke="#8D99AE"
+                  tick={{ fill: '#8D99AE', fontSize: 11 }}
+                  interval={chartData.length > 10 ? 'preserveStartEnd' : 0}
+                  height={chartData.length > 5 ? 40 : 25}
+                  angle={chartData.length > 5 ? -18 : 0}
+                  textAnchor={chartData.length > 5 ? 'end' : 'middle'}
+                  dy={chartData.length > 5 ? 4 : 0}
+                />
                 <YAxis
                   domain={[minTime, maxTime]}
                   stroke="#8D99AE"

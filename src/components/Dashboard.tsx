@@ -78,8 +78,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
   searchQuery,
   setSearchQuery,
 }) => {
-  const [hideEmpty, setHideEmpty] = useState<boolean>(true);
-  const [sortBy, setSortBy] = useState<DashboardSortOption>('date-desc');
+  const getInitialDashboardParams = () => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
+    const params = new URLSearchParams(searchPart);
+    return {
+      sort: (params.get('sort') as DashboardSortOption) || 'date-desc',
+      hideEmpty: params.get('hideEmpty') !== 'false',
+    };
+  };
+
+  const initialParams = getInitialDashboardParams();
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.hideEmpty);
+  const [sortBy, setSortByState] = useState<DashboardSortOption>(initialParams.sort);
+
+  const updateDashboardUrl = (updates: { sort?: DashboardSortOption; hideEmpty?: boolean }) => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : '';
+    const params = new URLSearchParams(searchPart);
+
+    if (updates.sort !== undefined) {
+      if (updates.sort === 'date-desc') params.delete('sort');
+      else params.set('sort', updates.sort);
+    }
+    if (updates.hideEmpty !== undefined) {
+      if (updates.hideEmpty) params.delete('hideEmpty');
+      else params.set('hideEmpty', 'false');
+    }
+
+    const paramStr = params.toString();
+    const newHash = `#/${pathPart}${paramStr ? `?${paramStr}` : ''}`;
+    window.history.replaceState(null, '', newHash);
+  };
+
+  const setSortBy = (sort: DashboardSortOption) => {
+    setSortByState(sort);
+    updateDashboardUrl({ sort });
+  };
+
+  const setHideEmpty = (hide: boolean) => {
+    setHideEmptyState(hide);
+    updateDashboardUrl({ hideEmpty: hide });
+  };
 
   // Extract unique track layout variations sorted alphabetically
   const tracks = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, s.trackCourse)))).filter(Boolean).sort((a, b) => a.localeCompare(b));
