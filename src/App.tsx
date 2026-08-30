@@ -219,6 +219,8 @@ export default function App() {
             trackName={selectedRouteTrackName}
             onBack={() => { window.location.hash = 'tracks'; }}
             onSelectSession={handleSelectSession}
+            selectedCarClass={selectedCarClass}
+            setSelectedCarClass={setSelectedCarClass}
           />
         ) : activeTab === 'dashboard' ? (
           <Dashboard
@@ -244,8 +246,11 @@ export default function App() {
           />
         ) : activeTab === 'tracks' ? (
           <TrackSummaries
+            sessions={sessions}
             tracksMap={tracksMap}
             onSelectTrack={handleSelectTrack}
+            selectedCarClass={selectedCarClass}
+            setSelectedCarClass={setSelectedCarClass}
           />
         ) : activeTab === 'settings' ? (
           <FileUploader

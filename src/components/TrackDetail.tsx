@@ -28,9 +28,17 @@ interface TrackDetailProps {
   trackName: string;
   onBack: () => void;
   onSelectSession: (sessionId: string) => void;
+  selectedCarClass: string;
+  setSelectedCarClass: (carClass: string) => void;
 }
 
-export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onSelectSession }) => {
+export const TrackDetail: React.FC<TrackDetailProps> = ({
+  trackName,
+  onBack,
+  onSelectSession,
+  selectedCarClass,
+  setSelectedCarClass,
+}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [data, setData] = useState<{
     trackName: string;
@@ -40,7 +48,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
     benchmarks: ReferenceLaptimeEntry[];
   } | null>(null);
 
-  const [selectedClass, setSelectedClass] = useState<string>('');
+  const selectedClass = selectedCarClass;
+  const setSelectedClass = setSelectedCarClass;
 
   useEffect(() => {
     setLoading(true);
@@ -48,9 +57,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
       .then(res => res.json())
       .then(resData => {
         setData(resData);
-        if (resData.benchmarks && resData.benchmarks.length > 0) {
-          setSelectedClass(resData.benchmarks[0].carClass);
-        }
         setLoading(false);
       })
       .catch(err => {
@@ -84,26 +90,29 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
 
   const { sessions, benchmarks } = data;
 
-  const currentBenchmark = benchmarks.find(b => matchesCarClass(b.carClass, b.carClass, selectedClass)) || benchmarks[0];
+  const filteredSessions = sessions.filter(s =>
+    matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass)
+  );
 
-  // Helper to find driver's best lap in current car class for this track
-  const findDriverBestInClass = (carClass: string) => {
+  // Helper to find driver's overall best lap in filtered sessions for this track
+  const findOverallBestInFilteredSessions = () => {
     let bestTime: number | null = null;
     let bestTimeStr = '--:--.---';
     let bestCar = '';
+    let bestCarClass = '';
     let bestPaceCat: PaceCategory | null = null;
     let bestPacePct: number | null = null;
 
-    sessions.forEach(s => {
+    filteredSessions.forEach(s => {
       if (s.playerDriver) {
         const p = s.playerDriver;
-        const isMatch = matchesCarClass(p.carClass, p.carType, carClass);
 
-        if (isMatch && p.bestLapTime) {
+        if (p.bestLapTime) {
           if (bestTime === null || p.bestLapTime < bestTime) {
             bestTime = p.bestLapTime;
             bestTimeStr = p.bestLapTimeString;
             bestCar = p.carType;
+            bestCarClass = p.carClass || '';
             bestPaceCat = p.bestLapPaceCategory || null;
             bestPacePct = p.bestLapPacePercentage || null;
           }
@@ -111,10 +120,25 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
       }
     });
 
-    return { bestTime, bestTimeStr, bestCar, bestPaceCat, bestPacePct };
+    return { bestTime, bestTimeStr, bestCar, bestCarClass, bestPaceCat, bestPacePct };
   };
 
-  const currentClassDriverStats = currentBenchmark ? findDriverBestInClass(currentBenchmark.carClass) : null;
+  const currentClassDriverStats = findOverallBestInFilteredSessions();
+
+  // Find current benchmark matching selectedClass or matching the best lap's car class when selectedClass is 'All'
+  let currentBenchmark: ReferenceLaptimeEntry | null = null;
+  if (benchmarks && benchmarks.length > 0) {
+    if (selectedClass && selectedClass !== 'All') {
+      currentBenchmark = benchmarks.find(b => matchesCarClass(b.carClass, b.carClass, selectedClass)) || benchmarks[0];
+    } else if (currentClassDriverStats.bestCarClass || currentClassDriverStats.bestCar) {
+      currentBenchmark = benchmarks.find(b =>
+        matchesCarClass(b.carClass, b.carClass, currentClassDriverStats.bestCarClass || currentClassDriverStats.bestCar) ||
+        matchesCarClass(currentClassDriverStats.bestCarClass || currentClassDriverStats.bestCar, currentClassDriverStats.bestCar, b.carClass)
+      ) || benchmarks[0];
+    } else {
+      currentBenchmark = benchmarks[0];
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -132,18 +156,35 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
 
       {/* Track Title Card */}
       <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30">
                 Official Circuit
               </span>
-              <span className="text-xs text-lmu-muted">{sessions.length} Recorded Sessions</span>
+              <span className="text-xs text-lmu-muted">{filteredSessions.length} Recorded Sessions</span>
             </div>
             <h2 className="text-3xl font-extrabold text-white mt-1">{trackName}</h2>
             <p className="text-xs text-lmu-muted mt-0.5">
               Benchmark Target Lap Times & Personal Telemetry per Vehicle Category
             </p>
+          </div>
+
+          {/* Vehicle Class Filter Buttons (Beside Circuit Title) */}
+          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto shrink-0">
+            {VEHICLE_CLASS_OPTIONS.map(cls => (
+              <button
+                key={cls.id}
+                onClick={() => setSelectedClass(cls.id)}
+                className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                  selectedClass === cls.id
+                    ? 'bg-lmu-accent text-white shadow-md font-bold'
+                    : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                {cls.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -151,7 +192,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
       {/* Reference Lap Times Benchmark Section (Isolated per Vehicle Class) */}
       <div className="glass-panel p-6 rounded-2xl space-y-6">
         
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-lmu-border/50 pb-4">
+        <div className="flex items-center justify-between border-b border-lmu-border/50 pb-4">
           <div>
             <h3 className="text-lg font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
               <Zap className="w-5 h-5 text-lmu-gold" />
@@ -160,23 +201,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
             <p className="text-xs text-lmu-muted mt-0.5">
               Reference lap times categorized by vehicle class (strictly isolated to avoid mixing different vehicle types)
             </p>
-          </div>
-
-          {/* Vehicle Class Tabs Selector */}
-          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto">
-            {VEHICLE_CLASS_OPTIONS.filter(cls => cls.id !== 'All').map(cls => (
-              <button
-                key={cls.id}
-                onClick={() => setSelectedClass(cls.id)}
-                className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                  selectedClass === cls.id || (currentBenchmark && matchesCarClass(currentBenchmark.carClass, currentBenchmark.carClass, cls.id))
-                    ? 'bg-lmu-accent text-white shadow-md font-bold'
-                    : 'text-lmu-muted hover:text-white'
-                }`}
-              >
-                {cls.label}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -289,7 +313,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
                   💤 Offline (&gt;107%)
                 </span>
                 <h4 className="text-lg font-extrabold text-zinc-300 font-mono mt-1">
-                  {formatTime(currentBenchmark.targets.offlineSec)}
+                  {formatTime(currentBenchmark.targets.tailEnderSec ? currentBenchmark.targets.tailEnderSec * 1.01 : null)}
                 </h4>
                 <p className="text-[10px] text-zinc-400/80">+7% off Alien</p>
               </div>
@@ -309,12 +333,12 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({ trackName, onBack, onS
       <div className="glass-panel p-6 rounded-2xl space-y-4">
         <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <FileText className="w-5 h-5 text-lmu-accent" />
-          Sessions Recorded on {trackName} ({sessions.length})
+          Sessions Recorded on {trackName} ({filteredSessions.length})
         </h3>
 
-        {sessions.length > 0 ? (
+        {filteredSessions.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sessions.map(s => {
+            {filteredSessions.map(s => {
               const p = s.playerDriver;
               return (
                 <div
