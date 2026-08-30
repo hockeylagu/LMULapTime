@@ -79,30 +79,27 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   const selectedDriver = session.drivers.find(d => d.name === selectedDriverName) || session.drivers[0];
 
-  // All-time Personal Best for this specific driver, track, and vehicle category (LMGT3, Hypercar, LMP2, GTE, etc.)
+  // All-time Personal Best for this specific driver, track, and vehicle category
   const allTimeCategoryTrackPB = (() => {
     if (!session || !selectedDriver || progression.length === 0) return null;
     const normTrack = getDisplayTrackName(session.trackVenue, session.trackCourse).toLowerCase().trim();
     const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
     const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
 
-    const matchingProg = progression.filter(p => {
-      const pTrack = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
-      const isTrack = pTrack === normTrack;
-      const isClass = matchesCarClass(p.carClass, p.carType, driverClass) ||
-        matchesCarClass(driverClass, selectedDriver.carType, p.carClass);
-      const isDriver = !driverNorm || (p.driverName || '').toLowerCase().trim() === driverNorm ||
-        (p.driverName || '').toLowerCase().includes(driverNorm) ||
-        driverNorm.includes((p.driverName || '').toLowerCase());
-      return isTrack && isClass && isDriver && p.bestLapTime !== null && p.bestLapTime > 0;
-    });
+    const matchingLapTimes = progression
+      .filter(p => {
+        const pTrack = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
+        const isTrack = pTrack === normTrack;
+        const isClass = matchesCarClass(p.carClass, p.carType, driverClass) ||
+          matchesCarClass(driverClass, selectedDriver.carType, p.carClass);
+        const isDriver = !driverNorm || (p.driverName || '').toLowerCase().trim() === driverNorm ||
+          (p.driverName || '').toLowerCase().includes(driverNorm) ||
+          driverNorm.includes((p.driverName || '').toLowerCase());
+        return isTrack && isClass && isDriver && p.bestLapTime !== null && p.bestLapTime > 0;
+      })
+      .map(p => p.bestLapTime as number);
 
-    if (matchingProg.length === 0) return selectedDriver.bestLapTime;
-    return matchingProg.reduce<number | null>((min, p) => {
-      if (p.bestLapTime === null) return min;
-      if (min === null || p.bestLapTime < min) return p.bestLapTime;
-      return min;
-    }, null);
+    return matchingLapTimes.length > 0 ? Math.min(...matchingLapTimes) : selectedDriver.bestLapTime;
   })();
 
   const isCurrentSessionAllTimePB = selectedDriver?.bestLapTime !== null &&
@@ -391,33 +388,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           );
         };
 
-        const sessionChartTimes = (() => {
-          if (chartMetric === 'lapTime') {
-            return sessionChartData.map(d => d.lapTime).filter((v): v is number => v !== null && v > 0);
-          }
-          if (chartMetric === 'sectors') {
-            return [
-              ...sessionChartData.map(d => d.s1),
-              ...sessionChartData.map(d => d.s2),
-              ...sessionChartData.map(d => d.s3),
-            ].filter((v): v is number => v !== null && v > 0);
-          }
-          if (chartMetric === 'topSpeed') {
-            return sessionChartData.map(d => d.topSpeed).filter((v): v is number => v !== null && v > 0);
-          }
-          return [];
-        })();
+        const sessionChartTimes = (
+          chartMetric === 'lapTime'
+            ? sessionChartData.map(d => d.lapTime)
+            : chartMetric === 'sectors'
+            ? sessionChartData.flatMap(d => [d.s1, d.s2, d.s3])
+            : sessionChartData.map(d => d.topSpeed)
+        ).filter((v): v is number => v !== null && v > 0);
 
+        const padding = chartMetric === 'topSpeed' ? 5 : 1;
         const yDomainMin = sessionChartTimes.length > 0
-          ? (chartMetric === 'topSpeed'
-              ? Math.max(0, Math.floor(Math.min(...sessionChartTimes) - 5))
-              : Math.max(0, Math.floor(Math.min(...sessionChartTimes) - 1)))
+          ? Math.max(0, Math.floor(Math.min(...sessionChartTimes) - padding))
           : 'auto';
 
         const yDomainMax = sessionChartTimes.length > 0
-          ? (chartMetric === 'topSpeed'
-              ? Math.ceil(Math.max(...sessionChartTimes) + 5)
-              : Math.ceil(Math.max(...sessionChartTimes) + 1))
+          ? Math.ceil(Math.max(...sessionChartTimes) + padding)
           : 'auto';
 
         return (

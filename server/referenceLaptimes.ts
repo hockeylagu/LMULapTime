@@ -139,13 +139,12 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
 export function normalizeCarClass(carClass: string, carType: string = ''): string {
   const combined = `${carClass} ${carType}`.toLowerCase();
 
-  if (combined.includes('hyper') || combined.includes('lmh') || combined.includes('lmdh')) return 'LMH';
-  if (combined.includes('gt3') || combined.includes('lmgt3')) return 'LMGT3';
+  if (/hyper|lmh|lmdh/.test(combined)) return 'LMH';
+  if (/gt3|lmgt3/.test(combined)) return 'LMGT3';
   if (combined.includes('gte')) return 'GTE';
   if (combined.includes('lmp3')) return 'LMP3';
   if (combined.includes('lmp2')) {
-    if (combined.includes('elms') || combined.includes('lmp2_elms')) return 'LMP2elms';
-    return 'LMP2wec';
+    return /elms|lmp2_elms/.test(combined) ? 'LMP2elms' : 'LMP2wec';
   }
 
   return carClass;

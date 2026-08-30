@@ -118,21 +118,20 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   // Apply Date Range / Session Count filter
   const trackData = (() => {
     if (activeRange === 'all') return allTrackData;
-    if (activeRange === 'last-5') return allTrackData.slice(-5);
-    if (activeRange === 'last-10') return allTrackData.slice(-10);
-    if (activeRange === 'last-20') return allTrackData.slice(-20);
+    if (activeRange.startsWith('last-')) {
+      const count = parseInt(activeRange.replace('last-', ''), 10);
+      return allTrackData.slice(-count);
+    }
 
     if (allTrackData.length === 0) return [];
     const validTimestamps = allTrackData.map(p => p.timestamp).filter(t => !isNaN(t) && t > 0);
     if (validTimestamps.length === 0) return allTrackData;
     const latestTimestamp = Math.max(...validTimestamps);
 
-    let durationMs = 0;
-    if (activeRange === 'week') durationMs = 7 * 24 * 60 * 60 * 1000;
-    else if (activeRange === 'month') durationMs = 30 * 24 * 60 * 60 * 1000;
-    else if (activeRange === 'year') durationMs = 365 * 24 * 60 * 60 * 1000;
+    const durationDays = activeRange === 'week' ? 7 : activeRange === 'month' ? 30 : activeRange === 'year' ? 365 : 0;
+    if (durationDays === 0) return allTrackData;
 
-    const cutoff = latestTimestamp - durationMs;
+    const cutoff = latestTimestamp - durationDays * 24 * 60 * 60 * 1000;
     const filtered = allTrackData.filter(p => p.timestamp >= cutoff);
     return filtered.length > 0 ? filtered : allTrackData;
   })();
@@ -147,8 +146,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     ? parseFloat((firstValidSession.bestLapTime - bestLapTimeInTrack).toFixed(3))
     : null;
 
-  // Format chart data with rolling 3-session moving average
-  const validLapsQueue: number[] = [];
+  // Format chart data with pure 3-session moving average
   const chartData = trackData.map((p, idx) => {
     const sessionDate = p.dateString ? p.dateString.split(' ')[0] : '';
     const dateParts = sessionDate.split('/');
@@ -156,15 +154,16 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     const labelSession = p.sessionName || p.sessionType || `S#${idx + 1}`;
     const shortSessionLabel = shortDate ? `${labelSession} (${shortDate})` : `#${idx + 1} ${labelSession}`;
 
-    let movingAvg: number | null = null;
-    if (p.bestLapTime !== null && p.bestLapTime > 0) {
-      validLapsQueue.push(p.bestLapTime);
-      if (validLapsQueue.length > 3) {
-        validLapsQueue.shift();
-      }
-      const sum = validLapsQueue.reduce((a, b) => a + b, 0);
-      movingAvg = parseFloat((sum / validLapsQueue.length).toFixed(3));
-    }
+    // Pure 3-session moving average of valid lap times up to current index
+    const prevValidLaps = trackData
+      .slice(0, idx + 1)
+      .map(item => item.bestLapTime)
+      .filter((t): t is number => t !== null && t > 0)
+      .slice(-3);
+
+    const movingAvg = (p.bestLapTime !== null && p.bestLapTime > 0 && prevValidLaps.length > 0)
+      ? parseFloat((prevValidLaps.reduce((sum, val) => sum + val, 0) / prevValidLaps.length).toFixed(3))
+      : null;
 
     return {
       sessionId: p.sessionId,
@@ -194,28 +193,13 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   });
 
   // Min / Max domain calculation for chart Y axis based on active metric
-  const validTimes = (() => {
-    if (metric === 'sectors') {
-      return [
-        ...trackData.map(p => p.bestS1),
-        ...trackData.map(p => p.bestS2),
-        ...trackData.map(p => p.bestS3),
-      ];
-    }
-    if (metric === 'theoretical') {
-      return [
-        ...trackData.map(p => p.bestLapTime),
-        ...chartData.map(p => p.movingAvg),
-        ...trackData.map(p => p.theoreticalBest),
-      ];
-    }
-    // bestLap
-    return [
-      ...trackData.map(p => p.bestLapTime),
-      ...trackData.map(p => p.avgLapTime),
-      ...chartData.map(p => p.movingAvg),
-    ];
-  })().filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
+  const validTimes = (
+    metric === 'sectors'
+      ? trackData.flatMap(p => [p.bestS1, p.bestS2, p.bestS3])
+      : metric === 'theoretical'
+      ? [...trackData.flatMap(p => [p.bestLapTime, p.theoreticalBest]), ...chartData.map(c => c.movingAvg)]
+      : [...trackData.flatMap(p => [p.bestLapTime, p.avgLapTime]), ...chartData.map(c => c.movingAvg)]
+  ).filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
 
   const minTime = validTimes.length > 0 ? Math.max(0, Math.floor(Math.min(...validTimes) - 2)) : 0;
   const maxTime = validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;

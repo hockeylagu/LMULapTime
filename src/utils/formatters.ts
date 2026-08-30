@@ -4,8 +4,7 @@ export function formatTime(seconds: number | string | null | undefined): string 
   if (isNaN(num) || num <= 0) return '--:--.---';
   const mins = Math.floor(num / 60);
   const secs = (num % 60).toFixed(3);
-  const secsPadded = parseFloat(secs) < 10 ? `0${secs}` : secs;
-  return `${mins}:${secsPadded}`;
+  return `${mins}:${secs.padStart(6, '0')}`;
 }
 
 export function parseTimeStringToSeconds(timeStr: string | number): number | null {
@@ -46,12 +45,7 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   const cNorm = course.toLowerCase().trim();
 
   // If course is generic GP/Grand Prix/Full/WEC, omit layout string
-  if (cNorm === 'gp' || cNorm === 'grand prix' || cNorm === 'full' || cNorm === 'wec') {
-    return venue;
-  }
-
-  // If venue already includes the full course string
-  if (vNorm.includes(cNorm)) {
+  if (cNorm === 'gp' || cNorm === 'grand prix' || cNorm === 'full' || cNorm === 'wec' || vNorm.includes(cNorm)) {
     return venue;
   }
 
@@ -60,10 +54,7 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   // Remove leading venue name or prefix e.g. "Paul Ricard - 1A-V2-Short" -> "1A-V2-Short"
   cleanCourse = cleanCourse.replace(/^[a-zA-Z\s]+-\s*/, (match) => {
     const matchNorm = match.toLowerCase();
-    if (vNorm.split(' ').some(word => word.length > 2 && matchNorm.includes(word))) {
-      return '';
-    }
-    return match;
+    return vNorm.split(' ').some(word => word.length > 2 && matchNorm.includes(word)) ? '' : match;
   });
 
   // Filter out redundant venue location words from course string
@@ -76,12 +67,7 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   });
 
   cleanCourse = filteredWords.join(' ').replace(/^-\s*/, '').trim();
-
-  if (!cleanCourse) {
-    return venue;
-  }
-
-  return `${venue} (${cleanCourse})`;
+  return cleanCourse ? `${venue} (${cleanCourse})` : venue;
 }
 
 export function matchesSessionType(sessionType: string = '', sessionName: string = '', filterType: string = 'All'): boolean {
@@ -90,22 +76,21 @@ export function matchesSessionType(sessionType: string = '', sessionName: string
   const t = (sessionType || '').toLowerCase().trim();
   const n = (sessionName || '').toLowerCase().trim();
 
-  if (f === 'practice') {
-    return t === 'practice' || n.startsWith('p') || n.includes('practice');
+  switch (f) {
+    case 'practice':
+      return t === 'practice' || n.startsWith('p') || n.includes('practice');
+    case 'qualifying':
+      return t === 'qualifying' || t === 'qualify' || n.startsWith('q') || n.includes('qual');
+    case 'race':
+      return t === 'race' || n.startsWith('r') || n.includes('race');
+    default:
+      return t === f || n === f || n.includes(f) || t.includes(f);
   }
-  if (f === 'qualifying') {
-    return t === 'qualifying' || t === 'qualify' || n.startsWith('q') || n.includes('qual');
-  }
-  if (f === 'race') {
-    return t === 'race' || n.startsWith('r') || n.includes('race');
-  }
-  return t === f || n === f || n.includes(f) || t.includes(f);
 }
 
 export function parseDateStringToTimestamp(dateStr?: string): number {
   if (!dateStr) return 0;
-  const clean = dateStr.replace(/\//g, '-');
-  const time = new Date(clean).getTime();
+  const time = new Date(dateStr.replace(/\//g, '-')).getTime();
   return isNaN(time) ? 0 : time;
 }
 

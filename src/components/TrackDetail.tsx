@@ -145,43 +145,33 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const { sessions, benchmarks } = data;
 
-  // Extract unique specific car models for the currently selected class on this track
+  // 1. Filter track sessions matching selected car class once
+  const classTrackSessions = sessions.filter(s => {
+    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
+    return display.toLowerCase() === trackName.toLowerCase() &&
+      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
+  });
+
+  // Extract unique specific car models for current class
   const availableCarModels = Array.from(new Set(
-    sessions
-      .filter(s => {
-        const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
-        if (display.toLowerCase() !== trackName.toLowerCase()) return false;
-        return matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
-      })
-      .map(s => s.playerDriver?.carType)
-      .filter(Boolean) as string[]
+    classTrackSessions.map(s => s.playerDriver?.carType).filter(Boolean) as string[]
   )).sort((a, b) => a.localeCompare(b));
 
   // Count empty sessions for this track & car class
-  const classTrackSessions = sessions.filter(s => {
-    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    if (display.toLowerCase() !== trackName.toLowerCase()) return false;
-    return matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
-  });
-
   const emptyCount = classTrackSessions.filter(s => {
     const p = s.playerDriver;
     return !p || (p.lapsCount ?? 0) === 0 || p.bestLapTime === null;
   }).length;
 
-  const filteredSessions = sessions.filter(s => {
-    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    if (display.toLowerCase() !== trackName.toLowerCase()) return false;
-
-    const classMatch = matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
-    if (!classMatch) return false;
-
+  // Apply model, type, search query, and empty filters
+  const filteredSessions = classTrackSessions.filter(s => {
     if (selectedCarModel !== 'All' && s.playerDriver?.carType !== selectedCarModel) {
       return false;
     }
 
-    const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
-    if (!matchesType) return false;
+    if (!matchesSessionType(s.sessionType, s.sessionName, filterType)) {
+      return false;
+    }
 
     const q = searchQuery.toLowerCase().trim();
     if (q !== '') {
@@ -201,17 +191,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     return true;
   });
 
-  // Build progression points directly from filtered track sessions (synchronizing class, car model, session type, search, and empty filter)
+  // Build progression points directly from filtered track sessions
   const trackProgression: SessionProgressionPoint[] = filteredSessions.length > 0
     ? filteredSessions.map(s => {
         const p = s.playerDriver;
-        const parseTimestamp = (str: string) => {
-          if (!str) return 0;
-          return new Date(str.replace(/\//g, '-')).getTime() || 0;
-        };
         return {
           sessionId: s.id,
-          timestamp: parseTimestamp(s.timeString),
+          timestamp: parseDateStringToTimestamp(s.timeString),
           dateString: s.timeString,
           sessionType: s.sessionType,
           sessionName: s.sessionName,
@@ -241,49 +227,43 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       const timeA = parseDateStringToTimestamp(a.timeString);
       const timeB = parseDateStringToTimestamp(b.timeString);
       return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
-    } else if (sortBy === 'lap-asc') {
+    }
+    if (sortBy === 'lap-asc') {
       const lapA = a.playerDriver?.bestLapTime ?? 99999;
       const lapB = b.playerDriver?.bestLapTime ?? 99999;
       return lapA - lapB;
-    } else {
-      const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
-      const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
-      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
     }
+    const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
+    const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
+    return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
   });
 
-  // 1. Helper to calculate pace category & percentage against a reference entry
+  // Calculate pace category & percentage against a reference entry
   const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null) => {
     if (!lapTime || !refEntry || !refEntry.target100Sec) return null;
     const pct = (lapTime / refEntry.target100Sec) * 100;
     return { category: getPaceCategoryFromPercentage(pct), pct };
   };
 
-  // 2. Find driver's overall best lap in filtered sessions for this track
-  const rawBestStats = (() => {
-    let bestTime: number | null = null;
-    let bestTimeStr = '--:--.---';
-    let bestCar = '';
-    let bestCarClass = '';
+  // Find driver's overall best lap in filtered sessions for this track
+  let bestTime: number | null = null;
+  let bestTimeStr = '--:--.---';
+  let bestCar = '';
+  let bestCarClass = '';
 
-    filteredSessions.forEach(s => {
-      if (s.playerDriver) {
-        const p = s.playerDriver;
-        if (p.bestLapTime) {
-          if (bestTime === null || p.bestLapTime < bestTime) {
-            bestTime = p.bestLapTime;
-            bestTimeStr = p.bestLapTimeString;
-            bestCar = p.carType;
-            bestCarClass = p.carClass || '';
-          }
-        }
-      }
-    });
+  for (const s of filteredSessions) {
+    const p = s.playerDriver;
+    if (p?.bestLapTime && (bestTime === null || p.bestLapTime < bestTime)) {
+      bestTime = p.bestLapTime;
+      bestTimeStr = p.bestLapTimeString;
+      bestCar = p.carType;
+      bestCarClass = p.carClass || '';
+    }
+  }
 
-    return { bestTime, bestTimeStr, bestCar, bestCarClass };
-  })();
+  const rawBestStats = { bestTime, bestTimeStr, bestCar, bestCarClass };
 
-  // 3. Find current benchmark matching selectedClass or matching the best lap's car class when selectedClass is 'All'
+  // Find current benchmark matching selectedClass or matching the best lap's car class
   let currentBenchmark: ReferenceLaptimeEntry | null = null;
   if (benchmarks && benchmarks.length > 0) {
     if (selectedClass && selectedClass !== 'All') {
@@ -298,15 +278,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     }
   }
 
-  // 4. Compute overall best pace stats dynamically against currentBenchmark
-  const currentClassDriverStats = (() => {
-    const paceInfo = getPaceCategoryForLap(rawBestStats.bestTime, currentBenchmark);
-    return {
-      ...rawBestStats,
-      bestPaceCat: paceInfo?.category || null,
-      bestPacePct: paceInfo?.pct || null,
-    };
-  })();
+  // Compute overall best pace stats dynamically against currentBenchmark
+  const paceInfo = getPaceCategoryForLap(rawBestStats.bestTime, currentBenchmark);
+  const currentClassDriverStats = {
+    ...rawBestStats,
+    bestPaceCat: paceInfo?.category || null,
+    bestPacePct: paceInfo?.pct || null,
+  };
 
   return (
     <div className="space-y-6">
