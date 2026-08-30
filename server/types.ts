@@ -1,3 +1,39 @@
+export type PaceCategory = 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
+
+export interface PaceCategoryInfo {
+  category: PaceCategory;
+  percentage: number; // e.g. 101.2 for 101.2%
+  target100Sec: number | null;
+  deltaToTargetSec: number | null;
+}
+
+export interface ReferenceLaptimeEntry {
+  key: string;              // e.g. "Bahrain (wec)_LMGT3"
+  trackName: string;        // e.g. "Bahrain (wec)"
+  carClass: string;         // e.g. "LMGT3"
+  patch: string;            // e.g. "1.4+"
+  target100Sec: number;     // ~100% reference time in seconds
+  targets: {
+    alienSec: number;       // ~100%
+    competitiveSec: number; // 101%
+    goodSec: number;        // 102%
+    goodMidpackSec: number; // 103%
+    midpackSec: number;     // 104%
+    midpackTailSec: number; // 105%
+    tailEnderSec: number;   // 106%
+    offlineSec: number;     // 107%
+  };
+  fastestCar?: string;
+  recordLaptimeSec?: number;
+}
+
+export interface ReferenceLaptimesCache {
+  lastUpdated: string; // ISO string timestamp
+  sourceUrl: string;
+  entriesCount: number;
+  entries: Record<string, ReferenceLaptimeEntry>;
+}
+
 export interface LapData {
   lapNum: number;
   position: number;
@@ -11,6 +47,9 @@ export interface LapData {
   rCompound: string;
   isPitStop: boolean;
   isValid: boolean;
+  paceCategory?: PaceCategory | null;
+  pacePercentage?: number | null;
+  target100Sec?: number | null;
 }
 
 export interface DriverData {
@@ -29,6 +68,9 @@ export interface DriverData {
   bestS3: number | null;
   theoreticalBest: number | null;
   theoreticalBestString: string;
+  bestLapPaceCategory?: PaceCategory | null;
+  bestLapPacePercentage?: number | null;
+  top3LapsCount?: number;
   lapsCount: number;
   laps: LapData[];
 }

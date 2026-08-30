@@ -3,6 +3,7 @@ import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import { DetailedSession, DriverData, LapData, SessionMetadata, SessionProgressionPoint, TrackSummary } from './types.js';
 import { formatTime, parseTimeStringToSeconds } from '../src/utils/formatters.js';
+import { calculatePaceCategory } from './referenceLaptimes.js';
 
 const defaultOptions = {
   ignoreAttributes: false,
@@ -25,10 +26,54 @@ interface ReplayFileEntry {
 
 export class LmuParser {
   private replaysMap: ReplayFileEntry[] = [];
+  public configuredPlayerName: string = '';
 
-  constructor(replaysDir?: string) {
+  constructor(replaysDir?: string, resultsDir?: string) {
+    this.detectPlayerName(resultsDir || replaysDir);
     if (replaysDir && fs.existsSync(replaysDir)) {
       this.indexReplays(replaysDir);
+    }
+  }
+
+  public detectPlayerName(baseDir?: string) {
+    try {
+      const candidateUserDataDirs: string[] = [];
+
+      if (baseDir) {
+        const uIdx = baseDir.indexOf('UserData');
+        if (uIdx !== -1) {
+          candidateUserDataDirs.push(baseDir.substring(0, uIdx + 8));
+        }
+      }
+
+      candidateUserDataDirs.push(
+        'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData',
+        path.join(process.cwd(), 'UserData')
+      );
+
+      for (const udDir of candidateUserDataDirs) {
+        if (!fs.existsSync(udDir)) continue;
+
+        const settingsPaths = [
+          path.join(udDir, 'player', 'settings.json'),
+          path.join(udDir, 'player', 'Settings.JSON'),
+        ];
+
+        for (const sp of settingsPaths) {
+          if (fs.existsSync(sp)) {
+            const raw = fs.readFileSync(sp, 'utf8');
+            const parsed = JSON.parse(raw);
+            const pName = parsed?.DRIVER?.['Player Name'] || parsed?.DRIVER?.PlayerName;
+            if (pName && typeof pName === 'string' && pName.trim()) {
+              this.configuredPlayerName = pName.trim();
+              console.log(`[LmuParser] Dynamically detected LMU player profile name: "${this.configuredPlayerName}"`);
+              return;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore fallback
     }
   }
 
@@ -40,7 +85,7 @@ export class LmuParser {
         .map(f => {
           const filePath = path.join(replaysDir, f);
           const stat = fs.statSync(filePath);
-          
+
           // Match e.g. "Circuit de Spa-Francorchamps P1 78.Vcr"
           const match = f.match(/^(.+?)\s+([PQR]\d+)\b/i);
           const trackName = match ? match[1].trim() : f.replace(/\.vcr$/i, '');
@@ -113,8 +158,45 @@ export class LmuParser {
 
       const drivers: DriverData[] = rawDrivers.map((d: any) => this.parseDriver(d)).filter(Boolean);
 
-      // Identify Player driver (isPlayer === 1 or true)
-      const playerDriver = drivers.find(d => d.isPlayer) || drivers[0];
+      // Compute Pace Categories for each lap and driver best lap
+      drivers.forEach(driver => {
+        driver.laps.forEach(lap => {
+          if (lap.isValid && lap.lapTime) {
+            const paceInfo = calculatePaceCategory(lap.lapTime, trackVenue, trackCourse, driver.carClass, driver.carType);
+            if (paceInfo) {
+              lap.paceCategory = paceInfo.category;
+              lap.pacePercentage = paceInfo.percentage;
+              lap.target100Sec = paceInfo.target100Sec;
+            }
+          }
+        });
+
+        if (driver.bestLapTime) {
+          const bestPaceInfo = calculatePaceCategory(driver.bestLapTime, trackVenue, trackCourse, driver.carClass, driver.carType);
+          if (bestPaceInfo) {
+            driver.bestLapPaceCategory = bestPaceInfo.category;
+            driver.bestLapPacePercentage = bestPaceInfo.percentage;
+          }
+        }
+      });
+
+      // Identify Player driver dynamically (matching profile name from LMU settings.json if available, or first isPlayer === 1)
+      const targetName = this.configuredPlayerName.toLowerCase().trim();
+      let mainPlayerDriver = targetName
+        ? drivers.find(d => d.name.toLowerCase().includes(targetName) || targetName.includes(d.name.toLowerCase()))
+        : undefined;
+
+      if (!mainPlayerDriver) {
+        mainPlayerDriver = drivers.find(d => d.isPlayer) || drivers[0];
+      }
+
+      if (mainPlayerDriver) {
+        drivers.forEach(d => {
+          d.isPlayer = (d.name === mainPlayerDriver.name);
+        });
+      }
+
+      const playerDriver = mainPlayerDriver;
 
       // Find overall best lap of session
       let bestSessionLap: SessionMetadata['bestSessionLap'] = undefined;
@@ -210,6 +292,8 @@ export class LmuParser {
       ? parseFloat((bestS1 + bestS2 + bestS3).toFixed(3))
       : null;
 
+    const top3LapsCount = laps.filter(l => l.isValid && l.position > 0 && l.position <= 3).length;
+
     return {
       name,
       carType,
@@ -226,6 +310,7 @@ export class LmuParser {
       bestS3,
       theoreticalBest,
       theoreticalBestString: formatTime(theoreticalBest),
+      top3LapsCount,
       lapsCount: laps.length,
       laps,
     };
@@ -383,27 +468,28 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
     const summary = map[track];
     summary.sessionsCount += 1;
 
-    s.drivers.forEach(d => {
-      summary.totalLaps += d.lapsCount;
-      if (!summary.carsUsed.includes(d.carType)) {
-        summary.carsUsed.push(d.carType);
+    const p = s.playerDriver || s.drivers.find(d => d.isPlayer);
+    if (p) {
+      summary.totalLaps += p.lapsCount || 0;
+      if (p.carType && !summary.carsUsed.includes(p.carType)) {
+        summary.carsUsed.push(p.carType);
       }
 
-      if (d.bestLapTime && (summary.bestLapTime === null || d.bestLapTime < summary.bestLapTime)) {
-        summary.bestLapTime = d.bestLapTime;
-        summary.bestLapDriver = d.name;
-        summary.bestLapCar = d.carType;
+      if (p.bestLapTime && (summary.bestLapTime === null || p.bestLapTime < summary.bestLapTime)) {
+        summary.bestLapTime = p.bestLapTime;
+        summary.bestLapDriver = p.name;
+        summary.bestLapCar = p.carType;
       }
-      if (d.bestS1 && (summary.bestS1 === null || d.bestS1 < summary.bestS1)) {
-        summary.bestS1 = d.bestS1;
+      if (p.bestS1 && (summary.bestS1 === null || p.bestS1 < summary.bestS1)) {
+        summary.bestS1 = p.bestS1;
       }
-      if (d.bestS2 && (summary.bestS2 === null || d.bestS2 < summary.bestS2)) {
-        summary.bestS2 = d.bestS2;
+      if (p.bestS2 && (summary.bestS2 === null || p.bestS2 < summary.bestS2)) {
+        summary.bestS2 = p.bestS2;
       }
-      if (d.bestS3 && (summary.bestS3 === null || d.bestS3 < summary.bestS3)) {
-        summary.bestS3 = d.bestS3;
+      if (p.bestS3 && (summary.bestS3 === null || p.bestS3 < summary.bestS3)) {
+        summary.bestS3 = p.bestS3;
       }
-    });
+    }
 
     if (summary.bestS1 && summary.bestS2 && summary.bestS3) {
       summary.theoreticalBest = parseFloat((summary.bestS1 + summary.bestS2 + summary.bestS3).toFixed(3));

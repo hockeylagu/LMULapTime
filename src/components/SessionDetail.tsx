@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { DetailedSession } from '../../server/types.js';
+import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { DetailedSession, ReferenceLaptimeEntry } from '../../server/types.js';
 import { formatTime } from '../utils/formatters.js';
+import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass } from '../utils/paceCategory.js';
 
 interface SessionDetailProps {
   sessionId: string;
@@ -10,25 +11,29 @@ interface SessionDetailProps {
 
 export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack }) => {
   const [session, setSession] = useState<DetailedSession | null>(null);
+  const [refCache, setRefCache] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/session/${sessionId}`)
-      .then(res => res.json())
-      .then(data => {
-        setSession(data);
-        if (data.playerDriver) {
-          setSelectedDriverName(data.playerDriver.name);
-        } else if (data.drivers && data.drivers.length > 0) {
-          setSelectedDriverName(data.drivers[0].name);
+    Promise.all([
+      fetch(`/api/session/${sessionId}`).then(res => res.json()),
+      fetch('/api/reference-laptimes').then(res => res.json()).catch(() => null),
+    ])
+      .then(([sessionData, refData]) => {
+        setSession(sessionData);
+        setRefCache(refData);
+        if (sessionData.playerDriver) {
+          setSelectedDriverName(sessionData.playerDriver.name);
+        } else if (sessionData.drivers && sessionData.drivers.length > 0) {
+          setSelectedDriverName(sessionData.drivers[0].name);
         }
         setLoading(false);
       })
       .catch(err => {
-        console.error('Failed to load session:', err);
+        console.error('Failed to load session detail data:', err);
         setLoading(false);
       });
   }, [sessionId]);
@@ -58,6 +63,24 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   const selectedDriver = session.drivers.find(d => d.name === selectedDriverName) || session.drivers[0];
 
+  const refEntry = (() => {
+    if (!refCache?.entries || !session || !selectedDriver) return null;
+    const entries: ReferenceLaptimeEntry[] = Object.values(refCache.entries);
+
+    const trackMatches = entries.filter(e =>
+      e.trackName.toLowerCase().includes(session.trackVenue.toLowerCase()) ||
+      session.trackVenue.toLowerCase().includes(e.trackName.toLowerCase())
+    );
+
+    if (trackMatches.length > 0) {
+      const classMatch = trackMatches.find(e =>
+        matchesCarClass(e.carClass, e.carClass, selectedDriver.carClass || selectedDriver.carType)
+      );
+      return classMatch || trackMatches[0];
+    }
+    return null;
+  })();
+
   const handleCopyReplayPath = () => {
     if (session.matchingReplayFile) {
       navigator.clipboard.writeText(session.matchingReplayFile.path);
@@ -68,11 +91,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   const handleExportCsv = () => {
     if (!selectedDriver) return;
-    const headers = ['Lap', 'LapTime_Seconds', 'LapTime_Formatted', 'S1', 'S2', 'S3', 'TopSpeed_kmh', 'FrontTire', 'RearTire', 'PitStop', 'Valid'];
+    const headers = ['Lap', 'LapTime_Seconds', 'LapTime_Formatted', 'PaceCategory', 'PacePercentage', 'S1', 'S2', 'S3', 'TopSpeed_kmh', 'FrontTire', 'RearTire', 'PitStop', 'Valid'];
     const rows = selectedDriver.laps.map(l => [
       l.lapNum,
       l.lapTime || '',
       l.lapTimeString,
+      l.paceCategory || '',
+      l.pacePercentage ? `${l.pacePercentage}%` : '',
       l.s1 || '',
       l.s2 || '',
       l.s3 || '',
@@ -96,7 +121,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
   return (
     <div className="space-y-6">
-      
+
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
@@ -123,11 +148,10 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30' :
-                session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30' :
-                'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
-              }`}>
+              <span className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30' :
+                  session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30' :
+                    'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                }`}>
                 {session.sessionName} ({session.sessionType})
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
@@ -153,6 +177,31 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           </div>
         </div>
 
+        {/* Reference Lap Targets for this Track & Category */}
+        {refEntry && (
+          <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-bold text-lmu-gold flex items-center gap-1.5 mr-1">
+              <Zap className="w-4 h-4 text-lmu-gold" />
+              {refEntry.carClass} Reference Targets:
+            </span>
+            <span className="px-2.5 py-1 rounded bg-purple-950/60 text-purple-300 border border-purple-500/40 text-xs font-mono">
+              👾 Alien: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.alienSec)}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded bg-amber-950/60 text-amber-300 border border-amber-500/40 text-xs font-mono">
+              🏆 Competitive: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.competitiveSec)}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 text-xs font-mono">
+              ⭐ Good: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.goodSec)}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded bg-sky-950/60 text-sky-300 border border-sky-500/40 text-xs font-mono">
+              🏎️ Midpack: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.midpackSec)}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded bg-orange-950/60 text-orange-300 border border-orange-500/40 text-xs font-mono">
+              🐢 Tail-ender: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.tailEnderSec)}</strong>
+            </span>
+          </div>
+        )}
+
         {/* Replay file banner if matched */}
         {session.matchingReplayFile && (
           <div className="p-3 rounded-xl bg-lmu-green/10 border border-lmu-green/20 flex items-center justify-between text-xs">
@@ -173,11 +222,22 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       {/* Selected Driver Summary Cards */}
       {selectedDriver && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="glass-panel p-4 rounded-xl">
+          <div className="glass-panel p-4 rounded-xl relative overflow-hidden">
             <p className="text-xs text-lmu-muted uppercase font-semibold">Best Lap Time</p>
-            <h4 className="text-2xl font-extrabold text-lmu-gold font-mono mt-1">
-              {selectedDriver.bestLapTimeString}
-            </h4>
+            <div className="flex items-baseline gap-2 mt-1">
+              <h4 className="text-2xl font-extrabold text-lmu-gold font-mono">
+                {selectedDriver.bestLapTimeString}
+              </h4>
+            </div>
+            {selectedDriver.bestLapPaceCategory && (
+              <div className="mt-1.5">
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).badgeClass}`}>
+                  <span>{getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).emoji}</span>
+                  <span>{selectedDriver.bestLapPaceCategory}</span>
+                  <span className="opacity-80 text-[10px]">({formatPacePercentage(selectedDriver.bestLapPacePercentage)})</span>
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="glass-panel p-4 rounded-xl">
@@ -222,6 +282,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <th className="px-3 py-3">Lap</th>
                 <th className="px-3 py-3">Pos</th>
                 <th className="px-3 py-3 text-right">Lap Time</th>
+                <th className="px-3 py-3 text-center">Pace Category</th>
                 <th className="px-3 py-3 text-right">Delta</th>
                 <th className="px-3 py-3 text-right">Sector 1</th>
                 <th className="px-3 py-3 text-right">Sector 2</th>
@@ -247,35 +308,40 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 return (
                   <tr
                     key={l.lapNum}
-                    className={`hover:bg-lmu-card/50 transition-colors ${
-                      isBest ? 'bg-lmu-gold/10' : ''
-                    }`}
+                    className={`hover:bg-lmu-card/50 transition-colors ${isBest ? 'bg-lmu-gold/10' : ''
+                      }`}
                   >
                     <td className="px-3 py-2.5 font-bold text-white">{l.lapNum}</td>
                     <td className="px-3 py-2.5 text-lmu-muted">{l.position || '-'}</td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${
-                      isBest ? 'text-lmu-gold' : 'text-white'
-                    }`}>
+                    <td className={`px-3 py-2.5 text-right font-bold ${isBest ? 'text-lmu-gold' : 'text-white'
+                      }`}>
                       {l.lapTimeString}
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-semibold text-xs ${
-                      isBest ? 'text-lmu-gold' : 'text-lmu-muted'
-                    }`}>
+                    <td className="px-3 py-2.5 text-center font-sans">
+                      {l.isValid && l.paceCategory ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold border shadow-sm ${getPaceCategoryStyle(l.paceCategory).badgeClass}`}>
+                          <span>{getPaceCategoryStyle(l.paceCategory).emoji}</span>
+                          <span>{l.paceCategory}</span>
+                          <span className="opacity-80 text-[10px]">({formatPacePercentage(l.pacePercentage)})</span>
+                        </span>
+                      ) : (
+                        <span className="text-lmu-muted text-xs">-</span>
+                      )}
+                    </td>
+                    <td className={`px-3 py-2.5 text-right font-semibold text-xs ${isBest ? 'text-lmu-gold' : 'text-lmu-muted'
+                      }`}>
                       {deltaStr}
                     </td>
-                    <td className={`px-3 py-2.5 text-right ${
-                      isS1Best ? 'text-lmu-gold font-bold' : ''
-                    }`}>
+                    <td className={`px-3 py-2.5 text-right ${isS1Best ? 'text-lmu-gold font-bold' : ''
+                      }`}>
                       {formatTime(l.s1)}
                     </td>
-                    <td className={`px-3 py-2.5 text-right ${
-                      isS2Best ? 'text-lmu-blue font-bold' : ''
-                    }`}>
+                    <td className={`px-3 py-2.5 text-right ${isS2Best ? 'text-lmu-blue font-bold' : ''
+                      }`}>
                       {formatTime(l.s2)}
                     </td>
-                    <td className={`px-3 py-2.5 text-right ${
-                      isS3Best ? 'text-lmu-green font-bold' : ''
-                    }`}>
+                    <td className={`px-3 py-2.5 text-right ${isS3Best ? 'text-lmu-green font-bold' : ''
+                      }`}>
                       {formatTime(l.s3)}
                     </td>
                     <td className="px-3 py-2.5 text-right text-white">

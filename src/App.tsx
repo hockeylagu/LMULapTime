@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { ImprovementChart } from './components/ImprovementChart';
 import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
+import { TrackDetail } from './components/TrackDetail';
 import { FileUploader } from './components/FileUploader';
 
 export default function App() {
@@ -13,27 +14,107 @@ export default function App() {
   const [progression, setProgression] = useState<any[]>([]);
   const [tracksMap, setTracksMap] = useState<any>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [selectedTrack, setSelectedTrack] = useState<string>('All');
+  const [selectedRouteTrackName, setSelectedRouteTrackName] = useState<string | null>(null);
+
+  // Filter states
+  const [selectedTrack, setSelectedTrackState] = useState<string>('All');
+  const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
+  const [filterType, setFilterTypeState] = useState<string>('All');
+  const [searchQuery, setSearchQueryState] = useState<string>('');
+
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Helper to parse location hash for routing
-  const parseHash = () => {
-    const rawHash = window.location.hash.replace(/^#\/?/, '');
-    if (rawHash.startsWith('session/')) {
-      const sessionId = rawHash.replace('session/', '');
-      return { tab: 'dashboard' as const, sessionId: decodeURIComponent(sessionId) };
+  // Helper to parse location hash and query parameters for routing and filter state
+  const parseUrlState = () => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const pathPart = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
+    const searchPart = qIndex !== -1 ? fullHash.substring(qIndex + 1) : window.location.search.replace(/^\?/, '');
+
+    const params = new URLSearchParams(searchPart);
+    const filterTrack = params.get('track') || 'All';
+    const filterCarClass = params.get('carClass') || 'All';
+    const filterTypeVal = params.get('type') || 'All';
+    const filterSearchVal = params.get('q') || '';
+
+    let tab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings' = 'dashboard';
+    let sessionId: string | null = null;
+    let trackRouteName: string | null = null;
+
+    if (pathPart.startsWith('session/')) {
+      sessionId = decodeURIComponent(pathPart.replace('session/', ''));
+    } else if (pathPart.startsWith('track/')) {
+      tab = 'tracks';
+      trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
+    } else if (['improvement', 'tracks', 'settings', 'dashboard'].includes(pathPart)) {
+      tab = pathPart as any;
     }
-    if (['improvement', 'tracks', 'settings', 'dashboard'].includes(rawHash)) {
-      return { tab: rawHash as any, sessionId: null };
-    }
-    return { tab: 'dashboard' as const, sessionId: null };
+
+    return {
+      tab,
+      sessionId,
+      trackRouteName,
+      filters: {
+        track: filterTrack,
+        carClass: filterCarClass,
+        type: filterTypeVal,
+        q: filterSearchVal,
+      },
+    };
+  };
+
+  const updateUrlFilters = (updates: { track?: string; carClass?: string; type?: string; q?: string }) => {
+    const fullHash = window.location.hash.replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const currentPath = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
+
+    const currentFilters = parseUrlState().filters;
+    const track = updates.track !== undefined ? updates.track : currentFilters.track;
+    const carClass = updates.carClass !== undefined ? updates.carClass : currentFilters.carClass;
+    const type = updates.type !== undefined ? updates.type : currentFilters.type;
+    const q = updates.q !== undefined ? updates.q : currentFilters.q;
+
+    const params = new URLSearchParams();
+    if (track && track !== 'All') params.set('track', track);
+    if (carClass && carClass !== 'All') params.set('carClass', carClass);
+    if (type && type !== 'All') params.set('type', type);
+    if (q && q.trim() !== '') params.set('q', q.trim());
+
+    const paramStr = params.toString();
+    const newHash = `#/${currentPath}${paramStr ? `?${paramStr}` : ''}`;
+    window.history.replaceState(null, '', newHash);
+  };
+
+  const setSelectedTrack = (track: string) => {
+    setSelectedTrackState(track);
+    updateUrlFilters({ track });
+  };
+
+  const setSelectedCarClass = (carClass: string) => {
+    setSelectedCarClassState(carClass);
+    updateUrlFilters({ carClass });
+  };
+
+  const setFilterType = (type: string) => {
+    setFilterTypeState(type);
+    updateUrlFilters({ type });
+  };
+
+  const setSearchQuery = (q: string) => {
+    setSearchQueryState(q);
+    updateUrlFilters({ q });
   };
 
   const handleHashChange = useCallback(() => {
-    const { tab, sessionId } = parseHash();
+    const { tab, sessionId, trackRouteName, filters } = parseUrlState();
     setActiveTab(tab);
     setSelectedSessionId(sessionId);
+    setSelectedRouteTrackName(trackRouteName);
+    setSelectedTrackState(filters.track);
+    setSelectedCarClassState(filters.carClass);
+    setFilterTypeState(filters.type);
+    setSearchQueryState(filters.q);
   }, []);
 
   useEffect(() => {
@@ -94,19 +175,22 @@ export default function App() {
   };
 
   const handleTabChange = (tab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings') => {
-    window.location.hash = tab === 'dashboard' ? '' : tab;
+    const paramStr = new URLSearchParams(parseUrlState().filters).toString();
+    const queryPart = paramStr ? `?${paramStr}` : '';
+    window.location.hash = tab === 'dashboard' ? `dashboard${queryPart}` : `${tab}${queryPart}`;
   };
 
   const handleSelectTrack = (trackName: string) => {
-    setSelectedTrack(trackName);
-    window.location.hash = 'improvement';
+    const paramStr = new URLSearchParams(parseUrlState().filters).toString();
+    const queryPart = paramStr ? `?${paramStr}` : '';
+    window.location.hash = `track/${encodeURIComponent(trackName)}${queryPart}`;
   };
 
   const tracks = Object.keys(tracksMap);
 
   return (
     <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
-      
+
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -118,7 +202,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
-        
+
         {loading ? (
           <div className="py-24 text-center glass-panel rounded-2xl">
             <div className="inline-block animate-spin w-10 h-10 border-4 border-lmu-accent border-t-transparent rounded-full mb-4" />
@@ -130,18 +214,32 @@ export default function App() {
             sessionId={selectedSessionId}
             onBack={handleBackToSessions}
           />
+        ) : selectedRouteTrackName ? (
+          <TrackDetail
+            trackName={selectedRouteTrackName}
+            onBack={() => { window.location.hash = 'tracks'; }}
+            onSelectSession={handleSelectSession}
+          />
         ) : activeTab === 'dashboard' ? (
           <Dashboard
             sessions={sessions}
             onSelectSession={handleSelectSession}
             selectedTrack={selectedTrack}
             setSelectedTrack={setSelectedTrack}
+            selectedCarClass={selectedCarClass}
+            setSelectedCarClass={setSelectedCarClass}
+            filterType={filterType}
+            setFilterType={setFilterType}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
           />
         ) : activeTab === 'improvement' ? (
           <ImprovementChart
             progression={progression}
             selectedTrack={selectedTrack}
             setSelectedTrack={setSelectedTrack}
+            selectedCarClass={selectedCarClass}
+            setSelectedCarClass={setSelectedCarClass}
             tracks={tracks}
           />
         ) : activeTab === 'tracks' ? (

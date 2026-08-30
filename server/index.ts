@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries } from './parser.js';
 import { DetailedSession } from './types.js';
+import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +21,19 @@ let currentReplaysDir = DEFAULT_REPLAYS_DIR;
 
 let parser = new LmuParser(currentReplaysDir);
 let cachedSessions: DetailedSession[] = [];
+
+// Ensure reference laptimes are loaded or cached on server startup
+(async () => {
+  let refData = loadReferenceLaptimesFromCache();
+  if (!refData) {
+    try {
+      console.log('Initializing reference laptimes cache from Google Sheets...');
+      await fetchAndCacheReferenceLaptimes();
+    } catch (err) {
+      console.warn('Initial fetch of reference laptimes failed:', err);
+    }
+  }
+})();
 
 function loadSessions(forceRefresh = false): DetailedSession[] {
   // Return cached sessions instantly unless a force refresh is requested
@@ -61,14 +75,20 @@ app.get('/api/status', (_req, res) => {
   const resultsExist = fs.existsSync(currentResultsDir);
   const replaysExist = fs.existsSync(currentReplaysDir);
   const sessions = loadSessions();
+  const refCache = loadReferenceLaptimesFromCache();
 
   res.json({
     resultsDir: currentResultsDir,
     resultsExist,
     replaysDir: currentReplaysDir,
     replaysExist,
+    playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
     tracksCount: Object.keys(computeTrackSummaries(sessions)).length,
+    referenceLaptimes: {
+      lastUpdated: refCache?.lastUpdated || null,
+      entriesCount: refCache?.entriesCount || 0,
+    },
   });
 });
 
@@ -154,14 +174,18 @@ app.get('/api/tracks', (_req, res) => {
 });
 
 app.post('/api/scan', (req, res) => {
-  const { resultsDir, replaysDir } = req.body;
+  const { resultsDir, replaysDir, playerName } = req.body;
 
   if (resultsDir && fs.existsSync(resultsDir)) {
     currentResultsDir = resultsDir;
   }
   if (replaysDir && fs.existsSync(replaysDir)) {
     currentReplaysDir = replaysDir;
-    parser = new LmuParser(currentReplaysDir);
+  }
+
+  parser = new LmuParser(currentReplaysDir, currentResultsDir);
+  if (typeof playerName === 'string' && playerName.trim()) {
+    parser.configuredPlayerName = playerName.trim();
   }
 
   const sessions = loadSessions(true);
@@ -169,8 +193,68 @@ app.post('/api/scan', (req, res) => {
     success: true,
     resultsDir: currentResultsDir,
     replaysDir: currentReplaysDir,
+    playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
   });
+});
+
+app.get('/api/track/:trackName', (req, res) => {
+  const { trackName } = req.params;
+  const decoded = decodeURIComponent(trackName);
+  const allSessions = loadSessions();
+  const trackSessions = allSessions.filter(s =>
+    s.trackVenue.toLowerCase().includes(decoded.toLowerCase()) ||
+    s.trackCourse.toLowerCase().includes(decoded.toLowerCase()) ||
+    decoded.toLowerCase().includes(s.trackVenue.toLowerCase())
+  );
+
+  const normTrack = normalizeTrackName(decoded);
+  const refCache = loadReferenceLaptimesFromCache();
+  const benchmarks: any[] = [];
+
+  if (refCache) {
+    Object.values(refCache.entries).forEach(entry => {
+      if (
+        entry.trackName.toLowerCase() === normTrack.toLowerCase() ||
+        normalizeTrackName(entry.trackName).toLowerCase() === normTrack.toLowerCase()
+      ) {
+        benchmarks.push(entry);
+      }
+    });
+  }
+
+  res.json({
+    trackName: decoded,
+    normalizedTrackName: normTrack,
+    sessionsCount: trackSessions.length,
+    sessions: trackSessions.map(s => {
+      const { drivers, ...meta } = s;
+      return meta;
+    }),
+    benchmarks,
+  });
+});
+
+app.get('/api/reference-laptimes', (_req, res) => {
+  const refData = loadReferenceLaptimesFromCache();
+  res.json(refData || { lastUpdated: null, entriesCount: 0, entries: {} });
+});
+
+app.post('/api/reference-laptimes/refresh', async (_req, res) => {
+  try {
+    const updatedCache = await fetchAndCacheReferenceLaptimes();
+    // Force reload sessions so lap pace categories update with latest reference benchmark
+    const sessions = loadSessions(true);
+    res.json({
+      success: true,
+      lastUpdated: updatedCache.lastUpdated,
+      entriesCount: updatedCache.entriesCount,
+      sessionsCount: sessions.length,
+    });
+  } catch (err: any) {
+    console.error('Failed to refresh reference laptimes:', err);
+    res.status(500).json({ error: err.message || 'Failed to refresh reference laptimes' });
+  }
 });
 
 app.listen(PORT, () => {

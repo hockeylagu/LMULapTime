@@ -26,7 +26,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({ tracksMap, onSel
 
   return (
     <div className="space-y-6">
-      
+
       {/* Title */}
       <div className="glass-panel p-5 rounded-2xl flex items-center justify-between">
         <div>

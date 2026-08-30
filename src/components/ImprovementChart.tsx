@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Zap, Trophy, Clock, CheckCircle2, FilterX } from 'lucide-react';
 import { formatTime } from '../utils/formatters';
+import { matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 
 interface SessionProgressionPoint {
   sessionId: string;
@@ -36,6 +37,8 @@ interface ImprovementChartProps {
   progression: SessionProgressionPoint[];
   selectedTrack: string;
   setSelectedTrack: (track: string) => void;
+  selectedCarClass: string;
+  setSelectedCarClass: (carClass: string) => void;
   tracks: string[];
 }
 
@@ -43,14 +46,18 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   progression,
   selectedTrack,
   setSelectedTrack,
+  selectedCarClass,
+  setSelectedCarClass,
   tracks,
 }) => {
   const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical'>('bestLap');
   const [hideEmpty, setHideEmpty] = useState<boolean>(true);
 
-  // Filter progression by selected track & optional empty filter
+  // Filter progression by selected track, vehicle class & optional empty filter
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
-  const rawTrackData = progression.filter(p => p.trackVenue === activeTrack);
+  const rawTrackData = progression.filter(p =>
+    p.trackVenue === activeTrack && matchesCarClass(p.carClass, p.carType, selectedCarClass)
+  );
   const emptyCount = rawTrackData.filter(p => p.totalLapsCount === 0 || p.bestLapTime === null).length;
   const trackData = rawTrackData.filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null));
 
@@ -95,7 +102,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header & Controls */}
       <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -120,29 +127,43 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             ))}
           </select>
 
+          {/* Vehicle Class Filter Buttons */}
+          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto">
+            {VEHICLE_CLASS_OPTIONS.map(cls => (
+              <button
+                key={cls.id}
+                onClick={() => setSelectedCarClass(cls.id)}
+                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                  selectedCarClass === cls.id
+                    ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                    : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                {cls.label}
+              </button>
+            ))}
+          </div>
+
           {/* Metric Toggle */}
           <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
             <button
               onClick={() => setMetric('bestLap')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                metric === 'bestLap' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'bestLap' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
+                }`}
             >
               Lap Pace
             </button>
             <button
               onClick={() => setMetric('sectors')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                metric === 'sectors' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'sectors' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
+                }`}
             >
               Sectors (S1/S2/S3)
             </button>
             <button
               onClick={() => setMetric('theoretical')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                metric === 'theoretical' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'theoretical' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
+                }`}
             >
               Theoretical Best
             </button>
@@ -151,19 +172,17 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
           {/* Hide Empty Toggle */}
           <button
             onClick={() => setHideEmpty(!hideEmpty)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-              hideEmpty
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${hideEmpty
                 ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
                 : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-            }`}
+              }`}
             title={hideEmpty ? "Hiding empty sessions. Click to show all." : "Showing all sessions. Click to filter out empty results."}
           >
             <FilterX className="w-3.5 h-3.5" />
             <span>Hide Empty Results</span>
             {emptyCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
-              }`}>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
+                }`}>
                 {emptyCount}
               </span>
             )}
@@ -195,9 +214,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
           <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
             <div>
               <p className="text-xs text-lmu-muted uppercase font-semibold">Overall Pace Improvement</p>
-              <h4 className={`text-2xl font-extrabold mt-0.5 font-mono ${
-                totalImprovement !== null && totalImprovement > 0 ? 'text-lmu-green' : 'text-white'
-              }`}>
+              <h4 className={`text-2xl font-extrabold mt-0.5 font-mono ${totalImprovement !== null && totalImprovement > 0 ? 'text-lmu-green' : 'text-white'
+                }`}>
                 {totalImprovement !== null
                   ? `${totalImprovement > 0 ? '-' : '+'}${Math.abs(totalImprovement).toFixed(3)}s`
                   : 'N/A'}

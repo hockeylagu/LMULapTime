@@ -8,8 +8,22 @@ export function formatTime(seconds: number | null): string {
 
 export function parseTimeStringToSeconds(timeStr: string | number): number | null {
   if (typeof timeStr === 'number') return isNaN(timeStr) || timeStr <= 0 ? null : timeStr;
-  if (!timeStr || timeStr === '--.----' || timeStr === '--.---') return null;
-  const val = parseFloat(timeStr);
+  if (!timeStr) return null;
+  const str = String(timeStr).trim();
+  if (str === '--.----' || str === '--.---' || str === '--:--.---' || str === '') return null;
+  
+  if (str.includes(':')) {
+    const parts = str.split(':');
+    if (parts.length === 2) {
+      const mins = parseFloat(parts[0]);
+      const secs = parseFloat(parts[1]);
+      if (!isNaN(mins) && !isNaN(secs)) {
+        return mins * 60 + secs;
+      }
+    }
+  }
+  
+  const val = parseFloat(str);
   return isNaN(val) || val <= 0 ? null : val;
 }
 

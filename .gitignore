@@ -38,3 +38,4 @@ Thumbs.db
 .cache/
 .temp/
 tmp/
+server/laptimes_cache.json

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gauge, TrendingUp, Flag, FolderSearch, RefreshCw } from 'lucide-react';
+import { Gauge, TrendingUp, Flag, Settings, RefreshCw } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings';
@@ -90,8 +90,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
             }`}
           >
-            <FolderSearch className="w-4 h-4" />
-            Paths
+            <Settings className="w-4 h-4" />
+            Settings
           </button>
         </nav>
 
