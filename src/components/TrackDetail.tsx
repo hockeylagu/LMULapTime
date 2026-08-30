@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Zap, ChevronRight, FileText } from 'lucide-react';
-import { formatTime } from '../utils/formatters.js';
+import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
+import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
 
 interface SessionMeta {
   id: string;
@@ -30,6 +31,7 @@ interface TrackDetailProps {
   onSelectSession: (sessionId: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
+  progression?: SessionProgressionPoint[];
 }
 
 export const TrackDetail: React.FC<TrackDetailProps> = ({
@@ -38,8 +40,10 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   onSelectSession,
   selectedCarClass,
   setSelectedCarClass,
+  progression = [],
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
+  const [hideEmpty, setHideEmpty] = useState<boolean>(true);
   const [data, setData] = useState<{
     trackName: string;
     normalizedTrackName: string;
@@ -90,9 +94,20 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const { sessions, benchmarks } = data;
 
-  const filteredSessions = sessions.filter(s =>
-    matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass)
-  );
+
+
+  const filteredSessions = sessions.filter(s => {
+    const display = getDisplayTrackName(s.trackVenue, (s as any).trackCourse);
+    if (trackName.includes('(') && trackName.includes(')')) {
+      if (display.toLowerCase() !== trackName.toLowerCase()) return false;
+    }
+    const classMatch = matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
+    if (!classMatch) return false;
+    if (hideEmpty) {
+      return (s.playerDriver?.lapsCount ?? 0) > 0 && s.playerDriver?.bestLapTime !== null;
+    }
+    return true;
+  });
 
   // Helper to find driver's overall best lap in filtered sessions for this track
   const findOverallBestInFilteredSessions = () => {
@@ -328,6 +343,21 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         )}
 
       </div>
+
+      {/* Progression & Pace Improvement Chart */}
+      {progression && progression.length > 0 && (
+        <ImprovementChart
+          progression={progression}
+          selectedTrack={trackName}
+          setSelectedTrack={() => {}}
+          selectedCarClass={selectedCarClass}
+          setSelectedCarClass={setSelectedCarClass}
+          tracks={[trackName]}
+          hideEmpty={hideEmpty}
+          setHideEmpty={setHideEmpty}
+          embedded={true}
+        />
+      )}
 
       {/* Recorded Sessions on this Track */}
       <div className="glass-panel p-6 rounded-2xl space-y-4">

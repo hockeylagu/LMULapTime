@@ -142,9 +142,18 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
 }
 
 // Track Normalization Helper
-export function normalizeTrackName(venue: string, course?: string): string {
-  const combined = `${venue} ${course || ''}`.toLowerCase();
+export function normalizeTrackName(venue: string = '', course: string = ''): string {
+  const combined = `${venue} ${course}`.toLowerCase().trim();
 
+  if (combined.includes('paul ricard') || combined.includes('ricard')) {
+    if (combined.includes('short') || combined.includes('v2 short') || combined.includes('1a v2 short')) {
+      return 'Paul Ricard (1A v2 short)';
+    }
+    if (combined.includes('1a v2')) return 'Paul Ricard (1A v2)';
+    if (combined.includes('1a')) return 'Paul Ricard (1A)';
+    if (combined.includes('3a')) return 'Paul Ricard (3A)';
+    return 'Paul Ricard (1A v2)';
+  }
   if (combined.includes('spa')) return 'Spa';
   if (combined.includes('monza')) {
     if (combined.includes('curva') || combined.includes('grande')) return 'Monza (curvagrande)';
@@ -167,13 +176,6 @@ export function normalizeTrackName(venue: string, course?: string): string {
   if (combined.includes('imola') || combined.includes('ferrari')) return 'Imola';
   if (combined.includes('interlagos') || combined.includes('pace')) return 'Interlagos';
   if (combined.includes('laguna') || combined.includes('seca')) return 'Laguna Seca';
-  if (combined.includes('paul ricard') || combined.includes('ricard')) {
-    if (combined.includes('1a v2 short')) return 'Paul Ricard (1A v2 short)';
-    if (combined.includes('1a v2')) return 'Paul Ricard (1A v2)';
-    if (combined.includes('1a')) return 'Paul Ricard (1A)';
-    if (combined.includes('3a')) return 'Paul Ricard (3A)';
-    return 'Paul Ricard';
-  }
   if (combined.includes('portimao') || combined.includes('algarve')) return 'Portimao';
   if (combined.includes('qatar') || combined.includes('lusail')) {
     if (combined.includes('short')) return 'Qatar (short)';
@@ -233,10 +235,23 @@ export function getReferenceEntry(
   }
 
   // Match by track name
-  const trackEntries = Object.values(cache.entries).filter(
-    e => e.trackName.toLowerCase() === normTrack.toLowerCase() ||
-         normalizeTrackName(e.trackName).toLowerCase() === normTrack.toLowerCase()
+  const normClean = normTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let trackEntries = Object.values(cache.entries).filter(
+    e => {
+      const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const eRaw = e.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return eNorm === normClean || eRaw === normClean;
+    }
   );
+
+  if (trackEntries.length === 0) {
+    trackEntries = Object.values(cache.entries).filter(
+      e => {
+        const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        return eNorm.includes(normClean) || normClean.includes(eNorm);
+      }
+    );
+  }
 
   if (trackEntries.length > 0) {
     const targetGroup = normClass.toLowerCase();
@@ -257,8 +272,7 @@ export function getReferenceEntry(
       return eClass === targetGroup;
     });
 
-    // Return classMatch ONLY if found. Never return an unmatched vehicle class benchmark.
-    return classMatch || null;
+    return classMatch || trackEntries[0];
   }
 
   return null;

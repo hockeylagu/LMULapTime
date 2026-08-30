@@ -138,3 +138,61 @@ export function matchesCarClass(carClass: string = '', carType: string = '', tar
 
   return combined.includes(target);
 }
+
+export function normalizeTrackName(venue: string = '', course: string = ''): string {
+  const combined = `${venue} ${course}`.toLowerCase().trim();
+
+  if (combined.includes('paul ricard') || combined.includes('ricard')) {
+    if (combined.includes('short') || combined.includes('v2 short') || combined.includes('1a v2 short')) {
+      return 'Paul Ricard (1A v2 short)';
+    }
+    if (combined.includes('1a v2')) return 'Paul Ricard (1A v2)';
+    if (combined.includes('1a')) return 'Paul Ricard (1A)';
+    if (combined.includes('3a')) return 'Paul Ricard (3A)';
+    return 'Paul Ricard (1A v2)';
+  }
+  if (combined.includes('spa')) return 'Spa';
+  if (combined.includes('monza')) {
+    if (combined.includes('curva') || combined.includes('grande')) return 'Monza (curvagrande)';
+    return 'Monza';
+  }
+  if (combined.includes('barcelona') || combined.includes('catalunya')) return 'Barcelona';
+  if (combined.includes('sarthe') || combined.includes('mans')) {
+    if (combined.includes('straight') || combined.includes('chicaneless')) return 'Circuit de la Sarthe (straight)';
+    return 'Circuit de la Sarthe';
+  }
+  if (combined.includes('cota') || combined.includes('americas')) {
+    if (combined.includes('national')) return 'COTA (national)';
+    return 'COTA';
+  }
+  if (combined.includes('daytona')) return 'Daytona';
+  if (combined.includes('fuji')) {
+    if (combined.includes('classic')) return 'Fuji (classic)';
+    return 'Fuji (chicane)';
+  }
+  if (combined.includes('imola') || combined.includes('ferrari')) return 'Imola';
+  if (combined.includes('interlagos') || combined.includes('pace')) return 'Interlagos';
+  if (combined.includes('laguna') || combined.includes('seca')) return 'Laguna Seca';
+  if (combined.includes('portimao') || combined.includes('algarve')) return 'Portimao';
+  if (combined.includes('qatar') || combined.includes('lusail')) {
+    if (combined.includes('short')) return 'Qatar (short)';
+    return 'Qatar';
+  }
+  if (combined.includes('sebring')) {
+    if (combined.includes('school')) return 'Sebring (school)';
+    return 'Sebring';
+  }
+  if (combined.includes('silverstone')) {
+    if (combined.includes('national')) return 'Silverstone (National)';
+    if (combined.includes('international')) return 'Silverstone (International)';
+    return 'Silverstone (GP)';
+  }
+  if (combined.includes('bahrain')) {
+    if (combined.includes('endurance')) return 'Bahrain (endurance)';
+    if (combined.includes('outer')) return 'Bahrain (outer)';
+    if (combined.includes('paddock')) return 'Bahrain (paddock)';
+    return 'Bahrain (wec)';
+  }
+
+  return venue;
+}

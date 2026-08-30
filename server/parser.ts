@@ -441,6 +441,53 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
   });
 }
 
+export function getDisplayTrackName(venue: string = '', course: string = ''): string {
+  if (!course || course.trim() === '') {
+    return venue;
+  }
+
+  const vNorm = venue.toLowerCase();
+  const cNorm = course.toLowerCase().trim();
+
+  // If course is generic GP/Grand Prix/Full/WEC, omit layout string
+  if (cNorm === 'gp' || cNorm === 'grand prix' || cNorm === 'full' || cNorm === 'wec') {
+    return venue;
+  }
+
+  // If venue already includes the full course string
+  if (vNorm.includes(cNorm)) {
+    return venue;
+  }
+
+  let cleanCourse = course.trim();
+
+  // Remove leading venue name or prefix e.g. "Paul Ricard - 1A-V2-Short" -> "1A-V2-Short"
+  cleanCourse = cleanCourse.replace(/^[a-zA-Z\s]+-\s*/, (match) => {
+    const matchNorm = match.toLowerCase();
+    if (vNorm.split(' ').some(word => word.length > 2 && matchNorm.includes(word))) {
+      return '';
+    }
+    return match;
+  });
+
+  // Filter out redundant venue location words from course string
+  const venueWords = venue.split(/[\s\-_]+/).map(w => w.toLowerCase()).filter(w => w.length > 2);
+  const courseWords = cleanCourse.split(/[\s\-_]+/);
+
+  const filteredWords = courseWords.filter(word => {
+    const wordLower = word.toLowerCase();
+    return !venueWords.some(vw => vw === wordLower && !['circuit', 'course', 'layout'].includes(vw));
+  });
+
+  cleanCourse = filteredWords.join(' ').replace(/^-\s*/, '').trim();
+
+  if (!cleanCourse) {
+    return venue;
+  }
+
+  return `${venue} (${cleanCourse})`;
+}
+
 /**
  * Aggregates summary statistics per track.
  */
@@ -448,7 +495,7 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
   const map: Record<string, TrackSummary> = {};
 
   sessions.forEach(s => {
-    const track = s.trackVenue;
+    const track = getDisplayTrackName(s.trackVenue, s.trackCourse);
     if (!map[track]) {
       map[track] = {
         trackVenue: track,

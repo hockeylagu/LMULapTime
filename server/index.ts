@@ -208,19 +208,27 @@ app.get('/api/track/:trackName', (req, res) => {
     decoded.toLowerCase().includes(s.trackVenue.toLowerCase())
   );
 
-  const normTrack = normalizeTrackName(decoded);
+  const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
+  const normTrack = normalizeTrackName(decoded, sampleCourse);
   const refCache = loadReferenceLaptimesFromCache();
-  const benchmarks: any[] = [];
+  let benchmarks: any[] = [];
 
   if (refCache) {
-    Object.values(refCache.entries).forEach(entry => {
-      if (
-        entry.trackName.toLowerCase() === normTrack.toLowerCase() ||
-        normalizeTrackName(entry.trackName).toLowerCase() === normTrack.toLowerCase()
-      ) {
-        benchmarks.push(entry);
-      }
+    const normClean = normTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let matches = Object.values(refCache.entries).filter(entry => {
+      const entryNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return entryNorm === normClean || entryRaw === normClean;
     });
+
+    if (matches.length === 0) {
+      matches = Object.values(refCache.entries).filter(entry => {
+        const entryNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        return entryNorm.includes(normClean) || normClean.includes(entryNorm);
+      });
+    }
+
+    benchmarks = matches;
   }
 
   res.json({

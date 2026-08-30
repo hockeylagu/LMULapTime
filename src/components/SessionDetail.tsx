@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { DetailedSession, ReferenceLaptimeEntry } from '../../server/types.js';
-import { formatTime } from '../utils/formatters.js';
+import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass } from '../utils/paceCategory.js';
 
 interface SessionDetailProps {
@@ -156,7 +156,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
             </div>
-            <h2 className="text-2xl font-extrabold text-white mt-1">{session.trackVenue}</h2>
+            <h2 className="text-2xl font-extrabold text-white mt-1">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</h2>
             <p className="text-xs text-lmu-muted mt-0.5">{session.trackCourse} • {session.trackEvent || 'Session'}</p>
           </div>
 

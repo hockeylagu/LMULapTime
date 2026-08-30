@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
-import { ImprovementChart } from './components/ImprovementChart';
 import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
 import { FileUploader } from './components/FileUploader';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'sessions' | 'settings'>('dashboard');
   const [status, setStatus] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [progression, setProgression] = useState<any[]>([]);
@@ -38,7 +37,7 @@ export default function App() {
     const filterTypeVal = params.get('type') || 'All';
     const filterSearchVal = params.get('q') || '';
 
-    let tab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings' = 'dashboard';
+    let tab: 'dashboard' | 'tracks' | 'sessions' | 'settings' = 'dashboard';
     let sessionId: string | null = null;
     let trackRouteName: string | null = null;
 
@@ -47,7 +46,7 @@ export default function App() {
     } else if (pathPart.startsWith('track/')) {
       tab = 'tracks';
       trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
-    } else if (['improvement', 'tracks', 'settings', 'dashboard'].includes(pathPart)) {
+    } else if (['tracks', 'settings', 'dashboard'].includes(pathPart)) {
       tab = pathPart as any;
     }
 
@@ -174,7 +173,7 @@ export default function App() {
     }
   };
 
-  const handleTabChange = (tab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings') => {
+  const handleTabChange = (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => {
     const paramStr = new URLSearchParams(parseUrlState().filters).toString();
     const queryPart = paramStr ? `?${paramStr}` : '';
     window.location.hash = tab === 'dashboard' ? `dashboard${queryPart}` : `${tab}${queryPart}`;
@@ -185,8 +184,6 @@ export default function App() {
     const queryPart = paramStr ? `?${paramStr}` : '';
     window.location.hash = `track/${encodeURIComponent(trackName)}${queryPart}`;
   };
-
-  const tracks = Object.keys(tracksMap);
 
   return (
     <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
@@ -221,6 +218,7 @@ export default function App() {
             onSelectSession={handleSelectSession}
             selectedCarClass={selectedCarClass}
             setSelectedCarClass={setSelectedCarClass}
+            progression={progression}
           />
         ) : activeTab === 'dashboard' ? (
           <Dashboard
@@ -234,15 +232,6 @@ export default function App() {
             setFilterType={setFilterType}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-          />
-        ) : activeTab === 'improvement' ? (
-          <ImprovementChart
-            progression={progression}
-            selectedTrack={selectedTrack}
-            setSelectedTrack={setSelectedTrack}
-            selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setSelectedCarClass}
-            tracks={tracks}
           />
         ) : activeTab === 'tracks' ? (
           <TrackSummaries

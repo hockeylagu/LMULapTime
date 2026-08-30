@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Calendar, Car, Zap, FileText, ChevronRight, Video, FilterX, AlertCircle, MapPin, Award } from 'lucide-react';
-import { isSessionEmpty } from '../utils/formatters';
+import { isSessionEmpty, getDisplayTrackName } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types';
 
 interface BestRefLapInfo {
+  sessionId: string;
   percentage: number;
   category: PaceCategory;
   lapTimeString: string;
@@ -16,6 +17,7 @@ interface SessionSummary {
   id: string;
   filename: string;
   trackVenue: string;
+  trackCourse?: string;
   timeString: string;
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string;
@@ -61,6 +63,8 @@ interface DashboardProps {
   setSearchQuery: (query: string) => void;
 }
 
+
+
 export const Dashboard: React.FC<DashboardProps> = ({
   sessions,
   onSelectSession,
@@ -75,18 +79,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [hideEmpty, setHideEmpty] = useState<boolean>(true);
 
-  // Extract unique tracks
-  const tracks = Array.from(new Set(sessions.map(s => s.trackVenue))).filter(Boolean);
+  // Extract unique track layout variations sorted alphabetically
+  const tracks = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, s.trackCourse)))).filter(Boolean).sort((a, b) => a.localeCompare(b));
 
   // Count empty results
   const emptyCount = sessions.filter(s => isSessionEmpty(s)).length;
 
   // Filtered sessions
   const filteredSessions = sessions.filter(s => {
-    const matchesTrack = selectedTrack === 'All' || s.trackVenue === selectedTrack;
+    const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
+    const matchesTrack = selectedTrack === 'All' || displayTrack === selectedTrack || s.trackVenue === selectedTrack;
     const matchesType = filterType === 'All' || s.sessionType.toLowerCase() === filterType.toLowerCase();
     const isMatchingCarClass = matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass);
     const matchesSearch = searchQuery === '' ||
+      displayTrack.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.trackVenue.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.filename.toLowerCase().includes(searchQuery.toLowerCase());
@@ -116,10 +122,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
         allRefLaps.push({
+          sessionId: s.id,
           percentage: p.bestLapPacePercentage,
           category: p.bestLapPaceCategory,
           lapTimeString: p.bestLapTimeString,
-          track: s.trackVenue,
+          track: getDisplayTrackName(s.trackVenue, s.trackCourse),
           car: p.carType,
         });
       }
@@ -235,10 +242,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {top3RefLaps.length > 0 ? (
               top3RefLaps.map((item, idx) => (
                 <div
-                  key={item.track}
-                  onClick={() => { window.location.hash = `track/${encodeURIComponent(item.track)}`; }}
+                  key={item.sessionId || item.track}
+                  onClick={() => onSelectSession(item.sessionId)}
                   className="flex items-center justify-between text-xs cursor-pointer hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
-                  title={`View ${item.track} Track Details`}
+                  title={`Open session details for ${item.track}`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <span className={`font-mono text-[11px] font-bold ${idx === 0 ? 'text-purple-300' : idx === 1 ? 'text-purple-400' : 'text-purple-500'}`}>
@@ -407,7 +414,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         )}
                       </div>
                       <h4 className="font-bold text-white text-base mt-2 truncate leading-tight">
-                        {s.trackVenue}
+                        {getDisplayTrackName(s.trackVenue, s.trackCourse)}
                       </h4>
                       <p className="text-xs text-lmu-muted mt-0.5">{s.timeString}</p>
                     </div>

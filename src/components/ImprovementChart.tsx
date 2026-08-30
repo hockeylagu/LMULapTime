@@ -9,11 +9,11 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { TrendingUp, Zap, Trophy, Clock, CheckCircle2, FilterX } from 'lucide-react';
+import { TrendingUp, Zap, Trophy, Clock, FilterX } from 'lucide-react';
 import { formatTime } from '../utils/formatters';
 import { matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 
-interface SessionProgressionPoint {
+export interface SessionProgressionPoint {
   sessionId: string;
   timestamp: number;
   dateString: string;
@@ -40,6 +40,9 @@ interface ImprovementChartProps {
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
   tracks: string[];
+  hideEmpty?: boolean;
+  setHideEmpty?: (hide: boolean) => void;
+  embedded?: boolean;
 }
 
 export const ImprovementChart: React.FC<ImprovementChartProps> = ({
@@ -49,9 +52,15 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   selectedCarClass,
   setSelectedCarClass,
   tracks,
+  hideEmpty: externalHideEmpty,
+  setHideEmpty: externalSetHideEmpty,
+  embedded = false,
 }) => {
   const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical'>('bestLap');
-  const [hideEmpty, setHideEmpty] = useState<boolean>(true);
+  const [internalHideEmpty, setInternalHideEmpty] = useState<boolean>(true);
+
+  const hideEmpty = externalHideEmpty !== undefined ? externalHideEmpty : internalHideEmpty;
+  const setHideEmpty = externalSetHideEmpty || setInternalHideEmpty;
 
   // Filter progression by selected track, vehicle class & optional empty filter
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
@@ -103,92 +112,50 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   return (
     <div className="space-y-6">
 
-      {/* Header & Controls */}
-      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-lmu-accent" />
-            Lap & Sector Improvement Over Time
-          </h2>
-          <p className="text-xs text-lmu-muted mt-1">
-            Track how your lap times, sector splits, and theoretical limits evolved session by session
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Select Track */}
-          <select
-            value={activeTrack}
-            onChange={(e) => setSelectedTrack(e.target.value)}
-            className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lmu-accent font-medium"
-          >
-            {tracks.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-
-          {/* Vehicle Class Filter Buttons */}
-          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto">
-            {VEHICLE_CLASS_OPTIONS.map(cls => (
-              <button
-                key={cls.id}
-                onClick={() => setSelectedCarClass(cls.id)}
-                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                  selectedCarClass === cls.id
-                    ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                    : 'text-lmu-muted hover:text-white'
-                }`}
-              >
-                {cls.label}
-              </button>
-            ))}
+      {/* Standalone Header (Only when not embedded) */}
+      {!embedded && (
+        <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-lmu-accent" />
+              Lap & Sector Improvement Over Time
+            </h2>
+            <p className="text-xs text-lmu-muted mt-1">
+              Track how your lap times, sector splits, and theoretical limits evolved session by session
+            </p>
           </div>
 
-          {/* Metric Toggle */}
-          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
-            <button
-              onClick={() => setMetric('bestLap')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'bestLap' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-                }`}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Select Track */}
+            <select
+              value={activeTrack}
+              onChange={(e) => setSelectedTrack(e.target.value)}
+              className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lmu-accent font-medium"
             >
-              Lap Pace
-            </button>
-            <button
-              onClick={() => setMetric('sectors')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'sectors' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-                }`}
-            >
-              Sectors (S1/S2/S3)
-            </button>
-            <button
-              onClick={() => setMetric('theoretical')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${metric === 'theoretical' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-                }`}
-            >
-              Theoretical Best
-            </button>
-          </div>
+              {tracks.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
 
-          {/* Hide Empty Toggle */}
-          <button
-            onClick={() => setHideEmpty(!hideEmpty)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${hideEmpty
-                ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
-                : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-              }`}
-            title={hideEmpty ? "Hiding empty sessions. Click to show all." : "Showing all sessions. Click to filter out empty results."}
-          >
-            <FilterX className="w-3.5 h-3.5" />
-            <span>Hide Empty Results</span>
-            {emptyCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
-                }`}>
-                {emptyCount}
-              </span>
-            )}
-          </button>
+            {/* Vehicle Class Filter Buttons */}
+            <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto">
+              {VEHICLE_CLASS_OPTIONS.map(cls => (
+                <button
+                  key={cls.id}
+                  onClick={() => setSelectedCarClass(cls.id)}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                    selectedCarClass === cls.id
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  {cls.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Highlights / Improvement Stat Banner */}
       {trackData.length > 0 && (
@@ -226,19 +193,72 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
         </div>
       )}
 
-      {/* Main Chart */}
-      <div className="glass-panel p-6 rounded-2xl">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center justify-between">
-          <span>Progression Timeline — {activeTrack}</span>
-          <span className="text-xs font-normal text-lmu-muted">Y-Axis: Lap Time (seconds)</span>
-        </h3>
+      {/* Main Chart Card with Integrated Controls */}
+      <div className="glass-panel p-6 rounded-2xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
+          <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-lmu-accent" />
+            <span>Progression Timeline — {activeTrack}</span>
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Metric Toggle */}
+            <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
+              <button
+                onClick={() => setMetric('bestLap')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  metric === 'bestLap' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                Lap Pace
+              </button>
+              <button
+                onClick={() => setMetric('sectors')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  metric === 'sectors' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                Sectors (S1/S2/S3)
+              </button>
+              <button
+                onClick={() => setMetric('theoretical')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  metric === 'theoretical' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                Theoretical Best
+              </button>
+            </div>
+
+            {/* Hide Empty Toggle */}
+            <button
+              onClick={() => setHideEmpty(!hideEmpty)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                hideEmpty
+                  ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
+                  : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
+              }`}
+              title={hideEmpty ? "Hiding empty sessions. Click to show all." : "Showing all sessions. Click to filter out empty results."}
+            >
+              <FilterX className="w-3.5 h-3.5" />
+              <span>Hide Empty Results</span>
+              {emptyCount > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                  hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
+                }`}>
+                  {emptyCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
 
         {chartData.length === 0 ? (
           <div className="py-16 text-center text-lmu-muted">
             No session data found for this track.
           </div>
         ) : (
-          <div className="w-full h-80">
+          <div className="w-full h-80 pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#232A36" />
@@ -341,54 +361,6 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             </ResponsiveContainer>
           </div>
         )}
-      </div>
-
-      {/* Session Comparison Table */}
-      <div className="glass-panel p-5 rounded-2xl">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-          Session-over-Session Detailed Data Log
-        </h3>
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs text-lmu-muted">
-            <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
-              <tr>
-                <th className="px-4 py-3">Date / Time</th>
-                <th className="px-4 py-3">Session</th>
-                <th className="px-4 py-3">Car Model</th>
-                <th className="px-4 py-3 text-right">Best Lap</th>
-                <th className="px-4 py-3 text-right">Theoretical Best</th>
-                <th className="px-4 py-3 text-right">Sector 1</th>
-                <th className="px-4 py-3 text-right">Sector 2</th>
-                <th className="px-4 py-3 text-right">Sector 3</th>
-                <th className="px-4 py-3 text-center">Replay VCR</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-lmu-border/50 font-mono">
-              {chartData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-lmu-card/50 transition-colors">
-                  <td className="px-4 py-3 text-white font-sans">{row.fullDate}</td>
-                  <td className="px-4 py-3 font-bold text-lmu-accent">{row.session}</td>
-                  <td className="px-4 py-3 text-white font-sans">{row.car}</td>
-                  <td className="px-4 py-3 text-right text-lmu-gold font-bold">{row.bestLapStr}</td>
-                  <td className="px-4 py-3 text-right text-lmu-green font-bold">{row.theoreticalStr}</td>
-                  <td className="px-4 py-3 text-right">{row.s1Str}</td>
-                  <td className="px-4 py-3 text-right">{row.s2Str}</td>
-                  <td className="px-4 py-3 text-right">{row.s3Str}</td>
-                  <td className="px-4 py-3 text-center font-sans">
-                    {row.replay ? (
-                      <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Available
-                      </span>
-                    ) : (
-                      <span className="text-lmu-muted opacity-50">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
     </div>

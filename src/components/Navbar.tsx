@@ -1,9 +1,9 @@
 import React from 'react';
-import { Gauge, TrendingUp, Flag, Settings, RefreshCw } from 'lucide-react';
+import { Gauge, Flag, Settings, RefreshCw } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'improvement' | 'tracks' | 'sessions' | 'settings') => void;
+  activeTab: 'dashboard' | 'tracks' | 'sessions' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => void;
   status: {
     resultsExist: boolean;
     replaysExist: boolean;
@@ -56,18 +56,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Gauge className="w-4 h-4" />
             Dashboard
-          </button>
-
-          <button
-            onClick={() => setActiveTab('improvement')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'improvement'
-                ? 'bg-lmu-accent text-white shadow-md shadow-lmu-accent/20'
-                : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            Progression
           </button>
 
           <button

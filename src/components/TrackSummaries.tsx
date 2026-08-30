@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Flag, Trophy } from 'lucide-react';
-import { formatTime } from '../utils/formatters.js';
-import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle } from '../utils/paceCategory.js';
+import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
+import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle, normalizeTrackName } from '../utils/paceCategory.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 
 interface SessionSummary {
   id: string;
   filename: string;
   trackVenue: string;
+  trackCourse?: string;
   timeString: string;
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string;
@@ -66,17 +67,17 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
 
   const trackList = React.useMemo(() => {
     if (!sessions || sessions.length === 0) {
-      return Object.values(tracksMap);
+      return Object.values(tracksMap).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
     }
 
     const filteredSessions = sessions.filter(s =>
       matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass)
     );
 
-    const trackVenues = Array.from(new Set(sessions.map(s => s.trackVenue))).filter(Boolean);
+    const trackVenues = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, (s as any).trackCourse)))).filter(Boolean);
 
-    return trackVenues.map(venue => {
-      const venueSessions = filteredSessions.filter(s => s.trackVenue === venue);
+    const list = trackVenues.map(venue => {
+      const venueSessions = filteredSessions.filter(s => getDisplayTrackName(s.trackVenue, (s as any).trackCourse) === venue);
 
       let bestLapTime: number | null = null;
       let bestLapDriver = '';
@@ -147,23 +148,36 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         carsUsed: carsUsedSet.size > 0 ? Array.from(carsUsedSet) : (selectedCarClass === 'All' ? fallback.carsUsed : []),
       };
     });
+
+    return list.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
   }, [sessions, tracksMap, selectedCarClass]);
 
   const getRefEntryForTrack = (trackName: string, carType?: string, carClass?: string): ReferenceLaptimeEntry | null => {
     if (!refCache?.entries) return null;
 
-    const normTrack = trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normTrack = normalizeTrackName(trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
     const normCar = (carType || '').toLowerCase();
     const normClass = (carClass || '').toLowerCase();
 
-    const trackEntries = Object.values(refCache.entries).filter((entry: any) => {
-      const entryTrackNorm = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return normTrack.includes(entryTrackNorm) || entryTrackNorm.includes(normTrack);
+    // 1. Exact normalized track matches first
+    let trackEntries = Object.values(refCache.entries).filter((entry: any) => {
+      const entryTrackNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return entryTrackNorm === normTrack || entryRaw === normTrack;
     });
+
+    // 2. Fallback to substring match if no exact matches exist
+    if (trackEntries.length === 0) {
+      trackEntries = Object.values(refCache.entries).filter((entry: any) => {
+        const entryTrackNorm = normalizeTrackName(entry.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const entryRaw = entry.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return normTrack.includes(entryTrackNorm) || entryTrackNorm.includes(normTrack) || normTrack.includes(entryRaw) || entryRaw.includes(normTrack);
+      });
+    }
 
     if (trackEntries.length === 0) return null;
 
-    // 1. If a specific car class filter is active (not All), match entry against selectedCarClass
+    // 3. Match vehicle class
     if (selectedCarClass && selectedCarClass !== 'All') {
       const classMatch = trackEntries.find((entry: any) =>
         matchesCarClass(entry.carClass, entry.carClass, selectedCarClass)
@@ -171,7 +185,6 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       if (classMatch) return classMatch as ReferenceLaptimeEntry;
     }
 
-    // 2. Otherwise (selectedCarClass is All), match entry against carType's actual class
     if (normCar || normClass) {
       const classMatch = trackEntries.find((entry: any) =>
         matchesCarClass(normClass || normCar, normCar, entry.carClass) ||
@@ -262,21 +275,20 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
                   <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50 flex flex-col justify-between">
                     <div>
                       <p className="text-xs text-lmu-muted font-semibold uppercase">Session Best</p>
-                      <h4 className="text-xl font-extrabold text-lmu-gold font-mono mt-0.5">
-                        {formatTime(t.bestLapTime)}
-                      </h4>
-                      <p className="text-[11px] text-lmu-muted mt-1 truncate">
-                        {t.bestLapCar || 'Car'}
-                      </p>
-                      {/* Pace Category Badge */}
-                      {paceInfo && (
-                        <div className="mt-2">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
+                          {formatTime(t.bestLapTime)}
+                        </h4>
+                        {paceInfo && (
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(paceInfo.category).badgeClass}`}>
                             <span>{getPaceCategoryStyle(paceInfo.category).emoji}</span>
                             <span>{paceInfo.category}</span>
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      <p className="text-[11px] text-lmu-muted mt-1 truncate">
+                        {t.bestLapCar || 'Car'}
+                      </p>
                     </div>
                   </div>
 
