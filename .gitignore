@@ -39,3 +39,4 @@ Thumbs.db
 .temp/
 tmp/
 server/laptimes_cache.json
+coverage/

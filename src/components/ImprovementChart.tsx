@@ -72,7 +72,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   selectedCarModel = 'All',
   filterType = 'All',
   searchQuery = '',
-  tracks,
+  tracks = [],
   hideEmpty = true,
   embedded = false,
   yourBest,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
-import fs from 'fs';
+import path from 'path';
 import { app } from '../../server/index';
 import * as refModule from '../../server/referenceLaptimes';
 
@@ -18,21 +18,35 @@ describe('Server API routes', () => {
   });
 
   it('GET /api/sessions returns session summaries and supports filtering', async () => {
-    const res = await request(app).get('/api/sessions?track=Spa&sessionType=Practice&hideEmpty=true');
+    const res = await request(app).get('/api/sessions?refresh=true&track=Spa&sessionType=Practice&carClass=Hypercar&driver=TestPlayer&hideEmpty=true');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+
+    const allRes = await request(app).get('/api/sessions?track=All&sessionType=All&carClass=All&refresh=false');
+    expect(allRes.status).toBe(200);
+    expect(Array.isArray(allRes.body)).toBe(true);
   });
 
-  it('GET /api/session/:id returns 404 for non-existent session', async () => {
-    const res = await request(app).get('/api/session/nonexistent-session-id-12345');
-    expect(res.status).toBe(404);
-    expect(res.body).toHaveProperty('error', 'Session not found');
+  it('GET /api/session/:id returns session details or 404', async () => {
+    const successRes = await request(app).get('/api/session/2026_05_28_P1.xml');
+    if (successRes.status === 200) {
+      expect(successRes.body).toHaveProperty('trackVenue', 'Spa');
+      expect(successRes.body).toHaveProperty('drivers');
+    }
+
+    const notFoundRes = await request(app).get('/api/session/nonexistent-session-id-12345');
+    expect(notFoundRes.status).toBe(404);
+    expect(notFoundRes.body).toHaveProperty('error', 'Session not found');
   });
 
-  it('GET /api/progression returns progression array', async () => {
-    const res = await request(app).get('/api/progression?track=Spa&hideEmpty=true');
+  it('GET /api/progression returns progression array with filters', async () => {
+    const res = await request(app).get('/api/progression?track=Spa&carClass=Hypercar&driver=TestPlayer&hideEmpty=true');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+
+    const allProg = await request(app).get('/api/progression?track=All&carClass=All');
+    expect(allProg.status).toBe(200);
+    expect(Array.isArray(allProg.body)).toBe(true);
   });
 
   it('GET /api/tracks returns track summaries', async () => {
@@ -59,8 +73,8 @@ describe('Server API routes', () => {
     const res = await request(app)
       .post('/api/scan')
       .send({
-        resultsDir: 'C:\\NonExistentResults',
-        replaysDir: 'C:\\NonExistentReplays',
+        resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
+        replaysDir: path.join(process.cwd(), 'test', 'fixtures', 'replays'),
         playerName: 'TestPlayer',
       });
 

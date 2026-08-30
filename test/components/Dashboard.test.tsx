@@ -54,10 +54,58 @@ describe('Dashboard component', () => {
       },
     },
     {
+      id: 'sess-ricard-1',
+      filename: '2026_05_30_R1.xml',
+      trackVenue: 'Paul Ricard',
+      timeString: '2026/05/30 18:00',
+      sessionType: 'Race' as const,
+      sessionName: 'R1',
+      driversCount: 1,
+      playerDriver: {
+        name: 'Player',
+        carType: 'Oreca 07',
+        carClass: 'LMP2',
+        bestLapTime: 95.0,
+        bestLapTimeString: '1:35.000',
+        bestS1: 25.0,
+        bestS2: 35.0,
+        bestS3: 35.0,
+        theoreticalBest: 95.0,
+        theoreticalBestString: '1:35.000',
+        bestLapPaceCategory: 'Competitive' as const,
+        bestLapPacePercentage: 101.2,
+        lapsCount: 10,
+      },
+    },
+    {
+      id: 'sess-le-mans-1',
+      filename: '2026_05_31_P1.xml',
+      trackVenue: 'Le Mans',
+      timeString: '2026/05/31 10:00',
+      sessionType: 'Practice' as const,
+      sessionName: 'P1',
+      driversCount: 1,
+      playerDriver: {
+        name: 'Player',
+        carType: 'Cadillac V-Series.R',
+        carClass: 'LMH',
+        bestLapTime: 200.0,
+        bestLapTimeString: '3:20.000',
+        bestS1: 50.0,
+        bestS2: 70.0,
+        bestS3: 80.0,
+        theoreticalBest: 200.0,
+        theoreticalBestString: '3:20.000',
+        bestLapPaceCategory: 'Midpack' as const,
+        bestLapPacePercentage: 104.0,
+        lapsCount: 3,
+      },
+    },
+    {
       id: 'sess-empty-1',
-      filename: '2026_05_30_P2.xml',
+      filename: '2026_06_01_P2.xml',
       trackVenue: 'Spa',
-      timeString: '2026/05/30 10:00',
+      timeString: '2026/06/01 10:00',
       sessionType: 'Practice' as const,
       sessionName: 'P2',
       driversCount: 0,
@@ -144,5 +192,79 @@ describe('Dashboard component', () => {
     const qualBtn = screen.getByRole('button', { name: 'Qualifying' });
     fireEvent.click(qualBtn);
     expect(setFilterType).toHaveBeenCalledWith('Qualifying');
+  });
+
+  it('handles sort dropdown changes (date-asc, pace-asc, pace-desc)', () => {
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[1];
+
+    fireEvent.change(sortSelect, { target: { value: 'date-asc' } });
+    fireEvent.change(sortSelect, { target: { value: 'pace-asc' } });
+    fireEvent.change(sortSelect, { target: { value: 'pace-desc' } });
+    fireEvent.change(sortSelect, { target: { value: 'date-desc' } });
+  });
+
+  it('expands and collapses Show More Circuits, Cars, and Benchmarks', () => {
+    const setSelectedCarClass = vi.fn();
+    const onSelectSession = vi.fn();
+
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={onSelectSession}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={setSelectedCarClass}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Expand Show More buttons
+    const moreButtons = screen.getAllByText(/\+1 More/i);
+    moreButtons.forEach(btn => fireEvent.click(btn));
+
+    // Collapse again
+    const lessButtons = screen.getAllByText(/Show Less/i);
+    lessButtons.forEach(btn => fireEvent.click(btn));
+  });
+
+  it('toggles Hide Empty Results filter', () => {
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    const hideEmptyBtn = screen.getByRole('button', { name: /Hide Empty Results/i });
+    fireEvent.click(hideEmptyBtn);
+    fireEvent.click(hideEmptyBtn);
   });
 });

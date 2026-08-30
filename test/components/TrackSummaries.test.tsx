@@ -1,29 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TrackSummaries } from '../../src/components/TrackSummaries';
 
 describe('TrackSummaries component', () => {
-  const mockTracksMap = {
-    'Spa': {
+  const mockTrackSummaries = {
+    Spa: {
       trackVenue: 'Spa',
-      sessionsCount: 5,
-      totalLaps: 25,
-      bestLapTime: 122.5,
+      sessionsCount: 3,
+      totalLaps: 15,
+      bestLapTime: 122.0,
+      bestLapTimeString: '2:02.000',
       bestLapDriver: 'Player',
       bestLapCar: 'Ferrari 499P',
-      bestS1: 35.1,
-      bestS2: 42.2,
-      bestS3: 45.2,
-      theoreticalBest: 122.5,
+      bestLapClass: 'LMH',
+      bestS1: 34.0,
+      bestS2: 42.0,
+      bestS3: 46.0,
+      theoreticalBest: 122.0,
       carsUsed: ['Ferrari 499P'],
     },
-    'Monza': {
+    Monza: {
       trackVenue: 'Monza',
-      sessionsCount: 3,
-      totalLaps: 18,
+      sessionsCount: 1,
+      totalLaps: 5,
       bestLapTime: 108.0,
+      bestLapTimeString: '1:48.000',
       bestLapDriver: 'Player',
       bestLapCar: 'Porsche 911 GT3',
+      bestLapClass: 'LMGT3',
       bestS1: 28.0,
       bestS2: 38.0,
       bestS3: 42.0,
@@ -32,76 +36,29 @@ describe('TrackSummaries component', () => {
     },
   };
 
-  const mockSessions = [
-    {
-      id: 'sess1',
-      filename: 'sess1.xml',
-      trackVenue: 'Spa',
-      timeString: '2026/05/28 14:00',
-      sessionType: 'Practice' as const,
-      sessionName: 'P1',
-      driversCount: 1,
-      playerDriver: {
-        name: 'Player',
-        carType: 'Ferrari 499P',
-        carClass: 'LMH',
-        bestLapTime: 122.5,
-        bestLapTimeString: '2:02.500',
-        bestS1: 35.1,
-        bestS2: 42.2,
-        bestS3: 45.2,
-        lapsCount: 5,
-      },
-    },
-    {
-      id: 'sess2',
-      filename: 'sess2.xml',
-      trackVenue: 'Monza',
-      timeString: '2026/05/29 16:00',
-      sessionType: 'Qualifying' as const,
-      sessionName: 'Q1',
-      driversCount: 1,
-      playerDriver: {
-        name: 'Player',
-        carType: 'Porsche 911 GT3',
-        carClass: 'LMGT3',
-        bestLapTime: 108.0,
-        bestLapTimeString: '1:48.000',
-        bestS1: 28.0,
-        bestS2: 38.0,
-        bestS3: 42.0,
-        lapsCount: 3,
-      },
-    },
-  ];
-
-  beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve({ entries: {} }),
-    });
-  });
-
   it('renders track cards and allows selecting a track', () => {
     const onSelectTrack = vi.fn();
     const setSelectedCarClass = vi.fn();
 
     render(
       <TrackSummaries
-        sessions={mockSessions}
-        tracksMap={mockTracksMap}
+        tracksMap={mockTrackSummaries}
         onSelectTrack={onSelectTrack}
         selectedCarClass="All"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
 
-    expect(screen.getByText(/Track Records & Benchmarks/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks/i })).toBeInTheDocument();
     expect(screen.getByText('Spa')).toBeInTheDocument();
     expect(screen.getByText('Monza')).toBeInTheDocument();
 
-    const spaCard = screen.getByText('Spa');
-    fireEvent.click(spaCard);
-    expect(onSelectTrack).toHaveBeenCalledWith('Spa');
+    const spaCard = screen.getByText('Spa').closest('div.glass-panel');
+    expect(spaCard).not.toBeNull();
+    if (spaCard) {
+      fireEvent.click(spaCard);
+      expect(onSelectTrack).toHaveBeenCalledWith('Spa');
+    }
   });
 
   it('filters by car class and sorts tracks', () => {
@@ -109,16 +66,33 @@ describe('TrackSummaries component', () => {
 
     render(
       <TrackSummaries
-        sessions={mockSessions}
-        tracksMap={mockTracksMap}
+        tracksMap={mockTrackSummaries}
         onSelectTrack={vi.fn()}
-        selectedCarClass="LMGT3"
+        selectedCarClass="All"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
 
-    const hypercarBtn = screen.getByRole('button', { name: /Hypercar/i });
-    fireEvent.click(hypercarBtn);
-    expect(setSelectedCarClass).toHaveBeenCalledWith('LMH');
+    const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
+    fireEvent.click(lmgt3Btn);
+    expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
+
+    const sortSelect = screen.getByRole('combobox');
+    fireEvent.change(sortSelect, { target: { value: 'name-desc' } });
+    fireEvent.change(sortSelect, { target: { value: 'pace-asc' } });
+    fireEvent.change(sortSelect, { target: { value: 'last-session-desc' } });
+  });
+
+  it('handles empty track summaries list', () => {
+    render(
+      <TrackSummaries
+        tracksMap={{}}
+        onSelectTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks \(0 Tracks\)/i })).toBeInTheDocument();
   });
 });

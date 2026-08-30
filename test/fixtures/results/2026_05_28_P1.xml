@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Practice 1</Setting>
+    <TrackVenue>Spa</TrackVenue>
+    <TrackCourse>Grand Prix</TrackCourse>
+    <TrackLength>7004.0</TrackLength>
+    <TimeString>2026/05/28 14:00:00</TimeString>
+    <DateTime>1748440800</DateTime>
+    <TimeStringShort>26-05-28 14:00</TimeStringShort>
+    <Event>LMU Test Championship</Event>
+    <TrackEvent>Spa GP Test</TrackEvent>
+    <Race>
+      <AmbientTemp>22.5</AmbientTemp>
+      <TrackTemp>31.0</TrackTemp>
+      <TimeOfDay>840</TimeOfDay>
+      <Driver>
+        <Name>TestPlayer</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <CarNumber>50</CarNumber>
+        <TeamName>Ferrari AF Corse</TeamName>
+        <Position>1</Position>
+        <ClassPosition>1</ClassPosition>
+        <Lap num="1" p="1" s1="34.120" s2="42.340" s3="45.540" fuel="50.0" fCompound="Hard" rCompound="Hard">122.000</Lap>
+        <Lap num="2" p="1" s1="33.800" s2="42.100" s3="45.100" fuel="48.0" fCompound="Hard" rCompound="Hard">121.000</Lap>
+        <BestLapTime>121.000</BestLapTime>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>
