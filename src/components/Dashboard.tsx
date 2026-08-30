@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Car, Zap, FileText, ChevronRight, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
+import { Calendar, Car, Zap, FileText, ChevronRight, ChevronDown, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types';
@@ -78,6 +78,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   searchQuery,
   setSearchQuery,
 }) => {
+  const [showMoreTracks, setShowMoreTracks] = useState<boolean>(false);
+  const [showMoreCars, setShowMoreCars] = useState<boolean>(false);
+  const [showMoreBenchmarks, setShowMoreBenchmarks] = useState<boolean>(false);
+
   const getInitialDashboardParams = () => {
     const fullHash = window.location.hash.replace(/^#\/?/, '');
     const qIndex = fullHash.indexOf('?');
@@ -197,19 +201,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   });
 
-  // Top 3 Tracks by Laps
-  const top3Tracks = Object.entries(trackLapsMap)
+  // Ranked Tracks by Laps
+  const rankedTracks = Object.entries(trackLapsMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
     .map(([track, laps]) => ({ track, laps }));
+  const visibleTracks = showMoreTracks ? rankedTracks : rankedTracks.slice(0, 3);
 
-  // Top 3 Cars by Laps
-  const top3Cars = Object.entries(carLapsMap)
+  // Ranked Cars by Laps
+  const rankedCars = Object.entries(carLapsMap)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
     .map(([car, laps]) => ({ car, laps }));
+  const visibleCars = showMoreCars ? rankedCars : rankedCars.slice(0, 3);
 
-  // Top 3 Reference Laps (lowest percentage relative to reference benchmark)
+  // Ranked Reference Laps (lowest percentage relative to reference benchmark)
   const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
   allRefLaps.forEach(item => {
     if (!uniqueTrackRefLapsMap[item.track] || item.percentage < uniqueTrackRefLapsMap[item.track].percentage) {
@@ -217,28 +221,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   });
 
-  const top3RefLaps = Object.values(uniqueTrackRefLapsMap)
-    .sort((a, b) => a.percentage - b.percentage)
-    .slice(0, 3);
+  const rankedRefLaps = Object.values(uniqueTrackRefLapsMap)
+    .sort((a, b) => a.percentage - b.percentage);
+  const visibleRefLaps = showMoreBenchmarks ? rankedRefLaps : rankedRefLaps.slice(0, 3);
 
   return (
     <div className="space-y-6">
 
       {/* Top Hero / Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
 
-        {/* Top 3 Circuits Card */}
+        {/* Top Circuits Card */}
         <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-lmu-gold uppercase tracking-wider flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-lmu-gold" />
-              Top 3 Circuits
+              <span>Circuits {rankedTracks.length > 3 && `(${visibleTracks.length}/${rankedTracks.length})`}</span>
             </p>
-            <span className="text-[10px] text-lmu-muted">By Laps</span>
+            {rankedTracks.length > 3 && (
+              <button
+                onClick={() => setShowMoreTracks(!showMoreTracks)}
+                className="text-[10px] text-lmu-accent hover:text-white font-semibold transition-colors flex items-center gap-0.5"
+              >
+                <span>{showMoreTracks ? 'Show Less' : `+${rankedTracks.length - 3} More`}</span>
+                <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreTracks ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
-          <div className="space-y-1.5 flex-1">
-            {top3Tracks.length > 0 ? (
-              top3Tracks.map((item, idx) => (
+          <div className={`space-y-1.5 flex-1 ${showMoreTracks ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
+            {visibleTracks.length > 0 ? (
+              visibleTracks.map((item, idx) => (
                 <div
                   key={item.track}
                   onClick={() => { window.location.hash = `track/${encodeURIComponent(item.track)}`; }}
@@ -246,7 +258,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   title={`View ${item.track} Track Details`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className={`font-mono text-[11px] font-bold ${idx === 0 ? 'text-lmu-gold' : idx === 1 ? 'text-slate-300' : 'text-amber-600'}`}>
+                    <span className={`font-mono text-[11px] font-bold shrink-0 ${
+                      idx === 0 ? 'text-lmu-gold' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-lmu-muted'
+                    }`}>
                       #{idx + 1}
                     </span>
                     <span className="text-white font-medium truncate group-hover:text-lmu-gold transition-colors">{item.track}</span>
@@ -258,20 +272,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-xs text-lmu-muted">No track data</p>
             )}
           </div>
+          {rankedTracks.length > 3 && (
+            <button
+              onClick={() => setShowMoreTracks(!showMoreTracks)}
+              className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-accent font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+            >
+              <span>{showMoreTracks ? 'Show Top 3 Only' : `Show All ${rankedTracks.length} Circuits`}</span>
+              <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreTracks ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
 
-        {/* Top 3 Cars Card */}
+        {/* Top Cars Card */}
         <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-lmu-cyan uppercase tracking-wider flex items-center gap-1.5">
               <Award className="w-4 h-4 text-lmu-cyan" />
-              Top 3 Cars
+              <span>Cars {rankedCars.length > 3 && `(${visibleCars.length}/${rankedCars.length})`}</span>
             </p>
-            <span className="text-[10px] text-lmu-muted">By Laps</span>
+            {rankedCars.length > 3 && (
+              <button
+                onClick={() => setShowMoreCars(!showMoreCars)}
+                className="text-[10px] text-lmu-cyan hover:text-white font-semibold transition-colors flex items-center gap-0.5"
+              >
+                <span>{showMoreCars ? 'Show Less' : `+${rankedCars.length - 3} More`}</span>
+                <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreCars ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
-          <div className="space-y-1.5 flex-1">
-            {top3Cars.length > 0 ? (
-              top3Cars.map((item, idx) => (
+          <div className={`space-y-1.5 flex-1 ${showMoreCars ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
+            {visibleCars.length > 0 ? (
+              visibleCars.map((item, idx) => (
                 <div
                   key={item.car}
                   onClick={() => setSelectedCarClass(item.car.split(' ')[0] || item.car)}
@@ -279,7 +310,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   title={`Filter by ${item.car}`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className={`font-mono text-[11px] font-bold ${idx === 0 ? 'text-lmu-cyan' : idx === 1 ? 'text-slate-300' : 'text-amber-600'}`}>
+                    <span className={`font-mono text-[11px] font-bold shrink-0 ${
+                      idx === 0 ? 'text-lmu-cyan' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-lmu-muted'
+                    }`}>
                       #{idx + 1}
                     </span>
                     <span className="text-white font-medium truncate max-w-[130px] group-hover:text-lmu-cyan transition-colors">{item.car}</span>
@@ -291,20 +324,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-xs text-lmu-muted">No car data</p>
             )}
           </div>
+          {rankedCars.length > 3 && (
+            <button
+              onClick={() => setShowMoreCars(!showMoreCars)}
+              className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-cyan font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+            >
+              <span>{showMoreCars ? 'Show Top 3 Only' : `Show All ${rankedCars.length} Cars`}</span>
+              <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreCars ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
 
-        {/* Top 3 Benchmark Laps Card */}
+        {/* Top Benchmark Laps Card */}
         <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-purple-400" />
-              Top 3 Benchmark Laps
+              <span>Benchmarks {rankedRefLaps.length > 3 && `(${visibleRefLaps.length}/${rankedRefLaps.length})`}</span>
             </p>
-            <span className="text-[10px] text-lmu-muted">Vs Ref</span>
+            {rankedRefLaps.length > 3 && (
+              <button
+                onClick={() => setShowMoreBenchmarks(!showMoreBenchmarks)}
+                className="text-[10px] text-purple-300 hover:text-white font-semibold transition-colors flex items-center gap-0.5"
+              >
+                <span>{showMoreBenchmarks ? 'Show Less' : `+${rankedRefLaps.length - 3} More`}</span>
+                <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreBenchmarks ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
-          <div className="space-y-1.5 flex-1">
-            {top3RefLaps.length > 0 ? (
-              top3RefLaps.map((item, idx) => (
+          <div className={`space-y-1.5 flex-1 ${showMoreBenchmarks ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
+            {visibleRefLaps.length > 0 ? (
+              visibleRefLaps.map((item, idx) => (
                 <div
                   key={item.sessionId || item.track}
                   onClick={() => onSelectSession(item.sessionId)}
@@ -312,7 +362,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   title={`Open session details for ${item.track}`}
                 >
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className={`font-mono text-[11px] font-bold ${idx === 0 ? 'text-purple-300' : idx === 1 ? 'text-purple-400' : 'text-purple-500'}`}>
+                    <span className={`font-mono text-[11px] font-bold shrink-0 ${
+                      idx === 0 ? 'text-purple-300' : idx === 1 ? 'text-purple-400' : idx === 2 ? 'text-purple-500' : 'text-lmu-muted'
+                    }`}>
                       #{idx + 1}
                     </span>
                     <span className="text-white font-medium truncate max-w-[110px] group-hover:text-purple-300 transition-colors">{item.track}</span>
@@ -327,6 +379,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-xs text-lmu-muted">No benchmark lap data</p>
             )}
           </div>
+          {rankedRefLaps.length > 3 && (
+            <button
+              onClick={() => setShowMoreBenchmarks(!showMoreBenchmarks)}
+              className="w-full text-center text-[10px] text-lmu-muted hover:text-purple-300 font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+            >
+              <span>{showMoreBenchmarks ? 'Show Top 3 Only' : `Show All ${rankedRefLaps.length} Benchmark Laps`}</span>
+              <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreBenchmarks ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* Total Overview */}

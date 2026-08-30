@@ -82,13 +82,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   // All-time Personal Best for this specific driver, track, and vehicle category (LMGT3, Hypercar, LMP2, GTE, etc.)
   const allTimeCategoryTrackPB = (() => {
     if (!session || !selectedDriver || progression.length === 0) return null;
-    const normTrack = getDisplayTrackName(session.trackVenue, session.trackCourse).toLowerCase();
+    const normTrack = getDisplayTrackName(session.trackVenue, session.trackCourse).toLowerCase().trim();
     const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
     const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
 
     const matchingProg = progression.filter(p => {
-      const pTrack = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase();
-      const isTrack = pTrack === normTrack || p.trackVenue.toLowerCase() === session.trackVenue.toLowerCase();
+      const pTrack = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
+      const isTrack = pTrack === normTrack;
       const isClass = matchesCarClass(p.carClass, p.carType, driverClass) ||
         matchesCarClass(driverClass, selectedDriver.carType, p.carClass);
       const isDriver = !driverNorm || (p.driverName || '').toLowerCase().trim() === driverNorm ||
@@ -567,22 +567,23 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
             </thead>
             <tbody className="divide-y divide-lmu-border/50 font-mono">
               {selectedDriver?.laps.map(l => {
-                const isSessionBest = l.lapTime === selectedDriver.bestLapTime;
+                const isSessionBest = l.lapTime !== null && selectedDriver.bestLapTime !== null &&
+                  Math.abs(l.lapTime - selectedDriver.bestLapTime) < 0.0005;
                 const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
                 
                 let deltaStr = '--';
                 if (l.lapTime && selectedDriver.bestLapTime) {
                   const delta = l.lapTime - selectedDriver.bestLapTime;
-                  if (delta === 0) {
+                  if (Math.abs(delta) < 0.0005) {
                     deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
                   } else {
                     deltaStr = `+${delta.toFixed(3)}s`;
                   }
                 }
 
-                const isS1Best = l.s1 === selectedDriver.bestS1;
-                const isS2Best = l.s2 === selectedDriver.bestS2;
-                const isS3Best = l.s3 === selectedDriver.bestS3;
+                const isS1Best = l.s1 !== null && selectedDriver.bestS1 !== null && Math.abs(l.s1 - selectedDriver.bestS1) < 0.0005;
+                const isS2Best = l.s2 !== null && selectedDriver.bestS2 !== null && Math.abs(l.s2 - selectedDriver.bestS2) < 0.0005;
+                const isS3Best = l.s3 !== null && selectedDriver.bestS3 !== null && Math.abs(l.s3 - selectedDriver.bestS3) < 0.0005;
 
                 return (
                   <tr

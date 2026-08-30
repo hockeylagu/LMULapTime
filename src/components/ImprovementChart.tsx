@@ -88,13 +88,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   // Filter progression by selected track, vehicle class, car model, session type, search & empty filter
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
   const rawTrackData = progression.filter(p => {
-    const display = p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue;
+    const display = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
     const activeNorm = activeTrack.toLowerCase().trim();
-    const matchesTrack = activeTrack === 'All' ||
-      display.toLowerCase().trim() === activeNorm ||
-      p.trackVenue.toLowerCase().trim() === activeNorm ||
-      activeNorm.includes(p.trackVenue.toLowerCase().trim()) ||
-      p.trackVenue.toLowerCase().trim().includes(activeNorm);
+    const matchesTrack = activeTrack === 'All' || display === activeNorm;
 
     const matchesClass = matchesCarClass(p.carClass, p.carType, selectedCarClass);
     const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;
