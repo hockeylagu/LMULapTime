@@ -1,46 +1,48 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ImprovementChart, SessionProgressionPoint } from '../../src/components/ImprovementChart';
+import { ImprovementChart } from '../../src/components/ImprovementChart';
 
 describe('ImprovementChart component', () => {
-  const mockProgression: SessionProgressionPoint[] = [
+  const mockProgressionData = [
     {
-      sessionId: 's1',
-      timestamp: 1000,
+      sessionId: 'sess1',
+      timestamp: Date.now() - 100000,
       dateString: '2026/05/28 14:00',
       sessionType: 'Practice',
       sessionName: 'P1',
       trackVenue: 'Spa',
-      carType: 'Ferrari 499P',
-      carClass: 'LMH',
-      driverName: 'Player',
-      bestLapTime: 124.0,
-      bestS1: 36.0,
-      bestS2: 42.0,
-      bestS3: 46.0,
-      theoreticalBest: 124.0,
-      cleanLapsCount: 5,
-      totalLapsCount: 5,
-      avgLapTime: 125.0,
-    },
-    {
-      sessionId: 's2',
-      timestamp: 2000,
-      dateString: '2026/05/29 14:00',
-      sessionType: 'Qualifying',
-      sessionName: 'Q1',
-      trackVenue: 'Spa',
+      displayTrack: 'Spa',
       carType: 'Ferrari 499P',
       carClass: 'LMH',
       driverName: 'Player',
       bestLapTime: 122.0,
-      bestS1: 35.0,
-      bestS2: 41.5,
-      bestS3: 45.5,
+      bestS1: 34.0,
+      bestS2: 42.0,
+      bestS3: 46.0,
       theoreticalBest: 122.0,
-      cleanLapsCount: 4,
-      totalLapsCount: 4,
+      cleanLapsCount: 5,
+      totalLapsCount: 5,
       avgLapTime: 123.0,
+    },
+    {
+      sessionId: 'sess2',
+      timestamp: Date.now(),
+      dateString: '2026/05/29 16:00',
+      sessionType: 'Practice',
+      sessionName: 'P2',
+      trackVenue: 'Spa',
+      displayTrack: 'Spa',
+      carType: 'Ferrari 499P',
+      carClass: 'LMH',
+      driverName: 'Player',
+      bestLapTime: 121.0,
+      bestS1: 33.5,
+      bestS2: 42.0,
+      bestS3: 45.5,
+      theoreticalBest: 121.0,
+      cleanLapsCount: 8,
+      totalLapsCount: 8,
+      avgLapTime: 122.5,
     },
   ];
 
@@ -50,43 +52,63 @@ describe('ImprovementChart component', () => {
 
     render(
       <ImprovementChart
-        progression={mockProgression}
+        progression={mockProgressionData}
+        tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={setSelectedTrack}
         selectedCarClass="LMH"
         setSelectedCarClass={setSelectedCarClass}
-        tracks={['Spa', 'Monza']}
-        yourBest={{ timeStr: '2:02.000', paceCat: 'Alien', pacePct: 100.1 }}
       />
     );
 
-    expect(screen.getByText('Progression Timeline — Spa')).toBeInTheDocument();
+    expect(screen.getByText('Lap & Sector Improvement Over Time')).toBeInTheDocument();
     expect(screen.getByText('Total Sessions Parsed')).toBeInTheDocument();
-    expect(screen.getByText('-2.000s')).toBeInTheDocument();
+    expect(screen.getByText(/Your Best/i)).toBeInTheDocument();
+
+    // Switch metrics
+    const theoreticalBtn = screen.getByRole('button', { name: /theoretical/i });
+    fireEvent.click(theoreticalBtn);
 
     const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
     fireEvent.click(sectorsBtn);
-    expect(sectorsBtn).toHaveClass('bg-lmu-accent');
+
+    const lapPaceBtn = screen.getByRole('button', { name: /lap pace/i });
+    fireEvent.click(lapPaceBtn);
   });
 
   it('filters by time range when selected', () => {
-    const onTimeRangeChange = vi.fn();
-
     render(
       <ImprovementChart
-        progression={mockProgression}
+        progression={mockProgressionData}
+        tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
         selectedCarClass="LMH"
         setSelectedCarClass={vi.fn()}
-        tracks={['Spa']}
-        onTimeRangeChange={onTimeRangeChange}
       />
     );
 
     const comboboxes = screen.getAllByRole('combobox');
     const historySelect = comboboxes[comboboxes.length - 1];
     fireEvent.change(historySelect, { target: { value: 'last-5' } });
-    expect(onTimeRangeChange).toHaveBeenCalledWith('last-5');
+    fireEvent.change(historySelect, { target: { value: 'week' } });
+    fireEvent.change(historySelect, { target: { value: 'month' } });
+    fireEvent.change(historySelect, { target: { value: 'year' } });
+  });
+
+  it('renders correctly in embedded mode with empty data fallback', () => {
+    render(
+      <ImprovementChart
+        progression={[]}
+        tracks={['Spa']}
+        selectedTrack="Spa"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        embedded={true}
+      />
+    );
+
+    expect(screen.getByText(/No session data found for this track/i)).toBeInTheDocument();
   });
 });

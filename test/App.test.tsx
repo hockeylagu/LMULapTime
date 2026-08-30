@@ -129,14 +129,74 @@ describe('App component', () => {
     await waitFor(() => {
       expect(screen.getByText('Application Settings')).toBeInTheDocument();
     });
+
+    const dashboardTab = screen.getByRole('button', { name: /dashboard/i });
+    fireEvent.click(dashboardTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    });
   });
 
-  it('navigates to session detail when hash is set to session/:id', async () => {
+  it('navigates to session detail when hash is set to session/:id and handles back navigation', async () => {
     window.location.hash = '#session/sess1';
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText(/Back to Sessions/i)).toBeInTheDocument();
     });
+
+    const backBtn = screen.getByRole('button', { name: /Back to Sessions/i });
+    fireEvent.click(backBtn);
+  });
+
+  it('navigates to track detail when hash is set to track/:trackName', async () => {
+    window.location.hash = '#track/Spa';
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+      expect(screen.getByText(/Back to Tracks/i)).toBeInTheDocument();
+    });
+
+    const backBtn = screen.getByRole('button', { name: /Back to Tracks/i });
+    fireEvent.click(backBtn);
+  });
+
+  it('handles track and filter interactions on Dashboard view', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    });
+
+    // Select track filter
+    const comboboxes = screen.getAllByRole('combobox');
+    fireEvent.change(comboboxes[0], { target: { value: 'Spa' } });
+
+    // Select car class filter
+    const hypercarBtn = screen.getByRole('button', { name: /Hypercar/i });
+    fireEvent.click(hypercarBtn);
+
+    // Search query
+    const searchInput = screen.getByPlaceholderText(/search track, car, file/i);
+    fireEvent.change(searchInput, { target: { value: 'Ferrari' } });
+
+    // Select session card
+    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.glass-panel');
+    if (sessionCard) {
+      fireEvent.click(sessionCard);
+    }
+  });
+
+  it('refreshes telemetry data when clicking Refresh in Navbar', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    });
+
+    const refreshBtn = screen.getByTitle(/Refresh LMU Directory Scan/i);
+    fireEvent.click(refreshBtn);
   });
 });

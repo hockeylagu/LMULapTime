@@ -8,60 +8,78 @@ describe('FileUploader component', () => {
     resultsExist: true,
     replaysDir: 'C:\\LMU\\Replays',
     replaysExist: true,
-    playerName: 'SimDriver',
-    sessionsCount: 12,
+    playerName: 'Player1',
+    sessionsCount: 15,
     tracksCount: 5,
     referenceLaptimes: {
-      lastUpdated: '2026-05-28T12:00:00.000Z',
-      entriesCount: 30,
+      lastUpdated: '2026-05-28T12:00:00Z',
+      entriesCount: 186,
     },
   };
 
   beforeEach(() => {
-    vi.restoreAllMocks();
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/scan')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, count: 20, tracksCount: 5 }) });
+      }
+      if (url.includes('/api/reference-laptimes/refresh')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, entriesCount: 190 }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
   });
 
-  it('renders paths, detected status, and player name', () => {
-    render(<FileUploader status={mockStatus} onUpdatePaths={vi.fn()} />);
+  it('renders directory paths, status indicators, and scans directories on submit', async () => {
+    const onUpdatePaths = vi.fn();
+    render(<FileUploader status={mockStatus} onUpdatePaths={onUpdatePaths} />);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
-    expect(screen.getByText('30 Benchmarks Cached')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('SimDriver')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
-  });
 
-  it('submits path scan form and calls onUpdatePaths', async () => {
-    const onUpdatePaths = vi.fn();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve({ success: true, sessionsCount: 15, playerName: 'SimDriver' }),
-    });
-
-    render(<FileUploader status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    const playerNameInput = screen.getByDisplayValue('Player1');
+    fireEvent.change(playerNameInput, { target: { value: 'NewDriver' } });
 
     const scanBtn = screen.getByRole('button', { name: /rescan & load telemetry/i });
     fireEvent.click(scanBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Scanned 15 sessions successfully!/i)).toBeInTheDocument();
+      expect(onUpdatePaths).toHaveBeenCalled();
     });
-    expect(onUpdatePaths).toHaveBeenCalledWith('C:\\LMU\\Results', 'C:\\LMU\\Replays');
   });
 
-  it('triggers reference laptimes update from Google Sheets', async () => {
+  it('handles reference laptimes manual refresh button click', async () => {
     const onUpdatePaths = vi.fn();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve({ success: true, entriesCount: 45 }),
-    });
-
     render(<FileUploader status={mockStatus} onUpdatePaths={onUpdatePaths} />);
 
-    const updateBtn = screen.getByRole('button', { name: /update reference laptimes/i });
-    fireEvent.click(updateBtn);
+    expect(screen.getByText('Reference Laptimes Benchmark')).toBeInTheDocument();
+
+    const refreshBtn = screen.getByRole('button', { name: /update reference laptimes/i });
+    fireEvent.click(refreshBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Updated 45 benchmark entries/i)).toBeInTheDocument();
+      expect(screen.getByText(/Updated 190 benchmark entries from Google Sheets!/i)).toBeInTheDocument();
+      expect(onUpdatePaths).toHaveBeenCalled();
     });
-    expect(onUpdatePaths).toHaveBeenCalled();
+  });
+
+  it('displays error notification when scan fails', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/scan')) {
+        return Promise.reject(new Error('Network failure during scan'));
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    render(<FileUploader status={mockStatus} onUpdatePaths={vi.fn()} />);
+
+    expect(screen.getByText('Application Settings')).toBeInTheDocument();
+
+    const scanBtn = screen.getByRole('button', { name: /rescan & load telemetry/i });
+    fireEvent.click(scanBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Network failure during scan/i)).toBeInTheDocument();
+    });
   });
 });

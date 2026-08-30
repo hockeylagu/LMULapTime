@@ -6,18 +6,27 @@ describe('SessionDetail component', () => {
   const mockDetailedSession = {
     id: 'sess123',
     filename: '2026_05_28_P1.xml',
-    filePath: 'C:\\Results\\2026_05_28_P1.xml',
+    filePath: 'C:\\LMU\\UserData\\LOG\\Results\\2026_05_28_P1.xml',
     trackVenue: 'Spa',
     trackCourse: 'GP',
-    trackEvent: 'Test Event',
-    trackLengthMeters: 7004,
     timeString: '2026/05/28 14:00',
-    timestamp: 1780000000000,
-    sessionType: 'Practice' as const,
+    sessionType: 'Practice',
     sessionName: 'P1',
-    weatherInfo: '☀️ Dry • Daytime',
+    eventTimeString: '14:00:00',
+    eventName: 'Test Event',
+    ambientTemp: '24°C',
+    trackTemp: '32°C',
+    weatherCondition: '☀️ Dry',
+    timeOfDayCategory: 'Daytime',
+    isNight: false,
+    isWet: false,
     driversCount: 2,
-    matchingReplayFile: { name: 'spa_replay.vcr', path: 'C:\\Replays\\spa_replay.vcr', sizeBytes: 1024 },
+    matchingReplayFile: {
+      name: 'spa_replay.vcr',
+      path: 'C:\\LMU\\UserData\\Replays\\spa_replay.vcr',
+      sizeFormatted: '4.2 MB',
+      createdDateFormatted: '2026/05/28 14:30',
+    },
     playerDriver: {
       name: 'Sim Driver',
       carType: 'Ferrari 499P',
@@ -34,9 +43,9 @@ describe('SessionDetail component', () => {
       bestS3: 46.0,
       theoreticalBest: 122.0,
       theoreticalBestString: '2:02.000',
-      bestLapPaceCategory: 'Competitive' as const,
-      bestLapPacePercentage: 101.0,
-      lapsCount: 2,
+      bestLapPaceCategory: 'Alien' as const,
+      bestLapPacePercentage: 100.1,
+      lapsCount: 3,
       laps: [
         {
           lapNum: 1,
@@ -70,6 +79,22 @@ describe('SessionDetail component', () => {
           paceCategory: 'Competitive' as const,
           pacePercentage: 101.0,
         },
+        {
+          lapNum: 3,
+          position: 1,
+          lapTime: 135.0,
+          lapTimeString: '2:15.000',
+          s1: 36.0,
+          s2: 45.0,
+          s3: 54.0,
+          topSpeed: 290.0,
+          fCompound: 'Hard',
+          rCompound: 'Hard',
+          isPitStop: true,
+          isValid: false,
+          paceCategory: 'Offline' as const,
+          pacePercentage: 112.5,
+        },
       ],
     },
     drivers: [
@@ -88,7 +113,8 @@ describe('SessionDetail component', () => {
         bestS2: 42.0,
         bestS3: 46.0,
         theoreticalBest: 122.0,
-        lapsCount: 2,
+        theoreticalBestString: '2:02.000',
+        lapsCount: 3,
         laps: [
           {
             lapNum: 1,
@@ -122,23 +148,67 @@ describe('SessionDetail component', () => {
             paceCategory: 'Competitive' as const,
             pacePercentage: 101.0,
           },
+          {
+            lapNum: 3,
+            position: 1,
+            lapTime: 135.0,
+            lapTimeString: '2:15.000',
+            s1: 36.0,
+            s2: 45.0,
+            s3: 54.0,
+            topSpeed: 290.0,
+            fCompound: 'Hard',
+            rCompound: 'Hard',
+            isPitStop: true,
+            isValid: false,
+            paceCategory: 'Offline' as const,
+            pacePercentage: 112.5,
+          },
+        ],
+      },
+      {
+        name: 'AI Driver 2',
+        carType: 'Porsche 963',
+        carClass: 'LMH',
+        carNumber: '5',
+        teamName: 'Penske',
+        isPlayer: false,
+        position: 2,
+        classPosition: 2,
+        bestLapTime: 124.0,
+        bestLapTimeString: '2:04.000',
+        bestS1: 35.0,
+        bestS2: 43.0,
+        bestS3: 46.0,
+        theoreticalBest: 124.0,
+        theoreticalBestString: '2:04.000',
+        lapsCount: 1,
+        laps: [
+          {
+            lapNum: 1,
+            position: 2,
+            lapTime: 124.0,
+            lapTimeString: '2:04.000',
+            s1: 35.0,
+            s2: 43.0,
+            s3: 46.0,
+            topSpeed: 318.0,
+            fCompound: 'Medium',
+            rCompound: 'Medium',
+            isPitStop: false,
+            isValid: true,
+            paceCategory: 'Good' as const,
+            pacePercentage: 102.8,
+          },
         ],
       },
     ],
   };
 
   beforeEach(() => {
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/session/')) {
-        return Promise.resolve({ json: () => Promise.resolve(mockDetailedSession) });
-      }
-      if (url.includes('/api/reference-laptimes')) {
-        return Promise.resolve({ json: () => Promise.resolve({ entries: {} }) });
-      }
-      if (url.includes('/api/progression')) {
-        return Promise.resolve({ json: () => Promise.resolve([]) });
-      }
-      return Promise.resolve({ json: () => Promise.resolve({}) });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockDetailedSession),
     });
   });
 
@@ -149,31 +219,76 @@ describe('SessionDetail component', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
       expect(screen.getByText(/Sim Driver/)).toBeInTheDocument();
-      expect(screen.getByText('Lap Telemetry Table (2 Laps)')).toBeInTheDocument();
+      expect(screen.getByText('Lap Telemetry Table (3 Laps)')).toBeInTheDocument();
       expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
     });
+
+    // Metric buttons on telemetry chart
+    const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
+    fireEvent.click(sectorsBtn);
+
+    const topSpeedBtn = screen.getByRole('button', { name: /^top speed$/i });
+    fireEvent.click(topSpeedBtn);
+
+    const lapPaceBtn = screen.getByRole('button', { name: /^lap pace$/i });
+    fireEvent.click(lapPaceBtn);
 
     const backBtn = screen.getByRole('button', { name: /back to sessions/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalled();
   });
 
+  it('allows switching drivers and exporting CSV', async () => {
+    global.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sim Driver/)).toBeInTheDocument();
+    });
+
+    // Switch driver
+    const driverSelect = screen.getByRole('combobox');
+    fireEvent.change(driverSelect, { target: { value: 'AI Driver 2' } });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Porsche 963/i).length).toBeGreaterThan(0);
+    });
+
+    // Click Export CSV
+    const exportBtn = screen.getByRole('button', { name: /export csv/i });
+    fireEvent.click(exportBtn);
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+  });
+
   it('copies replay file path when clicking Copy Path', async () => {
-    const writeTextMock = vi.fn();
     Object.assign(navigator, {
       clipboard: {
-        writeText: writeTextMock,
+        writeText: vi.fn().mockImplementation(() => Promise.resolve()),
       },
     });
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Matching Replay/i)).toBeInTheDocument();
+      expect(screen.getByText('spa_replay.vcr')).toBeInTheDocument();
     });
 
     const copyBtn = screen.getByRole('button', { name: /copy path/i });
     fireEvent.click(copyBtn);
-    expect(writeTextMock).toHaveBeenCalledWith('C:\\Replays\\spa_replay.vcr');
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('C:\\LMU\\UserData\\Replays\\spa_replay.vcr');
+  });
+
+  it('navigates to track detail when clicking track heading', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: /Spa/i })).toBeInTheDocument();
+    });
+
+    const trackHeading = screen.getByRole('heading', { level: 2, name: /Spa/i });
+    fireEvent.click(trackHeading);
+    expect(window.location.hash).toBe('#track/Spa');
   });
 });

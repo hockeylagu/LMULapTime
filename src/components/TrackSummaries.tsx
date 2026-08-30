@@ -53,7 +53,7 @@ interface TrackSummariesProps {
 
 export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   sessions = [],
-  tracksMap,
+  tracksMap = {},
   onSelectTrack,
   selectedCarClass,
   setSelectedCarClass,
