@@ -259,9 +259,9 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
             >
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-white tracking-wide">{t.trackVenue}</h3>
-                    <p className="text-xs text-lmu-muted mt-0.5">
+                  <div className="min-w-0 flex-1 mr-2">
+                    <h3 className="text-lg font-bold text-white tracking-wide truncate" title={t.trackVenue}>{t.trackVenue}</h3>
+                    <p className="text-xs text-lmu-muted mt-0.5 truncate">
                       {t.sessionsCount} Sessions • {t.totalLaps} Total Laps
                     </p>
                   </div>

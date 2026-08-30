@@ -172,14 +172,14 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       {/* Track Title Card */}
       <div className="glass-panel p-6 rounded-2xl space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30">
                 Official Circuit
               </span>
               <span className="text-xs text-lmu-muted">{filteredSessions.length} Recorded Sessions</span>
             </div>
-            <h2 className="text-3xl font-extrabold text-white mt-1">{trackName}</h2>
+            <h2 className="text-3xl font-extrabold text-white mt-1 truncate" title={trackName}>{trackName}</h2>
             <p className="text-xs text-lmu-muted mt-0.5">
               Benchmark Target Lap Times & Personal Telemetry per Vehicle Category
             </p>

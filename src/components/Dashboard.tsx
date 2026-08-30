@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Car, Zap, FileText, ChevronRight, Video, FilterX, AlertCircle, MapPin, Award } from 'lucide-react';
+import { Calendar, Car, Zap, FileText, ChevronRight, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types';
@@ -63,8 +63,6 @@ interface DashboardProps {
   setSearchQuery: (query: string) => void;
 }
 
-
-
 export const Dashboard: React.FC<DashboardProps> = ({
   sessions,
   onSelectSession,
@@ -78,6 +76,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setSearchQuery,
 }) => {
   const [hideEmpty, setHideEmpty] = useState<boolean>(true);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Extract unique track layout variations sorted alphabetically
   const tracks = Array.from(new Set(sessions.map(s => getDisplayTrackName(s.trackVenue, s.trackCourse)))).filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -98,6 +97,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
       s.filename.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
     return matchesTrack && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty;
+  });
+
+  // Sorted sessions by Date (desc / asc)
+  const sortedSessions = [...filteredSessions].sort((a, b) => {
+    const parseTimestamp = (str: string) => {
+      if (!str) return 0;
+      const clean = str.replace(/\//g, '-');
+      const time = new Date(clean).getTime();
+      return isNaN(time) ? 0 : time;
+    };
+    const timeA = parseTimestamp(a.timeString);
+    const timeB = parseTimestamp(b.timeString);
+
+    return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
   // Calculate overall metrics & top3 aggregations
@@ -334,6 +347,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             ))}
           </div>
 
+          {/* Search Bar */}
+          <input
+            type="text"
+            placeholder="Search track, car, file..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-1.5 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent w-full md:w-56"
+          />
+
           {/* Hide Empty Results Filter Toggle */}
           <button
             onClick={() => setHideEmpty(!hideEmpty)}
@@ -352,16 +374,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
             )}
           </button>
-        </div>
 
-        {/* Search Bar */}
-        <input
-          type="text"
-          placeholder="Search track, car, file..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent w-full md:w-64"
-        />
+          {/* Date Sort Order Toggle */}
+          <button
+            onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-lmu-border bg-lmu-bg text-xs font-semibold text-white hover:border-lmu-accent transition-all shrink-0"
+            title={`Currently sorted by date ${sortOrder === 'desc' ? 'descending (newest first)' : 'ascending (oldest first)'}. Click to switch.`}
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
+            <span>Date: {sortOrder === 'desc' ? 'Newest First (Desc)' : 'Oldest First (Asc)'}</span>
+          </button>
+        </div>
 
       </div>
 
@@ -370,14 +393,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <FileText className="w-5 h-5 text-lmu-accent" />
-            Session Results ({filteredSessions.length}{hideEmpty && emptyCount > 0 ? ` / ${sessions.length}` : ''})
+            Session Results ({sortedSessions.length}{hideEmpty && emptyCount > 0 ? ` / ${sessions.length}` : ''})
           </h3>
           <span className="text-xs text-lmu-muted">
             {hideEmpty && emptyCount > 0 ? `Filtering ${emptyCount} empty session${emptyCount > 1 ? 's' : ''}` : 'Click any session to view detailed telemetry & sector timings'}
           </span>
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {sortedSessions.length === 0 ? (
           <div className="py-12 text-center text-lmu-muted">
             <p className="text-base font-medium">No sessions found matching filters.</p>
             {hideEmpty && emptyCount > 0 && (
@@ -388,18 +411,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSessions.map(s => {
+            {sortedSessions.map(s => {
               const p = s.playerDriver;
               const empty = isSessionEmpty(s);
               return (
                 <div
                   key={s.id}
                   onClick={() => onSelectSession(s.id)}
-                  className={`glass-panel glass-panel-hover p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 ${empty ? 'border-amber-500/30 bg-amber-950/10' : ''
+                  className={`glass-panel glass-panel-hover p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${empty ? 'border-amber-500/30 bg-amber-950/10' : ''
                     }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${s.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30' :
                             s.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30' :
@@ -413,14 +436,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </span>
                         )}
                       </div>
-                      <h4 className="font-bold text-white text-base mt-2 truncate leading-tight">
+                      <h4 className="font-bold text-white text-base mt-2 truncate leading-tight" title={getDisplayTrackName(s.trackVenue, s.trackCourse)}>
                         {getDisplayTrackName(s.trackVenue, s.trackCourse)}
                       </h4>
                       <p className="text-xs text-lmu-muted mt-0.5">{s.timeString}</p>
                     </div>
 
                     {s.matchingReplayFile && (
-                      <span className="p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20" title={`Replay VCR: ${s.matchingReplayFile.name}`}>
+                      <span className="p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20 shrink-0 mt-0.5" title={`Replay VCR: ${s.matchingReplayFile.name}`}>
                         <Video className="w-4 h-4" />
                       </span>
                     )}

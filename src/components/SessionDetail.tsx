@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, ChevronRight } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from 'recharts';
 import { DetailedSession, ReferenceLaptimeEntry } from '../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
-import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass } from '../utils/paceCategory.js';
+import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, normalizeTrackName } from '../utils/paceCategory.js';
 
 interface SessionDetailProps {
   sessionId: string;
@@ -15,6 +25,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
+  const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed'>('lapTime');
 
   useEffect(() => {
     setLoading(true);
@@ -67,14 +78,28 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     if (!refCache?.entries || !session || !selectedDriver) return null;
     const entries: ReferenceLaptimeEntry[] = Object.values(refCache.entries);
 
-    const trackMatches = entries.filter(e =>
-      e.trackName.toLowerCase().includes(session.trackVenue.toLowerCase()) ||
-      session.trackVenue.toLowerCase().includes(e.trackName.toLowerCase())
-    );
+    const normTrack = normalizeTrackName(session.trackVenue, session.trackCourse).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // 1. Try exact normalized track matches first
+    let trackMatches = entries.filter(e => {
+      const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const eRaw = e.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return eNorm === normTrack || eRaw === normTrack;
+    });
+
+    // 2. Fallback to substring matching if no exact matches exist
+    if (trackMatches.length === 0) {
+      trackMatches = entries.filter(e => {
+        const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const eRaw = e.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return eNorm.includes(normTrack) || normTrack.includes(eNorm) || eRaw.includes(normTrack) || normTrack.includes(eRaw);
+      });
+    }
 
     if (trackMatches.length > 0) {
       const classMatch = trackMatches.find(e =>
-        matchesCarClass(e.carClass, e.carClass, selectedDriver.carClass || selectedDriver.carType)
+        matchesCarClass(e.carClass, e.carClass, selectedDriver.carClass || selectedDriver.carType) ||
+        matchesCarClass(selectedDriver.carClass || selectedDriver.carType, selectedDriver.carType, e.carClass)
       );
       return classMatch || trackMatches[0];
     }
@@ -156,7 +181,17 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
             </div>
-            <h2 className="text-2xl font-extrabold text-white mt-1">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</h2>
+            <h2
+              onClick={() => {
+                const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+                window.location.hash = `track/${encodeURIComponent(trackName)}`;
+              }}
+              className="text-2xl font-extrabold text-white mt-1 cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
+              title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
+            >
+              <span className="truncate">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</span>
+              <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-lmu-gold group-hover:translate-x-0.5 transition-all shrink-0" />
+            </h2>
             <p className="text-xs text-lmu-muted mt-0.5">{session.trackCourse} • {session.trackEvent || 'Session'}</p>
           </div>
 
@@ -267,6 +302,197 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           </div>
         </div>
       )}
+
+      {/* Session Lap Telemetry & Sector Analysis Chart */}
+      {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (() => {
+        const sessionChartData = selectedDriver.laps.map(l => ({
+          lapNum: `Lap ${l.lapNum}`,
+          lapNumber: l.lapNum,
+          lapTime: l.lapTime && l.isValid ? l.lapTime : null,
+          lapTimeString: l.lapTimeString,
+          s1: l.s1 && l.isValid ? l.s1 : null,
+          s2: l.s2 && l.isValid ? l.s2 : null,
+          s3: l.s3 && l.isValid ? l.s3 : null,
+          s1String: formatTime(l.s1),
+          s2String: formatTime(l.s2),
+          s3String: formatTime(l.s3),
+          topSpeed: l.topSpeed || null,
+          isValid: l.isValid,
+          isPitStop: l.isPitStop,
+        }));
+
+        const CustomTooltip = ({ active, payload }: any) => {
+          if (!active || !payload || !payload.length) return null;
+          const data = payload[0].payload;
+          return (
+            <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1 font-mono">
+              <div className="font-bold text-white flex items-center justify-between gap-3 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
+                <span>{data.lapNum}</span>
+                {data.isPitStop && <span className="text-[10px] text-amber-400">🛑 Pit Stop</span>}
+                {!data.isValid && <span className="text-[10px] text-rose-400">⚠️ Invalid</span>}
+              </div>
+
+              {chartMetric === 'lapTime' && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-lmu-muted">Lap Pace:</span>
+                  <span className="font-bold text-lmu-gold">{data.lapTimeString}</span>
+                </div>
+              )}
+
+              {chartMetric === 'sectors' && (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-lmu-gold">Sector 1:</span>
+                    <span className="font-bold text-white">{data.s1String}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-lmu-cyan">Sector 2:</span>
+                    <span className="font-bold text-white">{data.s2String}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-lmu-green">Sector 3:</span>
+                    <span className="font-bold text-white">{data.s3String}</span>
+                  </div>
+                </>
+              )}
+
+              {chartMetric === 'topSpeed' && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-lmu-muted">Top Speed:</span>
+                  <span className="font-bold text-lmu-cyan">{data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : 'N/A'}</span>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="glass-panel p-5 rounded-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-lmu-accent" />
+                  Lap & Sector Telemetry Chart
+                </h3>
+                <p className="text-xs text-lmu-muted mt-0.5">
+                  Session lap pace progression, sector splits (S1/S2/S3), and top speeds by lap
+                </p>
+              </div>
+
+              {/* Metric Toggle */}
+              <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold shrink-0">
+                <button
+                  onClick={() => setChartMetric('lapTime')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartMetric === 'lapTime'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Lap Pace
+                </button>
+                <button
+                  onClick={() => setChartMetric('sectors')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartMetric === 'sectors'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  Sectors (S1/S2/S3)
+                </button>
+                <button
+                  onClick={() => setChartMetric('topSpeed')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartMetric === 'topSpeed'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <Gauge className="w-3.5 h-3.5" />
+                  Top Speed
+                </button>
+              </div>
+            </div>
+
+            <div className="h-72 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sessionChartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.5} />
+                  <XAxis dataKey="lapNum" stroke="#718096" tick={{ fill: '#A0AEC0', fontSize: 11 }} />
+                  <YAxis
+                    stroke="#718096"
+                    tick={{ fill: '#A0AEC0', fontSize: 11 }}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(val) => chartMetric === 'topSpeed' ? `${val}` : formatTime(val)}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12 }} />
+
+                  {chartMetric === 'lapTime' && (
+                    <Line
+                      type="monotone"
+                      dataKey="lapTime"
+                      name="Lap Time"
+                      stroke="#E53E3E"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#E53E3E', strokeWidth: 2, stroke: '#FFFFFF' }}
+                      activeDot={{ r: 7 }}
+                      connectNulls={true}
+                    />
+                  )}
+
+                  {chartMetric === 'sectors' && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="s1"
+                        name="Sector 1"
+                        stroke="#ECC94B"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#ECC94B' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="s2"
+                        name="Sector 2"
+                        stroke="#3182CE"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#3182CE' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="s3"
+                        name="Sector 3"
+                        stroke="#38A169"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#38A169' }}
+                        connectNulls={true}
+                      />
+                    </>
+                  )}
+
+                  {chartMetric === 'topSpeed' && (
+                    <Line
+                      type="monotone"
+                      dataKey="topSpeed"
+                      name="Top Speed (km/h)"
+                      stroke="#00F2FE"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: '#00F2FE' }}
+                      connectNulls={true}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Detailed Lap Table */}
       <div className="glass-panel p-5 rounded-2xl">
