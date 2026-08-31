@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { TrackDetail } from '../../src/components/TrackDetail';
 
 describe('TrackDetail component', () => {
@@ -270,5 +270,44 @@ describe('TrackDetail component', () => {
     const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
     fireEvent.click(lmgt3Btn);
     expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
+  });
+
+  it('toggles between Cards view and Table view in TrackDetail', async () => {
+    const onSelectSession = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={onSelectSession}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const cardsButton = screen.getByRole('button', { name: /Cards view/i });
+    const tableButton = screen.getByRole('button', { name: /Table view/i });
+    expect(cardsButton).toBeInTheDocument();
+    expect(tableButton).toBeInTheDocument();
+
+    // Switch to Table view
+    fireEvent.click(tableButton);
+    const table = screen.getByRole('table');
+    expect(table).toBeInTheDocument();
+
+    // Verify row selection in table view
+    const tableRow = within(table).getByText('2026/05/28 14:00').closest('tr');
+    expect(tableRow).not.toBeNull();
+    if (tableRow) {
+      fireEvent.click(tableRow);
+      expect(onSelectSession).toHaveBeenCalledWith('sess-hypercar-1');
+    }
+
+    // Switch back to Cards view
+    fireEvent.click(cardsButton);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });

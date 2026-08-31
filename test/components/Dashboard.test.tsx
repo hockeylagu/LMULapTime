@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Dashboard } from '../../src/components/Dashboard';
 
 describe('Dashboard component', () => {
@@ -348,5 +348,52 @@ describe('Dashboard component', () => {
     const alienBenchmarkRow = screen.getByTitle('Open session details for Spa');
     fireEvent.click(alienBenchmarkRow);
     expect(onSelectSession).toHaveBeenCalledWith('sess-spa-1');
+  });
+
+  it('toggles between Cards view and Table view and allows selecting sessions from table', () => {
+    const onSelectSession = vi.fn();
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={onSelectSession}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Initial state: Cards view
+    const cardsButton = screen.getByRole('button', { name: /Cards view/i });
+    const tableButton = screen.getByRole('button', { name: /Table view/i });
+    expect(cardsButton).toBeInTheDocument();
+    expect(tableButton).toBeInTheDocument();
+
+    // Switch to Table view
+    fireEvent.click(tableButton);
+
+    // Check table headers
+    const table = screen.getByRole('table');
+    expect(table).toBeInTheDocument();
+    expect(screen.getByText('Track / Layout')).toBeInTheDocument();
+    expect(screen.getByText('Date & Time')).toBeInTheDocument();
+    expect(screen.getByText('Car / Class')).toBeInTheDocument();
+    expect(screen.getByText('Benchmark Pace')).toBeInTheDocument();
+
+    // Click on a table row
+    const tableRow = within(table).getByText('2026/05/28 14:00').closest('tr');
+    expect(tableRow).not.toBeNull();
+    if (tableRow) {
+      fireEvent.click(tableRow);
+      expect(onSelectSession).toHaveBeenCalledWith('sess-spa-1');
+    }
+
+    // Switch back to Cards view
+    fireEvent.click(cardsButton);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });
