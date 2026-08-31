@@ -335,10 +335,10 @@ describe('SessionDetail component', () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('spa_replay.vcr')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Copy Replay/i })).toBeInTheDocument();
     });
 
-    const copyBtn = screen.getByRole('button', { name: /copy path/i });
+    const copyBtn = screen.getByRole('button', { name: /Copy Replay/i });
     fireEvent.click(copyBtn);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('C:\\LMU\\UserData\\Replays\\spa_replay.vcr');
   });
@@ -427,6 +427,10 @@ describe('SessionDetail component', () => {
     expect(screen.getAllByText(/3.8%/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/~26/i)).toBeInTheDocument();
 
+    // Check Setup Fuel Ratio Optimizer banner
+    expect(screen.getByText(/Recommended Setup Fuel Ratio:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/0.66/i).length).toBeGreaterThan(0);
+
     // Check table column
     expect(screen.getByRole('columnheader', { name: /Fuel & VE/i })).toBeInTheDocument();
 
@@ -509,14 +513,14 @@ describe('SessionDetail component', () => {
     // Stint strategy card should NOT be rendered
     expect(screen.queryByText(/Avg Fuel Usage/i)).not.toBeInTheDocument();
 
-    // Chart buttons for Tire Wear and Fuel & Energy should be disabled
+    // Chart buttons for Tire Wear and Fuel should be disabled
     const tireWearBtn = screen.getByRole('button', { name: /Tire Wear/i });
-    const fuelBtn = screen.getByRole('button', { name: /Fuel & Energy/i });
+    const fuelBtn = screen.getByRole('button', { name: /^Fuel/i });
     expect(tireWearBtn).toBeDisabled();
     expect(fuelBtn).toBeDisabled();
 
     // Columns should NOT be rendered in table
     expect(screen.queryByRole('columnheader', { name: /Tire Wear/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: /Fuel & VE/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Fuel/i })).not.toBeInTheDocument();
   });
 });

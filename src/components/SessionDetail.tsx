@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight, Scale, Target } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -83,9 +83,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     l => l.tireWear !== undefined && l.tireWear !== null && (l.tireWear.fl !== null || l.tireWear.avg !== null)
   ) ?? false;
 
+  const hasVirtualEnergyData = (selectedDriver?.laps?.some(
+    l => l.virtualEnergy !== null && l.virtualEnergy !== undefined
+  ) || (selectedDriver?.avgVePerLap !== null && selectedDriver?.avgVePerLap !== undefined)) ?? false;
+
   const hasFuelData = (selectedDriver?.laps?.some(
     l => (l.fuel !== null && l.fuel !== undefined) || (l.virtualEnergy !== null && l.virtualEnergy !== undefined)
-  ) || (selectedDriver?.avgFuelPerLap !== null && selectedDriver?.avgFuelPerLap !== undefined)) ?? false;
+  ) || (selectedDriver?.avgFuelPerLap !== null && selectedDriver?.avgFuelPerLap !== undefined) || hasVirtualEnergyData) ?? false;
 
   const activeChartMetric = (chartMetric === 'tireWear' && !hasTireWearData) || (chartMetric === 'fuelEnergy' && !hasFuelData)
     ? 'lapTime'
@@ -126,6 +130,51 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         selectedDriver.carType
       )
     : null;
+
+  const fuelStrategy = (() => {
+    if (!selectedDriver || !selectedDriver.avgFuelPerLap) return null;
+    const avgFuel = selectedDriver.avgFuelPerLap;
+    const estFuelLaps = selectedDriver.estFuelStintLaps || (avgFuel > 0 ? Math.floor(100 / avgFuel) : null);
+    const avgVe = selectedDriver.avgVePerLap || null;
+    const estVeLaps = selectedDriver.estVeStintLaps || (avgVe && avgVe > 0 ? Math.floor(100 / avgVe) : null);
+
+    const optimalRatio = avgFuel > 0 && avgVe && avgVe > 0
+      ? parseFloat((avgFuel / avgVe).toFixed(2))
+      : null;
+
+    const zeroWasteFuelPct = estVeLaps && avgFuel
+      ? Math.min(100, Math.ceil((estVeLaps + 0.5) * avgFuel))
+      : null;
+
+    let limiter: 've' | 'fuel' | 'balanced' | null = null;
+    let lapDelta = 0;
+    let surplusFuelPct = 0;
+
+    if (estFuelLaps && estVeLaps) {
+      if (estVeLaps < estFuelLaps - 1) {
+        limiter = 've';
+        lapDelta = estFuelLaps - estVeLaps;
+        surplusFuelPct = Math.max(0, Math.round(100 - (estVeLaps * avgFuel)));
+      } else if (estFuelLaps < estVeLaps - 1) {
+        limiter = 'fuel';
+        lapDelta = estVeLaps - estFuelLaps;
+      } else {
+        limiter = 'balanced';
+      }
+    }
+
+    return {
+      avgFuel,
+      estFuelLaps,
+      avgVe,
+      estVeLaps,
+      optimalRatio,
+      zeroWasteFuelPct,
+      limiter,
+      lapDelta,
+      surplusFuelPct,
+    };
+  })();
 
   const handleCopyReplayPath = () => {
     if (session.matchingReplayFile) {
@@ -179,6 +228,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </button>
 
         <div className="flex items-center gap-3">
+          {session.matchingReplayFile && (
+            <button
+              onClick={handleCopyReplayPath}
+              title={`Matching Replay: ${session.matchingReplayFile.name}\nPath: ${session.matchingReplayFile.path}\nClick to copy path`}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
+                copiedReplay
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-lmu-card text-emerald-400 border-lmu-border hover:border-emerald-500/40 hover:bg-emerald-500/10'
+              }`}
+            >
+              <Video className="w-4 h-4 text-emerald-400" />
+              {copiedReplay ? 'Path Copied!' : 'Copy Replay (.VCR)'}
+            </button>
+          )}
+
           <button
             onClick={handleExportCsv}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-green transition-all"
@@ -334,22 +398,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
             </span>
           </div>
         )}
-
-        {/* Replay file banner if matched */}
-        {session.matchingReplayFile && (
-          <div className="p-3 rounded-xl bg-lmu-green/10 border border-lmu-green/20 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-lmu-green font-medium truncate">
-              <Video className="w-4 h-4 shrink-0" />
-              <span>Matching Replay (.VCR): <strong className="text-white">{session.matchingReplayFile.name}</strong></span>
-            </div>
-            <button
-              onClick={handleCopyReplayPath}
-              className="px-3 py-1 rounded bg-lmu-green/20 hover:bg-lmu-green/30 text-lmu-green font-semibold text-xs transition-all shrink-0"
-            >
-              {copiedReplay ? 'Path Copied!' : 'Copy Path'}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Selected Driver Summary Cards */}
@@ -410,59 +458,103 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
       {/* Stint Strategy & Energy Management */}
       {selectedDriver && hasFuelData && (selectedDriver.avgFuelPerLap || selectedDriver.avgVePerLap) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-lmu-card/70 border border-lmu-border shadow-sm">
-          {selectedDriver.avgFuelPerLap !== null && selectedDriver.avgFuelPerLap !== undefined && (
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
-                <Fuel className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-lmu-card/70 border border-lmu-border shadow-sm space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {selectedDriver.avgFuelPerLap !== null && selectedDriver.avgFuelPerLap !== undefined && (
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                  <Fuel className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Fuel Usage</p>
+                  <p className="text-sm font-mono font-bold text-white">
+                    {selectedDriver.avgFuelPerLap}% <span className="text-xs font-normal text-lmu-muted">/ clean lap</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Fuel Usage</p>
-                <p className="text-sm font-mono font-bold text-white">
-                  {selectedDriver.avgFuelPerLap}% <span className="text-xs font-normal text-lmu-muted">/ clean lap</span>
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {selectedDriver.estFuelStintLaps !== null && selectedDriver.estFuelStintLaps !== undefined && (
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 shrink-0">
-                <Clock className="w-5 h-5" />
+            {selectedDriver.estFuelStintLaps !== null && selectedDriver.estFuelStintLaps !== undefined && (
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Fuel Stint</p>
+                  <p className="text-sm font-mono font-bold text-amber-300">
+                    ~{selectedDriver.estFuelStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / tank</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Fuel Stint</p>
-                <p className="text-sm font-mono font-bold text-amber-300">
-                  ~{selectedDriver.estFuelStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / tank</span>
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {selectedDriver.avgVePerLap !== null && selectedDriver.avgVePerLap !== undefined && (
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
-                <Zap className="w-5 h-5" />
+            {selectedDriver.avgVePerLap !== null && selectedDriver.avgVePerLap !== undefined && (
+              <div className="flex items-center gap-3" title="Virtual Energy consumed per lap (WEC / LMU BoP energy allocation)">
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Virtual Energy</p>
+                  <p className="text-sm font-mono font-bold text-white">
+                    {selectedDriver.avgVePerLap}% <span className="text-xs font-normal text-lmu-muted">/ lap</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Virtual Energy</p>
-                <p className="text-sm font-mono font-bold text-white">
-                  {selectedDriver.avgVePerLap}% <span className="text-xs font-normal text-lmu-muted">/ lap</span>
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {selectedDriver.estVeStintLaps !== null && selectedDriver.estVeStintLaps !== undefined && (
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
-                <Clock className="w-5 h-5" />
+            {selectedDriver.estVeStintLaps !== null && selectedDriver.estVeStintLaps !== undefined && (
+              <div className="flex items-center gap-3" title="Estimated laps before 100% Virtual Energy allocation is depleted. In WEC, running out before pitting triggers a 100s stop-and-go penalty.">
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Energy Stint (VE)</p>
+                  <p className="text-sm font-mono font-bold text-indigo-300">
+                    ~{selectedDriver.estVeStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / stint</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. VE Stint (Hypercar)</p>
-                <p className="text-sm font-mono font-bold text-indigo-300">
-                  ~{selectedDriver.estVeStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / stint</span>
-                </p>
+            )}
+          </div>
+
+          {/* Optimal Setup Fuel Ratio & Stint Optimization Banner */}
+          {fuelStrategy && fuelStrategy.optimalRatio !== null && (
+            <div className="pt-3 border-t border-lmu-border/50 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs bg-lmu-bg/60 -mx-4 -mb-4 px-4 py-3 rounded-b-2xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-white uppercase tracking-wider text-[11px]">Recommended Setup Fuel Ratio:</span>
+                    <span
+                      className="px-2.5 py-0.5 rounded bg-purple-950/90 text-purple-300 border border-purple-500/50 font-mono font-bold text-xs"
+                      title="Recommended Fuel-to-Energy ratio for LMU Setup (Electronics/Strategy menu). Sets how much physical fuel to carry per % Virtual Energy."
+                    >
+                      {fuelStrategy.optimalRatio}
+                    </span>
+                    {fuelStrategy.zeroWasteFuelPct !== null && (
+                      <span className="text-lmu-muted text-[11px]">
+                        (Zero-Waste Tank Fill: <strong className="text-amber-300 font-mono">~{fuelStrategy.zeroWasteFuelPct}%</strong> for full VE stint)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-lmu-muted mt-1">
+                    {fuelStrategy.limiter === 've' ? (
+                      <span>
+                        <strong className="text-indigo-300">⚡ Stint Limited by Virtual Energy:</strong> VE allocation runs out ~{fuelStrategy.lapDelta} laps before fuel tank (carrying ~{fuelStrategy.surplusFuelPct}% excess dead-weight fuel). Set ratio to <strong className="text-white font-mono">{fuelStrategy.optimalRatio}</strong> or use lift-and-coast to save weight.
+                      </span>
+                    ) : fuelStrategy.limiter === 'fuel' ? (
+                      <span>
+                        <strong className="text-amber-300">⛽ Stint Limited by Fuel Tank:</strong> Physical fuel runs dry ~{fuelStrategy.lapDelta} laps before VE is exhausted. Increase fuel ratio or short-shift to maximize stint length.
+                      </span>
+                    ) : (
+                      <span className="text-emerald-300">
+                        ✨ <strong>Perfect Stint Balance:</strong> Physical fuel tank and Virtual Energy allocation run out simultaneously with zero wasted weight.
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -687,7 +779,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     if (hasFuelData) setChartMetric('fuelEnergy');
                   }}
                   disabled={!hasFuelData}
-                  title={hasFuelData ? 'View fuel & energy telemetry' : 'No fuel or energy data available in this session'}
+                  title={hasFuelData ? (hasVirtualEnergyData ? 'View fuel & virtual energy telemetry' : 'View fuel telemetry') : 'No fuel or energy data available in this session'}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                     !hasFuelData
                       ? 'opacity-40 cursor-not-allowed text-lmu-muted'
@@ -697,7 +789,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                   }`}
                 >
                   <Fuel className="w-3.5 h-3.5" />
-                  Fuel & Energy
+                  {hasVirtualEnergyData ? 'Fuel & Energy' : 'Fuel'}
                 </button>
               </div>
             </div>
@@ -903,7 +995,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <th className="px-3 py-3 text-right">Top Speed</th>
                 <th className="px-3 py-3 text-center">Tire Compound</th>
                 {hasTireWearData && <th className="px-3 py-3 text-center">Tire Wear</th>}
-                {hasFuelData && <th className="px-3 py-3 text-center">Fuel & VE</th>}
+                {hasFuelData && <th className="px-3 py-3 text-center">{hasVirtualEnergyData ? 'Fuel & VE' : 'Fuel'}</th>}
                 <th className="px-3 py-3 text-center">Status</th>
                 <th className="px-3 py-3 text-center">Action</th>
               </tr>
