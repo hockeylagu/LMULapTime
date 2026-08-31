@@ -11,6 +11,24 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+
+  a,
+  button:not(:disabled),
+  [role="button"],
+  select,
+  summary,
+  label[for],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="button"],
+  input[type="submit"] {
+    @apply cursor-pointer;
+  }
+
+  button:disabled,
+  [disabled] {
+    @apply cursor-not-allowed;
+  }
 }
 
 .glass-panel {

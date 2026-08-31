@@ -44,17 +44,26 @@ describe('Navbar component', () => {
     expect(onRefresh).toHaveBeenCalled();
   });
 
-  it('renders Scanning... when status is null', () => {
+  it('returns to dashboard when clicking the top-right status section or the brand logo', () => {
+    const setActiveTab = vi.fn();
     render(
       <Navbar
-        activeTab="settings"
-        setActiveTab={vi.fn()}
-        status={null}
+        activeTab="tracks"
+        setActiveTab={setActiveTab}
+        status={{ resultsExist: true, replaysExist: true, sessionsCount: 15 }}
         onRefresh={vi.fn()}
-        isRefreshing={true}
+        isRefreshing={false}
       />
     );
 
-    expect(screen.getByText('Scanning...')).toBeInTheDocument();
+    // Click top-right status section
+    const statusCard = screen.getByText(/15 Sessions Parsed/i);
+    fireEvent.click(statusCard);
+    expect(setActiveTab).toHaveBeenCalledWith('dashboard');
+
+    // Click brand title
+    const brandHeading = screen.getByRole('heading', { level: 1, name: /LMU Lap Time Analyzer/i });
+    fireEvent.click(brandHeading);
+    expect(setActiveTab).toHaveBeenCalledWith('dashboard');
   });
 });

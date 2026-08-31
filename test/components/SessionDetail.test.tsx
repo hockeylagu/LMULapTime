@@ -413,14 +413,24 @@ describe('SessionDetail component', () => {
     expect(screen.getByText(/60 min/i)).toBeInTheDocument();
   });
 
-  it('switches to Fuel & Energy chart metric and displays stint strategy banner', async () => {
+  it('switches to Fuel & Energy chart metric and displays stint strategy banner on top of chart', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Avg Fuel Usage/i)).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /Fuel & VE/i })).toBeInTheDocument();
     });
 
-    // Check stint strategy summary
+    // Before clicking Fuel & Energy toggle, the fuel estimate is not rendered
+    expect(screen.queryByText(/Avg Fuel Usage/i)).not.toBeInTheDocument();
+
+    // Click Fuel & Energy toggle
+    const fuelToggle = screen.getByRole('button', { name: /Fuel & Energy/i });
+    fireEvent.click(fuelToggle);
+
+    expect(screen.getByText(/Fuel Consumption & Virtual Energy Telemetry/i)).toBeInTheDocument();
+
+    // Check stint strategy summary on top of the chart
+    expect(screen.getByText(/Avg Fuel Usage/i)).toBeInTheDocument();
     expect(screen.getAllByText(/2.5%/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/~40/i)).toBeInTheDocument();
     expect(screen.getByText(/Avg Virtual Energy/i)).toBeInTheDocument();
@@ -430,15 +440,6 @@ describe('SessionDetail component', () => {
     // Check Setup Fuel Ratio Optimizer banner
     expect(screen.getByText(/Recommended Setup Fuel Ratio:/i)).toBeInTheDocument();
     expect(screen.getAllByText(/0.66/i).length).toBeGreaterThan(0);
-
-    // Check table column
-    expect(screen.getByRole('columnheader', { name: /Fuel & VE/i })).toBeInTheDocument();
-
-    // Click Fuel & Energy toggle
-    const fuelToggle = screen.getByRole('button', { name: /Fuel & Energy/i });
-    fireEvent.click(fuelToggle);
-
-    expect(screen.getByText(/Fuel Consumption & Virtual Energy Telemetry/i)).toBeInTheDocument();
   });
 
   it('renders elapsed session finish times and pit stop duration tooltips in lap table', async () => {
