@@ -678,6 +678,61 @@ describe('parser server module', () => {
       expect(driver?.bestLapPaceCategory).toBeUndefined();
       expect(driver?.bestLapPacePercentage).toBeUndefined();
     });
+
+    it('safely handles 0 fuel usage without dividing by zero or crashing', () => {
+      const xmlZeroFuel = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Circuit de Spa-Francorchamps</TrackVenue>
+    <Practice1>
+      <Driver>
+        <Name>Electric Driver</Name>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <isPlayer>1</isPlayer>
+        <Lap num="1" s1="35.0" s2="42.0" s3="45.0" fuel="100.0" ve="100.0">122.0</Lap>
+        <Lap num="2" s1="35.0" s2="42.0" s3="45.0" fuel="100.0" ve="100.0">122.0</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlZeroFuel);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('zero_fuel.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver?.avgFuelPerLap).toBeNull();
+      expect(driver?.estFuelStintLaps).toBeNull();
+      expect(driver?.avgVePerLap).toBeNull();
+      expect(driver?.estVeStintLaps).toBeNull();
+    });
+
+    it('auto-detects player driver when isPlayer tag is omitted', () => {
+      const xmlNoPlayerTag = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Autodromo Nazionale Monza</TrackVenue>
+    <Qualify>
+      <Driver>
+        <Name>Solo Driver</Name>
+        <CarType>BMW M4 LMGT3</CarType>
+        <CarClass>LMGT3</CarClass>
+        <Lap num="1" s1="28.0" s2="38.0" s3="42.0">108.0</Lap>
+      </Driver>
+    </Qualify>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlNoPlayerTag);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('no_player_tag.xml');
+      expect(session).not.toBeNull();
+      expect(session?.playerDriver?.name).toBe('Solo Driver');
+      expect(session?.playerDriver?.bestLapTime).toBe(108.0);
+    });
   });
 
   describe('getDisplayTrackName', () => {

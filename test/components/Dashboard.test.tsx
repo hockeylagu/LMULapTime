@@ -269,4 +269,84 @@ describe('Dashboard component', () => {
     fireEvent.click(hideEmptyBtn);
     fireEvent.click(hideEmptyBtn);
   });
+
+  it('accurately displays Driving Overview aggregated metrics', () => {
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Header sessions badge
+    expect(screen.getByText('5 Sessions')).toBeInTheDocument();
+    // Total laps row
+    expect(screen.getByText('22 laps')).toBeInTheDocument();
+    // Distance Driven and Driving Time
+    expect(screen.getByText('Distance Driven')).toBeInTheDocument();
+    expect(screen.getByText('Driving Time')).toBeInTheDocument();
+    // Footer tracks count
+    expect(screen.getByText(/Across 4 Unique Circuits/i)).toBeInTheDocument();
+  });
+
+  it('renders empty search state and provides Reset All Filters button', () => {
+    const setSelectedTrack = vi.fn();
+    const setSelectedCarClass = vi.fn();
+    const setFilterType = vi.fn();
+    const setSearchQuery = vi.fn();
+
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="Spa"
+        setSelectedTrack={setSelectedTrack}
+        selectedCarClass="LMGT3"
+        setSelectedCarClass={setSelectedCarClass}
+        filterType="Race"
+        setFilterType={setFilterType}
+        searchQuery="NonexistentQueryString"
+        setSearchQuery={setSearchQuery}
+      />
+    );
+
+    expect(screen.getByText('No sessions found matching filters.')).toBeInTheDocument();
+    const resetBtn = screen.getByRole('button', { name: /Reset All Filters/i });
+    fireEvent.click(resetBtn);
+
+    expect(setSelectedTrack).toHaveBeenCalledWith('All');
+    expect(setSelectedCarClass).toHaveBeenCalledWith('All');
+    expect(setFilterType).toHaveBeenCalledWith('All');
+    expect(setSearchQuery).toHaveBeenCalledWith('');
+  });
+
+  it('allows clicking a benchmark lap item to select session', () => {
+    const onSelectSession = vi.fn();
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={onSelectSession}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    const alienBenchmarkRow = screen.getByTitle('Open session details for Spa');
+    fireEvent.click(alienBenchmarkRow);
+    expect(onSelectSession).toHaveBeenCalledWith('sess-spa-1');
+  });
 });

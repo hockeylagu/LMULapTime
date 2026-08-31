@@ -529,4 +529,40 @@ describe('SessionDetail component', () => {
     expect(screen.queryByRole('columnheader', { name: /Tire Wear/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Fuel/i })).not.toBeInTheDocument();
   });
+
+  it('switches between Sector Times, Top Speed, and Lap Pace chart views', async () => {
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/sess123')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockDetailedSession),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry/i)).toBeInTheDocument();
+    });
+
+    // Switch to Sectors
+    const sectorsBtn = screen.getByRole('button', { name: /Sectors/i });
+    fireEvent.click(sectorsBtn);
+    expect(sectorsBtn).toHaveClass('bg-lmu-accent');
+
+    // Switch to Top Speed
+    const topSpeedBtn = screen.getByRole('button', { name: /Top Speed/i });
+    fireEvent.click(topSpeedBtn);
+    expect(topSpeedBtn).toHaveClass('bg-lmu-accent');
+
+    // Switch back to Lap Pace
+    const lapPaceBtn = screen.getByRole('button', { name: /Lap Pace/i });
+    fireEvent.click(lapPaceBtn);
+    expect(lapPaceBtn).toHaveClass('bg-lmu-accent');
+  });
 });

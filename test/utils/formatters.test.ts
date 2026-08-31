@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatTime,
+  formatElapsedSeconds,
   parseTimeStringToSeconds,
   isSessionEmpty,
   getDisplayTrackName,
@@ -26,6 +27,28 @@ describe('formatters utility', () => {
       expect(formatTime(9.5)).toBe('0:09.500');
       expect(formatTime(60)).toBe('1:00.000');
       expect(formatTime('142.789')).toBe('2:22.789');
+    });
+  });
+
+  describe('formatElapsedSeconds', () => {
+    it('returns placeholder for null, undefined, NaN, and negative inputs', () => {
+      expect(formatElapsedSeconds(null)).toBe('--:--');
+      expect(formatElapsedSeconds(undefined)).toBe('--:--');
+      expect(formatElapsedSeconds(NaN)).toBe('--:--');
+      expect(formatElapsedSeconds(-5)).toBe('--:--');
+    });
+
+    it('formats short elapsed times under 1 hour in M:SS.d format', () => {
+      expect(formatElapsedSeconds(0)).toBe('0:00.0');
+      expect(formatElapsedSeconds(45.5)).toBe('0:45.5');
+      expect(formatElapsedSeconds(130.5)).toBe('2:10.5');
+      expect(formatElapsedSeconds(3599.9)).toBe('59:59.9');
+    });
+
+    it('formats long elapsed times over 1 hour in H:MM:SS.d format', () => {
+      expect(formatElapsedSeconds(3600)).toBe('1:00:00.0');
+      expect(formatElapsedSeconds(3665.2)).toBe('1:01:05.2');
+      expect(formatElapsedSeconds(7325.8)).toBe('2:02:05.8');
     });
   });
 
@@ -148,10 +171,11 @@ describe('formatters utility', () => {
   });
 
   describe('computeTheoreticalBest', () => {
-    it('returns null if any sector is null', () => {
+    it('returns null if any sector is null or undefined or <= 0', () => {
       expect(computeTheoreticalBest(null, 30.0, 40.0)).toBeNull();
       expect(computeTheoreticalBest(25.0, null, 40.0)).toBeNull();
       expect(computeTheoreticalBest(25.0, 30.0, null)).toBeNull();
+      expect(computeTheoreticalBest(0, 30.0, 40.0)).toBeNull();
     });
 
     it('sums valid sector times correctly', () => {
