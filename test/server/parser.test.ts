@@ -379,6 +379,65 @@ describe('parser server module', () => {
     });
   });
 
+  describe('extractComparableLaps layout isolation', () => {
+    it('does not mix Sebring Full and Sebring School laps when filtering', async () => {
+      const { extractComparableLaps } = await import('../../server/parser');
+
+      const mockSessions: any[] = [
+        {
+          id: 'sebring_full_1',
+          trackVenue: 'Sebring International Raceway',
+          trackCourse: '12h',
+          sessionType: 'Practice',
+          sessionName: 'P1',
+          drivers: [
+            {
+              name: 'Driver 1',
+              isPlayer: true,
+              carType: 'Porsche 911 GT3 R',
+              carClass: 'LMGT3',
+              bestLapTime: 121.5,
+              laps: [
+                { lapNum: 1, lapTime: 121.5, s1: 30.0, s2: 45.0, s3: 46.5, isValid: true, isPitStop: false },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'sebring_school_1',
+          trackVenue: 'Sebring International Raceway',
+          trackCourse: 'School',
+          sessionType: 'Practice',
+          sessionName: 'P1',
+          drivers: [
+            {
+              name: 'Driver 1',
+              isPlayer: true,
+              carType: 'Porsche 911 GT3 R',
+              carClass: 'LMGT3',
+              bestLapTime: 63.2,
+              laps: [
+                { lapNum: 1, lapTime: 63.2, s1: 15.0, s2: 24.0, s3: 24.2, isValid: true, isPitStop: false },
+              ],
+            },
+          ],
+        },
+      ];
+
+      // Query Full track
+      const fullResults = extractComparableLaps(mockSessions, { trackName: 'Sebring International Raceway' });
+      expect(fullResults.laps.length).toBe(1);
+      expect(fullResults.laps[0].lapTime).toBe(121.5);
+      expect(fullResults.allTimeBestLap?.lapTime).toBe(121.5);
+
+      // Query School track
+      const schoolResults = extractComparableLaps(mockSessions, { trackName: 'Sebring (school)' });
+      expect(schoolResults.laps.length).toBe(1);
+      expect(schoolResults.laps[0].lapTime).toBe(63.2);
+      expect(schoolResults.allTimeBestLap?.lapTime).toBe(63.2);
+    });
+  });
+
   describe('getDisplayTrackName', () => {
     it('computes clean track names directly in parser', () => {
       expect(getDisplayTrackName('Spa-Francorchamps', 'GP')).toBe('Spa-Francorchamps');

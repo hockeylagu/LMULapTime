@@ -219,7 +219,7 @@ describe('SessionDetail component', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
       expect(screen.getByText(/Sim Driver/)).toBeInTheDocument();
-      expect(screen.getByText('Lap Telemetry Table (3 Laps)')).toBeInTheDocument();
+      expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
     });
 
@@ -290,5 +290,30 @@ describe('SessionDetail component', () => {
     const trackHeading = screen.getByRole('heading', { level: 2, name: /Spa/i });
     fireEvent.click(trackHeading);
     expect(window.location.hash).toBe('#track/Spa');
+  });
+
+  it('opens the full comparison studio when clicking compare buttons', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
+    });
+
+    const compareButtons = screen.getAllByRole('button', { name: /Compare/i });
+    expect(compareButtons.length).toBeGreaterThan(0);
+
+    // Click compare on first lap
+    fireEvent.click(compareButtons[0]);
+
+    // Verify hash changed to full comparison studio with session & lap parameters
+    expect(window.location.hash).toContain('compare');
+    expect(window.location.hash).toContain('sessionId=sess123');
+    expect(window.location.hash).toContain('lapNum=1');
+
+    // Click Open in Comparison Studio in header
+    const openStudioBtn = screen.getByRole('button', { name: /Open in Comparison Studio/i });
+    fireEvent.click(openStudioBtn);
+    expect(window.location.hash).toContain('compare');
+    expect(window.location.hash).toContain('sessionId=sess123');
   });
 });

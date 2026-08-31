@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Car, Zap, FileText, ChevronRight, ChevronDown, Video, FilterX, AlertCircle, MapPin, Award, ArrowUpDown } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
-import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
+import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, matchesTrack } from '../utils/paceCategory';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams';
 import { PaceCategory } from '../../server/types';
 
@@ -108,7 +108,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Filtered sessions
   const filteredSessions = sessions.filter(s => {
     const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    const matchesTrack = selectedTrack === 'All' || displayTrack === selectedTrack || s.trackVenue === selectedTrack;
+    const isTrackMatch = matchesTrack(selectedTrack, s.trackVenue, s.trackCourse);
     const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
     const isMatchingCarClass = matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass);
     const matchesSearch = searchQuery === '' ||
@@ -117,7 +117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       s.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.filename.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
-    return matchesTrack && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty;
+    return isTrackMatch && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty;
   });
 
   // Sorted sessions by Date / Benchmark Pace %

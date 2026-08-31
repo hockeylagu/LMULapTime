@@ -5,10 +5,11 @@ import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
 import { FileUploader } from './components/FileUploader';
+import { CompareLaps } from './components/CompareLaps';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'sessions' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings'>('dashboard');
   const [status, setStatus] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [progression, setProgression] = useState<any[]>([]);
@@ -29,7 +30,7 @@ export default function App() {
   const parseUrlState = () => {
     const { path: pathPart, params } = getHashRouteAndParams();
 
-    let tab: 'dashboard' | 'tracks' | 'sessions' | 'settings' = 'dashboard';
+    let tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings' = 'dashboard';
     let sessionId: string | null = null;
     let trackRouteName: string | null = null;
 
@@ -38,7 +39,7 @@ export default function App() {
     } else if (pathPart.startsWith('track/')) {
       tab = 'tracks';
       trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
-    } else if (['tracks', 'settings', 'dashboard'].includes(pathPart)) {
+    } else if (['tracks', 'compare', 'settings', 'dashboard'].includes(pathPart)) {
       tab = pathPart as any;
     }
 
@@ -143,7 +144,7 @@ export default function App() {
     }
   };
 
-  const handleTabChange = (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => {
+  const handleTabChange = (tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings') => {
     setHashRoute(tab);
   };
 
@@ -206,6 +207,15 @@ export default function App() {
             onSelectTrack={handleSelectTrack}
             selectedCarClass={selectedCarClass}
             setSelectedCarClass={setSelectedCarClass}
+          />
+        ) : activeTab === 'compare' ? (
+          <CompareLaps
+            sessions={sessions}
+            onSelectSession={handleSelectSession}
+            initialTrack={getHashRouteAndParams().params.get('track') || (selectedTrack !== 'All' ? selectedTrack : undefined)}
+            initialCarClass={getHashRouteAndParams().params.get('carClass') || (selectedCarClass !== 'All' ? selectedCarClass : undefined)}
+            initialSessionId={getHashRouteAndParams().params.get('sessionId') || undefined}
+            initialLapNum={getHashRouteAndParams().params.get('lapNum') ? parseInt(getHashRouteAndParams().params.get('lapNum')!, 10) : undefined}
           />
         ) : activeTab === 'settings' ? (
           <FileUploader

@@ -83,6 +83,15 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('playerName', 'TestPlayer');
   });
 
+  it('GET /api/compare/laps returns comparable laps and benchmarks', async () => {
+    const res = await request(app).get('/api/compare/laps?track=Spa&carClass=Hypercar&playerOnly=true');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('laps');
+    expect(Array.isArray(res.body.laps)).toBe(true);
+    expect(res.body).toHaveProperty('benchmarks');
+    expect(Array.isArray(res.body.benchmarks)).toBe(true);
+  });
+
   it('POST /api/reference-laptimes/refresh triggers refresh from Google Sheets', async () => {
     vi.spyOn(refModule, 'fetchAndCacheReferenceLaptimes').mockResolvedValue({
       lastUpdated: new Date().toISOString(),

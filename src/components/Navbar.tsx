@@ -1,9 +1,9 @@
 import React from 'react';
-import { Gauge, Flag, Settings, RefreshCw } from 'lucide-react';
+import { Gauge, Flag, Settings, RefreshCw, ArrowLeftRight } from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'dashboard' | 'tracks' | 'sessions' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'tracks' | 'sessions' | 'settings') => void;
+  activeTab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings') => void;
   status: {
     resultsExist: boolean;
     replaysExist: boolean;
@@ -68,6 +68,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Flag className="w-4 h-4" />
             Tracks
+          </button>
+
+          <button
+            onClick={() => setActiveTab('compare')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'compare'
+                ? 'bg-lmu-accent text-white shadow-md shadow-lmu-accent/20'
+                : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
+            }`}
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            Compare Laps
           </button>
 
           <button
