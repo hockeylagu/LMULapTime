@@ -762,15 +762,43 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       </div>
 
                       <div className="p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-                        <span className="text-[10px] uppercase text-lmu-muted font-sans block">Tires / Status</span>
+                        <span className="text-[10px] uppercase text-lmu-muted font-sans block">Tires & Wear</span>
                         <span className="text-xs text-white font-medium block truncate mt-0.5">
                           {lap.fCompound || lap.rCompound ? `${lap.fCompound || lap.rCompound}` : 'Standard'}
                         </span>
-                        <span className="text-[10px] text-lmu-muted">
-                          {lap.isPitStop ? '🛑 Pit Stop' : lap.isValid ? '✓ Valid Lap' : '⚠️ Incomplete'}
-                        </span>
+                        {lap.tireWear ? (
+                          <span className="text-[10px] text-lmu-gold font-mono font-bold block" title={`FL: ${lap.tireWear.fl}% | FR: ${lap.tireWear.fr}%\nRL: ${lap.tireWear.rl}% | RR: ${lap.tireWear.rr}%`}>
+                            Wear: {lap.tireWear.avg}% avg
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-lmu-muted">
+                            {lap.isPitStop ? '🛑 Pit Stop' : lap.isValid ? '✓ Valid Lap' : '⚠️ Incomplete'}
+                          </span>
+                        )}
                       </div>
                     </div>
+
+                    {/* Fuel & Virtual Energy if available */}
+                    {(lap.fuel !== undefined && lap.fuel !== null || lap.virtualEnergy !== undefined && lap.virtualEnergy !== null) && (
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-mono">
+                        {lap.fuel !== undefined && lap.fuel !== null && (
+                          <div className="p-1.5 rounded-lg bg-lmu-bg/30 border border-lmu-border/30 flex items-center justify-between text-[11px]">
+                            <span className="text-lmu-muted font-sans">⛽ Fuel:</span>
+                            <span className="text-amber-300 font-bold">
+                              {lap.fuel}% {lap.fuelUsed ? `(-${lap.fuelUsed}%)` : ''}
+                            </span>
+                          </div>
+                        )}
+                        {lap.virtualEnergy !== undefined && lap.virtualEnergy !== null && (
+                          <div className="p-1.5 rounded-lg bg-lmu-bg/30 border border-lmu-border/30 flex items-center justify-between text-[11px]">
+                            <span className="text-lmu-muted font-sans">⚡ VE:</span>
+                            <span className="text-indigo-300 font-bold">
+                              {lap.virtualEnergy}% {lap.virtualEnergyUsed ? `(-${lap.virtualEnergyUsed}%)` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Open Session Link if available */}

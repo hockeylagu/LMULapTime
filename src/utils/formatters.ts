@@ -7,6 +7,21 @@ export function formatTime(seconds: number | string | null | undefined): string 
   return `${mins}:${secs.padStart(6, '0')}`;
 }
 
+export function formatElapsedSeconds(seconds: number | string | null | undefined): string {
+  if (seconds === null || seconds === undefined || seconds === '') return '--:--';
+  const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
+  if (isNaN(num) || num < 0) return '--:--';
+  const hours = Math.floor(num / 3600);
+  const remainder = num % 3600;
+  const mins = Math.floor(remainder / 60);
+  const secs = (remainder % 60).toFixed(1);
+  const formattedSecs = secs.padStart(4, '0');
+  if (hours > 0) {
+    return `${hours}:${String(mins).padStart(2, '0')}:${formattedSecs}`;
+  }
+  return `${mins}:${formattedSecs}`;
+}
+
 export function parseTimeStringToSeconds(timeStr: string | number): number | null {
   if (typeof timeStr === 'number') return isNaN(timeStr) || timeStr <= 0 ? null : timeStr;
   if (!timeStr) return null;

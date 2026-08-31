@@ -34,6 +34,14 @@ export interface ReferenceLaptimesCache {
   entries: Record<string, ReferenceLaptimeEntry>;
 }
 
+export interface TireWear {
+  fl: number; // Front Left tire wear % remaining (0-100)
+  fr: number; // Front Right tire wear % remaining (0-100)
+  rl: number; // Rear Left tire wear % remaining (0-100)
+  rr: number; // Rear Right tire wear % remaining (0-100)
+  avg: number; // 4-wheel average wear % remaining (0-100)
+}
+
 export interface LapData {
   lapNum: number;
   position: number;
@@ -45,6 +53,21 @@ export interface LapData {
   topSpeed: number | null;
   fCompound: string;
   rCompound: string;
+  flCompound?: string;
+  frCompound?: string;
+  rlCompound?: string;
+  rrCompound?: string;
+  tireWear?: TireWear;
+  fuel?: number | null; // Remaining fuel % (0-100)
+  fuelUsed?: number | null; // Fuel consumed in lap %
+  virtualEnergy?: number | null; // Remaining Virtual Energy % (0-100) for Hypercar
+  virtualEnergyUsed?: number | null; // Virtual Energy consumed in lap %
+  elapsedSeconds?: number | null; // Session elapsed seconds at lap finish (et)
+  elapsedTimeString?: string; // Formatted MM:SS or HH:MM:SS
+  pitStopDuration?: number | null; // Estimated pit lane / stop time in seconds
+  pitStopDurationString?: string; // Formatted pit duration (e.g. "32.4s")
+  gapToLeader?: number | null; // Gap to session leader at lap finish (seconds)
+  gapToLeaderString?: string; // Formatted gap (e.g. "+4.215s" or "LEADER")
   isPitStop: boolean;
   isValid: boolean;
   paceCategory?: PaceCategory | null;
@@ -72,6 +95,10 @@ export interface DriverData {
   bestLapPacePercentage?: number | null;
   avgLapTime?: number | null;
   avgLapTimeString?: string;
+  avgFuelPerLap?: number | null; // Avg fuel consumed per clean lap (%)
+  estFuelStintLaps?: number | null; // Estimated laps on full tank
+  avgVePerLap?: number | null; // Avg Virtual Energy consumed per clean lap (%)
+  estVeStintLaps?: number | null; // Estimated laps per full VE allocation (Hypercar)
   top3LapsCount?: number;
   lapsCount: number;
   laps: LapData[];
@@ -81,6 +108,23 @@ export interface SessionWeather {
   condition: 'Dry' | 'Wet' | 'Damp';
   timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night';
   weatherString: string;
+}
+
+export interface SessionSettings {
+  modeSetting?: string;       // e.g. "Race Weekend", "Multiplayer", "Single Player"
+  serverName?: string;        // Server name for multiplayer
+  damageMultiplier?: number;  // e.g. 50 (%) or 100 (%)
+  fuelMultiplier?: number;    // e.g. 1 (1x)
+  tireMultiplier?: number;    // e.g. 1 (1x)
+  tireWarmers?: boolean;      // true if TireWarmers === 1
+  fixedSetups?: boolean;      // true if FixedSetups === 1
+  fixedUpgrades?: boolean;    // true if FixedUpgrades === 1
+  parcFerme?: number;         // e.g. 3
+  mechFailRate?: number;      // e.g. 1
+  durationMinutes?: number;   // e.g. 60, 120
+  raceLaps?: number;
+  raceTimeMinutes?: number;
+  vehiclesAllowed?: string;   // e.g. "Ferrari_488_GTE_EVO,"
 }
 
 export interface SessionMetadata {
@@ -97,6 +141,7 @@ export interface SessionMetadata {
   sessionName: string; // e.g. "P1", "Q1", "R1"
   weatherInfo?: string;
   weather?: SessionWeather;
+  settings?: SessionSettings;
   gameVersion?: string;
   driversCount: number;
   playerDriver?: DriverData;

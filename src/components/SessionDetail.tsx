@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, ChevronRight, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -26,7 +26,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
-  const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed'>('lapTime');
+  const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy'>('lapTime');
 
   useEffect(() => {
     setLoading(true);
@@ -77,7 +77,19 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     );
   }
 
-  const selectedDriver = session.drivers.find(d => d.name === selectedDriverName) || session.drivers[0];
+  const selectedDriver = session.drivers ? (session.drivers.find(d => d.name === selectedDriverName) || session.drivers[0]) : undefined;
+
+  const hasTireWearData = selectedDriver?.laps?.some(
+    l => l.tireWear !== undefined && l.tireWear !== null && (l.tireWear.fl !== null || l.tireWear.avg !== null)
+  ) ?? false;
+
+  const hasFuelData = (selectedDriver?.laps?.some(
+    l => (l.fuel !== null && l.fuel !== undefined) || (l.virtualEnergy !== null && l.virtualEnergy !== undefined)
+  ) || (selectedDriver?.avgFuelPerLap !== null && selectedDriver?.avgFuelPerLap !== undefined)) ?? false;
+
+  const activeChartMetric = (chartMetric === 'tireWear' && !hasTireWearData) || (chartMetric === 'fuelEnergy' && !hasFuelData)
+    ? 'lapTime'
+    : chartMetric;
 
   // All-time Personal Best for this specific driver, track, and vehicle category
   const allTimeCategoryTrackPB = (() => {
@@ -217,7 +229,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               onChange={(e) => setSelectedDriverName(e.target.value)}
               className="bg-lmu-card border border-lmu-border rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:outline-none focus:border-lmu-accent"
             >
-              {session.drivers.map(d => (
+              {(session.drivers || []).map(d => (
                 <option key={d.name} value={d.name}>
                   {d.isPlayer ? '⭐ ' : ''}{d.name} ({d.carType})
                 </option>
@@ -225,6 +237,78 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
             </select>
           </div>
         </div>
+
+        {/* Session Rules & Server Configuration */}
+        {session.settings && (
+          <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-bold text-white flex items-center gap-1.5 mr-1">
+              <Sliders className="w-3.5 h-3.5 text-lmu-accent" />
+              Rules & Config:
+            </span>
+
+            {session.settings.modeSetting && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-semibold">
+                🎮 {session.settings.modeSetting}
+              </span>
+            )}
+
+            {session.settings.serverName && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-lmu-cyan border border-lmu-border text-xs font-semibold truncate max-w-[200px]" title={session.settings.serverName}>
+                🌐 {session.settings.serverName}
+              </span>
+            )}
+
+            {session.settings.damageMultiplier !== undefined && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-mono">
+                🛡️ Damage: <strong className={session.settings.damageMultiplier > 0 ? 'text-amber-300' : 'text-emerald-300'}>{session.settings.damageMultiplier}%</strong>
+              </span>
+            )}
+
+            {session.settings.fuelMultiplier !== undefined && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-mono">
+                ⛽ Fuel: <strong className="text-white">{session.settings.fuelMultiplier}x</strong>
+              </span>
+            )}
+
+            {session.settings.tireMultiplier !== undefined && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-mono">
+                🛞 Tire Wear: <strong className="text-white">{session.settings.tireMultiplier}x</strong>
+              </span>
+            )}
+
+            {session.settings.tireWarmers !== undefined && (
+              <span className={`px-2.5 py-1 rounded border text-xs font-semibold ${
+                session.settings.tireWarmers
+                  ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
+                  : 'bg-sky-950/40 text-sky-300 border-sky-500/30'
+              }`}>
+                🔥 {session.settings.tireWarmers ? 'Warm Tires' : 'Cold Tires'}
+              </span>
+            )}
+
+            {session.settings.fixedSetups !== undefined && (
+              <span className={`px-2.5 py-1 rounded border text-xs font-semibold ${
+                session.settings.fixedSetups
+                  ? 'bg-purple-950/40 text-purple-300 border-purple-500/30'
+                  : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'
+              }`}>
+                🔧 {session.settings.fixedSetups ? 'Fixed Setup' : 'Open Setup'}
+              </span>
+            )}
+
+            {session.settings.durationMinutes !== undefined && session.settings.durationMinutes > 0 && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-mono">
+                ⏱️ {session.settings.durationMinutes} min
+              </span>
+            )}
+
+            {session.settings.raceLaps !== undefined && session.settings.raceLaps > 0 && session.settings.raceLaps < 2147483640 && (
+              <span className="px-2.5 py-1 rounded bg-lmu-card text-white border border-lmu-border text-xs font-mono">
+                🏁 {session.settings.raceLaps} Laps
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Reference Lap Targets for this Track & Category */}
         {refEntry && (
@@ -324,6 +408,67 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         </div>
       )}
 
+      {/* Stint Strategy & Energy Management */}
+      {selectedDriver && hasFuelData && (selectedDriver.avgFuelPerLap || selectedDriver.avgVePerLap) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-lmu-card/70 border border-lmu-border shadow-sm">
+          {selectedDriver.avgFuelPerLap !== null && selectedDriver.avgFuelPerLap !== undefined && (
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                <Fuel className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Fuel Usage</p>
+                <p className="text-sm font-mono font-bold text-white">
+                  {selectedDriver.avgFuelPerLap}% <span className="text-xs font-normal text-lmu-muted">/ clean lap</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {selectedDriver.estFuelStintLaps !== null && selectedDriver.estFuelStintLaps !== undefined && (
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Fuel Stint</p>
+                <p className="text-sm font-mono font-bold text-amber-300">
+                  ~{selectedDriver.estFuelStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / tank</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {selectedDriver.avgVePerLap !== null && selectedDriver.avgVePerLap !== undefined && (
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Virtual Energy</p>
+                <p className="text-sm font-mono font-bold text-white">
+                  {selectedDriver.avgVePerLap}% <span className="text-xs font-normal text-lmu-muted">/ lap</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {selectedDriver.estVeStintLaps !== null && selectedDriver.estVeStintLaps !== undefined && (
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. VE Stint (Hypercar)</p>
+                <p className="text-sm font-mono font-bold text-indigo-300">
+                  ~{selectedDriver.estVeStintLaps} <span className="text-xs font-normal text-lmu-muted">laps / stint</span>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Session Lap Telemetry & Sector Analysis Chart */}
       {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (() => {
         const sessionChartData = selectedDriver.laps.map(l => ({
@@ -338,6 +483,16 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           s2String: formatTime(l.s2),
           s3String: formatTime(l.s3),
           topSpeed: l.topSpeed || null,
+          twFL: l.tireWear?.fl ?? null,
+          twFR: l.tireWear?.fr ?? null,
+          twRL: l.tireWear?.rl ?? null,
+          twRR: l.tireWear?.rr ?? null,
+          twAvg: l.tireWear?.avg ?? null,
+          tireWear: l.tireWear,
+          fuel: l.fuel ?? null,
+          fuelUsed: l.fuelUsed ?? null,
+          virtualEnergy: l.virtualEnergy ?? null,
+          virtualEnergyUsed: l.virtualEnergyUsed ?? null,
           isValid: l.isValid,
           isPitStop: l.isPitStop,
         }));
@@ -353,14 +508,14 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 {!data.isValid && <span className="text-[10px] text-rose-400">⚠️ Invalid</span>}
               </div>
 
-              {chartMetric === 'lapTime' && (
+              {activeChartMetric === 'lapTime' && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-lmu-muted">Lap Pace:</span>
                   <span className="font-bold text-lmu-gold">{data.lapTimeString}</span>
                 </div>
               )}
 
-              {chartMetric === 'sectors' && (
+              {activeChartMetric === 'sectors' && (
                 <>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-lmu-gold">Sector 1:</span>
@@ -377,10 +532,52 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 </>
               )}
 
-              {chartMetric === 'topSpeed' && (
+              {activeChartMetric === 'topSpeed' && (
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-lmu-muted">Top Speed:</span>
                   <span className="font-bold text-lmu-cyan">{data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : 'N/A'}</span>
+                </div>
+              )}
+
+              {activeChartMetric === 'tireWear' && data.tireWear && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sky-400">Front Left (FL):</span>
+                    <span className="text-white font-bold">{data.twFL}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-blue-400">Front Right (FR):</span>
+                    <span className="text-white font-bold">{data.twFR}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-emerald-400">Rear Left (RL):</span>
+                    <span className="text-white font-bold">{data.twRL}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-amber-400">Rear Right (RR):</span>
+                    <span className="text-white font-bold">{data.twRR}%</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-lmu-border/50 pt-1 mt-1">
+                    <span className="text-lmu-muted">4-Tire Average:</span>
+                    <span className="text-lmu-gold font-bold">{data.twAvg}%</span>
+                  </div>
+                </div>
+              )}
+
+              {activeChartMetric === 'fuelEnergy' && (
+                <div className="space-y-1">
+                  {data.fuel !== null && data.fuel !== undefined && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-amber-400">Fuel Level:</span>
+                      <span className="text-white font-bold">{data.fuel.toFixed(1)}% {data.fuelUsed ? `(-${data.fuelUsed.toFixed(1)}%)` : ''}</span>
+                    </div>
+                  )}
+                  {data.virtualEnergy !== null && data.virtualEnergy !== undefined && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-indigo-400">Virtual Energy:</span>
+                      <span className="text-white font-bold">{data.virtualEnergy.toFixed(1)}% {data.virtualEnergyUsed ? `(-${data.virtualEnergyUsed.toFixed(1)}%)` : ''}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -388,19 +585,27 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         };
 
         const sessionChartTimes = (
-          chartMetric === 'lapTime'
+          activeChartMetric === 'lapTime'
             ? sessionChartData.map(d => d.lapTime)
-            : chartMetric === 'sectors'
+            : activeChartMetric === 'sectors'
             ? sessionChartData.flatMap(d => [d.s1, d.s2, d.s3])
-            : sessionChartData.map(d => d.topSpeed)
+            : activeChartMetric === 'topSpeed'
+            ? sessionChartData.map(d => d.topSpeed)
+            : activeChartMetric === 'tireWear'
+            ? sessionChartData.flatMap(d => [d.twFL, d.twFR, d.twRL, d.twRR])
+            : sessionChartData.flatMap(d => [d.fuel, d.virtualEnergy])
         ).filter((v): v is number => v !== null && v > 0);
 
-        const padding = chartMetric === 'topSpeed' ? 5 : 1;
-        const yDomainMin = sessionChartTimes.length > 0
+        const padding = activeChartMetric === 'topSpeed' ? 5 : 1;
+        const yDomainMin = (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy')
+          ? Math.max(0, Math.floor(Math.min(...(sessionChartTimes.length ? sessionChartTimes : [50])) - 2))
+          : sessionChartTimes.length > 0
           ? Math.max(0, Math.floor(Math.min(...sessionChartTimes) - padding))
           : 'auto';
 
-        const yDomainMax = sessionChartTimes.length > 0
+        const yDomainMax = (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy')
+          ? 100
+          : sessionChartTimes.length > 0
           ? Math.ceil(Math.max(...sessionChartTimes) + padding)
           : 'auto';
 
@@ -410,10 +615,18 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               <div>
                 <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-lmu-accent" />
-                  Lap & Sector Telemetry Chart
+                  {activeChartMetric === 'tireWear'
+                    ? 'Tire Wear & Degradation Telemetry'
+                    : activeChartMetric === 'fuelEnergy'
+                    ? 'Fuel Consumption & Virtual Energy Telemetry'
+                    : 'Lap & Sector Telemetry Chart'}
                 </h3>
                 <p className="text-xs text-lmu-muted mt-0.5">
-                  Session lap pace progression, sector splits (S1/S2/S3), and top speeds by lap
+                  {activeChartMetric === 'tireWear'
+                    ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints'
+                    : activeChartMetric === 'fuelEnergy'
+                    ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh)'
+                    : 'Session lap pace progression, sector splits (S1/S2/S3), and top speeds by lap'}
                 </p>
               </div>
 
@@ -422,7 +635,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <button
                   onClick={() => setChartMetric('lapTime')}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                    chartMetric === 'lapTime'
+                    activeChartMetric === 'lapTime'
                       ? 'bg-lmu-accent text-white shadow-sm font-bold'
                       : 'text-lmu-muted hover:text-white'
                   }`}
@@ -433,7 +646,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <button
                   onClick={() => setChartMetric('sectors')}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                    chartMetric === 'sectors'
+                    activeChartMetric === 'sectors'
                       ? 'bg-lmu-accent text-white shadow-sm font-bold'
                       : 'text-lmu-muted hover:text-white'
                   }`}
@@ -444,7 +657,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <button
                   onClick={() => setChartMetric('topSpeed')}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                    chartMetric === 'topSpeed'
+                    activeChartMetric === 'topSpeed'
                       ? 'bg-lmu-accent text-white shadow-sm font-bold'
                       : 'text-lmu-muted hover:text-white'
                   }`}
@@ -452,13 +665,47 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                   <Gauge className="w-3.5 h-3.5" />
                   Top Speed
                 </button>
+                <button
+                  onClick={() => {
+                    if (hasTireWearData) setChartMetric('tireWear');
+                  }}
+                  disabled={!hasTireWearData}
+                  title={hasTireWearData ? 'View tire wear telemetry' : 'No tire wear data available in this session'}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    !hasTireWearData
+                      ? 'opacity-40 cursor-not-allowed text-lmu-muted'
+                      : activeChartMetric === 'tireWear'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <Disc className="w-3.5 h-3.5" />
+                  Tire Wear
+                </button>
+                <button
+                  onClick={() => {
+                    if (hasFuelData) setChartMetric('fuelEnergy');
+                  }}
+                  disabled={!hasFuelData}
+                  title={hasFuelData ? 'View fuel & energy telemetry' : 'No fuel or energy data available in this session'}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    !hasFuelData
+                      ? 'opacity-40 cursor-not-allowed text-lmu-muted'
+                      : activeChartMetric === 'fuelEnergy'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <Fuel className="w-3.5 h-3.5" />
+                  Fuel & Energy
+                </button>
               </div>
             </div>
 
             <div className="h-72 min-h-[288px] w-full pt-2">
               <ResponsiveContainer width="100%" height="100%" minHeight={260}>
                 <LineChart
-                  key={`session-chart-${chartMetric}-${sessionChartData.length}`}
+                  key={`session-chart-${activeChartMetric}-${sessionChartData.length}`}
                   data={sessionChartData}
                   margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
                 >
@@ -468,12 +715,12 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     stroke="#718096"
                     tick={{ fill: '#A0AEC0', fontSize: 11 }}
                     domain={[yDomainMin, yDomainMax]}
-                    tickFormatter={(val) => chartMetric === 'topSpeed' ? `${val}` : formatTime(val)}
+                    tickFormatter={(val) => activeChartMetric === 'topSpeed' ? `${val} km/h` : (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy') ? `${val}%` : formatTime(val)}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12 }} />
 
-                  {chartMetric === 'lapTime' && (
+                  {activeChartMetric === 'lapTime' && (
                     <Line
                       type="monotone"
                       dataKey="lapTime"
@@ -486,7 +733,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     />
                   )}
 
-                  {chartMetric === 'sectors' && (
+                  {activeChartMetric === 'sectors' && (
                     <>
                       <Line
                         type="monotone"
@@ -518,7 +765,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     </>
                   )}
 
-                  {chartMetric === 'topSpeed' && (
+                  {activeChartMetric === 'topSpeed' && (
                     <Line
                       type="monotone"
                       dataKey="topSpeed"
@@ -528,6 +775,80 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                       dot={{ r: 4, fill: '#00F2FE' }}
                       connectNulls={true}
                     />
+                  )}
+
+                  {activeChartMetric === 'tireWear' && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="twFL"
+                        name="Front Left (FL)"
+                        stroke="#38BDF8"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#38BDF8' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="twFR"
+                        name="Front Right (FR)"
+                        stroke="#60A5FA"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#60A5FA' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="twRL"
+                        name="Rear Left (RL)"
+                        stroke="#34D399"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#34D399' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="twRR"
+                        name="Rear Right (RR)"
+                        stroke="#FBBF24"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#FBBF24' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="twAvg"
+                        name="4-Tire Avg"
+                        stroke="#E2E8F0"
+                        strokeWidth={1.5}
+                        strokeDasharray="4 4"
+                        dot={false}
+                        connectNulls={true}
+                      />
+                    </>
+                  )}
+
+                  {activeChartMetric === 'fuelEnergy' && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="fuel"
+                        name="Fuel Level (%)"
+                        stroke="#F97316"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#F97316' }}
+                        connectNulls={true}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="virtualEnergy"
+                        name="Virtual Energy (%)"
+                        stroke="#818CF8"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#818CF8' }}
+                        connectNulls={true}
+                      />
+                    </>
                   )}
                 </LineChart>
               </ResponsiveContainer>
@@ -581,6 +902,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 <th className="px-3 py-3 text-right">Sector 3</th>
                 <th className="px-3 py-3 text-right">Top Speed</th>
                 <th className="px-3 py-3 text-center">Tire Compound</th>
+                {hasTireWearData && <th className="px-3 py-3 text-center">Tire Wear</th>}
+                {hasFuelData && <th className="px-3 py-3 text-center">Fuel & VE</th>}
                 <th className="px-3 py-3 text-center">Status</th>
                 <th className="px-3 py-3 text-center">Action</th>
               </tr>
@@ -612,7 +935,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                       isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-blue/10' : ''
                     }`}
                   >
-                    <td className="px-3 py-2.5 font-bold text-white">{l.lapNum}</td>
+                    <td className="px-3 py-2.5 font-bold text-white" title={l.elapsedTimeString ? `Session Time: ${l.elapsedTimeString}` : undefined}>
+                      {l.lapNum}
+                    </td>
                     <td className="px-3 py-2.5 text-lmu-muted">{l.position || '-'}</td>
                     <td className={`px-3 py-2.5 text-right font-bold ${
                       isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue' : 'text-white'
@@ -657,9 +982,49 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         </span>
                       ) : '-'}
                     </td>
+                    {hasTireWearData && (
+                      <td className="px-3 py-2.5 text-center font-sans text-xs whitespace-nowrap">
+                        {l.tireWear ? (
+                          <span
+                            className="px-2 py-0.5 rounded bg-lmu-bg border border-lmu-border/60 text-[11px] font-mono text-lmu-gold font-bold cursor-help inline-block"
+                            title={`4-Tire Average: ${l.tireWear.avg}%\nFL: ${l.tireWear.fl}% | FR: ${l.tireWear.fr}%\nRL: ${l.tireWear.rl}% | RR: ${l.tireWear.rr}%`}
+                          >
+                            {l.tireWear.avg}%
+                          </span>
+                        ) : (
+                          <span className="text-lmu-muted text-xs">-</span>
+                        )}
+                      </td>
+                    )}
+                    {hasFuelData && (
+                      <td className="px-3 py-2.5 text-center font-sans text-xs whitespace-nowrap">
+                        {l.fuel !== null && l.fuel !== undefined || l.virtualEnergy !== null && l.virtualEnergy !== undefined ? (
+                          <div
+                            className="inline-flex items-center gap-2 font-mono text-[11px] cursor-help"
+                            title={`Remaining Fuel: ${l.fuel ?? 'N/A'}% ${l.fuelUsed ? `(Consumed: ${l.fuelUsed}%)` : ''}${l.virtualEnergy !== null && l.virtualEnergy !== undefined ? `\nRemaining Virtual Energy: ${l.virtualEnergy}% ${l.virtualEnergyUsed ? `(Consumed: ${l.virtualEnergyUsed}%)` : ''}` : ''}`}
+                          >
+                            {l.fuel !== null && l.fuel !== undefined && (
+                              <span className="text-amber-300 font-bold">
+                                ⛽ {l.fuel}%
+                              </span>
+                            )}
+                            {l.virtualEnergy !== null && l.virtualEnergy !== undefined && (
+                              <span className="text-indigo-300 font-bold">
+                                ⚡ {l.virtualEnergy}%
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-lmu-muted text-xs">-</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-2.5 text-center font-sans">
                       {l.isPitStop ? (
-                        <span className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold">
+                        <span
+                          className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold"
+                          title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
+                        >
                           PIT STOP
                         </span>
                       ) : l.isValid ? (
