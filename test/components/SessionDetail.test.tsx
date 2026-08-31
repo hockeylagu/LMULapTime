@@ -21,6 +21,11 @@ describe('SessionDetail component', () => {
     isNight: false,
     isWet: false,
     driversCount: 2,
+    weather: {
+      condition: 'Dry' as const,
+      timeOfDay: 'Daytime' as const,
+      weatherString: '☀️ Dry • Daytime',
+    },
     settings: {
       modeSetting: 'Race Weekend',
       damageMultiplier: 50,
@@ -399,7 +404,7 @@ describe('SessionDetail component', () => {
     expect(screen.getByText(/Tire Wear & Degradation Telemetry/i)).toBeInTheDocument();
   });
 
-  it('renders session rules & server configuration badges', async () => {
+  it('renders session rules and server configuration badges', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {

@@ -148,6 +148,8 @@ describe('Dashboard component', () => {
     );
 
     expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    expect(screen.getByText('Distance Driven')).toBeInTheDocument();
+    expect(screen.getByText('Driving Time')).toBeInTheDocument();
     expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Monza').length).toBeGreaterThan(0);
 
