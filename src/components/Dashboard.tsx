@@ -558,6 +558,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {sortedSessions.length === 0 ? (
           <div className="py-12 text-center text-lmu-muted">
             <p className="text-base font-medium">No sessions found matching filters.</p>
+            {(selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '') && (
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setSelectedTrack('All');
+                    setSelectedCarClass('All');
+                    setFilterType('All');
+                    setSearchQuery('');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-accent text-white border border-lmu-border text-xs font-semibold transition-all cursor-pointer"
+                >
+                  <FilterX className="w-3.5 h-3.5" />
+                  <span>Reset All Filters</span>
+                </button>
+              </div>
+            )}
             {hideEmpty && emptyCount > 0 && (
               <p className="text-xs text-lmu-muted mt-2">
                 Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className="text-lmu-accent underline hover:text-white">Click here to show empty results</button>.

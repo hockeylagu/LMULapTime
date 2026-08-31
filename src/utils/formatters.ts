@@ -121,7 +121,7 @@ export function parseDateStringToTimestamp(dateStr?: string): number {
 }
 
 export function computeTheoreticalBest(s1: number | null, s2: number | null, s3: number | null): number | null {
-  if (s1 !== null && s2 !== null && s3 !== null) {
+  if (s1 !== null && s2 !== null && s3 !== null && s1 > 0 && s2 > 0 && s3 > 0) {
     return parseFloat((s1 + s2 + s3).toFixed(3));
   }
   return null;
