@@ -20,7 +20,7 @@ import {
   computeTheoreticalBest,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
+import { matchesTrack } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -281,37 +281,42 @@ export class LmuParser {
         return val === '1' || val === 1 || val === true || val === 'true';
       };
 
-      const modeSetting = raceResults.Setting ? String(raceResults.Setting) : undefined;
-      const serverName = raceResults.ServerName ? String(raceResults.ServerName) : undefined;
-      const damageMultiplier = parseNum(raceResults.DamageMult);
-      const fuelMultiplier = parseNum(raceResults.FuelMult);
-      const tireMultiplier = parseNum(raceResults.TireMult);
-      const tireWarmers = parseBool(raceResults.TireWarmers);
-      const fixedSetups = parseBool(raceResults.FixedSetups);
-      const fixedUpgrades = parseBool(raceResults.FixedUpgrades);
-      const parcFerme = parseNum(raceResults.ParcFerme);
-      const mechFailRate = parseNum(raceResults.MechFailRate);
-      const durationMinutes = parseNum(sessionDataNode?.Minutes || raceResults.RaceTime);
-      const raceLaps = parseNum(raceResults.RaceLaps);
-      const raceTimeMinutes = parseNum(raceResults.RaceTime);
-      const vehiclesAllowed = raceResults.VehiclesAllowed ? String(raceResults.VehiclesAllowed) : undefined;
+      const rawSetting = sessionDataNode?.Setting ?? raceResults.Setting;
+      const rawServerName = sessionDataNode?.ServerName ?? raceResults.ServerName;
+      const rawDamage = sessionDataNode?.DamageMult ?? raceResults.DamageMult;
+      const rawFuel = sessionDataNode?.FuelMult ?? raceResults.FuelMult;
+      const rawTire = sessionDataNode?.TireMult ?? raceResults.TireMult;
+      const rawWarmers = sessionDataNode?.TireWarmers ?? raceResults.TireWarmers;
+      const rawSetups = sessionDataNode?.FixedSetups ?? raceResults.FixedSetups;
+      const rawUpgrades = sessionDataNode?.FixedUpgrades ?? raceResults.FixedUpgrades;
+      const rawParcFerme = sessionDataNode?.ParcFerme ?? raceResults.ParcFerme;
+      const rawMechFail = sessionDataNode?.MechFailRate ?? raceResults.MechFailRate;
+      const rawDuration = sessionDataNode?.Minutes ?? raceResults.Minutes ?? sessionDataNode?.RaceTime ?? raceResults.RaceTime;
+      const rawRaceLaps = sessionDataNode?.RaceLaps ?? raceResults.RaceLaps;
+      const rawRaceTime = sessionDataNode?.RaceTime ?? raceResults.RaceTime;
+      const rawVehiclesAllowed = sessionDataNode?.VehiclesAllowed ?? raceResults.VehiclesAllowed;
 
-      const settings: SessionSettings = {
-        modeSetting,
-        serverName,
-        damageMultiplier,
-        fuelMultiplier,
-        tireMultiplier,
-        tireWarmers,
-        fixedSetups,
-        fixedUpgrades,
-        parcFerme,
-        mechFailRate,
-        durationMinutes,
-        raceLaps,
-        raceTimeMinutes,
-        vehiclesAllowed,
-      };
+      const hasAnySetting = [
+        rawSetting, rawServerName, rawDamage, rawFuel, rawTire, rawWarmers,
+        rawSetups, rawUpgrades, rawParcFerme, rawMechFail, rawDuration, rawRaceLaps, rawRaceTime, rawVehiclesAllowed
+      ].some(v => v !== undefined && v !== null && v !== '');
+
+      const settings: SessionSettings | undefined = hasAnySetting ? {
+        modeSetting: rawSetting ? String(rawSetting) : undefined,
+        serverName: rawServerName ? String(rawServerName) : undefined,
+        damageMultiplier: parseNum(rawDamage),
+        fuelMultiplier: parseNum(rawFuel),
+        tireMultiplier: parseNum(rawTire),
+        tireWarmers: parseBool(rawWarmers),
+        fixedSetups: parseBool(rawSetups),
+        fixedUpgrades: parseBool(rawUpgrades),
+        parcFerme: parseNum(rawParcFerme),
+        mechFailRate: parseNum(rawMechFail),
+        durationMinutes: parseNum(rawDuration),
+        raceLaps: parseNum(rawRaceLaps),
+        raceTimeMinutes: parseNum(rawRaceTime),
+        vehiclesAllowed: rawVehiclesAllowed ? String(rawVehiclesAllowed) : undefined,
+      } : undefined;
 
       const id = filename.replace(/\.xml$/i, '');
 

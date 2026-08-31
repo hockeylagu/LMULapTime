@@ -3,7 +3,7 @@ import { Calendar, Car, Zap, FileText, ChevronRight, ChevronDown, Video, FilterX
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, matchesTrack } from '../utils/paceCategory';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams';
-import { PaceCategory } from '../../server/types';
+import { PaceCategory, LapData } from '../../server/types';
 
 interface BestRefLapInfo {
   sessionId: string;
@@ -19,6 +19,7 @@ interface SessionSummary {
   filename: string;
   trackVenue: string;
   trackCourse?: string;
+  trackLengthMeters?: number | null;
   timeString: string;
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string;
@@ -37,8 +38,10 @@ interface SessionSummary {
     theoreticalBestString: string;
     bestLapPaceCategory?: PaceCategory | null;
     bestLapPacePercentage?: number | null;
+    avgLapTime?: number | null;
     top3LapsCount?: number;
     lapsCount: number;
+    laps?: LapData[];
   };
   bestSessionLap?: {
     driverName: string;
@@ -135,6 +138,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Calculate overall metrics & top3 aggregations in a single pass
   let totalLaps = 0;
+  let totalDistanceKm = 0;
+  let totalDrivingSeconds = 0;
   const trackLapsMap: Record<string, number> = {};
   const carLapsMap: Record<string, number> = {};
   const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
@@ -145,6 +150,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     const lapCount = p.lapsCount || 0;
     totalLaps += lapCount;
+
+    // Track Distance
+    const trackMeters = s.trackLengthMeters || 5000;
+    totalDistanceKm += (trackMeters / 1000) * lapCount;
+
+    // Track Driving Time from driver laps or average lap times
+    if (p.laps && p.laps.length > 0) {
+      for (const lap of p.laps) {
+        if (lap.lapTime && lap.lapTime > 0) {
+          totalDrivingSeconds += lap.lapTime;
+        }
+      }
+    } else if (p.avgLapTime && lapCount > 0) {
+      totalDrivingSeconds += p.avgLapTime * lapCount;
+    }
 
     if (s.trackVenue && lapCount > 0) {
       trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + lapCount;
@@ -170,6 +190,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }
 
+  // Format Driving Time helper (e.g. 142h 35m or 45m 20s)
+  const formatTotalDrivingTime = (totalSec: number): string => {
+    if (!totalSec || totalSec <= 0) return '0h 00m';
+    const hours = Math.floor(totalSec / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+    }
+    return `${minutes}m ${Math.floor(totalSec % 60)}s`;
+  };
+
   // Ranked Tracks by Laps
   const rankedTracks = Object.entries(trackLapsMap)
     .sort((a, b) => b[1] - a[1])
@@ -191,10 +222,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-6">
 
       {/* Top Hero / Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
 
         {/* Top Circuits Card */}
-        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
+        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-lmu-gold uppercase tracking-wider flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-lmu-gold" />
@@ -246,7 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Top Cars Card */}
-        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
+        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-lmu-cyan uppercase tracking-wider flex items-center gap-1.5">
               <Award className="w-4 h-4 text-lmu-cyan" />
@@ -298,7 +329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Top Benchmark Laps Card */}
-        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
+        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
           <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
             <p className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-purple-400" />
@@ -352,22 +383,66 @@ export const Dashboard: React.FC<DashboardProps> = ({
           )}
         </div>
 
-        {/* Total Overview */}
-        <div className="glass-panel p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Driving Overview</p>
-              <h3 className="text-2xl font-extrabold text-lmu-green mt-1">
-                {sessions.length} <span className="text-sm font-normal text-lmu-muted">Sessions</span>
-              </h3>
+        {/* Driving Overview Card */}
+        <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
+          <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
+            <p className="text-xs font-bold text-lmu-green uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-lmu-green" />
+              <span>Driving Overview</span>
+            </p>
+            <span className="text-[10px] text-lmu-green font-mono font-bold">
+              {sessions.length.toLocaleString()} Sessions
+            </span>
+          </div>
+
+          {/* 3 Overview Stat Rows with exact same look and feel */}
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="font-mono text-[11px] font-bold shrink-0 text-lmu-green">
+                  #1
+                </span>
+                <span className="text-white font-medium truncate group-hover:text-lmu-green transition-colors">
+                  Total Laps Driven
+                </span>
+              </div>
+              <span className="text-lmu-green font-mono font-bold text-[11px] shrink-0">
+                {totalLaps.toLocaleString()} laps
+              </span>
             </div>
-            <div className="p-3 bg-lmu-green/10 text-lmu-green rounded-xl border border-lmu-green/20">
-              <Calendar className="w-6 h-6" />
+
+            <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="font-mono text-[11px] font-bold shrink-0 text-slate-300">
+                  #2
+                </span>
+                <span className="text-white font-medium truncate group-hover:text-lmu-cyan transition-colors">
+                  Distance Driven
+                </span>
+              </div>
+              <span className="text-lmu-muted font-mono text-[11px] shrink-0">
+                {Math.round(totalDistanceKm).toLocaleString()} km
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="font-mono text-[11px] font-bold shrink-0 text-amber-600">
+                  #3
+                </span>
+                <span className="text-white font-medium truncate group-hover:text-lmu-gold transition-colors">
+                  Driving Time
+                </span>
+              </div>
+              <span className="text-lmu-muted font-mono text-[11px] shrink-0">
+                {formatTotalDrivingTime(totalDrivingSeconds)}
+              </span>
             </div>
           </div>
-          <p className="text-xs text-lmu-muted mt-3">
-            {totalLaps} Total Laps driven across {tracks.length} Tracks
-          </p>
+
+          <div className="w-full text-center text-[10px] text-lmu-muted font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1">
+            <span>Across {tracks.length} Unique Circuits</span>
+          </div>
         </div>
 
       </div>

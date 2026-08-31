@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight, Scale, Target } from 'lucide-react';
+import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight, Scale } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -304,6 +304,16 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
         {/* Session Rules & Server Configuration */}
         {session.settings && (
+          Boolean(session.settings.modeSetting) ||
+          Boolean(session.settings.serverName) ||
+          session.settings.damageMultiplier !== undefined ||
+          session.settings.fuelMultiplier !== undefined ||
+          session.settings.tireMultiplier !== undefined ||
+          session.settings.tireWarmers !== undefined ||
+          session.settings.fixedSetups !== undefined ||
+          (session.settings.durationMinutes !== undefined && session.settings.durationMinutes > 0) ||
+          (session.settings.raceLaps !== undefined && session.settings.raceLaps > 0 && session.settings.raceLaps < 2147483640)
+        ) && (
           <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs">
             <span className="font-bold text-white flex items-center gap-1.5 mr-1">
               <Sliders className="w-3.5 h-3.5 text-lmu-accent" />
@@ -1001,26 +1011,32 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </tr>
             </thead>
             <tbody className="divide-y divide-lmu-border/50 font-mono">
-              {(selectedDriver?.laps || []).map(l => {
-                const isSessionBest = l.lapTime !== null && selectedDriver.bestLapTime !== null &&
-                  Math.abs(l.lapTime - selectedDriver.bestLapTime) < 0.0005;
-                const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
-                
-                let deltaStr = '--';
-                if (l.lapTime && selectedDriver.bestLapTime) {
-                  const delta = l.lapTime - selectedDriver.bestLapTime;
-                  if (Math.abs(delta) < 0.0005) {
-                    deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
-                  } else {
-                    deltaStr = `+${delta.toFixed(3)}s`;
+              {(() => {
+                const bestLap = selectedDriver?.bestLapTime ?? null;
+                const bestS1 = selectedDriver?.bestS1 ?? null;
+                const bestS2 = selectedDriver?.bestS2 ?? null;
+                const bestS3 = selectedDriver?.bestS3 ?? null;
+
+                return (selectedDriver?.laps || []).map(l => {
+                  const isSessionBest = l.lapTime !== null && bestLap !== null &&
+                    Math.abs(l.lapTime - bestLap) < 0.0005;
+                  const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
+                  
+                  let deltaStr = '--';
+                  if (l.lapTime && bestLap) {
+                    const delta = l.lapTime - bestLap;
+                    if (Math.abs(delta) < 0.0005) {
+                      deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
+                    } else {
+                      deltaStr = `+${delta.toFixed(3)}s`;
+                    }
                   }
-                }
 
-                const isS1Best = l.s1 !== null && selectedDriver.bestS1 !== null && Math.abs(l.s1 - selectedDriver.bestS1) < 0.0005;
-                const isS2Best = l.s2 !== null && selectedDriver.bestS2 !== null && Math.abs(l.s2 - selectedDriver.bestS2) < 0.0005;
-                const isS3Best = l.s3 !== null && selectedDriver.bestS3 !== null && Math.abs(l.s3 - selectedDriver.bestS3) < 0.0005;
+                  const isS1Best = l.s1 !== null && bestS1 !== null && Math.abs(l.s1 - bestS1) < 0.0005;
+                  const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
+                  const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
 
-                return (
+                  return (
                   <tr
                     key={l.lapNum}
                     className={`hover:bg-lmu-card/50 transition-colors ${
@@ -1147,8 +1163,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     </td>
                   </tr>
                 );
-              })}
-            </tbody>
+              });
+            })()}
+          </tbody>
           </table>
         </div>
       </div>
