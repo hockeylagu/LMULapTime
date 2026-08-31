@@ -5,6 +5,7 @@ import {
   normalizeCarClassGroup,
   matchesCarClass,
   normalizeTrackName,
+  matchesTrack,
   getPaceCategoryFromPercentage,
   findMatchingTrackBenchmarkEntries,
   findReferenceEntry,
@@ -184,6 +185,76 @@ describe('paceCategory utility', () => {
     });
   });
 
+  describe('matchesTrack - Comprehensive Track Matching', () => {
+    it('matches exact and normalized track names regardless of layout or prefix', () => {
+      expect(matchesTrack('Spa', 'Circuit de Spa-Francorchamps', 'GP')).toBe(true);
+      expect(matchesTrack('Circuit de Spa-Francorchamps', 'Spa', '')).toBe(true);
+      expect(matchesTrack('Monza', 'Autodromo Nazionale Monza', 'Grand Prix')).toBe(true);
+      expect(matchesTrack('Circuit de la Sarthe', 'Circuit 24 Heures du Mans', '')).toBe(true);
+      expect(matchesTrack('Le Mans', 'Circuit de la Sarthe', '')).toBe(true);
+      expect(matchesTrack('COTA', 'Circuit of the Americas', 'GP')).toBe(true);
+      expect(matchesTrack('Austin', 'Circuit of the Americas', '')).toBe(true);
+      expect(matchesTrack('Imola', 'Autodromo Enzo e Dino Ferrari', '')).toBe(true);
+      expect(matchesTrack('Interlagos', 'Autodromo Jose Carlos Pace', '')).toBe(true);
+      expect(matchesTrack('Portimao', 'Autodromo Internacional do Algarve', '')).toBe(true);
+      expect(matchesTrack('Qatar', 'Losail International Circuit', '')).toBe(true);
+      expect(matchesTrack('Lusail', 'Losail International Circuit', '')).toBe(true);
+      expect(matchesTrack('Barcelona', 'Circuit de Barcelona-Catalunya', '')).toBe(true);
+      expect(matchesTrack('Daytona', 'Daytona International Speedway', '')).toBe(true);
+      expect(matchesTrack('Sebring', 'Sebring International Raceway', '')).toBe(true);
+      expect(matchesTrack('Silverstone', 'Silverstone Circuit', 'GP')).toBe(true);
+      expect(matchesTrack('Bahrain', 'Bahrain International Circuit', 'Grand Prix')).toBe(true);
+    });
+
+    it('differentiates between distinct track layouts when specified', () => {
+      // Sebring Full vs Sebring School
+      expect(matchesTrack('Sebring', 'Sebring International Raceway', '')).toBe(true);
+      expect(matchesTrack('Sebring International Raceway', 'Sebring International Raceway', '12h')).toBe(true);
+      expect(matchesTrack('Sebring (school)', 'Sebring International Raceway', 'School')).toBe(true);
+      expect(matchesTrack('Sebring International Raceway', 'Sebring International Raceway', 'School')).toBe(false);
+      expect(matchesTrack('Sebring', 'Sebring International Raceway', 'School')).toBe(false);
+      expect(matchesTrack('Sebring (school)', 'Sebring International Raceway', '12h')).toBe(false);
+      expect(matchesTrack('Sebring (school)', 'Sebring International Raceway', '')).toBe(false);
+
+      // Paul Ricard layouts
+      expect(matchesTrack('Paul Ricard (1A v2 short)', 'Circuit Paul Ricard', '1A-V2-Short')).toBe(true);
+      expect(matchesTrack('Paul Ricard (1A)', 'Circuit Paul Ricard', '3A')).toBe(false);
+      expect(matchesTrack('Paul Ricard (1A v2)', 'Circuit Paul Ricard', '1A-V2-Short')).toBe(false);
+
+      // Silverstone layouts
+      expect(matchesTrack('Silverstone (National)', 'Silverstone Circuit', 'National')).toBe(true);
+      expect(matchesTrack('Silverstone (International)', 'Silverstone Circuit', 'National')).toBe(false);
+      expect(matchesTrack('Silverstone (GP)', 'Silverstone Circuit', 'National')).toBe(false);
+      expect(matchesTrack('Silverstone (GP)', 'Silverstone Circuit', 'GP')).toBe(true);
+
+      // Bahrain layouts
+      expect(matchesTrack('Bahrain (wec)', 'Bahrain International Circuit', 'Grand Prix')).toBe(true);
+      expect(matchesTrack('Bahrain (outer)', 'Bahrain International Circuit', 'Outer')).toBe(true);
+      expect(matchesTrack('Bahrain (endurance)', 'Bahrain International Circuit', 'Outer')).toBe(false);
+      expect(matchesTrack('Bahrain (wec)', 'Bahrain International Circuit', 'Outer')).toBe(false);
+
+      // Monza layouts
+      expect(matchesTrack('Monza', 'Autodromo Nazionale Monza', 'GP')).toBe(true);
+      expect(matchesTrack('Monza (curvagrande)', 'Autodromo Nazionale Monza', 'Curva Grande')).toBe(true);
+      expect(matchesTrack('Monza', 'Autodromo Nazionale Monza', 'Curva Grande')).toBe(false);
+
+      // Le Mans layouts
+      expect(matchesTrack('Circuit de la Sarthe', 'Circuit 24 Heures du Mans', '24 Heures')).toBe(true);
+      expect(matchesTrack('Circuit de la Sarthe (straight)', 'Circuit de la Sarthe', 'Straight')).toBe(true);
+      expect(matchesTrack('Circuit de la Sarthe', 'Circuit de la Sarthe', 'Straight')).toBe(false);
+    });
+
+    it('returns true when queryTrack is All or empty', () => {
+      expect(matchesTrack('All', 'Spa', 'GP')).toBe(true);
+      expect(matchesTrack('', 'Monza', '')).toBe(true);
+    });
+
+    it('returns false for completely unrelated tracks', () => {
+      expect(matchesTrack('Spa', 'Autodromo Nazionale Monza', '')).toBe(false);
+      expect(matchesTrack('Silverstone', 'Circuit de la Sarthe', '')).toBe(false);
+    });
+  });
+
   describe('VEHICLE_CLASS_OPTIONS', () => {
     it('contains all standard LM classes', () => {
       const ids = VEHICLE_CLASS_OPTIONS.map(opt => opt.id);
@@ -213,11 +284,35 @@ describe('paceCategory utility', () => {
       { trackName: 'Spa', carClass: 'LMH', target100Sec: 120.0 },
       { trackName: 'Spa', carClass: 'LMGT3', target100Sec: 135.0 },
       { trackName: 'Monza', carClass: 'LMH', target100Sec: 95.0 },
+      { trackName: 'Sebring', carClass: 'LMGT3', target100Sec: 120.23 },
+      { trackName: 'Sebring (school)', carClass: 'LMGT3', target100Sec: 62.90 },
+      { trackName: 'Silverstone (GP)', carClass: 'LMH', target100Sec: 100.0 },
+      { trackName: 'Silverstone (National)', carClass: 'LMH', target100Sec: 55.0 },
     ];
 
     it('finds track benchmark entries matching track name', () => {
       const matches = findMatchingTrackBenchmarkEntries(mockEntries, 'Circuit de Spa-Francorchamps');
       expect(matches.length).toBe(2);
+    });
+
+    it('accurately isolates Sebring Full vs Sebring School benchmarks', () => {
+      const sebringFull = findMatchingTrackBenchmarkEntries(mockEntries, 'Sebring International Raceway', '12h');
+      expect(sebringFull.length).toBe(1);
+      expect(sebringFull[0].target100Sec).toBe(120.23);
+
+      const sebringSchool = findMatchingTrackBenchmarkEntries(mockEntries, 'Sebring International Raceway', 'School');
+      expect(sebringSchool.length).toBe(1);
+      expect(sebringSchool[0].target100Sec).toBe(62.90);
+    });
+
+    it('accurately isolates Silverstone layout benchmarks', () => {
+      const gp = findMatchingTrackBenchmarkEntries(mockEntries, 'Silverstone Circuit', 'GP');
+      expect(gp.length).toBe(1);
+      expect(gp[0].target100Sec).toBe(100.0);
+
+      const nat = findMatchingTrackBenchmarkEntries(mockEntries, 'Silverstone Circuit', 'National');
+      expect(nat.length).toBe(1);
+      expect(nat[0].target100Sec).toBe(55.0);
     });
 
     it('returns empty array when no track matches', () => {
@@ -229,6 +324,12 @@ describe('paceCategory utility', () => {
       const entry = findReferenceEntry(mockEntries, 'Spa', 'GP', 'LMGT3', 'Porsche 911');
       expect(entry?.carClass).toBe('LMGT3');
       expect(entry?.target100Sec).toBe(135.0);
+
+      const sebringRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', '12h', 'LMGT3', 'Porsche');
+      expect(sebringRef?.target100Sec).toBe(120.23);
+
+      const schoolRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', 'School', 'LMGT3', 'Porsche');
+      expect(schoolRef?.target100Sec).toBe(62.90);
     });
 
     it('returns null when no track matches', () => {

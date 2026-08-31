@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Zap, ChevronRight, FileText, Car, ArrowUpDown, Video, AlertCircle, FilterX } from 'lucide-react';
+import { ArrowLeft, Zap, ChevronRight, FileText, Car, ArrowUpDown, Video, AlertCircle, FilterX, ArrowLeftRight } from 'lucide-react';
 import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters.js';
-import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
+import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage, matchesTrack } from '../utils/paceCategory.js';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
@@ -147,8 +147,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   // 1. Filter track sessions matching selected car class once
   const classTrackSessions = sessions.filter(s => {
-    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    return display.toLowerCase() === trackName.toLowerCase() &&
+    return matchesTrack(trackName, s.trackVenue, s.trackCourse) &&
       matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
   });
 
@@ -297,6 +296,18 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Tracks
+        </button>
+
+        <button
+          onClick={() => {
+            const carClass = selectedClass !== 'All' ? selectedClass : 'LMGT3';
+            window.location.hash = `compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`;
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-accent transition-all"
+          title="Compare laps on this circuit"
+        >
+          <ArrowLeftRight className="w-4 h-4 text-lmu-gold" />
+          Compare Laps on Circuit
         </button>
       </div>
 

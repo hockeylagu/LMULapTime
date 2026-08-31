@@ -17,6 +17,7 @@ import {
   computeTheoreticalBest,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
+import { matchesTrack } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -411,7 +412,7 @@ export class LmuParser {
       if (minDiff > 600000) return false;
 
       const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const trackMatches = normXmlTrack.includes(normVcrTrack) || normVcrTrack.includes(normXmlTrack);
+      const trackMatches = matchesTrack(v.trackName, trackVenue, '') || normXmlTrack.includes(normVcrTrack) || normVcrTrack.includes(normXmlTrack);
       const sessionMatches = v.sessionCode.toLowerCase() === normSession;
 
       return trackMatches && (sessionMatches || minDiff < 180000);
@@ -518,3 +519,137 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
 
   return map;
 }
+
+/**
+ * Extracts and aggregates comparable laps across sessions matching a specific track and optional filters.
+ */
+export function extractComparableLaps(
+  sessions: DetailedSession[],
+  filters: {
+    trackName?: string;
+    carClass?: string;
+    carModel?: string;
+    driverName?: string;
+    sessionId?: string;
+    playerOnly?: boolean;
+  }
+) {
+  const normTrack = (filters.trackName || '').toLowerCase().trim();
+  const targetClass = (filters.carClass || '').trim();
+  const targetModel = (filters.carModel || '').toLowerCase().trim();
+  const targetDriver = (filters.driverName || '').toLowerCase().trim();
+
+  const matchingSessions = sessions.filter(s => {
+    if (!normTrack || normTrack === 'all') return true;
+    return matchesTrack(filters.trackName, s.trackVenue, s.trackCourse);
+  });
+
+  const laps: any[] = [];
+  let allTimeBestLap: any = null;
+  let bestS1: number | null = null;
+  let bestS2: number | null = null;
+  let bestS3: number | null = null;
+
+  matchingSessions.forEach(s => {
+    if (filters.sessionId && s.id !== filters.sessionId) {
+      // If a specific session is requested for isolation, but we still search all matching sessions for all-time stats
+    }
+
+    const driversToProcess = filters.playerOnly
+      ? (s.playerDriver ? [s.playerDriver] : s.drivers.filter(d => d.isPlayer))
+      : s.drivers;
+
+    driversToProcess.forEach(d => {
+      if (targetDriver && targetDriver !== 'all' && !d.name.toLowerCase().includes(targetDriver)) {
+        return;
+      }
+
+      if (targetClass && targetClass !== 'All') {
+        const dClass = d.carClass || '';
+        const dType = d.carType || '';
+        const normTarget = targetClass.toUpperCase();
+        const normD = `${dClass} ${dType}`.toUpperCase();
+        
+        const isLMH = (normTarget.includes('HYPER') || normTarget.includes('LMH')) && (normD.includes('HYPER') || normD.includes('LMH') || normD.includes('LMDH'));
+        const isGT3 = (normTarget.includes('GT3') || normTarget.includes('LMGT3')) && (normD.includes('GT3') || normD.includes('LMGT3'));
+        const isLMP2 = normTarget.includes('LMP2') && normD.includes('LMP2');
+        const isGTE = normTarget.includes('GTE') && normD.includes('GTE');
+        
+        if (!isLMH && !isGT3 && !isLMP2 && !isGTE && !normD.includes(normTarget)) {
+          return;
+        }
+      }
+
+      if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
+        return;
+      }
+
+      const sessionBestTime = d.bestLapTime;
+
+      (d.laps || []).forEach(l => {
+        const isSessionBest = l.lapTime !== null && sessionBestTime !== null && Math.abs(l.lapTime - sessionBestTime) < 0.0005;
+        
+        const lapItem = {
+          id: `${s.id}_${d.name}_lap_${l.lapNum}`,
+          sessionId: s.id,
+          sessionName: s.sessionName,
+          sessionType: s.sessionType,
+          dateString: s.timeString,
+          timestamp: s.timestamp,
+          driverName: d.name,
+          carType: d.carType,
+          carClass: d.carClass || 'General',
+          lapNum: l.lapNum,
+          lapTime: l.lapTime,
+          lapTimeString: l.lapTimeString,
+          s1: l.s1,
+          s2: l.s2,
+          s3: l.s3,
+          s1String: formatTime(l.s1),
+          s2String: formatTime(l.s2),
+          s3String: formatTime(l.s3),
+          topSpeed: l.topSpeed,
+          fCompound: l.fCompound,
+          rCompound: l.rCompound,
+          isPitStop: l.isPitStop,
+          isValid: l.isValid,
+          paceCategory: l.paceCategory || null,
+          pacePercentage: l.pacePercentage || null,
+          isSessionBest,
+        };
+
+        if (l.isValid && l.lapTime && l.lapTime > 0) {
+          if (!allTimeBestLap || l.lapTime < allTimeBestLap.lapTime) {
+            allTimeBestLap = { ...lapItem, isAllTimePB: true, tag: '⭐ All-Time Best Lap' };
+          }
+          if (l.s1 && (bestS1 === null || l.s1 < bestS1)) bestS1 = l.s1;
+          if (l.s2 && (bestS2 === null || l.s2 < bestS2)) bestS2 = l.s2;
+          if (l.s3 && (bestS3 === null || l.s3 < bestS3)) bestS3 = l.s3;
+        }
+
+        if (!filters.sessionId || s.id === filters.sessionId) {
+          laps.push(lapItem);
+        }
+      });
+    });
+  });
+
+  const theoreticalBestSec = bestS1 !== null && bestS2 !== null && bestS3 !== null
+    ? parseFloat((bestS1 + bestS2 + bestS3).toFixed(3))
+    : null;
+
+  return {
+    laps,
+    allTimeBestLap,
+    bestS1,
+    bestS2,
+    bestS3,
+    bestS1String: formatTime(bestS1),
+    bestS2String: formatTime(bestS2),
+    bestS3String: formatTime(bestS3),
+    theoreticalBestSec,
+    theoreticalBestString: formatTime(theoreticalBestSec),
+    sessionsCount: matchingSessions.length,
+  };
+}
+

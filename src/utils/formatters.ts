@@ -44,8 +44,19 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   const vNorm = venue.toLowerCase();
   const cNorm = course.toLowerCase().trim();
 
-  // If course is generic GP/Grand Prix/Full/WEC, omit layout string
-  if (cNorm === 'gp' || cNorm === 'grand prix' || cNorm === 'full' || cNorm === 'wec' || vNorm.includes(cNorm)) {
+  // If course is generic GP/Grand Prix/Full/WEC/12h/24h/Road Course, omit layout string
+  if (
+    cNorm === 'gp' ||
+    cNorm === 'grand prix' ||
+    cNorm === 'full' ||
+    cNorm === 'wec' ||
+    cNorm === '12h' ||
+    cNorm === '12 hours' ||
+    cNorm === '24h' ||
+    cNorm === '24 heures' ||
+    cNorm === 'road course' ||
+    vNorm.includes(cNorm)
+  ) {
     return venue;
   }
 

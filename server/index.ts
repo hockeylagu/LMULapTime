@@ -2,11 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
-import { LmuParser, computeProgression, computeTrackSummaries } from './parser.js';
+import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
 import { DetailedSession } from './types.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
-import { getDisplayTrackName } from '../src/utils/formatters.js';
-import { findMatchingTrackBenchmarkEntries } from '../src/utils/paceCategory.js';
+import { findMatchingTrackBenchmarkEntries, matchesTrack } from '../src/utils/paceCategory.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -111,8 +110,8 @@ app.get('/api/sessions', (req, res) => {
     sessions = sessions.filter(s => (s.playerDriver?.lapsCount ?? 0) > 0 && s.playerDriver?.bestLapTime !== null);
   }
 
-  if (track) {
-    sessions = sessions.filter(s => s.trackVenue.toLowerCase().includes(track.toLowerCase()));
+  if (track && track !== 'All') {
+    sessions = sessions.filter(s => matchesTrack(track, s.trackVenue, s.trackCourse));
   }
 
   if (sessionType && sessionType !== 'All') {
@@ -165,8 +164,8 @@ app.get('/api/progression', (req, res) => {
     sessions = sessions.filter(s => (s.playerDriver?.lapsCount ?? 0) > 0 && s.playerDriver?.bestLapTime !== null);
   }
 
-  if (track) {
-    sessions = sessions.filter(s => s.trackVenue.toLowerCase().includes(track.toLowerCase()));
+  if (track && track !== 'All') {
+    sessions = sessions.filter(s => matchesTrack(track, s.trackVenue, s.trackCourse));
   }
 
   const progression = computeProgression(sessions, driverName);
@@ -208,11 +207,7 @@ app.get('/api/track/:trackName', (req, res) => {
   const { trackName } = req.params;
   const decoded = decodeURIComponent(trackName);
   const allSessions = loadSessions();
-  const trackSessions = allSessions.filter(s => {
-    const display = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    return display.toLowerCase() === decoded.toLowerCase() ||
-      s.trackVenue.toLowerCase() === decoded.toLowerCase();
-  });
+  const trackSessions = allSessions.filter(s => matchesTrack(decoded, s.trackVenue, s.trackCourse));
 
   const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
   const normTrack = normalizeTrackName(decoded, sampleCourse);
@@ -251,6 +246,35 @@ app.post('/api/reference-laptimes/refresh', async (_req, res) => {
     console.error('Failed to refresh reference laptimes:', err);
     res.status(500).json({ error: err.message || 'Failed to refresh reference laptimes' });
   }
+});
+
+app.get('/api/compare/laps', (req, res) => {
+  const track = req.query.track as string | undefined;
+  const carClass = req.query.carClass as string | undefined;
+  const carModel = req.query.carModel as string | undefined;
+  const driver = req.query.driver as string | undefined;
+  const sessionId = req.query.sessionId as string | undefined;
+  const playerOnly = req.query.playerOnly !== 'false';
+
+  const sessions = loadSessions();
+  const comparisonData = extractComparableLaps(sessions, {
+    trackName: track,
+    carClass,
+    carModel,
+    driverName: driver,
+    sessionId,
+    playerOnly,
+  });
+
+  const refCache = loadReferenceLaptimesFromCache();
+  const benchmarks = refCache && track
+    ? findMatchingTrackBenchmarkEntries(refCache.entries, track, '')
+    : [];
+
+  res.json({
+    ...comparisonData,
+    benchmarks,
+  });
 });
 
 if (process.env.NODE_ENV !== 'test') {

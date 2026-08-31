@@ -149,94 +149,276 @@ export function matchesCarClass(carClass: string = '', carType: string = '', tar
   }
 }
 
-interface TrackRule {
+import { getDisplayTrackName } from './formatters.js';
+
+export interface TrackLayoutDef {
+  layoutId: string;
   match: RegExp;
-  layouts?: { match: RegExp; name: string }[];
-  default: string;
+  benchmarkName: string;
 }
 
-const TRACK_RULES: TrackRule[] = [
+export interface CircuitDef {
+  circuitId: string;
+  match: RegExp;
+  defaultLayout: string;
+  defaultBenchmarkName: string;
+  layouts: TrackLayoutDef[];
+}
+
+export const CIRCUIT_DEFINITIONS: CircuitDef[] = [
   {
-    match: /paul ricard|ricard/,
+    circuitId: 'sebring',
+    match: /sebring/i,
+    defaultLayout: 'full',
+    defaultBenchmarkName: 'Sebring',
     layouts: [
-      { match: /short|v2 short|1a v2 short/, name: 'Paul Ricard (1A v2 short)' },
-      { match: /1a v2/, name: 'Paul Ricard (1A v2)' },
-      { match: /1a/, name: 'Paul Ricard (1A)' },
-      { match: /3a/, name: 'Paul Ricard (3A)' },
+      { layoutId: 'school', match: /\b(school|club|short)\b/i, benchmarkName: 'Sebring (school)' },
+      { layoutId: 'full', match: /\b(12h|12\s*hours?|full|grand\s*prix|\bgp\b)\b/i, benchmarkName: 'Sebring' },
     ],
-    default: 'Paul Ricard (1A v2)',
-  },
-  { match: /\bspa\b/, default: 'Spa' },
-  {
-    match: /monza/,
-    layouts: [{ match: /curva|grande/, name: 'Monza (curvagrande)' }],
-    default: 'Monza',
-  },
-  { match: /barcelona|catalunya/, default: 'Barcelona' },
-  {
-    match: /sarthe|mans/,
-    layouts: [{ match: /straight|chicaneless/, name: 'Circuit de la Sarthe (straight)' }],
-    default: 'Circuit de la Sarthe',
   },
   {
-    match: /cota|americas/,
-    layouts: [{ match: /national/, name: 'COTA (national)' }],
-    default: 'COTA',
-  },
-  { match: /daytona/, default: 'Daytona' },
-  {
-    match: /fuji/,
-    layouts: [{ match: /classic/, name: 'Fuji (classic)' }],
-    default: 'Fuji (chicane)',
-  },
-  { match: /imola|ferrari/, default: 'Imola' },
-  { match: /interlagos|pace/, default: 'Interlagos' },
-  { match: /laguna|seca/, default: 'Laguna Seca' },
-  { match: /portimao|algarve/, default: 'Portimao' },
-  {
-    match: /qatar|lusail/,
-    layouts: [{ match: /short/, name: 'Qatar (short)' }],
-    default: 'Qatar',
-  },
-  {
-    match: /sebring/,
-    layouts: [{ match: /school/, name: 'Sebring (school)' }],
-    default: 'Sebring',
-  },
-  {
-    match: /silverstone/,
+    circuitId: 'bahrain',
+    match: /bahrain/i,
+    defaultLayout: 'wec',
+    defaultBenchmarkName: 'Bahrain (wec)',
     layouts: [
-      { match: /international/, name: 'Silverstone (International)' },
-      { match: /national/, name: 'Silverstone (National)' },
+      { layoutId: 'endurance', match: /\bendurance\b/i, benchmarkName: 'Bahrain (endurance)' },
+      { layoutId: 'outer', match: /\bouter\b/i, benchmarkName: 'Bahrain (outer)' },
+      { layoutId: 'paddock', match: /\b(paddock|oasis)\b/i, benchmarkName: 'Bahrain (paddock)' },
+      { layoutId: 'wec', match: /\b(wec|grand\s*prix|\bgp\b|full)\b/i, benchmarkName: 'Bahrain (wec)' },
     ],
-    default: 'Silverstone (GP)',
   },
   {
-    match: /bahrain/,
+    circuitId: 'paul_ricard',
+    match: /paul\s*ricard|ricard/i,
+    defaultLayout: '1a_v2',
+    defaultBenchmarkName: 'Paul Ricard (1A v2)',
     layouts: [
-      { match: /endurance/, name: 'Bahrain (endurance)' },
-      { match: /outer/, name: 'Bahrain (outer)' },
-      { match: /paddock/, name: 'Bahrain (paddock)' },
+      { layoutId: '1a_v2_short', match: /\b(short|v2\s*short|1a\s*v2\s*short)\b/i, benchmarkName: 'Paul Ricard (1A v2 short)' },
+      { layoutId: '1a_v2', match: /\b(1a\s*v2|v2)(?!.*short)\b/i, benchmarkName: 'Paul Ricard (1A v2)' },
+      { layoutId: '1a', match: /\b1a\b(?!.*v2)/i, benchmarkName: 'Paul Ricard (1A)' },
+      { layoutId: '3a', match: /\b3a\b/i, benchmarkName: 'Paul Ricard (3A)' },
     ],
-    default: 'Bahrain (wec)',
+  },
+  {
+    circuitId: 'silverstone',
+    match: /silverstone/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Silverstone (GP)',
+    layouts: [
+      { layoutId: 'national', match: /\b(?<!inter)national\b/i, benchmarkName: 'Silverstone (National)' },
+      { layoutId: 'international', match: /\binternational\b/i, benchmarkName: 'Silverstone (International)' },
+      { layoutId: 'gp', match: /\b(grand\s*prix|\bgp\b|historic|full)\b/i, benchmarkName: 'Silverstone (GP)' },
+    ],
+  },
+  {
+    circuitId: 'sarthe',
+    match: /sarthe|mans/i,
+    defaultLayout: 'full',
+    defaultBenchmarkName: 'Circuit de la Sarthe',
+    layouts: [
+      { layoutId: 'straight', match: /\b(straight|chicaneless|sans\s*chicanes?|mulsanne)\b/i, benchmarkName: 'Circuit de la Sarthe (straight)' },
+      { layoutId: 'full', match: /\b(24\s*heures?|24h|full)\b/i, benchmarkName: 'Circuit de la Sarthe' },
+    ],
+  },
+  {
+    circuitId: 'monza',
+    match: /monza/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Monza',
+    layouts: [
+      { layoutId: 'curvagrande', match: /\b(curva\s*grande|curvagrande|junior)\b/i, benchmarkName: 'Monza (curvagrande)' },
+      { layoutId: 'gp', match: /\b(grand\s*prix|\bgp\b|full)\b/i, benchmarkName: 'Monza' },
+    ],
+  },
+  {
+    circuitId: 'cota',
+    match: /cota|americas|austin/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'COTA',
+    layouts: [
+      { layoutId: 'national', match: /\b(national|short)\b/i, benchmarkName: 'COTA (national)' },
+      { layoutId: 'gp', match: /\b(grand\s*prix|\bgp\b|full)\b/i, benchmarkName: 'COTA' },
+    ],
+  },
+  {
+    circuitId: 'fuji',
+    match: /fuji/i,
+    defaultLayout: 'chicane',
+    defaultBenchmarkName: 'Fuji (chicane)',
+    layouts: [
+      { layoutId: 'classic', match: /\b(classic|old)\b/i, benchmarkName: 'Fuji (classic)' },
+      { layoutId: 'chicane', match: /\b(chicane|grand\s*prix|\bgp\b|full)\b/i, benchmarkName: 'Fuji (chicane)' },
+    ],
+  },
+  {
+    circuitId: 'qatar',
+    match: /qatar|lusail|losail/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Qatar',
+    layouts: [
+      { layoutId: 'short', match: /\b(short|club|national)\b/i, benchmarkName: 'Qatar (short)' },
+      { layoutId: 'gp', match: /\b(grand\s*prix|\bgp\b|full)\b/i, benchmarkName: 'Qatar' },
+    ],
+  },
+  {
+    circuitId: 'spa',
+    match: /spa|francorchamps/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Spa',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Spa' },
+    ],
+  },
+  {
+    circuitId: 'barcelona',
+    match: /barcelona|catalunya/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Barcelona',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Barcelona' },
+    ],
+  },
+  {
+    circuitId: 'daytona',
+    match: /daytona/i,
+    defaultLayout: 'road',
+    defaultBenchmarkName: 'Daytona',
+    layouts: [
+      { layoutId: 'road', match: /.*/i, benchmarkName: 'Daytona' },
+    ],
+  },
+  {
+    circuitId: 'imola',
+    match: /imola|ferrari/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Imola',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Imola' },
+    ],
+  },
+  {
+    circuitId: 'interlagos',
+    match: /interlagos|pace|sao\s*paulo|são\s*paulo/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Interlagos',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Interlagos' },
+    ],
+  },
+  {
+    circuitId: 'laguna_seca',
+    match: /laguna|seca/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Laguna Seca',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Laguna Seca' },
+    ],
+  },
+  {
+    circuitId: 'portimao',
+    match: /portimao|portimão|algarve/i,
+    defaultLayout: 'gp',
+    defaultBenchmarkName: 'Portimao',
+    layouts: [
+      { layoutId: 'gp', match: /.*/i, benchmarkName: 'Portimao' },
+    ],
   },
 ];
 
-export function normalizeTrackName(venue: string = '', course: string = ''): string {
-  const combined = `${venue} ${course}`.toLowerCase().trim();
+export interface ResolvedTrackInfo {
+  circuit: string;
+  layout: string;
+  benchmarkName: string;
+  isKnown: boolean;
+}
 
-  for (const rule of TRACK_RULES) {
-    if (rule.match.test(combined)) {
-      if (rule.layouts) {
-        for (const layout of rule.layouts) {
-          if (layout.match.test(combined)) return layout.name;
+export function getTrackAndLayout(venue: string = '', course: string = ''): ResolvedTrackInfo {
+  const combined = `${venue} ${course}`.trim();
+  const vLower = venue.toLowerCase();
+  const cLower = course.toLowerCase().trim();
+  const combLower = combined.toLowerCase();
+
+  for (const circuit of CIRCUIT_DEFINITIONS) {
+    if (circuit.match.test(combLower)) {
+      // 1. Check if course or combined specifies an explicit non-default layout
+      for (const layout of circuit.layouts) {
+        if (cLower && layout.match.test(cLower)) {
+          return {
+            circuit: circuit.circuitId,
+            layout: layout.layoutId,
+            benchmarkName: layout.benchmarkName,
+            isKnown: true,
+          };
         }
       }
-      return rule.default;
+
+      for (const layout of circuit.layouts) {
+        // If layout matches inside combined text e.g. "Sebring (school)"
+        if (layout.match.test(combLower)) {
+          return {
+            circuit: circuit.circuitId,
+            layout: layout.layoutId,
+            benchmarkName: layout.benchmarkName,
+            isKnown: true,
+          };
+        }
+      }
+
+      // 2. Default layout for this circuit
+      return {
+        circuit: circuit.circuitId,
+        layout: circuit.defaultLayout,
+        benchmarkName: circuit.defaultBenchmarkName,
+        isKnown: true,
+      };
     }
   }
 
-  return venue;
+  return {
+    circuit: vLower.replace(/[^a-z0-9]/g, '') || 'unknown',
+    layout: cLower.replace(/[^a-z0-9]/g, '') || 'default',
+    benchmarkName: venue.trim(),
+    isKnown: false,
+  };
+}
+
+export function normalizeTrackName(venue: string = '', course: string = ''): string {
+  const resolved = getTrackAndLayout(venue, course);
+  return resolved.benchmarkName;
+}
+
+/**
+ * Robust track matching comparing any query track against a session venue and course.
+ */
+export function matchesTrack(
+  queryTrack: string = '',
+  venue: string = '',
+  course: string = ''
+): boolean {
+  if (!queryTrack || queryTrack === 'All' || queryTrack.trim() === '') return true;
+
+  const qInfo = getTrackAndLayout(queryTrack, '');
+  const sInfo = getTrackAndLayout(venue, course);
+
+  // If both are known standard circuits:
+  if (qInfo.isKnown && sInfo.isKnown) {
+    if (qInfo.circuit !== sInfo.circuit) return false;
+    return qInfo.layout === sInfo.layout;
+  }
+
+  // Fallback for custom / mod tracks:
+  const qClean = queryTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const sClean = `${venue} ${course}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const vClean = (venue || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const displayClean = getDisplayTrackName(venue, course).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (qClean === sClean || qClean === vClean || qClean === displayClean) return true;
+  if (sClean.includes(qClean) || qClean.includes(sClean) || displayClean.includes(qClean) || qClean.includes(displayClean)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -250,22 +432,29 @@ export function findMatchingTrackBenchmarkEntries(
   const entryList: ReferenceLaptimeEntry[] = Array.isArray(entries) ? entries : Object.values(entries || {});
   if (entryList.length === 0) return [];
 
-  const normTrack = normalizeTrackName(trackVenue, course);
-  const normClean = normTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const targetInfo = getTrackAndLayout(trackVenue, course);
 
-  // 1. Try exact normalized match first
+  // 1. Exact match on resolved benchmark circuit and layout
   let matches = entryList.filter(e => {
-    const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const eRaw = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    return eNorm === normClean || eRaw === normClean;
+    const eInfo = getTrackAndLayout(e.trackName, '');
+    return eInfo.circuit === targetInfo.circuit && eInfo.layout === targetInfo.layout;
   });
 
-  // 2. Fallback to substring matching
+  // 2. Direct string equality match on cleaned name
   if (matches.length === 0) {
+    const cleanTarget = targetInfo.benchmarkName.toLowerCase().replace(/[^a-z0-9]/g, '');
     matches = entryList.filter(e => {
-      const eNorm = normalizeTrackName(e.trackName).toLowerCase().replace(/[^a-z0-9]/g, '');
-      const eRaw = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return eNorm.includes(normClean) || normClean.includes(eNorm) || eRaw.includes(normClean) || normClean.includes(eRaw);
+      const cleanE = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanE === cleanTarget;
+    });
+  }
+
+  // 3. Fallback for custom / mod tracks
+  if (matches.length === 0 && !targetInfo.isKnown) {
+    const cleanVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
+    matches = entryList.filter(e => {
+      const cleanE = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanE.includes(cleanVenue) || cleanVenue.includes(cleanE);
     });
   }
 
