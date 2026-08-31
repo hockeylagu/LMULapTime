@@ -20,7 +20,7 @@ import {
   computeTheoreticalBest,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack } from '../src/utils/paceCategory.js';
+import { matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -391,34 +391,17 @@ export class LmuParser {
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
     const laps: LapData[] = lapsList.map((l: any, idx: number) => this.parseLap(l, idx + 1));
 
-    // If lapTime is missing but elapsedSeconds is present, compute lap duration from delta
-    laps.forEach((lap, idx) => {
-      if (lap.lapTime === null && lap.elapsedSeconds !== null && lap.elapsedSeconds !== undefined) {
-        if (idx === 0 && lap.elapsedSeconds > 0) {
-          lap.lapTime = parseFloat(lap.elapsedSeconds.toFixed(3));
-          lap.lapTimeString = formatTime(lap.lapTime);
-          lap.isValid = true;
-        } else if (idx > 0) {
-          const prev = laps[idx - 1];
-          if (prev && prev.elapsedSeconds !== null && prev.elapsedSeconds !== undefined && lap.elapsedSeconds > prev.elapsedSeconds) {
-            lap.lapTime = parseFloat((lap.elapsedSeconds - prev.elapsedSeconds).toFixed(3));
-            lap.lapTimeString = formatTime(lap.lapTime);
-            lap.isValid = true;
-          }
-        }
-      }
-    });
+    // Best Laps & Sectors - Strictly calculated from valid completed laps
+    const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
+    const bestLapTime: number | null = validLaps.length > 0
+      ? Math.min(...validLaps.map(l => l.lapTime as number))
+      : null;
 
-    // Best Laps & Sectors
-    let bestLapTime: number | null = parseTimeStringToSeconds(d.BestLapTime);
     let bestS1: number | null = null;
     let bestS2: number | null = null;
     let bestS3: number | null = null;
 
-    laps.forEach(lap => {
-      if (lap.isValid && lap.lapTime) {
-        bestLapTime = updateMinTime(bestLapTime, lap.lapTime);
-      }
+    validLaps.forEach(lap => {
       bestS1 = updateMinTime(bestS1, lap.s1);
       bestS2 = updateMinTime(bestS2, lap.s2);
       bestS3 = updateMinTime(bestS3, lap.s3);
@@ -449,6 +432,7 @@ export class LmuParser {
       ? Math.floor(100 / avgFuelPerLap)
       : null;
 
+    // Virtual Energy (VE / NRG) applies to both Hypercar and LMGT3 under FIA WEC BoP stint rules
     const validVeLaps = laps.filter(l => l.isValid && !l.isPitStop && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
     const avgVePerLap = validVeLaps.length > 0
       ? parseFloat((validVeLaps.reduce((acc, l) => acc + (l.virtualEnergyUsed || 0), 0) / validVeLaps.length).toFixed(2))

@@ -613,7 +613,7 @@ describe('parser server module', () => {
       expect(chaser?.laps[1].pitStopDurationString).toMatch(/\+\d+(\.\d+)?s/);
     });
 
-    it('derives lap time from et delta when lap body text has no sectors or is missing', () => {
+    it('preserves elapsed time without fabricating false lap times on incomplete laps', () => {
       const xmlWithoutSectors = `<?xml version="1.0" encoding="utf-8"?>
 <rFactorXML version="1.0">
   <RaceResults>
@@ -635,11 +635,48 @@ describe('parser server module', () => {
       const session = parser.parseSessionXml('no_sectors_test.xml');
       expect(session).not.toBeNull();
       const laps = session?.drivers[0].laps || [];
-      expect(laps[0].lapTime).toBe(130.5);
-      expect(laps[0].isValid).toBe(true);
-      expect(laps[1].lapTime).toBe(109.7);
-      expect(laps[1].isValid).toBe(true);
+      expect(laps[0].lapTime).toBeNull();
+      expect(laps[0].isValid).toBe(false);
+      expect(laps[0].elapsedSeconds).toBe(130.5);
+      expect(laps[0].elapsedTimeString).toBe('2:10.5');
+      expect(laps[1].lapTime).toBeNull();
+      expect(laps[1].isValid).toBe(false);
+      expect(laps[1].elapsedSeconds).toBe(240.2);
       expect(laps[1].elapsedTimeString).toBe('4:00.2');
+    });
+
+    it('does not fabricate valid laps from incomplete outlaps or unverified BestLapTime XML tag', () => {
+      const xmlWithOutlapOnly = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Practice1>
+      <TrackVenue>Silverstone Circuit</TrackVenue>
+      <TrackCourse>WEC</TrackCourse>
+      <TimeString>2026/08/29 20:39:37</TimeString>
+      <Driver>
+        <Name>Outlap Driver</Name>
+        <CarType>BMW M4 LMGT3</CarType>
+        <CarClass>LMGT3</CarClass>
+        <isPlayer>1</isPlayer>
+        <BestLapTime>1:15.767</BestLapTime>
+        <Lap num="1" p="1" et="75.767">--:--.---</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithOutlapOnly);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('outlap_test.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver?.laps[0].isValid).toBe(false);
+      expect(driver?.laps[0].lapTime).toBeNull();
+      expect(driver?.bestLapTime).toBeNull();
+      expect(driver?.bestLapTimeString).toBe('--:--.---');
+      expect(driver?.bestLapPaceCategory).toBeUndefined();
+      expect(driver?.bestLapPacePercentage).toBeUndefined();
     });
   });
 
