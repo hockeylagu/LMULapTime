@@ -22,7 +22,7 @@ export function updateHashParams(updates: Record<string, string | boolean | null
   const { path, params } = getHashRouteAndParams();
 
   for (const [key, value] of Object.entries(updates)) {
-    if (value === undefined || value === null || value === '' || value === 'All' || value === 'date-desc') {
+    if (value === undefined || value === null || value === '' || value === 'All' || value === 'date-desc' || (key === 'view' && value === 'grid')) {
       params.delete(key);
     } else if (key === 'hideEmpty') {
       if (value === true) params.delete('hideEmpty');

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Zap, ChevronRight, FileText, Car, ArrowUpDown, Video, AlertCircle, FilterX, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeft, Zap, FileText, ArrowUpDown, FilterX, ArrowLeftRight, Car } from 'lucide-react';
 import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters.js';
-import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage, matchesTrack } from '../utils/paceCategory.js';
+import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage, matchesTrack } from '../utils/paceCategory.js';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
+import { SessionList } from './SessionList.js';
 
 export type TrackDetailSortOption = 'date-desc' | 'date-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
 
@@ -501,178 +502,100 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       />
 
       {/* Recorded Sessions on this Track */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-lmu-border/50 pb-4">
-          <div>
-            <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+      <div className="glass-panel p-6 rounded-2xl">
+        <SessionList
+          sessions={sortedSessions}
+          onSelectSession={onSelectSession}
+          showTrackColumn={false}
+          headerTitle={
+            <>
               <FileText className="w-5 h-5 text-lmu-accent" />
-              Sessions Recorded on {trackName} ({sortedSessions.length}{hideEmpty && emptyCount > 0 ? ` / ${classTrackSessions.length}` : ''})
-            </h3>
-            <span className="text-xs text-lmu-muted">
-              {hideEmpty && emptyCount > 0 ? `Filtering ${emptyCount} empty session${emptyCount > 1 ? 's' : ''}` : 'Click any session to view detailed telemetry & sector timings'}
-            </span>
-          </div>
+              <span>Sessions Recorded on {trackName} ({sortedSessions.length}{hideEmpty && emptyCount > 0 ? ` / ${classTrackSessions.length}` : ''})</span>
+            </>
+          }
+          headerSubtitle={
+            hideEmpty && emptyCount > 0 ? `Filtering ${emptyCount} empty session${emptyCount > 1 ? 's' : ''}` : 'Click any session to view detailed telemetry & sector timings'
+          }
+          headerActions={
+            <>
+              {/* Session Type Filter Pills */}
+              <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
+                {['All', 'Practice', 'Qualifying', 'Race'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setFilterType(type)}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      filterType === type
+                        ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                        : 'text-lmu-muted hover:text-white'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Session Type Filter Pills */}
-            <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
-              {['All', 'Practice', 'Qualifying', 'Race'].map(type => (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    filterType === type
-                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                      : 'text-lmu-muted hover:text-white'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Search car, file, driver..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-lmu-bg border border-lmu-border rounded-xl px-3.5 py-1.5 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent w-full sm:w-48"
+              />
 
-            {/* Search Input */}
-            <input
-              type="text"
-              placeholder="Search car, file, driver..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-lmu-bg border border-lmu-border rounded-xl px-3.5 py-1.5 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent w-full sm:w-48"
-            />
-
-            {/* Hide Empty Toggle */}
-            <button
-              onClick={() => setHideEmpty(!hideEmpty)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                hideEmpty
-                  ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
-                  : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-              }`}
-              title={hideEmpty ? "Hiding empty sessions (0 laps). Click to show all." : "Showing all sessions. Click to filter out empty results."}
-            >
-              <FilterX className="w-3.5 h-3.5" />
-              <span>Hide Empty</span>
-              {emptyCount > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                  hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
-                }`}>
-                  {emptyCount}
-                </span>
-              )}
-            </button>
-
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
-              <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
-              <span className="text-lmu-muted font-medium">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as TrackDetailSortOption)}
-                className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+              {/* Hide Empty Toggle */}
+              <button
+                onClick={() => setHideEmpty(!hideEmpty)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                  hideEmpty
+                    ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
+                    : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
+                }`}
+                title={hideEmpty ? "Hiding empty sessions (0 laps). Click to show all." : "Showing all sessions. Click to filter out empty results."}
               >
-                <option value="date-desc" className="bg-lmu-card text-white">Date (Newest First)</option>
-                <option value="date-asc" className="bg-lmu-card text-white">Date (Oldest First)</option>
-                <option value="pace-asc" className="bg-lmu-card text-white">Benchmark (Best Pace %)</option>
-                <option value="pace-desc" className="bg-lmu-card text-white">Benchmark (Slowest Pace %)</option>
-                <option value="lap-asc" className="bg-lmu-card text-white">Best Lap Time (Fastest)</option>
-              </select>
-            </div>
-          </div>
-        </div>
+                <FilterX className="w-3.5 h-3.5" />
+                <span>Hide Empty</span>
+                {emptyCount > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
+                  }`}>
+                    {emptyCount}
+                  </span>
+                )}
+              </button>
 
-        {sortedSessions.length === 0 ? (
-          <div className="py-12 text-center text-lmu-muted">
-            <p className="text-base font-medium">No sessions found matching filters.</p>
-            {(filterType !== 'All' || searchQuery !== '' || (hideEmpty && emptyCount > 0)) && (
-              <p className="text-xs text-lmu-muted mt-2">
-                {hideEmpty && emptyCount > 0 && `${emptyCount} empty session${emptyCount > 1 ? 's are' : ' is'} hidden. `}
-                <button
-                  onClick={() => {
-                    setFilterType('All');
-                    setSearchQuery('');
-                    setHideEmpty(false);
-                    setSelectedCarModel('All');
-                  }}
-                  className="text-lmu-accent underline hover:text-white ml-1"
+              {/* Sort Dropdown */}
+              <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
+                <span className="text-lmu-muted font-medium">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as TrackDetailSortOption)}
+                  className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
                 >
-                  Reset all filters
-                </button>
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedSessions.map(s => {
-              const p = s.playerDriver;
-              const cardPace = getPaceCategoryForLap(p?.bestLapTime || null, currentBenchmark);
-              const empty = (p?.lapsCount ?? 0) === 0 || !p?.bestLapTime;
-              return (
-                <div
-                  key={s.id}
-                  onClick={() => onSelectSession(s.id)}
-                  className={`glass-panel glass-panel-hover p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
-                    empty ? 'border-amber-500/30 bg-amber-950/10' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                          s.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30' :
-                          s.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30' :
-                          'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
-                        }`}>
-                          {s.sessionName || s.sessionType}
-                        </span>
-                        {s.weatherInfo && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-lmu-bg/80 border border-lmu-border/60 text-lmu-muted">
-                            {s.weatherInfo}
-                          </span>
-                        )}
-                        {empty && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Empty
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-lmu-muted mt-2">{s.timeString}</p>
-                    </div>
-
-                    {s.matchingReplayFile && (
-                      <span className="p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20 shrink-0 mt-0.5" title={`Replay VCR: ${s.matchingReplayFile.name}`}>
-                        <Video className="w-4 h-4" />
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-lmu-border/60 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="text-white font-semibold truncate max-w-[150px]">{p ? p.carType : 'N/A'}</p>
-                      <p className="text-lmu-muted text-[11px]">{p ? `${p.lapsCount} laps` : '0 laps'}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-sm text-lmu-gold">
-                        {p?.bestLapTimeString || '--:--.---'}
-                      </p>
-                      {cardPace && (
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border mt-0.5 ${getPaceCategoryStyle(cardPace.category).badgeClass}`}>
-                          <span>{getPaceCategoryStyle(cardPace.category).emoji}</span>
-                          <span>{cardPace.category}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-between text-xs text-lmu-accent font-semibold group">
-                    <span>Inspect Session Telemetry</span>
-                    <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  <option value="date-desc" className="bg-lmu-card text-white">Date (Newest First)</option>
+                  <option value="date-asc" className="bg-lmu-card text-white">Date (Oldest First)</option>
+                  <option value="pace-asc" className="bg-lmu-card text-white">Benchmark (Best Pace %)</option>
+                  <option value="pace-desc" className="bg-lmu-card text-white">Benchmark (Slowest Pace %)</option>
+                  <option value="lap-asc" className="bg-lmu-card text-white">Best Lap Time (Fastest)</option>
+                </select>
+              </div>
+            </>
+          }
+          getPaceBadge={(s) => getPaceCategoryForLap(s.playerDriver?.bestLapTime || null, currentBenchmark)}
+          onResetFilters={(filterType !== 'All' || searchQuery !== '' || (hideEmpty && emptyCount > 0)) ? () => {
+            setFilterType('All');
+            setSearchQuery('');
+            setHideEmpty(false);
+            setSelectedCarModel('All');
+          } : undefined}
+          hideEmptyNotice={hideEmpty && emptyCount > 0 ? (
+            <span>
+              {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden.
+            </span>
+          ) : undefined}
+        />
       </div>
 
     </div>
