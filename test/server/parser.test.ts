@@ -438,6 +438,211 @@ describe('parser server module', () => {
     });
   });
 
+  describe('Tire wear and fuel parsing', () => {
+    it('parses twfl, twfr, twrl, twrr, corner compounds, and fuel attributes correctly', () => {
+      const xmlWithTireWear = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Spa</TrackVenue>
+    <Practice1>
+      <Driver>
+        <Name>Tire Tester</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" s1="35.0" s2="42.0" s3="45.0" twfl="0.957" twfr="0.961" twrl="0.957" twrr="0.957" FL="0,Soft" FR="0,Soft" RL="0,Soft" RR="0,Soft" fuel="0.663" fuelUsed="0.024">122.000</Lap>
+        <Lap num="2" p="1" s1="34.8" s2="41.9" s3="44.8" twfl="0.933" twfr="0.941" twrl="0.925" twrr="0.937" fcompound="Soft" rcompound="Soft" fuel="0.639" fuelUsed="0.024">121.500</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithTireWear);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('tire_test.xml');
+      expect(session).not.toBeNull();
+      const laps = session?.drivers[0].laps || [];
+      expect(laps.length).toBe(2);
+
+      // Lap 1 checks
+      expect(laps[0].tireWear).toBeDefined();
+      expect(laps[0].tireWear?.fl).toBe(95.7);
+      expect(laps[0].tireWear?.fr).toBe(96.1);
+      expect(laps[0].tireWear?.rl).toBe(95.7);
+      expect(laps[0].tireWear?.rr).toBe(95.7);
+      expect(laps[0].tireWear?.avg).toBe(95.8);
+      expect(laps[0].flCompound).toBe('Soft');
+      expect(laps[0].fuel).toBe(66.3);
+      expect(laps[0].fuelUsed).toBe(2.4);
+
+      // Lap 2 checks
+      expect(laps[1].tireWear?.fl).toBe(93.3);
+      expect(laps[1].tireWear?.fr).toBe(94.1);
+      expect(laps[1].tireWear?.rl).toBe(92.5);
+      expect(laps[1].tireWear?.rr).toBe(93.7);
+      expect(laps[1].tireWear?.avg).toBe(93.4);
+    });
+
+    it('parses Virtual Energy and calculates stint averages for driver', () => {
+      const xmlWithVE = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Le Mans</TrackVenue>
+    <Practice1>
+      <Driver>
+        <Name>Hypercar Ace</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" s1="40.0" s2="60.0" s3="50.0" fuel="0.900" fuelUsed="0.030" ve="0.950" veUsed="0.040">150.000</Lap>
+        <Lap num="2" p="1" s1="39.8" s2="59.8" s3="49.8" fuel="0.870" fuelUsed="0.030" ve="0.910" veUsed="0.040">149.400</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithVE);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('ve_test.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver?.laps[0].virtualEnergy).toBe(95.0);
+      expect(driver?.laps[0].virtualEnergyUsed).toBe(4.0);
+      expect(driver?.avgFuelPerLap).toBe(3.0);
+      expect(driver?.estFuelStintLaps).toBe(33);
+      expect(driver?.avgVePerLap).toBe(4.0);
+      expect(driver?.estVeStintLaps).toBe(25);
+    });
+  });
+
+  describe('Session settings and server configuration parsing', () => {
+    it('parses settings, multipliers, tire warmers, and rules correctly', () => {
+      const xmlWithSettings = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Race Weekend</Setting>
+    <ServerName>LMU Championship Server</ServerName>
+    <TrackVenue>Spa</TrackVenue>
+    <DamageMult>50</DamageMult>
+    <FuelMult>2</FuelMult>
+    <TireMult>1</TireMult>
+    <TireWarmers>1</TireWarmers>
+    <FixedSetups>0</FixedSetups>
+    <FixedUpgrades>0</FixedUpgrades>
+    <ParcFerme>3</ParcFerme>
+    <MechFailRate>1</MechFailRate>
+    <VehiclesAllowed>Ferrari_488_GTE_EVO,</VehiclesAllowed>
+    <Practice1>
+      <Minutes>60</Minutes>
+      <Driver><Name>Racer</Name></Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithSettings);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('settings_test.xml');
+      expect(session).not.toBeNull();
+      expect(session?.settings).toBeDefined();
+      expect(session?.settings?.modeSetting).toBe('Race Weekend');
+      expect(session?.settings?.serverName).toBe('LMU Championship Server');
+      expect(session?.settings?.damageMultiplier).toBe(50);
+      expect(session?.settings?.fuelMultiplier).toBe(2);
+      expect(session?.settings?.tireMultiplier).toBe(1);
+      expect(session?.settings?.tireWarmers).toBe(true);
+      expect(session?.settings?.fixedSetups).toBe(false);
+      expect(session?.settings?.parcFerme).toBe(3);
+      expect(session?.settings?.durationMinutes).toBe(60);
+      expect(session?.settings?.vehiclesAllowed).toBe('Ferrari_488_GTE_EVO,');
+    });
+  });
+
+  describe('Timing Timestamps (et), Gaps, Pit Durations & Laps without sectors', () => {
+    it('extracts et, formats elapsed time, computes gap to leader, and estimates pit duration', () => {
+      const xmlWithEt = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Spa</TrackVenue>
+    <Race>
+      <Driver>
+        <Name>Leader</Name>
+        <isPlayer>0</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" s1="35.0" s2="42.0" s3="45.0" et="122.000">122.000</Lap>
+        <Lap num="2" p="1" s1="34.8" s2="41.9" s3="44.8" et="243.500">121.500</Lap>
+      </Driver>
+      <Driver>
+        <Name>Chaser</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Porsche 963</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="2" s1="35.5" s2="42.5" s3="45.5" et="123.500">123.500</Lap>
+        <Lap num="2" p="2" pit="1" et="278.000">154.500</Lap>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithEt);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('et_test.xml');
+      expect(session).not.toBeNull();
+      
+      const leader = session?.drivers.find(d => d.name === 'Leader');
+      const chaser = session?.drivers.find(d => d.name === 'Chaser');
+
+      // Leader checks
+      expect(leader?.laps[0].elapsedSeconds).toBe(122.0);
+      expect(leader?.laps[0].elapsedTimeString).toBe('2:02.0');
+      expect(leader?.laps[0].gapToLeaderString).toBe('LEADER');
+      expect(leader?.laps[1].gapToLeaderString).toBe('LEADER');
+
+      // Chaser checks
+      expect(chaser?.laps[0].elapsedSeconds).toBe(123.5);
+      expect(chaser?.laps[0].gapToLeader).toBe(1.5);
+      expect(chaser?.laps[0].gapToLeaderString).toBe('+1.500s');
+
+      // Pit Stop duration check
+      expect(chaser?.laps[1].isPitStop).toBe(true);
+      expect(chaser?.laps[1].pitStopDuration).toBeGreaterThan(0);
+      expect(chaser?.laps[1].pitStopDurationString).toMatch(/\+\d+(\.\d+)?s/);
+    });
+
+    it('derives lap time from et delta when lap body text has no sectors or is missing', () => {
+      const xmlWithoutSectors = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Monza</TrackVenue>
+    <Practice1>
+      <Driver>
+        <Name>Outlap Driver</Name>
+        <isPlayer>1</isPlayer>
+        <Lap num="1" p="1" et="130.500"></Lap>
+        <Lap num="2" p="1" et="240.200"></Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithoutSectors);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('no_sectors_test.xml');
+      expect(session).not.toBeNull();
+      const laps = session?.drivers[0].laps || [];
+      expect(laps[0].lapTime).toBe(130.5);
+      expect(laps[0].isValid).toBe(true);
+      expect(laps[1].lapTime).toBe(109.7);
+      expect(laps[1].isValid).toBe(true);
+      expect(laps[1].elapsedTimeString).toBe('4:00.2');
+    });
+  });
+
   describe('getDisplayTrackName', () => {
     it('computes clean track names directly in parser', () => {
       expect(getDisplayTrackName('Spa-Francorchamps', 'GP')).toBe('Spa-Francorchamps');

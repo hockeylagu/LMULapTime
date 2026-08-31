@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types.js';
+import { PaceCategory, ReferenceLaptimeEntry, TireWear } from '../../server/types.js';
 import { formatTime } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 
@@ -24,6 +24,19 @@ export interface ComparableLap {
   topSpeed: number | null;
   fCompound?: string;
   rCompound?: string;
+  flCompound?: string;
+  frCompound?: string;
+  rlCompound?: string;
+  rrCompound?: string;
+  tireWear?: TireWear;
+  fuel?: number | null;
+  fuelUsed?: number | null;
+  virtualEnergy?: number | null;
+  virtualEnergyUsed?: number | null;
+  elapsedSeconds?: number | null;
+  elapsedTimeString?: string;
+  pitStopDurationString?: string;
+  gapToLeaderString?: string;
   isPitStop?: boolean;
   isValid: boolean;
   paceCategory?: PaceCategory | null;

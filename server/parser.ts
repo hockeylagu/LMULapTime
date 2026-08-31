@@ -7,11 +7,14 @@ import {
   LapData,
   SessionMetadata,
   SessionProgressionPoint,
+  SessionSettings,
   SessionWeather,
+  TireWear,
   TrackSummary,
 } from './types.js';
 import {
   formatTime,
+  formatElapsedSeconds,
   parseTimeStringToSeconds,
   getDisplayTrackName,
   computeTheoreticalBest,
@@ -200,6 +203,32 @@ export class LmuParser {
         }
       });
 
+      // Compute Gap to Leader across drivers per lap
+      const leaderLapEtMap = new Map<number, number>();
+      drivers.forEach(d => {
+        d.laps.forEach(l => {
+          if (l.elapsedSeconds !== null && l.elapsedSeconds !== undefined && l.elapsedSeconds > 0) {
+            const currentMin = leaderLapEtMap.get(l.lapNum);
+            if (currentMin === undefined || l.elapsedSeconds < currentMin) {
+              leaderLapEtMap.set(l.lapNum, l.elapsedSeconds);
+            }
+          }
+        });
+      });
+
+      drivers.forEach(d => {
+        d.laps.forEach(l => {
+          if (l.elapsedSeconds !== null && l.elapsedSeconds !== undefined && l.elapsedSeconds > 0) {
+            const leaderEt = leaderLapEtMap.get(l.lapNum);
+            if (leaderEt !== undefined) {
+              const gap = parseFloat((l.elapsedSeconds - leaderEt).toFixed(3));
+              l.gapToLeader = gap;
+              l.gapToLeaderString = gap <= 0.001 ? 'LEADER' : `+${gap.toFixed(3)}s`;
+            }
+          }
+        });
+      });
+
       // Identify Player driver dynamically
       const targetName = this.configuredPlayerName.toLowerCase().trim();
       let mainPlayerDriver = targetName
@@ -240,6 +269,50 @@ export class LmuParser {
       const xmlFileMtime = fs.statSync(filePath).mtime.getTime();
       const matchingReplay = this.findMatchingReplay(trackVenue, sessionName, timestamp, xmlFileMtime);
 
+      // Parse Session Settings & Server Rules
+      const parseNum = (val: any): number | undefined => {
+        if (val === undefined || val === null || val === '') return undefined;
+        const n = parseFloat(val);
+        return isNaN(n) ? undefined : n;
+      };
+
+      const parseBool = (val: any): boolean | undefined => {
+        if (val === undefined || val === null || val === '') return undefined;
+        return val === '1' || val === 1 || val === true || val === 'true';
+      };
+
+      const modeSetting = raceResults.Setting ? String(raceResults.Setting) : undefined;
+      const serverName = raceResults.ServerName ? String(raceResults.ServerName) : undefined;
+      const damageMultiplier = parseNum(raceResults.DamageMult);
+      const fuelMultiplier = parseNum(raceResults.FuelMult);
+      const tireMultiplier = parseNum(raceResults.TireMult);
+      const tireWarmers = parseBool(raceResults.TireWarmers);
+      const fixedSetups = parseBool(raceResults.FixedSetups);
+      const fixedUpgrades = parseBool(raceResults.FixedUpgrades);
+      const parcFerme = parseNum(raceResults.ParcFerme);
+      const mechFailRate = parseNum(raceResults.MechFailRate);
+      const durationMinutes = parseNum(sessionDataNode?.Minutes || raceResults.RaceTime);
+      const raceLaps = parseNum(raceResults.RaceLaps);
+      const raceTimeMinutes = parseNum(raceResults.RaceTime);
+      const vehiclesAllowed = raceResults.VehiclesAllowed ? String(raceResults.VehiclesAllowed) : undefined;
+
+      const settings: SessionSettings = {
+        modeSetting,
+        serverName,
+        damageMultiplier,
+        fuelMultiplier,
+        tireMultiplier,
+        tireWarmers,
+        fixedSetups,
+        fixedUpgrades,
+        parcFerme,
+        mechFailRate,
+        durationMinutes,
+        raceLaps,
+        raceTimeMinutes,
+        vehiclesAllowed,
+      };
+
       const id = filename.replace(/\.xml$/i, '');
 
       return {
@@ -256,6 +329,7 @@ export class LmuParser {
         sessionName,
         weather,
         weatherInfo: weather.weatherString,
+        settings,
         gameVersion: raceResults.GameVersion || '',
         driversCount: drivers.length,
         drivers,
@@ -317,6 +391,24 @@ export class LmuParser {
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
     const laps: LapData[] = lapsList.map((l: any, idx: number) => this.parseLap(l, idx + 1));
 
+    // If lapTime is missing but elapsedSeconds is present, compute lap duration from delta
+    laps.forEach((lap, idx) => {
+      if (lap.lapTime === null && lap.elapsedSeconds !== null && lap.elapsedSeconds !== undefined) {
+        if (idx === 0 && lap.elapsedSeconds > 0) {
+          lap.lapTime = parseFloat(lap.elapsedSeconds.toFixed(3));
+          lap.lapTimeString = formatTime(lap.lapTime);
+          lap.isValid = true;
+        } else if (idx > 0) {
+          const prev = laps[idx - 1];
+          if (prev && prev.elapsedSeconds !== null && prev.elapsedSeconds !== undefined && lap.elapsedSeconds > prev.elapsedSeconds) {
+            lap.lapTime = parseFloat((lap.elapsedSeconds - prev.elapsedSeconds).toFixed(3));
+            lap.lapTimeString = formatTime(lap.lapTime);
+            lap.isValid = true;
+          }
+        }
+      }
+    });
+
     // Best Laps & Sectors
     let bestLapTime: number | null = parseTimeStringToSeconds(d.BestLapTime);
     let bestS1: number | null = null;
@@ -336,6 +428,35 @@ export class LmuParser {
     const avgLapTime = computeAverageLapTime(laps);
     const top3LapsCount = laps.filter(l => l.isValid && l.position > 0 && l.position <= 3).length;
 
+    // Calculate pit stop loss relative to driver's clean reference lap time
+    const refLapTime = avgLapTime || bestLapTime;
+    laps.forEach(lap => {
+      if (lap.isPitStop && lap.lapTime && refLapTime && lap.lapTime > refLapTime) {
+        const pitLoss = parseFloat((lap.lapTime - refLapTime).toFixed(1));
+        if (pitLoss > 0) {
+          lap.pitStopDuration = pitLoss;
+          lap.pitStopDurationString = `+${pitLoss}s`;
+        }
+      }
+    });
+
+    // Compute Fuel & VE Averages across valid flying laps (exclude pit laps and negative/anomalous fuel values)
+    const validFuelLaps = laps.filter(l => l.isValid && !l.isPitStop && l.fuelUsed !== null && l.fuelUsed !== undefined && l.fuelUsed > 0 && l.fuelUsed < 25);
+    const avgFuelPerLap = validFuelLaps.length > 0
+      ? parseFloat((validFuelLaps.reduce((acc, l) => acc + (l.fuelUsed || 0), 0) / validFuelLaps.length).toFixed(2))
+      : null;
+    const estFuelStintLaps = avgFuelPerLap && avgFuelPerLap > 0
+      ? Math.floor(100 / avgFuelPerLap)
+      : null;
+
+    const validVeLaps = laps.filter(l => l.isValid && !l.isPitStop && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
+    const avgVePerLap = validVeLaps.length > 0
+      ? parseFloat((validVeLaps.reduce((acc, l) => acc + (l.virtualEnergyUsed || 0), 0) / validVeLaps.length).toFixed(2))
+      : null;
+    const estVeStintLaps = avgVePerLap && avgVePerLap > 0
+      ? Math.floor(100 / avgVePerLap)
+      : null;
+
     return {
       name,
       carType,
@@ -352,8 +473,14 @@ export class LmuParser {
       bestS3,
       theoreticalBest,
       theoreticalBestString: formatTime(theoreticalBest),
+      bestLapPaceCategory: undefined,
+      bestLapPacePercentage: undefined,
       avgLapTime,
       avgLapTimeString: formatTime(avgLapTime),
+      avgFuelPerLap,
+      estFuelStintLaps,
+      avgVePerLap,
+      estVeStintLaps,
       top3LapsCount,
       lapsCount: laps.length,
       laps,
@@ -371,9 +498,69 @@ export class LmuParser {
     const s2 = parseTimeStringToSeconds(l['@_s2']);
     const s3 = parseTimeStringToSeconds(l['@_s3']);
     const topSpeed = parseFloat(l['@_topspeed']) || null;
-    const fCompound = l['@_fcompound'] ? String(l['@_fcompound']).split(',').pop() || String(l['@_fcompound']) : '';
-    const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop() || String(l['@_rcompound']) : '';
+    const fCompound = l['@_fcompound'] ? String(l['@_fcompound']).split(',').pop()?.trim() || String(l['@_fcompound']) : '';
+    const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop()?.trim() || String(l['@_rcompound']) : '';
     const isPitStop = l['@_pit'] === '1' || l['@_pit'] === 1 || l['@_et'] === '--.---';
+
+    const rawEt = l['@_et'];
+    const elapsedSeconds = rawEt !== undefined && rawEt !== null && rawEt !== '--.---' && rawEt !== '' && !isNaN(parseFloat(rawEt))
+      ? parseFloat(parseFloat(rawEt).toFixed(3))
+      : null;
+    const elapsedTimeString = elapsedSeconds !== null && elapsedSeconds >= 0
+      ? formatElapsedSeconds(elapsedSeconds)
+      : undefined;
+
+    const cleanCompound = (val?: any): string | undefined => {
+      if (!val) return undefined;
+      const str = String(val).split(',').pop()?.trim();
+      return str || undefined;
+    };
+
+    const flCompound = cleanCompound(l['@_FL'] || l['@_fl']);
+    const frCompound = cleanCompound(l['@_FR'] || l['@_fr']);
+    const rlCompound = cleanCompound(l['@_RL'] || l['@_rl']);
+    const rrCompound = cleanCompound(l['@_RR'] || l['@_rr']);
+
+    const parsePercentVal = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const parsed = parseFloat(val);
+      if (isNaN(parsed)) return null;
+      // If LMU outputs fraction e.g. 0.957 -> convert to 95.7%
+      const pct = parsed <= 1.0 && parsed >= 0 ? parsed * 100 : parsed;
+      return parseFloat(pct.toFixed(1));
+    };
+
+    const fl = parsePercentVal(l['@_twfl']);
+    const fr = parsePercentVal(l['@_twfr']);
+    const rl = parsePercentVal(l['@_twrl']);
+    const rr = parsePercentVal(l['@_twrr']);
+
+    let tireWear: TireWear | undefined = undefined;
+    if (fl !== null || fr !== null || rl !== null || rr !== null) {
+      const validWearVals = [fl, fr, rl, rr].filter((v): v is number => v !== null);
+      const avg = validWearVals.length > 0
+        ? parseFloat((validWearVals.reduce((a, b) => a + b, 0) / validWearVals.length).toFixed(1))
+        : 100;
+      tireWear = {
+        fl: fl ?? avg,
+        fr: fr ?? avg,
+        rl: rl ?? avg,
+        rr: rr ?? avg,
+        avg,
+      };
+    }
+
+    const fuel = parsePercentVal(l['@_fuel']);
+    const rawFuelUsed = l['@_fuelUsed'] !== undefined
+      ? parseFloat(l['@_fuelUsed'])
+      : l['@_fuelused'] !== undefined
+      ? parseFloat(l['@_fuelused'])
+      : null;
+    const fuelUsed = rawFuelUsed !== null && !isNaN(rawFuelUsed) ? parsePercentVal(rawFuelUsed) : null;
+
+    const virtualEnergy = parsePercentVal(l['@_ve'] ?? l['@_VE']);
+    const rawVeUsed = l['@_veUsed'] ?? l['@_veused'] ?? l['@_VEUsed'];
+    const virtualEnergyUsed = rawVeUsed !== undefined ? parsePercentVal(rawVeUsed) : null;
 
     const isValid = lapTime !== null && lapTime > 0;
 
@@ -388,6 +575,17 @@ export class LmuParser {
       topSpeed,
       fCompound,
       rCompound,
+      flCompound,
+      frCompound,
+      rlCompound,
+      rrCompound,
+      tireWear,
+      fuel,
+      fuelUsed,
+      virtualEnergy,
+      virtualEnergyUsed,
+      elapsedSeconds,
+      elapsedTimeString,
       isPitStop,
       isValid,
     };
@@ -611,6 +809,19 @@ export function extractComparableLaps(
           topSpeed: l.topSpeed,
           fCompound: l.fCompound,
           rCompound: l.rCompound,
+          flCompound: l.flCompound,
+          frCompound: l.frCompound,
+          rlCompound: l.rlCompound,
+          rrCompound: l.rrCompound,
+          tireWear: l.tireWear,
+          fuel: l.fuel,
+          fuelUsed: l.fuelUsed,
+          virtualEnergy: l.virtualEnergy,
+          virtualEnergyUsed: l.virtualEnergyUsed,
+          elapsedSeconds: l.elapsedSeconds,
+          elapsedTimeString: l.elapsedTimeString,
+          pitStopDurationString: l.pitStopDurationString,
+          gapToLeaderString: l.gapToLeaderString,
           isPitStop: l.isPitStop,
           isValid: l.isValid,
           paceCategory: l.paceCategory || null,

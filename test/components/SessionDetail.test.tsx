@@ -21,6 +21,15 @@ describe('SessionDetail component', () => {
     isNight: false,
     isWet: false,
     driversCount: 2,
+    settings: {
+      modeSetting: 'Race Weekend',
+      damageMultiplier: 50,
+      fuelMultiplier: 1,
+      tireMultiplier: 1,
+      tireWarmers: true,
+      fixedSetups: false,
+      durationMinutes: 60,
+    },
     matchingReplayFile: {
       name: 'spa_replay.vcr',
       path: 'C:\\LMU\\UserData\\Replays\\spa_replay.vcr',
@@ -45,6 +54,10 @@ describe('SessionDetail component', () => {
       theoreticalBestString: '2:02.000',
       bestLapPaceCategory: 'Alien' as const,
       bestLapPacePercentage: 100.1,
+      avgFuelPerLap: 2.5,
+      estFuelStintLaps: 40,
+      avgVePerLap: 3.8,
+      estVeStintLaps: 26,
       lapsCount: 3,
       laps: [
         {
@@ -58,6 +71,13 @@ describe('SessionDetail component', () => {
           topSpeed: 320.0,
           fCompound: 'Hard',
           rCompound: 'Hard',
+          tireWear: { fl: 98.0, fr: 98.0, rl: 97.5, rr: 97.5, avg: 97.8 },
+          fuel: 97.5,
+          fuelUsed: 2.5,
+          virtualEnergy: 96.2,
+          virtualEnergyUsed: 3.8,
+          elapsedSeconds: 123.0,
+          elapsedTimeString: '2:03.0',
           isPitStop: false,
           isValid: true,
           paceCategory: 'Good' as const,
@@ -74,6 +94,13 @@ describe('SessionDetail component', () => {
           topSpeed: 322.0,
           fCompound: 'Hard',
           rCompound: 'Hard',
+          tireWear: { fl: 95.0, fr: 94.5, rl: 94.0, rr: 94.0, avg: 94.4 },
+          fuel: 95.0,
+          fuelUsed: 2.5,
+          virtualEnergy: 92.4,
+          virtualEnergyUsed: 3.8,
+          elapsedSeconds: 245.0,
+          elapsedTimeString: '4:05.0',
           isPitStop: false,
           isValid: true,
           paceCategory: 'Competitive' as const,
@@ -90,6 +117,15 @@ describe('SessionDetail component', () => {
           topSpeed: 290.0,
           fCompound: 'Hard',
           rCompound: 'Hard',
+          tireWear: { fl: 92.0, fr: 91.0, rl: 90.5, rr: 90.5, avg: 91.0 },
+          fuel: 92.5,
+          fuelUsed: 2.5,
+          virtualEnergy: 88.6,
+          virtualEnergyUsed: 3.8,
+          elapsedSeconds: 380.0,
+          elapsedTimeString: '6:20.0',
+          pitStopDuration: 13.0,
+          pitStopDurationString: '+13.0s',
           isPitStop: true,
           isValid: false,
           paceCategory: 'Offline' as const,
@@ -114,6 +150,10 @@ describe('SessionDetail component', () => {
         bestS3: 46.0,
         theoreticalBest: 122.0,
         theoreticalBestString: '2:02.000',
+        avgFuelPerLap: 2.5,
+        estFuelStintLaps: 40,
+        avgVePerLap: 3.8,
+        estVeStintLaps: 26,
         lapsCount: 3,
         laps: [
           {
@@ -127,6 +167,13 @@ describe('SessionDetail component', () => {
             topSpeed: 320.0,
             fCompound: 'Hard',
             rCompound: 'Hard',
+            tireWear: { fl: 98.0, fr: 98.0, rl: 97.5, rr: 97.5, avg: 97.8 },
+            fuel: 97.5,
+            fuelUsed: 2.5,
+            virtualEnergy: 96.2,
+            virtualEnergyUsed: 3.8,
+            elapsedSeconds: 123.0,
+            elapsedTimeString: '2:03.0',
             isPitStop: false,
             isValid: true,
             paceCategory: 'Good' as const,
@@ -143,6 +190,13 @@ describe('SessionDetail component', () => {
             topSpeed: 322.0,
             fCompound: 'Hard',
             rCompound: 'Hard',
+            tireWear: { fl: 95.0, fr: 94.5, rl: 94.0, rr: 94.0, avg: 94.4 },
+            fuel: 95.0,
+            fuelUsed: 2.5,
+            virtualEnergy: 92.4,
+            virtualEnergyUsed: 3.8,
+            elapsedSeconds: 245.0,
+            elapsedTimeString: '4:05.0',
             isPitStop: false,
             isValid: true,
             paceCategory: 'Competitive' as const,
@@ -159,6 +213,15 @@ describe('SessionDetail component', () => {
             topSpeed: 290.0,
             fCompound: 'Hard',
             rCompound: 'Hard',
+            tireWear: { fl: 92.0, fr: 91.0, rl: 90.5, rr: 90.5, avg: 91.0 },
+            fuel: 92.5,
+            fuelUsed: 2.5,
+            virtualEnergy: 88.6,
+            virtualEnergyUsed: 3.8,
+            elapsedSeconds: 380.0,
+            elapsedTimeString: '6:20.0',
+            pitStopDuration: 13.0,
+            pitStopDurationString: '+13.0s',
             isPitStop: true,
             isValid: false,
             paceCategory: 'Offline' as const,
@@ -315,5 +378,145 @@ describe('SessionDetail component', () => {
     fireEvent.click(openStudioBtn);
     expect(window.location.hash).toContain('compare');
     expect(window.location.hash).toContain('sessionId=sess123');
+  });
+
+  it('switches to Tire Wear chart metric and displays tire wear in table', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry/i)).toBeInTheDocument();
+    });
+
+    // Check that Tire Wear column is rendered in the table
+    expect(screen.getByRole('columnheader', { name: /Tire Wear/i })).toBeInTheDocument();
+    expect(screen.getByText('97.8%')).toBeInTheDocument();
+    expect(screen.getByText('94.4%')).toBeInTheDocument();
+
+    // Click Tire Wear metric toggle
+    const tireWearToggle = screen.getByRole('button', { name: /Tire Wear/i });
+    fireEvent.click(tireWearToggle);
+
+    expect(screen.getByText(/Tire Wear & Degradation Telemetry/i)).toBeInTheDocument();
+  });
+
+  it('renders session rules & server configuration badges', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Rules & Config:/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Race Weekend/i)).toBeInTheDocument();
+    expect(screen.getByText(/50%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Warm Tires/i)).toBeInTheDocument();
+    expect(screen.getByText(/Open Setup/i)).toBeInTheDocument();
+    expect(screen.getByText(/60 min/i)).toBeInTheDocument();
+  });
+
+  it('switches to Fuel & Energy chart metric and displays stint strategy banner', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Avg Fuel Usage/i)).toBeInTheDocument();
+    });
+
+    // Check stint strategy summary
+    expect(screen.getAllByText(/2.5%/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/~40/i)).toBeInTheDocument();
+    expect(screen.getByText(/Avg Virtual Energy/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/3.8%/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/~26/i)).toBeInTheDocument();
+
+    // Check table column
+    expect(screen.getByRole('columnheader', { name: /Fuel & VE/i })).toBeInTheDocument();
+
+    // Click Fuel & Energy toggle
+    const fuelToggle = screen.getByRole('button', { name: /Fuel & Energy/i });
+    fireEvent.click(fuelToggle);
+
+    expect(screen.getByText(/Fuel Consumption & Virtual Energy Telemetry/i)).toBeInTheDocument();
+  });
+
+  it('renders elapsed session finish times and pit stop duration tooltips in lap table', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry/i)).toBeInTheDocument();
+    });
+
+    // Check elapsed finish tooltip on lap cell
+    expect(screen.getByTitle('Session Time: 2:03.0')).toBeInTheDocument();
+
+    // Check pit stop badge tooltip
+    expect(screen.getByTitle('Estimated pit loss: +13.0s')).toBeInTheDocument();
+  });
+
+  it('disables chart buttons and hides table columns when tire wear and fuel data are missing', async () => {
+    const driverWithoutData = {
+      ...mockDetailedSession.drivers[0],
+      avgFuelPerLap: null,
+      estFuelStintLaps: null,
+      avgVePerLap: null,
+      estVeStintLaps: null,
+      laps: [
+        {
+          lapNum: 1,
+          position: 1,
+          lapTime: 122.0,
+          lapTimeString: '2:02.000',
+          s1: 34.0,
+          s2: 42.0,
+          s3: 46.0,
+          topSpeed: 322.0,
+          fCompound: 'Hard',
+          rCompound: 'Hard',
+          tireWear: undefined,
+          fuel: null,
+          fuelUsed: null,
+          virtualEnergy: null,
+          virtualEnergyUsed: null,
+          isPitStop: false,
+          isValid: true,
+        },
+      ],
+    };
+
+    const sessionWithoutData = {
+      ...mockDetailedSession,
+      playerDriver: driverWithoutData,
+      drivers: [driverWithoutData],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/sess123')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(sessionWithoutData),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry/i)).toBeInTheDocument();
+    });
+
+    // Stint strategy card should NOT be rendered
+    expect(screen.queryByText(/Avg Fuel Usage/i)).not.toBeInTheDocument();
+
+    // Chart buttons for Tire Wear and Fuel & Energy should be disabled
+    const tireWearBtn = screen.getByRole('button', { name: /Tire Wear/i });
+    const fuelBtn = screen.getByRole('button', { name: /Fuel & Energy/i });
+    expect(tireWearBtn).toBeDisabled();
+    expect(fuelBtn).toBeDisabled();
+
+    // Columns should NOT be rendered in table
+    expect(screen.queryByRole('columnheader', { name: /Tire Wear/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Fuel & VE/i })).not.toBeInTheDocument();
   });
 });
