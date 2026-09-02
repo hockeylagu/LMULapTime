@@ -7,7 +7,7 @@ import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
 import { SessionList } from './SessionList.js';
 
-export type TrackDetailSortOption = 'date-desc' | 'date-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
+export type TrackDetailSortOption = 'date-desc' | 'date-asc' | 'pos-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
 
 interface SessionMeta {
   id: string;
@@ -218,15 +218,24 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
           avgLapTime: p?.avgLapTime ?? null,
           matchingReplayFile: s.matchingReplayFile?.name,
         };
-      }).sort((a, b) => a.timestamp - b.timestamp)
+      }).sort((a, b) => {
+        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+        return (a.dateString || '').localeCompare(b.dateString || '');
+      })
     : (sessions.length === 0 ? progression : []);
 
-  // Sorted sessions by Date / Benchmark Pace % / Best Lap Time
+  // Sorted sessions by Date / Best Position / Benchmark Pace % / Best Lap Time
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
       const timeA = parseDateStringToTimestamp(a.timeString);
       const timeB = parseDateStringToTimestamp(b.timeString);
       return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
+    }
+    if (sortBy === 'pos-asc') {
+      const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
+      const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
+      if (posA !== posB) return posA - posB;
+      return parseDateStringToTimestamp(b.timeString) - parseDateStringToTimestamp(a.timeString);
     }
     if (sortBy === 'lap-asc') {
       const lapA = a.playerDriver?.bestLapTime ?? 99999;
@@ -576,6 +585,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
                 >
                   <option value="date-desc" className="bg-lmu-card text-white">Date (Newest First)</option>
                   <option value="date-asc" className="bg-lmu-card text-white">Date (Oldest First)</option>
+                  <option value="pos-asc" className="bg-lmu-card text-white">Best Position (P1 First)</option>
                   <option value="pace-asc" className="bg-lmu-card text-white">Benchmark (Best Pace %)</option>
                   <option value="pace-desc" className="bg-lmu-card text-white">Benchmark (Slowest Pace %)</option>
                   <option value="lap-asc" className="bg-lmu-card text-white">Best Lap Time (Fastest)</option>

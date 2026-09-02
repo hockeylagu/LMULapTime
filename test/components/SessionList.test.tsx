@@ -24,6 +24,9 @@ describe('SessionList component', () => {
         bestLapPaceCategory: 'Alien',
         bestLapPacePercentage: 100.2,
         lapsCount: 15,
+        position: 2,
+        gridPosition: 5,
+        positionGain: 3,
       },
     },
     {
@@ -44,6 +47,7 @@ describe('SessionList component', () => {
         bestLapPaceCategory: 'Competitive',
         bestLapPacePercentage: 101.4,
         lapsCount: 8,
+        position: 3,
       },
     },
     {
@@ -79,6 +83,12 @@ describe('SessionList component', () => {
     expect(screen.getByText('2:02.345')).toBeInTheDocument();
     expect(screen.getByText('Alien')).toBeInTheDocument();
     expect(screen.getByText('Empty')).toBeInTheDocument();
+
+    // Check race finish badge and quali badge
+    expect(screen.getByText(/Finish:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Qual:/i)).toBeInTheDocument();
+    expect(screen.getByText('P2')).toBeInTheDocument();
+    expect(screen.getByText('P3')).toBeInTheDocument();
 
     const card = screen.getByText('Spa-Francorchamps').closest('div.glass-panel');
     expect(card).not.toBeNull();

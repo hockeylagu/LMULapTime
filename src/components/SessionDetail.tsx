@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Video, Download, Zap, ShieldCheck, AlertTriangle, TrendingUp, Clock, Gauge, Disc, Sliders, Fuel, ChevronRight, ArrowLeftRight, Scale } from 'lucide-react';
+import {
+  ArrowLeft,
+  Video,
+  Download,
+  Zap,
+  ShieldCheck,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  Gauge,
+  Disc,
+  Sliders,
+  Fuel,
+  ChevronRight,
+  ArrowLeftRight,
+  Scale,
+  Trophy,
+  ArrowUpDown,
+  Flag,
+} from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -14,6 +34,23 @@ import { DetailedSession, SessionProgressionPoint } from '../../server/types.js'
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, findReferenceEntry, matchesTrack } from '../utils/paceCategory.js';
 
+const OPPONENT_COLORS = [
+  '#38BDF8', // sky
+  '#34D399', // emerald
+  '#A78BFA', // purple
+  '#F472B6', // pink
+  '#FB923C', // orange
+  '#E2E8F0', // slate
+  '#4ADE80', // green
+  '#2DD4BF', // teal
+  '#818CF8', // indigo
+  '#C084FC', // fuchsia
+  '#F87171', // red
+  '#94A3B8', // cool gray
+];
+
+const PLAYER_HIGHLIGHT_COLOR = '#FBBF24'; // Vibrant Gold Accent
+
 interface SessionDetailProps {
   sessionId: string;
   onBack: () => void;
@@ -26,7 +63,17 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
-  const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy'>('lapTime');
+  const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
+  const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+
+  const handleLegendClick = (e: any) => {
+    if (!e || !e.dataKey) return;
+    const key = String(e.dataKey);
+    setHiddenSeries(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -90,6 +137,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
   const hasFuelData = (selectedDriver?.laps?.some(
     l => (l.fuel !== null && l.fuel !== undefined) || (l.virtualEnergy !== null && l.virtualEnergy !== undefined)
   ) || (selectedDriver?.avgFuelPerLap !== null && selectedDriver?.avgFuelPerLap !== undefined) || hasVirtualEnergyData) ?? false;
+
+  const uniqueClasses = new Set(
+    (session.drivers || [])
+      .map(d => (d.carClass || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const isMultiClass = uniqueClasses.size > 1;
 
   const activeChartMetric = (chartMetric === 'tireWear' && !hasTireWearData) || (chartMetric === 'fuelEnergy' && !hasFuelData)
     ? 'lapTime'
@@ -410,75 +464,382 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         )}
       </div>
 
-      {/* Selected Driver Summary Cards */}
-      {selectedDriver && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="glass-panel p-4 rounded-xl relative overflow-hidden">
-            <p className={`text-xs uppercase font-semibold ${isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold flex items-center gap-1' : 'text-lmu-muted'}`}>
-              {isCurrentSessionAllTimePB ? `⭐ Personal Best (${selectedDriver.carClass || 'Class'})` : 'Session Best Lap'}
-            </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <h4 className={`text-2xl font-extrabold font-mono ${isCurrentSessionAllTimePB ? 'text-lmu-gold' : 'text-white'}`}>
-                {selectedDriver.bestLapTimeString}
-              </h4>
-            </div>
-            {selectedDriver.bestLapPaceCategory && (
-              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).badgeClass}`}>
-                  <span>{getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).emoji}</span>
-                  <span>{selectedDriver.bestLapPaceCategory}</span>
-                  <span className="opacity-80 text-[10px]">({formatPacePercentage(selectedDriver.bestLapPacePercentage)})</span>
+      {/* Unified Driver Performance & Race Standings Overview Panel */}
+      {selectedDriver && (() => {
+        const isRaceSession = session.sessionType === 'Race' || selectedDriver.gridPosition !== null || selectedDriver.positionGain !== null;
+
+        const completedLaps = (selectedDriver?.laps || []).filter(
+          l => l.lapTime !== null && l.lapTime > 0
+        );
+        const hasMultipleLaps = completedLaps.length > 1;
+
+        const validFlyingLaps = completedLaps.filter(
+          l => l.isValid && (!hasMultipleLaps || l.lapNum > 1)
+        );
+        const cleanLapsForAvg = validFlyingLaps.length > 0
+          ? validFlyingLaps
+          : completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1).length > 0
+          ? completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1)
+          : completedLaps;
+
+        const avgLapTime = cleanLapsForAvg.length > 0
+          ? cleanLapsForAvg.reduce((sum, l) => sum + (l.lapTime || 0), 0) / cleanLapsForAvg.length
+          : null;
+
+        const deltaToBest = (avgLapTime !== null && selectedDriver.bestLapTime)
+          ? avgLapTime - selectedDriver.bestLapTime
+          : null;
+
+        const lapStdDev = (avgLapTime !== null && cleanLapsForAvg.length > 1)
+          ? Math.sqrt(
+              cleanLapsForAvg.reduce((sum, l) => sum + Math.pow((l.lapTime || 0) - avgLapTime, 2), 0) /
+                cleanLapsForAvg.length
+            )
+          : null;
+
+        const consistencyScore = (avgLapTime !== null && lapStdDev !== null && avgLapTime > 0)
+          ? Math.max(0, Math.min(100, (1 - (lapStdDev / avgLapTime)) * 100))
+          : null;
+
+        const s1Laps = (selectedDriver?.laps || []).filter(
+          l => l.s1 !== null && l.s1 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS1 = s1Laps.length > 0
+          ? s1Laps.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1Laps.length
+          : null;
+
+        const s2Laps = (selectedDriver?.laps || []).filter(
+          l => l.s2 !== null && l.s2 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS2 = s2Laps.length > 0
+          ? s2Laps.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2Laps.length
+          : null;
+
+        const s3Laps = (selectedDriver?.laps || []).filter(
+          l => l.s3 !== null && l.s3 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS3 = s3Laps.length > 0
+          ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length
+          : null;
+
+        return (
+          <div className="glass-panel p-4 rounded-xl border border-lmu-border/70 space-y-3">
+            {/* Header: Title / Car Info / Finish Status */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-lmu-border/50 pb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  {isRaceSession ? (
+                    <Trophy className="w-4 h-4 text-lmu-gold" />
+                  ) : (
+                    <Gauge className="w-4 h-4 text-lmu-cyan" />
+                  )}
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    {isRaceSession ? 'Race Standings & Position Deltas' : 'Driver Performance & Session Overview'}
+                  </h3>
+                </div>
+                <span className="text-xs text-lmu-muted hidden sm:inline">•</span>
+                <span className="text-xs text-slate-200 font-semibold truncate max-w-xs" title={selectedDriver.carType}>
+                  {selectedDriver.carType} <span className="text-lmu-muted font-normal">({selectedDriver.carClass || 'Class'} • #{selectedDriver.carNumber})</span>
                 </span>
-                {!isCurrentSessionAllTimePB && allTimeCategoryTrackPB && (
-                  <span className="text-[11px] text-lmu-muted" title={`Driver's all-time personal best for this track in ${selectedDriver.carClass || 'this class'}`}>
-                    Class PB: <strong className="text-lmu-gold font-mono">{formatTime(allTimeCategoryTrackPB)}</strong>
-                  </span>
-                )}
+              </div>
+
+              {isRaceSession && selectedDriver.finishStatus && (
+                <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                  selectedDriver.finishStatus.toLowerCase().includes('dnf')
+                    ? 'bg-rose-950/60 text-rose-300 border border-rose-500/40'
+                    : selectedDriver.classPosition === 1 || selectedDriver.position === 1
+                    ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
+                    : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  🏁 {selectedDriver.finishStatus}
+                </span>
+              )}
+            </div>
+
+            {/* Race Standings Sub-Grid (when Race session) */}
+            {isRaceSession && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Starting Grid</p>
+                  <p className="text-base font-mono font-extrabold text-white mt-0.5">
+                    {selectedDriver.gridPosition ? `P${selectedDriver.gridPosition}` : '-'}
+                    {isMultiClass && selectedDriver.classGridPosition ? (
+                      <span className="text-[11px] font-normal text-lmu-cyan ml-1">
+                        (Class P{selectedDriver.classGridPosition})
+                      </span>
+                    ) : null}
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Finish Position</p>
+                  <p className={`text-base font-mono font-extrabold mt-0.5 ${
+                    selectedDriver.classPosition === 1 || selectedDriver.position === 1 ? 'text-lmu-gold' : 'text-white'
+                  }`}>
+                    {selectedDriver.position ? `P${selectedDriver.position}` : '-'}
+                    {isMultiClass && selectedDriver.classPosition > 0 && (
+                      <span className="text-[11px] font-normal text-lmu-cyan ml-1">
+                        (Class P{selectedDriver.classPosition})
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Position Delta</p>
+                  <p className={`text-base font-mono font-extrabold mt-0.5 flex items-center justify-center gap-1 ${
+                    (selectedDriver.positionGain ?? 0) > 0
+                      ? 'text-lmu-green'
+                      : (selectedDriver.positionGain ?? 0) < 0
+                      ? 'text-rose-400'
+                      : 'text-white'
+                  }`}>
+                    {(selectedDriver.positionGain ?? 0) > 0 && <TrendingUp className="w-3.5 h-3.5" />}
+                    {(selectedDriver.positionGain ?? 0) < 0 && <TrendingDown className="w-3.5 h-3.5" />}
+                    <span>
+                      {selectedDriver.positionGain !== null && selectedDriver.positionGain !== undefined
+                        ? `${selectedDriver.positionGain > 0 ? '+' : ''}${selectedDriver.positionGain}`
+                        : '-'}
+                    </span>
+                    <span className="text-[10px] font-normal text-lmu-muted">
+                      {(selectedDriver.positionGain ?? 0) > 0 ? 'Gained' : (selectedDriver.positionGain ?? 0) < 0 ? 'Lost' : 'Net'}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Laps Led (P1)</p>
+                  <p className="text-base font-mono font-extrabold text-lmu-gold mt-0.5">
+                    {selectedDriver.lapsLedCount ?? 0}
+                    <span className="text-[10px] font-normal text-lmu-muted ml-1">laps</span>
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Peak Position</p>
+                  <p className="text-base font-mono font-extrabold text-lmu-cyan mt-0.5">
+                    {selectedDriver.highestPosition ? `P${selectedDriver.highestPosition}` : '-'}
+                  </p>
+                </div>
+
+                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Pit Stops</p>
+                  <p className="text-base font-mono font-extrabold text-amber-300 mt-0.5">
+                    {selectedDriver.pitStopsCount ?? 0}
+                    <span className="text-[10px] font-normal text-lmu-muted ml-1">stops</span>
+                  </p>
+                </div>
               </div>
             )}
-          </div>
 
-          <div className="glass-panel p-4 rounded-xl">
-            <p className="text-xs text-lmu-muted uppercase font-semibold">Theoretical Best</p>
-            <h4 className="text-2xl font-extrabold text-lmu-green font-mono mt-1">
-              {selectedDriver.theoreticalBestString}
-            </h4>
-          </div>
+            {/* Timing & Performance Metrics Row */}
+            <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${isRaceSession ? 'border-t border-lmu-border/40 pt-2.5' : ''}`}>
+              {/* 1. Best Lap */}
+              <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+                <div>
+                  <p className={`text-[10px] uppercase font-semibold ${isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold flex items-center gap-1' : 'text-lmu-muted'}`}>
+                    {isCurrentSessionAllTimePB ? `⭐ Personal Best` : 'Session Best Lap'}
+                  </p>
+                  <h4 className={`text-xl font-extrabold font-mono mt-0.5 ${isCurrentSessionAllTimePB ? 'text-lmu-gold' : 'text-white'}`}>
+                    {selectedDriver.bestLapTimeString}
+                  </h4>
+                </div>
+                {selectedDriver.bestLapPaceCategory && (
+                  <div className="mt-1 flex items-center gap-1 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold border ${getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).badgeClass}`}>
+                      <span>{getPaceCategoryStyle(selectedDriver.bestLapPaceCategory).emoji}</span>
+                      <span>{selectedDriver.bestLapPaceCategory}</span>
+                      <span className="opacity-80 text-[9px]">({formatPacePercentage(selectedDriver.bestLapPacePercentage)})</span>
+                    </span>
+                    {!isCurrentSessionAllTimePB && allTimeCategoryTrackPB && (
+                      <span className="text-[10px] text-lmu-muted" title="Track PB">
+                        PB: <strong className="text-lmu-gold font-mono">{formatTime(allTimeCategoryTrackPB)}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
 
-          <div className="glass-panel p-4 rounded-xl">
-            <p className="text-xs text-lmu-muted uppercase font-semibold">Best Sectors (S1 / S2 / S3)</p>
-            <p className="text-xs font-mono text-white mt-1">
-              S1: <span className="text-lmu-gold font-bold">{formatTime(selectedDriver.bestS1)}</span>
-            </p>
-            <p className="text-xs font-mono text-white">
-              S2: <span className="text-lmu-blue font-bold">{formatTime(selectedDriver.bestS2)}</span>
-            </p>
-            <p className="text-xs font-mono text-white">
-              S3: <span className="text-lmu-green font-bold">{formatTime(selectedDriver.bestS3)}</span>
-            </p>
-          </div>
+              {/* 2. Session Lap Average */}
+              <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-lmu-muted uppercase font-semibold">Session Lap Average</p>
+                    {consistencyScore !== null && (
+                      <span
+                        className={`text-[9px] font-bold font-mono px-1.5 py-0.2 rounded border ${
+                          consistencyScore >= 99
+                            ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                            : consistencyScore >= 97
+                            ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
+                            : consistencyScore >= 94
+                            ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+                            : 'bg-rose-950/60 text-rose-300 border-rose-500/40'
+                        }`}
+                        title="Pace consistency rating based on clean lap standard deviation"
+                      >
+                        {consistencyScore.toFixed(1)}% Consist
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-xl font-extrabold text-indigo-300 font-mono mt-0.5">
+                    {avgLapTime ? formatTime(avgLapTime) : '--:--.---'}
+                  </h4>
+                </div>
+                <div className="mt-1 space-y-0.5 text-[10px] text-lmu-muted">
+                  <div className="flex items-center justify-between">
+                    <span>
+                      Gap: <strong className="text-indigo-200 font-mono">{deltaToBest !== null ? `+${deltaToBest.toFixed(3)}s` : '--'}</strong>
+                    </span>
+                    {lapStdDev !== null && (
+                      <span title="Standard deviation of clean flying lap times">
+                        Std: <strong className="text-white font-mono">±{lapStdDev.toFixed(3)}s</strong>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-[9px] text-lmu-muted">
+                    <span>Clean Laps: <strong className="text-white font-mono">{cleanLapsForAvg.length}</strong> / {selectedDriver.laps?.length || 0}</span>
+                    {hasMultipleLaps && (
+                      <span className="text-[8px] uppercase tracking-wider text-amber-400/80 font-semibold" title="Lap 1 (Start/Out-lap) is excluded from flying averages">
+                        Excl. L1
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-          <div className="glass-panel p-4 rounded-xl">
-            <p className="text-xs text-lmu-muted uppercase font-semibold">Car & Class</p>
-            <h4 className="text-sm font-bold text-white mt-1 truncate">{selectedDriver.carType}</h4>
-            <p className="text-xs text-lmu-muted mt-0.5">{selectedDriver.carClass} • Car #{selectedDriver.carNumber}</p>
-          </div>
-        </div>
-      )}
+              {/* 3. Theoretical Best */}
+              <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+                <div>
+                  <p className="text-[10px] text-lmu-muted uppercase font-semibold">Theoretical Best</p>
+                  <h4 className="text-xl font-extrabold text-lmu-green font-mono mt-0.5">
+                    {selectedDriver.theoreticalBestString}
+                  </h4>
+                </div>
+                <p className="text-[10px] text-lmu-muted mt-1">
+                  Potential: <strong className="text-emerald-400 font-mono">{selectedDriver.bestLapTime && selectedDriver.theoreticalBest ? `-${(selectedDriver.bestLapTime - selectedDriver.theoreticalBest).toFixed(3)}s` : '0.000s'}</strong>
+                </p>
+              </div>
 
-      {/* Session Lap Telemetry & Sector Analysis Chart */}
+              {/* 4. Best Sectors (S1 / S2 / S3) & Averages */}
+              <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+                <p className="text-[10px] text-lmu-muted uppercase font-semibold">Sectors (Best / Avg)</p>
+                <div className="mt-1 space-y-0.5 text-xs font-mono">
+                  <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
+                    <span className="text-lmu-muted text-[10px] font-semibold">S1:</span>
+                    <strong className="text-lmu-gold font-bold">{formatTime(selectedDriver.bestS1)}</strong>
+                    <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS1)})</span>
+                  </div>
+                  <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
+                    <span className="text-lmu-muted text-[10px] font-semibold">S2:</span>
+                    <strong className="text-lmu-blue font-bold">{formatTime(selectedDriver.bestS2)}</strong>
+                    <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS2)})</span>
+                  </div>
+                  <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
+                    <span className="text-lmu-muted text-[10px] font-semibold">S3:</span>
+                    <strong className="text-lmu-green font-bold">{formatTime(selectedDriver.bestS3)}</strong>
+                    <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS3)})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Session Lap Telemetry, Sector & Multi-Driver Position Progression Chart */}
       {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (() => {
+        // Multi-class driver filtering: only show drivers belonging to the same car class
+        const classDrivers = (session.drivers || []).filter(d =>
+          matchesCarClass(d.carClass || '', d.carType || '', selectedDriver.carClass || selectedDriver.carType || '')
+        );
+        const driversToPlot = classDrivers.length > 0 ? classDrivers : (session.drivers || []);
+        const maxClassLaps = Math.max(...driversToPlot.map(d => (d.laps ? d.laps.length : 0)), 1);
+        const maxPosInClass = Math.max(
+          ...driversToPlot.flatMap(d => (d.laps || []).map(l => l.position)).filter(p => p > 0),
+          driversToPlot.length,
+          1
+        );
+
+        // Calculate clean/valid flying lap average and sector averages for selected driver (ignoring Lap 1 when > 1 lap)
+        const completedLaps = selectedDriver.laps.filter(
+          l => l.lapTime !== null && l.lapTime > 0
+        );
+        const hasMultipleLaps = completedLaps.length > 1;
+
+        const validFlyingLaps = completedLaps.filter(
+          l => l.isValid && (!hasMultipleLaps || l.lapNum > 1)
+        );
+        const cleanLapsForAvg = validFlyingLaps.length > 0
+          ? validFlyingLaps
+          : completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1).length > 0
+          ? completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1)
+          : completedLaps;
+
+        const avgLapTime = cleanLapsForAvg.length > 0
+          ? cleanLapsForAvg.reduce((sum, l) => sum + (l.lapTime || 0), 0) / cleanLapsForAvg.length
+          : null;
+
+        const s1Laps = selectedDriver.laps.filter(
+          l => l.s1 !== null && l.s1 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS1 = s1Laps.length > 0
+          ? s1Laps.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1Laps.length
+          : null;
+
+        const s2Laps = selectedDriver.laps.filter(
+          l => l.s2 !== null && l.s2 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS2 = s2Laps.length > 0
+          ? s2Laps.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2Laps.length
+          : null;
+
+        const s3Laps = selectedDriver.laps.filter(
+          l => l.s3 !== null && l.s3 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+        );
+        const avgS3 = s3Laps.length > 0
+          ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length
+          : null;
+
+        // Position Chart Data (Multi-driver lap positions)
+        const positionChartData = Array.from({ length: maxClassLaps }, (_, i) => {
+          const lapNum = i + 1;
+          const point: any = {
+            lapNum: `Lap ${lapNum}`,
+            lapNumber: lapNum,
+          };
+          driversToPlot.forEach(d => {
+            const lap = d.laps?.find(l => l.lapNum === lapNum);
+            if (lap && lap.position > 0) {
+              point[d.name] = lap.position;
+              point[`${d.name}_isPit`] = lap.isPitStop;
+              point[`${d.name}_lapTime`] = lap.lapTimeString;
+              point[`${d.name}_isPlayer`] = d.isPlayer;
+            }
+          });
+          return point;
+        });
+
+        // Single Driver Telemetry Chart Data
         const sessionChartData = selectedDriver.laps.map(l => ({
           lapNum: `Lap ${l.lapNum}`,
           lapNumber: l.lapNum,
           lapTime: l.lapTime && l.isValid ? l.lapTime : null,
           lapTimeString: l.lapTimeString,
+          avgLapTime: avgLapTime,
+          avgLapTimeString: formatTime(avgLapTime),
           s1: l.s1 && l.isValid ? l.s1 : null,
           s2: l.s2 && l.isValid ? l.s2 : null,
           s3: l.s3 && l.isValid ? l.s3 : null,
+          avgS1: avgS1,
+          avgS2: avgS2,
+          avgS3: avgS3,
           s1String: formatTime(l.s1),
           s2String: formatTime(l.s2),
           s3String: formatTime(l.s3),
+          avgS1String: formatTime(avgS1),
+          avgS2String: formatTime(avgS2),
+          avgS3String: formatTime(avgS3),
           topSpeed: l.topSpeed || null,
           twFL: l.tireWear?.fl ?? null,
           twFR: l.tireWear?.fr ?? null,
@@ -497,8 +858,59 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
         const CustomTooltip = ({ active, payload }: any) => {
           if (!active || !payload || !payload.length) return null;
           const data = payload[0].payload;
+
+          if (activeChartMetric === 'positions') {
+            const sortedDrivers = driversToPlot
+              .map(d => {
+                const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name));
+                return {
+                  name: d.name,
+                  pos: data[d.name] as number | undefined,
+                  isPlayer,
+                  isPit: data[`${d.name}_isPit`],
+                  lapTime: data[`${d.name}_lapTime`],
+                };
+              })
+              .filter(d => d.pos !== undefined && d.pos > 0)
+              .sort((a, b) => (a.pos || 999) - (b.pos || 999));
+
+            return (
+              <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-2 font-mono min-w-[240px]">
+                <div className="font-bold text-white flex items-center justify-between border-b border-lmu-border/60 pb-1 font-sans">
+                  <span>{data.lapNum}</span>
+                  <span className="text-[10px] text-lmu-muted uppercase font-semibold">
+                    {selectedDriver.carClass || 'Class'} Standings
+                  </span>
+                </div>
+                <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar pr-0.5">
+                  {sortedDrivers.map((d) => (
+                    <div
+                      key={d.name}
+                      className={`flex items-center justify-between gap-3 p-1 rounded transition-colors ${
+                        d.isPlayer ? 'bg-lmu-gold/20 text-lmu-gold font-bold border border-lmu-gold/40' : 'text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-gold' : 'text-slate-300'}`}>
+                          P{d.pos}
+                        </span>
+                        <span className="truncate max-w-[130px]" title={d.name}>
+                          {d.name} {d.isPlayer ? '(You)' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
+                        {d.isPit && <span className="px-1 py-0.2 rounded bg-amber-500/30 text-amber-300 text-[9px] font-bold">PIT</span>}
+                        <span className="text-lmu-muted font-mono">{d.lapTime || '--:--.---'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
           return (
-            <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1 font-mono">
+            <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1.5 font-mono">
               <div className="font-bold text-white flex items-center justify-between gap-3 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
                 <span>{data.lapNum}</span>
                 {data.isPitStop && <span className="text-[10px] text-amber-400">🛑 Pit Stop</span>}
@@ -506,14 +918,22 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               </div>
 
               {activeChartMetric === 'lapTime' && (
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-lmu-muted">Lap Pace:</span>
-                  <span className="font-bold text-lmu-gold">{data.lapTimeString}</span>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-lmu-muted">Lap Pace:</span>
+                    <span className="font-bold text-lmu-gold">{data.lapTimeString}</span>
+                  </div>
+                  {data.avgLapTimeString && (
+                    <div className="flex items-center justify-between gap-4 border-t border-lmu-border/50 pt-1 text-[11px]">
+                      <span className="text-purple-300">Session Avg:</span>
+                      <span className="font-bold text-indigo-200">{data.avgLapTimeString}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeChartMetric === 'sectors' && (
-                <>
+                <div className="space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-lmu-gold">Sector 1:</span>
                     <span className="font-bold text-white">{data.s1String}</span>
@@ -526,7 +946,15 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                     <span className="text-lmu-green">Sector 3:</span>
                     <span className="font-bold text-white">{data.s3String}</span>
                   </div>
-                </>
+                  {data.avgS1String && (
+                    <div className="border-t border-lmu-border/50 pt-1 text-[11px] text-lmu-muted flex items-center justify-between gap-2">
+                      <span>Sector Averages:</span>
+                      <span className="font-mono text-white">
+                        {data.avgS1String} / {data.avgS2String} / {data.avgS3String}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
 
               {activeChartMetric === 'topSpeed' && (
@@ -583,9 +1011,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
 
         const sessionChartTimes = (
           activeChartMetric === 'lapTime'
-            ? sessionChartData.map(d => d.lapTime)
+            ? sessionChartData.flatMap(d => [d.lapTime, d.avgLapTime])
             : activeChartMetric === 'sectors'
-            ? sessionChartData.flatMap(d => [d.s1, d.s2, d.s3])
+            ? sessionChartData.flatMap(d => [d.s1, d.s2, d.s3, d.avgS1, d.avgS2, d.avgS3])
             : activeChartMetric === 'topSpeed'
             ? sessionChartData.map(d => d.topSpeed)
             : activeChartMetric === 'tireWear'
@@ -612,23 +1040,27 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               <div>
                 <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-lmu-accent" />
-                  {activeChartMetric === 'tireWear'
+                  {activeChartMetric === 'positions'
+                    ? 'Driver Position Progression (Same Class)'
+                    : activeChartMetric === 'tireWear'
                     ? 'Tire Wear & Degradation Telemetry'
                     : activeChartMetric === 'fuelEnergy'
                     ? 'Fuel Consumption & Virtual Energy Telemetry'
                     : 'Lap & Sector Telemetry Chart'}
                 </h3>
                 <p className="text-xs text-lmu-muted mt-0.5">
-                  {activeChartMetric === 'tireWear'
-                    ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints'
+                  {activeChartMetric === 'positions'
+                    ? `Lap-by-lap position chart isolated to ${selectedDriver.carClass || 'same class'} competitors. Click legend items to toggle drivers.`
+                    : activeChartMetric === 'tireWear'
+                    ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints. Click legend items to toggle.'
                     : activeChartMetric === 'fuelEnergy'
-                    ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh)'
-                    : 'Session lap pace progression, sector splits (S1/S2/S3), and top speeds by lap'}
+                    ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh).'
+                    : 'Session lap pace progression, session average, sector splits (S1/S2/S3), and sector averages. Click legend to toggle lines.'}
                 </p>
               </div>
 
               {/* Metric Toggle */}
-              <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold shrink-0">
+              <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold shrink-0 flex-wrap gap-1">
                 <button
                   onClick={() => setChartMetric('lapTime')}
                   className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
@@ -661,6 +1093,17 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                 >
                   <Gauge className="w-3.5 h-3.5" />
                   Top Speed
+                </button>
+                <button
+                  onClick={() => setChartMetric('positions')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    activeChartMetric === 'positions'
+                      ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                      : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  Positions
                 </button>
                 <button
                   onClick={() => {
@@ -808,31 +1251,103 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
               <ResponsiveContainer width="100%" height="100%" minHeight={260}>
                 <LineChart
                   key={`session-chart-${activeChartMetric}-${sessionChartData.length}`}
-                  data={sessionChartData}
+                  data={activeChartMetric === 'positions' ? positionChartData : sessionChartData}
                   margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.5} />
                   <XAxis dataKey="lapNum" stroke="#718096" tick={{ fill: '#A0AEC0', fontSize: 11 }} />
                   <YAxis
+                    reversed={activeChartMetric === 'positions'}
                     stroke="#718096"
                     tick={{ fill: '#A0AEC0', fontSize: 11 }}
-                    domain={[yDomainMin, yDomainMax]}
-                    tickFormatter={(val) => activeChartMetric === 'topSpeed' ? `${val} km/h` : (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy') ? `${val}%` : formatTime(val)}
+                    domain={
+                      activeChartMetric === 'positions'
+                        ? [1, Math.max(maxPosInClass, 2)]
+                        : [yDomainMin, yDomainMax]
+                    }
+                    ticks={
+                      activeChartMetric === 'positions'
+                        ? Array.from({ length: Math.max(maxPosInClass, 2) }, (_, i) => i + 1)
+                        : undefined
+                    }
+                    tickFormatter={(val) => {
+                      if (activeChartMetric === 'positions') return `P${val}`;
+                      if (activeChartMetric === 'topSpeed') return `${val} km/h`;
+                      if (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy') return `${val}%`;
+                      return formatTime(val);
+                    }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12 }} />
+                  <Legend
+                    onClick={handleLegendClick}
+                    wrapperStyle={{ paddingTop: 10, fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
+                    formatter={(value, entry: any) => {
+                      const isHidden = Boolean(hiddenSeries[entry.dataKey]);
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
+                            isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+                          }`}
+                          title={`Click to toggle ${value} visibility`}
+                        >
+                          {value}
+                        </span>
+                      );
+                    }}
+                  />
+
+                  {activeChartMetric === 'positions' && (
+                    <>
+                      {driversToPlot.map((d, idx) => {
+                        const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name));
+                        const color = isPlayer
+                          ? PLAYER_HIGHLIGHT_COLOR
+                          : OPPONENT_COLORS[idx % OPPONENT_COLORS.length];
+                        return (
+                          <Line
+                            key={d.name}
+                            type="monotone"
+                            dataKey={d.name}
+                            name={isPlayer ? `${d.name} (You)` : d.name}
+                            stroke={color}
+                            strokeWidth={isPlayer ? 3.5 : 1.8}
+                            dot={isPlayer ? { r: 4, fill: color } : { r: 2.5, fill: color }}
+                            activeDot={{ r: isPlayer ? 6 : 4, stroke: '#fff', strokeWidth: 1.5 }}
+                            connectNulls={true}
+                            hide={Boolean(hiddenSeries[d.name])}
+                          />
+                        );
+                      })}
+                    </>
+                  )}
 
                   {activeChartMetric === 'lapTime' && (
-                    <Line
-                      type="monotone"
-                      dataKey="lapTime"
-                      name="Lap Time"
-                      stroke="#E53E3E"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#E53E3E', strokeWidth: 2, stroke: '#FFFFFF' }}
-                      activeDot={{ r: 7 }}
-                      connectNulls={true}
-                    />
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="lapTime"
+                        name="Lap Time"
+                        stroke="#E53E3E"
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: '#E53E3E', strokeWidth: 2, stroke: '#FFFFFF' }}
+                        activeDot={{ r: 7 }}
+                        connectNulls={true}
+                        hide={Boolean(hiddenSeries['lapTime'])}
+                      />
+                      {avgLapTime !== null && (
+                        <Line
+                          type="monotone"
+                          dataKey="avgLapTime"
+                          name="Session Avg Lap"
+                          stroke="#A78BFA"
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={false}
+                          connectNulls={true}
+                          hide={Boolean(hiddenSeries['avgLapTime'])}
+                        />
+                      )}
+                    </>
                   )}
 
                   {activeChartMetric === 'sectors' && (
@@ -845,7 +1360,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#ECC94B' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['s1'])}
                       />
+                      {avgS1 !== null && (
+                        <Line
+                          type="monotone"
+                          dataKey="avgS1"
+                          name="Avg S1"
+                          stroke="#FDE047"
+                          strokeWidth={1.8}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          connectNulls={true}
+                          hide={Boolean(hiddenSeries['avgS1'])}
+                        />
+                      )}
                       <Line
                         type="monotone"
                         dataKey="s2"
@@ -854,7 +1383,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#3182CE' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['s2'])}
                       />
+                      {avgS2 !== null && (
+                        <Line
+                          type="monotone"
+                          dataKey="avgS2"
+                          name="Avg S2"
+                          stroke="#60A5FA"
+                          strokeWidth={1.8}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          connectNulls={true}
+                          hide={Boolean(hiddenSeries['avgS2'])}
+                        />
+                      )}
                       <Line
                         type="monotone"
                         dataKey="s3"
@@ -863,7 +1406,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#38A169' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['s3'])}
                       />
+                      {avgS3 !== null && (
+                        <Line
+                          type="monotone"
+                          dataKey="avgS3"
+                          name="Avg S3"
+                          stroke="#4ADE80"
+                          strokeWidth={1.8}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          connectNulls={true}
+                          hide={Boolean(hiddenSeries['avgS3'])}
+                        />
+                      )}
                     </>
                   )}
 
@@ -876,6 +1433,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                       strokeWidth={2.5}
                       dot={{ r: 4, fill: '#00F2FE' }}
                       connectNulls={true}
+                      hide={Boolean(hiddenSeries['topSpeed'])}
                     />
                   )}
 
@@ -889,6 +1447,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#38BDF8' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['twFL'])}
                       />
                       <Line
                         type="monotone"
@@ -898,6 +1457,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#60A5FA' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['twFR'])}
                       />
                       <Line
                         type="monotone"
@@ -907,6 +1467,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#34D399' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['twRL'])}
                       />
                       <Line
                         type="monotone"
@@ -916,6 +1477,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#FBBF24' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['twRR'])}
                       />
                       <Line
                         type="monotone"
@@ -926,6 +1488,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeDasharray="4 4"
                         dot={false}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['twAvg'])}
                       />
                     </>
                   )}
@@ -940,6 +1503,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#F97316' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['fuel'])}
                       />
                       <Line
                         type="monotone"
@@ -949,6 +1513,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         strokeWidth={2.5}
                         dot={{ r: 3.5, fill: '#818CF8' }}
                         connectNulls={true}
+                        hide={Boolean(hiddenSeries['virtualEnergy'])}
                       />
                     </>
                   )}
@@ -1135,6 +1700,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         >
                           PIT STOP
                         </span>
+                      ) : l.lapNum === 1 && (session.sessionType === 'Race' || selectedDriver?.gridPosition !== null) ? (
+                        <span
+                          className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold inline-flex items-center gap-1"
+                          title="Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)"
+                        >
+                          🚦 START LAP
+                        </span>
                       ) : l.isValid ? (
                         <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
                           <ShieldCheck className="w-3.5 h-3.5" />
@@ -1169,6 +1741,107 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
           </table>
         </div>
       </div>
+
+      {/* Race Classification & Driver Standings (Multi-Driver Sessions) - Placed on the bottom */}
+      {session.drivers && session.drivers.length > 1 && (
+        <div className="glass-panel p-5 rounded-2xl relative space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-lmu-gold" />
+                <span>Session Classification & Driver Standings ({session.drivers.length} Drivers)</span>
+              </h3>
+              <p className="text-xs text-lmu-muted mt-0.5">
+                Full race results, grid starting positions, position gains, and best lap times. Click a driver to inspect their lap telemetry.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs text-lmu-muted">
+              <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
+                <tr>
+                  <th className="px-3.5 py-3 text-center">Pos</th>
+                  {isMultiClass && <th className="px-3.5 py-3 text-center">Class Pos</th>}
+                  <th className="px-3.5 py-3">Driver</th>
+                  <th className="px-3.5 py-3">Car & Class</th>
+                  <th className="px-3.5 py-3 text-center">Grid</th>
+                  <th className="px-3.5 py-3 text-center">Gain</th>
+                  <th className="px-3.5 py-3 text-right">Best Lap</th>
+                  <th className="px-3.5 py-3 text-center">Laps</th>
+                  <th className="px-3.5 py-3 text-center">Pit Stops</th>
+                  <th className="px-3.5 py-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-lmu-border/50">
+                {session.drivers.map(d => {
+                  const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name));
+                  const isSelected = d.name === selectedDriverName;
+
+                  return (
+                    <tr
+                      key={d.name}
+                      onClick={() => setSelectedDriverName(d.name)}
+                      className={`hover:bg-lmu-card/60 transition-colors cursor-pointer ${
+                        isSelected ? 'bg-lmu-accent/15 border-l-2 border-lmu-accent' : isPlayer ? 'bg-lmu-gold/10' : ''
+                      }`}
+                    >
+                      <td className="px-3.5 py-2.5 text-center font-bold text-white font-mono">
+                        P{d.position || '-'}
+                      </td>
+                      {isMultiClass && (
+                        <td className="px-3.5 py-2.5 text-center font-bold text-lmu-cyan font-mono">
+                          {d.classPosition ? `P${d.classPosition}` : '-'}
+                        </td>
+                      )}
+                      <td className="px-3.5 py-2.5 font-medium text-white">
+                        <div className="flex items-center gap-1.5">
+                          {isPlayer && <span className="text-lmu-gold">⭐</span>}
+                          <span className={isPlayer ? 'font-bold text-lmu-gold' : isSelected ? 'font-bold text-white' : 'text-white'}>
+                            {d.name} {isPlayer ? '(You)' : ''}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <span className="text-white font-medium">{d.carType}</span>
+                        <span className="text-lmu-muted ml-1.5 text-[11px]">({d.carClass || 'General'})</span>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center font-mono text-white">
+                        {d.gridPosition ? `P${d.gridPosition}` : '-'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center font-mono font-bold">
+                        {d.positionGain !== null && d.positionGain !== undefined ? (
+                          <span className={d.positionGain > 0 ? 'text-lmu-green' : d.positionGain < 0 ? 'text-rose-400' : 'text-slate-300'}>
+                            {d.positionGain > 0 ? `+${d.positionGain}` : d.positionGain}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right font-mono font-bold text-lmu-gold">
+                        {d.bestLapTimeString}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center font-mono text-white">
+                        {d.lapsCount}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center font-mono text-amber-300">
+                        {d.pitStopsCount ?? 0}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          (d.finishStatus || '').toLowerCase().includes('dnf')
+                            ? 'bg-rose-950/50 text-rose-300'
+                            : 'bg-emerald-950/50 text-emerald-300'
+                        }`}>
+                          {d.finishStatus || (d.position > 0 ? 'Finished' : '-')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -45,10 +45,37 @@ const updateMinTime = (current: number | null, next: number | null): number | nu
   next !== null && next > 0 && (current === null || next < current) ? next : current;
 
 const computeAverageLapTime = (laps: LapData[]): number | null => {
-  const valid = laps.filter(l => l.isValid && l.lapTime);
-  if (valid.length === 0) return null;
-  const sum = valid.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-  return parseFloat((sum / valid.length).toFixed(3));
+  const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
+  if (completedLaps.length === 0) return null;
+
+  const hasMultipleLaps = completedLaps.length > 1;
+  const nonPitLaps = completedLaps.filter(l => !l.isPitStop);
+
+  // 1. Prefer valid flying laps (lapNum > 1 and not a pit stop)
+  const validFlying = nonPitLaps.filter(l => l.isValid && (!hasMultipleLaps || l.lapNum > 1));
+  if (validFlying.length > 0) {
+    const sum = validFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+    return parseFloat((sum / validFlying.length).toFixed(3));
+  }
+
+  // 2. Otherwise any valid non-pit laps (including lap 1 if it's the only valid non-pit lap)
+  const anyValidNonPit = nonPitLaps.filter(l => l.isValid);
+  if (anyValidNonPit.length > 0) {
+    const sum = anyValidNonPit.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+    return parseFloat((sum / anyValidNonPit.length).toFixed(3));
+  }
+
+  // 3. Otherwise non-pit flying laps
+  const nonPitFlying = nonPitLaps.filter(l => !hasMultipleLaps || l.lapNum > 1);
+  if (nonPitFlying.length > 0) {
+    const sum = nonPitFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+    return parseFloat((sum / nonPitFlying.length).toFixed(3));
+  }
+
+  // 4. Fallback to any non-pit completed lap, or all completed laps
+  const fallback = nonPitLaps.length > 0 ? nonPitLaps : completedLaps;
+  const sum = fallback.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+  return parseFloat((sum / fallback.length).toFixed(3));
 };
 
 export class LmuParser {
@@ -449,6 +476,49 @@ export class LmuParser {
     // Completed laps (valid or not, but completed with recorded lap time)
     const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
 
+    // Starting Grid, Finish Position & Position Deltas
+    const parsedGrid = parseInt(d.GridPos ?? d.GridPosition ?? d.QualPosition ?? d.Grid, 10);
+    const gridPosition: number | null = !isNaN(parsedGrid) && parsedGrid > 0
+      ? parsedGrid
+      : (laps.length > 0 && laps[0].position > 0 ? laps[0].position : null);
+
+    const parsedClassGrid = parseInt(d.ClassGridPos ?? d.ClassGridPosition ?? d.ClassGrid, 10);
+    const classGridPosition: number | null = !isNaN(parsedClassGrid) && parsedClassGrid > 0
+      ? parsedClassGrid
+      : null;
+
+    const positionGain: number | null = gridPosition !== null && position > 0
+      ? gridPosition - position
+      : null;
+
+    const classPositionGain: number | null = classGridPosition !== null && classPosition > 0
+      ? classGridPosition - classPosition
+      : null;
+
+    // Finish Status, DNF Reason, and Pit Stops
+    const rawFinishStatus = d.FinishStatus ? String(d.FinishStatus).trim() : '';
+    const dnfReason = d.Reason ? String(d.Reason).trim() : undefined;
+    const finishStatus = rawFinishStatus || (dnfReason ? `DNF (${dnfReason})` : (position > 0 ? 'Finished' : undefined));
+
+    const rawPitstops = parseInt(d.Pitstops ?? d.PitStops ?? d.NumPitstops, 10);
+    const pitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
+      ? rawPitstops
+      : laps.filter(l => l.isPitStop).length;
+
+    // Laps Led (Laps in P1) and Peak/Lowest positions reached
+    const lapsLedCount = laps.filter(l => l.position === 1).length;
+    const validPositions = [
+      ...(gridPosition ? [gridPosition] : []),
+      ...(position > 0 ? [position] : []),
+      ...laps.map(l => l.position).filter(p => p > 0)
+    ];
+    const highestPosition = validPositions.length > 0 ? Math.min(...validPositions) : null;
+    const lowestPosition = validPositions.length > 0 ? Math.max(...validPositions) : null;
+
+    // Final gap to leader at finish
+    const lastLapWithGap = [...laps].reverse().find(l => l.gapToLeaderString);
+    const finishGapToLeaderString = lastLapWithGap?.gapToLeaderString;
+
     return {
       name,
       carType,
@@ -458,6 +528,17 @@ export class LmuParser {
       isPlayer,
       position,
       classPosition,
+      gridPosition,
+      classGridPosition,
+      positionGain,
+      classPositionGain,
+      finishStatus,
+      dnfReason,
+      pitStopsCount,
+      lapsLedCount,
+      highestPosition,
+      lowestPosition,
+      finishGapToLeaderString,
       bestLapTime,
       bestLapTimeString: formatTime(bestLapTime),
       bestS1,

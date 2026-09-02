@@ -451,4 +451,39 @@ describe('Dashboard component', () => {
     fireEvent.click(cardsButton);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
+
+  it('allows sorting sessions by Best Position (P1 First)', () => {
+    const sessionsWithPositions = [
+      {
+        ...mockSessions[0],
+        id: 'sess-p3',
+        playerDriver: { ...mockSessions[0].playerDriver, position: 3 },
+      },
+      {
+        ...mockSessions[1],
+        id: 'sess-p1',
+        playerDriver: { ...mockSessions[1].playerDriver, position: 1 },
+      },
+    ];
+
+    render(
+      <Dashboard
+        sessions={sessionsWithPositions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[comboboxes.length - 1];
+    fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
+    expect(sortSelect).toHaveValue('pos-asc');
+  });
 });

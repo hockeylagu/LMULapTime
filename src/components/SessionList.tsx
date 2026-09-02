@@ -27,6 +27,9 @@ export interface SessionListItem {
     bestLapTimeString: string;
     bestLapPaceCategory?: PaceCategory | null;
     bestLapPacePercentage?: number | null;
+    position?: number;
+    gridPosition?: number | null;
+    positionGain?: number | null;
     lapsCount: number;
   };
 }
@@ -267,32 +270,53 @@ export const SessionList: React.FC<SessionListProps> = ({
                   )}
                 </div>
 
-                {/* Driver / Car / Lap info */}
-                <div className="pt-2 border-t border-lmu-border/60 flex items-center justify-between text-xs">
-                  <div className="space-y-1">
-                    <p className="text-lmu-muted flex items-center gap-1">
-                      <Car className="w-3.5 h-3.5 text-lmu-cyan" />
-                      <span className="text-white font-medium truncate max-w-[160px]">
+                {/* Driver / Car / Lap / Timing Info */}
+                <div className="pt-2.5 border-t border-lmu-border/60 space-y-1.5 text-xs">
+                  {/* Row 1: Car & Best Lap */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 truncate min-w-0">
+                      <Car className="w-3.5 h-3.5 text-lmu-cyan shrink-0" />
+                      <span className="text-white font-medium truncate" title={p?.carType || 'N/A'}>
                         {p ? p.carType : 'N/A'}
                       </span>
-                    </p>
-                    <p className="text-lmu-muted">
-                      Laps Driven: <span className="text-white font-semibold">{p ? p.lapsCount : 0}</span>
-                    </p>
+                    </div>
+                    <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
+                      <span className="text-[10px] text-lmu-muted uppercase">Best:</span>
+                      <span className="font-bold text-sm text-lmu-gold">
+                        {p?.bestLapTimeString || '--:--.---'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <p className="text-lmu-muted">Best Lap</p>
-                    <p className="font-mono font-bold text-sm text-lmu-gold">
-                      {p?.bestLapTimeString || '--:--.---'}
-                    </p>
-                    {pace && (
-                      <div className="mt-0.5">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${getPaceCategoryStyle(pace.category).badgeClass}`}>
-                          <span>{getPaceCategoryStyle(pace.category).emoji}</span>
-                          <span>{pace.category}</span>
+                  {/* Row 2: Laps + Position & Pace Badge */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-lmu-muted text-xs">
+                        Laps: <strong className="text-white font-mono">{p ? p.lapsCount : 0}</strong>
+                      </span>
+                      {s.sessionType === 'Race' && p?.position ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm" title={p.gridPosition ? `Started P${p.gridPosition} → Finished P${p.position}` : `Finished P${p.position}`}>
+                          <span className="text-lmu-muted text-[10px] uppercase font-sans font-semibold">Finish:</span>
+                          <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-white'}`}>P{p.position}</strong>
+                          {p.positionGain !== null && p.positionGain !== undefined && (
+                            <span className={`font-bold text-xs ${p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                              ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
+                            </span>
+                          )}
                         </span>
-                      </div>
+                      ) : (s.sessionType === 'Qualifying' || s.sessionName?.toLowerCase().includes('quali')) && p?.position ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm" title={`Qualified P${p.position}`}>
+                          <span className="text-lmu-muted text-[10px] uppercase font-sans font-semibold">Qual:</span>
+                          <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-lmu-cyan'}`}>P{p.position}</strong>
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {pace && (
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${getPaceCategoryStyle(pace.category).badgeClass}`}>
+                        <span>{getPaceCategoryStyle(pace.category).emoji}</span>
+                        <span>{pace.category}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -359,6 +383,20 @@ export const SessionList: React.FC<SessionListProps> = ({
                         }`}>
                           {s.sessionName || s.sessionType}
                         </span>
+                        {s.sessionType === 'Race' && p?.position ? (
+                          <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-white" title={p.gridPosition ? `Grid: P${p.gridPosition} → Finish: P${p.position}` : `Finish: P${p.position}`}>
+                            P{p.position}
+                            {p.positionGain !== null && p.positionGain !== undefined && (
+                              <span className={`ml-1 font-bold ${p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
+                              </span>
+                            )}
+                          </span>
+                        ) : (s.sessionType === 'Qualifying' || s.sessionName?.toLowerCase().includes('quali')) && p?.position ? (
+                          <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-lmu-cyan" title={`Qualified P${p.position}`}>
+                            P{p.position}
+                          </span>
+                        ) : null}
                         {s.weatherInfo && (
                           <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-lmu-bg/80 border border-lmu-border/60 text-lmu-muted">
                             {s.weatherInfo}

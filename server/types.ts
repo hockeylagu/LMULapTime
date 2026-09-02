@@ -99,6 +99,17 @@ export interface DriverData {
   estFuelStintLaps?: number | null; // Estimated laps on full tank
   avgVePerLap?: number | null; // Avg Virtual Energy consumed per clean lap (%)
   estVeStintLaps?: number | null; // Estimated laps per full VE allocation (Hypercar)
+  gridPosition?: number | null;
+  classGridPosition?: number | null;
+  positionGain?: number | null;
+  classPositionGain?: number | null;
+  finishStatus?: string; // e.g. "Finished Normally", "DNF", "DQ", "DNS"
+  dnfReason?: string;
+  pitStopsCount?: number;
+  lapsLedCount?: number;
+  highestPosition?: number | null;
+  lowestPosition?: number | null;
+  finishGapToLeaderString?: string;
   top3LapsCount?: number;
   lapsCount: number;
   laps: LapData[];
