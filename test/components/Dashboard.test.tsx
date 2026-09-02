@@ -297,6 +297,61 @@ describe('Dashboard component', () => {
     expect(screen.getByText(/Across 4 Unique Circuits/i)).toBeInTheDocument();
   });
 
+  it('calculates Driving Overview lap count and km driven using completed laps (valid or not, excluding incomplete)', () => {
+    const sessionsWithMixedLaps = [
+      {
+        id: 'sess-mixed-1',
+        filename: '2026_06_10_P1.xml',
+        trackVenue: 'Spa',
+        trackLengthMeters: 7004,
+        timeString: '2026/06/10 14:00',
+        sessionType: 'Practice' as const,
+        sessionName: 'P1',
+        driversCount: 1,
+        playerDriver: {
+          name: 'Player',
+          carType: 'Ferrari 499P',
+          carClass: 'LMH',
+          bestLapTime: 122.0,
+          bestLapTimeString: '2:02.000',
+          bestS1: 34.0,
+          bestS2: 42.0,
+          bestS3: 46.0,
+          theoreticalBest: 122.0,
+          theoreticalBestString: '2:02.000',
+          lapsCount: 2,
+          laps: [
+            { lapNum: 1, position: 1, lapTime: 122.0, lapTimeString: '2:02.000', s1: 34, s2: 42, s3: 46, topSpeed: 320, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+            { lapNum: 2, position: 1, lapTime: 125.0, lapTimeString: '2:05.000', s1: 35, s2: 43, s3: 47, topSpeed: 318, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: false }, // invalid but completed
+            { lapNum: 3, position: 1, lapTime: null, lapTimeString: '--:--.---', s1: null, s2: null, s3: null, topSpeed: null, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: false }, // incomplete
+          ],
+        },
+      },
+    ];
+
+    render(
+      <Dashboard
+        sessions={sessionsWithMixedLaps}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // 2 completed laps displayed in Circuits, Cars, and Driving Overview (1 valid + 1 invalid, excluding incomplete lap 3)
+    const lapBadges = screen.getAllByText('2 laps');
+    expect(lapBadges.length).toBeGreaterThanOrEqual(1);
+    // Distance driven: (7004 / 1000) * 2 = 14.008 km -> 14 km
+    expect(screen.getByText('14 km')).toBeInTheDocument();
+    expect(screen.getByText('Total Laps Driven')).toBeInTheDocument();
+  });
+
   it('renders empty search state and provides Reset All Filters button', () => {
     const setSelectedTrack = vi.fn();
     const setSelectedCarClass = vi.fn();

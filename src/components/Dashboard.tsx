@@ -149,12 +149,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const p = s.playerDriver;
     if (!p) continue;
 
-    const lapCount = p.lapsCount || 0;
-    totalLaps += lapCount;
+    // Completed laps count (valid or invalid, but completed with recorded lap time)
+    const completedLapsCount = p.laps && p.laps.length > 0
+      ? p.laps.filter(l => l.lapTime !== null && l.lapTime > 0).length
+      : (p.lapsCount || 0);
+
+    totalLaps += completedLapsCount;
 
     // Track Distance
     const trackMeters = s.trackLengthMeters || 5000;
-    totalDistanceKm += (trackMeters / 1000) * lapCount;
+    totalDistanceKm += (trackMeters / 1000) * completedLapsCount;
 
     // Track Driving Time from driver laps or average lap times
     if (p.laps && p.laps.length > 0) {
@@ -163,16 +167,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           totalDrivingSeconds += lap.lapTime;
         }
       }
-    } else if (p.avgLapTime && lapCount > 0) {
-      totalDrivingSeconds += p.avgLapTime * lapCount;
+    } else if (p.avgLapTime && completedLapsCount > 0) {
+      totalDrivingSeconds += p.avgLapTime * completedLapsCount;
     }
 
-    if (s.trackVenue && lapCount > 0) {
-      trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + lapCount;
+    if (s.trackVenue && completedLapsCount > 0) {
+      trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + completedLapsCount;
     }
 
-    if (p.carType && lapCount > 0) {
-      carLapsMap[p.carType] = (carLapsMap[p.carType] || 0) + lapCount;
+    if (p.carType && completedLapsCount > 0) {
+      carLapsMap[p.carType] = (carLapsMap[p.carType] || 0) + completedLapsCount;
     }
 
     if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {

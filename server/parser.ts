@@ -446,6 +446,9 @@ export class LmuParser {
       ? Math.floor(100 / avgVePerLap)
       : null;
 
+    // Completed laps (valid or not, but completed with recorded lap time)
+    const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
+
     return {
       name,
       carType,
@@ -471,7 +474,7 @@ export class LmuParser {
       avgVePerLap,
       estVeStintLaps,
       top3LapsCount,
-      lapsCount: laps.length,
+      lapsCount: completedLaps.length,
       laps,
     };
   }
