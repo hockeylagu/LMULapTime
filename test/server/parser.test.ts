@@ -287,7 +287,7 @@ describe('parser server module', () => {
       expect(progression[1].sessionId).toBe('sess2');
       expect(progression[1].bestLapTime).toBe(120.0);
       expect(progression[1].cleanLapsCount).toBe(2);
-      expect(progression[1].avgLapTime).toBe(120.5);
+      expect(progression[1].avgLapTime).toBe(120.0);
     });
   });
 

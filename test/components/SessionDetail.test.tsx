@@ -286,7 +286,7 @@ describe('SessionDetail component', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
-      expect(screen.getByText(/Sim Driver/)).toBeInTheDocument();
+      expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
       expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
     });
@@ -313,7 +313,7 @@ describe('SessionDetail component', () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Sim Driver/)).toBeInTheDocument();
+      expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
     });
 
     // Switch driver
@@ -560,9 +560,119 @@ describe('SessionDetail component', () => {
     fireEvent.click(topSpeedBtn);
     expect(topSpeedBtn).toHaveClass('bg-lmu-accent');
 
+    // Switch to Positions
+    const positionsBtn = screen.getByRole('button', { name: /Positions/i });
+    fireEvent.click(positionsBtn);
+    expect(positionsBtn).toHaveClass('bg-lmu-accent');
+    expect(screen.getByText(/Driver Position Progression/i)).toBeInTheDocument();
+
     // Switch back to Lap Pace
     const lapPaceBtn = screen.getByRole('button', { name: /Lap Pace/i });
     fireEvent.click(lapPaceBtn);
     expect(lapPaceBtn).toHaveClass('bg-lmu-accent');
+  });
+
+  it('renders race standings, position deltas, and multi-driver classification for race sessions', async () => {
+    const mockRaceSession = {
+      ...mockDetailedSession,
+      sessionType: 'Race',
+      sessionName: 'Race 1',
+      playerDriver: {
+        ...mockDetailedSession.playerDriver,
+        gridPosition: 5,
+        classGridPosition: 3,
+        position: 2,
+        classPosition: 1,
+        positionGain: 3,
+        classPositionGain: 2,
+        finishStatus: 'Finished',
+        lapsLedCount: 4,
+        highestPosition: 1,
+        pitStopsCount: 1,
+      },
+      drivers: [
+        {
+          ...mockDetailedSession.playerDriver,
+          gridPosition: 5,
+          classGridPosition: 3,
+          position: 2,
+          classPosition: 1,
+          positionGain: 3,
+          finishStatus: 'Finished',
+          pitStopsCount: 1,
+        },
+        {
+          name: 'AI Driver 2',
+          carType: 'Porsche 963',
+          carClass: 'LMH',
+          carNumber: '5',
+          teamName: 'Porsche Penske',
+          isPlayer: false,
+          gridPosition: 1,
+          classGridPosition: 1,
+          position: 1,
+          classPosition: 2,
+          positionGain: 0,
+          finishStatus: 'Finished',
+          bestLapTime: 122.5,
+          bestLapTimeString: '2:02.500',
+          lapsCount: 3,
+          pitStopsCount: 1,
+          laps: [],
+        },
+      ],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/sess123')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockRaceSession),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Race Standings & Position Deltas/i)).toBeInTheDocument();
+    });
+
+    // Check race banner elements
+    expect(screen.getByText('Starting Grid')).toBeInTheDocument();
+    expect(screen.getByText('Position Delta')).toBeInTheDocument();
+    expect(screen.getByText('Laps Led (P1)')).toBeInTheDocument();
+    expect(screen.getByText('Peak Position')).toBeInTheDocument();
+    expect(screen.getByText(/Session Classification & Driver Standings/i)).toBeInTheDocument();
+
+    // Single class session: Class Pos header is hidden
+    expect(screen.queryByText('Class Pos')).not.toBeInTheDocument();
+
+    // Selecting another driver must not add (You) to that opponent
+    const opponentRow = screen.getByText('AI Driver 2');
+    fireEvent.click(opponentRow);
+    expect(screen.queryByText(/AI Driver 2\s*\(You\)/i)).not.toBeInTheDocument();
+  });
+
+  it('renders session lap average and sector averages with interactive legend toggle', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Session Lap Average')).toBeInTheDocument();
+      expect(screen.getByText('Sectors (Best / Avg)')).toBeInTheDocument();
+    });
+
+    // Check that average lap time across 3 laps (123.0 + 122.0 + 135.0)/3 = 126.666 -> '2:06.666' or '2:06.667'
+    expect(screen.getByText(/Clean Laps:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/34\.000/).length).toBeGreaterThan(0);
+
+    // Switch to Sectors chart
+    const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
+    fireEvent.click(sectorsBtn);
+    expect(sectorsBtn.className).toContain('bg-lmu-accent');
   });
 });

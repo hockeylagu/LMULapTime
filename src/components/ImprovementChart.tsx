@@ -10,7 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { TrendingUp, Zap, Trophy, Clock, Calendar } from 'lucide-react';
-import { formatTime, getDisplayTrackName, matchesSessionType } from '../utils/formatters';
+import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types.js';
 
@@ -113,7 +113,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     return matchesTrack && matchesClass && matchesModel && matchesType && matchesSearch;
   });
 
-  const allTrackData = rawTrackData.filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null));
+  const allTrackData = rawTrackData
+    .filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null))
+    .sort((a, b) => {
+      const timeA = a.timestamp || parseDateStringToTimestamp(a.dateString);
+      const timeB = b.timestamp || parseDateStringToTimestamp(b.dateString);
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.dateString || '').localeCompare(b.dateString || '');
+    });
 
   // Apply Date Range / Session Count filter
   const trackData = (() => {
@@ -165,7 +172,10 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       ? parseFloat((prevValidLaps.reduce((sum, val) => sum + val, 0) / prevValidLaps.length).toFixed(3))
       : null;
 
+    const chartKey = `session_${p.sessionId || idx}_${idx}`;
+
     return {
+      chartKey,
       sessionId: p.sessionId,
       session: `${labelSession} #${idx + 1}${sessionDate ? ` (${sessionDate})` : ''}`,
       shortSession: shortSessionLabel,
@@ -208,6 +218,19 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+
+      // Deduplicate payload entries and filter out missing values
+      const seen = new Set<string>();
+      const uniqueEntries = payload.filter((entry: any) => {
+        if (entry.value === null || entry.value === undefined || isNaN(Number(entry.value))) {
+          return false;
+        }
+        const key = String(entry.dataKey || entry.name || '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       return (
         <div className="bg-lmu-card/95 backdrop-blur-md border border-lmu-border p-3.5 rounded-xl shadow-xl space-y-2 text-xs min-w-[210px]">
           <div>
@@ -225,18 +248,20 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             </p>
           </div>
 
-          <div className="border-t border-lmu-border/60 pt-2 space-y-1">
-            {payload.map((entry: any, index: number) => (
-              <div key={`item-${index}`} className="flex items-center justify-between text-xs font-mono">
-                <span style={{ color: entry.color }} className="font-sans font-medium text-[11px]">
-                  {entry.name}:
-                </span>
-                <span className="font-bold text-white">
-                  {entry.value !== null && entry.value !== undefined ? formatTime(Number(entry.value)) : '-'}
-                </span>
-              </div>
-            ))}
-          </div>
+          {uniqueEntries.length > 0 && (
+            <div className="border-t border-lmu-border/60 pt-2 space-y-1">
+              {uniqueEntries.map((entry: any, index: number) => (
+                <div key={`item-${index}`} className="flex items-center justify-between text-xs font-mono">
+                  <span style={{ color: entry.color }} className="font-sans font-medium text-[11px]">
+                    {entry.name}:
+                  </span>
+                  <span className="font-bold text-white">
+                    {formatTime(Number(entry.value))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {onSelectSession && (
             <p className="text-[10px] text-lmu-accent pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
@@ -445,7 +470,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#232A36" />
                 <XAxis
-                  dataKey="shortSession"
+                  dataKey="chartKey"
                   stroke="#8D99AE"
                   tick={{ fill: '#8D99AE', fontSize: 11 }}
                   interval={chartData.length > 10 ? 'preserveStartEnd' : 0}
@@ -453,6 +478,10 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                   angle={chartData.length > 5 ? -18 : 0}
                   textAnchor={chartData.length > 5 ? 'end' : 'middle'}
                   dy={chartData.length > 5 ? 4 : 0}
+                  tickFormatter={(val) => {
+                    const item = chartData.find(c => c.chartKey === val);
+                    return item ? item.shortSession : val;
+                  }}
                 />
                 <YAxis
                   domain={[minTime, maxTime]}

@@ -111,4 +111,56 @@ describe('ImprovementChart component', () => {
 
     expect(screen.getByText(/No session data found for this track/i)).toBeInTheDocument();
   });
+
+  it('orders out-of-sequence progression points chronologically', () => {
+    const reversedData = [...mockProgressionData].reverse();
+    render(
+      <ImprovementChart
+        progression={reversedData}
+        tracks={['Spa']}
+        selectedTrack="Spa"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    // Verify first session is P1 and delta/improvement is computed from older to newer (122.0 - 121.0 = -1.000s)
+    expect(screen.getByText('-1.000s')).toBeInTheDocument();
+  });
+
+  it('handles multiple sessions on the same date with identical session names properly', () => {
+    const sameDateSessions = [
+      {
+        ...mockProgressionData[0],
+        sessionId: 'sess-r1-a',
+        sessionName: 'R1',
+        sessionType: 'Race',
+        dateString: '2026/09/02 12:00:00',
+        bestLapTime: 106.446,
+      },
+      {
+        ...mockProgressionData[1],
+        sessionId: 'sess-r1-b',
+        sessionName: 'R1',
+        sessionType: 'Race',
+        dateString: '2026/09/02 13:33:01',
+        bestLapTime: 105.123,
+      },
+    ];
+
+    render(
+      <ImprovementChart
+        progression={sameDateSessions}
+        tracks={['Spa']}
+        selectedTrack="Spa"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Progression Timeline/i)).toBeInTheDocument();
+    expect(screen.getByText('1:45.123')).toBeInTheDocument();
+  });
 });

@@ -310,4 +310,25 @@ describe('TrackDetail component', () => {
     fireEvent.click(cardsButton);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
+
+  it('allows sorting sessions by Best Position (P1 First) in TrackDetail', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[comboboxes.length - 1];
+    fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
+    expect(sortSelect).toHaveValue('pos-asc');
+  });
 });

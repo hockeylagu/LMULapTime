@@ -869,46 +869,56 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                               <p className="font-bold text-white">{label} Delta vs Baseline</p>
                               <span className="text-[10px] text-lmu-gold">Base: {baselineLap.tag || `Lap ${baselineLap.lapNum || '-'}`}</span>
                             </div>
-                            {payload.map((p: any) => {
-                              const lap = selectedLaps.find(l => l.id === p.dataKey);
-                              const isBase = lap?.id === baselineLap.id;
-                              const rawSecVal = metricKey && lap ? lap[metricKey] : null;
-                              const deltaVal = p.value as number;
+                            {(() => {
+                              const seen = new Set<string>();
+                              const uniquePayload = payload.filter((p: any) => {
+                                const key = String(p.dataKey || '');
+                                if (!key || seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                              });
 
-                              const deltaColor = isBase
-                                ? '#ECC94B'
-                                : deltaVal < 0
-                                ? '#48BB78'
-                                : deltaVal > 0
-                                ? '#F56565'
-                                : '#A0AEC0';
+                              return uniquePayload.map((p: any) => {
+                                const lap = selectedLaps.find(l => l.id === p.dataKey);
+                                const isBase = lap?.id === baselineLap.id;
+                                const rawSecVal = metricKey && lap ? lap[metricKey] : null;
+                                const deltaVal = p.value as number;
 
-                              const formattedDelta = isBase
-                                ? '±0.000s (Baseline)'
-                                : deltaVal > 0
-                                ? `+${deltaVal.toFixed(3)}s`
-                                : deltaVal < 0
-                                ? `${deltaVal.toFixed(3)}s`
-                                : '0.000s';
+                                const deltaColor = isBase
+                                  ? '#ECC94B'
+                                  : deltaVal < 0
+                                  ? '#48BB78'
+                                  : deltaVal > 0
+                                  ? '#F56565'
+                                  : '#A0AEC0';
 
-                              return (
-                                <div key={p.dataKey} className="flex items-center justify-between gap-4 py-0.5">
-                                  <span style={{ color: p.color }} className="font-semibold truncate max-w-[140px]">
-                                    {lap?.tag || `Lap ${lap?.lapNum || '-'}`}:
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold font-mono" style={{ color: deltaColor }}>
-                                      {formattedDelta}
+                                const formattedDelta = isBase
+                                  ? '±0.000s (Baseline)'
+                                  : deltaVal > 0
+                                  ? `+${deltaVal.toFixed(3)}s`
+                                  : deltaVal < 0
+                                  ? `${deltaVal.toFixed(3)}s`
+                                  : '0.000s';
+
+                                return (
+                                  <div key={p.dataKey} className="flex items-center justify-between gap-4 py-0.5">
+                                    <span style={{ color: p.color }} className="font-semibold truncate max-w-[140px]">
+                                      {lap?.tag || `Lap ${lap?.lapNum || '-'}`}:
                                     </span>
-                                    {rawSecVal !== null && rawSecVal !== undefined && (
-                                      <span className="text-lmu-muted text-[11px] font-mono">
-                                        ({formatTime(rawSecVal)})
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold font-mono" style={{ color: deltaColor }}>
+                                        {formattedDelta}
                                       </span>
-                                    )}
+                                      {rawSecVal !== null && rawSecVal !== undefined && (
+                                        <span className="text-lmu-muted text-[11px] font-mono">
+                                          ({formatTime(rawSecVal)})
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              });
+                            })()}
                           </div>
                         );
                       }}
