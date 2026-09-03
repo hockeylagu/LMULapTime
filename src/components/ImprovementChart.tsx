@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { TrendingUp, Zap, Trophy, Clock, Calendar } from 'lucide-react';
+import { TrendingUp, Zap, Trophy, Clock, Calendar, Activity } from 'lucide-react';
 import { formatTime, getDisplayTrackName, matchesSessionType, compareSessions } from '../utils/formatters';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types.js';
@@ -37,6 +37,9 @@ export interface SessionProgressionPoint {
   cleanLapsCount: number;
   totalLapsCount: number;
   avgLapTime: number | null;
+  top3AvgLapTime?: number | null;
+  consistencyScore?: number | null;
+  theoreticalGap?: number | null;
   matchingReplayFile?: string;
 }
 
@@ -80,7 +83,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   timeRange,
   onTimeRangeChange,
 }) => {
-  const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical'>('bestLap');
+  const [metric, setMetric] = useState<'bestLap' | 'sectors' | 'theoretical' | 'consistency'>('bestLap');
   const [internalTimeRange, setInternalTimeRange] = useState<TimeRangeFilter>('all');
   const activeRange = timeRange !== undefined ? timeRange : internalTimeRange;
   const setRange = onTimeRangeChange || setInternalTimeRange;
@@ -148,6 +151,22 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     ? parseFloat((firstValidSession.bestLapTime - bestLapTimeInTrack).toFixed(3))
     : null;
 
+  // Top 3 Clean Lap True Pace stats
+  const sessionsWithTop3 = trackData.filter(p => p.top3AvgLapTime !== null && p.top3AvgLapTime !== undefined && p.top3AvgLapTime > 0);
+  const firstTop3 = sessionsWithTop3[0]?.top3AvgLapTime;
+  const bestTop3 = sessionsWithTop3.length > 0
+    ? Math.min(...sessionsWithTop3.map(p => p.top3AvgLapTime as number))
+    : null;
+  const top3Improvement = (firstTop3 && bestTop3 && sessionsWithTop3.length > 1)
+    ? parseFloat((firstTop3 - bestTop3).toFixed(3))
+    : null;
+
+  // Latest / best theoretical execution gap
+  const sessionWithTheo = [...trackData].reverse().find(p => p.bestLapTime && p.theoreticalBest);
+  const latestTheoreticalGap = sessionWithTheo && sessionWithTheo.bestLapTime && sessionWithTheo.theoreticalBest
+    ? parseFloat((sessionWithTheo.bestLapTime - sessionWithTheo.theoreticalBest).toFixed(3))
+    : null;
+
   // Format chart data with pure 3-session moving average
   const chartData = trackData.map((p, idx) => {
     const sessionDate = p.dateString ? p.dateString.split(' ')[0] : '';
@@ -168,6 +187,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       : null;
 
     const chartKey = `session_${p.sessionId || idx}_${idx}`;
+    const top3Avg = p.top3AvgLapTime ?? null;
+    const theoreticalGap = p.theoreticalGap ?? (p.bestLapTime && p.theoreticalBest ? parseFloat((p.bestLapTime - p.theoreticalBest).toFixed(3)) : null);
+    const consistencyScore = p.consistencyScore ?? null;
 
     return {
       chartKey,
@@ -180,10 +202,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       weather: p.weatherInfo,
       bestLap: p.bestLapTime,
       bestLapStr: formatTime(p.bestLapTime),
+      top3Avg,
+      top3AvgStr: formatTime(top3Avg),
       movingAvg,
       movingAvgStr: formatTime(movingAvg),
       theoretical: p.theoreticalBest,
       theoreticalStr: formatTime(p.theoreticalBest),
+      theoreticalGap,
+      consistencyScore,
       s1: p.bestS1,
       s1Str: formatTime(p.bestS1),
       s2: p.bestS2,
@@ -203,11 +229,17 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       ? trackData.flatMap(p => [p.bestS1, p.bestS2, p.bestS3])
       : metric === 'theoretical'
       ? [...trackData.flatMap(p => [p.bestLapTime, p.theoreticalBest]), ...chartData.map(c => c.movingAvg)]
-      : [...trackData.flatMap(p => [p.bestLapTime, p.avgLapTime]), ...chartData.map(c => c.movingAvg)]
+      : metric === 'consistency'
+      ? chartData.map(c => c.consistencyScore).filter((c): c is number => c !== null && c > 0)
+      : [...trackData.flatMap(p => [p.bestLapTime, p.avgLapTime, p.top3AvgLapTime]), ...chartData.map(c => c.movingAvg)]
   ).filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
 
-  const minTime = validTimes.length > 0 ? Math.max(0, Math.floor(Math.min(...validTimes) - 2)) : 0;
-  const maxTime = validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
+  const minTime = metric === 'consistency'
+    ? (validTimes.length > 0 ? Math.max(70, Math.floor(Math.min(...validTimes) - 2)) : 80)
+    : (validTimes.length > 0 ? Math.max(0, Math.floor(Math.min(...validTimes) - 2)) : 0);
+  const maxTime = metric === 'consistency'
+    ? 100
+    : (validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100);
 
   // Custom rich tooltip
   const CustomTooltip = ({ active, payload }: any) => {
@@ -251,12 +283,32 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                     {entry.name}:
                   </span>
                   <span className="font-bold text-white">
-                    {formatTime(Number(entry.value))}
+                    {entry.dataKey === 'consistencyScore'
+                      ? `${Number(entry.value).toFixed(1)}%`
+                      : formatTime(Number(entry.value))}
                   </span>
                 </div>
               ))}
             </div>
           )}
+
+          <div className="flex items-center gap-2 flex-wrap pt-1 text-[10px] text-lmu-muted border-t border-lmu-border/40 font-mono">
+            {data.top3AvgStr && (
+              <span title="Average of 3 fastest valid laps in session">
+                Top 3: <strong className="text-cyan-300 font-mono">{data.top3AvgStr}</strong>
+              </span>
+            )}
+            {data.theoreticalGap !== null && (
+              <span title="Gap between actual PB and theoretical best">
+                Opt Gap: <strong className="text-emerald-300 font-mono">+{data.theoreticalGap.toFixed(3)}s</strong>
+              </span>
+            )}
+            {data.consistencyScore !== null && (
+              <span title="Pace consistency rating">
+                Consist: <strong className="text-emerald-300 font-mono">{data.consistencyScore.toFixed(1)}%</strong>
+              </span>
+            )}
+          </div>
 
           {onSelectSession && (
             <p className="text-[10px] text-lmu-accent pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
@@ -319,7 +371,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
       {/* Highlights / Improvement Stat Banner */}
       {trackData.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
             <div>
               <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions Parsed</p>
@@ -328,7 +380,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                 {selectedCarModel !== 'All' ? `${selectedCarModel}` : `${selectedCarClass === 'All' ? 'All Classes' : selectedCarClass}`}
               </p>
             </div>
-            <Clock className="w-8 h-8 text-lmu-blue opacity-50" />
+            <Clock className="w-8 h-8 text-lmu-blue opacity-50 shrink-0" />
           </div>
 
           <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
@@ -371,7 +423,24 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                   : 'Session progression tracking'}
               </p>
             </div>
-            <Zap className="w-8 h-8 text-lmu-green opacity-50" />
+            <Zap className="w-8 h-8 text-lmu-green opacity-50 shrink-0" />
+          </div>
+
+          <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
+            <div>
+              <p className="text-xs text-lmu-muted uppercase font-semibold">Top 3 Lap True Pace</p>
+              <h4 className={`text-2xl font-extrabold mt-0.5 font-mono ${top3Improvement !== null && top3Improvement > 0 ? 'text-cyan-400' : 'text-white'}`}>
+                {top3Improvement !== null
+                  ? `${top3Improvement > 0 ? '-' : '+'}${Math.abs(top3Improvement).toFixed(3)}s`
+                  : bestTop3 ? formatTime(bestTop3) : 'N/A'}
+              </h4>
+              <p className="text-[11px] text-lmu-muted mt-0.5">
+                {bestTop3
+                  ? `Best 3-Lap: ${formatTime(bestTop3)}${latestTheoreticalGap !== null ? ` • Opt: +${latestTheoreticalGap.toFixed(3)}s` : ''}`
+                  : 'Multi-lap pace consistency'}
+              </p>
+            </div>
+            <Activity className="w-8 h-8 text-cyan-400 opacity-50 shrink-0" />
           </div>
         </div>
       )}
@@ -414,14 +483,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             </div>
 
             {/* Metric Toggle */}
-            <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium">
+            <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium flex-wrap">
               <button
                 onClick={() => setMetric('bestLap')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${
                   metric === 'bestLap' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
                 }`}
               >
-                Lap Pace (Best, Trend & Avg)
+                Lap Pace (Best, Top 3 & Trends)
               </button>
               <button
                 onClick={() => setMetric('sectors')}
@@ -439,6 +508,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
               >
                 Theoretical Best
               </button>
+              <button
+                onClick={() => setMetric('consistency')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  metric === 'consistency' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                Consistency Rating (%)
+              </button>
             </div>
           </div>
         </div>
@@ -448,8 +525,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
             No session data found for this track matching current filters.
           </div>
         ) : (
-          <div className="w-full h-80 min-h-[320px] pt-2">
-            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
+          <div className="w-full h-[360px] min-h-[330px] pt-2">
+            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
               <LineChart
                 key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}-${metric}`}
                 data={chartData}
@@ -482,7 +559,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                   domain={[minTime, maxTime]}
                   stroke="#8D99AE"
                   tick={{ fill: '#8D99AE', fontSize: 12 }}
-                  tickFormatter={(val) => formatTime(val)}
+                  tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ paddingTop: '15px' }} />
@@ -501,10 +578,20 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                     />
                     <Line
                       type="monotone"
+                      dataKey="top3Avg"
+                      name="Top 3 Lap Avg (True Pace)"
+                      stroke="#06B6D4"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: '#06B6D4', cursor: onSelectSession ? 'pointer' : 'default' }}
+                      activeDot={{ r: 7 }}
+                      connectNulls={true}
+                    />
+                    <Line
+                      type="monotone"
                       dataKey="movingAvg"
                       name="3-Session Moving Avg"
                       stroke="#F59E0B"
-                      strokeWidth={2.5}
+                      strokeWidth={2}
                       strokeDasharray="6 4"
                       dot={{ r: 3.5, fill: '#F59E0B' }}
                       connectNulls={true}
@@ -514,9 +601,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       dataKey="avgLap"
                       name="Session Avg Lap"
                       stroke="#8ECAE6"
-                      strokeWidth={2}
+                      strokeWidth={1.5}
                       strokeDasharray="3 3"
-                      dot={{ r: 3.5, fill: '#8ECAE6' }}
+                      dot={{ r: 3, fill: '#8ECAE6' }}
                       connectNulls={true}
                     />
                   </>
@@ -555,6 +642,19 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
                       connectNulls={true}
                     />
                   </>
+                )}
+
+                {metric === 'consistency' && (
+                  <Line
+                    type="monotone"
+                    dataKey="consistencyScore"
+                    name="Pace Consistency Rating (%)"
+                    stroke="#10B981"
+                    strokeWidth={3}
+                    dot={{ r: 5, fill: '#10B981', cursor: onSelectSession ? 'pointer' : 'default' }}
+                    activeDot={{ r: 8 }}
+                    connectNulls={true}
+                  />
                 )}
 
                 {metric === 'sectors' && (

@@ -288,6 +288,9 @@ describe('parser server module', () => {
       expect(progression[1].bestLapTime).toBe(120.0);
       expect(progression[1].cleanLapsCount).toBe(2);
       expect(progression[1].avgLapTime).toBe(120.0);
+      expect(progression[1].top3AvgLapTime).toBe(120.0);
+      expect(progression[1].theoreticalGap).toBe(0);
+      expect(progression[1].consistencyScore).toBe(99.6);
     });
   });
 

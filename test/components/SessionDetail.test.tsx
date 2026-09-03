@@ -289,6 +289,8 @@ describe('SessionDetail component', () => {
       expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
       expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
+      expect(screen.getByText('Top 3 Lap Avg')).toBeInTheDocument();
+      expect(screen.getByText('Δ Prev')).toBeInTheDocument();
     });
 
     // Metric buttons on telemetry chart

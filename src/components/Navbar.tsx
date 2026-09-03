@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-lmu-border px-4 lg:px-8 py-3.5">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-[1500px] w-full mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
 
         {/* Brand logo & title */}
         <div

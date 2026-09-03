@@ -64,6 +64,7 @@ describe('ImprovementChart component', () => {
     expect(screen.getByText('Lap & Sector Improvement Over Time')).toBeInTheDocument();
     expect(screen.getByText('Total Sessions Parsed')).toBeInTheDocument();
     expect(screen.getByText(/Your Best/i)).toBeInTheDocument();
+    expect(screen.getByText('Top 3 Lap True Pace')).toBeInTheDocument();
 
     // Switch metrics
     const theoreticalBtn = screen.getByRole('button', { name: /theoretical/i });
@@ -71,6 +72,9 @@ describe('ImprovementChart component', () => {
 
     const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
     fireEvent.click(sectorsBtn);
+
+    const consistencyBtn = screen.getByRole('button', { name: /consistency rating/i });
+    fireEvent.click(consistencyBtn);
 
     const lapPaceBtn = screen.getByRole('button', { name: /lap pace/i });
     fireEvent.click(lapPaceBtn);

@@ -4,6 +4,9 @@ import {
   createTheoreticalBestLap,
   createBenchmarkLaps,
   filterLapsByCarCategory,
+  computeLapToLapDelta,
+  computeTopNLapAverage,
+  computeConsistencyRating,
   ComparableLap,
 } from '../../src/utils/lapComparison.js';
 import { ReferenceLaptimeEntry } from '../../server/types.js';
@@ -171,6 +174,99 @@ describe('lapComparison utility', () => {
       const result = filterLapsByCarCategory(mixedLaps, 'LMGT3', 'BMW M4 GT3');
       expect(result.length).toBe(1);
       expect(result[0].carType).toBe('BMW M4 GT3');
+    });
+  });
+
+  describe('computeLapToLapDelta', () => {
+    it('returns null and fallback string when previous lap or current lap is missing or invalid', () => {
+      expect(computeLapToLapDelta(null, 120.0)).toEqual({
+        delta: null,
+        formatted: '--',
+        deltaClass: 'text-lmu-muted',
+        isFaster: null,
+      });
+      expect(computeLapToLapDelta(120.0, null)).toEqual({
+        delta: null,
+        formatted: '--',
+        deltaClass: 'text-lmu-muted',
+        isFaster: null,
+      });
+      expect(computeLapToLapDelta(0, 120.0).formatted).toBe('--');
+    });
+
+    it('computes exact zero delta for equal consecutive lap times', () => {
+      const res = computeLapToLapDelta(122.5, 122.5);
+      expect(res.delta).toBe(0);
+      expect(res.formatted).toBe('±0.000s');
+      expect(res.isFaster).toBe(false);
+    });
+
+    it('computes negative delta with emerald styling when current lap is faster than previous lap', () => {
+      const res = computeLapToLapDelta(123.456, 122.123);
+      expect(res.delta).toBe(-1.333);
+      expect(res.formatted).toBe('-1.333s');
+      expect(res.deltaClass).toContain('text-emerald-400');
+      expect(res.isFaster).toBe(true);
+    });
+
+    it('computes positive delta with rose styling when current lap is slower than previous lap', () => {
+      const res = computeLapToLapDelta(122.0, 122.456);
+      expect(res.delta).toBe(0.456);
+      expect(res.formatted).toBe('+0.456s');
+      expect(res.deltaClass).toContain('text-rose-400');
+      expect(res.isFaster).toBe(false);
+    });
+  });
+
+  describe('computeTopNLapAverage', () => {
+    it('returns null when laps array is empty or contains no valid times', () => {
+      expect(computeTopNLapAverage([])).toBeNull();
+      expect(computeTopNLapAverage([{ lapTime: null }])).toBeNull();
+    });
+
+    it('computes average of the top 3 clean laps, excluding lap 1 when multiple laps exist', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 125.0, isValid: true }, // out-lap excluded
+        { lapNum: 2, lapTime: 121.0, isValid: true },
+        { lapNum: 3, lapTime: 120.0, isValid: true },
+        { lapNum: 4, lapTime: 122.0, isValid: true },
+        { lapNum: 5, lapTime: 123.0, isValid: true },
+      ];
+      // Top 3 from laps 2-5 are 120.0, 121.0, 122.0 -> average is 121.000
+      expect(computeTopNLapAverage(laps, 3)).toBe(121.0);
+    });
+
+    it('ignores invalid laps and pit stop laps', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 120.0, isValid: true },
+        { lapNum: 2, lapTime: 119.0, isValid: false }, // invalid
+        { lapNum: 3, lapTime: 118.0, isValid: true, isPitStop: true }, // pit stop
+        { lapNum: 4, lapTime: 121.0, isValid: true },
+        { lapNum: 5, lapTime: 122.0, isValid: true },
+      ];
+      // Valid flying laps are lap 4 (121.0) and lap 5 (122.0) -> average is 121.5
+      expect(computeTopNLapAverage(laps, 3)).toBe(121.5);
+    });
+  });
+
+  describe('computeConsistencyRating', () => {
+    it('returns 100% and 0 stdDev for a single lap', () => {
+      const res = computeConsistencyRating([{ lapNum: 1, lapTime: 120.0, isValid: true }]);
+      expect(res.consistencyScore).toBe(100);
+      expect(res.stdDev).toBe(0);
+      expect(res.avgLapTime).toBe(120.0);
+    });
+
+    it('returns high consistency score for tightly grouped laps', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 125.0, isValid: true },
+        { lapNum: 2, lapTime: 120.0, isValid: true },
+        { lapNum: 3, lapTime: 120.1, isValid: true },
+        { lapNum: 4, lapTime: 120.05, isValid: true },
+      ];
+      const res = computeConsistencyRating(laps);
+      expect(res.consistencyScore).toBeGreaterThan(99);
+      expect(res.stdDev).toBeLessThan(0.1);
     });
   });
 });

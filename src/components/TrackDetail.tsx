@@ -196,6 +196,15 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const trackProgression: SessionProgressionPoint[] = filteredSessions.length > 0
     ? filteredSessions.map(s => {
         const p = s.playerDriver;
+        const matchingPoint = progression.find(pt => pt.sessionId === s.id);
+        const top3AvgLapTime = matchingPoint?.top3AvgLapTime ?? null;
+        const consistencyScore = matchingPoint?.consistencyScore ?? null;
+        const theoreticalGap = matchingPoint?.theoreticalGap ?? (
+          p?.bestLapTime && p?.theoreticalBest
+            ? parseFloat((p.bestLapTime - p.theoreticalBest).toFixed(3))
+            : null
+        );
+
         return {
           sessionId: s.id,
           timestamp: parseDateStringToTimestamp(s.timeString),
@@ -217,6 +226,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
           cleanLapsCount: p?.lapsCount || 0,
           totalLapsCount: p?.lapsCount || 0,
           avgLapTime: p?.avgLapTime ?? null,
+          top3AvgLapTime,
+          theoreticalGap,
+          consistencyScore,
           matchingReplayFile: s.matchingReplayFile?.name,
         };
       }).sort((a, b) => {

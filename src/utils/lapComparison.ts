@@ -44,6 +44,7 @@ export interface ComparableLap {
   isTheoreticalBest?: boolean;
   isSessionBest?: boolean;
   isAllTimePB?: boolean;
+  isOverallTrackBest?: boolean;
   isBenchmarkTarget?: boolean;
   benchmarkCategory?: string;
   tag?: string; // e.g. "Session Best", "All-Time Best", "Theoretical Best", "Alien Benchmark"
@@ -147,7 +148,9 @@ export function createTheoreticalBestLap(
   driverName = 'Theoretical Optimal',
   carClass = 'Class Best',
   carType = 'Optimal Sectors',
-  tag = 'Theoretical Best'
+  tag = 'Theoretical Best',
+  paceCategory?: PaceCategory | null,
+  pacePercentage?: number | null
 ): ComparableLap {
   const lapTime = s1 !== null && s2 !== null && s3 !== null ? parseFloat((s1 + s2 + s3).toFixed(3)) : null;
   return {
@@ -166,6 +169,8 @@ export function createTheoreticalBestLap(
     topSpeed: null,
     isValid: true,
     isTheoreticalBest: true,
+    paceCategory: paceCategory || null,
+    pacePercentage: pacePercentage !== undefined ? pacePercentage : null,
     tag,
   };
 }
@@ -262,3 +267,95 @@ export function filterLapsByCarCategory(
     return true;
   });
 }
+
+export interface LapToLapDeltaResult {
+  delta: number | null;
+  formatted: string;
+  deltaClass: string;
+  isFaster: boolean | null;
+}
+
+/**
+ * Computes difference from previous completed lap to current lap (Lap N - Lap N-1).
+ * Negative delta = faster than previous lap (improvement).
+ * Positive delta = slower than previous lap.
+ */
+export function computeLapToLapDelta(
+  prevLapTime: number | null | undefined,
+  currentLapTime: number | null | undefined
+): LapToLapDeltaResult {
+  if (
+    prevLapTime === null ||
+    prevLapTime === undefined ||
+    currentLapTime === null ||
+    currentLapTime === undefined ||
+    prevLapTime <= 0 ||
+    currentLapTime <= 0
+  ) {
+    return { delta: null, formatted: '--', deltaClass: 'text-lmu-muted', isFaster: null };
+  }
+
+  const delta = parseFloat((currentLapTime - prevLapTime).toFixed(3));
+  if (Math.abs(delta) < 0.0005) {
+    return { delta: 0, formatted: '±0.000s', deltaClass: 'text-white font-semibold', isFaster: false };
+  }
+  if (delta < 0) {
+    return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-emerald-400 font-bold', isFaster: true };
+  }
+  return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-rose-400 font-medium', isFaster: false };
+}
+
+/**
+ * Computes average of the top N cleanest/fastest flying laps in a session.
+ */
+export function computeTopNLapAverage(
+  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; lapNum?: number }>,
+  n = 3
+): number | null {
+  const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
+  const hasMultiple = completed.length > 1;
+  const validFlying = completed.filter(
+    l => (l.isValid ?? true) && !l.isPitStop && (!hasMultiple || (l.lapNum ?? 2) > 1)
+  );
+  const candidates = validFlying.length > 0 ? validFlying : completed.filter(l => l.isValid ?? true);
+
+  if (candidates.length === 0) return null;
+  const sorted = [...candidates].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
+  const topSlice = sorted.slice(0, n);
+  const sum = topSlice.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+  return parseFloat((sum / topSlice.length).toFixed(3));
+}
+
+/**
+ * Computes consistency rating (%) and standard deviation across clean flying laps.
+ */
+export function computeConsistencyRating(
+  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; lapNum?: number }>
+): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null } {
+  const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
+  const hasMultiple = completed.length > 1;
+  const validFlying = completed.filter(
+    l => (l.isValid ?? true) && !l.isPitStop && (!hasMultiple || (l.lapNum ?? 2) > 1)
+  );
+  const candidates = validFlying.length > 0 ? validFlying : completed.filter(l => l.isValid ?? true);
+
+  if (candidates.length === 0) return { consistencyScore: null, avgLapTime: null, stdDev: null };
+
+  const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+  const avg = sum / candidates.length;
+
+  if (candidates.length <= 1) {
+    return { consistencyScore: 100, avgLapTime: parseFloat(avg.toFixed(3)), stdDev: 0 };
+  }
+
+  const variance = candidates.reduce((acc, l) => acc + Math.pow((l.lapTime || 0) - avg, 2), 0) / candidates.length;
+  const stdDev = Math.sqrt(variance);
+  const score = Math.max(0, Math.min(100, (1 - stdDev / avg) * 100));
+
+  return {
+    consistencyScore: parseFloat(score.toFixed(1)),
+    avgLapTime: parseFloat(avg.toFixed(3)),
+    stdDev: parseFloat(stdDev.toFixed(3)),
+  };
+}
+
