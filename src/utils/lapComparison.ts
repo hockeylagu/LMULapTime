@@ -311,15 +311,25 @@ export function computeLapToLapDelta(
  * Computes average of the top N cleanest/fastest flying laps in a session.
  */
 export function computeTopNLapAverage(
-  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; lapNum?: number }>,
+  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; isOutLap?: boolean; lapNum?: number }>,
   n = 3
 ): number | null {
   const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
   const hasMultiple = completed.length > 1;
-  const validFlying = completed.filter(
-    l => (l.isValid ?? true) && !l.isPitStop && (!hasMultiple || (l.lapNum ?? 2) > 1)
-  );
-  const candidates = validFlying.length > 0 ? validFlying : completed.filter(l => l.isValid ?? true);
+  const validFlying = completed.filter((l, idx, arr) => {
+    const prevLap = idx > 0 ? arr[idx - 1] : null;
+    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+    return (l.isValid ?? true) && !l.isPitStop && !isOut && (!hasMultiple || (l.lapNum ?? 2) > 1);
+  });
+  const candidates = validFlying.length > 0
+    ? validFlying
+    : completed.filter((l, idx, arr) => {
+        const prevLap = idx > 0 ? arr[idx - 1] : null;
+        const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+        const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+        return (l.isValid ?? true) && !l.isPitStop && !isOut;
+      });
 
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
