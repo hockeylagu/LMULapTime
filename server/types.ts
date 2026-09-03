@@ -69,7 +69,9 @@ export interface LapData {
   gapToLeader?: number | null; // Gap to session leader at lap finish (seconds)
   gapToLeaderString?: string; // Formatted gap (e.g. "+4.215s" or "LEADER")
   isPitStop: boolean;
+  isOutLap?: boolean; // Out-lap immediately following a pit stop
   isValid: boolean;
+  isInferred?: boolean; // Inferred from session elapsed time for incomplete laps
   paceCategory?: PaceCategory | null;
   pacePercentage?: number | null;
   target100Sec?: number | null;

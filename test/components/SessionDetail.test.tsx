@@ -745,4 +745,224 @@ describe('SessionDetail component', () => {
     fireEvent.click(screen.getByRole('button', { name: /go to race/i }));
     expect(onSelectSession).toHaveBeenCalledWith('2026_05_28_R1');
   });
+
+  it('displays class positions rather than overall positions in multiclass sessions', async () => {
+    const multiClassSession = {
+      ...mockDetailedSession,
+      sessionType: 'Race',
+      drivers: [
+        {
+          name: 'Hypercar Leader',
+          carType: 'Ferrari 499P',
+          carClass: 'Hypercar',
+          carNumber: '50',
+          isPlayer: false,
+          position: 1,
+          classPosition: 1,
+          gridPosition: 1,
+          classGridPosition: 1,
+          laps: [{ lapNum: 1, position: 1, lapTime: 95.0, isValid: true }],
+        },
+        {
+          name: 'GT3 Leader',
+          carType: 'Porsche 911 GT3 R',
+          carClass: 'LMGT3',
+          carNumber: '92',
+          isPlayer: false,
+          position: 15,
+          classPosition: 1,
+          gridPosition: 16,
+          classGridPosition: 2,
+          laps: [{ lapNum: 1, position: 15, lapTime: 120.0, isValid: true }],
+        },
+        {
+          name: 'Test Driver',
+          carType: 'Aston Martin Vantage GT3',
+          carClass: 'LMGT3',
+          carNumber: '77',
+          isPlayer: true,
+          position: 18,
+          classPosition: 2,
+          gridPosition: 15,
+          classGridPosition: 1,
+          laps: [{ lapNum: 1, position: 18, lapTime: 121.0, isValid: true }],
+        },
+      ],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(multiClassSession) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // In multiclass, both the lap table and classification table show Class Pos headers
+    const classPosHeaders = screen.getAllByRole('columnheader', { name: /class pos/i });
+    expect(classPosHeaders.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders lap 2 as valid (not out-lap) when lap 1 is the start of practice with no lap time', async () => {
+    const practiceSession = {
+      ...mockDetailedSession,
+      sessionType: 'Practice',
+      drivers: [
+        {
+          name: 'Test Driver',
+          carType: 'Porsche 911 GT3 R',
+          carClass: 'LMGT3',
+          carNumber: '92',
+          isPlayer: true,
+          position: 1,
+          bestLapTime: 215.585,
+          bestLapTimeString: '3:35.585',
+          lapsCount: 2,
+          laps: [
+            {
+              lapNum: 1,
+              position: 2,
+              lapTime: null,
+              lapTimeString: '--:--.---',
+              isPitStop: false,
+              isValid: false,
+            },
+            {
+              lapNum: 2,
+              position: 1,
+              lapTime: 215.585,
+              lapTimeString: '3:35.585',
+              s1: 34.925,
+              s2: 84.641,
+              s3: 96.019,
+              isPitStop: false,
+              isValid: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(practiceSession) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // Lap 2 should be displayed with "Valid" badge and NOT "Out Lap"
+    expect(screen.getByText('Valid')).toBeInTheDocument();
+    expect(screen.queryByText('Out Lap')).not.toBeInTheDocument();
+  });
+
+  it('plots invalid laps with estimated or parsed lap times in the chart and table', async () => {
+    const sessionWithInvalidLap = {
+      ...mockDetailedSession,
+      drivers: [
+        {
+          name: 'Test Driver',
+          carType: 'Porsche 911 GT3 R',
+          carClass: 'LMGT3',
+          carNumber: '92',
+          isPlayer: true,
+          position: 1,
+          bestLapTime: 213.0,
+          bestLapTimeString: '3:33.000',
+          lapsCount: 3,
+          laps: [
+            { lapNum: 1, lapTime: 225.0, lapTimeString: '3:45.000', isValid: true },
+            { lapNum: 2, lapTime: 224.698, lapTimeString: '3:44.698', isValid: false, isInferred: true },
+            { lapNum: 3, lapTime: 213.0, lapTimeString: '3:33.000', isValid: true },
+          ],
+        },
+      ],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithInvalidLap) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // The invalid lap time is rendered in the table
+    expect(screen.getByText('~3:44.698')).toBeInTheDocument();
+  });
+
+  it('renders lap 1 as Start Lap and lap 2 as Valid in Qualifying sessions', async () => {
+    const qualiSession = {
+      ...mockDetailedSession,
+      sessionType: 'Qualifying',
+      sessionName: 'Q1',
+      drivers: [
+        {
+          name: 'Quali Driver',
+          carType: 'Ferrari 499P',
+          carClass: 'Hypercar',
+          carNumber: '50',
+          isPlayer: true,
+          position: 1,
+          bestLapTime: 120.5,
+          bestLapTimeString: '2:00.500',
+          lapsCount: 2,
+          laps: [
+            {
+              lapNum: 1,
+              position: 1,
+              lapTime: null,
+              lapTimeString: '--:--.---',
+              isPitStop: false,
+              isValid: false,
+            },
+            {
+              lapNum: 2,
+              position: 1,
+              lapTime: 120.5,
+              lapTimeString: '2:00.500',
+              s1: 34.0,
+              s2: 41.0,
+              s3: 45.5,
+              isPitStop: false,
+              isValid: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // Lap 1 is Start Lap, Lap 2 is Valid (and NOT Out Lap)
+    expect(screen.getByText('Start Lap')).toBeInTheDocument();
+    expect(screen.getByText('Valid')).toBeInTheDocument();
+    expect(screen.queryByText('Out Lap')).not.toBeInTheDocument();
+  });
 });

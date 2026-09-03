@@ -638,13 +638,27 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
         );
         const hasMultipleLaps = completedLaps.length > 1;
 
-        const validFlyingLaps = completedLaps.filter(
-          l => l.isValid && (!hasMultipleLaps || l.lapNum > 1)
-        );
+        // Clean flying laps: strictly exclude pit stops and out-laps (laps after valid pit stops)
+        const validFlyingLaps = completedLaps.filter((l, idx, arr) => {
+          const prevLap = idx > 0 ? arr[idx - 1] : null;
+          const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+          const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+          return l.isValid && !l.isPitStop && !isOut && (!hasMultipleLaps || l.lapNum > 1);
+        });
         const cleanLapsForAvg = validFlyingLaps.length > 0
           ? validFlyingLaps
-          : completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1).length > 0
-          ? completedLaps.filter(l => !hasMultipleLaps || l.lapNum > 1)
+          : completedLaps.filter((l, idx, arr) => {
+              const prevLap = idx > 0 ? arr[idx - 1] : null;
+              const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+              const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+              return !l.isPitStop && !isOut && (!hasMultipleLaps || l.lapNum > 1);
+            }).length > 0
+          ? completedLaps.filter((l, idx, arr) => {
+              const prevLap = idx > 0 ? arr[idx - 1] : null;
+              const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+              const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+              return !l.isPitStop && !isOut && (!hasMultipleLaps || l.lapNum > 1);
+            })
           : completedLaps;
 
         const avgLapTime = cleanLapsForAvg.length > 0
@@ -739,53 +753,77 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             {/* Race Standings Sub-Grid (when Race session) */}
             {isRaceSession && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Starting Grid</p>
-                  <p className="text-base font-mono font-extrabold text-white mt-0.5">
-                    {selectedDriver.gridPosition ? `P${selectedDriver.gridPosition}` : '-'}
-                    {isMultiClass && selectedDriver.classGridPosition ? (
-                      <span className="text-[11px] font-normal text-lmu-cyan ml-1">
-                        (Class P{selectedDriver.classGridPosition})
-                      </span>
-                    ) : null}
-                  </p>
-                </div>
+                {(() => {
+                  const displayPosDelta = isMultiClass && selectedDriver.classGridPosition && selectedDriver.classPosition
+                    ? selectedDriver.classGridPosition - selectedDriver.classPosition
+                    : selectedDriver.positionGain;
 
-                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Finish Position</p>
-                  <p className={`text-base font-mono font-extrabold mt-0.5 ${
-                    selectedDriver.classPosition === 1 || selectedDriver.position === 1 ? 'text-lmu-gold' : 'text-white'
-                  }`}>
-                    {selectedDriver.position ? `P${selectedDriver.position}` : '-'}
-                    {isMultiClass && selectedDriver.classPosition > 0 && (
-                      <span className="text-[11px] font-normal text-lmu-cyan ml-1">
-                        (Class P{selectedDriver.classPosition})
-                      </span>
-                    )}
-                  </p>
-                </div>
+                  return (
+                    <>
+                      <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">Starting Grid</p>
+                        <p className="text-base font-mono font-extrabold text-white mt-0.5">
+                          {isMultiClass && selectedDriver.classGridPosition ? (
+                            <>
+                              P{selectedDriver.classGridPosition}
+                              {selectedDriver.gridPosition && (
+                                <span className="text-[11px] font-normal text-lmu-muted ml-1" title="Overall Starting Grid">
+                                  (OA: P{selectedDriver.gridPosition})
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            selectedDriver.gridPosition ? `P${selectedDriver.gridPosition}` : '-'
+                          )}
+                        </p>
+                      </div>
 
-                <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Position Delta</p>
-                  <p className={`text-base font-mono font-extrabold mt-0.5 flex items-center justify-center gap-1 ${
-                    (selectedDriver.positionGain ?? 0) > 0
-                      ? 'text-lmu-green'
-                      : (selectedDriver.positionGain ?? 0) < 0
-                      ? 'text-rose-400'
-                      : 'text-white'
-                  }`}>
-                    {(selectedDriver.positionGain ?? 0) > 0 && <TrendingUp className="w-3.5 h-3.5" />}
-                    {(selectedDriver.positionGain ?? 0) < 0 && <TrendingDown className="w-3.5 h-3.5" />}
-                    <span>
-                      {selectedDriver.positionGain !== null && selectedDriver.positionGain !== undefined
-                        ? `${selectedDriver.positionGain > 0 ? '+' : ''}${selectedDriver.positionGain}`
-                        : '-'}
-                    </span>
-                    <span className="text-[10px] font-normal text-lmu-muted">
-                      {(selectedDriver.positionGain ?? 0) > 0 ? 'Gained' : (selectedDriver.positionGain ?? 0) < 0 ? 'Lost' : 'Net'}
-                    </span>
-                  </p>
-                </div>
+                      <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">Finish Position</p>
+                        <p className={`text-base font-mono font-extrabold mt-0.5 ${
+                          selectedDriver.classPosition === 1 || (!isMultiClass && selectedDriver.position === 1) ? 'text-lmu-gold' : 'text-white'
+                        }`}>
+                          {isMultiClass && selectedDriver.classPosition > 0 ? (
+                            <>
+                              P{selectedDriver.classPosition}
+                              {selectedDriver.position && (
+                                <span className="text-[11px] font-normal text-lmu-muted ml-1" title="Overall Finish Position">
+                                  (OA: P{selectedDriver.position})
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            selectedDriver.position ? `P${selectedDriver.position}` : '-'
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">
+                          {isMultiClass ? 'Class Pos Delta' : 'Position Delta'}
+                        </p>
+                        <p className={`text-base font-mono font-extrabold mt-0.5 flex items-center justify-center gap-1 ${
+                          (displayPosDelta ?? 0) > 0
+                            ? 'text-lmu-green'
+                            : (displayPosDelta ?? 0) < 0
+                            ? 'text-rose-400'
+                            : 'text-white'
+                        }`}>
+                          {(displayPosDelta ?? 0) > 0 && <TrendingUp className="w-3.5 h-3.5" />}
+                          {(displayPosDelta ?? 0) < 0 && <TrendingDown className="w-3.5 h-3.5" />}
+                          <span>
+                            {displayPosDelta !== null && displayPosDelta !== undefined
+                              ? `${displayPosDelta > 0 ? '+' : ''}${displayPosDelta}`
+                              : '-'}
+                          </span>
+                          <span className="text-[10px] font-normal text-lmu-muted">
+                            {(displayPosDelta ?? 0) > 0 ? 'Gained' : (displayPosDelta ?? 0) < 0 ? 'Lost' : 'Net'}
+                          </span>
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
                   <p className="text-[10px] uppercase font-semibold text-lmu-muted">Laps Led (P1)</p>
@@ -960,11 +998,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
         );
         const driversToPlot = classDrivers.length > 0 ? classDrivers : (session.drivers || []);
         const maxClassLaps = Math.max(...driversToPlot.map(d => (d.laps ? d.laps.length : 0)), 1);
-        const maxPosInClass = Math.max(
-          ...driversToPlot.flatMap(d => (d.laps || []).map(l => l.position)).filter(p => p > 0),
-          driversToPlot.length,
-          1
-        );
+        const maxPosInClass = isMultiClass
+          ? Math.max(driversToPlot.length, 2)
+          : Math.max(
+              ...driversToPlot.flatMap(d => (d.laps || []).map(l => l.position)).filter(p => p > 0),
+              driversToPlot.length,
+              1
+            );
 
         // Calculate clean/valid flying lap average and sector averages for selected driver (ignoring Lap 1 when > 1 lap)
         const completedLaps = selectedDriver.laps.filter(
@@ -1006,59 +1046,111 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
           ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length
           : null;
 
-        // Position Chart Data (Multi-driver lap positions)
+        // Position Chart Data (Multi-driver lap positions - ranked within class in multiclass sessions)
         const positionChartData = Array.from({ length: maxClassLaps }, (_, i) => {
           const lapNum = i + 1;
           const point: any = {
             lapNum: `Lap ${lapNum}`,
             lapNumber: lapNum,
           };
-          driversToPlot.forEach(d => {
-            const lap = d.laps?.find(l => l.lapNum === lapNum);
-            if (lap && lap.position > 0) {
-              point[d.name] = lap.position;
-              point[`${d.name}_isPit`] = lap.isPitStop;
-              point[`${d.name}_lapTime`] = lap.lapTimeString;
-              point[`${d.name}_isPlayer`] = d.isPlayer;
-            }
+
+          // Find all drivers in this class who recorded a position on this lap
+          const driversOnLap = driversToPlot
+            .map(d => {
+              const lap = d.laps?.find(l => l.lapNum === lapNum);
+              return {
+                driver: d,
+                lap,
+                overallPos: lap && lap.position > 0 ? lap.position : null,
+              };
+            })
+            .filter((item): item is { driver: typeof item.driver; lap: NonNullable<typeof item.lap>; overallPos: number } => item.overallPos !== null);
+
+          // Sort ascending by overall position so the top-placed car in this class gets class rank 1 (P1)
+          driversOnLap.sort((a, b) => a.overallPos - b.overallPos);
+
+          driversOnLap.forEach((item, classIdx) => {
+            const classPos = isMultiClass ? classIdx + 1 : item.overallPos;
+            const prevLap = item.driver.laps?.find(ol => ol.lapNum === lapNum - 1);
+            const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+            const isOutLap = Boolean(item.lap.isOutLap || prevIsValidPitStop);
+            point[item.driver.name] = classPos;
+            point[`${item.driver.name}_isPit`] = item.lap.isPitStop;
+            point[`${item.driver.name}_isOutLap`] = isOutLap;
+            point[`${item.driver.name}_lapTime`] = item.lap.lapTimeString;
+            point[`${item.driver.name}_isPlayer`] = item.driver.isPlayer;
+            point[`${item.driver.name}_overallPos`] = item.overallPos;
           });
+
           return point;
         });
 
         // Single Driver Telemetry Chart Data
-        const sessionChartData = selectedDriver.laps.map(l => ({
-          lapNum: `Lap ${l.lapNum}`,
-          lapNumber: l.lapNum,
-          lapTime: l.lapTime && l.isValid ? l.lapTime : null,
-          lapTimeString: l.lapTimeString,
-          avgLapTime: avgLapTime,
-          avgLapTimeString: formatTime(avgLapTime),
-          s1: l.s1 && l.isValid ? l.s1 : null,
-          s2: l.s2 && l.isValid ? l.s2 : null,
-          s3: l.s3 && l.isValid ? l.s3 : null,
-          avgS1: avgS1,
-          avgS2: avgS2,
-          avgS3: avgS3,
-          s1String: formatTime(l.s1),
-          s2String: formatTime(l.s2),
-          s3String: formatTime(l.s3),
-          avgS1String: formatTime(avgS1),
-          avgS2String: formatTime(avgS2),
-          avgS3String: formatTime(avgS3),
-          topSpeed: l.topSpeed || null,
-          twFL: l.tireWear?.fl ?? null,
-          twFR: l.tireWear?.fr ?? null,
-          twRL: l.tireWear?.rl ?? null,
-          twRR: l.tireWear?.rr ?? null,
-          twAvg: l.tireWear?.avg ?? null,
-          tireWear: l.tireWear,
-          fuel: l.fuel ?? null,
-          fuelUsed: l.fuelUsed ?? null,
-          virtualEnergy: l.virtualEnergy ?? null,
-          virtualEnergyUsed: l.virtualEnergyUsed ?? null,
-          isValid: l.isValid,
-          isPitStop: l.isPitStop,
-        }));
+        const sessionChartData = selectedDriver.laps.map((l, idx, arr) => {
+          const prevLap = idx > 0 ? arr[idx - 1] : null;
+          const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+          const isOutLap = Boolean(l.isOutLap || prevIsValidPitStop);
+
+          // Infer lap time if missing and session elapsed times are available
+          let resolvedLapTime = l.lapTime;
+          let resolvedLapTimeString = l.lapTimeString;
+          let isInferred = Boolean(l.isInferred);
+
+          if ((resolvedLapTime === null || resolvedLapTime <= 0) && l.elapsedSeconds !== null && l.elapsedSeconds !== undefined) {
+            if (prevLap?.elapsedSeconds !== null && prevLap?.elapsedSeconds !== undefined) {
+              const deltaEt = parseFloat((l.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
+              const knownSectors = (l.s1 || 0) + (l.s2 || 0) + (l.s3 || 0);
+              const maxAllowed = selectedDriver.bestLapTime ? Math.max(selectedDriver.bestLapTime * 3.5, 300) : 600;
+              if (deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed) {
+                resolvedLapTime = deltaEt;
+                resolvedLapTimeString = formatTime(deltaEt);
+                isInferred = true;
+              }
+            }
+          }
+
+          // If the lap has a lap time (valid, invalid, or estimated/inferred), plot it!
+          const chartLapTime = (resolvedLapTime !== null && resolvedLapTime > 0) ? resolvedLapTime : null;
+          const chartS1 = (l.s1 !== null && l.s1 > 0) ? l.s1 : null;
+          const chartS2 = (l.s2 !== null && l.s2 > 0) ? l.s2 : null;
+          const chartS3 = (l.s3 !== null && l.s3 > 0) ? l.s3 : null;
+
+          return {
+            lapNum: `Lap ${l.lapNum}`,
+            lapNumber: l.lapNum,
+            lapTime: chartLapTime,
+            lapTimeString: resolvedLapTimeString,
+            isInferred,
+            avgLapTime: avgLapTime,
+            avgLapTimeString: formatTime(avgLapTime),
+            s1: chartS1,
+            s2: chartS2,
+            s3: chartS3,
+            avgS1: avgS1,
+            avgS2: avgS2,
+            avgS3: avgS3,
+            s1String: formatTime(l.s1),
+            s2String: formatTime(l.s2),
+            s3String: formatTime(l.s3),
+            avgS1String: formatTime(avgS1),
+            avgS2String: formatTime(avgS2),
+            avgS3String: formatTime(avgS3),
+            topSpeed: l.topSpeed || null,
+            twFL: l.tireWear?.fl ?? null,
+            twFR: l.tireWear?.fr ?? null,
+            twRL: l.tireWear?.rl ?? null,
+            twRR: l.tireWear?.rr ?? null,
+            twAvg: l.tireWear?.avg ?? null,
+            tireWear: l.tireWear,
+            fuel: l.fuel ?? null,
+            fuelUsed: l.fuelUsed ?? null,
+            virtualEnergy: l.virtualEnergy ?? null,
+            virtualEnergyUsed: l.virtualEnergyUsed ?? null,
+            isValid: l.isValid,
+            isPitStop: l.isPitStop,
+            isOutLap: isOutLap,
+          };
+        });
 
         const CustomTooltip = ({ active, payload }: any) => {
           if (!active || !payload || !payload.length) return null;
@@ -1071,8 +1163,10 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 return {
                   name: d.name,
                   pos: data[d.name] as number | undefined,
+                  overallPos: data[`${d.name}_overallPos`] as number | undefined,
                   isPlayer,
                   isPit: data[`${d.name}_isPit`],
+                  isOutLap: data[`${d.name}_isOutLap`],
                   lapTime: data[`${d.name}_lapTime`],
                 };
               })
@@ -1098,6 +1192,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       <div className="flex items-center gap-1.5 truncate">
                         <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-gold' : 'text-slate-300'}`}>
                           P{d.pos}
+                          {isMultiClass && d.overallPos && d.overallPos !== d.pos && (
+                            <span className="text-[10px] text-lmu-muted font-normal ml-1">
+                              (OA: P{d.overallPos})
+                            </span>
+                          )}
                         </span>
                         <span className="truncate max-w-[130px]" title={d.name}>
                           {d.name} {d.isPlayer ? '(You)' : ''}
@@ -1105,6 +1204,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
                         {d.isPit && <span className="px-1 py-0.2 rounded bg-amber-500/30 text-amber-300 text-[9px] font-bold">PIT</span>}
+                        {d.isOutLap && <span className="px-1 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[9px] font-bold">OUT</span>}
                         <span className="text-lmu-muted font-mono">{d.lapTime || '--:--.---'}</span>
                       </div>
                     </div>
@@ -1118,20 +1218,52 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1.5 font-mono">
               <div className="font-bold text-white flex items-center justify-between gap-3 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
                 <span>{data.lapNum}</span>
-                {data.isPitStop && <span className="text-[10px] text-amber-400">🛑 Pit Stop</span>}
-                {!data.isValid && <span className="text-[10px] text-rose-400">⚠️ Invalid</span>}
+                <div className="flex items-center gap-1.5">
+                  {data.isPitStop && (
+                    <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30">
+                      🛑 Pit Stop
+                    </span>
+                  )}
+                  {data.isOutLap && (
+                    <span className="text-[10px] text-cyan-400 font-semibold px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30">
+                      🚀 Out Lap
+                    </span>
+                  )}
+                  {!data.isValid && !data.isPitStop && !data.isOutLap && (
+                    <span className="text-[10px] text-rose-400 font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30">
+                      ⚠️ Invalid
+                    </span>
+                  )}
+                </div>
               </div>
 
               {activeChartMetric === 'lapTime' && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-lmu-muted">Lap Pace:</span>
-                    <span className="font-bold text-lmu-gold">{data.lapTimeString}</span>
+                    <span className={`font-bold ${data.isOutLap ? 'text-cyan-300' : data.isPitStop ? 'text-amber-300' : 'text-lmu-gold'}`}>
+                      {data.lapTimeString}
+                    </span>
                   </div>
                   {data.avgLapTimeString && (
                     <div className="flex items-center justify-between gap-4 border-t border-lmu-border/50 pt-1 text-[11px]">
                       <span className="text-purple-300">Session Avg:</span>
                       <span className="font-bold text-indigo-200">{data.avgLapTimeString}</span>
+                    </div>
+                  )}
+                  {data.isPitStop && (
+                    <div className="text-[10px] text-amber-400/90 font-sans italic pt-0.5 border-t border-lmu-border/30">
+                      Pit Stop (in-lap — excluded from flying avg & consistency)
+                    </div>
+                  )}
+                  {data.isOutLap && (
+                    <div className="text-[10px] text-cyan-400/90 font-sans italic pt-0.5 border-t border-lmu-border/30">
+                      Out Lap (pit exit — excluded from flying avg & consistency)
+                    </div>
+                  )}
+                  {data.lapNumber === 1 && !data.isPitStop && !data.isOutLap && (
+                    <div className="text-[10px] text-amber-400/90 font-sans italic pt-0.5 border-t border-lmu-border/30">
+                      Start Lap (standing/out-lap — excluded from flying avg & consistency)
                     </div>
                   )}
                 </div>
@@ -1472,7 +1604,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                     }
                     ticks={
                       activeChartMetric === 'positions'
-                        ? Array.from({ length: Math.max(maxPosInClass, 2) }, (_, i) => i + 1)
+                        ? (maxPosInClass <= 30 ? Array.from({ length: Math.max(maxPosInClass, 2) }, (_, i) => i + 1) : undefined)
                         : undefined
                     }
                     tickFormatter={(val) => {
@@ -1765,7 +1897,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
               <tr>
                 <th className="px-3 py-3">Lap</th>
-                <th className="px-3 py-3">Pos</th>
+                <th className="px-3 py-3" title={isMultiClass ? `Class Position (in ${selectedDriver?.carClass || 'Class'})` : 'Position'}>{isMultiClass ? 'Class Pos' : 'Pos'}</th>
                 <th className="px-3 py-3 text-right">Lap Time</th>
                 <th className="px-3 py-3 text-center">Pace Category</th>
                 <th className="px-3 py-3 text-right">Delta</th>
@@ -1790,30 +1922,60 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 const theoBest = selectedDriver?.theoreticalBest ?? null;
 
                 return (selectedDriver?.laps || []).map((l, idx, allLaps) => {
-                  const isSessionBest = l.lapTime !== null && bestLap !== null &&
-                    Math.abs(l.lapTime - bestLap) < 0.0005;
+                  const prevLap = idx > 0 ? allLaps[idx - 1] : null;
+
+                  // Infer lap time if missing and session elapsed times are available
+                  let displayLapTime = l.lapTime;
+                  let displayLapTimeString = l.lapTimeString;
+                  let isInferredLap = !!l.isInferred;
+                  const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+                  const isOutLap = Boolean(l.isOutLap || prevIsValidPitStop);
+
+                  if ((displayLapTime === null || displayLapTime <= 0) && l.elapsedSeconds !== null && l.elapsedSeconds !== undefined) {
+                    if (prevLap?.elapsedSeconds !== null && prevLap?.elapsedSeconds !== undefined) {
+                      const deltaEt = parseFloat((l.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
+                      const knownSectors = (l.s1 || 0) + (l.s2 || 0) + (l.s3 || 0);
+                      const maxAllowed = bestLap ? Math.max(bestLap * 3.5, 300) : 600;
+                      if (deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed) {
+                        displayLapTime = deltaEt;
+                        displayLapTimeString = formatTime(deltaEt);
+                        isInferredLap = true;
+                      }
+                    }
+                  }
+
+                  const isSessionBest = displayLapTime !== null && bestLap !== null &&
+                    Math.abs(displayLapTime - bestLap) < 0.0005 && l.isValid && !l.isPitStop && !isOutLap;
                   const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
                   
                   let deltaStr = '--';
-                  if (l.lapTime && bestLap) {
-                    const delta = l.lapTime - bestLap;
-                    if (Math.abs(delta) < 0.0005) {
+                  if (displayLapTime && bestLap) {
+                    const delta = displayLapTime - bestLap;
+                    if (Math.abs(delta) < 0.0005 && l.isValid && !l.isPitStop && !isOutLap) {
                       deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
                     } else {
                       deltaStr = `+${delta.toFixed(3)}s`;
                     }
                   }
 
-                  const prevLap = idx > 0 ? allLaps[idx - 1] : null;
-                  const lapToLap = computeLapToLapDelta(prevLap?.lapTime, l.lapTime);
+                  const lapToLap = computeLapToLapDelta(prevLap?.lapTime, displayLapTime);
 
-                  const theoGapLap = (l.lapTime && theoBest && l.isValid && !isSessionBest)
-                    ? parseFloat((l.lapTime - theoBest).toFixed(3))
+                  const theoGapLap = (displayLapTime && theoBest && l.isValid && !isSessionBest && !l.isPitStop && !isOutLap)
+                    ? parseFloat((displayLapTime - theoBest).toFixed(3))
                     : null;
 
                   const isS1Best = l.s1 !== null && bestS1 !== null && Math.abs(l.s1 - bestS1) < 0.0005;
                   const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
                   const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
+
+                  const lapClassPos = isMultiClass && l.position > 0
+                    ? 1 + (session.drivers || [])
+                        .filter(d => d.name !== selectedDriver?.name && matchesCarClass(d.carClass || '', d.carType || '', selectedDriver?.carClass || selectedDriver?.carType || ''))
+                        .filter(d => {
+                          const otherLap = d.laps?.find(ol => ol.lapNum === l.lapNum);
+                          return otherLap && otherLap.position > 0 && otherLap.position < l.position;
+                        }).length
+                    : l.position;
 
                   return (
                   <tr
@@ -1825,14 +1987,19 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                     <td className="px-3 py-2.5 font-bold text-white" title={l.elapsedTimeString ? `Session Time: ${l.elapsedTimeString}` : undefined}>
                       {l.lapNum}
                     </td>
-                    <td className="px-3 py-2.5 text-lmu-muted">{l.position || '-'}</td>
+                    <td
+                      className="px-3 py-2.5 text-lmu-muted font-mono"
+                      title={isMultiClass && l.position ? `Class: P${lapClassPos} (Overall: P${l.position})` : undefined}
+                    >
+                      {lapClassPos ? (isMultiClass ? `P${lapClassPos}` : lapClassPos) : (l.position || '-')}
+                    </td>
                     <td className={`px-3 py-2.5 text-right font-bold ${
-                      isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue' : 'text-white'
+                      isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue' : isInferredLap ? 'text-amber-300/80 italic font-mono' : 'text-white'
                     }`}>
-                      {l.lapTimeString}
+                      {isInferredLap ? `~${displayLapTimeString}` : displayLapTimeString}
                     </td>
                     <td className="px-3 py-2.5 text-center font-sans">
-                      {l.isValid && l.paceCategory ? (
+                      {l.isValid && !l.isPitStop && !isOutLap && l.paceCategory ? (
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold border shadow-sm ${getPaceCategoryStyle(l.paceCategory).badgeClass}`}>
                           <span>{getPaceCategoryStyle(l.paceCategory).emoji}</span>
                           <span>{l.paceCategory}</span>
@@ -1918,17 +2085,28 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </td>
                     )}
                     <td className="px-3 py-2.5 text-center font-sans">
-                      {l.isPitStop ? (
+                      {l.isPitStop && l.lapTime !== null && l.lapTime > 0 ? (
                         <span
                           className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold"
                           title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
                         >
                           PIT STOP
                         </span>
-                      ) : l.lapNum === 1 && (session.sessionType === 'Race' || selectedDriver?.gridPosition !== null) ? (
+                      ) : isOutLap ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-cyan-400 text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30"
+                          title="Out Lap (rejoining track from pit lane — excluded from flying consistency)"
+                        >
+                          Out Lap
+                        </span>
+                      ) : l.lapNum === 1 ? (
                         <span
                           className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
-                          title="Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)"
+                          title={
+                            session.sessionType === 'Race'
+                              ? 'Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)'
+                              : 'Session Start Lap (Pit exit / out-lap from garage — excluded from average flying pace)'
+                          }
                         >
                           <Flag className="w-3.5 h-3.5" />
                           Start Lap
@@ -1937,6 +2115,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                         <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
                           <ShieldCheck className="w-3.5 h-3.5" />
                           Valid
+                        </span>
+                      ) : isInferredLap ? (
+                        <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium">
+                          <Clock className="w-3.5 h-3.5" />
+                          Incomplete
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-lmu-gold text-xs font-medium">

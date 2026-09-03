@@ -1315,9 +1315,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       </td>
 
                       <td className={`px-3 py-2.5 text-right font-bold ${
-                        isAllTimePB ? 'text-lmu-gold font-extrabold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
+                        isAllTimePB ? 'text-lmu-gold font-extrabold' : lap.isSessionBest ? 'text-lmu-blue' : lap.isInferred ? 'text-amber-300/80 italic font-mono' : 'text-white'
                       }`}>
-                        {lap.lapTimeString}
+                        {lap.isInferred ? `~${lap.lapTimeString}` : lap.lapTimeString}
                       </td>
 
                       <td className="px-3 py-2.5 text-center font-sans">
@@ -1346,8 +1346,12 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       <td className="px-3 py-2.5 text-center font-sans">
                         {lap.isPitStop ? (
                           <span className="text-[10px] text-amber-400 font-bold">PIT</span>
+                        ) : lap.isOutLap ? (
+                          <span className="text-[10px] text-cyan-400 font-semibold" title="Out Lap (rejoining track from pit lane)">OUT LAP</span>
                         ) : lap.isValid ? (
                           <span className="text-[10px] text-lmu-green font-semibold">Valid</span>
+                        ) : lap.isInferred ? (
+                          <span className="text-[10px] text-amber-400 font-semibold">Inferred</span>
                         ) : (
                           <span className="text-[10px] text-rose-400 font-semibold">Invalid</span>
                         )}

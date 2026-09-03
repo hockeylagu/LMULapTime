@@ -38,7 +38,9 @@ export interface ComparableLap {
   pitStopDurationString?: string;
   gapToLeaderString?: string;
   isPitStop?: boolean;
+  isOutLap?: boolean;
   isValid: boolean;
+  isInferred?: boolean;
   paceCategory?: PaceCategory | null;
   pacePercentage?: number | null;
   isTheoreticalBest?: boolean;
@@ -328,16 +330,30 @@ export function computeTopNLapAverage(
 
 /**
  * Computes consistency rating (%) and standard deviation across clean flying laps.
+ * Excludes pit stop laps (in-laps) and out-laps (laps immediately following a pit stop).
  */
 export function computeConsistencyRating(
-  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; lapNum?: number }>
+  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; isOutLap?: boolean; lapNum?: number }>
 ): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null } {
   const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
   const hasMultiple = completed.length > 1;
-  const validFlying = completed.filter(
-    l => (l.isValid ?? true) && !l.isPitStop && (!hasMultiple || (l.lapNum ?? 2) > 1)
-  );
-  const candidates = validFlying.length > 0 ? validFlying : completed.filter(l => l.isValid ?? true);
+
+  // Filter out pit stops, out laps after valid pit stops, and start laps (lap 1)
+  const validFlying = completed.filter((l, idx, arr) => {
+    const prevLap = idx > 0 ? arr[idx - 1] : null;
+    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+    return (l.isValid ?? true) && !l.isPitStop && !isOut && (!hasMultiple || (l.lapNum ?? 2) > 1);
+  });
+
+  const candidates = validFlying.length > 0
+    ? validFlying
+    : completed.filter((l, idx, arr) => {
+        const prevLap = idx > 0 ? arr[idx - 1] : null;
+        const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+        const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+        return (l.isValid ?? true) && !l.isPitStop && !isOut;
+      });
 
   if (candidates.length === 0) return { consistencyScore: null, avgLapTime: null, stdDev: null };
 

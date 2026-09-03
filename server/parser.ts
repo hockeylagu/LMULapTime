@@ -52,31 +52,36 @@ const computeAverageLapTime = (laps: LapData[]): number | null => {
   if (completedLaps.length === 0) return null;
 
   const hasMultipleLaps = completedLaps.length > 1;
-  const nonPitLaps = completedLaps.filter(l => !l.isPitStop);
+  const cleanFlyingCandidates = completedLaps.filter((l, idx, arr) => {
+    const prevLap = idx > 0 ? arr[idx - 1] : null;
+    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+    return !l.isPitStop && !isOut;
+  });
 
-  // 1. Prefer valid flying laps (lapNum > 1 and not a pit stop)
-  const validFlying = nonPitLaps.filter(l => l.isValid && (!hasMultipleLaps || l.lapNum > 1));
+  // 1. Prefer valid flying laps (lapNum > 1, not pit stop, and not out-lap)
+  const validFlying = cleanFlyingCandidates.filter(l => l.isValid && (!hasMultipleLaps || l.lapNum > 1));
   if (validFlying.length > 0) {
     const sum = validFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
     return parseFloat((sum / validFlying.length).toFixed(3));
   }
 
-  // 2. Otherwise any valid non-pit laps (including lap 1 if it's the only valid non-pit lap)
-  const anyValidNonPit = nonPitLaps.filter(l => l.isValid);
-  if (anyValidNonPit.length > 0) {
-    const sum = anyValidNonPit.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-    return parseFloat((sum / anyValidNonPit.length).toFixed(3));
+  // 2. Otherwise any valid non-pit non-out laps (including lap 1 if it's the only valid non-pit lap)
+  const anyValid = cleanFlyingCandidates.filter(l => l.isValid);
+  if (anyValid.length > 0) {
+    const sum = anyValid.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+    return parseFloat((sum / anyValid.length).toFixed(3));
   }
 
-  // 3. Otherwise non-pit flying laps
-  const nonPitFlying = nonPitLaps.filter(l => !hasMultipleLaps || l.lapNum > 1);
+  // 3. Otherwise non-pit non-out flying laps
+  const nonPitFlying = cleanFlyingCandidates.filter(l => !hasMultipleLaps || l.lapNum > 1);
   if (nonPitFlying.length > 0) {
     const sum = nonPitFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
     return parseFloat((sum / nonPitFlying.length).toFixed(3));
   }
 
-  // 4. Fallback to any non-pit completed lap, or all completed laps
-  const fallback = nonPitLaps.length > 0 ? nonPitLaps : completedLaps;
+  // 4. Fallback to cleanFlyingCandidates, or completedLaps
+  const fallback = cleanFlyingCandidates.length > 0 ? cleanFlyingCandidates : completedLaps;
   const sum = fallback.reduce((acc, l) => acc + (l.lapTime || 0), 0);
   return parseFloat((sum / fallback.length).toFixed(3));
 };
@@ -440,7 +445,16 @@ export class LmuParser {
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
     const laps: LapData[] = lapsList.map((l: any, idx: number) => this.parseLap(l, idx + 1));
 
-    // Best Laps & Sectors - Strictly calculated from valid completed laps
+    // Mark out-laps: any lap immediately following a valid pit stop (completed in-lap)
+    for (let i = 0; i < laps.length; i++) {
+      const prevLap = i > 0 ? laps[i - 1] : null;
+      const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+      if (prevIsValidPitStop && !laps[i].isPitStop) {
+        laps[i].isOutLap = true;
+      }
+    }
+
+    // Best Laps & Sectors - Strictly calculated from valid completed laps (before any inference)
     const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
     const bestLapTime: number | null = validLaps.length > 0
       ? Math.min(...validLaps.map(l => l.lapTime as number))
@@ -460,6 +474,56 @@ export class LmuParser {
     const avgLapTime = computeAverageLapTime(laps);
     const top3LapsCount = laps.filter(l => l.isValid && l.position > 0 && l.position <= 3).length;
 
+    // Infer lap time for incomplete laps from session elapsed time if it makes sense and is possible
+    for (let i = 0; i < laps.length; i++) {
+      const curLap = laps[i];
+      if (curLap.lapTime === null || curLap.lapTime <= 0) {
+        let inferredTime: number | null = null;
+
+        // Case 1: All 3 sectors are present (sometimes LMU logs sectors but omits body time on cut tracks)
+        if (curLap.s1 !== null && curLap.s2 !== null && curLap.s3 !== null && curLap.s1 > 0 && curLap.s2 > 0 && curLap.s3 > 0) {
+          inferredTime = parseFloat((curLap.s1 + curLap.s2 + curLap.s3).toFixed(3));
+        }
+
+        // Case 2: Infer from session elapsed time delta vs previous lap
+        if (inferredTime === null && typeof curLap.elapsedSeconds === 'number' && curLap.elapsedSeconds > 0) {
+          const prevLapEt = i > 0 ? laps[i - 1].elapsedSeconds : null;
+          if (typeof prevLapEt === 'number' && prevLapEt > 0) {
+            const deltaEt = parseFloat((curLap.elapsedSeconds - prevLapEt).toFixed(3));
+
+            if (deltaEt > 0) {
+              const knownSectors = (curLap.s1 || 0) + (curLap.s2 || 0) + (curLap.s3 || 0);
+              const passesSectorCheck = knownSectors === 0 || deltaEt >= knownSectors;
+
+              // Reasonable lap duration threshold:
+              // Cap at 3.5x bestLapTime or 600s (10 minutes) to avoid counting extended garage idle time
+              const maxAllowed = bestLapTime ? Math.max(bestLapTime * 3.5, 300) : 600;
+              const minAllowed = 10;
+
+              if (passesSectorCheck && deltaEt >= minAllowed && deltaEt <= maxAllowed) {
+                inferredTime = deltaEt;
+
+                // If S1 and S2 are present but S3 is missing, deduce S3
+                if (curLap.s1 !== null && curLap.s2 !== null && (curLap.s3 === null || curLap.s3 <= 0)) {
+                  const s3Est = parseFloat((deltaEt - curLap.s1 - curLap.s2).toFixed(3));
+                  if (s3Est > 0) {
+                    curLap.s3 = s3Est;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (inferredTime !== null && inferredTime > 0) {
+          curLap.lapTime = inferredTime;
+          curLap.lapTimeString = formatTime(inferredTime);
+          curLap.isInferred = true;
+          // curLap.isValid remains false to keep official leaderboards and records uncorrupted
+        }
+      }
+    }
+
     // Calculate pit stop loss relative to driver's clean reference lap time
     const refLapTime = avgLapTime || bestLapTime;
     laps.forEach(lap => {
@@ -472,8 +536,8 @@ export class LmuParser {
       }
     });
 
-    // Compute Fuel & VE Averages across valid flying laps (exclude pit laps and negative/anomalous fuel values)
-    const validFuelLaps = laps.filter(l => l.isValid && !l.isPitStop && l.fuelUsed !== null && l.fuelUsed !== undefined && l.fuelUsed > 0 && l.fuelUsed < 25);
+    // Compute Fuel & VE Averages across valid flying laps (exclude pit laps, out laps, and negative/anomalous fuel values)
+    const validFuelLaps = laps.filter(l => l.isValid && !l.isPitStop && !l.isOutLap && l.fuelUsed !== null && l.fuelUsed !== undefined && l.fuelUsed > 0 && l.fuelUsed < 25);
     const avgFuelPerLap = validFuelLaps.length > 0
       ? parseFloat((validFuelLaps.reduce((acc, l) => acc + (l.fuelUsed || 0), 0) / validFuelLaps.length).toFixed(2))
       : null;
@@ -482,7 +546,7 @@ export class LmuParser {
       : null;
 
     // Virtual Energy (VE / NRG) applies to both Hypercar and LMGT3 under FIA WEC BoP stint rules
-    const validVeLaps = laps.filter(l => l.isValid && !l.isPitStop && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
+    const validVeLaps = laps.filter(l => l.isValid && !l.isPitStop && !l.isOutLap && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
     const avgVePerLap = validVeLaps.length > 0
       ? parseFloat((validVeLaps.reduce((acc, l) => acc + (l.virtualEnergyUsed || 0), 0) / validVeLaps.length).toFixed(2))
       : null;
@@ -590,7 +654,7 @@ export class LmuParser {
     const topSpeed = parseFloat(l['@_topspeed']) || null;
     const fCompound = l['@_fcompound'] ? String(l['@_fcompound']).split(',').pop()?.trim() || String(l['@_fcompound']) : '';
     const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop()?.trim() || String(l['@_rcompound']) : '';
-    const isPitStop = l['@_pit'] === '1' || l['@_pit'] === 1 || l['@_et'] === '--.---';
+    const isPitStop = (l['@_pit'] === '1' || l['@_pit'] === 1 || (l['@_et'] === '--.---' && lapNum > 1)) && !(lapNum === 1 && (lapTime === null || lapTime <= 0));
 
     const rawEt = l['@_et'];
     const elapsedSeconds = rawEt !== undefined && rawEt !== null && rawEt !== '--.---' && rawEt !== '' && !isNaN(parseFloat(rawEt))
@@ -733,10 +797,15 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
     const totalLapsCount = driver?.lapsCount || 0;
     const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
 
-    // Top 3 Clean Lap Average (filters out lap 1 out-laps when multiple laps exist)
+    // Top 3 Clean Lap Average (filters out lap 1, pit stops, and out-laps after valid pit stops)
     const hasMultipleLaps = cleanLaps.length > 1;
-    const validFlyingLaps = cleanLaps.filter(l => !hasMultipleLaps || l.lapNum > 1);
-    const lapsForTop3 = validFlyingLaps.length > 0 ? validFlyingLaps : cleanLaps;
+    const validFlyingLaps = cleanLaps.filter((l, idx, arr) => {
+      const prevLap = idx > 0 ? arr[idx - 1] : null;
+      const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+      const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+      return (!hasMultipleLaps || l.lapNum > 1) && !l.isPitStop && !isOut;
+    });
+    const lapsForTop3 = validFlyingLaps.length > 0 ? validFlyingLaps : cleanLaps.filter(l => !l.isPitStop && !l.isOutLap);
     const sortedLaps = [...lapsForTop3].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
     const top3Slice = sortedLaps.slice(0, 3);
     const top3AvgLapTime = top3Slice.length > 0
@@ -1020,7 +1089,9 @@ export function extractComparableLaps(
           pitStopDurationString: l.pitStopDurationString,
           gapToLeaderString: l.gapToLeaderString,
           isPitStop: l.isPitStop,
+          isOutLap: l.isOutLap || false,
           isValid: l.isValid,
+          isInferred: l.isInferred || false,
           paceCategory: l.paceCategory || null,
           pacePercentage: l.pacePercentage || null,
           isSessionBest,

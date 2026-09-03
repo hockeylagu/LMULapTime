@@ -268,5 +268,33 @@ describe('lapComparison utility', () => {
       expect(res.consistencyScore).toBeGreaterThan(99);
       expect(res.stdDev).toBeLessThan(0.1);
     });
+
+    it('excludes pit stops and the lap after a pit stop (out-lap) from consistency calculations', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 125.0, isValid: true }, // Start lap excluded
+        { lapNum: 2, lapTime: 120.0, isValid: true }, // Flying lap
+        { lapNum: 3, lapTime: 120.1, isValid: true }, // Flying lap
+        { lapNum: 4, lapTime: 145.0, isValid: true, isPitStop: true }, // In-lap / Pit Stop -> excluded
+        { lapNum: 5, lapTime: 210.0, isValid: true }, // Out-lap (immediately follows pit stop) -> excluded
+        { lapNum: 6, lapTime: 120.05, isValid: true }, // Flying lap
+      ];
+      const res = computeConsistencyRating(laps);
+      // Only laps 2, 3, 6 (120.0, 120.1, 120.05) should be evaluated
+      expect(res.consistencyScore).toBeGreaterThan(99);
+      expect(res.avgLapTime).toBeCloseTo(120.05, 1);
+      expect(res.stdDev).toBeLessThan(0.1);
+    });
+
+    it('does not exclude lap 2 as an out-lap if lap 1 was practice start with no completed lap time', () => {
+      const laps = [
+        { lapNum: 1, lapTime: null, isValid: false, isPitStop: false }, // Practice start from garage
+        { lapNum: 2, lapTime: 120.0, isValid: true }, // First flying lap -> should be valid!
+        { lapNum: 3, lapTime: 120.2, isValid: true },
+      ];
+      const res = computeConsistencyRating(laps);
+      // Laps 2 and 3 should both be evaluated
+      expect(res.consistencyScore).toBeGreaterThan(99);
+      expect(res.avgLapTime).toBeCloseTo(120.1, 1);
+    });
   });
 });

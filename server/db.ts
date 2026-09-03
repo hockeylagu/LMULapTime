@@ -182,13 +182,21 @@ export class SessionDatabase {
       };
     }
 
+    const DB_PARSER_VERSION = '2.3_valid_pitstop_outlap';
+    const cachedVersion = this.getMetadata('parser_version');
+    const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
+    if (versionMismatch) {
+      this.db.exec('DELETE FROM sessions');
+      this.setMetadata('parser_version', DB_PARSER_VERSION);
+    }
+
     // Get existing cached session file info
-    const existingRows = this.db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
+    const existingRows = versionMismatch ? [] : (this.db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
       id: string;
       file_path: string;
       file_mtime: number;
       file_size: number;
-    }[];
+    }[]);
 
     const cacheMap = new Map<string, { id: string; file_mtime: number; file_size: number }>();
     for (const row of existingRows) {
