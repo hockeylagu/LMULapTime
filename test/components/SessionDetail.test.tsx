@@ -675,4 +675,72 @@ describe('SessionDetail component', () => {
     fireEvent.click(sectorsBtn);
     expect(sectorsBtn.className).toContain('bg-lmu-accent');
   });
+
+  it('renders button next to replay to navigate from Race to Quali, and from Quali to Race', async () => {
+    const onSelectSession = vi.fn();
+    const raceSession = {
+      ...mockDetailedSession,
+      id: '2026_05_28_R1',
+      sessionType: 'Race',
+      sessionName: 'R1',
+    };
+
+    const qualiSummary = {
+      id: '2026_05_28_Q1',
+      sessionType: 'Qualifying',
+      sessionName: 'Q1',
+      trackVenue: 'Spa',
+      timeString: '2026/05/28 14:00',
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/session/2026_05_28_R1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(raceSession) });
+      }
+      if (url.includes('/api/sessions')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSummary, raceSession]) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const { rerender } = render(
+      <SessionDetail sessionId="2026_05_28_R1" onBack={vi.fn()} onSelectSession={onSelectSession} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /go to quali/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /go to quali/i }));
+    expect(onSelectSession).toHaveBeenCalledWith('2026_05_28_Q1');
+
+    // Now test navigating from Quali to Race
+    const qualiSession = {
+      ...mockDetailedSession,
+      id: '2026_05_28_Q1',
+      sessionType: 'Qualifying',
+      sessionName: 'Q1',
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/session/2026_05_28_Q1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
+      }
+      if (url.includes('/api/sessions')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSession, raceSession]) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    rerender(
+      <SessionDetail sessionId="2026_05_28_Q1" onBack={vi.fn()} onSelectSession={onSelectSession} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /go to race/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /go to race/i }));
+    expect(onSelectSession).toHaveBeenCalledWith('2026_05_28_R1');
+  });
 });

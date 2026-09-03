@@ -8,6 +8,8 @@ import {
   matchesSessionType,
   parseDateStringToTimestamp,
   computeTheoreticalBest,
+  getSessionTypeWeight,
+  compareSessions,
 } from '../../src/utils/formatters';
 
 describe('formatters utility', () => {
@@ -180,6 +182,57 @@ describe('formatters utility', () => {
 
     it('sums valid sector times correctly', () => {
       expect(computeTheoreticalBest(25.100, 32.200, 41.300)).toBeCloseTo(98.6);
+    });
+  });
+
+  describe('getSessionTypeWeight and compareSessions', () => {
+    it('ranks Race as higher weight / newer than Qualifying, and Qualifying higher than Practice', () => {
+      const practiceWeight = getSessionTypeWeight('Practice', 'P1');
+      const qualiWeight = getSessionTypeWeight('Qualifying', 'Q1');
+      const raceWeight = getSessionTypeWeight('Race', 'R1');
+
+      expect(practiceWeight).toBeLessThan(qualiWeight);
+      expect(qualiWeight).toBeLessThan(raceWeight);
+    });
+
+    it('orders Race after Qualifying in chronological ascending order, and before in descending order', () => {
+      const qualiSession = {
+        id: '2026_05_28_Q1',
+        timeString: '2026/05/28 14:00:00',
+        sessionType: 'Qualifying',
+        sessionName: 'Q1',
+      };
+
+      const raceSession = {
+        id: '2026_05_28_R1',
+        timeString: '2026/05/28 14:00:00',
+        sessionType: 'Race',
+        sessionName: 'R1',
+      };
+
+      // In descending order (newest first), Race is newer so it should come first (negative return value)
+      expect(compareSessions(raceSession, qualiSession, 'desc')).toBeLessThan(0);
+      expect(compareSessions(qualiSession, raceSession, 'desc')).toBeGreaterThan(0);
+
+      // In ascending order (chronological), Quali comes before Race (negative return value)
+      expect(compareSessions(qualiSession, raceSession, 'asc')).toBeLessThan(0);
+      expect(compareSessions(raceSession, qualiSession, 'asc')).toBeGreaterThan(0);
+    });
+
+    it('orders multiple sessions on the same date: Practice -> Quali -> Race', () => {
+      const p1 = { id: 'P1', timeString: '2026/05/28 14:00', sessionType: 'Practice', sessionName: 'P1' };
+      const q1 = { id: 'Q1', timeString: '2026/05/28 14:00', sessionType: 'Qualifying', sessionName: 'Q1' };
+      const r1 = { id: 'R1', timeString: '2026/05/28 14:00', sessionType: 'Race', sessionName: 'R1' };
+
+      const list = [q1, r1, p1];
+
+      // Chronological: Practice, Quali, Race
+      const sortedAsc = [...list].sort((a, b) => compareSessions(a, b, 'asc'));
+      expect(sortedAsc.map(s => s.id)).toEqual(['P1', 'Q1', 'R1']);
+
+      // Newest first: Race, Quali, Practice
+      const sortedDesc = [...list].sort((a, b) => compareSessions(a, b, 'desc'));
+      expect(sortedDesc.map(s => s.id)).toEqual(['R1', 'Q1', 'P1']);
     });
   });
 });

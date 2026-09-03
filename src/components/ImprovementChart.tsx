@@ -10,7 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { TrendingUp, Zap, Trophy, Clock, Calendar } from 'lucide-react';
-import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
+import { formatTime, getDisplayTrackName, matchesSessionType, compareSessions } from '../utils/formatters';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, VEHICLE_CLASS_OPTIONS } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types.js';
 
@@ -115,12 +115,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
   const allTrackData = rawTrackData
     .filter(p => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null))
-    .sort((a, b) => {
-      const timeA = a.timestamp || parseDateStringToTimestamp(a.dateString);
-      const timeB = b.timestamp || parseDateStringToTimestamp(b.dateString);
-      if (timeA !== timeB) return timeA - timeB;
-      return (a.dateString || '').localeCompare(b.dateString || '');
-    });
+    .sort((a, b) => compareSessions(a, b, 'asc'));
 
   // Apply Date Range / Session Count filter
   const trackData = (() => {

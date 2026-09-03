@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Zap, FileText, ArrowUpDown, FilterX, ArrowLeftRight, Car } from 'lucide-react';
-import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters.js';
+import { formatTime, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp, compareSessions } from '../utils/formatters.js';
 import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryFromPercentage, matchesTrack } from '../utils/paceCategory.js';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
@@ -228,24 +228,26 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   // Sorted sessions by Date / Best Position / Benchmark Pace % / Best Lap Time
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-      const timeA = parseDateStringToTimestamp(a.timeString);
-      const timeB = parseDateStringToTimestamp(b.timeString);
-      return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
+      return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
     }
     if (sortBy === 'pos-asc') {
       const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
       const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
       if (posA !== posB) return posA - posB;
-      return parseDateStringToTimestamp(b.timeString) - parseDateStringToTimestamp(a.timeString);
+      return compareSessions(a, b, 'desc');
     }
     if (sortBy === 'lap-asc') {
       const lapA = a.playerDriver?.bestLapTime ?? 99999;
       const lapB = b.playerDriver?.bestLapTime ?? 99999;
-      return lapA - lapB;
+      if (lapA !== lapB) return lapA - lapB;
+      return compareSessions(a, b, 'desc');
     }
     const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
     const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
-    return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    if (pctA !== pctB) {
+      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    }
+    return compareSessions(a, b, 'desc');
   });
 
   // Calculate pace category & percentage against a reference entry

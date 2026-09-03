@@ -18,6 +18,8 @@ import {
   Scale,
   Trophy,
   ArrowUpDown,
+  Timer,
+  Flag,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,7 +32,7 @@ import {
   Legend,
 } from 'recharts';
 import { DetailedSession, SessionProgressionPoint } from '../../server/types.js';
-import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
+import { formatTime, getDisplayTrackName, parseDateStringToTimestamp } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, findReferenceEntry, matchesTrack } from '../utils/paceCategory.js';
 
 const OPPONENT_COLORS = [
@@ -53,12 +55,107 @@ const PLAYER_HIGHLIGHT_COLOR = '#FBBF24'; // Vibrant Gold Accent
 interface SessionDetailProps {
   sessionId: string;
   onBack: () => void;
+  onSelectSession?: (sessionId: string) => void;
 }
 
-export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack }) => {
+function findClosestSession(current: DetailedSession, candidates: any[]): any {
+  if (candidates.length <= 1) return candidates[0] || null;
+
+  const currentTime = current.timestamp || parseDateStringToTimestamp(current.timeString);
+  let best = candidates[0];
+  let minDiff = Infinity;
+
+  for (const cand of candidates) {
+    const candTime = cand.timestamp || parseDateStringToTimestamp(cand.timeString || cand.dateString);
+    const diff = Math.abs(currentTime - candTime);
+    if (diff < minDiff) {
+      minDiff = diff;
+      best = cand;
+    }
+  }
+
+  return best;
+}
+
+function findRelatedSession(
+  current: DetailedSession | null,
+  sessions: any[]
+): { type: 'qualifying' | 'race'; target: any } | null {
+  if (!current || !sessions || sessions.length === 0) return null;
+
+  const currentType = (current.sessionType || '').toLowerCase();
+  const currentName = (current.sessionName || '').toLowerCase();
+  const isRace = currentType === 'race' || currentName.startsWith('r');
+  const isQuali = currentType.includes('qual') || currentName.startsWith('q');
+  const isPractice = currentType.includes('practice') || currentName.startsWith('p');
+
+  // Race -> Quali; Quali -> Race; Practice -> Race or Quali
+  const targetType: 'qualifying' | 'race' | null = isRace ? 'qualifying' : (isQuali || isPractice) ? 'race' : null;
+  if (!targetType) return null;
+
+  const targetSessions = sessions.filter(s => {
+    const sId = s.id || s.sessionId;
+    if (sId === current.id) return false;
+    const t = (s.sessionType || '').toLowerCase();
+    const n = (s.sessionName || '').toLowerCase();
+    if (targetType === 'qualifying') {
+      return t.includes('qual') || n.startsWith('q');
+    }
+    if (targetType === 'race') {
+      return t === 'race' || n.startsWith('r');
+    }
+    return false;
+  });
+
+  if (targetSessions.length === 0) {
+    if (isPractice) {
+      const qualiSessions = sessions.filter(s => {
+        const sId = s.id || s.sessionId;
+        if (sId === current.id) return false;
+        const t = (s.sessionType || '').toLowerCase();
+        const n = (s.sessionName || '').toLowerCase();
+        return t.includes('qual') || n.startsWith('q');
+      });
+      if (qualiSessions.length > 0) {
+        return { type: 'qualifying', target: findClosestSession(current, qualiSessions) };
+      }
+    }
+    return null;
+  }
+
+  // 1. Direct filename/ID pattern match: e.g. 2026_05_28_R1 <-> 2026_05_28_Q1
+  const currentId = current.id;
+  const directIdPattern = isRace
+    ? currentId.replace(/([_.-])R(\d*)$/i, '$1Q$2')
+    : currentId.replace(/([_.-])Q(\d*)$/i, '$1R$2');
+
+  if (directIdPattern !== currentId) {
+    const directMatch = targetSessions.find(s => {
+      const sId = s.id || s.sessionId;
+      return sId === directIdPattern || s.filename === `${directIdPattern}.xml`;
+    });
+    if (directMatch) {
+      return { type: targetType, target: directMatch };
+    }
+  }
+
+  // 2. Same track match, closest in time
+  const sameTrackSessions = targetSessions.filter(s =>
+    matchesTrack(current.trackVenue, s.trackVenue, s.trackCourse) ||
+    s.trackVenue?.toLowerCase() === current.trackVenue?.toLowerCase()
+  );
+
+  const candidatePool = sameTrackSessions.length > 0 ? sameTrackSessions : targetSessions;
+  const bestMatch = findClosestSession(current, candidatePool);
+
+  return bestMatch ? { type: targetType, target: bestMatch } : null;
+}
+
+export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack, onSelectSession }) => {
   const [session, setSession] = useState<DetailedSession | null>(null);
   const [refCache, setRefCache] = useState<any>(null);
   const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
+  const [allSessions, setAllSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
@@ -80,12 +177,16 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
       fetch(`/api/session/${sessionId}`).then(res => res.json()),
       fetch('/api/reference-laptimes').then(res => res.json()).catch(() => null),
       fetch('/api/progression').then(res => res.json()).catch(() => []),
+      fetch('/api/sessions').then(res => res.json()).catch(() => []),
     ])
-      .then(([sessionData, refData, progData]) => {
+      .then(([sessionData, refData, progData, allSessionsData]) => {
         setSession(sessionData);
         setRefCache(refData);
         if (Array.isArray(progData)) {
           setProgression(progData);
+        }
+        if (Array.isArray(allSessionsData)) {
+          setAllSessions(allSessionsData);
         }
         if (sessionData.playerDriver) {
           setSelectedDriverName(sessionData.playerDriver.name);
@@ -267,6 +368,17 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
     document.body.removeChild(link);
   };
 
+  const candidatePool = allSessions.length > 0 ? allSessions : progression;
+  const relatedSession = findRelatedSession(session, candidatePool);
+
+  const handleNavigateToSession = (targetId: string) => {
+    if (onSelectSession) {
+      onSelectSession(targetId);
+    } else {
+      window.location.hash = `session/${encodeURIComponent(targetId)}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
 
@@ -293,6 +405,34 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
             >
               <Video className="w-4 h-4 text-emerald-400" />
               {copiedReplay ? 'Path Copied!' : 'Copy Replay (.VCR)'}
+            </button>
+          )}
+
+          {relatedSession && (
+            <button
+              onClick={() => handleNavigateToSession(relatedSession.target.id || relatedSession.target.sessionId)}
+              title={
+                relatedSession.type === 'qualifying'
+                  ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
+                  : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
+              }
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all shadow-sm cursor-pointer ${
+                relatedSession.type === 'qualifying'
+                  ? 'bg-lmu-gold/10 text-lmu-gold border-lmu-gold/30 hover:bg-lmu-gold/20 hover:border-lmu-gold'
+                  : 'bg-lmu-accent/10 text-lmu-accent border-lmu-accent/30 hover:bg-lmu-accent/20 hover:border-lmu-accent'
+              }`}
+            >
+              {relatedSession.type === 'qualifying' ? (
+                <>
+                  <Timer className="w-4 h-4 text-lmu-gold" />
+                  <span>Go to Quali ({relatedSession.target.sessionName || 'Q1'})</span>
+                </>
+              ) : (
+                <>
+                  <Trophy className="w-4 h-4 text-lmu-accent" />
+                  <span>Go to Race ({relatedSession.target.sessionName || 'R1'})</span>
+                </>
+              )}
             </button>
           )}
 
@@ -1701,10 +1841,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack 
                         </span>
                       ) : l.lapNum === 1 && (session.sessionType === 'Race' || selectedDriver?.gridPosition !== null) ? (
                         <span
-                          className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold inline-flex items-center gap-1"
+                          className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
                           title="Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)"
                         >
-                          🚦 START LAP
+                          <Flag className="w-3.5 h-3.5" />
+                          Start Lap
                         </span>
                       ) : l.isValid ? (
                         <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">

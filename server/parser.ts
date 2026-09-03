@@ -18,6 +18,9 @@ import {
   parseTimeStringToSeconds,
   getDisplayTrackName,
   computeTheoreticalBest,
+  parseDateStringToTimestamp,
+  getSessionTypeWeight,
+  compareSessions,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
 import { matchesTrack } from '../src/utils/paceCategory.js';
@@ -173,7 +176,6 @@ export class LmuParser {
       const trackEvent = raceResults.TrackEvent || '';
       const trackLengthMeters = parseFloat(raceResults.TrackLength) || null;
       const timeString = raceResults.TimeString || '';
-      const timestamp = raceResults.DateTime ? parseInt(raceResults.DateTime, 10) * 1000 : Date.now();
       const filename = path.basename(filePath);
 
       // Determine session type (Qualify, Race, Practice)
@@ -202,6 +204,21 @@ export class LmuParser {
           else if (sessionName.startsWith('R')) sessionType = 'Race';
         }
       }
+
+      let baseTimestamp = raceResults.DateTime ? parseInt(raceResults.DateTime, 10) * 1000 : 0;
+      if (!baseTimestamp && timeString) {
+        baseTimestamp = parseDateStringToTimestamp(timeString);
+      }
+      if (!baseTimestamp) {
+        try {
+          const stats = fs.statSync(filePath);
+          baseTimestamp = Math.floor(stats.mtimeMs);
+        } catch {
+          baseTimestamp = Date.now();
+        }
+      }
+      // Add session type weight (Practice < Quali < Race) so same-date sessions order chronologically
+      const timestamp = baseTimestamp + getSessionTypeWeight(sessionType, sessionName);
 
       // Parse Drivers
       const rawDrivers = sessionDataNode?.Driver || raceResults.Driver || [];
@@ -700,7 +717,7 @@ export class LmuParser {
  * Computes chronological session-over-session improvement points for a driver or overall.
  */
 export function computeProgression(sessions: DetailedSession[], targetDriverName?: string): SessionProgressionPoint[] {
-  const sorted = [...sessions].sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = [...sessions].sort((a, b) => compareSessions(a, b, 'asc'));
 
   return sorted.map(s => {
     let driver = targetDriverName
