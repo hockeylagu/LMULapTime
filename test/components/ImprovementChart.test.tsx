@@ -167,4 +167,62 @@ describe('ImprovementChart component', () => {
     expect(screen.getByText(/Progression Timeline/i)).toBeInTheDocument();
     expect(screen.getByText('1:45.123')).toBeInTheDocument();
   });
+
+  it('filters by specific car model when selectedCarModel prop is provided', () => {
+    const multiCarProgression = [
+      mockProgressionData[0],
+      {
+        ...mockProgressionData[1],
+        sessionId: 'sess3',
+        carType: 'Porsche 963',
+        bestLapTime: 123.5,
+      },
+    ];
+
+    render(
+      <ImprovementChart
+        progression={multiCarProgression}
+        tracks={['Spa']}
+        selectedTrack="Spa"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+        selectedCarModel="Ferrari 499P"
+      />
+    );
+
+    expect(screen.getByText('Ferrari 499P')).toBeInTheDocument();
+  });
+
+  it('switches to consistency rating view and renders consistency metrics', () => {
+    const dataWithConsistency = [
+      {
+        ...mockProgressionData[0],
+        consistencyScore: 98.5,
+        top3AvgLapTime: 121.5,
+        theoreticalGap: 0.2,
+      },
+      {
+        ...mockProgressionData[1],
+        consistencyScore: 99.2,
+        top3AvgLapTime: 120.8,
+        theoreticalGap: 0.1,
+      },
+    ];
+
+    render(
+      <ImprovementChart
+        progression={dataWithConsistency}
+        tracks={['Spa']}
+        selectedTrack="Spa"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    const consistencyBtn = screen.getByRole('button', { name: /consistency rating/i });
+    fireEvent.click(consistencyBtn);
+    expect(consistencyBtn).toHaveClass('bg-lmu-accent');
+  });
 });

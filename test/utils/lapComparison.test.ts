@@ -118,6 +118,23 @@ describe('lapComparison utility', () => {
       expect(theo.lapTime).toBeNull();
       expect(theo.lapTimeString).toBe('--:--.---');
     });
+
+    it('creates a theoretical lap with paceCategory and pacePercentage attached', () => {
+      const theo = createTheoreticalBestLap(
+        29.5,
+        44.2,
+        45.1,
+        'Theoretical Optimal',
+        'LMGT3',
+        'Porsche 911 GT3 R',
+        'Theoretical Best',
+        'Competitive',
+        101.5
+      );
+      expect(theo.paceCategory).toBe('Competitive');
+      expect(theo.pacePercentage).toBe(101.5);
+      expect(theo.tag).toBe('Theoretical Best');
+    });
   });
 
   describe('createBenchmarkLaps', () => {
@@ -240,12 +257,25 @@ describe('lapComparison utility', () => {
       const laps = [
         { lapNum: 1, lapTime: 120.0, isValid: true },
         { lapNum: 2, lapTime: 119.0, isValid: false }, // invalid
-        { lapNum: 3, lapTime: 118.0, isValid: true, isPitStop: true }, // pit stop
-        { lapNum: 4, lapTime: 121.0, isValid: true },
-        { lapNum: 5, lapTime: 122.0, isValid: true },
+        { lapNum: 3, lapTime: 121.0, isValid: true }, // flying lap
+        { lapNum: 4, lapTime: 122.0, isValid: true }, // flying lap
+        { lapNum: 5, lapTime: 135.0, isValid: true, isPitStop: true }, // pit stop
       ];
-      // Valid flying laps are lap 4 (121.0) and lap 5 (122.0) -> average is 121.5
+      // Valid flying laps are lap 3 (121.0) and lap 4 (122.0) -> average is 121.5
       expect(computeTopNLapAverage(laps, 3)).toBe(121.5);
+    });
+
+    it('excludes out-laps immediately following a valid pit stop', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 120.0, isValid: true },
+        { lapNum: 2, lapTime: 121.0, isValid: true },
+        { lapNum: 3, lapTime: 135.0, isValid: true, isPitStop: true }, // in-lap
+        { lapNum: 4, lapTime: 180.0, isValid: true }, // out-lap
+        { lapNum: 5, lapTime: 120.5, isValid: true },
+        { lapNum: 6, lapTime: 120.8, isValid: true },
+      ];
+      // Top 3 from flying laps (2, 5, 6: 121.0, 120.5, 120.8) -> average is 120.767
+      expect(computeTopNLapAverage(laps, 3)).toBe(120.767);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName } from '../../server/parser';
+import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName, extractComparableLaps } from '../../server/parser';
 import { DetailedSession } from '../../server/types';
 import fs from 'fs';
 
@@ -899,6 +899,119 @@ describe('parser server module', () => {
     it('computes clean track names directly in parser', () => {
       expect(getDisplayTrackName('Spa-Francorchamps', 'GP')).toBe('Spa-Francorchamps');
       expect(getDisplayTrackName('Silverstone', 'National Circuit')).toBe('Silverstone (National Circuit)');
+    });
+  });
+
+  describe('extractComparableLaps', () => {
+    const mockSessions: DetailedSession[] = [
+      {
+        id: 'sess_1',
+        filename: 'sess_1.xml',
+        filePath: '/path/1',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        trackEvent: '',
+        trackLengthMeters: 7004,
+        timeString: '2026/05/28 14:00',
+        timestamp: 1000,
+        sessionType: 'Practice',
+        sessionName: 'P1',
+        driversCount: 2,
+        playerDriver: {
+          name: 'Player Driver',
+          isPlayer: true,
+          carType: 'Porsche 911 GT3 R',
+          carClass: 'LMGT3',
+          carNumber: '92',
+          teamName: 'Manthey',
+          position: 2,
+          classPosition: 2,
+          bestLapTime: 122.5,
+          bestLapTimeString: '2:02.500',
+          theoreticalBest: 122.0,
+          theoreticalBestString: '2:02.000',
+          lapsCount: 2,
+          laps: [
+            { lapNum: 1, position: 2, lapTime: 124.0, lapTimeString: '2:04.000', s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
+            { lapNum: 2, position: 2, lapTime: 122.5, lapTimeString: '2:02.500', s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
+          ],
+        },
+        drivers: [
+          {
+            name: 'Player Driver',
+            isPlayer: true,
+            carType: 'Porsche 911 GT3 R',
+            carClass: 'LMGT3',
+            carNumber: '92',
+            teamName: 'Manthey',
+            position: 2,
+            classPosition: 2,
+            bestLapTime: 122.5,
+            bestLapTimeString: '2:02.500',
+            lapsCount: 2,
+            laps: [
+              { lapNum: 1, position: 2, lapTime: 124.0, lapTimeString: '2:04.000', s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
+              { lapNum: 2, position: 2, lapTime: 122.5, lapTimeString: '2:02.500', s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
+            ],
+          },
+          {
+            name: 'Alien AI Opponent',
+            isPlayer: false,
+            carType: 'Ferrari 296 GT3',
+            carClass: 'LMGT3',
+            carNumber: '55',
+            teamName: 'AF Corse',
+            position: 1,
+            classPosition: 1,
+            bestLapTime: 120.0,
+            bestLapTimeString: '2:00.000',
+            lapsCount: 2,
+            laps: [
+              { lapNum: 1, position: 1, lapTime: 121.0, lapTimeString: '2:01.000', s1: 30.0, s2: 45.0, s3: 46.0, isValid: true },
+              { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 29.8, s2: 44.5, s3: 45.7, isValid: true },
+            ],
+          },
+        ],
+      },
+    ];
+
+    it('extracts comparable laps and finds personal best and overall track best without driver restriction', () => {
+      const result = extractComparableLaps(mockSessions, {
+        track: 'Spa',
+        carClass: 'LMGT3',
+        playerOnly: true,
+      });
+
+      // Player laps are extracted
+      expect(result.laps.length).toBe(2);
+      expect(result.laps[0].driverName).toBe('Player Driver');
+
+      // Player personal best is 122.5s
+      expect(result.allTimeBestLap).toBeDefined();
+      expect(result.allTimeBestLap?.lapTime).toBe(122.5);
+      expect(result.allTimeBestLap?.driverName).toBe('Player Driver');
+
+      // Overall track best is the Alien AI Opponent (120.0s), even with playerOnly: true!
+      expect(result.overallTrackBestLap).toBeDefined();
+      expect(result.overallTrackBestLap?.lapTime).toBe(120.0);
+      expect(result.overallTrackBestLap?.driverName).toBe('Alien AI Opponent');
+      expect(result.overallTrackBestLap?.isOverallTrackBest).toBe(true);
+
+      // Best sectors across player laps (when playerOnly is true)
+      expect(result.bestS1).toBe(30.5);
+      expect(result.bestS2).toBe(45.5);
+      expect(result.bestS3).toBe(46.5);
+    });
+
+    it('filters strictly by carClass and returns empty when class does not match', () => {
+      const result = extractComparableLaps(mockSessions, {
+        track: 'Spa',
+        carClass: 'Hypercar',
+      });
+
+      expect(result.laps.length).toBe(0);
+      expect(result.allTimeBestLap).toBeNull();
+      expect(result.overallTrackBestLap).toBeNull();
     });
   });
 });
