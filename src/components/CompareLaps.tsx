@@ -28,19 +28,19 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { ReferenceLaptimeEntry } from '../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../utils/formatters.js';
 import {
   getPaceCategoryStyle,
   formatPacePercentage,
   VEHICLE_CLASS_OPTIONS,
   matchesCarClass,
+  getPaceCategoryFromPercentage,
 } from '../utils/paceCategory.js';
 import {
   ComparableLap,
   computeLapDeltas,
   createTheoreticalBestLap,
-  createBenchmarkLaps,
   filterLapsByCarCategory,
 } from '../utils/lapComparison.js';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
@@ -100,6 +100,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   const [apiData, setApiData] = useState<{
     laps: ComparableLap[];
     allTimeBestLap: ComparableLap | null;
+    overallTrackBestLap?: ComparableLap | null;
     bestS1: number | null;
     bestS2: number | null;
     bestS3: number | null;
@@ -108,6 +109,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   }>({
     laps: [],
     allTimeBestLap: null,
+    overallTrackBestLap: null,
     bestS1: null,
     bestS2: null,
     bestS3: null,
@@ -270,10 +272,51 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     });
   }, [baseFilteredLaps, hideEmpty, availableLapsSort]);
 
+  // Best sector times across all valid available laps currently displayed (with fallback to apiData track bests)
+  const bestAvailableS1 = useMemo(() => {
+    const valid = displayLaps
+      .filter(l => l.isValid && l.s1 !== null && l.s1 !== undefined && l.s1 > 0)
+      .map(l => l.s1 as number);
+    if (valid.length > 0) return Math.min(...valid);
+    return apiData.bestS1 ?? null;
+  }, [displayLaps, apiData.bestS1]);
+
+  const bestAvailableS2 = useMemo(() => {
+    const valid = displayLaps
+      .filter(l => l.isValid && l.s2 !== null && l.s2 !== undefined && l.s2 > 0)
+      .map(l => l.s2 as number);
+    if (valid.length > 0) return Math.min(...valid);
+    return apiData.bestS2 ?? null;
+  }, [displayLaps, apiData.bestS2]);
+
+  const bestAvailableS3 = useMemo(() => {
+    const valid = displayLaps
+      .filter(l => l.isValid && l.s3 !== null && l.s3 !== undefined && l.s3 > 0)
+      .map(l => l.s3 as number);
+    if (valid.length > 0) return Math.min(...valid);
+    return apiData.bestS3 ?? null;
+  }, [displayLaps, apiData.bestS3]);
+
   // Active baseline lap
   const baselineLap = useMemo(() => {
     return selectedLaps.find(l => l.id === baselineLapId) || selectedLaps[0] || null;
   }, [selectedLaps, baselineLapId]);
+
+  // Best sector times among currently selected laps in the comparison deck
+  const bestComparedS1 = useMemo(() => {
+    const valid = selectedLaps.filter(l => l.isValid && l.s1 !== null && l.s1 > 0).map(l => l.s1 as number);
+    return valid.length > 0 ? Math.min(...valid) : null;
+  }, [selectedLaps]);
+
+  const bestComparedS2 = useMemo(() => {
+    const valid = selectedLaps.filter(l => l.isValid && l.s2 !== null && l.s2 > 0).map(l => l.s2 as number);
+    return valid.length > 0 ? Math.min(...valid) : null;
+  }, [selectedLaps]);
+
+  const bestComparedS3 = useMemo(() => {
+    const valid = selectedLaps.filter(l => l.isValid && l.s3 !== null && l.s3 > 0).map(l => l.s3 as number);
+    return valid.length > 0 ? Math.min(...valid) : null;
+  }, [selectedLaps]);
 
   // Toggle selection of a lap
   const handleToggleLap = (lap: ComparableLap) => {
@@ -301,6 +344,27 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
   const handleAddTheoreticalBest = () => {
     if (!apiData.bestS1 || !apiData.bestS2 || !apiData.bestS3) return;
+    const theoTime = parseFloat((apiData.bestS1 + apiData.bestS2 + apiData.bestS3).toFixed(3));
+
+    const matchingRef = apiData.benchmarks.find(b =>
+      matchesCarClass(b.carClass, '', selectedCarClass)
+    ) || apiData.benchmarks[0];
+
+    let pacePercentage: number | null = null;
+    let paceCategory: PaceCategory | null = null;
+
+    if (matchingRef?.target100Sec && theoTime > 0) {
+      pacePercentage = parseFloat(((theoTime / matchingRef.target100Sec) * 100).toFixed(2));
+      paceCategory = getPaceCategoryFromPercentage(pacePercentage);
+    } else {
+      const sampleLap = apiData.laps.find(l => l.isValid && l.lapTime && l.pacePercentage);
+      if (sampleLap?.lapTime && sampleLap.pacePercentage) {
+        const target100 = sampleLap.lapTime / (sampleLap.pacePercentage / 100);
+        pacePercentage = parseFloat(((theoTime / target100) * 100).toFixed(2));
+        paceCategory = getPaceCategoryFromPercentage(pacePercentage);
+      }
+    }
+
     const theoLap = createTheoreticalBestLap(
       apiData.bestS1,
       apiData.bestS2,
@@ -308,23 +372,12 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       'Theoretical Optimal',
       selectedCarClass,
       'Best Sectors Combined',
-      '⚡ Theoretical Best'
+      '⚡ Theoretical Best',
+      paceCategory,
+      pacePercentage
     );
     if (!selectedLaps.some(l => l.id === theoLap.id || l.isTheoreticalBest)) {
       handleToggleLap(theoLap);
-    }
-  };
-
-  const handleAddBenchmark = (category: 'Alien' | 'Competitive' | 'Good') => {
-    const matching = apiData.benchmarks.find(b =>
-      matchesCarClass(b.carClass, '', selectedCarClass)
-    ) || apiData.benchmarks[0];
-    if (!matching) return;
-
-    const benchLaps = createBenchmarkLaps(matching);
-    const target = benchLaps.find(b => b.benchmarkCategory === category);
-    if (target && !selectedLaps.some(l => l.id === target.id)) {
-      handleToggleLap(target);
     }
   };
 
@@ -363,74 +416,106 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     if (!baselineLapId) setBaselineLapId(allTimePBObject.id);
   };
 
+  // Overall Track Best Lap Object (Track record across ALL drivers on this track without driver restriction)
+  const overallTrackBestObject: ComparableLap | null = useMemo(() => {
+    if (apiData.overallTrackBestLap) {
+      return {
+        ...apiData.overallTrackBestLap,
+        isOverallTrackBest: true,
+        tag: apiData.overallTrackBestLap.tag || `🏆 All-Time Best (${apiData.overallTrackBestLap.driverName})`,
+      };
+    }
+    if (apiData.allTimeBestLap) {
+      return {
+        ...apiData.allTimeBestLap,
+        isOverallTrackBest: true,
+        tag: `🏆 All-Time Best (${apiData.allTimeBestLap.driverName})`,
+      };
+    }
+    const valid = apiData.laps.filter(l => l.isValid && l.lapTime && l.lapTime > 0);
+    if (valid.length === 0) return null;
+    const sorted = [...valid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
+    return {
+      ...sorted[0],
+      isOverallTrackBest: true,
+      tag: `🏆 All-Time Best (${sorted[0].driverName})`,
+    };
+  }, [apiData]);
+
+  const isOverallBestInComparison = overallTrackBestObject
+    ? selectedLaps.some(l => l.id === overallTrackBestObject.id)
+    : false;
+
+  const handleAddOverallTrackBest = () => {
+    if (!overallTrackBestObject) return;
+    if (selectedLaps.some(l => l.id === overallTrackBestObject.id)) return;
+    if (selectedLaps.length >= 4) {
+      alert('Maximum of 4 laps can be compared simultaneously.');
+      return;
+    }
+    const updated = [...selectedLaps, overallTrackBestObject];
+    setSelectedLaps(updated);
+    if (!baselineLapId) setBaselineLapId(overallTrackBestObject.id);
+  };
+
   const handleClearAll = () => {
     setSelectedLaps([]);
     setBaselineLapId('');
   };
 
+  // Laps compared against the baseline (excluding baseline itself since its delta is always 0)
+  const comparedLaps = useMemo(() => {
+    if (!baselineLap) return [];
+    return selectedLaps.filter(l => l.id !== baselineLap.id);
+  }, [selectedLaps, baselineLap]);
+
   // Prepare sector time difference (delta vs baseline) chart data
   const chartData = useMemo(() => {
-    if (!baselineLap) return [];
+    if (!baselineLap || comparedLaps.length === 0) return [];
 
     return [
       {
         metric: 'Sector 1',
         metricKey: 's1' as const,
-        ...selectedLaps.reduce((acc, lap) => {
-          if (lap.id === baselineLap.id) {
-            acc[lap.id] = 0;
-          } else {
-            const baseVal = baselineLap.s1 ?? 0;
-            const lapVal = lap.s1 ?? 0;
-            acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
-          }
+        ...comparedLaps.reduce((acc, lap) => {
+          const baseVal = baselineLap.s1 ?? 0;
+          const lapVal = lap.s1 ?? 0;
+          acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
           return acc;
         }, {} as Record<string, number>),
       },
       {
         metric: 'Sector 2',
         metricKey: 's2' as const,
-        ...selectedLaps.reduce((acc, lap) => {
-          if (lap.id === baselineLap.id) {
-            acc[lap.id] = 0;
-          } else {
-            const baseVal = baselineLap.s2 ?? 0;
-            const lapVal = lap.s2 ?? 0;
-            acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
-          }
+        ...comparedLaps.reduce((acc, lap) => {
+          const baseVal = baselineLap.s2 ?? 0;
+          const lapVal = lap.s2 ?? 0;
+          acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
           return acc;
         }, {} as Record<string, number>),
       },
       {
         metric: 'Sector 3',
         metricKey: 's3' as const,
-        ...selectedLaps.reduce((acc, lap) => {
-          if (lap.id === baselineLap.id) {
-            acc[lap.id] = 0;
-          } else {
-            const baseVal = baselineLap.s3 ?? 0;
-            const lapVal = lap.s3 ?? 0;
-            acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
-          }
+        ...comparedLaps.reduce((acc, lap) => {
+          const baseVal = baselineLap.s3 ?? 0;
+          const lapVal = lap.s3 ?? 0;
+          acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
           return acc;
         }, {} as Record<string, number>),
       },
       {
         metric: 'Full Lap',
         metricKey: 'lapTime' as const,
-        ...selectedLaps.reduce((acc, lap) => {
-          if (lap.id === baselineLap.id) {
-            acc[lap.id] = 0;
-          } else {
-            const baseVal = baselineLap.lapTime ?? 0;
-            const lapVal = lap.lapTime ?? 0;
-            acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
-          }
+        ...comparedLaps.reduce((acc, lap) => {
+          const baseVal = baselineLap.lapTime ?? 0;
+          const lapVal = lap.lapTime ?? 0;
+          acc[lap.id] = baseVal > 0 && lapVal > 0 ? parseFloat((lapVal - baseVal).toFixed(3)) : 0;
           return acc;
         }, {} as Record<string, number>),
       },
     ];
-  }, [selectedLaps, baselineLap]);
+  }, [comparedLaps, baselineLap]);
 
   // Color palette for compared laps
   const LAP_COLORS = ['#ECC94B', '#3182CE', '#38A169', '#E53E3E', '#9F7AEA'];
@@ -459,7 +544,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
           {/* Quick Presets & Clear */}
           <div className="flex flex-wrap items-center gap-2">
-            {allTimePBObject && !isPBInComparison && (
+            {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
               <button
                 onClick={handleAddPersonalBest}
                 className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
@@ -481,14 +566,15 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
               </button>
             )}
 
-            {apiData.benchmarks && apiData.benchmarks.length > 0 && (
+            {/* All-Time Best Lap for this Track across all drivers without driver restriction */}
+            {overallTrackBestObject && !isOverallBestInComparison && (
               <button
-                onClick={() => handleAddBenchmark('Alien')}
-                className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5"
-                title="Add reference Alien benchmark target"
+                onClick={handleAddOverallTrackBest}
+                className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                title={`Add all-time fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
               >
                 <Award className="w-3.5 h-3.5 text-amber-400" />
-                + Alien Target
+                + All-Time Best ({overallTrackBestObject.lapTimeString})
               </button>
             )}
 
@@ -621,6 +707,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
               const isBaseline = lap.id === baselineLap?.id;
               const deltas = baselineLap ? computeLapDeltas(baselineLap, lap) : null;
               const color = LAP_COLORS[index % LAP_COLORS.length];
+              const isCardS1Best = lap.isValid && lap.s1 !== null && bestComparedS1 !== null && Math.abs(lap.s1 - bestComparedS1) < 0.0005;
+              const isCardS2Best = lap.isValid && lap.s2 !== null && bestComparedS2 !== null && Math.abs(lap.s2 - bestComparedS2) < 0.0005;
+              const isCardS3Best = lap.isValid && lap.s3 !== null && bestComparedS3 !== null && Math.abs(lap.s3 - bestComparedS3) < 0.0005;
 
               return (
                 <div
@@ -648,15 +737,15 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                         {!isBaseline && (
                           <button
                             onClick={() => setBaselineLapId(lap.id)}
-                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-lmu-bg hover:bg-lmu-gold/20 text-lmu-muted hover:text-lmu-gold border border-lmu-border transition-all"
-                            title="Set as active baseline lap"
+                            className="text-[10px] text-lmu-muted hover:text-lmu-gold font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg"
+                            title="Set as baseline for deltas"
                           >
                             Set Baseline
                           </button>
                         )}
                         <button
                           onClick={() => handleToggleLap(lap)}
-                          className="p-1 text-lmu-muted hover:text-rose-400 transition-colors"
+                          className="text-lmu-muted hover:text-rose-400 p-0.5 rounded transition-colors"
                           title="Remove from comparison"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -664,43 +753,63 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-xs font-medium text-lmu-muted mt-1 truncate">
-                      {lap.driverName} • <span className="text-white">{lap.carType}</span>
-                    </p>
-
-                    {lap.dateString && (
-                      <p className="text-[11px] text-lmu-muted/80 mt-0.5">
-                        {lap.sessionName || 'Session'} • {lap.dateString}
+                    {/* Driver & Car Info */}
+                    <div className="mt-3">
+                      <p className="text-xs text-lmu-muted truncate" title={lap.driverName}>
+                        {lap.driverName}
                       </p>
-                    )}
-
-                    {/* Overall Lap Time & Delta */}
-                    <div className="mt-3 p-3 rounded-xl bg-lmu-bg/80 border border-lmu-border/60">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[11px] uppercase font-semibold text-lmu-muted">Lap Time</span>
-                        {deltas && !isBaseline && (
-                          <span className={`text-xs font-mono font-bold ${deltas.lapTimeDeltaClass}`}>
-                            {deltas.lapTimeDeltaFormatted}
-                          </span>
-                        )}
-                        {isBaseline && (
-                          <span className="text-[10px] uppercase font-bold text-lmu-gold tracking-wider">
-                            BASELINE
+                      <p className="text-xs font-medium text-white truncate" title={lap.carType}>
+                        {lap.carType}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-[11px] text-lmu-muted mt-0.5">
+                        <span className="px-1.5 py-0.2 bg-lmu-bg rounded text-[10px] font-semibold text-lmu-cyan border border-lmu-border">
+                          {lap.carClass}
+                        </span>
+                        {lap.sessionName && (
+                          <span className="truncate">
+                            {lap.sessionName} ({lap.sessionType || 'P'})
                           </span>
                         )}
                       </div>
                       <h4 className="text-2xl font-extrabold font-mono text-white mt-0.5">
                         {lap.lapTimeString}
                       </h4>
-                      {lap.paceCategory && (
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${getPaceCategoryStyle(lap.paceCategory).badgeClass}`}>
-                            <span>{getPaceCategoryStyle(lap.paceCategory).emoji}</span>
-                            <span>{lap.paceCategory}</span>
-                            <span className="opacity-80">({formatPacePercentage(lap.pacePercentage)})</span>
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        let cat = lap.paceCategory;
+                        let pct = lap.pacePercentage;
+
+                        if (!cat && lap.lapTime && lap.lapTime > 0) {
+                          const matchingRef = apiData.benchmarks.find(b =>
+                            matchesCarClass(b.carClass, '', selectedCarClass)
+                          ) || apiData.benchmarks[0];
+
+                          if (matchingRef?.target100Sec) {
+                            pct = parseFloat(((lap.lapTime / matchingRef.target100Sec) * 100).toFixed(2));
+                            cat = getPaceCategoryFromPercentage(pct);
+                          } else {
+                            const sampleLap = apiData.laps.find(l => l.isValid && l.lapTime && l.pacePercentage);
+                            if (sampleLap?.lapTime && sampleLap.pacePercentage) {
+                              const target100 = sampleLap.lapTime / (sampleLap.pacePercentage / 100);
+                              pct = parseFloat(((lap.lapTime / target100) * 100).toFixed(2));
+                              cat = getPaceCategoryFromPercentage(pct);
+                            }
+                          }
+                        }
+
+                        if (!cat) return null;
+
+                        return (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${getPaceCategoryStyle(cat).badgeClass}`}>
+                              <span>{getPaceCategoryStyle(cat).emoji}</span>
+                              <span>{cat}</span>
+                              {pct !== null && pct !== undefined && (
+                                <span className="opacity-80">({formatPacePercentage(pct)})</span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Sector Breakdown */}
@@ -709,7 +818,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
                         <span className="text-lmu-gold font-sans font-semibold">S1</span>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-white font-bold">{lap.s1String || formatTime(lap.s1)}</span>
+                          <span className={`font-bold ${isCardS1Best ? 'text-lmu-gold' : 'text-white'}`}>
+                            {lap.s1String || formatTime(lap.s1)}
+                          </span>
                           {deltas && !isBaseline && (
                             <span className={`text-[11px] font-bold ${deltas.s1DeltaClass}`}>
                               {deltas.s1DeltaFormatted}
@@ -722,7 +833,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
                         <span className="text-lmu-blue font-sans font-semibold">S2</span>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-white font-bold">{lap.s2String || formatTime(lap.s2)}</span>
+                          <span className={`font-bold ${isCardS2Best ? 'text-lmu-blue' : 'text-white'}`}>
+                            {lap.s2String || formatTime(lap.s2)}
+                          </span>
                           {deltas && !isBaseline && (
                             <span className={`text-[11px] font-bold ${deltas.s2DeltaClass}`}>
                               {deltas.s2DeltaFormatted}
@@ -735,7 +848,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
                         <span className="text-lmu-green font-sans font-semibold">S3</span>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-white font-bold">{lap.s3String || formatTime(lap.s3)}</span>
+                          <span className={`font-bold ${isCardS3Best ? 'text-lmu-green' : 'text-white'}`}>
+                            {lap.s3String || formatTime(lap.s3)}
+                          </span>
                           {deltas && !isBaseline && (
                             <span className={`text-[11px] font-bold ${deltas.s3DeltaClass}`}>
                               {deltas.s3DeltaFormatted}
@@ -924,7 +1039,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                       }}
                     />
                     <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
-                    {selectedLaps.map((lap) => (
+                    {comparedLaps.map((lap) => (
                       <Bar
                         key={lap.id}
                         dataKey={lap.id}
@@ -932,11 +1047,8 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                         radius={[4, 4, 0, 0]}
                       >
                         {chartData.map((entry, entryIndex) => {
-                          const isBase = lap.id === baselineLap.id;
                           const val = (entry as any)[lap.id] as number;
-                          const cellColor = isBase
-                            ? '#ECC94B' // Gold for baseline
-                            : val < 0
+                          const cellColor = val < 0
                             ? '#10B981' // Green for faster / time gained
                             : val > 0
                             ? '#EF4444' // Red for slower / time lost
@@ -1096,34 +1208,34 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
                   <th
                     onClick={() => setAvailableLapsSort('s1-asc')}
-                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-accent transition-colors"
+                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-gold transition-colors"
                     title="Sort by Sector 1 (S1)"
                   >
                     <div className="flex items-center justify-end gap-1">
-                      S1
-                      {availableLapsSort === 's1-asc' && <ChevronDown className="w-3 h-3 text-lmu-accent" />}
+                      <span className="text-lmu-gold/90">S1</span>
+                      {availableLapsSort === 's1-asc' && <ChevronDown className="w-3 h-3 text-lmu-gold" />}
                     </div>
                   </th>
 
                   <th
                     onClick={() => setAvailableLapsSort('s2-asc')}
-                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-accent transition-colors"
+                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-blue transition-colors"
                     title="Sort by Sector 2 (S2)"
                   >
                     <div className="flex items-center justify-end gap-1">
-                      S2
-                      {availableLapsSort === 's2-asc' && <ChevronDown className="w-3 h-3 text-lmu-accent" />}
+                      <span className="text-lmu-blue/90">S2</span>
+                      {availableLapsSort === 's2-asc' && <ChevronDown className="w-3 h-3 text-lmu-blue" />}
                     </div>
                   </th>
 
                   <th
                     onClick={() => setAvailableLapsSort('s3-asc')}
-                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-accent transition-colors"
+                    className="px-3 py-3 text-right cursor-pointer hover:text-lmu-green transition-colors"
                     title="Sort by Sector 3 (S3)"
                   >
                     <div className="flex items-center justify-end gap-1">
-                      S3
-                      {availableLapsSort === 's3-asc' && <ChevronDown className="w-3 h-3 text-lmu-accent" />}
+                      <span className="text-lmu-green/90">S3</span>
+                      {availableLapsSort === 's3-asc' && <ChevronDown className="w-3 h-3 text-lmu-green" />}
                     </div>
                   </th>
 
@@ -1147,6 +1259,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                   const isSelected = selectedLaps.some(l => l.id === lap.id);
                   const isBaseline = baselineLap?.id === lap.id;
                   const isAllTimePB = apiData.allTimeBestLap?.id === lap.id;
+
+                  const isS1Best = lap.isValid && lap.s1 !== null && bestAvailableS1 !== null && Math.abs(lap.s1 - bestAvailableS1) < 0.0005;
+                  const isS2Best = lap.isValid && lap.s2 !== null && bestAvailableS2 !== null && Math.abs(lap.s2 - bestAvailableS2) < 0.0005;
+                  const isS3Best = lap.isValid && lap.s3 !== null && bestAvailableS3 !== null && Math.abs(lap.s3 - bestAvailableS3) < 0.0005;
 
                   return (
                     <tr
@@ -1213,9 +1329,15 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
                         ) : '-'}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right">{lap.s1String || formatTime(lap.s1)}</td>
-                      <td className="px-3 py-2.5 text-right">{lap.s2String || formatTime(lap.s2)}</td>
-                      <td className="px-3 py-2.5 text-right">{lap.s3String || formatTime(lap.s3)}</td>
+                      <td className={`px-3 py-2.5 text-right font-mono ${isS1Best ? 'text-lmu-gold font-bold' : ''}`} title={isS1Best ? 'Best Sector 1' : undefined}>
+                        {lap.s1String || formatTime(lap.s1)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right font-mono ${isS2Best ? 'text-lmu-blue font-bold' : ''}`} title={isS2Best ? 'Best Sector 2' : undefined}>
+                        {lap.s2String || formatTime(lap.s2)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right font-mono ${isS3Best ? 'text-lmu-green font-bold' : ''}`} title={isS3Best ? 'Best Sector 3' : undefined}>
+                        {lap.s3String || formatTime(lap.s3)}
+                      </td>
 
                       <td className="px-3 py-2.5 text-right text-white">
                         {lap.topSpeed ? `${lap.topSpeed.toFixed(1)}` : '-'}

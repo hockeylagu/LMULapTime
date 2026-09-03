@@ -728,9 +728,40 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       driver = s.drivers[0];
     }
 
-    const cleanLapsCount = driver?.laps.filter(l => l.isValid && l.lapTime).length || 0;
+    const cleanLaps = (driver?.laps || []).filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
+    const cleanLapsCount = cleanLaps.length;
     const totalLapsCount = driver?.lapsCount || 0;
     const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
+
+    // Top 3 Clean Lap Average (filters out lap 1 out-laps when multiple laps exist)
+    const hasMultipleLaps = cleanLaps.length > 1;
+    const validFlyingLaps = cleanLaps.filter(l => !hasMultipleLaps || l.lapNum > 1);
+    const lapsForTop3 = validFlyingLaps.length > 0 ? validFlyingLaps : cleanLaps;
+    const sortedLaps = [...lapsForTop3].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
+    const top3Slice = sortedLaps.slice(0, 3);
+    const top3AvgLapTime = top3Slice.length > 0
+      ? parseFloat((top3Slice.reduce((sum, l) => sum + (l.lapTime || 0), 0) / top3Slice.length).toFixed(3))
+      : null;
+
+    // Theoretical Gap (Execution gap: Actual Best - Theoretical Best)
+    const theoreticalGap = (driver?.bestLapTime && driver?.theoreticalBest)
+      ? parseFloat((driver.bestLapTime - driver.theoreticalBest).toFixed(3))
+      : null;
+
+    // Consistency score (%) based on standard deviation of clean flying laps
+    const lapsForConsistency = validFlyingLaps.length >= 2 ? validFlyingLaps : (cleanLaps.length >= 2 ? cleanLaps : validFlyingLaps);
+    const consistAvg = lapsForConsistency.length > 0
+      ? lapsForConsistency.reduce((sum, l) => sum + (l.lapTime || 0), 0) / lapsForConsistency.length
+      : null;
+    const stdDev = (consistAvg !== null && lapsForConsistency.length > 1)
+      ? Math.sqrt(
+          lapsForConsistency.reduce((sum, l) => sum + Math.pow((l.lapTime || 0) - consistAvg, 2), 0) /
+            lapsForConsistency.length
+        )
+      : null;
+    const consistencyScore = (consistAvg !== null && stdDev !== null && consistAvg > 0)
+      ? parseFloat(Math.max(0, Math.min(100, (1 - stdDev / consistAvg) * 100)).toFixed(1))
+      : null;
 
     return {
       sessionId: s.id,
@@ -753,6 +784,9 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       cleanLapsCount,
       totalLapsCount,
       avgLapTime,
+      top3AvgLapTime,
+      theoreticalGap,
+      consistencyScore,
       matchingReplayFile: s.matchingReplayFile?.name,
     };
   });
@@ -834,6 +868,7 @@ export function extractComparableLaps(
 
   const laps: any[] = [];
   let allTimeBestLap: any = null;
+  let overallTrackBestLap: any = null;
   let bestS1: number | null = null;
   let bestS2: number | null = null;
   let bestS3: number | null = null;
@@ -842,6 +877,78 @@ export function extractComparableLaps(
     if (filters.sessionId && s.id !== filters.sessionId) {
       // If a specific session is requested for isolation, but we still search all matching sessions for all-time stats
     }
+
+    // Check all drivers in matching sessions to determine overall track record without driver restriction
+    (s.drivers || []).forEach(d => {
+      if (targetClass && targetClass !== 'All') {
+        const dClass = d.carClass || '';
+        const dType = d.carType || '';
+        const normTarget = targetClass.toUpperCase();
+        const normD = `${dClass} ${dType}`.toUpperCase();
+        
+        const isLMH = (normTarget.includes('HYPER') || normTarget.includes('LMH')) && (normD.includes('HYPER') || normD.includes('LMH') || normD.includes('LMDH'));
+        const isGT3 = (normTarget.includes('GT3') || normTarget.includes('LMGT3')) && (normD.includes('GT3') || normD.includes('LMGT3'));
+        const isLMP2 = normTarget.includes('LMP2') && normD.includes('LMP2');
+        const isGTE = normTarget.includes('GTE') && normD.includes('GTE');
+        
+        if (!isLMH && !isGT3 && !isLMP2 && !isGTE && !normD.includes(normTarget)) {
+          return;
+        }
+      }
+
+      if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
+        return;
+      }
+
+      (d.laps || []).forEach(l => {
+        if (l.isValid && l.lapTime && l.lapTime > 0) {
+          if (!overallTrackBestLap || l.lapTime < overallTrackBestLap.lapTime) {
+            overallTrackBestLap = {
+              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
+              sessionId: s.id,
+              sessionName: s.sessionName,
+              sessionType: s.sessionType,
+              dateString: s.timeString,
+              timestamp: s.timestamp,
+              driverName: d.name,
+              carType: d.carType,
+              carClass: d.carClass || 'General',
+              lapNum: l.lapNum,
+              lapTime: l.lapTime,
+              lapTimeString: l.lapTimeString,
+              s1: l.s1,
+              s2: l.s2,
+              s3: l.s3,
+              s1String: formatTime(l.s1),
+              s2String: formatTime(l.s2),
+              s3String: formatTime(l.s3),
+              topSpeed: l.topSpeed,
+              fCompound: l.fCompound,
+              rCompound: l.rCompound,
+              flCompound: l.flCompound,
+              frCompound: l.frCompound,
+              rlCompound: l.rlCompound,
+              rrCompound: l.rrCompound,
+              tireWear: l.tireWear,
+              fuel: l.fuel,
+              fuelUsed: l.fuelUsed,
+              virtualEnergy: l.virtualEnergy,
+              virtualEnergyUsed: l.virtualEnergyUsed,
+              elapsedSeconds: l.elapsedSeconds,
+              elapsedTimeString: l.elapsedTimeString,
+              pitStopDurationString: l.pitStopDurationString,
+              gapToLeaderString: l.gapToLeaderString,
+              isPitStop: l.isPitStop,
+              isValid: l.isValid,
+              paceCategory: l.paceCategory || null,
+              pacePercentage: l.pacePercentage || null,
+              isOverallTrackBest: true,
+              tag: `🏆 All-Time Best (${d.name})`,
+            };
+          }
+        }
+      });
+    });
 
     const driversToProcess = filters.playerOnly
       ? (s.playerDriver ? [s.playerDriver] : s.drivers.filter(d => d.isPlayer))
@@ -942,6 +1049,7 @@ export function extractComparableLaps(
   return {
     laps,
     allTimeBestLap,
+    overallTrackBestLap,
     bestS1,
     bestS2,
     bestS3,

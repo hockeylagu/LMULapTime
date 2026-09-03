@@ -34,6 +34,7 @@ import {
 import { DetailedSession, SessionProgressionPoint } from '../../server/types.js';
 import { formatTime, getDisplayTrackName, parseDateStringToTimestamp } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, findReferenceEntry, matchesTrack } from '../utils/paceCategory.js';
+import { computeLapToLapDelta } from '../utils/lapComparison.js';
 
 const OPPONENT_COLORS = [
   '#38BDF8', // sky
@@ -340,22 +341,47 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
 
   const handleExportCsv = () => {
     if (!selectedDriver) return;
-    const headers = ['Lap', 'LapTime_Seconds', 'LapTime_Formatted', 'PaceCategory', 'PacePercentage', 'S1', 'S2', 'S3', 'TopSpeed_kmh', 'FrontTire', 'RearTire', 'PitStop', 'Valid'];
-    const rows = selectedDriver.laps.map(l => [
-      l.lapNum,
-      l.lapTime || '',
-      l.lapTimeString,
-      l.paceCategory || '',
-      l.pacePercentage ? `${l.pacePercentage}%` : '',
-      l.s1 || '',
-      l.s2 || '',
-      l.s3 || '',
-      l.topSpeed || '',
-      l.fCompound,
-      l.rCompound,
-      l.isPitStop ? 'Yes' : 'No',
-      l.isValid ? 'Yes' : 'No',
-    ]);
+    const headers = [
+      'Lap',
+      'LapTime_Seconds',
+      'LapTime_Formatted',
+      'DeltaPrevLap_Seconds',
+      'DeltaOptimal_Seconds',
+      'PaceCategory',
+      'PacePercentage',
+      'S1',
+      'S2',
+      'S3',
+      'TopSpeed_kmh',
+      'FrontTire',
+      'RearTire',
+      'PitStop',
+      'Valid',
+    ];
+    const theo = selectedDriver.theoreticalBest;
+    const rows = selectedDriver.laps.map((l, idx, allLaps) => {
+      const prevLap = idx > 0 ? allLaps[idx - 1] : null;
+      const prevDelta = l.lapTime && prevLap && prevLap.lapTime ? (l.lapTime - prevLap.lapTime).toFixed(3) : '';
+      const optDelta = l.lapTime && theo ? (l.lapTime - theo).toFixed(3) : '';
+
+      return [
+        l.lapNum,
+        l.lapTime || '',
+        l.lapTimeString,
+        prevDelta,
+        optDelta,
+        l.paceCategory || '',
+        l.pacePercentage ? `${l.pacePercentage}%` : '',
+        l.s1 || '',
+        l.s2 || '',
+        l.s3 || '',
+        l.topSpeed || '',
+        l.fCompound,
+        l.rCompound,
+        l.isPitStop ? 'Yes' : 'No',
+        l.isValid ? 'Yes' : 'No',
+      ];
+    });
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -640,6 +666,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
           ? Math.max(0, Math.min(100, (1 - (lapStdDev / avgLapTime)) * 100))
           : null;
 
+        const sortedCleanLaps = [...cleanLapsForAvg]
+          .filter(l => l.lapTime !== null && l.lapTime > 0)
+          .sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
+        const top3Slice = sortedCleanLaps.slice(0, 3);
+        const top3Avg = top3Slice.length > 0
+          ? parseFloat((top3Slice.reduce((sum, l) => sum + (l.lapTime || 0), 0) / top3Slice.length).toFixed(3))
+          : null;
+        const top3DeltaToBest = (top3Avg !== null && selectedDriver.bestLapTime)
+          ? parseFloat((top3Avg - selectedDriver.bestLapTime).toFixed(3))
+          : null;
+
+        const theoGap = (selectedDriver.bestLapTime && selectedDriver.theoreticalBest)
+          ? parseFloat((selectedDriver.bestLapTime - selectedDriver.theoreticalBest).toFixed(3))
+          : null;
+
         const s1Laps = (selectedDriver?.laps || []).filter(
           l => l.s1 !== null && l.s1 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
         );
@@ -772,7 +813,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             )}
 
             {/* Timing & Performance Metrics Row */}
-            <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${isRaceSession ? 'border-t border-lmu-border/40 pt-2.5' : ''}`}>
+            <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 ${isRaceSession ? 'border-t border-lmu-border/40 pt-2.5' : ''}`}>
               {/* 1. Best Lap */}
               <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
                 <div>
@@ -799,7 +840,32 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 )}
               </div>
 
-              {/* 2. Session Lap Average */}
+              {/* 2. Top 3 Clean Lap Avg (True Pace) */}
+              <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-lmu-muted uppercase font-semibold">Top 3 Lap Avg</p>
+                    <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/40">
+                      True Pace
+                    </span>
+                  </div>
+                  <h4 className="text-xl font-extrabold text-cyan-300 font-mono mt-0.5">
+                    {top3Avg ? formatTime(top3Avg) : '--:--.---'}
+                  </h4>
+                </div>
+                <div className="mt-1 space-y-0.5 text-[10px] text-lmu-muted">
+                  <div className="flex items-center justify-between">
+                    <span>
+                      Gap to PB: <strong className="text-cyan-200 font-mono">{top3DeltaToBest !== null ? `+${top3DeltaToBest.toFixed(3)}s` : '--'}</strong>
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-lmu-muted truncate" title="Average of 3 fastest valid flying laps">
+                    Repeatable Pace Trend
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. Session Lap Average */}
               <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
@@ -847,7 +913,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 </div>
               </div>
 
-              {/* 3. Theoretical Best */}
+              {/* 4. Theoretical Best */}
               <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
                 <div>
                   <p className="text-[10px] text-lmu-muted uppercase font-semibold">Theoretical Best</p>
@@ -856,11 +922,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                   </h4>
                 </div>
                 <p className="text-[10px] text-lmu-muted mt-1">
-                  Potential: <strong className="text-emerald-400 font-mono">{selectedDriver.bestLapTime && selectedDriver.theoreticalBest ? `-${(selectedDriver.bestLapTime - selectedDriver.theoreticalBest).toFixed(3)}s` : '0.000s'}</strong>
+                  Potential: <strong className="text-emerald-400 font-mono">{theoGap !== null && theoGap > 0 ? `-${theoGap.toFixed(3)}s` : '0.000s'}</strong>
                 </p>
               </div>
 
-              {/* 4. Best Sectors (S1 / S2 / S3) & Averages */}
+              {/* 5. Best Sectors (S1 / S2 / S3) & Averages */}
               <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
                 <p className="text-[10px] text-lmu-muted uppercase font-semibold">Sectors (Best / Avg)</p>
                 <div className="mt-1 space-y-0.5 text-xs font-mono">
@@ -1386,8 +1452,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
               </div>
             )}
 
-            <div className="h-72 min-h-[288px] w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+            <div className="h-[340px] min-h-[300px] w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%" minHeight={280}>
                 <LineChart
                   key={`session-chart-${activeChartMetric}-${sessionChartData.length}`}
                   data={activeChartMetric === 'positions' ? positionChartData : sessionChartData}
@@ -1703,6 +1769,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 <th className="px-3 py-3 text-right">Lap Time</th>
                 <th className="px-3 py-3 text-center">Pace Category</th>
                 <th className="px-3 py-3 text-right">Delta</th>
+                <th className="px-3 py-3 text-right" title="Consecutive lap-to-lap delta (Lap N - Lap N-1)">Δ Prev</th>
                 <th className="px-3 py-3 text-right">Sector 1</th>
                 <th className="px-3 py-3 text-right">Sector 2</th>
                 <th className="px-3 py-3 text-right">Sector 3</th>
@@ -1720,8 +1787,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 const bestS1 = selectedDriver?.bestS1 ?? null;
                 const bestS2 = selectedDriver?.bestS2 ?? null;
                 const bestS3 = selectedDriver?.bestS3 ?? null;
+                const theoBest = selectedDriver?.theoreticalBest ?? null;
 
-                return (selectedDriver?.laps || []).map(l => {
+                return (selectedDriver?.laps || []).map((l, idx, allLaps) => {
                   const isSessionBest = l.lapTime !== null && bestLap !== null &&
                     Math.abs(l.lapTime - bestLap) < 0.0005;
                   const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
@@ -1735,6 +1803,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       deltaStr = `+${delta.toFixed(3)}s`;
                     }
                   }
+
+                  const prevLap = idx > 0 ? allLaps[idx - 1] : null;
+                  const lapToLap = computeLapToLapDelta(prevLap?.lapTime, l.lapTime);
+
+                  const theoGapLap = (l.lapTime && theoBest && l.isValid && !isSessionBest)
+                    ? parseFloat((l.lapTime - theoBest).toFixed(3))
+                    : null;
 
                   const isS1Best = l.s1 !== null && bestS1 !== null && Math.abs(l.s1 - bestS1) < 0.0005;
                   const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
@@ -1767,10 +1842,21 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                         <span className="text-lmu-muted text-xs">-</span>
                       )}
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-semibold text-xs ${
-                      isLapAllTimePB ? 'text-lmu-gold font-bold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-lmu-muted'
-                    }`}>
-                      {deltaStr}
+                    <td className="px-3 py-2.5 text-right font-semibold text-xs">
+                      <span className={isLapAllTimePB ? 'text-lmu-gold font-bold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-white'}>
+                        {deltaStr}
+                      </span>
+                      {theoGapLap !== null && (
+                        <span className="block text-[10px] text-emerald-400/80 font-mono" title={`Gap to Theoretical Optimal (${formatTime(theoBest)})`}>
+                          +{theoGapLap.toFixed(3)}s vs opt
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      className={`px-3 py-2.5 text-right font-semibold text-xs ${lapToLap.deltaClass}`}
+                      title={prevLap ? `Lap-to-lap delta vs Lap ${prevLap.lapNum} (${formatTime(prevLap.lapTime)}): ${lapToLap.formatted}` : 'Initial lap'}
+                    >
+                      {lapToLap.formatted}
                     </td>
                     <td className={`px-3 py-2.5 text-right ${isS1Best ? 'text-lmu-gold font-bold' : ''
                       }`}>

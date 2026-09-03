@@ -194,6 +194,9 @@ export interface SessionProgressionPoint {
   cleanLapsCount: number;
   totalLapsCount: number;
   avgLapTime: number | null;
+  top3AvgLapTime?: number | null;
+  consistencyScore?: number | null;
+  theoreticalGap?: number | null;
   matchingReplayFile?: string;
 }
 

@@ -80,6 +80,23 @@ describe('CompareLaps component', () => {
       isValid: true,
       tag: '⭐ All-Time Best Lap',
     },
+    overallTrackBestLap: {
+      id: 'sess1_Pro Driver_lap_5',
+      sessionId: 'sess1',
+      sessionName: 'P1',
+      driverName: 'Pro Driver',
+      carType: 'Porsche 911 GT3.R',
+      carClass: 'LMGT3',
+      lapNum: 5,
+      lapTime: 120.5,
+      lapTimeString: '2:00.500',
+      s1: 29.9,
+      s2: 44.8,
+      s3: 45.8,
+      topSpeed: 284.0,
+      isValid: true,
+      tag: '🏆 All-Time Best (Pro Driver)',
+    },
     bestS1: 30.2,
     bestS2: 45.1,
     bestS3: 46.5,
@@ -133,7 +150,7 @@ describe('CompareLaps component', () => {
     });
   });
 
-  it('allows adding theoretical optimal and alien benchmark laps on demand', async () => {
+  it('allows adding theoretical optimal and all-time track best laps on demand', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     await waitFor(() => {
@@ -148,9 +165,9 @@ describe('CompareLaps component', () => {
       expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
     });
 
-    // Click + Alien Target
-    const alienBtn = screen.getByRole('button', { name: /\+ Alien Target/i });
-    fireEvent.click(alienBtn);
+    // Click + All-Time Best
+    const allTimeBtn = screen.getByRole('button', { name: /\+ All-Time Best/i });
+    fireEvent.click(allTimeBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(3\/4\)/i)).toBeInTheDocument();
@@ -283,5 +300,34 @@ describe('CompareLaps component', () => {
     await waitFor(() => {
       expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
     });
+  });
+
+  it('highlights the fastest sectors in available laps table with distinct colors matching SessionDetail', async () => {
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa"
+        initialCarClass="LMGT3"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Available Laps on Spa/i)).toBeInTheDocument();
+    });
+
+    // In mockCompareData:
+    // Lap 1 has s1: 30.5, s2: 45.5, s3: 46.5
+    // Lap 2 has s1: 30.2, s2: 45.1, s3: 46.5 (Best S1, Best S2, and tied for Best S3)
+    const bestS1Cell = screen.getByTitle('Best Sector 1');
+    expect(bestS1Cell).toHaveClass('text-lmu-gold');
+    expect(bestS1Cell).toHaveTextContent('30.200');
+
+    const bestS2Cell = screen.getByTitle('Best Sector 2');
+    expect(bestS2Cell).toHaveClass('text-lmu-blue');
+    expect(bestS2Cell).toHaveTextContent('45.100');
+
+    const bestS3Cells = screen.getAllByTitle('Best Sector 3');
+    expect(bestS3Cells.length).toBeGreaterThan(0);
+    expect(bestS3Cells[0]).toHaveClass('text-lmu-green');
   });
 });
