@@ -3,7 +3,6 @@ import {
   parseReferenceCsv,
   normalizeTrackName,
   normalizeCarClass,
-  getReferenceEntry,
   calculatePaceCategory,
   loadReferenceLaptimesFromCache,
   fetchAndCacheReferenceLaptimes,
