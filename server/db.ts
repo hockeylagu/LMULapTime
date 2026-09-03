@@ -1,7 +1,7 @@
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { DetailedSession, SessionMetadata } from './types.js';
+import { DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff } from './types.js';
 import { LmuParser } from './parser.js';
 
 export interface CacheStats {
@@ -66,6 +66,28 @@ export class SessionDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_sessions_timestamp ON sessions(timestamp);
       CREATE INDEX IF NOT EXISTS idx_sessions_track ON sessions(track_venue);
+
+      CREATE TABLE IF NOT EXISTS reference_laptimes (
+        key TEXT PRIMARY KEY,
+        track_name TEXT NOT NULL,
+        car_class TEXT NOT NULL,
+        patch TEXT,
+        target100_sec REAL NOT NULL,
+        alien_sec REAL NOT NULL,
+        competitive_sec REAL NOT NULL,
+        good_sec REAL NOT NULL,
+        good_midpack_sec REAL NOT NULL,
+        midpack_sec REAL NOT NULL,
+        midpack_tail_sec REAL NOT NULL,
+        tail_ender_sec REAL NOT NULL,
+        offline_sec REAL NOT NULL,
+        fastest_car TEXT,
+        record_laptime_sec REAL,
+        data_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ref_track_class ON reference_laptimes(track_name, car_class);
 
       CREATE TABLE IF NOT EXISTS cache_metadata (
         key TEXT PRIMARY KEY,
@@ -271,7 +293,129 @@ export class SessionDatabase {
   }
 
   public clearCache(): void {
-    this.db.exec('DELETE FROM sessions; DELETE FROM cache_metadata;');
+    this.db.exec("DELETE FROM sessions; DELETE FROM cache_metadata WHERE key NOT LIKE 'reference_%';");
+  }
+
+  public saveReferenceLaptimes(cache: ReferenceLaptimesCache): void {
+    const upsertStmt = this.db.prepare(`
+      INSERT INTO reference_laptimes (
+        key, track_name, car_class, patch, target100_sec,
+        alien_sec, competitive_sec, good_sec, good_midpack_sec,
+        midpack_sec, midpack_tail_sec, tail_ender_sec, offline_sec,
+        fastest_car, record_laptime_sec, data_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        track_name = excluded.track_name,
+        car_class = excluded.car_class,
+        patch = excluded.patch,
+        target100_sec = excluded.target100_sec,
+        alien_sec = excluded.alien_sec,
+        competitive_sec = excluded.competitive_sec,
+        good_sec = excluded.good_sec,
+        good_midpack_sec = excluded.good_midpack_sec,
+        midpack_sec = excluded.midpack_sec,
+        midpack_tail_sec = excluded.midpack_tail_sec,
+        tail_ender_sec = excluded.tail_ender_sec,
+        offline_sec = excluded.offline_sec,
+        fastest_car = excluded.fastest_car,
+        record_laptime_sec = excluded.record_laptime_sec,
+        data_json = excluded.data_json,
+        updated_at = excluded.updated_at
+    `);
+
+    const now = Date.now();
+    const entries = Object.values(cache.entries);
+
+    const transaction = this.db.transaction(() => {
+      // Save metadata
+      this.setMetadata('reference_laptimes_last_updated', cache.lastUpdated);
+      this.setMetadata('reference_laptimes_source_url', cache.sourceUrl);
+      if (cache.lastUpdateDiff) {
+        this.setMetadata('reference_laptimes_last_diff', JSON.stringify(cache.lastUpdateDiff));
+      }
+
+      // Upsert all entries
+      for (const entry of entries) {
+        const targets = entry.targets || {
+          alienSec: entry.target100Sec,
+          competitiveSec: entry.target100Sec * 1.01,
+          goodSec: entry.target100Sec * 1.02,
+          goodMidpackSec: entry.target100Sec * 1.03,
+          midpackSec: entry.target100Sec * 1.04,
+          midpackTailSec: entry.target100Sec * 1.05,
+          tailEnderSec: entry.target100Sec * 1.06,
+          offlineSec: entry.target100Sec * 1.07,
+        };
+
+        upsertStmt.run(
+          entry.key,
+          entry.trackName,
+          entry.carClass,
+          entry.patch || null,
+          entry.target100Sec,
+          targets.alienSec,
+          targets.competitiveSec,
+          targets.goodSec,
+          targets.goodMidpackSec,
+          targets.midpackSec,
+          targets.midpackTailSec,
+          targets.tailEnderSec,
+          targets.offlineSec,
+          entry.fastestCar || null,
+          entry.recordLaptimeSec ?? null,
+          JSON.stringify(entry),
+          now
+        );
+      }
+
+      // Remove deleted entries if any
+      const existingKeys = this.db.prepare('SELECT key FROM reference_laptimes').all() as { key: string }[];
+      const newKeySet = new Set(Object.keys(cache.entries));
+      const deleteStmt = this.db.prepare('DELETE FROM reference_laptimes WHERE key = ?');
+      for (const row of existingKeys) {
+        if (!newKeySet.has(row.key)) {
+          deleteStmt.run(row.key);
+        }
+      }
+    });
+
+    transaction();
+  }
+
+  public getReferenceLaptimesCache(): ReferenceLaptimesCache | null {
+    const rows = this.db.prepare('SELECT data_json FROM reference_laptimes').all() as { data_json: string }[];
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const entries: Record<string, ReferenceLaptimeEntry> = {};
+    for (const row of rows) {
+      const entry = JSON.parse(row.data_json) as ReferenceLaptimeEntry;
+      entries[entry.key] = entry;
+    }
+
+    const lastUpdated = this.getMetadata('reference_laptimes_last_updated') || new Date().toISOString();
+    const sourceUrl = this.getMetadata('reference_laptimes_source_url') || '';
+    const diffJson = this.getMetadata('reference_laptimes_last_diff');
+    const lastUpdateDiff = diffJson ? (JSON.parse(diffJson) as ReferenceBenchmarkDiff) : null;
+
+    return {
+      lastUpdated,
+      sourceUrl,
+      entriesCount: Object.keys(entries).length,
+      entries,
+      lastUpdateDiff,
+    };
+  }
+
+  public getReferenceLaptimeEntry(key: string): ReferenceLaptimeEntry | null {
+    const row = this.db.prepare('SELECT data_json FROM reference_laptimes WHERE key = ?').get(key) as { data_json: string } | undefined;
+    if (!row) return null;
+    return JSON.parse(row.data_json) as ReferenceLaptimeEntry;
+  }
+
+  public clearReferenceLaptimes(): void {
+    this.db.exec("DELETE FROM reference_laptimes; DELETE FROM cache_metadata WHERE key LIKE 'reference_%';");
   }
 
   public getCacheStats(): CacheStats {

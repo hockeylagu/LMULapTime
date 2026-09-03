@@ -124,4 +124,107 @@ describe('Settings component', () => {
       expect(onUpdatePaths).toHaveBeenCalled();
     });
   });
+
+  it('renders benchmark updates changelog section when lastUpdateDiff has changes', async () => {
+    const onUpdatePaths = vi.fn();
+    const statusWithDiff = {
+      ...mockStatus,
+      referenceLaptimes: {
+        lastUpdated: '2026-05-28T12:00:00Z',
+        entriesCount: 187,
+        lastUpdateDiff: {
+          timestamp: '2026-05-28T12:00:00Z',
+          hasChanges: true,
+          addedCount: 1,
+          updatedCount: 1,
+          removedCount: 0,
+          totalEntries: 187,
+          added: [
+            {
+              key: 'cota_lmgt3',
+              trackName: 'Circuit of the Americas',
+              carClass: 'LMGT3',
+              patch: '1.4+',
+              type: 'added' as const,
+              newAlienSec: 125.4,
+              newAlienTimeString: '2:05.400',
+            },
+          ],
+          updated: [
+            {
+              key: 'bahrain_lmgt3',
+              trackName: 'Bahrain',
+              carClass: 'LMGT3',
+              patch: '1.4+',
+              oldPatch: '1.3',
+              newPatch: '1.4+',
+              type: 'updated' as const,
+              oldAlienSec: 120.0,
+              newAlienSec: 119.5,
+              oldAlienTimeString: '2:00.000',
+              newAlienTimeString: '1:59.500',
+              diffSec: -0.5,
+            },
+          ],
+          removed: [],
+        },
+      },
+    };
+
+    render(<Settings status={statusWithDiff} onUpdatePaths={onUpdatePaths} />);
+
+    // Renders benchmark section title and badges
+    expect(screen.getByText('Benchmark Reference Updates')).toBeInTheDocument();
+    expect(screen.getByText('+1 New Reference')).toBeInTheDocument();
+    expect(screen.getByText('1 Updated Target')).toBeInTheDocument();
+
+    // Renders items
+    expect(screen.getByText('Circuit of the Americas')).toBeInTheDocument();
+    expect(screen.getByText('Alien: 2:05.400')).toBeInTheDocument();
+    expect(screen.getByText('Bahrain')).toBeInTheDocument();
+    expect(screen.getByText('2:00.000')).toBeInTheDocument();
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.getByText('(-0.500s)')).toBeInTheDocument();
+  });
+
+  it('updates diff and renders changelog upon clicking update reference laptimes', async () => {
+    const onUpdatePaths = vi.fn();
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/reference-laptimes/refresh')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              entriesCount: 188,
+              diff: {
+                timestamp: '2026-05-28T12:05:00Z',
+                hasChanges: false,
+                addedCount: 0,
+                updatedCount: 0,
+                removedCount: 0,
+                totalEntries: 188,
+                added: [],
+                updated: [],
+                removed: [],
+              },
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+
+    const refreshBtn = screen.getByRole('button', { name: /update reference laptimes/i });
+    fireEvent.click(refreshBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/No Changes \(All 188 targets identical\)/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/All 188 benchmark targets are currently synchronized with Google Sheets/i)
+      ).toBeInTheDocument();
+    });
+  });
 });
