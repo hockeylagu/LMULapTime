@@ -127,3 +127,82 @@ export function computeTheoreticalBest(s1: number | null, s2: number | null, s3:
   return null;
 }
 
+/**
+ * Returns chronological weight for session types and names.
+ * Practice (100-199) < Qualifying (200-299) < Warmup (250) < Race (300-399).
+ * Higher weight means later in the weekend / newer.
+ */
+export function getSessionTypeWeight(sessionType?: string, sessionName?: string): number {
+  const type = (sessionType || '').toLowerCase();
+  const name = (sessionName || '').toLowerCase();
+
+  // Practice: 100 - 199
+  if (type.includes('practice') || name.startsWith('p') || name.startsWith('fp')) {
+    const num = parseInt(name.replace(/\D/g, ''), 10);
+    return 100 + (isNaN(num) ? 1 : Math.min(num, 99));
+  }
+
+  // Qualifying: 200 - 299
+  if (type.includes('qualif') || name.startsWith('q') || name.includes('hyperpole')) {
+    const num = parseInt(name.replace(/\D/g, ''), 10);
+    return 200 + (isNaN(num) ? 1 : Math.min(num, 99));
+  }
+
+  // Warmup: 250
+  if (type.includes('warmup') || name.startsWith('w')) {
+    return 250;
+  }
+
+  // Race: 300 - 399
+  if (type.includes('race') || name.startsWith('r')) {
+    const num = parseInt(name.replace(/\D/g, ''), 10);
+    return 300 + (isNaN(num) ? 1 : Math.min(num, 99));
+  }
+
+  return 0;
+}
+
+export interface SessionComparable {
+  timeString?: string;
+  dateString?: string;
+  timestamp?: number;
+  sessionType?: string;
+  sessionName?: string;
+  id?: string;
+}
+
+/**
+ * Compares two sessions chronologically.
+ * When dates/timestamps are equal or in the same event, Race is after Qualifying (so newer).
+ */
+export function compareSessions(
+  a: SessionComparable,
+  b: SessionComparable,
+  direction: 'desc' | 'asc' = 'desc'
+): number {
+  const timeA = a.timestamp || parseDateStringToTimestamp(a.timeString || a.dateString);
+  const timeB = b.timestamp || parseDateStringToTimestamp(b.timeString || b.dateString);
+
+  // If timestamps differ by more than 1 second, sort by timestamp
+  if (Math.abs(timeA - timeB) >= 1000) {
+    return direction === 'desc' ? timeB - timeA : timeA - timeB;
+  }
+
+  // Within the same second or identical dates, order by session type:
+  // Race (300) > Quali (200) > Practice (100)
+  const weightA = getSessionTypeWeight(a.sessionType, a.sessionName);
+  const weightB = getSessionTypeWeight(b.sessionType, b.sessionName);
+
+  if (weightA !== weightB) {
+    return direction === 'desc' ? weightB - weightA : weightA - weightB;
+  }
+
+  if (timeA !== timeB) {
+    return direction === 'desc' ? timeB - timeA : timeA - timeB;
+  }
+
+  const idA = a.id || '';
+  const idB = b.id || '';
+  return direction === 'desc' ? idB.localeCompare(idA) : idA.localeCompare(idB);
+}
+

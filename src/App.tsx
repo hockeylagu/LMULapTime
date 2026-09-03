@@ -177,6 +177,7 @@ export default function App() {
           <SessionDetail
             sessionId={selectedSessionId}
             onBack={handleBackToSessions}
+            onSelectSession={handleSelectSession}
           />
         ) : selectedRouteTrackName ? (
           <TrackDetail

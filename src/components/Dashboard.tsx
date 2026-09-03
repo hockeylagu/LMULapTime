@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Zap, ChevronDown, FilterX, MapPin, Award, ArrowUpDown, FileText } from 'lucide-react';
-import { isSessionEmpty, getDisplayTrackName, matchesSessionType, parseDateStringToTimestamp } from '../utils/formatters';
+import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessions } from '../utils/formatters';
 import { getPaceCategoryStyle, matchesCarClass, VEHICLE_CLASS_OPTIONS, matchesTrack } from '../utils/paceCategory';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams';
 import { PaceCategory, LapData } from '../../server/types';
@@ -128,19 +128,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Sorted sessions by Date / Best Position / Benchmark Pace %
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-      const timeA = parseDateStringToTimestamp(a.timeString);
-      const timeB = parseDateStringToTimestamp(b.timeString);
-      return sortBy === 'date-desc' ? timeB - timeA : timeA - timeB;
+      return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
     }
     if (sortBy === 'pos-asc') {
       const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
       const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
       if (posA !== posB) return posA - posB;
-      return parseDateStringToTimestamp(b.timeString) - parseDateStringToTimestamp(a.timeString);
+      return compareSessions(a, b, 'desc');
     }
     const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
     const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
-    return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    if (pctA !== pctB) {
+      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    }
+    return compareSessions(a, b, 'desc');
   });
 
   // Calculate overall metrics & top3 aggregations in a single pass
