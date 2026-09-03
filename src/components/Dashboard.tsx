@@ -41,6 +41,7 @@ interface SessionSummary {
     bestLapPacePercentage?: number | null;
     avgLapTime?: number | null;
     top3LapsCount?: number;
+    position?: number;
     lapsCount: number;
     laps?: LapData[];
   };

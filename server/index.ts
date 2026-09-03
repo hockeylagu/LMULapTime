@@ -6,6 +6,7 @@ import { LmuParser, computeProgression, computeTrackSummaries, extractComparable
 import { DetailedSession } from './types.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack } from '../src/utils/paceCategory.js';
+import { getSessionDatabase } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,7 +26,15 @@ let currentResultsDir = DEFAULT_RESULTS_DIR;
 let currentReplaysDir = DEFAULT_REPLAYS_DIR;
 
 let parser = new LmuParser(currentReplaysDir);
-let cachedSessions: DetailedSession[] = [];
+const sessionDb = getSessionDatabase();
+
+// Initial sync of LMU XML sessions into SQLite cache on server startup
+try {
+  const syncRes = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
+  console.log(`[SQLite Cache] Loaded ${syncRes.total} sessions (${syncRes.added} new, ${syncRes.updated} updated) from ${currentResultsDir}`);
+} catch (err) {
+  console.warn('[SQLite Cache] Initial sync warning:', err);
+}
 
 // Ensure reference laptimes are loaded or cached on server startup
 (async () => {
@@ -41,37 +50,10 @@ let cachedSessions: DetailedSession[] = [];
 })();
 
 function loadSessions(forceRefresh = false): DetailedSession[] {
-  // Return cached sessions instantly unless a force refresh is requested
-  if (!forceRefresh && cachedSessions.length > 0) {
-    return cachedSessions;
+  if (forceRefresh) {
+    sessionDb.syncSessionsFromDir(currentResultsDir, parser);
   }
-
-  if (!fs.existsSync(currentResultsDir)) {
-    console.warn(`Results directory does not exist: ${currentResultsDir}`);
-    return [];
-  }
-
-  try {
-    const files = fs.readdirSync(currentResultsDir).filter(f => f.endsWith('.xml'));
-    const sessions: DetailedSession[] = [];
-
-    for (const f of files) {
-      const filePath = path.join(currentResultsDir, f);
-      const parsed = parser.parseSessionXml(filePath);
-      if (parsed) {
-        sessions.push(parsed);
-      }
-    }
-
-    // Sort chronologically
-    sessions.sort((a, b) => a.timestamp - b.timestamp);
-    cachedSessions = sessions;
-    console.log(`Scanned ${sessions.length} LMU XML sessions from ${currentResultsDir}`);
-    return sessions;
-  } catch (err) {
-    console.error('Error loading sessions:', err);
-    return [];
-  }
+  return sessionDb.getAllSessions();
 }
 
 // API Routes
@@ -81,6 +63,7 @@ app.get('/api/status', (_req, res) => {
   const replaysExist = fs.existsSync(currentReplaysDir);
   const sessions = loadSessions();
   const refCache = loadReferenceLaptimesFromCache();
+  const cacheStats = sessionDb.getCacheStats();
 
   res.json({
     resultsDir: currentResultsDir,
@@ -93,6 +76,13 @@ app.get('/api/status', (_req, res) => {
     referenceLaptimes: {
       lastUpdated: refCache?.lastUpdated || null,
       entriesCount: refCache?.entriesCount || 0,
+    },
+    sqliteCache: {
+      enabled: cacheStats.enabled,
+      dbPath: cacheStats.dbPath,
+      sessionsCount: cacheStats.sessionsCount,
+      lastSyncedAt: cacheStats.lastSyncedAt,
+      dbSizeBytes: cacheStats.dbSizeBytes,
     },
   });
 });
@@ -136,17 +126,24 @@ app.get('/api/sessions', (req, res) => {
 app.get('/api/session/:id', (req, res) => {
   const { id } = req.params;
 
-  // 1. Check in-memory cached sessions first (instant lookup without rescanning directory)
-  const cached = cachedSessions.find(s => s.id === id);
+  // 1. Check SQLite database by id or filename
+  const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;
+  const cached = sessionDb.getSessionById(id) || sessionDb.getSessionById(cleanId) || sessionDb.getSessionById(`${cleanId}.xml`);
   if (cached) {
     return res.json(cached);
   }
 
   // 2. Fallback: Parse ONLY the single requested XML file directly
-  const singleFilePath = path.join(currentResultsDir, `${id}.xml`);
+  const singleFilePath = path.join(currentResultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
   if (fs.existsSync(singleFilePath)) {
     const parsed = parser.parseSessionXml(singleFilePath);
     if (parsed) {
+      try {
+        const stats = fs.statSync(singleFilePath);
+        sessionDb.upsertSession(parsed, singleFilePath, Math.floor(stats.mtimeMs), stats.size);
+      } catch {
+        // ignore
+      }
       return res.json(parsed);
     }
   }
@@ -178,6 +175,21 @@ app.get('/api/tracks', (_req, res) => {
   res.json(summaries);
 });
 
+app.post('/api/cache/clear', (_req, res) => {
+  try {
+    sessionDb.clearCache();
+    res.json({
+      success: true,
+      message: 'SQLite cache cleared successfully',
+      sqliteCache: sessionDb.getCacheStats(),
+      sessionsCount: 0,
+    });
+  } catch (err: any) {
+    console.error('Failed to clear SQLite cache:', err);
+    res.status(500).json({ error: err.message || 'Failed to clear cache' });
+  }
+});
+
 app.post('/api/scan', (req, res) => {
   const { resultsDir, replaysDir, playerName } = req.body;
 
@@ -193,13 +205,17 @@ app.post('/api/scan', (req, res) => {
     parser.configuredPlayerName = playerName.trim();
   }
 
-  const sessions = loadSessions(true);
+  const syncResult = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
+  const sessions = sessionDb.getAllSessions();
+
   res.json({
     success: true,
     resultsDir: currentResultsDir,
     replaysDir: currentReplaysDir,
     playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
+    sync: syncResult,
+    sqliteCache: sessionDb.getCacheStats(),
   });
 });
 
@@ -283,5 +299,5 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app, loadSessions };
+export { app, loadSessions, sessionDb };
 

@@ -18,7 +18,6 @@ import {
   Scale,
   Trophy,
   ArrowUpDown,
-  Flag,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
