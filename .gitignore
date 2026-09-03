@@ -38,7 +38,6 @@ Thumbs.db
 .cache/
 .temp/
 tmp/
-server/laptimes_cache.json
 server/lmu_cache.db*
 *.db
 *.db-wal

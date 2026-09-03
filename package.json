@@ -1,7 +1,17 @@
 {
   "name": "lmu-lap-time-analyzer",
-  "private": true,
   "version": "1.0.0",
+  "description": "Comprehensive telemetry analytics, lap comparison, and benchmark progression analyzer for Le Mans Ultimate (LMU)",
+  "author": "Samuel Lague",
+  "license": "MIT",
+  "keywords": [
+    "le-mans-ultimate",
+    "sim-racing",
+    "telemetry",
+    "lap-times",
+    "motorsport",
+    "rfactor2"
+  ],
   "type": "module",
   "scripts": {
     "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
