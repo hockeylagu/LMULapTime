@@ -37,6 +37,7 @@ interface SessionMeta {
     bestLapPacePercentage?: number | null;
     avgLapTime?: number | null;
     avgLapTimeString?: string;
+    position?: number;
     lapsCount: number;
   };
 }

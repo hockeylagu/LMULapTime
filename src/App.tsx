@@ -4,7 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
-import { FileUploader } from './components/FileUploader';
+import { Settings } from './components/Settings';
 import { CompareLaps } from './components/CompareLaps';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 
@@ -218,7 +218,7 @@ export default function App() {
             initialLapNum={getHashRouteAndParams().params.get('lapNum') ? parseInt(getHashRouteAndParams().params.get('lapNum')!, 10) : undefined}
           />
         ) : activeTab === 'settings' ? (
-          <FileUploader
+          <Settings
             status={status}
             onUpdatePaths={() => fetchData(true)}
           />

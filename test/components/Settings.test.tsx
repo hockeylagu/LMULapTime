@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileUploader } from '../../src/components/FileUploader';
+import { Settings } from '../../src/components/Settings';
 
-describe('FileUploader component', () => {
+describe('Settings component', () => {
   const mockStatus = {
     resultsDir: 'C:\\LMU\\Results',
     resultsExist: true,
@@ -31,7 +31,7 @@ describe('FileUploader component', () => {
 
   it('renders directory paths, status indicators, and scans directories on submit', async () => {
     const onUpdatePaths = vi.fn();
-    render(<FileUploader status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
@@ -50,7 +50,7 @@ describe('FileUploader component', () => {
 
   it('handles reference laptimes manual refresh button click', async () => {
     const onUpdatePaths = vi.fn();
-    render(<FileUploader status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
 
     expect(screen.getByText('Reference Laptimes Benchmark')).toBeInTheDocument();
 
@@ -71,7 +71,7 @@ describe('FileUploader component', () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    render(<FileUploader status={mockStatus} onUpdatePaths={vi.fn()} />);
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
 
@@ -80,6 +80,48 @@ describe('FileUploader component', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Network failure during scan/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders SQLite cache section with stats and handles clear cache button', async () => {
+    const onUpdatePaths = vi.fn();
+    const statusWithCache = {
+      ...mockStatus,
+      sqliteCache: {
+        enabled: true,
+        dbPath: 'C:\\LMU\\server\\lmu_cache.db',
+        sessionsCount: 42,
+        lastSyncedAt: '2026-06-01T10:30:00Z',
+        dbSizeBytes: 524288,
+      },
+    };
+
+    // Mock confirm dialog
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/cache/clear')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, message: 'SQLite cache cleared', sessionsCount: 0 }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    render(<Settings status={statusWithCache} onUpdatePaths={onUpdatePaths} />);
+
+    expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+    expect(screen.getByText(/42 Sessions Cached/i)).toBeInTheDocument();
+    expect(screen.getByText('512.0 KB')).toBeInTheDocument();
+
+    const clearBtn = screen.getByRole('button', { name: /clear cache/i });
+    fireEvent.click(clearBtn);
+
+    expect(window.confirm).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText(/Session SQLite cache cleared successfully/i)).toBeInTheDocument();
+      expect(onUpdatePaths).toHaveBeenCalled();
     });
   });
 });

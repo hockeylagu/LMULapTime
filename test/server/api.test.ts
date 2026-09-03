@@ -15,6 +15,17 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('resultsDir');
     expect(res.body).toHaveProperty('sessionsCount');
     expect(res.body).toHaveProperty('referenceLaptimes');
+    expect(res.body).toHaveProperty('sqliteCache');
+    expect(res.body.sqliteCache).toHaveProperty('enabled', true);
+    expect(typeof res.body.sqliteCache.sessionsCount).toBe('number');
+  });
+
+  it('POST /api/cache/clear clears the SQLite cache', async () => {
+    const res = await request(app).post('/api/cache/clear');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('success', true);
+    expect(res.body).toHaveProperty('sessionsCount', 0);
+    expect(res.body.sqliteCache).toHaveProperty('sessionsCount', 0);
   });
 
   it('GET /api/sessions returns session summaries and supports filtering', async () => {
