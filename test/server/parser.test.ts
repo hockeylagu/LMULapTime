@@ -642,7 +642,9 @@ describe('parser server module', () => {
       expect(laps[0].isValid).toBe(false);
       expect(laps[0].elapsedSeconds).toBe(130.5);
       expect(laps[0].elapsedTimeString).toBe('2:10.5');
-      expect(laps[1].lapTime).toBeNull();
+      // Lap 2 elapsed time delta (240.2 - 130.5 = 109.7s) is inferred, but marked invalid/incomplete
+      expect(laps[1].lapTime).toBe(109.7);
+      expect(laps[1].isInferred).toBe(true);
       expect(laps[1].isValid).toBe(false);
       expect(laps[1].elapsedSeconds).toBe(240.2);
       expect(laps[1].elapsedTimeString).toBe('4:00.2');
@@ -735,6 +737,161 @@ describe('parser server module', () => {
       expect(session).not.toBeNull();
       expect(session?.playerDriver?.name).toBe('Solo Driver');
       expect(session?.playerDriver?.bestLapTime).toBe(108.0);
+    });
+
+    it('infers lap time and missing sector from session elapsed time for incomplete laps', () => {
+      const xmlIncompleteLaps = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Circuit de la Sarthe</TrackVenue>
+    <Race>
+      <Driver>
+        <Name>LeMans Driver</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" et="200.000" s1="33.000" s2="82.000" s3="95.000">210.000</Lap>
+        <Lap num="2" et="410.500" s1="33.200" s2="82.800">--.----</Lap>
+        <Lap num="3" et="620.000" s1="33.100" s2="82.500" s3="94.400">210.000</Lap>
+        <Lap num="4" et="2000.000" s1="33.000">--.----</Lap>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlIncompleteLaps);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('incomplete_laps.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver).toBeDefined();
+
+      const laps = driver!.laps;
+      expect(laps.length).toBe(4);
+
+      // Lap 1: Normal valid lap
+      expect(laps[0].lapTime).toBe(210.0);
+      expect(laps[0].isValid).toBe(true);
+      expect(laps[0].isInferred).toBeUndefined();
+
+      // Lap 2: Incomplete lap (--.----) with et=410.500 vs prev et=200.000 -> inferred = 210.500s
+      expect(laps[1].lapTime).toBe(210.5);
+      expect(laps[1].lapTimeString).toBe('3:30.500');
+      expect(laps[1].isInferred).toBe(true);
+      expect(laps[1].isValid).toBe(false); // Keeps official clean lap records intact
+      // S3 deduced: 210.5 - 33.2 - 82.8 = 94.5s
+      expect(laps[1].s3).toBe(94.5);
+
+      // Lap 4: Incomplete lap with et=2000.000 (1380s delta - 23 minutes in garage) -> does NOT make sense to infer
+      expect(laps[3].lapTime).toBeNull();
+      expect(laps[3].lapTimeString).toBe('--:--.---');
+      expect(laps[3].isInferred).toBeUndefined();
+
+      // Official driver best lap time should strictly reflect valid clean laps
+      expect(driver?.bestLapTime).toBe(210.0);
+    });
+
+    it('does not mark lap 2 as an out-lap when lap 1 is practice start with no lap time, and treats lap 2 as valid', () => {
+      const xmlPracticeStart = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Practice 1</Setting>
+    <TrackVenue>Circuit de Spa-Francorchamps</TrackVenue>
+    <TrackCourse>Grand Prix</TrackCourse>
+    <TrackEvent>Spa 6 Hours</TrackEvent>
+    <TrackLength>7004.0</TrackLength>
+    <TimeString>2026/05/28 12:00</TimeString>
+    <Driver>
+      <Name>Test Driver</Name>
+      <CarType>Porsche 911 GT3 R</CarType>
+      <CarClass>LMGT3</CarClass>
+      <CarNumber>92</CarNumber>
+      <TeamName>Manthey EMA</TeamName>
+      <isPlayer>1</isPlayer>
+      <GridPos>1</GridPos>
+      <Position>1</Position>
+      <Lap num="1" p="2" et="--.---" topspeed="324.9">--.----</Lap>
+      <Lap num="2" p="1" et="215.585" s1="34.925" s2="84.641" s3="96.019" topspeed="327.0">215.585</Lap>
+    </Driver>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlPracticeStart);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('practice_start.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver).toBeDefined();
+
+      const laps = driver!.laps;
+      expect(laps.length).toBe(2);
+
+      // Lap 1 is practice start from pit lane / garage without completed lap time
+      expect(laps[0].lapNum).toBe(1);
+      expect(laps[0].lapTime).toBeNull();
+      expect(laps[0].isPitStop).toBe(false);
+
+      // Lap 2 is the first full flying lap: should be VALID and NOT an out lap
+      expect(laps[1].lapNum).toBe(2);
+      expect(laps[1].lapTime).toBe(215.585);
+      expect(laps[1].isValid).toBe(true);
+      expect(laps[1].isOutLap).toBeUndefined();
+
+      // Average lap time should include lap 2 as a valid clean lap
+      expect(driver?.avgLapTime).toBe(215.585);
+    });
+
+    it('does not mark lap 2 as an out-lap in Qualifying when lap 1 is start lap, and treats lap 2 as valid', () => {
+      const xmlQualiStart = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Qualifying 1</Setting>
+    <TrackVenue>Circuit de Spa-Francorchamps</TrackVenue>
+    <TrackCourse>Grand Prix</TrackCourse>
+    <TrackEvent>Spa 6 Hours</TrackEvent>
+    <TrackLength>7004.0</TrackLength>
+    <TimeString>2026/05/28 14:00</TimeString>
+    <Driver>
+      <Name>Quali Driver</Name>
+      <CarType>Ferrari 499P</CarType>
+      <CarClass>Hypercar</CarClass>
+      <CarNumber>50</CarNumber>
+      <TeamName>Ferrari AF Corse</TeamName>
+      <isPlayer>1</isPlayer>
+      <GridPos>1</GridPos>
+      <Position>1</Position>
+      <Lap num="1" p="1" et="--.---" topspeed="310.5">--.----</Lap>
+      <Lap num="2" p="1" et="120.500" s1="34.000" s2="41.000" s3="45.500" topspeed="325.0">120.500</Lap>
+    </Driver>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlQualiStart);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('quali_start.xml');
+      expect(session).not.toBeNull();
+      const driver = session?.drivers[0];
+      expect(driver).toBeDefined();
+
+      const laps = driver!.laps;
+      expect(laps.length).toBe(2);
+
+      // Lap 1 is untimed session start lap
+      expect(laps[0].lapNum).toBe(1);
+      expect(laps[0].lapTime).toBeNull();
+      expect(laps[0].isPitStop).toBe(false);
+
+      // Lap 2 is valid flying lap and not an out-lap
+      expect(laps[1].lapNum).toBe(2);
+      expect(laps[1].lapTime).toBe(120.5);
+      expect(laps[1].isValid).toBe(true);
+      expect(laps[1].isOutLap).toBeUndefined();
+
+      // Average lap time is the flying lap 2 time
+      expect(driver?.avgLapTime).toBe(120.5);
     });
   });
 
