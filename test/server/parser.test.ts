@@ -973,11 +973,11 @@ describe('parser server module', () => {
           },
         ],
       },
-    ];
+    ] as any;
 
     it('extracts comparable laps and finds personal best and overall track best without driver restriction', () => {
       const result = extractComparableLaps(mockSessions, {
-        track: 'Spa',
+        trackName: 'Spa',
         carClass: 'LMGT3',
         playerOnly: true,
       });
@@ -1005,7 +1005,7 @@ describe('parser server module', () => {
 
     it('filters strictly by carClass and returns empty when class does not match', () => {
       const result = extractComparableLaps(mockSessions, {
-        track: 'Spa',
+        trackName: 'Spa',
         carClass: 'Hypercar',
       });
 

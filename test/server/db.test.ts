@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
-import fs from 'fs';
 import { SessionDatabase } from '../../server/db';
 import { LmuParser } from '../../server/parser';
 
