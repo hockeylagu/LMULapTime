@@ -76,6 +76,7 @@ app.get('/api/status', (_req, res) => {
     referenceLaptimes: {
       lastUpdated: refCache?.lastUpdated || null,
       entriesCount: refCache?.entriesCount || 0,
+      lastUpdateDiff: refCache?.lastUpdateDiff || null,
     },
     sqliteCache: {
       enabled: cacheStats.enabled,
@@ -257,6 +258,7 @@ app.post('/api/reference-laptimes/refresh', async (_req, res) => {
       lastUpdated: updatedCache.lastUpdated,
       entriesCount: updatedCache.entriesCount,
       sessionsCount: sessions.length,
+      diff: updatedCache.lastUpdateDiff || null,
     });
   } catch (err: any) {
     console.error('Failed to refresh reference laptimes:', err);

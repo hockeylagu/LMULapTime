@@ -1,13 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ReferenceLaptimeEntry, ReferenceLaptimesCache, PaceCategoryInfo } from './types.js';
-import { parseTimeStringToSeconds } from '../src/utils/formatters.js';
+import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from './types.js';
+import { parseTimeStringToSeconds, formatTime } from '../src/utils/formatters.js';
 import {
   normalizeTrackName,
   getPaceCategoryFromPercentage,
   findReferenceEntry,
 } from '../src/utils/paceCategory.js';
+import { getSessionDatabase } from './db.js';
 
 export { normalizeTrackName };
 
@@ -20,6 +21,89 @@ export const PUBLISHED_SPREADSHEET_CSV_URL =
 const CACHE_FILE_PATH = path.join(__dirname, 'laptimes_cache.json');
 
 let cachedData: ReferenceLaptimesCache | null = null;
+
+export function computeReferenceBenchmarkDiff(
+  oldEntries: Record<string, ReferenceLaptimeEntry> = {},
+  newEntries: Record<string, ReferenceLaptimeEntry> = {}
+): ReferenceBenchmarkDiff {
+  const added: ReferenceBenchmarkDiffItem[] = [];
+  const updated: ReferenceBenchmarkDiffItem[] = [];
+  const removed: ReferenceBenchmarkDiffItem[] = [];
+
+  const oldKeysCount = Object.keys(oldEntries).length;
+
+  for (const [key, newEntry] of Object.entries(newEntries)) {
+    const oldEntry = oldEntries[key];
+    const newAlien = newEntry.targets?.alienSec ?? newEntry.target100Sec;
+
+    if (!oldEntry) {
+      if (oldKeysCount > 0) {
+        added.push({
+          key,
+          trackName: newEntry.trackName,
+          carClass: newEntry.carClass,
+          patch: newEntry.patch,
+          type: 'added',
+          newAlienSec: newAlien,
+          newAlienTimeString: formatTime(newAlien),
+        });
+      }
+    } else {
+      const oldAlien = oldEntry.targets?.alienSec ?? oldEntry.target100Sec;
+      const diffSec = parseFloat((newAlien - oldAlien).toFixed(3));
+      const patchChanged = (oldEntry.patch || '').trim() !== (newEntry.patch || '').trim();
+      const timeChanged = Math.abs(diffSec) >= 0.001;
+
+      if (timeChanged || patchChanged) {
+        updated.push({
+          key,
+          trackName: newEntry.trackName,
+          carClass: newEntry.carClass,
+          patch: newEntry.patch,
+          oldPatch: oldEntry.patch,
+          newPatch: newEntry.patch,
+          type: 'updated',
+          oldAlienSec: oldAlien,
+          newAlienSec: newAlien,
+          oldAlienTimeString: formatTime(oldAlien),
+          newAlienTimeString: formatTime(newAlien),
+          diffSec,
+        });
+      }
+    }
+  }
+
+  if (oldKeysCount > 0) {
+    for (const [key, oldEntry] of Object.entries(oldEntries)) {
+      if (!newEntries[key]) {
+        const oldAlien = oldEntry.targets?.alienSec ?? oldEntry.target100Sec;
+        removed.push({
+          key,
+          trackName: oldEntry.trackName,
+          carClass: oldEntry.carClass,
+          patch: oldEntry.patch,
+          type: 'removed',
+          oldAlienSec: oldAlien,
+          oldAlienTimeString: formatTime(oldAlien),
+        });
+      }
+    }
+  }
+
+  const hasChanges = added.length > 0 || updated.length > 0 || removed.length > 0;
+
+  return {
+    timestamp: new Date().toISOString(),
+    hasChanges,
+    addedCount: added.length,
+    updatedCount: updated.length,
+    removedCount: removed.length,
+    totalEntries: Object.keys(newEntries).length,
+    added,
+    updated,
+    removed,
+  };
+}
 
 // Simple CSV parser for quoted or unquoted cells
 function parseCsvLine(line: string): string[] {
@@ -75,7 +159,7 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
       patch,
       target100Sec,
       targets: {
-        alienSec: parseTimeStringToSeconds(cols[4]) || target100Sec,
+        alienSec: getTarget(4, 1.0),
         competitiveSec: getTarget(5, 1.01),
         goodSec: getTarget(6, 1.02),
         goodMidpackSec: getTarget(7, 1.03),
@@ -97,14 +181,38 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
   };
 }
 
+export function resetCachedReferenceLaptimes(): void {
+  cachedData = null;
+}
+
 export function loadReferenceLaptimesFromCache(): ReferenceLaptimesCache | null {
   if (cachedData) return cachedData;
 
+  try {
+    const db = getSessionDatabase();
+    const dbCache = db.getReferenceLaptimesCache();
+    if (dbCache && dbCache.entriesCount > 0) {
+      cachedData = dbCache;
+      return cachedData;
+    }
+  } catch (err) {
+    console.warn('[SQLite Reference Laptimes] Failed to read from database:', err);
+  }
+
+  // Fallback: If DB is empty, check legacy laptimes_cache.json and migrate into SQLite DB
   if (fs.existsSync(CACHE_FILE_PATH)) {
     try {
-      const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8');
-      cachedData = JSON.parse(raw);
-      console.log(`Loaded ${cachedData?.entriesCount || 0} reference laptimes from cache file`);
+      const content = fs.readFileSync(CACHE_FILE_PATH, 'utf-8');
+      cachedData = JSON.parse(content);
+      if (cachedData && cachedData.entriesCount > 0) {
+        try {
+          const db = getSessionDatabase();
+          db.saveReferenceLaptimes(cachedData);
+          console.log(`[SQLite Reference Laptimes] Migrated ${cachedData.entriesCount} reference laptimes from JSON cache into SQLite database`);
+        } catch (dbErr) {
+          console.warn('[SQLite Reference Laptimes] Failed to migrate to SQLite database:', dbErr);
+        }
+      }
       return cachedData;
     } catch (err) {
       console.error('Failed to read reference laptimes cache:', err);
@@ -122,13 +230,27 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
   }
 
   const csvText = await res.text();
+  const currentCache = loadReferenceLaptimesFromCache();
   const cache = parseReferenceCsv(csvText);
 
+  // Compute diff against previous cache
+  const diff = computeReferenceBenchmarkDiff(currentCache?.entries || {}, cache.entries);
+  cache.lastUpdateDiff = diff;
+
+  // Persist directly to SQLite database
+  try {
+    const db = getSessionDatabase();
+    db.saveReferenceLaptimes(cache);
+    console.log(`[SQLite Reference Laptimes] Saved ${cache.entriesCount} reference laptimes to SQLite database (changes: ${diff.hasChanges ? 'yes' : 'no'})`);
+  } catch (err) {
+    console.error('[SQLite Reference Laptimes] Failed to save reference laptimes to database:', err);
+  }
+
+  // Also write to JSON cache file as backup
   try {
     fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
-    console.log(`Saved ${cache.entriesCount} reference laptimes to ${CACHE_FILE_PATH}`);
   } catch (err) {
-    console.error('Failed to write reference laptimes cache file:', err);
+    console.warn('Failed to write backup reference laptimes JSON cache file:', err);
   }
 
   cachedData = cache;

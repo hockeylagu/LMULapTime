@@ -27,11 +27,39 @@ export interface ReferenceLaptimeEntry {
   recordLaptimeSec?: number;
 }
 
+export interface ReferenceBenchmarkDiffItem {
+  key: string;
+  trackName: string;
+  carClass: string;
+  patch: string;
+  type: 'added' | 'updated' | 'removed';
+  oldAlienSec?: number;
+  newAlienSec?: number;
+  oldAlienTimeString?: string;
+  newAlienTimeString?: string;
+  diffSec?: number;
+  oldPatch?: string;
+  newPatch?: string;
+}
+
+export interface ReferenceBenchmarkDiff {
+  timestamp: string;
+  hasChanges: boolean;
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+  totalEntries: number;
+  added: ReferenceBenchmarkDiffItem[];
+  updated: ReferenceBenchmarkDiffItem[];
+  removed: ReferenceBenchmarkDiffItem[];
+}
+
 export interface ReferenceLaptimesCache {
   lastUpdated: string; // ISO string timestamp
   sourceUrl: string;
   entriesCount: number;
   entries: Record<string, ReferenceLaptimeEntry>;
+  lastUpdateDiff?: ReferenceBenchmarkDiff | null;
 }
 
 export interface TireWear {
