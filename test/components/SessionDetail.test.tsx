@@ -620,6 +620,16 @@ describe('SessionDetail component', () => {
           bestLapTimeString: '2:02.500',
           lapsCount: 3,
           pitStopsCount: 1,
+          totalIncidents: 2,
+          totalTrackLimits: 1,
+          incidents: [
+            {
+              type: 'contact',
+              description: 'Contact with Ferrari 499P (1200N)',
+              lapNum: 2,
+              otherVehicle: 'Ferrari 499P',
+            },
+          ],
           laps: [],
         },
       ],
@@ -651,8 +661,21 @@ describe('SessionDetail component', () => {
     expect(screen.getByText('Peak Position')).toBeInTheDocument();
     expect(screen.getByText(/Session Classification & Driver Standings/i)).toBeInTheDocument();
 
+    // Check 1-row layout on md+ screens (grid-cols-7)
+    const gridContainer = screen.getByText('Starting Grid').closest('.grid');
+    expect(gridContainer?.className).toContain('md:grid-cols-7');
+
     // Single class session: Class Pos header is hidden
     expect(screen.queryByText('Class Pos')).not.toBeInTheDocument();
+
+    // Classification table has Safety column
+    expect(screen.getByText('Safety')).toBeInTheDocument();
+    expect(screen.getAllByText('Clean').length).toBeGreaterThanOrEqual(1);
+    const incidentBadge = screen.getByText(/💥\s*2x/i).parentElement;
+    expect(incidentBadge).toBeInTheDocument();
+    expect(incidentBadge?.getAttribute('title')).toContain('Lap 2: Contact with Ferrari 499P (1200N)');
+    expect(incidentBadge?.getAttribute('title')).not.toContain('contact ()');
+    expect(incidentBadge?.getAttribute('title')).not.toContain('Lap ?');
 
     // Selecting another driver must not add (You) to that opponent
     const opponentRow = screen.getByText('AI Driver 2');
@@ -964,5 +987,176 @@ describe('SessionDetail component', () => {
     expect(screen.getByText('Start Lap')).toBeInTheDocument();
     expect(screen.getByText('Valid')).toBeInTheDocument();
     expect(screen.queryByText('Out Lap')).not.toBeInTheDocument();
+  });
+
+  it('renders incident tooltips on incomplete laps, compact badges, and incidents log', async () => {
+    const incidentSession = {
+      id: 'sess_incidents',
+      filename: '2026_05_29_R1.xml',
+      filePath: 'C:\\LMU\\UserData\\Log\\Results\\2026_05_29_R1.xml',
+      trackVenue: 'Spa',
+      trackCourse: 'GP',
+      timeString: '2026/05/29 15:00',
+      sessionType: 'Race',
+      sessionName: 'R1',
+      driversCount: 1,
+      playerDriver: {
+        name: 'Sim Racer',
+        carType: 'Ferrari 499P',
+        carClass: 'Hypercar',
+        carNumber: '50',
+        teamName: 'AF Corse',
+        isPlayer: true,
+        position: 1,
+        classPosition: 1,
+        bestLapTime: 122.0,
+        bestLapTimeString: '2:02.000',
+        bestS1: 34.0,
+        bestS2: 42.0,
+        bestS3: 46.0,
+        theoreticalBest: 122.0,
+        theoreticalBestString: '2:02.000',
+        lapsCount: 2,
+        totalIncidents: 2,
+        totalTrackLimits: 1,
+        totalPenalties: 1,
+        incidents: [
+          {
+            type: 'contact',
+            description: 'Contact with Archie Porter (585N)',
+            elapsedSeconds: 125.0,
+            force: 585,
+            otherVehicle: 'Archie Porter',
+            isWallImpact: false,
+          },
+          {
+            type: 'contact',
+            description: 'Contact with Immovable (4522N)',
+            elapsedSeconds: 260.0,
+            force: 4522,
+            isWallImpact: true,
+          },
+        ],
+        trackLimits: [
+          {
+            description: 'Track limits violation (+0.25 pts)',
+            elapsedSeconds: 130.0,
+            warningPoints: 0.25,
+            action: 'Warning',
+          },
+        ],
+        penalties: [
+          {
+            penalty: 'Drive Thru',
+            reason: 'Speeding',
+            elapsedSeconds: 140.0,
+            description: 'Drive Thru penalty for Speeding',
+          },
+        ],
+        laps: [
+          {
+            lapNum: 1,
+            position: 1,
+            lapTime: 122.0,
+            lapTimeString: '2:02.000',
+            s1: 34.0,
+            s2: 42.0,
+            s3: 46.0,
+            isPitStop: false,
+            isValid: true,
+            incidentCount: 1,
+            incidents: [
+              {
+                type: 'contact',
+                description: 'Contact with Archie Porter (585N)',
+                elapsedSeconds: 125.0,
+                force: 585,
+                otherVehicle: 'Archie Porter',
+                isWallImpact: false,
+              },
+            ],
+            trackLimitCount: 1,
+            trackLimits: [
+              {
+                description: 'Track limits violation (+0.25 pts)',
+                elapsedSeconds: 130.0,
+                warningPoints: 0.25,
+                action: 'Warning',
+              },
+            ],
+            penaltyCount: 1,
+            penalties: [
+              {
+                penalty: 'Drive Thru',
+                reason: 'Speeding',
+                elapsedSeconds: 140.0,
+                description: 'Drive Thru penalty for Speeding',
+              },
+            ],
+          },
+          {
+            lapNum: 2,
+            position: 1,
+            lapTime: null,
+            lapTimeString: '--:--.---',
+            isPitStop: false,
+            isValid: false,
+            incidentCount: 1,
+            incidents: [
+              {
+                type: 'contact',
+                description: 'Contact with Immovable (4522N)',
+                elapsedSeconds: 260.0,
+                force: 4522,
+                isWallImpact: true,
+              },
+            ],
+          },
+        ],
+      },
+      drivers: [],
+    };
+
+    incidentSession.drivers = [incidentSession.playerDriver];
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-incidents')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(incidentSession) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-incidents" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // Verify Safety Summary pill in Session Title Card
+    expect(screen.getAllByText(/2 Incidents/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/1 Track Limit/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/1 Penalty/).length).toBeGreaterThanOrEqual(1);
+
+    // Verify Incomplete status badge contains incident tooltip details
+    const incompleteEl = screen.getByText('Incomplete');
+    expect(incompleteEl).toBeInTheDocument();
+    const incompleteContainer = incompleteEl.closest('span');
+    expect(incompleteContainer?.getAttribute('title')).toContain('Contact with Immovable (4522N)');
+
+    // Verify compact badges on laps
+    expect(screen.getAllByText('💥 1').length).toBe(2);
+    expect(screen.getByText('⚠️ 1')).toBeInTheDocument();
+    expect(screen.getByText('🛑 Drive Thru')).toBeInTheDocument();
+
+    // Verify Expandable Incidents & Stewards Log toggle
+    const toggleLogBtn = screen.getByText(/Incidents & Stewards Log/i);
+    expect(toggleLogBtn).toBeInTheDocument();
+
+    // Click to expand log
+    fireEvent.click(toggleLogBtn);
+
+    // After expansion, event descriptions should be visible
+    expect(screen.getByText(/Contact with Archie Porter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Contact with Immovable/i)).toBeInTheDocument();
   });
 });
