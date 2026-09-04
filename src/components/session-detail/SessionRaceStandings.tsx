@@ -2,6 +2,10 @@ import React from 'react';
 import { Trophy, ShieldCheck } from 'lucide-react';
 import { DetailedSession } from '../../../server/types.js';
 import { formatElapsedSeconds } from '../../utils/formatters.js';
+import {
+  getWorstTrackLimitSeverity,
+  getTrackLimitStandingsPillClasses,
+} from '../../utils/trackLimits.js';
 
 export interface SessionRaceStandingsProps {
   session: DetailedSession;
@@ -205,6 +209,12 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                         );
                       }
 
+                      const allTls = d.trackLimits && d.trackLimits.length > 0
+                        ? d.trackLimits
+                        : d.laps?.flatMap((l) => l.trackLimits || []) || [];
+                      const tlSeverity = getWorstTrackLimitSeverity(allTls);
+                      const tlPillClass = getTrackLimitStandingsPillClasses(tlSeverity);
+
                       if (incCount > 0) {
                         return (
                           <span
@@ -213,7 +223,17 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                           >
                             <span>💥 {incCount}x</span>
                             {tlCount > 0 && (
-                              <span className="text-[10px] text-amber-300/70 font-mono">({tlCount} TL)</span>
+                              <span
+                                className={`text-[10px] font-mono ${
+                                  tlSeverity === 'green'
+                                    ? 'text-emerald-300/80'
+                                    : tlSeverity === 'orange'
+                                    ? 'text-orange-300/80'
+                                    : 'text-yellow-300/70'
+                                }`}
+                              >
+                                ({tlCount} TL)
+                              </span>
                             )}
                           </span>
                         );
@@ -221,7 +241,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
 
                       return (
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-950/50 text-amber-300 border border-amber-500/30 cursor-help"
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border cursor-help ${tlPillClass}`}
                           title={tooltip}
                         >
                           <span>⚠️ {tlCount} TL</span>

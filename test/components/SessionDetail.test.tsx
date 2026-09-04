@@ -1144,9 +1144,11 @@ describe('SessionDetail component', () => {
     const incompleteContainer = incompleteEl.closest('span');
     expect(incompleteContainer?.getAttribute('title')).toContain('Contact with Immovable (4522N)');
 
-    // Verify compact badges on laps
+    // Verify compact badges on laps - yellow for 0.25 pts
     expect(screen.getAllByText('💥 1').length).toBe(2);
-    expect(screen.getByText('⚠️ 1')).toBeInTheDocument();
+    const tlBadge = screen.getByText('⚠️ 1');
+    expect(tlBadge).toBeInTheDocument();
+    expect(tlBadge.className).toContain('text-yellow-300');
     expect(screen.getByText('🛑 Drive Thru')).toBeInTheDocument();
 
     // Verify Expandable Incidents & Stewards Log toggle
@@ -1159,5 +1161,108 @@ describe('SessionDetail component', () => {
     // After expansion, event descriptions should be visible
     expect(screen.getByText(/Contact with Archie Porter/i)).toBeInTheDocument();
     expect(screen.getByText(/Contact with Immovable/i)).toBeInTheDocument();
+  });
+
+  it('styles track limit badges as green for No Further Action and orange for 0.75+ points', async () => {
+    const sessionWithVariedLimits = {
+      id: 'test-session-tl-colors',
+      sessionType: 'Race',
+      sessionName: 'R1',
+      trackVenue: 'Spa',
+      trackCourse: 'Grand Prix',
+      timestamp: '2026-06-01T12:00:00Z',
+      playerDriver: {
+        name: 'Color Test Driver',
+        isPlayer: true,
+        carType: 'Ferrari 499P',
+        carClass: 'Hypercar',
+        totalTrackLimits: 2,
+        trackLimits: [
+          {
+            description: 'Track limits review (No Further Action)',
+            elapsedSeconds: 110.0,
+            action: 'No Further Action',
+            warningPoints: 0,
+            lapNum: 1,
+          },
+          {
+            description: 'Track limits violation (+0.75 pts)',
+            elapsedSeconds: 220.0,
+            action: 'Warning',
+            warningPoints: 0.75,
+            lapNum: 2,
+          },
+        ],
+        laps: [
+          {
+            lapNum: 1,
+            position: 1,
+            lapTime: 122.0,
+            lapTimeString: '2:02.000',
+            s1: 34.0,
+            s2: 42.0,
+            s3: 46.0,
+            isPitStop: false,
+            isValid: true,
+            trackLimitCount: 1,
+            trackLimits: [
+              {
+                description: 'Track limits review (No Further Action)',
+                elapsedSeconds: 110.0,
+                action: 'No Further Action',
+                warningPoints: 0,
+                lapNum: 1,
+              },
+            ],
+          },
+          {
+            lapNum: 2,
+            position: 1,
+            lapTime: 123.0,
+            lapTimeString: '2:03.000',
+            s1: 34.5,
+            s2: 42.5,
+            s3: 46.0,
+            isPitStop: false,
+            isValid: true,
+            trackLimitCount: 1,
+            trackLimits: [
+              {
+                description: 'Track limits violation (+0.75 pts)',
+                elapsedSeconds: 220.0,
+                action: 'Warning',
+                warningPoints: 0.75,
+                lapNum: 2,
+              },
+            ],
+          },
+        ],
+      },
+      drivers: [] as DriverData[],
+    };
+
+    sessionWithVariedLimits.drivers = [sessionWithVariedLimits.playerDriver as unknown as DriverData];
+
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('/api/session/test-session-tl-colors')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithVariedLimits) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<SessionDetail sessionId="test-session-tl-colors" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    const badges = screen.getAllByText('⚠️ 1');
+    expect(badges.length).toBe(2);
+
+    // Lap 1: No Further Action -> Green (emerald)
+    expect(badges[0].className).toContain('text-emerald-300');
+
+    // Lap 2: 0.75 pts -> Orange
+    expect(badges[1].className).toContain('text-orange-300');
   });
 });

@@ -1,6 +1,10 @@
 import React from 'react';
 import { Flag, ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
 import { LapData } from '../../../server/types.js';
+import {
+  getWorstTrackLimitSeverity,
+  getTrackLimitBadgeClasses,
+} from '../../utils/trackLimits.js';
 
 export interface SessionLapStatusBadgeProps {
   lap: LapData;
@@ -22,6 +26,9 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   const hasLapIncidents = Boolean(l.incidentCount && l.incidentCount > 0);
   const hasLapTrackLimits = Boolean(l.trackLimitCount && l.trackLimitCount > 0);
   const hasLapPenalties = Boolean(l.penaltyCount && l.penaltyCount > 0);
+
+  const tlSeverity = getWorstTrackLimitSeverity(l.trackLimits);
+  const tlBadgeClass = getTrackLimitBadgeClasses(tlSeverity);
 
   return (
     <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
@@ -85,7 +92,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       )}
       {hasLapTrackLimits && (
         <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-help"
+          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-help ${tlBadgeClass}`}
           title={l.trackLimits?.map((tl) => `⚠️ ${tl.description}`).join('\n')}
         >
           ⚠️ {l.trackLimitCount}

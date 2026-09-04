@@ -1,5 +1,10 @@
 import { DriverData } from '../../../server/types.js';
 import { formatElapsedSeconds } from '../../utils/formatters.js';
+import {
+  getTrackLimitSeverity,
+  getWorstTrackLimitSeverity,
+  getTrackLimitBadgeClasses,
+} from '../../utils/trackLimits.js';
 
 export interface SessionStewardsLogProps {
   selectedDriver: DriverData;
@@ -29,6 +34,8 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
     lapNum?: number;
   }> = [];
 
+  const seenTrackLimits = new Set();
+
   selectedDriver.laps?.forEach((l) => {
     l.incidents?.forEach((inc) => {
       allEvents.push({
@@ -45,12 +52,14 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
       });
     });
     l.trackLimits?.forEach((tl) => {
+      seenTrackLimits.add(tl);
+      const severity = getTrackLimitSeverity(tl);
       allEvents.push({
         kind: 'trackLimit',
         et: tl.elapsedSeconds,
         description: tl.description,
         badge: '⚠️ Track Limit',
-        badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        badgeClass: getTrackLimitBadgeClasses(severity),
         lapNum: l.lapNum,
       });
     });
@@ -64,6 +73,20 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         lapNum: l.lapNum,
       });
     });
+  });
+
+  selectedDriver.trackLimits?.forEach((tl) => {
+    if (!seenTrackLimits.has(tl)) {
+      const severity = getTrackLimitSeverity(tl);
+      allEvents.push({
+        kind: 'trackLimit',
+        et: tl.elapsedSeconds,
+        description: tl.description,
+        badge: '⚠️ Track Limit',
+        badgeClass: getTrackLimitBadgeClasses(severity),
+        lapNum: tl.lapNum,
+      });
+    }
   });
 
   allEvents.sort((a, b) => (a.et ?? 0) - (b.et ?? 0));
@@ -85,11 +108,18 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
                 💥 {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}
               </span>
             )}
-            {hasTrackLimits && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                ⚠️ {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}
-              </span>
-            )}
+            {hasTrackLimits && (() => {
+              const allTls = selectedDriver.trackLimits && selectedDriver.trackLimits.length > 0
+                ? selectedDriver.trackLimits
+                : selectedDriver.laps?.flatMap((l) => l.trackLimits || []) || [];
+              const tlSeverity = getWorstTrackLimitSeverity(allTls);
+              const badgeClass = getTrackLimitBadgeClasses(tlSeverity);
+              return (
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}`}>
+                  ⚠️ {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}
+                </span>
+              );
+            })()}
             {hasPenalties && (
               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-600/25 text-red-200 border border-red-500/40">
                 🛑 {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}
