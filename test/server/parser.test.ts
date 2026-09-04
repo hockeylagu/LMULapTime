@@ -1014,4 +1014,94 @@ describe('parser server module', () => {
       expect(result.overallTrackBestLap).toBeNull();
     });
   });
+
+  describe('Stream Incidents, Track Limits, Damage, and Penalties', () => {
+    it('parses incidents, track limits, penalties, and damage and maps them to laps and drivers', () => {
+      const xmlWithStream = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Spa</TrackVenue>
+    <Race>
+      <Stream>
+        <Incident et="120.5">Player Driver(1) reported contact (750.25) with another vehicle AI Rival(2)</Incident>
+        <Incident et="120.5">AI Rival(2) reported contact (710.00) with another vehicle Player Driver(1)</Incident>
+        <Incident et="245.0">Player Driver(1) reported contact (4500.00) with Immovable</Incident>
+        <Sector et="250.0">Player Driver(1) reports new suspension damage</Sector>
+        <TrackLimits Driver="Player Driver" ID="1" Lap="0" WarningPoints="0.25" CurrentPoints="0.25" et="150.0">Warning</TrackLimits>
+        <TrackLimits Driver="Player Driver" ID="1" Lap="1" WarningPoints="0" CurrentPoints="0.25" et="280.0">No Further Action</TrackLimits>
+        <Penalty Driver="AI Rival" ID="2" Penalty="Drive Thru" Reason="Speeding" et="130.0">AI Rival received Drive Thru for Speeding</Penalty>
+      </Stream>
+      <Driver>
+        <Name>Player Driver</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" s1="35.0" s2="42.0" s3="45.0" et="100.0">122.0</Lap>
+        <Lap num="2" p="1" s1="36.0" s2="45.0" s3="50.0" et="222.0">131.0</Lap>
+      </Driver>
+      <Driver>
+        <Name>AI Rival</Name>
+        <isPlayer>0</isPlayer>
+        <CarType>Porsche 963</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="2" s1="35.5" s2="42.5" s3="45.5" et="100.0">123.5</Lap>
+        <Lap num="2" p="2" s1="35.0" s2="42.0" s3="45.0" et="223.5">122.0</Lap>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithStream);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+
+      const session = parser.parseSessionXml('stream_test.xml');
+      expect(session).not.toBeNull();
+
+      const player = session?.drivers.find(d => d.name === 'Player Driver');
+      const rival = session?.drivers.find(d => d.name === 'AI Rival');
+
+      expect(player).toBeDefined();
+      expect(rival).toBeDefined();
+
+      // Check Player totals
+      expect(player?.totalIncidents).toBe(3); // 1 vehicle contact + 1 wall contact + 1 suspension damage
+      expect(player?.totalTrackLimits).toBe(2);
+      expect(player?.totalPenalties).toBe(0);
+
+      // Check Player Lap 1 events (et between 100.0 and 222.0)
+      const pLap1 = player?.laps[0];
+      expect(pLap1?.incidentCount).toBe(1);
+      expect(pLap1?.incidents?.[0].type).toBe('contact');
+      expect(pLap1?.incidents?.[0].otherVehicle).toBe('AI Rival');
+      expect(pLap1?.incidents?.[0].force).toBe(750.25);
+      expect(pLap1?.incidents?.[0].isWallImpact).toBe(false);
+
+      expect(pLap1?.trackLimitCount).toBe(1);
+      expect(pLap1?.trackLimits?.[0].warningPoints).toBe(0.25);
+      expect(pLap1?.trackLimits?.[0].action).toBe('Warning');
+
+      // Check Player Lap 2 events (et between 222.0 and 353.0)
+      const pLap2 = player?.laps[1];
+      expect(pLap2?.incidentCount).toBe(2);
+      // Wall contact
+      expect(pLap2?.incidents?.[0].type).toBe('contact');
+      expect(pLap2?.incidents?.[0].isWallImpact).toBe(true);
+      expect(pLap2?.incidents?.[0].force).toBe(4500);
+      // Suspension damage
+      expect(pLap2?.incidents?.[1].type).toBe('damage');
+      expect(pLap2?.incidents?.[1].description).toContain('suspension damage');
+
+      expect(pLap2?.trackLimitCount).toBe(1);
+      expect(pLap2?.trackLimits?.[0].action).toBe('No Further Action');
+
+      // Check AI Rival penalties and incidents
+      expect(rival?.totalPenalties).toBe(1);
+      expect(rival?.penalties?.[0].penalty).toBe('Drive Thru');
+      expect(rival?.penalties?.[0].reason).toBe('Speeding');
+      expect(rival?.laps[0].penaltyCount).toBe(1);
+
+      expect(rival?.totalIncidents).toBe(1);
+      expect(rival?.laps[0].incidents?.[0].otherVehicle).toBe('Player Driver');
+    });
+  });
 });

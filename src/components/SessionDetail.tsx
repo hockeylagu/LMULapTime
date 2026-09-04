@@ -32,7 +32,7 @@ import {
   Legend,
 } from 'recharts';
 import { DetailedSession, SessionProgressionPoint } from '../../server/types.js';
-import { formatTime, getDisplayTrackName, parseDateStringToTimestamp } from '../utils/formatters.js';
+import { formatTime, getDisplayTrackName, parseDateStringToTimestamp, formatElapsedSeconds } from '../utils/formatters.js';
 import { getPaceCategoryStyle, formatPacePercentage, matchesCarClass, findReferenceEntry, matchesTrack } from '../utils/paceCategory.js';
 import { computeLapToLapDelta } from '../utils/lapComparison.js';
 
@@ -160,6 +160,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
+  const [showIncidentsLog, setShowIncidentsLog] = useState<boolean>(false);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -627,6 +628,39 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             </span>
           </div>
         )}
+
+        {/* Safety & Incident Summary for Selected Driver */}
+        {selectedDriver && (selectedDriver.totalIncidents !== undefined || selectedDriver.totalTrackLimits !== undefined || selectedDriver.totalPenalties !== undefined) && (
+          <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-bold text-white flex items-center gap-1.5 mr-1">
+              <ShieldCheck className="w-4 h-4 text-lmu-green" />
+              Safety & Incidents ({selectedDriver.name}):
+            </span>
+            {(selectedDriver.totalIncidents ?? 0) === 0 && (selectedDriver.totalPenalties ?? 0) === 0 && (selectedDriver.totalTrackLimits ?? 0) === 0 ? (
+              <span className="px-2.5 py-1 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1">
+                🛡️ Clean Driving • 0 Incidents
+              </span>
+            ) : (
+              <>
+                {(selectedDriver.totalIncidents ?? 0) > 0 && (
+                  <span className="px-2.5 py-1 rounded bg-rose-950/60 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1">
+                    💥 {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {(selectedDriver.totalTrackLimits ?? 0) > 0 && (
+                  <span className="px-2.5 py-1 rounded bg-amber-950/60 text-amber-300 border border-amber-500/40 text-xs font-semibold flex items-center gap-1">
+                    ⚠️ {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {(selectedDriver.totalPenalties ?? 0) > 0 && (
+                  <span className="px-2.5 py-1 rounded bg-red-950/60 text-red-300 border border-red-500/40 text-xs font-semibold flex items-center gap-1">
+                    🛑 {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Unified Driver Performance & Race Standings Overview Panel */}
@@ -750,9 +784,9 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
               )}
             </div>
 
-            {/* Race Standings Sub-Grid (when Race session) */}
+            {/* Race Standings Sub-Grid (when Race session) - strictly 1 row on md+ screens */}
             {isRaceSession && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                 {(() => {
                   const displayPosDelta = isMultiClass && selectedDriver.classGridPosition && selectedDriver.classPosition
                     ? selectedDriver.classGridPosition - selectedDriver.classPosition
@@ -761,13 +795,13 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                   return (
                     <>
                       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">Starting Grid</p>
-                        <p className="text-base font-mono font-extrabold text-white mt-0.5">
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Starting Grid</p>
+                        <p className="text-base font-mono font-extrabold text-white mt-0.5 whitespace-nowrap">
                           {isMultiClass && selectedDriver.classGridPosition ? (
                             <>
                               P{selectedDriver.classGridPosition}
                               {selectedDriver.gridPosition && (
-                                <span className="text-[11px] font-normal text-lmu-muted ml-1" title="Overall Starting Grid">
+                                <span className="text-[10px] font-normal text-lmu-muted ml-1" title="Overall Starting Grid">
                                   (OA: P{selectedDriver.gridPosition})
                                 </span>
                               )}
@@ -779,15 +813,15 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </div>
 
                       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">Finish Position</p>
-                        <p className={`text-base font-mono font-extrabold mt-0.5 ${
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Finish Position</p>
+                        <p className={`text-base font-mono font-extrabold mt-0.5 whitespace-nowrap ${
                           selectedDriver.classPosition === 1 || (!isMultiClass && selectedDriver.position === 1) ? 'text-lmu-gold' : 'text-white'
                         }`}>
                           {isMultiClass && selectedDriver.classPosition > 0 ? (
                             <>
                               P{selectedDriver.classPosition}
                               {selectedDriver.position && (
-                                <span className="text-[11px] font-normal text-lmu-muted ml-1" title="Overall Finish Position">
+                                <span className="text-[10px] font-normal text-lmu-muted ml-1" title="Overall Finish Position">
                                   (OA: P{selectedDriver.position})
                                 </span>
                               )}
@@ -799,7 +833,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </div>
 
                       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                        <p className="text-[10px] uppercase font-semibold text-lmu-muted">
+                        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">
                           {isMultiClass ? 'Class Pos Delta' : 'Position Delta'}
                         </p>
                         <p className={`text-base font-mono font-extrabold mt-0.5 flex items-center justify-center gap-1 ${
@@ -809,14 +843,14 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                             ? 'text-rose-400'
                             : 'text-white'
                         }`}>
-                          {(displayPosDelta ?? 0) > 0 && <TrendingUp className="w-3.5 h-3.5" />}
-                          {(displayPosDelta ?? 0) < 0 && <TrendingDown className="w-3.5 h-3.5" />}
+                          {(displayPosDelta ?? 0) > 0 && <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {(displayPosDelta ?? 0) < 0 && <TrendingDown className="w-3.5 h-3.5 flex-shrink-0" />}
                           <span>
                             {displayPosDelta !== null && displayPosDelta !== undefined
                               ? `${displayPosDelta > 0 ? '+' : ''}${displayPosDelta}`
                               : '-'}
                           </span>
-                          <span className="text-[10px] font-normal text-lmu-muted">
+                          <span className="text-[10px] font-normal text-lmu-muted hidden xl:inline">
                             {(displayPosDelta ?? 0) > 0 ? 'Gained' : (displayPosDelta ?? 0) < 0 ? 'Lost' : 'Net'}
                           </span>
                         </p>
@@ -826,7 +860,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 })()}
 
                 <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Laps Led (P1)</p>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Laps Led (P1)</p>
                   <p className="text-base font-mono font-extrabold text-lmu-gold mt-0.5">
                     {selectedDriver.lapsLedCount ?? 0}
                     <span className="text-[10px] font-normal text-lmu-muted ml-1">laps</span>
@@ -834,17 +868,39 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                 </div>
 
                 <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Peak Position</p>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Peak Position</p>
                   <p className="text-base font-mono font-extrabold text-lmu-cyan mt-0.5">
                     {selectedDriver.highestPosition ? `P${selectedDriver.highestPosition}` : '-'}
                   </p>
                 </div>
 
                 <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-                  <p className="text-[10px] uppercase font-semibold text-lmu-muted">Pit Stops</p>
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Pit Stops</p>
                   <p className="text-base font-mono font-extrabold text-amber-300 mt-0.5">
                     {selectedDriver.pitStopsCount ?? 0}
                     <span className="text-[10px] font-normal text-lmu-muted ml-1">stops</span>
+                  </p>
+                </div>
+
+                <div
+                  className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center cursor-help"
+                  title={`Incidents: ${selectedDriver.totalIncidents ?? 0}\nTrack Limits: ${selectedDriver.totalTrackLimits ?? 0}\nPenalties: ${selectedDriver.totalPenalties ?? 0}`}
+                >
+                  <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Incidents & Limits</p>
+                  <p className="text-base font-mono font-extrabold mt-0.5">
+                    {(selectedDriver.totalIncidents ?? 0) === 0 && (selectedDriver.totalPenalties ?? 0) === 0 ? (
+                      <span className="text-emerald-400 text-sm flex items-center justify-center gap-1 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Clean</span>
+                      </span>
+                    ) : (
+                      <span className="text-rose-400 text-sm flex items-center justify-center gap-1 font-bold">
+                        <span>{selectedDriver.totalIncidents ?? 0}x</span>
+                        <span className="text-[10px] font-normal text-lmu-muted font-sans truncate">
+                          ({selectedDriver.totalTrackLimits ?? 0} TL{selectedDriver.totalPenalties ? `, ${selectedDriver.totalPenalties}P` : ''})
+                        </span>
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -1977,6 +2033,26 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                         }).length
                     : l.position;
 
+                  const hasLapIncidents = Boolean(l.incidentCount && l.incidentCount > 0);
+                  const hasLapTrackLimits = Boolean(l.trackLimitCount && l.trackLimitCount > 0);
+                  const hasLapPenalties = Boolean(l.penaltyCount && l.penaltyCount > 0);
+
+                  const lapEventLines: string[] = [];
+                  if (hasLapIncidents) {
+                    lapEventLines.push(`💥 Incidents (${l.incidentCount}):\n${l.incidents?.map(i => `  • ${i.description}`).join('\n')}`);
+                  }
+                  if (hasLapTrackLimits) {
+                    lapEventLines.push(`⚠️ Track Limits (${l.trackLimitCount}):\n${l.trackLimits?.map(tl => `  • ${tl.description}`).join('\n')}`);
+                  }
+                  if (hasLapPenalties) {
+                    lapEventLines.push(`🛑 Penalties (${l.penaltyCount}):\n${l.penalties?.map(p => `  • ${p.description}`).join('\n')}`);
+                  }
+                  const eventsTooltip = lapEventLines.length > 0 ? lapEventLines.join('\n\n') : undefined;
+
+                  const incompleteTooltip = eventsTooltip
+                    ? `Incomplete Lap:\n${eventsTooltip}`
+                    : 'Incomplete Lap (lap not finished or missing sector timing)';
+
                   return (
                   <tr
                     key={l.lapNum}
@@ -2085,48 +2161,82 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </td>
                     )}
                     <td className="px-3 py-2.5 text-center font-sans">
-                      {l.isPitStop && l.lapTime !== null && l.lapTime > 0 ? (
-                        <span
-                          className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold"
-                          title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
-                        >
-                          PIT STOP
-                        </span>
-                      ) : isOutLap ? (
-                        <span
-                          className="inline-flex items-center gap-1 text-cyan-400 text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30"
-                          title="Out Lap (rejoining track from pit lane — excluded from flying consistency)"
-                        >
-                          Out Lap
-                        </span>
-                      ) : l.lapNum === 1 ? (
-                        <span
-                          className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
-                          title={
-                            session.sessionType === 'Race'
-                              ? 'Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)'
-                              : 'Session Start Lap (Pit exit / out-lap from garage — excluded from average flying pace)'
-                          }
-                        >
-                          <Flag className="w-3.5 h-3.5" />
-                          Start Lap
-                        </span>
-                      ) : l.isValid ? (
-                        <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          Valid
-                        </span>
-                      ) : isInferredLap ? (
-                        <span className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium">
-                          <Clock className="w-3.5 h-3.5" />
-                          Incomplete
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-lmu-gold text-xs font-medium">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          Incomplete
-                        </span>
-                      )}
+                      <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
+                        {l.isPitStop && l.lapTime !== null && l.lapTime > 0 ? (
+                          <span
+                            className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold"
+                            title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
+                          >
+                            PIT STOP
+                          </span>
+                        ) : isOutLap ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-cyan-400 text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30"
+                            title="Out Lap (rejoining track from pit lane — excluded from flying consistency)"
+                          >
+                            Out Lap
+                          </span>
+                        ) : l.lapNum === 1 ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
+                            title={
+                              session.sessionType === 'Race'
+                                ? 'Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)'
+                                : 'Session Start Lap (Pit exit / out-lap from garage — excluded from average flying pace)'
+                            }
+                          >
+                            <Flag className="w-3.5 h-3.5" />
+                            Start Lap
+                          </span>
+                        ) : l.isValid ? (
+                          <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Valid
+                          </span>
+                        ) : isInferredLap ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium cursor-help"
+                            title={incompleteTooltip}
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            Incomplete
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 text-lmu-gold text-xs font-medium cursor-help"
+                            title={incompleteTooltip}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Incomplete
+                          </span>
+                        )}
+
+                        {/* Compact Incident & Penalty Badges (Zero extra columns, rich hover details) */}
+                        {hasLapIncidents && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-help"
+                            title={l.incidents?.map(i => `💥 ${i.description}`).join('\n')}
+                          >
+                            💥 {l.incidentCount}
+                          </span>
+                        )}
+                        {hasLapTrackLimits && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-help"
+                            title={l.trackLimits?.map(tl => `⚠️ ${tl.description}`).join('\n')}
+                          >
+                            ⚠️ {l.trackLimitCount}
+                          </span>
+                        )}
+                        {hasLapPenalties && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600/30 text-red-200 border border-red-500/50 cursor-help"
+                            title={l.penalties?.map(p => `🛑 ${p.description}`).join('\n')}
+                          >
+                            🛑 {l.penalties?.[0]?.penalty || 'Pen'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 text-center font-sans">
                       <button
@@ -2150,6 +2260,114 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
           </table>
         </div>
       </div>
+
+      {/* Driver Incidents, Track Limits & Stewards Log */}
+      {selectedDriver && ((selectedDriver.totalIncidents ?? 0) > 0 || (selectedDriver.totalTrackLimits ?? 0) > 0 || (selectedDriver.totalPenalties ?? 0) > 0) && (
+        <div className="glass-panel p-4 rounded-2xl space-y-3">
+          <div
+            onClick={() => setShowIncidentsLog(prev => !prev)}
+            className="flex items-center justify-between cursor-pointer group select-none"
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-base">💥</span>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider group-hover:text-lmu-gold transition-colors">
+                Incidents & Stewards Log ({selectedDriver.name})
+              </h3>
+              <div className="flex items-center gap-1.5 ml-2 flex-wrap">
+                {(selectedDriver.totalIncidents ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    💥 {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {(selectedDriver.totalTrackLimits ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    ⚠️ {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {(selectedDriver.totalPenalties ?? 0) > 0 && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-600/25 text-red-200 border border-red-500/40">
+                    🛑 {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-lmu-muted group-hover:text-white shrink-0">
+              {showIncidentsLog ? 'Hide Details ▲' : 'Show Details ▼'}
+            </span>
+          </div>
+
+          {showIncidentsLog && (
+            <div className="pt-2 border-t border-lmu-border/50 divide-y divide-lmu-border/30 max-h-64 overflow-y-auto">
+              {(() => {
+                const allEvents: Array<{
+                  kind: 'incident' | 'trackLimit' | 'penalty';
+                  et?: number;
+                  description: string;
+                  badge: string;
+                  badgeClass: string;
+                  lapNum?: number;
+                }> = [];
+
+                selectedDriver.laps?.forEach(l => {
+                  l.incidents?.forEach(inc => {
+                    allEvents.push({
+                      kind: 'incident',
+                      et: inc.elapsedSeconds,
+                      description: inc.description,
+                      badge: inc.isWallImpact ? '🧱 Wall Contact' : inc.type === 'damage' ? '🔧 Damage' : '💥 Collision',
+                      badgeClass: inc.isWallImpact ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : inc.type === 'damage' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+                      lapNum: l.lapNum,
+                    });
+                  });
+                  l.trackLimits?.forEach(tl => {
+                    allEvents.push({
+                      kind: 'trackLimit',
+                      et: tl.elapsedSeconds,
+                      description: tl.description,
+                      badge: '⚠️ Track Limit',
+                      badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                      lapNum: l.lapNum,
+                    });
+                  });
+                  l.penalties?.forEach(pen => {
+                    allEvents.push({
+                      kind: 'penalty',
+                      et: pen.elapsedSeconds,
+                      description: pen.description,
+                      badge: `🛑 ${pen.penalty}`,
+                      badgeClass: 'bg-red-600/30 text-red-200 border-red-500/50',
+                      lapNum: l.lapNum,
+                    });
+                  });
+                });
+
+                allEvents.sort((a, b) => (a.et ?? 0) - (b.et ?? 0));
+
+                return allEvents.map((evt, idx) => (
+                  <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${evt.badgeClass}`}>
+                        {evt.badge}
+                      </span>
+                      <span className="font-mono text-lmu-gold text-xs shrink-0">
+                        {evt.lapNum ? `Lap ${evt.lapNum}` : '-'}
+                      </span>
+                      <span className="text-white truncate" title={evt.description}>
+                        {evt.description}
+                      </span>
+                    </div>
+                    {evt.et !== undefined && evt.et > 0 && (
+                      <span className="text-lmu-muted font-mono text-[11px] shrink-0">
+                        {formatElapsedSeconds(evt.et)}
+                      </span>
+                    )}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Race Classification & Driver Standings (Multi-Driver Sessions) - Placed on the bottom */}
       {session.drivers && session.drivers.length > 1 && (
@@ -2179,6 +2397,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                   <th className="px-3.5 py-3 text-right">Best Lap</th>
                   <th className="px-3.5 py-3 text-center">Laps</th>
                   <th className="px-3.5 py-3 text-center">Pit Stops</th>
+                  <th className="px-3.5 py-3 text-center">Safety</th>
                   <th className="px-3.5 py-3 text-center">Status</th>
                 </tr>
               </thead>
@@ -2233,6 +2452,98 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                       </td>
                       <td className="px-3.5 py-2.5 text-center font-mono text-amber-300">
                         {d.pitStopsCount ?? 0}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-center">
+                        {(() => {
+                          const incCount = d.totalIncidents ?? d.incidents?.length ?? 0;
+                          const tlCount = d.totalTrackLimits ?? d.trackLimits?.length ?? 0;
+                          const penCount = d.totalPenalties ?? d.penalties?.length ?? 0;
+
+                          const tooltip = [
+                            `Driver: ${d.name}`,
+                            `• Contacts / Incidents: ${incCount}x`,
+                            `• Track Limits Warnings: ${tlCount}`,
+                            `• Penalties: ${penCount}`,
+                            ...(d.penalties && d.penalties.length > 0
+                              ? [
+                                  '',
+                                  'Penalties:',
+                                  ...d.penalties.map(p => {
+                                    const lapLabel = p.lapNum ? `Lap ${p.lapNum}` : (p.elapsedSeconds ? formatElapsedSeconds(p.elapsedSeconds) : '');
+                                    return `  - ${lapLabel ? `${lapLabel}: ` : ''}${p.penalty} (${p.reason})`;
+                                  }),
+                                ]
+                              : []),
+                            ...(d.incidents && d.incidents.length > 0
+                              ? [
+                                  '',
+                                  'Incidents:',
+                                  ...d.incidents.slice(0, 8).map(inc => {
+                                    const lapLabel = inc.lapNum ? `Lap ${inc.lapNum}` : (inc.elapsedSeconds ? formatElapsedSeconds(inc.elapsedSeconds) : 'Lap ?');
+                                    const desc = inc.description || (inc.otherVehicle ? `Contact with ${inc.otherVehicle}` : (inc.type === 'contact' ? 'Contact with barrier' : inc.type || 'Incident'));
+                                    return `  - ${lapLabel}: ${desc}`;
+                                  }),
+                                  ...(d.incidents.length > 8 ? [`  ...and ${d.incidents.length - 8} more`] : []),
+                                ]
+                              : []),
+                            ...(d.trackLimits && d.trackLimits.length > 0
+                              ? [
+                                  '',
+                                  'Track Limits:',
+                                  ...d.trackLimits.slice(0, 6).map(tl => {
+                                    const lapLabel = tl.lapNum ? `Lap ${tl.lapNum}` : (tl.elapsedSeconds ? formatElapsedSeconds(tl.elapsedSeconds) : 'Warning');
+                                    return `  - ${lapLabel}: ${tl.description}`;
+                                  }),
+                                  ...(d.trackLimits.length > 6 ? [`  ...and ${d.trackLimits.length - 6} more`] : []),
+                                ]
+                              : []),
+                          ].join('\n');
+
+                          if (incCount === 0 && penCount === 0 && tlCount === 0) {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 cursor-help"
+                                title={tooltip}
+                              >
+                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                <span>Clean</span>
+                              </span>
+                            );
+                          }
+
+                          if (penCount > 0) {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-950/70 text-rose-300 border border-rose-500/40 cursor-help"
+                                title={tooltip}
+                              >
+                                <span>🛑 {penCount} Pen</span>
+                                {incCount > 0 && <span className="text-[10px] text-rose-200/70 font-mono">({incCount}x)</span>}
+                              </span>
+                            );
+                          }
+
+                          if (incCount > 0) {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-950/60 text-orange-300 border border-orange-500/30 cursor-help"
+                                title={tooltip}
+                              >
+                                <span>💥 {incCount}x</span>
+                                {tlCount > 0 && <span className="text-[10px] text-amber-300/70 font-mono">({tlCount} TL)</span>}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-950/50 text-amber-300 border border-amber-500/30 cursor-help"
+                              title={tooltip}
+                            >
+                              <span>⚠️ {tlCount} TL</span>
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-3.5 py-2.5 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${

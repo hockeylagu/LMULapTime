@@ -70,6 +70,34 @@ export interface TireWear {
   avg: number; // 4-wheel average wear % remaining (0-100)
 }
 
+export interface LapIncident {
+  type: 'contact' | 'damage' | 'other';
+  description: string;
+  details?: string;
+  lapNum?: number;
+  elapsedSeconds?: number;
+  force?: number;
+  otherVehicle?: string;
+  isWallImpact?: boolean;
+}
+
+export interface LapTrackLimit {
+  description: string;
+  lapNum?: number;
+  elapsedSeconds?: number;
+  warningPoints?: number;
+  currentPoints?: number;
+  action?: string; // e.g. "Warning", "No Further Action"
+}
+
+export interface LapPenalty {
+  penalty: string; // e.g. "Drive Thru", "Stop and Go"
+  reason: string; // e.g. "Speeding", "Jumped the start"
+  lapNum?: number;
+  elapsedSeconds?: number;
+  description: string;
+}
+
 export interface LapData {
   lapNum: number;
   position: number;
@@ -103,6 +131,12 @@ export interface LapData {
   paceCategory?: PaceCategory | null;
   pacePercentage?: number | null;
   target100Sec?: number | null;
+  incidents?: LapIncident[];
+  trackLimits?: LapTrackLimit[];
+  penalties?: LapPenalty[];
+  incidentCount?: number;
+  trackLimitCount?: number;
+  penaltyCount?: number;
 }
 
 export interface DriverData {
@@ -142,6 +176,12 @@ export interface DriverData {
   finishGapToLeaderString?: string;
   top3LapsCount?: number;
   lapsCount: number;
+  totalIncidents?: number;
+  totalTrackLimits?: number;
+  totalPenalties?: number;
+  incidents?: LapIncident[];
+  trackLimits?: LapTrackLimit[];
+  penalties?: LapPenalty[];
   laps: LapData[];
 }
 

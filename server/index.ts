@@ -127,15 +127,41 @@ app.get('/api/sessions', (req, res) => {
 app.get('/api/session/:id', (req, res) => {
   const { id } = req.params;
 
-  // 1. Check SQLite database by id or filename
   const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;
+  const singleFilePath = path.join(currentResultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
+
+  // 1. Check SQLite database by id or filename
   const cached = sessionDb.getSessionById(id) || sessionDb.getSessionById(cleanId) || sessionDb.getSessionById(`${cleanId}.xml`);
+
+  // If cached session is from an older schema without incident data or missing lapNum on incidents, re-parse on demand!
+  const hasStaleIncidents = Boolean(
+    cached &&
+    cached.drivers &&
+    cached.drivers.some(d => {
+      if (d.totalIncidents === undefined) return true;
+      if (d.incidents && d.incidents.length > 0 && d.incidents[0].lapNum === undefined) return true;
+      return false;
+    })
+  );
+
+  if (cached && hasStaleIncidents && fs.existsSync(singleFilePath)) {
+    const fresh = parser.parseSessionXml(singleFilePath);
+    if (fresh) {
+      try {
+        const stats = fs.statSync(singleFilePath);
+        sessionDb.upsertSession(fresh, singleFilePath, Math.floor(stats.mtimeMs), stats.size);
+      } catch {
+        // ignore
+      }
+      return res.json(fresh);
+    }
+  }
+
   if (cached) {
     return res.json(cached);
   }
 
   // 2. Fallback: Parse ONLY the single requested XML file directly
-  const singleFilePath = path.join(currentResultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
   if (fs.existsSync(singleFilePath)) {
     const parsed = parser.parseSessionXml(singleFilePath);
     if (parsed) {

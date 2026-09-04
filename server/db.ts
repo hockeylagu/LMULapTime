@@ -204,7 +204,7 @@ export class SessionDatabase {
       };
     }
 
-    const DB_PARSER_VERSION = '2.3_valid_pitstop_outlap';
+    const DB_PARSER_VERSION = '2.5_incident_lapnum_fix';
     const cachedVersion = this.getMetadata('parser_version');
     const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
     if (versionMismatch) {
