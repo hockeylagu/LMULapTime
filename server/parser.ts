@@ -1294,6 +1294,7 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
 export interface ComparableLapsResult {
   laps: ComparableLap[];
   allTimeBestLap: ComparableLap | null;
+  playerBestLap?: ComparableLap | null;
   overallTrackBestLap: ComparableLap | null;
   bestS1: number | null;
   bestS2: number | null;
@@ -1332,6 +1333,7 @@ export function extractComparableLaps(
 
   const laps: ComparableLap[] = [];
   let allTimeBestLap: ComparableLap | null = null;
+  let playerBestLap: ComparableLap | null = null;
   let overallTrackBestLap: ComparableLap | null = null;
   let bestS1: number | null = null;
   let bestS2: number | null = null;
@@ -1410,6 +1412,53 @@ export function extractComparableLaps(
               tag: `🏆 All-Time Best (${d.name})`,
             };
           }
+
+          const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
+          if (isPlayerDriver && (!playerBestLap || playerBestLap.lapTime === null || l.lapTime < playerBestLap.lapTime)) {
+            playerBestLap = {
+              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
+              sessionId: s.id,
+              sessionName: s.sessionName,
+              sessionType: s.sessionType,
+              dateString: s.timeString,
+              timestamp: s.timestamp,
+              driverName: d.name,
+              carType: d.carType,
+              carClass: d.carClass || 'General',
+              lapNum: l.lapNum,
+              lapTime: l.lapTime,
+              lapTimeString: l.lapTimeString,
+              s1: l.s1,
+              s2: l.s2,
+              s3: l.s3,
+              s1String: formatTime(l.s1),
+              s2String: formatTime(l.s2),
+              s3String: formatTime(l.s3),
+              topSpeed: l.topSpeed,
+              fCompound: l.fCompound,
+              rCompound: l.rCompound,
+              flCompound: l.flCompound,
+              frCompound: l.frCompound,
+              rlCompound: l.rlCompound,
+              rrCompound: l.rrCompound,
+              tireWear: l.tireWear,
+              fuel: l.fuel,
+              fuelUsed: l.fuelUsed,
+              virtualEnergy: l.virtualEnergy,
+              virtualEnergyUsed: l.virtualEnergyUsed,
+              elapsedSeconds: l.elapsedSeconds,
+              elapsedTimeString: l.elapsedTimeString,
+              pitStopDurationString: l.pitStopDurationString,
+              gapToLeaderString: l.gapToLeaderString,
+              isPitStop: l.isPitStop,
+              isValid: l.isValid,
+              paceCategory: l.paceCategory || null,
+              pacePercentage: l.pacePercentage || null,
+              isAllTimePB: true,
+              isPlayer: true,
+              tag: '⭐ Personal Best',
+            };
+          }
         }
       });
     });
@@ -1447,6 +1496,7 @@ export function extractComparableLaps(
 
       (d.laps || []).forEach(l => {
         const isSessionBest = l.lapTime !== null && sessionBestTime !== null && Math.abs(l.lapTime - sessionBestTime) < 0.0005;
+        const isPlayer = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
         
         const lapItem = {
           id: `${s.id}_${d.name}_lap_${l.lapNum}`,
@@ -1490,6 +1540,7 @@ export function extractComparableLaps(
           paceCategory: l.paceCategory || null,
           pacePercentage: l.pacePercentage || null,
           isSessionBest,
+          isPlayer,
         };
 
         if (l.isValid && l.lapTime && l.lapTime > 0) {
@@ -1515,6 +1566,7 @@ export function extractComparableLaps(
   return {
     laps,
     allTimeBestLap,
+    playerBestLap,
     overallTrackBestLap,
     bestS1,
     bestS2,

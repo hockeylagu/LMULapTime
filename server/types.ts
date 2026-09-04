@@ -365,5 +365,6 @@ export interface ComparableLap {
   isOverallTrackBest?: boolean;
   isBenchmarkTarget?: boolean;
   benchmarkCategory?: string;
+  isPlayer?: boolean;
   tag?: string;
 }
