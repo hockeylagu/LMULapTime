@@ -45,9 +45,9 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
               className="flex items-center justify-between text-xs cursor-pointer hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
               title={`Filter by ${item.car}`}
             >
-              <div className="flex items-center gap-1.5 truncate">
+              <div className="flex items-center gap-1.5 min-w-0 mr-2">
                 <RankBadge rank={idx + 1} firstPlaceColor="text-lmu-cyan" />
-                <span className="text-white font-medium truncate max-w-[130px] group-hover:text-lmu-cyan transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-cyan transition-colors" title={item.car}>
                   {item.car}
                 </span>
               </div>

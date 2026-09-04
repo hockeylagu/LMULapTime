@@ -114,8 +114,9 @@ export function useDashboardMetrics({
         totalDrivingSeconds += p.avgLapTime * completedLapsCount;
       }
 
-      if (s.trackVenue && completedLapsCount > 0) {
-        trackLapsMap[s.trackVenue] = (trackLapsMap[s.trackVenue] || 0) + completedLapsCount;
+      const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
+      if (displayTrack && completedLapsCount > 0) {
+        trackLapsMap[displayTrack] = (trackLapsMap[displayTrack] || 0) + completedLapsCount;
       }
 
       if (p.carType && completedLapsCount > 0) {
@@ -123,15 +124,14 @@ export function useDashboardMetrics({
       }
 
       if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
-        const track = getDisplayTrackName(s.trackVenue, s.trackCourse);
-        const currentBest = uniqueTrackRefLapsMap[track];
+        const currentBest = uniqueTrackRefLapsMap[displayTrack];
         if (!currentBest || p.bestLapPacePercentage < currentBest.percentage) {
-          uniqueTrackRefLapsMap[track] = {
+          uniqueTrackRefLapsMap[displayTrack] = {
             sessionId: s.id,
             percentage: p.bestLapPacePercentage,
             category: p.bestLapPaceCategory,
             lapTimeString: p.bestLapTimeString,
-            track,
+            track: displayTrack,
             car: p.carType,
           };
         }

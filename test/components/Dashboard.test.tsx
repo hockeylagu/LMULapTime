@@ -486,4 +486,58 @@ describe('Dashboard component', () => {
     fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
     expect(sortSelect).toHaveValue('pos-asc');
   });
+
+  it('counts laps for full track with alternate layout rather than aggregating into the circuit', () => {
+    const sessionsWithLayouts = [
+      {
+        ...mockSessions[0],
+        id: 'sess-ricard-short',
+        trackVenue: 'Paul Ricard',
+        trackCourse: '1A-V2-Short',
+        playerDriver: {
+          ...mockSessions[0].playerDriver,
+          lapsCount: 8,
+          bestLapPacePercentage: 101.1,
+          bestLapPaceCategory: 'Alien' as const,
+          bestLapTimeString: '1:20.000',
+        },
+      },
+      {
+        ...mockSessions[0],
+        id: 'sess-ricard-full',
+        trackVenue: 'Paul Ricard',
+        trackCourse: '1A',
+        playerDriver: {
+          ...mockSessions[0].playerDriver,
+          lapsCount: 12,
+          bestLapPacePercentage: 101.5,
+          bestLapPaceCategory: 'Good' as const,
+          bestLapTimeString: '1:45.000',
+        },
+      },
+    ];
+
+    render(
+      <Dashboard
+        sessions={sessionsWithLayouts}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Both alternate layouts should be listed separately in the ranked tracks
+    expect(screen.getByTitle('View Paul Ricard (1A V2 Short) Track Details')).toBeInTheDocument();
+    expect(screen.getByTitle('View Paul Ricard (1A) Track Details')).toBeInTheDocument();
+    expect(screen.getByText('8 laps')).toBeInTheDocument();
+    expect(screen.getByText('12 laps')).toBeInTheDocument();
+    // And total laps across both layouts in overview and cars card
+    expect(screen.getAllByText('20 laps').length).toBe(2);
+  });
 });
