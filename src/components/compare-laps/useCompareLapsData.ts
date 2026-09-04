@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/types.js';
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import {
@@ -65,7 +65,9 @@ export function useCompareLapsData({
   const [selectedTrack, setSelectedTrackState] = useState<string>(defaultTrack);
   const [selectedCarClass, setSelectedCarClassState] = useState<string>(defaultCarClass);
   const [selectedCarModel, setSelectedCarModelState] = useState<string>(params.get('model') || 'All');
-  const [playerOnly, setPlayerOnlyState] = useState<boolean>(true);
+  const [playerOnly, setPlayerOnlyState] = useState<boolean>(
+    params.get('playerOnly') === 'false' ? false : true
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [availableLapsSort, setAvailableLapsSort] = useState<AvailableLapsSortOption>('lap-asc');
   const [hideEmpty, setHideEmptyState] = useState<boolean>(params.get('hideEmpty') !== 'false');
@@ -73,6 +75,7 @@ export function useCompareLapsData({
   const [apiData, setApiData] = useState<{
     laps: ComparableLap[];
     allTimeBestLap: ComparableLap | null;
+    playerBestLap?: ComparableLap | null;
     overallTrackBestLap?: ComparableLap | null;
     bestS1: number | null;
     bestS2: number | null;
@@ -82,6 +85,7 @@ export function useCompareLapsData({
   }>({
     laps: [],
     allTimeBestLap: null,
+    playerBestLap: null,
     overallTrackBestLap: null,
     bestS1: null,
     bestS2: null,
@@ -93,11 +97,16 @@ export function useCompareLapsData({
   const [selectedLaps, setSelectedLaps] = useState<ComparableLap[]>([]);
   const [baselineLapId, setBaselineLapId] = useState<string>('');
 
+  const initializedScopeRef = useRef<string>('');
+  const hasFetchedRef = useRef<boolean>(false);
+
   const setSelectedTrack = (track: string) => {
     setSelectedTrackState(track);
     setSelectedCarModelState('All');
     setSelectedLaps([]);
     setBaselineLapId('');
+    initializedScopeRef.current = '';
+    hasFetchedRef.current = false;
     updateHashParams({ track, model: null });
   };
 
@@ -106,12 +115,19 @@ export function useCompareLapsData({
     setSelectedCarModelState('All');
     setSelectedLaps([]);
     setBaselineLapId('');
+    initializedScopeRef.current = '';
+    hasFetchedRef.current = false;
     updateHashParams({ carClass, model: null });
   };
 
   const setSelectedCarModel = (model: string) => {
     setSelectedCarModelState(model);
     updateHashParams({ model });
+  };
+
+  const setPlayerOnly = (val: boolean) => {
+    setPlayerOnlyState(val);
+    updateHashParams({ playerOnly: val ? null : 'false' });
   };
 
   const setHideEmpty = (hide: boolean) => {
@@ -131,6 +147,7 @@ export function useCompareLapsData({
       .then((res) => res.json())
       .then((data) => {
         setApiData(data);
+        hasFetchedRef.current = true;
         setLoading(false);
       })
       .catch((err) => {
@@ -148,6 +165,30 @@ export function useCompareLapsData({
       : undefined;
 
   useEffect(() => {
+    if (!hasFetchedRef.current) return;
+
+    const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNum ?? ''}`;
+
+    // If already initialized for this track and vehicle class scope,
+    // preserve whatever laps the user has selected (keeps player laps when changing driver scope)
+    if (initializedScopeRef.current === currentScope) {
+      if (apiData.laps.length > 0) {
+        setSelectedLaps((prevSelected) =>
+          prevSelected.map((selLap) => {
+            const fresh = apiData.laps.find((l) => l.id === selLap.id);
+            if (!fresh) return selLap;
+            return {
+              ...fresh,
+              tag: selLap.tag || fresh.tag,
+              isAllTimePB: selLap.isAllTimePB || fresh.isAllTimePB,
+              isTheoreticalBest: selLap.isTheoreticalBest || fresh.isTheoreticalBest,
+            };
+          })
+        );
+      }
+      return;
+    }
+
     const candidates: ComparableLap[] = [];
 
     if (targetSessionId) {
@@ -163,6 +204,7 @@ export function useCompareLapsData({
     }
 
     const pbLap =
+      apiData.playerBestLap ||
       apiData.allTimeBestLap ||
       (apiData.laps && apiData.laps.length > 0
         ? [...apiData.laps]
@@ -184,7 +226,8 @@ export function useCompareLapsData({
     const initialSlice = candidates.slice(0, 4);
     setSelectedLaps(initialSlice);
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
-  }, [apiData, selectedCarClass, targetSessionId, targetLapNum]);
+    initializedScopeRef.current = currentScope;
+  }, [apiData, selectedTrack, selectedCarClass, targetSessionId, targetLapNum]);
 
   const availableCarModels = useMemo(() => {
     const set = new Set<string>();
@@ -253,6 +296,14 @@ export function useCompareLapsData({
   };
 
   const allTimePBObject: ComparableLap | null = useMemo(() => {
+    if (apiData.playerBestLap) {
+      return { ...apiData.playerBestLap, isAllTimePB: true, tag: apiData.playerBestLap.tag || '⭐ Personal Best' };
+    }
+    const playerValid = apiData.laps.filter((l) => (l.isPlayer || playerOnly) && l.isValid && l.lapTime && l.lapTime > 0);
+    if (playerValid.length > 0) {
+      const sorted = [...playerValid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
+      return { ...sorted[0], isAllTimePB: true, tag: '⭐ Personal Best' };
+    }
     if (apiData.allTimeBestLap) {
       return { ...apiData.allTimeBestLap, isAllTimePB: true, tag: apiData.allTimeBestLap.tag || '⭐ Personal Best' };
     }
@@ -260,7 +311,7 @@ export function useCompareLapsData({
     if (valid.length === 0) return null;
     const sorted = [...valid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
     return sorted.length > 0 ? { ...sorted[0], isAllTimePB: true, tag: '⭐ Personal Best' } : null;
-  }, [apiData.allTimeBestLap, apiData.laps]);
+  }, [apiData.playerBestLap, apiData.allTimeBestLap, apiData.laps, playerOnly]);
 
   const isPBInComparison = Boolean(allTimePBObject && selectedLaps.some((l) => l.id === allTimePBObject.id));
 
@@ -383,7 +434,8 @@ export function useCompareLapsData({
     selectedCarModel,
     setSelectedCarModel,
     playerOnly,
-    setPlayerOnlyState,
+    setPlayerOnlyState: setPlayerOnly,
+    setPlayerOnly,
     loading,
     availableLapsSort,
     setAvailableLapsSort,
