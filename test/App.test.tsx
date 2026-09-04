@@ -148,6 +148,10 @@ describe('App component', () => {
 
     const backBtn = screen.getByRole('button', { name: /Back to Sessions/i });
     fireEvent.click(backBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    });
   });
 
   it('navigates to track detail when hash is set to track/:trackName', async () => {
@@ -161,6 +165,10 @@ describe('App component', () => {
 
     const backBtn = screen.getByRole('button', { name: /Back to Tracks/i });
     fireEvent.click(backBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+    });
   });
 
   it('handles track and filter interactions on Dashboard view', async () => {
@@ -186,6 +194,9 @@ describe('App component', () => {
     const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.glass-panel');
     if (sessionCard) {
       fireEvent.click(sessionCard);
+      await waitFor(() => {
+        expect(screen.getByText(/Back to Sessions/i)).toBeInTheDocument();
+      });
     }
   });
 
@@ -198,5 +209,10 @@ describe('App component', () => {
 
     const refreshBtn = screen.getByTitle(/Refresh LMU Directory Scan/i);
     fireEvent.click(refreshBtn);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true');
+      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+    });
   });
 });

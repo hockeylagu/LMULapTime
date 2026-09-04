@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Navbar } from './components/Navbar';
+import { Navbar, NavTab } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { TrackSummaries } from './components/TrackSummaries';
 import { SessionDetail } from './components/SessionDetail';
@@ -9,7 +9,7 @@ import { CompareLaps } from './components/CompareLaps';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [status, setStatus] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [progression, setProgression] = useState<any[]>([]);
@@ -30,7 +30,7 @@ export default function App() {
   const parseUrlState = () => {
     const { path: pathPart, params } = getHashRouteAndParams();
 
-    let tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings' = 'dashboard';
+    let tab: NavTab = 'dashboard';
     let sessionId: string | null = null;
     let trackRouteName: string | null = null;
 
@@ -40,7 +40,7 @@ export default function App() {
       tab = 'tracks';
       trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
     } else if (['tracks', 'compare', 'settings', 'dashboard'].includes(pathPart)) {
-      tab = pathPart as any;
+      tab = pathPart as NavTab;
     }
 
     return {
@@ -144,13 +144,15 @@ export default function App() {
     }
   };
 
-  const handleTabChange = (tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings') => {
+  const handleTabChange = (tab: NavTab) => {
     setHashRoute(tab);
   };
 
   const handleSelectTrack = (trackName: string) => {
     setHashRoute(`track/${encodeURIComponent(trackName)}`);
   };
+
+  const compareParams = activeTab === 'compare' ? getHashRouteAndParams().params : null;
 
   return (
     <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
@@ -213,10 +215,10 @@ export default function App() {
           <CompareLaps
             sessions={sessions}
             onSelectSession={handleSelectSession}
-            initialTrack={getHashRouteAndParams().params.get('track') || (selectedTrack !== 'All' ? selectedTrack : undefined)}
-            initialCarClass={getHashRouteAndParams().params.get('carClass') || (selectedCarClass !== 'All' ? selectedCarClass : undefined)}
-            initialSessionId={getHashRouteAndParams().params.get('sessionId') || undefined}
-            initialLapNum={getHashRouteAndParams().params.get('lapNum') ? parseInt(getHashRouteAndParams().params.get('lapNum')!, 10) : undefined}
+            initialTrack={compareParams?.get('track') || (selectedTrack !== 'All' ? selectedTrack : undefined)}
+            initialCarClass={compareParams?.get('carClass') || (selectedCarClass !== 'All' ? selectedCarClass : undefined)}
+            initialSessionId={compareParams?.get('sessionId') || undefined}
+            initialLapNum={compareParams?.get('lapNum') ? parseInt(compareParams.get('lapNum')!, 10) : undefined}
           />
         ) : activeTab === 'settings' ? (
           <Settings

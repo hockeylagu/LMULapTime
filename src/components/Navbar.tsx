@@ -1,9 +1,11 @@
 import React from 'react';
 import { Gauge, Flag, Settings, RefreshCw, ArrowLeftRight } from 'lucide-react';
 
+export type NavTab = 'dashboard' | 'tracks' | 'compare' | 'settings';
+
 interface NavbarProps {
-  activeTab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'tracks' | 'compare' | 'sessions' | 'settings') => void;
+  activeTab: NavTab;
+  setActiveTab: (tab: NavTab) => void;
   status: {
     resultsExist: boolean;
     replaysExist: boolean;

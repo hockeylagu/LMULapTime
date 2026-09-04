@@ -806,13 +806,18 @@ export class LmuParser {
         .toLowerCase();
     };
 
+    const driversWithClean = drivers.map(d => ({
+      driver: d,
+      clean: cleanDriverName(d.name),
+    }));
+
     const matchDriver = (rawName?: string): DriverData | undefined => {
       const clean = cleanDriverName(rawName);
       if (!clean) return undefined;
-      return drivers.find(d => {
-        const dClean = cleanDriverName(d.name);
-        return dClean === clean || dClean.includes(clean) || clean.includes(dClean);
-      });
+      const found = driversWithClean.find(({ clean: dClean }) =>
+        dClean === clean || dClean.includes(clean) || clean.includes(dClean)
+      );
+      return found?.driver;
     };
 
     const matchLapForDriver = (driver: DriverData, et?: number, explicitLapNum?: number): LapData | undefined => {

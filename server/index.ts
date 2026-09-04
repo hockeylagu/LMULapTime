@@ -5,7 +5,8 @@ import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
 import { DetailedSession } from './types.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
-import { findMatchingTrackBenchmarkEntries, matchesTrack } from '../src/utils/paceCategory.js';
+import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
+import { matchesSessionType, isSessionEmpty } from '../src/utils/formatters.js';
 import { getSessionDatabase } from './db.js';
 
 const app = express();
@@ -56,6 +57,19 @@ function loadSessions(forceRefresh = false): DetailedSession[] {
   return sessionDb.getAllSessions();
 }
 
+function parseAndCacheFile(filePath: string): DetailedSession | null {
+  const parsed = parser.parseSessionXml(filePath);
+  if (parsed) {
+    try {
+      const stats = fs.statSync(filePath);
+      sessionDb.upsertSession(parsed, filePath, Math.floor(stats.mtimeMs), stats.size);
+    } catch {
+      // ignore
+    }
+  }
+  return parsed;
+}
+
 // API Routes
 
 app.get('/api/status', (_req, res) => {
@@ -92,13 +106,15 @@ app.get('/api/sessions', (req, res) => {
   const forceRefresh = req.query.refresh === 'true';
   const track = req.query.track as string | undefined;
   const car = req.query.car as string | undefined;
+  const carClass = req.query.carClass as string | undefined;
+  const driver = req.query.driver as string | undefined;
   const sessionType = req.query.sessionType as string | undefined;
   const hideEmpty = req.query.hideEmpty === 'true' || req.query.filterEmpty === 'true';
 
   let sessions = loadSessions(forceRefresh);
 
   if (hideEmpty) {
-    sessions = sessions.filter(s => (s.playerDriver?.lapsCount ?? 0) > 0 && s.playerDriver?.bestLapTime !== null);
+    sessions = sessions.filter(s => !isSessionEmpty(s));
   }
 
   if (track && track !== 'All') {
@@ -106,10 +122,25 @@ app.get('/api/sessions', (req, res) => {
   }
 
   if (sessionType && sessionType !== 'All') {
-    sessions = sessions.filter(s => s.sessionType.toLowerCase() === sessionType.toLowerCase());
+    sessions = sessions.filter(s => matchesSessionType(s.sessionType, s.sessionName, sessionType));
   }
 
-  if (car) {
+  if (carClass && carClass !== 'All') {
+    sessions = sessions.filter(s =>
+      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', carClass) ||
+      s.drivers.some(d => matchesCarClass(d.carClass || '', d.carType || '', carClass))
+    );
+  }
+
+  if (driver && driver !== 'All') {
+    const dLower = driver.toLowerCase();
+    sessions = sessions.filter(s =>
+      (s.playerDriver?.name && s.playerDriver.name.toLowerCase().includes(dLower)) ||
+      s.drivers.some(d => d.name.toLowerCase().includes(dLower))
+    );
+  }
+
+  if (car && car !== 'All') {
     sessions = sessions.filter(s => 
       s.drivers.some(d => d.carType.toLowerCase().includes(car.toLowerCase()))
     );
@@ -145,14 +176,8 @@ app.get('/api/session/:id', (req, res) => {
   );
 
   if (cached && hasStaleIncidents && fs.existsSync(singleFilePath)) {
-    const fresh = parser.parseSessionXml(singleFilePath);
+    const fresh = parseAndCacheFile(singleFilePath);
     if (fresh) {
-      try {
-        const stats = fs.statSync(singleFilePath);
-        sessionDb.upsertSession(fresh, singleFilePath, Math.floor(stats.mtimeMs), stats.size);
-      } catch {
-        // ignore
-      }
       return res.json(fresh);
     }
   }
@@ -163,14 +188,8 @@ app.get('/api/session/:id', (req, res) => {
 
   // 2. Fallback: Parse ONLY the single requested XML file directly
   if (fs.existsSync(singleFilePath)) {
-    const parsed = parser.parseSessionXml(singleFilePath);
+    const parsed = parseAndCacheFile(singleFilePath);
     if (parsed) {
-      try {
-        const stats = fs.statSync(singleFilePath);
-        sessionDb.upsertSession(parsed, singleFilePath, Math.floor(stats.mtimeMs), stats.size);
-      } catch {
-        // ignore
-      }
       return res.json(parsed);
     }
   }
@@ -181,15 +200,23 @@ app.get('/api/session/:id', (req, res) => {
 app.get('/api/progression', (req, res) => {
   const driverName = req.query.driver as string | undefined;
   const track = req.query.track as string | undefined;
+  const carClass = req.query.carClass as string | undefined;
   const hideEmpty = req.query.hideEmpty === 'true' || req.query.filterEmpty === 'true';
   let sessions = loadSessions();
 
   if (hideEmpty) {
-    sessions = sessions.filter(s => (s.playerDriver?.lapsCount ?? 0) > 0 && s.playerDriver?.bestLapTime !== null);
+    sessions = sessions.filter(s => !isSessionEmpty(s));
   }
 
   if (track && track !== 'All') {
     sessions = sessions.filter(s => matchesTrack(track, s.trackVenue, s.trackCourse));
+  }
+
+  if (carClass && carClass !== 'All') {
+    sessions = sessions.filter(s =>
+      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', carClass) ||
+      s.drivers.some(d => matchesCarClass(d.carClass || '', d.carType || '', carClass))
+    );
   }
 
   const progression = computeProgression(sessions, driverName);

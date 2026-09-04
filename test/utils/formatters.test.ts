@@ -76,6 +76,12 @@ describe('formatters utility', () => {
       expect(parseTimeStringToSeconds('invalid:val')).toBeNull();
     });
 
+    it('parses multi-hour H:MM:SS.sss time strings', () => {
+      expect(parseTimeStringToSeconds('1:02:15.500')).toBe(3735.5);
+      expect(parseTimeStringToSeconds('2:00:00.000')).toBe(7200);
+      expect(parseTimeStringToSeconds('1:invalid:30')).toBeNull();
+    });
+
     it('parses pure decimal strings', () => {
       expect(parseTimeStringToSeconds('102.50')).toBe(102.5);
       expect(parseTimeStringToSeconds('0')).toBeNull();
