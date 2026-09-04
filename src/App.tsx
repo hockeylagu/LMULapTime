@@ -180,6 +180,8 @@ export default function App() {
             sessionId={selectedSessionId}
             onBack={handleBackToSessions}
             onSelectSession={handleSelectSession}
+            progression={progression}
+            sessions={sessions}
           />
         ) : selectedRouteTrackName ? (
           <TrackDetail

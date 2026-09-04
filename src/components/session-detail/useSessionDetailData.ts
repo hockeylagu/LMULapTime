@@ -6,15 +6,40 @@ import { findRelatedSession } from './sessionDetailHelpers.js';
 export interface UseSessionDetailDataParams {
   sessionId: string;
   onSelectSession?: (sessionId: string) => void;
+  initialProgression?: SessionProgressionPoint[];
+  initialSessions?: any[];
 }
 
-export function useSessionDetailData({ sessionId, onSelectSession }: UseSessionDetailDataParams) {
-  const [session, setSession] = useState<DetailedSession | null>(null);
-  const [refCache, setRefCache] = useState<any>(null);
-  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
-  const [allSessions, setAllSessions] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedDriverName, setSelectedDriverName] = useState<string>('');
+// Module-level in-memory cache for instant sub-millisecond session switching
+export const clientSessionCache = new Map<string, DetailedSession>();
+let clientRefCache: any = null;
+
+export function clearSessionDetailCache() {
+  clientSessionCache.clear();
+  clientRefCache = null;
+}
+
+export function useSessionDetailData({
+  sessionId,
+  onSelectSession,
+  initialProgression,
+  initialSessions,
+}: UseSessionDetailDataParams) {
+  const cachedInitial = clientSessionCache.get(sessionId) || null;
+  const [session, setSession] = useState<DetailedSession | null>(cachedInitial);
+  const [refCache, setRefCache] = useState<any>(clientRefCache);
+  const [progression, setProgression] = useState<SessionProgressionPoint[]>(
+    initialProgression || []
+  );
+  const [allSessions, setAllSessions] = useState<any[]>(
+    initialSessions || []
+  );
+  const [loading, setLoading] = useState<boolean>(!cachedInitial);
+  const [selectedDriverName, setSelectedDriverName] = useState<string>(() => {
+    if (cachedInitial?.playerDriver) return cachedInitial.playerDriver.name;
+    if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
+    return '';
+  });
   const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
   const [showIncidentsLog, setShowIncidentsLog] = useState<boolean>(false);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
@@ -30,30 +55,96 @@ export function useSessionDetailData({ sessionId, onSelectSession }: UseSessionD
   };
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch(`/api/session/${sessionId}`).then((res) => res.json()),
-      fetch('/api/reference-laptimes').then((res) => res.json()).catch(() => null),
-      fetch('/api/progression').then((res) => res.json()).catch(() => []),
-      fetch('/api/sessions').then((res) => res.json()).catch(() => []),
-    ])
-      .then(([sessionData, refData, progData, allSessionsData]) => {
-        setSession(sessionData);
-        setRefCache(refData);
-        if (Array.isArray(progData)) setProgression(progData);
-        if (Array.isArray(allSessionsData)) setAllSessions(allSessionsData);
-        if (sessionData.playerDriver) {
-          setSelectedDriverName(sessionData.playerDriver.name);
-        } else if (sessionData.drivers && sessionData.drivers.length > 0) {
-          setSelectedDriverName(sessionData.drivers[0].name);
+    if (initialProgression && initialProgression.length > 0) {
+      setProgression(initialProgression);
+    }
+  }, [initialProgression]);
+
+  useEffect(() => {
+    if (initialSessions && initialSessions.length > 0) {
+      setAllSessions(initialSessions);
+    }
+  }, [initialSessions]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const memCached = clientSessionCache.get(sessionId);
+    if (memCached) {
+      setSession(memCached);
+      if (memCached.playerDriver) {
+        setSelectedDriverName(memCached.playerDriver.name);
+      } else if (memCached.drivers?.[0]) {
+        setSelectedDriverName(memCached.drivers[0].name);
+      }
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    // 1. Fetch Session Telemetry Data (primary critical path)
+    fetch(`/api/session/${sessionId}`)
+      .then((res) => res.json())
+      .then((sessionData) => {
+        if (!isCurrent) return;
+        if (sessionData && !sessionData.error) {
+          clientSessionCache.set(sessionId, sessionData);
+          setSession(sessionData);
+          if (sessionData.playerDriver) {
+            setSelectedDriverName(sessionData.playerDriver.name);
+          } else if (sessionData.drivers && sessionData.drivers.length > 0) {
+            setSelectedDriverName(sessionData.drivers[0].name);
+          }
         }
         setLoading(false);
       })
       .catch((err) => {
+        if (!isCurrent) return;
         console.error('Failed to load session detail data:', err);
         setLoading(false);
       });
-  }, [sessionId]);
+
+    // 2. Fetch Reference Targets (if not yet cached in memory)
+    if (!clientRefCache) {
+      fetch('/api/reference-laptimes')
+        .then((res) => res.json())
+        .then((refData) => {
+          if (!isCurrent) return;
+          clientRefCache = refData;
+          setRefCache(refData);
+        })
+        .catch(() => null);
+    }
+
+    // 3. Fetch Progression in background (if not supplied via props)
+    if (!initialProgression || initialProgression.length === 0) {
+      fetch('/api/progression')
+        .then((res) => res.json())
+        .then((progData) => {
+          if (!isCurrent) return;
+          if (Array.isArray(progData)) {
+            setProgression(progData);
+          }
+        })
+        .catch(() => null);
+    }
+
+    // 4. Fetch All Sessions summary in background (if not supplied via props)
+    if (!initialSessions || initialSessions.length === 0) {
+      fetch('/api/sessions')
+        .then((res) => res.json())
+        .then((allSessionsData) => {
+          if (!isCurrent) return;
+          if (Array.isArray(allSessionsData)) {
+            setAllSessions(allSessionsData);
+          }
+        })
+        .catch(() => null);
+    }
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [sessionId, initialProgression, initialSessions]);
 
   const selectedDriver = useMemo(() => {
     if (!session) return undefined;

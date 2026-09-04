@@ -125,10 +125,36 @@ export class SessionDatabase {
     return rows.map(r => JSON.parse(r.metadata_json) as SessionMetadata);
   }
 
+  private sessionMemoryCache = new Map<string, DetailedSession>();
+  private stmtGetSessionById: any = null;
+
   public getSessionById(id: string): DetailedSession | null {
-    const row = this.db.prepare('SELECT data_json FROM sessions WHERE id = ?').get(id) as { data_json: string } | undefined;
+    const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;
+    const withXml = `${cleanId}.xml`;
+
+    // 1. Check in-memory cache first for instant 0ms retrieval
+    const memCached =
+      this.sessionMemoryCache.get(id) ||
+      this.sessionMemoryCache.get(cleanId) ||
+      this.sessionMemoryCache.get(withXml);
+    if (memCached) return memCached;
+
+    // 2. Query SQLite with cached prepared statement
+    if (!this.stmtGetSessionById) {
+      this.stmtGetSessionById = this.db.prepare(
+        'SELECT data_json FROM sessions WHERE id = ? OR id = ? OR id = ? OR filename = ? OR filename = ? LIMIT 1'
+      );
+    }
+
+    const row = this.stmtGetSessionById.get(id, cleanId, withXml, withXml, id) as { data_json: string } | undefined;
     if (!row) return null;
-    return JSON.parse(row.data_json) as DetailedSession;
+
+    const parsed = JSON.parse(row.data_json) as DetailedSession;
+    if (parsed) {
+      this.sessionMemoryCache.set(parsed.id, parsed);
+      if (parsed.filename) this.sessionMemoryCache.set(parsed.filename, parsed);
+    }
+    return parsed;
   }
 
   public upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void {
@@ -193,6 +219,11 @@ export class SessionDatabase {
       dataJson,
       updatedAt: now,
     });
+
+    this.sessionMemoryCache.set(session.id, session);
+    if (session.filename) {
+      this.sessionMemoryCache.set(session.filename, session);
+    }
   }
 
   public syncSessionsFromDir(resultsDir: string, parser: LmuParser): SyncResult {
@@ -294,6 +325,7 @@ export class SessionDatabase {
   }
 
   public clearCache(): void {
+    this.sessionMemoryCache.clear();
     this.db.exec("DELETE FROM sessions; DELETE FROM cache_metadata WHERE key NOT LIKE 'reference_%';");
   }
 
