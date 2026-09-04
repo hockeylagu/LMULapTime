@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from './types.js';
 import { parseTimeStringToSeconds, formatTime } from '../src/utils/formatters.js';
 import {
@@ -12,13 +9,8 @@ import { getSessionDatabase } from './db.js';
 
 export { normalizeTrackName };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
-
-const CACHE_FILE_PATH = path.join(__dirname, 'laptimes_cache.json');
 
 let cachedData: ReferenceLaptimesCache | null = null;
 
@@ -199,26 +191,6 @@ export function loadReferenceLaptimesFromCache(): ReferenceLaptimesCache | null 
     console.warn('[SQLite Reference Laptimes] Failed to read from database:', err);
   }
 
-  // Fallback: If DB is empty, check legacy laptimes_cache.json and migrate into SQLite DB
-  if (fs.existsSync(CACHE_FILE_PATH)) {
-    try {
-      const content = fs.readFileSync(CACHE_FILE_PATH, 'utf-8');
-      cachedData = JSON.parse(content);
-      if (cachedData && cachedData.entriesCount > 0) {
-        try {
-          const db = getSessionDatabase();
-          db.saveReferenceLaptimes(cachedData);
-          console.log(`[SQLite Reference Laptimes] Migrated ${cachedData.entriesCount} reference laptimes from JSON cache into SQLite database`);
-        } catch (dbErr) {
-          console.warn('[SQLite Reference Laptimes] Failed to migrate to SQLite database:', dbErr);
-        }
-      }
-      return cachedData;
-    } catch (err) {
-      console.error('Failed to read reference laptimes cache:', err);
-    }
-  }
-
   return null;
 }
 
@@ -244,13 +216,6 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
     console.log(`[SQLite Reference Laptimes] Saved ${cache.entriesCount} reference laptimes to SQLite database (changes: ${diff.hasChanges ? 'yes' : 'no'})`);
   } catch (err) {
     console.error('[SQLite Reference Laptimes] Failed to save reference laptimes to database:', err);
-  }
-
-  // Also write to JSON cache file as backup
-  try {
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cache, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Failed to write backup reference laptimes JSON cache file:', err);
   }
 
   cachedData = cache;

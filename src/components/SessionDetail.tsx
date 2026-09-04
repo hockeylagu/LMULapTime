@@ -402,7 +402,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
     if (onSelectSession) {
       onSelectSession(targetId);
     } else {
-      window.location.hash = `session/${encodeURIComponent(targetId)}`;
+      window.location.hash = `#session/${encodeURIComponent(targetId)}`;
     }
   };
 
@@ -494,7 +494,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
             <h2
               onClick={() => {
                 const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-                window.location.hash = `track/${encodeURIComponent(trackName)}`;
+                window.location.hash = `#track/${encodeURIComponent(trackName)}`;
               }}
               className="text-2xl font-extrabold text-white mt-1 cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
               title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
@@ -1937,7 +1937,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
               onClick={() => {
                 const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
                 const carClass = selectedDriver?.carClass || 'LMGT3';
-                window.location.hash = `compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}&sessionId=${encodeURIComponent(session.id)}`;
+                window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}&sessionId=${encodeURIComponent(session.id)}`;
               }}
               className="px-3.5 py-1.5 rounded-xl bg-lmu-accent/20 hover:bg-lmu-accent/30 border border-lmu-accent/40 text-lmu-accent text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
               title="Open full telemetry comparator studio for this session"
@@ -2243,7 +2243,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
                         onClick={() => {
                           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
                           const carClass = selectedDriver?.carClass || 'LMGT3';
-                          window.location.hash = `compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
+                          window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
                         }}
                         className="px-2.5 py-1 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border text-[11px] font-semibold transition-all flex items-center gap-1 mx-auto"
                         title={`Open Lap ${l.lapNum} in Telemetry Studio`}

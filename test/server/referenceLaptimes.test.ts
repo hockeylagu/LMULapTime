@@ -10,7 +10,6 @@ import {
   resetCachedReferenceLaptimes,
 } from '../../server/referenceLaptimes';
 import { getSessionDatabase, resetSessionDatabaseForTest } from '../../server/db';
-import fs from 'fs';
 
 describe('referenceLaptimes server module', () => {
   const sampleCsv = `Key,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest Car,Record,Diff,Diff%,Class
@@ -68,10 +67,11 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
     });
 
     it('correctly maps Alien (<100.5%), Competitive (100.5-101.5%), Good (101.5-103.5%), Midpack, Tail-ender, Offline', () => {
-      // Mock cache loaded
+      // Save cache directly to DB
+      const db = getSessionDatabase();
       const cache = parseReferenceCsv(sampleCsv);
-      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(cache));
+      db.saveReferenceLaptimes(cache);
+      resetCachedReferenceLaptimes();
 
       // 120s reference for Spa LMH
       // Alien: <= 120.6s (100.5%)
@@ -146,7 +146,6 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         text: () => Promise.resolve(sampleCsv),
       });
       global.fetch = mockFetch;
-      vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
 
       const result = await fetchAndCacheReferenceLaptimes();
       expect(result.entriesCount).toBe(3);

@@ -48,6 +48,18 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => 
   );
 
   useEffect(() => {
+    if (status?.resultsDir && (!resultsDirInput || resultsDirInput.includes('Le Mans Ultimate\\UserData\\LOG\\Results'))) {
+      setResultsDirInput(status.resultsDir);
+    }
+  }, [status?.resultsDir]);
+
+  useEffect(() => {
+    if (status?.replaysDir && (!replaysDirInput || replaysDirInput.includes('Le Mans Ultimate\\UserData\\Replays'))) {
+      setReplaysDirInput(status.replaysDir);
+    }
+  }, [status?.replaysDir]);
+
+  useEffect(() => {
     if (status?.playerName && !playerNameInput) {
       setPlayerNameInput(status.playerName);
     }

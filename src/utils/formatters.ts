@@ -33,10 +33,20 @@ export function parseTimeStringToSeconds(timeStr: string | number): number | nul
     if (parts.length === 2) {
       const mins = parseFloat(parts[0]);
       const secs = parseFloat(parts[1]);
-      if (!isNaN(mins) && !isNaN(secs)) {
-        return mins * 60 + secs;
+      if (!isNaN(mins) && !isNaN(secs) && mins >= 0 && secs >= 0) {
+        const total = mins * 60 + secs;
+        return total > 0 ? total : null;
+      }
+    } else if (parts.length === 3) {
+      const hours = parseFloat(parts[0]);
+      const mins = parseFloat(parts[1]);
+      const secs = parseFloat(parts[2]);
+      if (!isNaN(hours) && !isNaN(mins) && !isNaN(secs) && hours >= 0 && mins >= 0 && secs >= 0) {
+        const total = hours * 3600 + mins * 60 + secs;
+        return total > 0 ? total : null;
       }
     }
+    return null;
   }
   
   const val = parseFloat(str);

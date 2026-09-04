@@ -1114,7 +1114,7 @@ describe('SessionDetail component', () => {
           },
         ],
       },
-      drivers: [],
+      drivers: [] as any[],
     };
 
     incidentSession.drivers = [incidentSession.playerDriver];

@@ -1,6 +1,7 @@
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff } from './types.js';
 import { LmuParser } from './parser.js';
 
@@ -29,7 +30,7 @@ export class SessionDatabase {
     } else if (process.env.NODE_ENV === 'test') {
       this.dbPath = ':memory:';
     } else {
-      const serverDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+      const serverDir = path.dirname(fileURLToPath(import.meta.url));
       this.dbPath = path.join(serverDir, 'lmu_cache.db');
     }
 

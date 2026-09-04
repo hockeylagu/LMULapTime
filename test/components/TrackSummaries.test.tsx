@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TrackSummaries } from '../../src/components/TrackSummaries';
 
 describe('TrackSummaries component', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      })
+    );
+  });
   const mockTrackSummaries = {
     Spa: {
       trackVenue: 'Spa',
@@ -36,7 +44,7 @@ describe('TrackSummaries component', () => {
     },
   };
 
-  it('renders track cards and allows selecting a track', () => {
+  it('renders track cards and allows selecting a track', async () => {
     const onSelectTrack = vi.fn();
     const setSelectedCarClass = vi.fn();
 
@@ -49,7 +57,9 @@ describe('TrackSummaries component', () => {
       />
     );
 
-    expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks/i })).toBeInTheDocument();
+    });
     expect(screen.getByText('Spa')).toBeInTheDocument();
     expect(screen.getByText('Monza')).toBeInTheDocument();
 
@@ -61,7 +71,7 @@ describe('TrackSummaries component', () => {
     }
   });
 
-  it('filters by car class and sorts tracks', () => {
+  it('filters by car class and sorts tracks', async () => {
     const setSelectedCarClass = vi.fn();
 
     render(
@@ -73,6 +83,10 @@ describe('TrackSummaries component', () => {
       />
     );
 
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'LMGT3' })).toBeInTheDocument();
+    });
+
     const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
     fireEvent.click(lmgt3Btn);
     expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
@@ -83,7 +97,7 @@ describe('TrackSummaries component', () => {
     fireEvent.change(sortSelect, { target: { value: 'last-session-desc' } });
   });
 
-  it('handles empty track summaries list', () => {
+  it('handles empty track summaries list', async () => {
     render(
       <TrackSummaries
         tracksMap={{}}
@@ -93,6 +107,8 @@ describe('TrackSummaries component', () => {
       />
     );
 
-    expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks \(0 Tracks\)/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks \(0 Tracks\)/i })).toBeInTheDocument();
+    });
   });
 });

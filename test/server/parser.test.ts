@@ -1051,57 +1051,62 @@ describe('parser server module', () => {
   </RaceResults>
 </rFactorXML>`;
 
-      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithStream);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithStream);
+      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
 
-      const session = parser.parseSessionXml('stream_test.xml');
-      expect(session).not.toBeNull();
+      try {
+        const session = parser.parseSessionXml('stream_test.xml');
+        expect(session).not.toBeNull();
 
-      const player = session?.drivers.find(d => d.name === 'Player Driver');
-      const rival = session?.drivers.find(d => d.name === 'AI Rival');
+        const player = session?.drivers.find(d => d.name === 'Player Driver');
+        const rival = session?.drivers.find(d => d.name === 'AI Rival');
 
-      expect(player).toBeDefined();
-      expect(rival).toBeDefined();
+        expect(player).toBeDefined();
+        expect(rival).toBeDefined();
 
-      // Check Player totals
-      expect(player?.totalIncidents).toBe(3); // 1 vehicle contact + 1 wall contact + 1 suspension damage
-      expect(player?.totalTrackLimits).toBe(2);
-      expect(player?.totalPenalties).toBe(0);
+        // Check Player totals
+        expect(player?.totalIncidents).toBe(3); // 1 vehicle contact + 1 wall contact + 1 suspension damage
+        expect(player?.totalTrackLimits).toBe(2);
+        expect(player?.totalPenalties).toBe(0);
 
-      // Check Player Lap 1 events (et between 100.0 and 222.0)
-      const pLap1 = player?.laps[0];
-      expect(pLap1?.incidentCount).toBe(1);
-      expect(pLap1?.incidents?.[0].type).toBe('contact');
-      expect(pLap1?.incidents?.[0].otherVehicle).toBe('AI Rival');
-      expect(pLap1?.incidents?.[0].force).toBe(750.25);
-      expect(pLap1?.incidents?.[0].isWallImpact).toBe(false);
+        // Check Player Lap 1 events (et between 100.0 and 222.0)
+        const pLap1 = player?.laps[0];
+        expect(pLap1?.incidentCount).toBe(1);
+        expect(pLap1?.incidents?.[0].type).toBe('contact');
+        expect(pLap1?.incidents?.[0].otherVehicle).toBe('AI Rival');
+        expect(pLap1?.incidents?.[0].force).toBe(750.25);
+        expect(pLap1?.incidents?.[0].isWallImpact).toBe(false);
 
-      expect(pLap1?.trackLimitCount).toBe(1);
-      expect(pLap1?.trackLimits?.[0].warningPoints).toBe(0.25);
-      expect(pLap1?.trackLimits?.[0].action).toBe('Warning');
+        expect(pLap1?.trackLimitCount).toBe(1);
+        expect(pLap1?.trackLimits?.[0].warningPoints).toBe(0.25);
+        expect(pLap1?.trackLimits?.[0].action).toBe('Warning');
 
-      // Check Player Lap 2 events (et between 222.0 and 353.0)
-      const pLap2 = player?.laps[1];
-      expect(pLap2?.incidentCount).toBe(2);
-      // Wall contact
-      expect(pLap2?.incidents?.[0].type).toBe('contact');
-      expect(pLap2?.incidents?.[0].isWallImpact).toBe(true);
-      expect(pLap2?.incidents?.[0].force).toBe(4500);
-      // Suspension damage
-      expect(pLap2?.incidents?.[1].type).toBe('damage');
-      expect(pLap2?.incidents?.[1].description).toContain('suspension damage');
+        // Check Player Lap 2 events (et between 222.0 and 353.0)
+        const pLap2 = player?.laps[1];
+        expect(pLap2?.incidentCount).toBe(2);
+        // Wall contact
+        expect(pLap2?.incidents?.[0].type).toBe('contact');
+        expect(pLap2?.incidents?.[0].isWallImpact).toBe(true);
+        expect(pLap2?.incidents?.[0].force).toBe(4500);
+        // Suspension damage
+        expect(pLap2?.incidents?.[1].type).toBe('damage');
+        expect(pLap2?.incidents?.[1].description).toContain('suspension damage');
 
-      expect(pLap2?.trackLimitCount).toBe(1);
-      expect(pLap2?.trackLimits?.[0].action).toBe('No Further Action');
+        expect(pLap2?.trackLimitCount).toBe(1);
+        expect(pLap2?.trackLimits?.[0].action).toBe('No Further Action');
 
-      // Check AI Rival penalties and incidents
-      expect(rival?.totalPenalties).toBe(1);
-      expect(rival?.penalties?.[0].penalty).toBe('Drive Thru');
-      expect(rival?.penalties?.[0].reason).toBe('Speeding');
-      expect(rival?.laps[0].penaltyCount).toBe(1);
+        // Check AI Rival penalties and incidents
+        expect(rival?.totalPenalties).toBe(1);
+        expect(rival?.penalties?.[0].penalty).toBe('Drive Thru');
+        expect(rival?.penalties?.[0].reason).toBe('Speeding');
+        expect(rival?.laps[0].penaltyCount).toBe(1);
 
-      expect(rival?.totalIncidents).toBe(1);
-      expect(rival?.laps[0].incidents?.[0].otherVehicle).toBe('Player Driver');
+        expect(rival?.totalIncidents).toBe(1);
+        expect(rival?.laps[0].incidents?.[0].otherVehicle).toBe('Player Driver');
+      } finally {
+        readSpy.mockRestore();
+        statSpy.mockRestore();
+      }
     });
   });
 });
