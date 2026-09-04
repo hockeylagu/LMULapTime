@@ -1,4 +1,4 @@
-import Database, { Database as DatabaseType } from 'better-sqlite3';
+import Database, { Database as DatabaseType, Statement } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -126,7 +126,7 @@ export class SessionDatabase {
   }
 
   private sessionMemoryCache = new Map<string, DetailedSession>();
-  private stmtGetSessionById: any = null;
+  private stmtGetSessionById: Statement | null = null;
 
   public getSessionById(id: string): DetailedSession | null {
     const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;

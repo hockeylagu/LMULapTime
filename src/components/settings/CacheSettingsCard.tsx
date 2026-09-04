@@ -1,8 +1,9 @@
 import React from 'react';
 import { Zap, Trash2, CheckCircle2 } from 'lucide-react';
+import { AppStatus } from '../../../server/types.js';
 
 export interface CacheSettingsCardProps {
-  status: any;
+  status: AppStatus | null;
   isClearingCache: boolean;
   onClearCache: () => void;
   cacheMessage: string | null;

@@ -1,56 +1,8 @@
-import { PaceCategory, ReferenceLaptimeEntry, TireWear } from '../../server/types.js';
+import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../../server/types.js';
 import { formatTime } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 
-export interface ComparableLap {
-  id: string; // Unique key e.g. "session123_lap_4" or "benchmark_alien"
-  sessionId?: string;
-  sessionName?: string;
-  sessionType?: string;
-  dateString?: string;
-  timestamp?: number;
-  driverName: string;
-  carType: string;
-  carClass: string;
-  lapNum?: number;
-  lapTime: number | null;
-  lapTimeString: string;
-  s1: number | null;
-  s2: number | null;
-  s3: number | null;
-  s1String?: string;
-  s2String?: string;
-  s3String?: string;
-  topSpeed: number | null;
-  fCompound?: string;
-  rCompound?: string;
-  flCompound?: string;
-  frCompound?: string;
-  rlCompound?: string;
-  rrCompound?: string;
-  tireWear?: TireWear;
-  fuel?: number | null;
-  fuelUsed?: number | null;
-  virtualEnergy?: number | null;
-  virtualEnergyUsed?: number | null;
-  elapsedSeconds?: number | null;
-  elapsedTimeString?: string;
-  pitStopDurationString?: string;
-  gapToLeaderString?: string;
-  isPitStop?: boolean;
-  isOutLap?: boolean;
-  isValid: boolean;
-  isInferred?: boolean;
-  paceCategory?: PaceCategory | null;
-  pacePercentage?: number | null;
-  isTheoreticalBest?: boolean;
-  isSessionBest?: boolean;
-  isAllTimePB?: boolean;
-  isOverallTrackBest?: boolean;
-  isBenchmarkTarget?: boolean;
-  benchmarkCategory?: string;
-  tag?: string; // e.g. "Session Best", "All-Time Best", "Theoretical Best", "Alien Benchmark"
-}
+export type { ComparableLap };
 
 export interface LapDeltaResult {
   lapTimeDelta: number | null;

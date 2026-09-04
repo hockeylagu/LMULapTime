@@ -19,15 +19,28 @@ export const OPPONENT_COLORS = [
 
 export const PLAYER_HIGHLIGHT_COLOR = '#FBBF24'; // Vibrant Gold Accent
 
-export function findClosestSession(current: DetailedSession, candidates: any[]): any {
+export interface CandidateRelatedSession {
+  id?: string;
+  sessionId?: string;
+  sessionType?: string;
+  sessionName?: string;
+  trackVenue?: string;
+  trackCourse?: string;
+  timeString?: string;
+  dateString?: string;
+  timestamp?: number;
+  filename?: string;
+}
+
+export function findClosestSession<T extends CandidateRelatedSession>(current: DetailedSession, candidates: T[]): T | null {
   if (candidates.length <= 1) return candidates[0] || null;
 
   const currentTime = current.timestamp || parseDateStringToTimestamp(current.timeString);
-  let best = candidates[0];
+  let best: T = candidates[0];
   let minDiff = Infinity;
 
   for (const cand of candidates) {
-    const candTime = cand.timestamp || parseDateStringToTimestamp(cand.timeString || cand.dateString);
+    const candTime = cand.timestamp || parseDateStringToTimestamp(cand.timeString);
     const diff = Math.abs(currentTime - candTime);
     if (diff < minDiff) {
       minDiff = diff;
@@ -38,10 +51,10 @@ export function findClosestSession(current: DetailedSession, candidates: any[]):
   return best;
 }
 
-export function findRelatedSession(
+export function findRelatedSession<T extends CandidateRelatedSession>(
   current: DetailedSession | null,
-  sessions: any[]
-): { type: 'qualifying' | 'race'; target: any } | null {
+  sessions: T[]
+): { type: 'qualifying' | 'race'; target: T } | null {
   if (!current || !sessions || sessions.length === 0) return null;
 
   const currentType = (current.sessionType || '').toLowerCase();
@@ -78,7 +91,8 @@ export function findRelatedSession(
         return t.includes('qual') || n.startsWith('q');
       });
       if (qualiSessions.length > 0) {
-        return { type: 'qualifying', target: findClosestSession(current, qualiSessions) };
+        const target = findClosestSession(current, qualiSessions);
+        return target ? { type: 'qualifying', target } : null;
       }
     }
     return null;

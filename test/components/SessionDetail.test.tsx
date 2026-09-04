@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionDetail } from '../../src/components/SessionDetail';
+import { DriverData } from '../../server/types';
 
 describe('SessionDetail component', () => {
   const mockDetailedSession = {
@@ -499,7 +500,7 @@ describe('SessionDetail component', () => {
       drivers: [driverWithoutData],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/sess123')) {
         return Promise.resolve({
           ok: true,
@@ -533,7 +534,7 @@ describe('SessionDetail component', () => {
   });
 
   it('switches between Sector Times, Top Speed, and Lap Pace chart views', async () => {
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/sess123')) {
         return Promise.resolve({
           ok: true,
@@ -635,7 +636,7 @@ describe('SessionDetail component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/sess123')) {
         return Promise.resolve({
           ok: true,
@@ -813,7 +814,7 @@ describe('SessionDetail component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/test-session-1')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(multiClassSession) });
       }
@@ -871,7 +872,7 @@ describe('SessionDetail component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/test-session-1')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(practiceSession) });
       }
@@ -912,7 +913,7 @@ describe('SessionDetail component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/test-session-1')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithInvalidLap) });
       }
@@ -970,7 +971,7 @@ describe('SessionDetail component', () => {
       ],
     };
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/test-session-1')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
       }
@@ -1022,7 +1023,7 @@ describe('SessionDetail component', () => {
         totalPenalties: 1,
         incidents: [
           {
-            type: 'contact',
+            type: 'contact' as const,
             description: 'Contact with Archie Porter (585N)',
             elapsedSeconds: 125.0,
             force: 585,
@@ -1030,7 +1031,7 @@ describe('SessionDetail component', () => {
             isWallImpact: false,
           },
           {
-            type: 'contact',
+            type: 'contact' as const,
             description: 'Contact with Immovable (4522N)',
             elapsedSeconds: 260.0,
             force: 4522,
@@ -1067,7 +1068,7 @@ describe('SessionDetail component', () => {
             incidentCount: 1,
             incidents: [
               {
-                type: 'contact',
+                type: 'contact' as const,
                 description: 'Contact with Archie Porter (585N)',
                 elapsedSeconds: 125.0,
                 force: 585,
@@ -1104,7 +1105,7 @@ describe('SessionDetail component', () => {
             incidentCount: 1,
             incidents: [
               {
-                type: 'contact',
+                type: 'contact' as const,
                 description: 'Contact with Immovable (4522N)',
                 elapsedSeconds: 260.0,
                 force: 4522,
@@ -1114,12 +1115,12 @@ describe('SessionDetail component', () => {
           },
         ],
       },
-      drivers: [] as any[],
+      drivers: [] as DriverData[],
     };
 
-    incidentSession.drivers = [incidentSession.playerDriver];
+    incidentSession.drivers = [incidentSession.playerDriver as unknown as DriverData];
 
-    (global.fetch as any).mockImplementation((url: string) => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url.includes('/api/session/test-session-incidents')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(incidentSession) });
       }

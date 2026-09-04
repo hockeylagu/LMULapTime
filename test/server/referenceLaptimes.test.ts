@@ -10,6 +10,7 @@ import {
   resetCachedReferenceLaptimes,
 } from '../../server/referenceLaptimes';
 import { getSessionDatabase, resetSessionDatabaseForTest } from '../../server/db';
+import { ReferenceLaptimeEntry } from '../../server/types';
 
 describe('referenceLaptimes server module', () => {
   const sampleCsv = `Key,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest Car,Record,Diff,Diff%,Class
@@ -169,7 +170,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
   });
 
   describe('computeReferenceBenchmarkDiff', () => {
-    const oldEntries: any = {
+    const oldEntries: Record<string, ReferenceLaptimeEntry> = {
       bahrain_lmgt3: {
         key: 'bahrain_lmgt3',
         trackName: 'Bahrain',
@@ -197,7 +198,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
     };
 
     it('identifies added, updated, and removed benchmark entries accurately', () => {
-      const newEntries: any = {
+      const newEntries: Record<string, ReferenceLaptimeEntry> = {
         // bahrain_lmgt3: faster time & new patch -> UPDATED
         bahrain_lmgt3: {
           ...oldEntries.bahrain_lmgt3,

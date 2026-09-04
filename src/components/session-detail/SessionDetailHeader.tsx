@@ -4,6 +4,7 @@ import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../ser
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import { SessionRulesCard } from './SessionRulesCard.js';
 import { SessionReferenceAndSafety } from './SessionReferenceAndSafety.js';
+import { CandidateRelatedSession } from './sessionDetailHelpers.js';
 
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
@@ -13,7 +14,7 @@ export interface SessionDetailHeaderProps {
   onBack: () => void;
   copiedReplay: boolean;
   handleCopyReplayPath: () => void;
-  relatedSession: { type: 'qualifying' | 'race'; target: any } | null;
+  relatedSession: { type: 'qualifying' | 'race'; target: CandidateRelatedSession } | null;
   handleNavigateToSession: (id: string) => void;
   handleExportCsv: () => void;
   refEntry: ReferenceLaptimeEntry | null;
@@ -62,7 +63,12 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
           {relatedSession && (
             <button
-              onClick={() => handleNavigateToSession(relatedSession.target.id || relatedSession.target.sessionId)}
+              onClick={() => {
+                const targetId = relatedSession.target.id || relatedSession.target.sessionId;
+                if (targetId) {
+                  handleNavigateToSession(targetId);
+                }
+              }}
               title={
                 relatedSession.type === 'qualifying'
                   ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
@@ -115,9 +121,9 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 {session.sessionName} ({session.sessionType})
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
-              {(session.weatherInfo || (session as any).weather?.weatherString) && (
+              {(session.weatherInfo || session.weather?.weatherString) && (
                 <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-lmu-bg border border-lmu-border text-white flex items-center gap-1">
-                  {session.weatherInfo || (session as any).weather?.weatherString}
+                  {session.weatherInfo || session.weather?.weatherString}
                 </span>
               )}
             </div>

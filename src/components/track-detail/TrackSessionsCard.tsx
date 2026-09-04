@@ -1,12 +1,12 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
-import { SessionList } from '../SessionList';
+import { SessionList, SessionListItem } from '../SessionList';
 import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
 import { PaceCategory } from '../../../server/types';
 
 export interface TrackSessionsCardProps {
   trackName: string;
-  sortedSessions: any[];
+  sortedSessions: SessionListItem[];
   totalSessionsCount: number;
   emptyCount: number;
   hideEmpty: boolean;
@@ -18,7 +18,7 @@ export interface TrackSessionsCardProps {
   setSearchQuery: (val: string) => void;
   sortBy: TrackDetailSortOption;
   setSortBy: (val: TrackDetailSortOption) => void;
-  getPaceBadge: (s: any) => { category: PaceCategory; percentage?: number | null } | null;
+  getPaceBadge: (s: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
   onResetFilters?: () => void;
 }
 

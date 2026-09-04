@@ -221,9 +221,10 @@ app.post('/api/cache/clear', (_req, res) => {
       sqliteCache: sessionDb.getCacheStats(),
       sessionsCount: 0,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to clear SQLite cache:', err);
-    res.status(500).json({ error: err.message || 'Failed to clear cache' });
+    const message = err instanceof Error ? err.message : 'Failed to clear cache';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -296,9 +297,10 @@ app.post('/api/reference-laptimes/refresh', async (_req, res) => {
       sessionsCount: sessions.length,
       diff: updatedCache.lastUpdateDiff || null,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to refresh reference laptimes:', err);
-    res.status(500).json({ error: err.message || 'Failed to refresh reference laptimes' });
+    const message = err instanceof Error ? err.message : 'Failed to refresh reference laptimes';
+    res.status(500).json({ error: message });
   }
 });
 

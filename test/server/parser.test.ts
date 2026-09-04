@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName, extractComparableLaps } from '../../server/parser';
-import { DetailedSession } from '../../server/types';
+import { DetailedSession, DriverData } from '../../server/types';
 import fs from 'fs';
 
 const samplePracticeXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -102,7 +102,7 @@ describe('parser server module', () => {
 
     it('parses Practice session accurately with drivers, laps, and theoretical best', () => {
       vi.spyOn(fs, 'readFileSync').mockReturnValue(samplePracticeXml);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date(1780000000 * 1000) } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date(1780000000 * 1000) } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('dummy_practice.xml');
       expect(session).not.toBeNull();
@@ -122,7 +122,7 @@ describe('parser server module', () => {
 
     it('parses Qualifying session with wet weather and night time', () => {
       vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleQualifyingXml);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('dummy_qual.xml');
       expect(session?.sessionType).toBe('Qualifying');
@@ -133,7 +133,7 @@ describe('parser server module', () => {
 
     it('parses Race session with morning time', () => {
       vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleRaceXml);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('dummy_race.xml');
       expect(session?.sessionType).toBe('Race');
@@ -150,7 +150,7 @@ describe('parser server module', () => {
   </RaceResults>
 </rFactorXML>`;
       vi.spyOn(fs, 'readFileSync').mockReturnValue(genericXml);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const sessionP = parser.parseSessionXml('2026_01_01_12_00_00-01P1.xml');
       expect(sessionP?.sessionType).toBe('Practice');
@@ -166,7 +166,7 @@ describe('parser server module', () => {
   describe('parseWeather', () => {
     it('detects wet tires and various times of day', () => {
       const wetWeather = parser.parseWeather('2026/05/28 15:00', [
-        { laps: [{ fCompound: 'Wet Tire', rCompound: 'Slick' }] } as any,
+        { laps: [{ fCompound: 'Wet Tire', rCompound: 'Slick' }] } as unknown as DriverData,
       ]);
       expect(wetWeather.condition).toBe('Wet');
       expect(wetWeather.timeOfDay).toBe('Daytime');
@@ -185,8 +185,8 @@ describe('parser server module', () => {
   describe('replay indexing and matching', () => {
     it('indexes replay directory and matches session', () => {
       vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-      vi.spyOn(fs, 'readdirSync').mockReturnValue(['Circuit de Spa-Francorchamps P1 78.Vcr'] as any);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ size: 1048576, mtime: new Date(1780000000 * 1000) } as any);
+      vi.spyOn(fs, 'readdirSync').mockReturnValue(['Circuit de Spa-Francorchamps P1 78.Vcr'] as unknown as ReturnType<typeof fs.readdirSync>);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ size: 1048576, mtime: new Date(1780000000 * 1000) } as unknown as fs.Stats);
 
       const p = new LmuParser('C:\\Replays');
       vi.spyOn(fs, 'readFileSync').mockReturnValue(samplePracticeXml);
@@ -386,7 +386,7 @@ describe('parser server module', () => {
     it('does not mix Sebring Full and Sebring School laps when filtering', async () => {
       const { extractComparableLaps } = await import('../../server/parser');
 
-      const mockSessions: any[] = [
+      const mockSessions = [
         {
           id: 'sebring_full_1',
           trackVenue: 'Sebring International Raceway',
@@ -425,7 +425,7 @@ describe('parser server module', () => {
             },
           ],
         },
-      ];
+      ] as unknown as DetailedSession[];
 
       // Query Full track
       const fullResults = extractComparableLaps(mockSessions, { trackName: 'Sebring International Raceway' });
@@ -461,7 +461,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithTireWear);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('tire_test.xml');
       expect(session).not.toBeNull();
@@ -506,7 +506,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithVE);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('ve_test.xml');
       expect(session).not.toBeNull();
@@ -545,7 +545,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithSettings);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('settings_test.xml');
       expect(session).not.toBeNull();
@@ -591,7 +591,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithEt);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('et_test.xml');
       expect(session).not.toBeNull();
@@ -633,7 +633,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithoutSectors);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('no_sectors_test.xml');
       expect(session).not.toBeNull();
@@ -671,7 +671,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithOutlapOnly);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('outlap_test.xml');
       expect(session).not.toBeNull();
@@ -703,7 +703,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlZeroFuel);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('zero_fuel.xml');
       expect(session).not.toBeNull();
@@ -731,7 +731,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlNoPlayerTag);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('no_player_tag.xml');
       expect(session).not.toBeNull();
@@ -760,7 +760,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlIncompleteLaps);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('incomplete_laps.xml');
       expect(session).not.toBeNull();
@@ -818,7 +818,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlPracticeStart);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('practice_start.xml');
       expect(session).not.toBeNull();
@@ -869,7 +869,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlQualiStart);
-      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('quali_start.xml');
       expect(session).not.toBeNull();
@@ -973,7 +973,7 @@ describe('parser server module', () => {
           },
         ],
       },
-    ] as any;
+    ] as unknown as DetailedSession[];
 
     it('extracts comparable laps and finds personal best and overall track best without driver restriction', () => {
       const result = extractComparableLaps(mockSessions, {
@@ -1052,7 +1052,7 @@ describe('parser server module', () => {
 </rFactorXML>`;
 
       const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithStream);
-      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as any);
+      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       try {
         const session = parser.parseSessionXml('stream_test.xml');

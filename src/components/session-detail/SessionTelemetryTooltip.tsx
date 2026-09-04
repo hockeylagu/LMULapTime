@@ -1,9 +1,40 @@
 import React from 'react';
 import { DetailedSession, DriverData } from '../../../server/types.js';
 
+export interface SessionTelemetryPointData {
+  lapNum?: string;
+  isPitStop?: boolean;
+  isOutLap?: boolean;
+  isValid?: boolean;
+  isInferred?: boolean;
+  lapTimeString?: string;
+  avgLapTime?: number;
+  avgLapTimeString?: string;
+  s1String?: string;
+  s2String?: string;
+  s3String?: string;
+  topSpeed?: number | null;
+  twFL?: number | null;
+  twFR?: number | null;
+  twRL?: number | null;
+  twRR?: number | null;
+  twAvg?: number | null;
+  fuel?: number | null;
+  virtualEnergy?: number | null;
+  [key: string]: unknown;
+}
+
+export interface SessionTelemetryTooltipEntry {
+  dataKey?: string | number;
+  name?: string;
+  value?: number | string | null;
+  color?: string;
+  payload: SessionTelemetryPointData;
+}
+
 export interface SessionTelemetryTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: SessionTelemetryTooltipEntry[];
   activeChartMetric: 'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions';
   driversToPlot: DriverData[];
   session: DetailedSession;
@@ -28,9 +59,9 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
         pos: data[d.name] as number | undefined,
         overallPos: data[`${d.name}_overallPos`] as number | undefined,
         isPlayer: Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name)),
-        isPit: data[`${d.name}_isPit`],
-        isOutLap: data[`${d.name}_isOutLap`],
-        lapTime: data[`${d.name}_lapTime`],
+        isPit: Boolean(data[`${d.name}_isPit`]),
+        isOutLap: Boolean(data[`${d.name}_isOutLap`]),
+        lapTime: data[`${d.name}_lapTime`] as string | undefined,
       }))
       .filter((d) => d.pos !== undefined && d.pos > 0)
       .sort((a, b) => (a.pos || 999) - (b.pos || 999));
@@ -113,8 +144,8 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       )}
       {activeChartMetric === 'fuelEnergy' && (
         <>
-          {data.fuel !== null && <p className="text-amber-400">Fuel: {data.fuel.toFixed(1)}%</p>}
-          {data.virtualEnergy !== null && <p className="text-indigo-400">Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
+          {data.fuel !== null && data.fuel !== undefined && <p className="text-amber-400">Fuel: {data.fuel.toFixed(1)}%</p>}
+          {data.virtualEnergy !== null && data.virtualEnergy !== undefined && <p className="text-indigo-400">Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
         </>
       )}
     </div>

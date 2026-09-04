@@ -1,8 +1,9 @@
 import React from 'react';
 import { HardDrive, CheckCircle2, AlertCircle, User, RefreshCw } from 'lucide-react';
+import { AppStatus } from '../../../server/types.js';
 
 export interface FolderPathsCardProps {
-  status: any;
+  status: AppStatus | null;
   resultsDirInput: string;
   setResultsDirInput: (val: string) => void;
   replaysDirInput: string;

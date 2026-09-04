@@ -67,14 +67,15 @@ if (!window.URL.revokeObjectURL) {
 HTMLAnchorElement.prototype.click = vi.fn();
 
 // Safe default mock for global.fetch in jsdom tests
-if (!global.fetch || (global.fetch as any)._isDefaultMock === undefined) {
+const currentFetch = global.fetch as (typeof global.fetch & { _isDefaultMock?: boolean }) | undefined;
+if (!currentFetch || currentFetch._isDefaultMock === undefined) {
   const defaultFetch = vi.fn().mockImplementation(() =>
     Promise.resolve({
       ok: true,
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
     })
-  );
-  (defaultFetch as any)._isDefaultMock = true;
+  ) as typeof global.fetch & { _isDefaultMock?: boolean };
+  defaultFetch._isDefaultMock = true;
   global.fetch = defaultFetch;
 }

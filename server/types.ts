@@ -283,3 +283,87 @@ export interface TrackSummary {
   theoreticalBest: number | null;
   carsUsed: string[];
 }
+
+export interface AppStatus {
+  resultsDir: string;
+  resultsExist: boolean;
+  replaysDir: string;
+  replaysExist: boolean;
+  playerName?: string;
+  sessionsCount: number;
+  tracksCount: number;
+  referenceLaptimes?: {
+    lastUpdated: string | null;
+    entriesCount: number;
+    lastUpdateDiff?: ReferenceBenchmarkDiff | null;
+  };
+  sqliteCache?: {
+    enabled: boolean;
+    dbPath: string;
+    sessionsCount: number;
+    lastSyncedAt: string | null;
+    dbSizeBytes: number;
+  };
+}
+
+export interface FuelStrategyData {
+  avgFuel: number;
+  estFuelLaps: number | null;
+  avgVe: number | null;
+  estVeLaps: number | null;
+  optimalRatio: number | null;
+  zeroWasteFuelPct: number | null;
+  limiter: 've' | 'fuel' | 'balanced' | null;
+  lapDelta: number;
+  surplusFuelPct: number;
+}
+
+export interface ComparableLap {
+  id: string;
+  sessionId?: string;
+  sessionName?: string;
+  sessionType?: string;
+  dateString?: string;
+  timestamp?: number;
+  driverName: string;
+  carType: string;
+  carClass: string;
+  lapNum?: number;
+  lapTime: number | null;
+  lapTimeString: string;
+  s1: number | null;
+  s2: number | null;
+  s3: number | null;
+  s1String?: string;
+  s2String?: string;
+  s3String?: string;
+  topSpeed: number | null;
+  fCompound?: string;
+  rCompound?: string;
+  flCompound?: string;
+  frCompound?: string;
+  rlCompound?: string;
+  rrCompound?: string;
+  tireWear?: TireWear;
+  fuel?: number | null;
+  fuelUsed?: number | null;
+  virtualEnergy?: number | null;
+  virtualEnergyUsed?: number | null;
+  elapsedSeconds?: number | null;
+  elapsedTimeString?: string;
+  pitStopDurationString?: string;
+  gapToLeaderString?: string;
+  isPitStop?: boolean;
+  isOutLap?: boolean;
+  isValid: boolean;
+  isInferred?: boolean;
+  paceCategory?: PaceCategory | null;
+  pacePercentage?: number | null;
+  isTheoreticalBest?: boolean;
+  isSessionBest?: boolean;
+  isAllTimePB?: boolean;
+  isOverallTrackBest?: boolean;
+  isBenchmarkTarget?: boolean;
+  benchmarkCategory?: string;
+  tag?: string;
+}

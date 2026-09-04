@@ -3,6 +3,8 @@ import { DetailedSession, DriverData, LapData } from '../../../server/types.js';
 import { formatTime } from '../../utils/formatters.js';
 import { matchesCarClass } from '../../utils/paceCategory.js';
 
+export type SessionPositionChartPoint = Record<string, string | number | boolean | null | undefined>;
+
 export interface UseSessionChartDataParams {
   session: DetailedSession;
   selectedDriver: DriverData;
@@ -80,7 +82,7 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
   const positionChartData = useMemo(() => {
     return Array.from({ length: maxClassLaps }, (_, i) => {
       const lapNum = i + 1;
-      const point: any = { lapNum: `Lap ${lapNum}`, lapNumber: lapNum };
+      const point: SessionPositionChartPoint = { lapNum: `Lap ${lapNum}`, lapNumber: lapNum };
 
       const driversOnLap = driversToPlot
         .map((d) => ({

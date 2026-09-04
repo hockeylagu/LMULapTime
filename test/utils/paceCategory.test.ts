@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types';
 import {
   getPaceCategoryStyle,
   formatPacePercentage,
@@ -27,7 +28,7 @@ describe('paceCategory utility', () => {
     it('returns Offline fallback style when given null, undefined, or invalid category', () => {
       expect(getPaceCategoryStyle(null)).toEqual(PACE_CATEGORY_STYLES.Offline);
       expect(getPaceCategoryStyle(undefined)).toEqual(PACE_CATEGORY_STYLES.Offline);
-      expect(getPaceCategoryStyle('InvalidCategory' as any)).toEqual(PACE_CATEGORY_STYLES.Offline);
+      expect(getPaceCategoryStyle('InvalidCategory' as unknown as PaceCategory)).toEqual(PACE_CATEGORY_STYLES.Offline);
     });
   });
 
@@ -280,7 +281,7 @@ describe('paceCategory utility', () => {
   });
 
   describe('findMatchingTrackBenchmarkEntries and findReferenceEntry', () => {
-    const mockEntries: any[] = [
+    const mockEntries = [
       { trackName: 'Spa', carClass: 'LMH', target100Sec: 120.0 },
       { trackName: 'Spa', carClass: 'LMGT3', target100Sec: 135.0 },
       { trackName: 'Monza', carClass: 'LMH', target100Sec: 95.0 },
@@ -288,7 +289,7 @@ describe('paceCategory utility', () => {
       { trackName: 'Sebring (school)', carClass: 'LMGT3', target100Sec: 62.90 },
       { trackName: 'Silverstone (GP)', carClass: 'LMH', target100Sec: 100.0 },
       { trackName: 'Silverstone (National)', carClass: 'LMH', target100Sec: 55.0 },
-    ];
+    ] as unknown as ReferenceLaptimeEntry[];
 
     it('finds track benchmark entries matching track name', () => {
       const matches = findMatchingTrackBenchmarkEntries(mockEntries, 'Circuit de Spa-Francorchamps');
