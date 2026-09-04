@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/types.js';
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import {
   matchesCarClass,
@@ -24,8 +24,17 @@ export type AvailableLapsSortOption =
   | 's3-asc'
   | 'pace-asc';
 
+export type CompareLapsSessionItem = DetailedSession | (Omit<Partial<DetailedSession>, 'sessionType'> & {
+  id: string;
+  trackVenue: string;
+  trackCourse?: string;
+  timeString?: string;
+  sessionType?: string;
+  sessionName?: string;
+});
+
 export interface UseCompareLapsParams {
-  sessions: any[];
+  sessions: CompareLapsSessionItem[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;

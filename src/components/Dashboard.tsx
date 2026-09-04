@@ -12,7 +12,7 @@ import { useDashboardMetrics } from './dashboard/useDashboardMetrics';
 
 export type { DashboardSortOption };
 
-interface SessionSummary {
+export interface SessionSummary {
   id: string;
   filename: string;
   trackVenue: string;

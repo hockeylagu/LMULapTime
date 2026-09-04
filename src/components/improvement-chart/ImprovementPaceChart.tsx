@@ -12,8 +12,42 @@ import {
 import { formatTime } from '../../utils/formatters';
 import { ImprovementMetric } from './ImprovementChartControls';
 
+export interface ImprovementChartPoint {
+  chartKey: string;
+  shortSession: string;
+  fullDate: string;
+  sessionId: string;
+  session: string;
+  car: string;
+  weather?: string;
+  bestLap: number | null;
+  top3Avg: number | null;
+  top3AvgStr: string | null;
+  movingAvg: number | null;
+  avgLap: number | null;
+  theoretical: number | null;
+  theoreticalGap: number | null;
+  consistencyScore: number | null;
+  s1: number | null;
+  s2: number | null;
+  s3: number | null;
+  lapStr: string;
+  theoreticalStr: string;
+  avgLapStr: string;
+  cleanLaps: number;
+  replay?: string;
+}
+
+export interface ImprovementTooltipPayloadEntry {
+  dataKey?: string | number;
+  name?: string;
+  value?: number | string | null;
+  color?: string;
+  payload: ImprovementChartPoint;
+}
+
 export interface ImprovementPaceChartProps {
-  chartData: any[];
+  chartData: ImprovementChartPoint[];
   metric: ImprovementMetric;
   minTime: number;
   maxTime: number;
@@ -45,12 +79,12 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
     );
   }
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: ImprovementTooltipPayloadEntry[] }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
 
       const seen = new Set<string>();
-      const uniqueEntries = payload.filter((entry: any) => {
+      const uniqueEntries = payload.filter((entry) => {
         if (entry.value === null || entry.value === undefined || isNaN(Number(entry.value))) {
           return false;
         }
@@ -79,7 +113,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
 
           {uniqueEntries.length > 0 && (
             <div className="border-t border-lmu-border/60 pt-2 space-y-1">
-              {uniqueEntries.map((entry: any, index: number) => (
+              {uniqueEntries.map((entry, index: number) => (
                 <div key={`item-${index}`} className="flex items-center justify-between text-xs font-mono">
                   <span style={{ color: entry.color }} className="font-sans font-medium text-[11px]">
                     {entry.name}:
@@ -130,12 +164,18 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
           key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}-${metric}`}
           data={chartData}
           margin={{ top: 10, right: 25, left: 10, bottom: chartData.length > 5 ? 35 : 15 }}
-          onClick={(e: any) => {
-            if (e && e.activePayload && e.activePayload.length > 0) {
-              const sId = e.activePayload[0].payload.sessionId;
-              if (sId && onSelectSession) {
-                onSelectSession(sId);
-              }
+          onClick={(state) => {
+            if (!state) return;
+            const stateObj = state as unknown as Record<string, unknown>;
+            let sId: string | undefined;
+            if (Array.isArray(stateObj.activePayload) && stateObj.activePayload.length > 0) {
+              const item = stateObj.activePayload[0] as { payload?: ImprovementChartPoint };
+              sId = item?.payload?.sessionId;
+            } else if (typeof state.activeTooltipIndex === 'number' && chartData[state.activeTooltipIndex]) {
+              sId = chartData[state.activeTooltipIndex].sessionId;
+            }
+            if (sId && onSelectSession) {
+              onSelectSession(sId);
             }
           }}
         >

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp } from '../utils/formatters.js';
 import { matchesCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
-import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache } from '../../server/types.js';
 import { TrackSummariesHeader, TracksSortOption } from './track-summaries/TrackSummariesHeader';
 import { TrackSummaryCard, TrackSummaryItem } from './track-summaries/TrackSummaryCard';
 
@@ -59,7 +59,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   selectedCarClass,
   setSelectedCarClass,
 }) => {
-  const [refCache, setRefCache] = useState<any>(null);
+  const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(null);
   const [sortBy, setSortBy] = useState<TracksSortOption>('name-asc');
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     const allVenues = new Set<string>();
 
     sessions.forEach(s => {
-      const venue = getDisplayTrackName(s.trackVenue, (s as any).trackCourse);
+      const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
       if (!venue) return;
       allVenues.add(venue);
       if (matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass)) {
@@ -172,8 +172,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         return b.trackVenue.localeCompare(a.trackVenue);
       }
       if (sortBy === 'last-session-desc') {
-        const lastA = (a as any).lastSessionTimestamp || 0;
-        const lastB = (b as any).lastSessionTimestamp || 0;
+        const lastA = a.lastSessionTimestamp || 0;
+        const lastB = b.lastSessionTimestamp || 0;
         return lastB - lastA;
       }
       if (sortBy === 'pace-asc') {

@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessions } from '../../utils/formatters.js';
 import { matchesCarClass, matchesTrack } from '../../utils/paceCategory.js';
+import { DetailedSession } from '../../../server/types.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
+import { SessionSummary } from '../Dashboard.js';
+
+export type DashboardSessionItem = SessionSummary | DetailedSession;
 
 export interface UseDashboardMetricsParams {
-  sessions: any[];
+  sessions: DashboardSessionItem[];
   selectedTrack: string;
   selectedCarClass: string;
   filterType: string;
@@ -92,7 +96,7 @@ export function useDashboardMetrics({
 
       const completedLapsCount =
         p.laps && p.laps.length > 0
-          ? p.laps.filter((l: any) => l.lapTime !== null && l.lapTime > 0).length
+          ? p.laps.filter((l) => l.lapTime !== null && l.lapTime > 0).length
           : p.lapsCount || 0;
 
       totalLaps += completedLapsCount;

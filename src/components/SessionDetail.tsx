@@ -6,13 +6,14 @@ import { SessionTelemetryChart } from './session-detail/SessionTelemetryChart.js
 import { SessionLapTable } from './session-detail/SessionLapTable.js';
 import { SessionStewardsLog } from './session-detail/SessionStewardsLog.js';
 import { SessionRaceStandings } from './session-detail/SessionRaceStandings.js';
+import { DetailedSession, SessionProgressionPoint } from '../../server/types.js';
 
 export interface SessionDetailProps {
   sessionId: string;
   onBack: () => void;
   onSelectSession?: (sessionId: string) => void;
-  progression?: any[];
-  sessions?: any[];
+  progression?: SessionProgressionPoint[];
+  sessions?: DetailedSession[];
 }
 
 export const SessionDetail: React.FC<SessionDetailProps> = ({

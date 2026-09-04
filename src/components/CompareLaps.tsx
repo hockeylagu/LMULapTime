@@ -4,12 +4,12 @@ import { CompareLapsFilters } from './compare-laps/CompareLapsFilters';
 import { CompareLapsDeck } from './compare-laps/CompareLapsDeck';
 import { CompareSectorChart } from './compare-laps/CompareSectorChart';
 import { CompareLapsTable } from './compare-laps/CompareLapsTable';
-import { useCompareLapsData, AvailableLapsSortOption } from './compare-laps/useCompareLapsData';
+import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './compare-laps/useCompareLapsData';
 
-export type { AvailableLapsSortOption };
+export type { AvailableLapsSortOption, CompareLapsSessionItem };
 
 interface CompareLapsProps {
-  sessions: any[];
+  sessions: CompareLapsSessionItem[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;

@@ -7,13 +7,14 @@ import { TrackDetail } from './components/TrackDetail';
 import { Settings } from './components/Settings';
 import { CompareLaps } from './components/CompareLaps';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
+import { AppStatus, DetailedSession, SessionProgressionPoint, TrackSummary } from '../server/types.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-  const [status, setStatus] = useState<any>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [progression, setProgression] = useState<any[]>([]);
-  const [tracksMap, setTracksMap] = useState<any>({});
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [sessions, setSessions] = useState<DetailedSession[]>([]);
+  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
+  const [tracksMap, setTracksMap] = useState<Record<string, TrackSummary>>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedRouteTrackName, setSelectedRouteTrackName] = useState<string | null>(null);
 

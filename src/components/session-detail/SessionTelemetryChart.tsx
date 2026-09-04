@@ -8,8 +8,9 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  type LegendPayload,
 } from 'recharts';
-import { DetailedSession, DriverData } from '../../../server/types.js';
+import { DetailedSession, DriverData, FuelStrategyData } from '../../../server/types.js';
 import { formatTime } from '../../utils/formatters.js';
 import { SessionFuelStrategyCard } from './SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';
@@ -26,9 +27,9 @@ export interface SessionTelemetryChartProps {
   hasFuelData: boolean;
   hasVirtualEnergyData: boolean;
   isMultiClass: boolean;
-  fuelStrategy: any;
+  fuelStrategy: FuelStrategyData | null;
   hiddenSeries: Record<string, boolean>;
-  handleLegendClick: (e: any) => void;
+  handleLegendClick: (e: LegendPayload) => void;
 }
 
 export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
@@ -210,8 +211,9 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             <Legend
               onClick={handleLegendClick}
               wrapperStyle={{ paddingTop: 10, fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
-              formatter={(value, entry: any) => {
-                const isHidden = Boolean(hiddenSeries[entry.dataKey]);
+              formatter={(value, entry: LegendPayload) => {
+                const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey || '');
+                const isHidden = Boolean(hiddenSeries[key]);
                 return (
                   <span
                     className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${

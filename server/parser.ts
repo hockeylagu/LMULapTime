@@ -14,6 +14,7 @@ import {
   SessionWeather,
   TireWear,
   TrackSummary,
+  ComparableLap,
 } from './types.js';
 import {
   formatTime,
@@ -29,6 +30,133 @@ import { calculatePaceCategory } from './referenceLaptimes.js';
 import { matchesTrack } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
+
+export interface RawLapXmlNode {
+  '@_num'?: string | number;
+  '@_p'?: string | number;
+  '@_s1'?: string;
+  '@_s2'?: string;
+  '@_s3'?: string;
+  '@_topspeed'?: string | number;
+  '@_fcompound'?: string;
+  '@_rcompound'?: string;
+  '@_FL'?: string;
+  '@_fl'?: string;
+  '@_FR'?: string;
+  '@_fr'?: string;
+  '@_RL'?: string;
+  '@_rl'?: string;
+  '@_RR'?: string;
+  '@_rr'?: string;
+  '@_pit'?: string | number;
+  '@_et'?: string;
+  '@_twfl'?: string | number;
+  '@_twfr'?: string | number;
+  '@_twrl'?: string | number;
+  '@_twrr'?: string | number;
+  '@_fuel'?: string | number;
+  '@_fuelUsed'?: string | number;
+  '@_fuelused'?: string | number;
+  '@_fused'?: string | number;
+  '@_ve'?: string | number;
+  '@_veUsed'?: string | number;
+  '@_veused'?: string | number;
+  '@_nrg'?: string | number;
+  '@_nrgused'?: string | number;
+  '#text'?: string;
+  [key: string]: unknown;
+}
+
+export interface RawDriverXmlNode {
+  Name?: string;
+  CarType?: string;
+  VehName?: string;
+  CarClass?: string;
+  CarNumber?: string | number;
+  TeamName?: string;
+  isPlayer?: string | number | boolean;
+  Position?: string | number;
+  ClassPosition?: string | number;
+  Lap?: RawLapXmlNode | RawLapXmlNode[];
+  GridPos?: string | number;
+  GridPosition?: string | number;
+  QualPosition?: string | number;
+  Grid?: string | number;
+  ClassGridPos?: string | number;
+  ClassGridPosition?: string | number;
+  ClassGrid?: string | number;
+  FinishStatus?: string;
+  Reason?: string;
+  Pitstops?: string | number;
+  PitStops?: string | number;
+  NumPitstops?: string | number;
+  [key: string]: unknown;
+}
+
+export interface RawStreamIncidentNode {
+  '@_et'?: string | number;
+  '#text'?: string;
+  [key: string]: unknown;
+}
+
+export interface RawStreamSectorNode {
+  '@_et'?: string | number;
+  '#text'?: string;
+  [key: string]: unknown;
+}
+
+export interface RawStreamTrackLimitNode {
+  '@_Driver'?: string;
+  '@_driver'?: string;
+  '@_et'?: string | number;
+  '@_Lap'?: string | number;
+  '@_WarningPoints'?: string | number;
+  '@_warningpoints'?: string | number;
+  '@_CurrentPoints'?: string | number;
+  '@_currentpoints'?: string | number;
+  '#text'?: string;
+  [key: string]: unknown;
+}
+
+export interface RawStreamPenaltyNode {
+  '@_Driver'?: string;
+  '@_driver'?: string;
+  '@_et'?: string | number;
+  '@_Penalty'?: string;
+  '@_penalty'?: string;
+  '@_Reason'?: string;
+  '@_reason'?: string;
+  '#text'?: string;
+  [key: string]: unknown;
+}
+
+export interface RawStreamXmlNode {
+  Incident?: RawStreamIncidentNode | RawStreamIncidentNode[];
+  Sector?: RawStreamSectorNode | RawStreamSectorNode[];
+  TrackLimits?: RawStreamTrackLimitNode | RawStreamTrackLimitNode[];
+  Penalty?: RawStreamPenaltyNode | RawStreamPenaltyNode[];
+  [key: string]: unknown;
+}
+
+export interface RawSessionXmlNode {
+  Driver?: RawDriverXmlNode | RawDriverXmlNode[];
+  Stream?: RawStreamXmlNode;
+  Setting?: unknown;
+  ServerName?: unknown;
+  DamageMult?: unknown;
+  FuelMult?: unknown;
+  TireMult?: unknown;
+  TireWarmers?: unknown;
+  FixedSetups?: unknown;
+  FixedUpgrades?: unknown;
+  ParcFerme?: unknown;
+  MechFailRate?: unknown;
+  Minutes?: unknown;
+  RaceTime?: unknown;
+  RaceLaps?: unknown;
+  VehiclesAllowed?: unknown;
+  [key: string]: unknown;
+}
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -189,7 +317,7 @@ export class LmuParser {
       // Determine session type (Qualify, Race, Practice)
       let sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown' = 'Unknown';
       let sessionName = 'Session';
-      let sessionDataNode: any = null;
+      let sessionDataNode: RawSessionXmlNode | null = null;
 
       if (raceResults.Qualify) {
         sessionType = 'Qualifying';
@@ -231,7 +359,7 @@ export class LmuParser {
       // Parse Drivers
       const rawDrivers = sessionDataNode?.Driver || raceResults.Driver || [];
       const driversList = Array.isArray(rawDrivers) ? rawDrivers : [rawDrivers];
-      const drivers: DriverData[] = driversList.map((d: any) => this.parseDriver(d)).filter(Boolean);
+      const drivers: DriverData[] = driversList.map((d: RawDriverXmlNode) => this.parseDriver(d)).filter(Boolean);
 
       // Compute Pace Categories for each lap and driver best lap
       drivers.forEach(driver => {
@@ -328,13 +456,13 @@ export class LmuParser {
       const matchingReplay = this.findMatchingReplay(trackVenue, sessionName, timestamp, xmlFileMtime);
 
       // Parse Session Settings & Server Rules
-      const parseNum = (val: any): number | undefined => {
+      const parseNum = (val: unknown): number | undefined => {
         if (val === undefined || val === null || val === '') return undefined;
-        const n = parseFloat(val);
+        const n = typeof val === 'number' ? val : parseFloat(String(val));
         return isNaN(n) ? undefined : n;
       };
 
-      const parseBool = (val: any): boolean | undefined => {
+      const parseBool = (val: unknown): boolean | undefined => {
         if (val === undefined || val === null || val === '') return undefined;
         return val === '1' || val === 1 || val === true || val === 'true';
       };
@@ -440,19 +568,19 @@ export class LmuParser {
     };
   }
 
-  private parseDriver(d: any): DriverData {
+  private parseDriver(d: RawDriverXmlNode): DriverData {
     const name = String(d.Name || 'Unknown Driver');
     const carType = String(d.CarType || d.VehName || 'Unknown Car');
     const carClass = String(d.CarClass || 'General');
     const carNumber = String(d.CarNumber || '');
     const teamName = String(d.TeamName || '');
     const isPlayer = String(d.isPlayer) === '1' || d.isPlayer === true;
-    const position = parseInt(d.Position, 10) || 0;
-    const classPosition = parseInt(d.ClassPosition, 10) || 0;
+    const position = parseInt(String(d.Position || ''), 10) || 0;
+    const classPosition = parseInt(String(d.ClassPosition || ''), 10) || 0;
 
     const rawLaps = d.Lap || [];
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
-    const laps: LapData[] = lapsList.map((l: any, idx: number) => this.parseLap(l, idx + 1));
+    const laps: LapData[] = lapsList.map((l: RawLapXmlNode, idx: number) => this.parseLap(l, idx + 1));
 
     // Mark out-laps: any lap immediately following a valid pit stop (completed in-lap)
     for (let i = 0; i < laps.length; i++) {
@@ -567,12 +695,12 @@ export class LmuParser {
     const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
 
     // Starting Grid, Finish Position & Position Deltas
-    const parsedGrid = parseInt(d.GridPos ?? d.GridPosition ?? d.QualPosition ?? d.Grid, 10);
+    const parsedGrid = parseInt(String(d.GridPos ?? d.GridPosition ?? d.QualPosition ?? d.Grid ?? ''), 10);
     const gridPosition: number | null = !isNaN(parsedGrid) && parsedGrid > 0
       ? parsedGrid
       : (laps.length > 0 && laps[0].position > 0 ? laps[0].position : null);
 
-    const parsedClassGrid = parseInt(d.ClassGridPos ?? d.ClassGridPosition ?? d.ClassGrid, 10);
+    const parsedClassGrid = parseInt(String(d.ClassGridPos ?? d.ClassGridPosition ?? d.ClassGrid ?? ''), 10);
     const classGridPosition: number | null = !isNaN(parsedClassGrid) && parsedClassGrid > 0
       ? parsedClassGrid
       : null;
@@ -590,7 +718,7 @@ export class LmuParser {
     const dnfReason = d.Reason ? String(d.Reason).trim() : undefined;
     const finishStatus = rawFinishStatus || (dnfReason ? `DNF (${dnfReason})` : (position > 0 ? 'Finished' : undefined));
 
-    const rawPitstops = parseInt(d.Pitstops ?? d.PitStops ?? d.NumPitstops, 10);
+    const rawPitstops = parseInt(String(d.Pitstops ?? d.PitStops ?? d.NumPitstops ?? ''), 10);
     const pitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
       ? rawPitstops
       : laps.filter(l => l.isPitStop).length;
@@ -656,22 +784,22 @@ export class LmuParser {
     };
   }
 
-  private parseLap(l: any, fallbackNum: number): LapData {
-    const lapNum = parseInt(l['@_num'], 10) || fallbackNum;
-    const position = parseInt(l['@_p'], 10) || 0;
+  private parseLap(l: RawLapXmlNode, fallbackNum: number): LapData {
+    const lapNum = typeof l['@_num'] === 'number' ? l['@_num'] : parseInt(String(l['@_num'] || ''), 10) || fallbackNum;
+    const position = typeof l['@_p'] === 'number' ? l['@_p'] : parseInt(String(l['@_p'] || ''), 10) || 0;
 
-    const bodyVal = typeof l === 'object' && l['#text'] ? l['#text'] : (typeof l === 'string' || typeof l === 'number' ? String(l) : '');
+    const bodyVal = typeof l === 'object' && l && '#text' in l && l['#text'] ? String(l['#text']) : (typeof l === 'string' || typeof l === 'number' ? String(l) : '');
     const lapTime = parseTimeStringToSeconds(bodyVal);
 
-    const s1 = parseTimeStringToSeconds(l['@_s1']);
-    const s2 = parseTimeStringToSeconds(l['@_s2']);
-    const s3 = parseTimeStringToSeconds(l['@_s3']);
-    const topSpeed = parseFloat(l['@_topspeed']) || null;
+    const s1 = l['@_s1'] !== undefined ? parseTimeStringToSeconds(String(l['@_s1'])) : null;
+    const s2 = l['@_s2'] !== undefined ? parseTimeStringToSeconds(String(l['@_s2'])) : null;
+    const s3 = l['@_s3'] !== undefined ? parseTimeStringToSeconds(String(l['@_s3'])) : null;
+    const topSpeed = l['@_topspeed'] !== undefined ? (typeof l['@_topspeed'] === 'number' ? l['@_topspeed'] : parseFloat(String(l['@_topspeed']))) || null : null;
     const fCompound = l['@_fcompound'] ? String(l['@_fcompound']).split(',').pop()?.trim() || String(l['@_fcompound']) : '';
     const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop()?.trim() || String(l['@_rcompound']) : '';
-    const isPitStop = (l['@_pit'] === '1' || l['@_pit'] === 1 || (l['@_et'] === '--.---' && lapNum > 1)) && !(lapNum === 1 && (lapTime === null || lapTime <= 0));
+    const isPitStop = (String(l['@_pit']) === '1' || l['@_pit'] === 1 || (String(l['@_et']) === '--.---' && lapNum > 1)) && !(lapNum === 1 && (lapTime === null || lapTime <= 0));
 
-    const rawEt = l['@_et'];
+    const rawEt = l['@_et'] !== undefined ? String(l['@_et']) : undefined;
     const elapsedSeconds = rawEt !== undefined && rawEt !== null && rawEt !== '--.---' && rawEt !== '' && !isNaN(parseFloat(rawEt))
       ? parseFloat(parseFloat(rawEt).toFixed(3))
       : null;
@@ -679,7 +807,7 @@ export class LmuParser {
       ? formatElapsedSeconds(elapsedSeconds)
       : undefined;
 
-    const cleanCompound = (val?: any): string | undefined => {
+    const cleanCompound = (val?: unknown): string | undefined => {
       if (!val) return undefined;
       const str = String(val).split(',').pop()?.trim();
       return str || undefined;
@@ -690,9 +818,9 @@ export class LmuParser {
     const rlCompound = cleanCompound(l['@_RL'] || l['@_rl']);
     const rrCompound = cleanCompound(l['@_RR'] || l['@_rr']);
 
-    const parsePercentVal = (val: any): number | null => {
+    const parsePercentVal = (val: unknown): number | null => {
       if (val === undefined || val === null || val === '') return null;
-      const parsed = parseFloat(val);
+      const parsed = typeof val === 'number' ? val : parseFloat(String(val));
       if (isNaN(parsed)) return null;
       // If LMU outputs fraction e.g. 0.957 -> convert to 95.7%
       const pct = parsed <= 1.0 && parsed >= 0 ? parsed * 100 : parsed;
@@ -720,11 +848,8 @@ export class LmuParser {
     }
 
     const fuel = parsePercentVal(l['@_fuel']);
-    const rawFuelUsed = l['@_fuelUsed'] !== undefined
-      ? parseFloat(l['@_fuelUsed'])
-      : l['@_fuelused'] !== undefined
-      ? parseFloat(l['@_fuelused'])
-      : null;
+    const rawFuelUsedVal = l['@_fuelUsed'] !== undefined ? l['@_fuelUsed'] : l['@_fuelused'];
+    const rawFuelUsed = rawFuelUsedVal !== undefined ? parseFloat(String(rawFuelUsedVal)) : null;
     const fuelUsed = rawFuelUsed !== null && !isNaN(rawFuelUsed) ? parsePercentVal(rawFuelUsed) : null;
 
     const virtualEnergy = parsePercentVal(l['@_ve'] ?? l['@_VE']);
@@ -794,7 +919,7 @@ export class LmuParser {
     return candidates[0];
   }
 
-  private parseStreamEvents(streamNode: any, drivers: DriverData[]) {
+  private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {
     if (!streamNode || !drivers || drivers.length === 0) return;
 
     const cleanDriverName = (raw?: string): string => {
@@ -868,9 +993,9 @@ export class LmuParser {
 
     // 1. Process Incidents
     const rawIncidents = streamNode.Incident ? (Array.isArray(streamNode.Incident) ? streamNode.Incident : [streamNode.Incident]) : [];
-    rawIncidents.forEach((inc: any) => {
-      const et = inc['@_et'] !== undefined ? parseFloat(inc['@_et']) : undefined;
-      const text = typeof inc === 'object' && inc['#text'] ? inc['#text'] : (typeof inc === 'string' ? inc : '');
+    rawIncidents.forEach((inc: RawStreamIncidentNode) => {
+      const et = inc['@_et'] !== undefined ? parseFloat(String(inc['@_et'])) : undefined;
+      const text = typeof inc === 'object' && inc['#text'] ? String(inc['#text']) : (typeof inc === 'string' ? inc : '');
       if (!text) return;
 
       const match = text.match(/^(.+?)(?:#\d+)?\(\d+\)\s+reported contact\s+\(([0-9.]+)\)\s+with\s+(.+)$/i);
@@ -918,9 +1043,9 @@ export class LmuParser {
 
     // 2. Process Sector Damage
     const rawSectors = streamNode.Sector ? (Array.isArray(streamNode.Sector) ? streamNode.Sector : [streamNode.Sector]) : [];
-    rawSectors.forEach((sec: any) => {
-      const et = sec['@_et'] !== undefined ? parseFloat(sec['@_et']) : undefined;
-      const text = typeof sec === 'object' && sec['#text'] ? sec['#text'] : (typeof sec === 'string' ? sec : '');
+    rawSectors.forEach((sec: RawStreamSectorNode) => {
+      const et = sec['@_et'] !== undefined ? parseFloat(String(sec['@_et'])) : undefined;
+      const text = typeof sec === 'object' && sec['#text'] ? String(sec['#text']) : (typeof sec === 'string' ? sec : '');
       if (!text) return;
 
       const match = text.match(/^(.+?)(?:#\d+)?\(\d+\)\s+reports new\s+(.+)$/i);
@@ -953,17 +1078,17 @@ export class LmuParser {
 
     // 3. Process TrackLimits
     const rawTrackLimits = streamNode.TrackLimits ? (Array.isArray(streamNode.TrackLimits) ? streamNode.TrackLimits : [streamNode.TrackLimits]) : [];
-    rawTrackLimits.forEach((tl: any) => {
+    rawTrackLimits.forEach((tl: RawStreamTrackLimitNode) => {
       const rawDriver = tl['@_Driver'] || tl['@_driver'];
       const driver = matchDriver(rawDriver);
       if (!driver) return;
 
-      const et = tl['@_et'] !== undefined ? parseFloat(tl['@_et']) : undefined;
-      const lapAttr = tl['@_Lap'] !== undefined ? parseInt(tl['@_Lap'], 10) : undefined;
+      const et = tl['@_et'] !== undefined ? parseFloat(String(tl['@_et'])) : undefined;
+      const lapAttr = tl['@_Lap'] !== undefined ? parseInt(String(tl['@_Lap']), 10) : undefined;
       const explicitLapNum = lapAttr !== undefined && !isNaN(lapAttr) ? lapAttr + 1 : undefined;
 
-      const warnPts = parseFloat(tl['@_WarningPoints'] ?? tl['@_warningpoints'] ?? 0);
-      const curPts = parseFloat(tl['@_CurrentPoints'] ?? tl['@_currentpoints'] ?? 0);
+      const warnPts = parseFloat(String(tl['@_WarningPoints'] ?? tl['@_warningpoints'] ?? 0));
+      const curPts = parseFloat(String(tl['@_CurrentPoints'] ?? tl['@_currentpoints'] ?? 0));
       const action = typeof tl === 'object' && tl['#text'] ? String(tl['#text']).trim() : (typeof tl === 'string' ? tl : 'Warning');
 
       const isWarning = action.toLowerCase().includes('warning') || warnPts > 0;
@@ -994,12 +1119,12 @@ export class LmuParser {
 
     // 4. Process Penalties
     const rawPenalties = streamNode.Penalty ? (Array.isArray(streamNode.Penalty) ? streamNode.Penalty : [streamNode.Penalty]) : [];
-    rawPenalties.forEach((p: any) => {
+    rawPenalties.forEach((p: RawStreamPenaltyNode) => {
       const rawDriver = p['@_Driver'] || p['@_driver'];
       const driver = matchDriver(rawDriver);
       if (!driver) return;
 
-      const et = p['@_et'] !== undefined ? parseFloat(p['@_et']) : undefined;
+      const et = p['@_et'] !== undefined ? parseFloat(String(p['@_et'])) : undefined;
       const penalty = String(p['@_Penalty'] || p['@_penalty'] || 'Penalty');
       const reason = String(p['@_Reason'] || p['@_reason'] || 'Infraction');
       const text = typeof p === 'object' && p['#text'] ? String(p['#text']).trim() : `${penalty}: ${reason}`;
@@ -1166,6 +1291,21 @@ export function computeTrackSummaries(sessions: DetailedSession[]): Record<strin
   return map;
 }
 
+export interface ComparableLapsResult {
+  laps: ComparableLap[];
+  allTimeBestLap: ComparableLap | null;
+  overallTrackBestLap: ComparableLap | null;
+  bestS1: number | null;
+  bestS2: number | null;
+  bestS3: number | null;
+  bestS1String: string;
+  bestS2String: string;
+  bestS3String: string;
+  theoreticalBestSec: number | null;
+  theoreticalBestString: string;
+  sessionsCount: number;
+}
+
 /**
  * Extracts and aggregates comparable laps across sessions matching a specific track and optional filters.
  */
@@ -1179,7 +1319,7 @@ export function extractComparableLaps(
     sessionId?: string;
     playerOnly?: boolean;
   }
-) {
+): ComparableLapsResult {
   const normTrack = (filters.trackName || '').toLowerCase().trim();
   const targetClass = (filters.carClass || '').trim();
   const targetModel = (filters.carModel || '').toLowerCase().trim();
@@ -1190,9 +1330,9 @@ export function extractComparableLaps(
     return matchesTrack(filters.trackName, s.trackVenue, s.trackCourse);
   });
 
-  const laps: any[] = [];
-  let allTimeBestLap: any = null;
-  let overallTrackBestLap: any = null;
+  const laps: ComparableLap[] = [];
+  let allTimeBestLap: ComparableLap | null = null;
+  let overallTrackBestLap: ComparableLap | null = null;
   let bestS1: number | null = null;
   let bestS2: number | null = null;
   let bestS3: number | null = null;
@@ -1226,7 +1366,7 @@ export function extractComparableLaps(
 
       (d.laps || []).forEach(l => {
         if (l.isValid && l.lapTime && l.lapTime > 0) {
-          if (!overallTrackBestLap || l.lapTime < overallTrackBestLap.lapTime) {
+          if (!overallTrackBestLap || overallTrackBestLap.lapTime === null || l.lapTime < overallTrackBestLap.lapTime) {
             overallTrackBestLap = {
               id: `${s.id}_${d.name}_lap_${l.lapNum}`,
               sessionId: s.id,
@@ -1353,7 +1493,7 @@ export function extractComparableLaps(
         };
 
         if (l.isValid && l.lapTime && l.lapTime > 0) {
-          if (!allTimeBestLap || l.lapTime < allTimeBestLap.lapTime) {
+          if (!allTimeBestLap || allTimeBestLap.lapTime === null || l.lapTime < allTimeBestLap.lapTime) {
             allTimeBestLap = { ...lapItem, isAllTimePB: true, tag: '⭐ All-Time Best Lap' };
           }
           if (l.s1 && (bestS1 === null || l.s1 < bestS1)) bestS1 = l.s1;

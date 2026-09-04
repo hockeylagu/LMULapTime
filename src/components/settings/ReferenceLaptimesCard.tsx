@@ -1,10 +1,10 @@
 import React from 'react';
 import { Database, Globe, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { ReferenceBenchmarkDiff } from '../../../server/types';
+import { ReferenceBenchmarkDiff, AppStatus } from '../../../server/types';
 import { ReferenceChangesList } from './ReferenceChangesList';
 
 export interface ReferenceLaptimesCardProps {
-  status: any;
+  status: AppStatus | null;
   isUpdatingLaptimes: boolean;
   onUpdateReferenceLaptimes: () => void;
   laptimesMessage: string | null;

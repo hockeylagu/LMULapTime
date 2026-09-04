@@ -1,18 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
-import { DetailedSession, SessionProgressionPoint } from '../../../server/types.js';
+import type { LegendPayload } from 'recharts';
+import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../server/types.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../utils/paceCategory.js';
-import { findRelatedSession } from './sessionDetailHelpers.js';
+import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
 
 export interface UseSessionDetailDataParams {
   sessionId: string;
   onSelectSession?: (sessionId: string) => void;
   initialProgression?: SessionProgressionPoint[];
-  initialSessions?: any[];
+  initialSessions?: DetailedSession[];
 }
 
 // Module-level in-memory cache for instant sub-millisecond session switching
 export const clientSessionCache = new Map<string, DetailedSession>();
-let clientRefCache: any = null;
+let clientRefCache: ReferenceLaptimesCache | null = null;
 
 export function clearSessionDetailCache() {
   clientSessionCache.clear();
@@ -27,11 +28,11 @@ export function useSessionDetailData({
 }: UseSessionDetailDataParams) {
   const cachedInitial = clientSessionCache.get(sessionId) || null;
   const [session, setSession] = useState<DetailedSession | null>(cachedInitial);
-  const [refCache, setRefCache] = useState<any>(clientRefCache);
+  const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(clientRefCache);
   const [progression, setProgression] = useState<SessionProgressionPoint[]>(
     initialProgression || []
   );
-  const [allSessions, setAllSessions] = useState<any[]>(
+  const [allSessions, setAllSessions] = useState<DetailedSession[]>(
     initialSessions || []
   );
   const [loading, setLoading] = useState<boolean>(!cachedInitial);
@@ -45,9 +46,10 @@ export function useSessionDetailData({
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
-  const handleLegendClick = (e: any) => {
+  const handleLegendClick = (e: LegendPayload) => {
     if (!e || !e.dataKey) return;
-    const key = String(e.dataKey);
+    const key = typeof e.dataKey === 'function' ? '' : String(e.dataKey);
+    if (!key) return;
     setHiddenSeries((prev) => ({
       ...prev,
       [key]: !prev[key],
@@ -338,7 +340,7 @@ export function useSessionDetailData({
     document.body.removeChild(link);
   };
 
-  const candidatePool = allSessions.length > 0 ? allSessions : progression;
+  const candidatePool: CandidateRelatedSession[] = allSessions.length > 0 ? allSessions : progression;
   const relatedSession = useMemo(() => {
     return findRelatedSession(session, candidatePool);
   }, [session, candidatePool]);
