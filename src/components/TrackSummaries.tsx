@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Flag, Trophy, ArrowUpDown } from 'lucide-react';
-import { formatTime, getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp } from '../utils/formatters.js';
-import { matchesCarClass, VEHICLE_CLASS_OPTIONS, getPaceCategoryStyle, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
-import { ReferenceLaptimeEntry } from '../../server/types.js';
+import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp } from '../utils/formatters.js';
+import { matchesCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
+import { ReferenceLaptimeEntry, PaceCategory } from '../../server/types.js';
+import { TrackSummariesHeader, TracksSortOption } from './track-summaries/TrackSummariesHeader';
+import { TrackSummaryCard, TrackSummaryItem } from './track-summaries/TrackSummaryCard';
 
-export type TracksSortOption = 'name-asc' | 'name-desc' | 'pace-asc' | 'last-session-desc';
+export type { TracksSortOption };
 
-interface SessionSummary {
+export interface SessionSummary {
   id: string;
   filename: string;
   trackVenue: string;
@@ -28,7 +29,7 @@ interface SessionSummary {
   };
 }
 
-interface TrackSummaryData {
+export interface TrackSummaryData {
   trackVenue: string;
   sessionsCount: number;
   totalLaps: number;
@@ -43,7 +44,7 @@ interface TrackSummaryData {
   carsUsed: string[];
 }
 
-interface TrackSummariesProps {
+export interface TrackSummariesProps {
   sessions?: SessionSummary[];
   tracksMap: Record<string, TrackSummaryData>;
   onSelectTrack: (trackName: string) => void;
@@ -68,7 +69,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       .catch(err => console.error('Failed to load reference laptimes in TrackSummaries:', err));
   }, []);
 
-  const trackList = React.useMemo(() => {
+  const trackList: TrackSummaryItem[] = useMemo(() => {
     if (!sessions || sessions.length === 0) {
       return Object.values(tracksMap).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
     }
@@ -156,10 +157,10 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     return findReferenceEntry(refCache.entries, trackName, '', targetClass, carType || '');
   };
 
-  const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null) => {
+  const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null): { category: PaceCategory; pct: number } | null => {
     if (!lapTime || !refEntry || !refEntry.target100Sec) return null;
     const pct = (lapTime / refEntry.target100Sec) * 100;
-    return { category: getPaceCategoryFromPercentage(pct), pct };
+    return { category: getPaceCategoryFromPercentage(pct) as PaceCategory, pct };
   };
 
   const sortedTrackList = useMemo(() => {
@@ -188,54 +189,13 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
 
   return (
     <div className="space-y-6">
-
-      {/* Header with Title & Car Class Filter */}
-      <div className="glass-panel p-5 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-            <Flag className="w-6 h-6 text-lmu-gold" />
-            Track Records & Benchmarks ({sortedTrackList.length} Tracks)
-          </h2>
-          <p className="text-xs text-lmu-muted mt-1">
-            Aggregated personal best lap times, theoretical limits, and car stats filtered by category
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap shrink-0">
-          {/* Sort Dropdown (Name, Pace, Last Session) */}
-          <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
-            <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
-            <span className="text-lmu-muted font-medium">Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as TracksSortOption)}
-              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="name-asc" className="bg-lmu-card text-white">Name (A-Z)</option>
-              <option value="name-desc" className="bg-lmu-card text-white">Name (Z-A)</option>
-              <option value="pace-asc" className="bg-lmu-card text-white">Pace / Benchmark (Best First)</option>
-              <option value="last-session-desc" className="bg-lmu-card text-white">Last Session (Newest First)</option>
-            </select>
-          </div>
-
-          {/* Car Class Filter Buttons */}
-          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto shrink-0">
-            {VEHICLE_CLASS_OPTIONS.map(cls => (
-              <button
-                key={cls.id}
-                onClick={() => setSelectedCarClass(cls.id)}
-                className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                  selectedCarClass === cls.id
-                    ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                    : 'text-lmu-muted hover:text-white'
-                }`}
-              >
-                {cls.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <TrackSummariesHeader
+        totalTracks={sortedTrackList.length}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+        selectedCarClass={selectedCarClass}
+        onSelectCarClass={setSelectedCarClass}
+      />
 
       {/* Grid of Tracks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -244,86 +204,15 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
           const paceInfo = getPaceCategoryForLap(t.bestLapTime, refEntry);
 
           return (
-            <div
+            <TrackSummaryCard
               key={t.trackVenue}
-              onClick={() => onSelectTrack(t.trackVenue)}
-              className="glass-panel glass-panel-hover p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1 mr-2">
-                    <h3 className="text-lg font-bold text-white tracking-wide truncate" title={t.trackVenue}>{t.trackVenue}</h3>
-                    <p className="text-xs text-lmu-muted mt-0.5 truncate">
-                      {t.sessionsCount} Sessions • {t.totalLaps} Total Laps
-                    </p>
-                  </div>
-                  <span className="p-2 rounded-xl bg-lmu-gold/10 text-lmu-gold border border-lmu-gold/20">
-                    <Trophy className="w-5 h-5" />
-                  </span>
-                </div>
-
-                {/* Best Lap vs Theoretical */}
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-lmu-border/60">
-                  <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50 flex flex-col justify-between">
-                    <div>
-                      <p className="text-xs text-lmu-muted font-semibold uppercase">Session Best</p>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
-                          {formatTime(t.bestLapTime)}
-                        </h4>
-                        {paceInfo && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold border ${getPaceCategoryStyle(paceInfo.category).badgeClass}`}>
-                            <span>{getPaceCategoryStyle(paceInfo.category).emoji}</span>
-                            <span>{paceInfo.category}</span>
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-lmu-muted mt-1 truncate">
-                        {t.bestLapCar || 'Car'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50">
-                    <p className="text-xs text-lmu-muted font-semibold uppercase">Theoretical Best</p>
-                    <h4 className="text-xl font-extrabold text-lmu-green font-mono mt-0.5">
-                      {formatTime(t.theoreticalBest)}
-                    </h4>
-                    <p className="text-[11px] text-lmu-muted mt-1">
-                      Optimal S1 + S2 + S3
-                    </p>
-                  </div>
-                </div>
-
-                {/* Sector Splits */}
-                <div className="flex items-center justify-between text-xs font-mono pt-1 text-lmu-muted">
-                  <span>S1: <strong className="text-white">{formatTime(t.bestS1)}</strong></span>
-                  <span>S2: <strong className="text-white">{formatTime(t.bestS2)}</strong></span>
-                  <span>S3: <strong className="text-white">{formatTime(t.bestS3)}</strong></span>
-                </div>
-              </div>
-
-              {/* Cars driven */}
-              {t.carsUsed.length > 0 && (
-                <div className="pt-2 flex flex-wrap gap-1 border-t border-lmu-border/40">
-                  {t.carsUsed.slice(0, 4).map(car => (
-                    <span key={car} className="px-2 py-0.5 text-[10px] font-medium rounded bg-lmu-card text-lmu-muted border border-lmu-border">
-                      {car}
-                    </span>
-                  ))}
-                  {t.carsUsed.length > 4 && (
-                    <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-lmu-card text-lmu-muted">
-                      +{t.carsUsed.length - 4} more
-                    </span>
-                  )}
-                </div>
-              )}
-
-            </div>
+              track={t}
+              paceInfo={paceInfo}
+              onSelectTrack={onSelectTrack}
+            />
           );
         })}
       </div>
-
     </div>
   );
 };
