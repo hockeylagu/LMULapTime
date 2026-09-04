@@ -16,46 +16,66 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
     );
   }, [session.drivers, selectedDriver]);
 
-  const driversToPlot = classDrivers.length > 0 ? classDrivers : session.drivers || [];
-  const maxClassLaps = Math.max(...driversToPlot.map((d) => (d.laps ? d.laps.length : 0)), 1);
-  const maxPosInClass = isMultiClass
-    ? Math.max(driversToPlot.length, 2)
-    : Math.max(
-        ...driversToPlot.flatMap((d) => (d.laps || []).map((l) => l.position)).filter((p) => p > 0),
-        driversToPlot.length,
-        1
-      );
+  const {
+    driversToPlot,
+    maxClassLaps,
+    maxPosInClass,
+    avgLapTime,
+    avgS1,
+    avgS2,
+    avgS3,
+  } = useMemo(() => {
+    const drivers = classDrivers.length > 0 ? classDrivers : session.drivers || [];
+    const maxLaps = Math.max(...drivers.map((d) => (d.laps ? d.laps.length : 0)), 1);
+    const maxPos = isMultiClass
+      ? Math.max(drivers.length, 2)
+      : Math.max(
+          ...drivers.flatMap((d) => (d.laps || []).map((l) => l.position)).filter((p) => p > 0),
+          drivers.length,
+          1
+        );
 
-  const completedLaps = (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0);
-  const hasMultipleLaps = completedLaps.length > 1;
+    const completed = (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0);
+    const hasMultiple = completed.length > 1;
 
-  const validFlyingLaps = completedLaps.filter((l) => l.isValid && (!hasMultipleLaps || l.lapNum > 1));
-  const cleanLapsForAvg =
-    validFlyingLaps.length > 0
-      ? validFlyingLaps
-      : completedLaps.filter((l) => !hasMultipleLaps || l.lapNum > 1).length > 0
-      ? completedLaps.filter((l) => !hasMultipleLaps || l.lapNum > 1)
-      : completedLaps;
+    const validFlying = completed.filter((l) => l.isValid && (!hasMultiple || l.lapNum > 1));
+    const cleanLaps =
+      validFlying.length > 0
+        ? validFlying
+        : completed.filter((l) => !hasMultiple || l.lapNum > 1).length > 0
+        ? completed.filter((l) => !hasMultiple || l.lapNum > 1)
+        : completed;
 
-  const avgLapTime =
-    cleanLapsForAvg.length > 0
-      ? cleanLapsForAvg.reduce((sum, l) => sum + (l.lapTime || 0), 0) / cleanLapsForAvg.length
-      : null;
+    const avgTime =
+      cleanLaps.length > 0
+        ? cleanLaps.reduce((sum, l) => sum + (l.lapTime || 0), 0) / cleanLaps.length
+        : null;
 
-  const s1Laps = (selectedDriver.laps || []).filter(
-    (l) => l.s1 !== null && l.s1 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
-  );
-  const avgS1 = s1Laps.length > 0 ? s1Laps.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1Laps.length : null;
+    const s1L = (selectedDriver.laps || []).filter(
+      (l) => l.s1 !== null && l.s1 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+    );
+    const s1Avg = s1L.length > 0 ? s1L.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1L.length : null;
 
-  const s2Laps = (selectedDriver.laps || []).filter(
-    (l) => l.s2 !== null && l.s2 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
-  );
-  const avgS2 = s2Laps.length > 0 ? s2Laps.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2Laps.length : null;
+    const s2L = (selectedDriver.laps || []).filter(
+      (l) => l.s2 !== null && l.s2 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+    );
+    const s2Avg = s2L.length > 0 ? s2L.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2L.length : null;
 
-  const s3Laps = (selectedDriver.laps || []).filter(
-    (l) => l.s3 !== null && l.s3 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
-  );
-  const avgS3 = s3Laps.length > 0 ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length : null;
+    const s3L = (selectedDriver.laps || []).filter(
+      (l) => l.s3 !== null && l.s3 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+    );
+    const s3Avg = s3L.length > 0 ? s3L.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3L.length : null;
+
+    return {
+      driversToPlot: drivers,
+      maxClassLaps: maxLaps,
+      maxPosInClass: maxPos,
+      avgLapTime: avgTime,
+      avgS1: s1Avg,
+      avgS2: s2Avg,
+      avgS3: s3Avg,
+    };
+  }, [classDrivers, session.drivers, selectedDriver, isMultiClass]);
 
   const positionChartData = useMemo(() => {
     return Array.from({ length: maxClassLaps }, (_, i) => {

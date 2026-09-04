@@ -7,13 +7,21 @@ import { SessionLapTable } from './session-detail/SessionLapTable.js';
 import { SessionStewardsLog } from './session-detail/SessionStewardsLog.js';
 import { SessionRaceStandings } from './session-detail/SessionRaceStandings.js';
 
-interface SessionDetailProps {
+export interface SessionDetailProps {
   sessionId: string;
   onBack: () => void;
   onSelectSession?: (sessionId: string) => void;
+  progression?: any[];
+  sessions?: any[];
 }
 
-export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack, onSelectSession }) => {
+export const SessionDetail: React.FC<SessionDetailProps> = ({
+  sessionId,
+  onBack,
+  onSelectSession,
+  progression,
+  sessions,
+}) => {
   const {
     session,
     loading,
@@ -40,7 +48,12 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({ sessionId, onBack,
     refEntry,
     fuelStrategy,
     relatedSession,
-  } = useSessionDetailData({ sessionId, onSelectSession });
+  } = useSessionDetailData({
+    sessionId,
+    onSelectSession,
+    initialProgression: progression,
+    initialSessions: sessions,
+  });
 
   if (loading) {
     return (
