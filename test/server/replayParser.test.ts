@@ -1329,4 +1329,358 @@ describe('replayParser', () => {
         fs.unlinkSync(pitVcr);
       });
     });
+
+    describe('extended VCR format features', () => {
+      it('extracts modUid and trackPath strings from replay metadata', () => {
+        const filePath = path.join(tempDir, 'meta_extended.vcr');
+        fs.writeFileSync(filePath, createSliceVcrBuffer());
+        const meta = parseReplayMetadata(filePath);
+        expect(meta.modUid).toBe('hash_123');
+        expect(meta.trackPath).toBe('C:\\Tracks\\Test');
+        fs.unlinkSync(filePath);
+      });
+
+      it('decodes sessionType and privateSession flag from session byte in metadata', () => {
+        // Construct VCR with session configuration byte: 133 (0x85 -> private=true, code=5 -> Qualifying)
+        const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+        const headerBuf = Buffer.from(headerText, 'ascii');
+        const irsrBuf = Buffer.from('IRSR', 'ascii');
+        const verBuf = Buffer.alloc(4);
+        verBuf.writeUInt32LE(0x80000008, 0);
+        const offsetBuf = Buffer.alloc(4);
+
+        function makeStr4(str: string): Buffer {
+          const sBuf = Buffer.from(str, 'utf8');
+          const lBuf = Buffer.alloc(4);
+          lBuf.writeUInt32LE(sBuf.length, 0);
+          return Buffer.concat([lBuf, sBuf]);
+        }
+
+        const metaParts = [
+          makeStr4(JSON.stringify({ eventTitle: 'Q1 Session' })),
+          makeStr4('PORTIMAO.SCN'),
+          makeStr4('PORTIMAO.AIW'),
+          makeStr4('Portimao'),
+          makeStr4('1.23'),
+          makeStr4('uid_456'),
+          makeStr4('C:\\Tracks\\Portimao'),
+          Buffer.from([0x0d, 133]), // Byte 0 = unknown, Byte 1 = 133 (0x85 -> private=true, sessionType=Qualifying)
+        ];
+
+        // Environment block + numDrivers (0) + trailer
+        metaParts.push(Buffer.alloc(67)); // 67-byte env block
+        const nDrvBuf = Buffer.alloc(4);
+        nDrvBuf.writeInt32LE(0, 0); // 0 drivers
+        metaParts.push(nDrvBuf);
+        const trailer = Buffer.alloc(28);
+        metaParts.push(trailer);
+
+        const metaBuf = Buffer.concat(metaParts);
+        const metaOffset = 57;
+        offsetBuf.writeUInt32LE(metaOffset, 0);
+        const fullBuf = Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, metaBuf]);
+
+        const filePath = path.join(tempDir, 'session_byte_test.vcr');
+        fs.writeFileSync(filePath, fullBuf);
+        const meta = parseReplayMetadata(filePath);
+
+        expect(meta.sessionType).toBe('Qualifying');
+        expect(meta.privateSession).toBe(true);
+        expect(meta.modUid).toBe('uid_456');
+        expect(meta.trackPath).toBe('C:\\Tracks\\Portimao');
+        fs.unlinkSync(filePath);
+      });
+
+      it('parses deterministic structured driver table with entryTime and exitTime', () => {
+        const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+        const headerBuf = Buffer.from(headerText, 'ascii');
+        const irsrBuf = Buffer.from('IRSR', 'ascii');
+        const verBuf = Buffer.alloc(4);
+        verBuf.writeUInt32LE(0x80000008, 0);
+        const offsetBuf = Buffer.alloc(4);
+
+        function makeStr4(str: string): Buffer {
+          const sBuf = Buffer.from(str, 'utf8');
+          const lBuf = Buffer.alloc(4);
+          lBuf.writeUInt32LE(sBuf.length, 0);
+          return Buffer.concat([lBuf, sBuf]);
+        }
+
+        function makePStr(str: string): Buffer {
+          const b = Buffer.from(str, 'utf8');
+          return Buffer.concat([Buffer.from([b.length]), b]);
+        }
+
+        const metaParts = [
+          makeStr4(JSON.stringify({ eventTitle: 'Multi Driver Test' })),
+          makeStr4('TRACK.SCN'),
+          makeStr4('TRACK.AIW'),
+          makeStr4('Track'),
+          makeStr4('1.0'),
+          makeStr4('uid'),
+          makeStr4('path'),
+          Buffer.from([0x01, 0x01]), // session byte: Practice
+          Buffer.alloc(67), // 67 bytes environment block
+        ];
+
+        // numDrivers = 2
+        const nDrvBuf = Buffer.alloc(4);
+        nDrvBuf.writeInt32LE(2, 0);
+        metaParts.push(nDrvBuf);
+
+        // Driver 0: slot 0, Douglas Riviera, entryTime=10.5, exitTime=120.0
+        metaParts.push(Buffer.from([0])); // slot 0
+        metaParts.push(makePStr('Douglas Riviera'));
+        metaParts.push(makePStr('32_26_WRT_83524148'));
+        metaParts.push(makePStr('')); // livery
+        metaParts.push(makePStr('Team WRT 2026 #32'));
+        metaParts.push(makePStr('32')); // carNumber
+        const fixed0 = Buffer.alloc(24);
+        fixed0.writeFloatLE(10.5, 16); // entryTime
+        fixed0.writeFloatLE(120.0, 20); // exitTime
+        metaParts.push(fixed0);
+
+        // Transition: 2 bytes index (0), 2 bytes next slot (1)
+        const trans = Buffer.alloc(4);
+        trans.writeUInt16BE(0, 0);
+        trans.writeUInt16BE(1, 2);
+        metaParts.push(trans);
+
+        // Driver 1: slot 1, Vincenzo Maggio, entryTime=0.0, exitTime=250.0
+        metaParts.push(makePStr('Vincenzo Maggio'));
+        metaParts.push(makePStr('86_24_GRR_82B297D8'));
+        metaParts.push(makePStr(''));
+        metaParts.push(makePStr('GR Racing 2024 #86'));
+        metaParts.push(makePStr('86'));
+        const fixed1 = Buffer.alloc(24);
+        fixed1.writeFloatLE(0.0, 16);
+        fixed1.writeFloatLE(250.0, 20);
+        metaParts.push(fixed1);
+
+        const trailer = Buffer.alloc(28);
+        metaParts.push(trailer);
+
+        const metaBuf = Buffer.concat(metaParts);
+        const metaOffset = 57;
+        offsetBuf.writeUInt32LE(metaOffset, 0);
+        const fullBuf = Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, metaBuf]);
+
+        const filePath = path.join(tempDir, 'struct_driver_test.vcr');
+        fs.writeFileSync(filePath, fullBuf);
+        const meta = parseReplayMetadata(filePath);
+
+        expect(meta.drivers.length).toBe(2);
+        expect(meta.drivers[0].name).toBe('Douglas Riviera');
+        expect(meta.drivers[0].carModel).toBe('BMW M4 GT3');
+        expect(meta.drivers[0].entryTime).toBe(10.5);
+        expect(meta.drivers[0].exitTime).toBe(120.0);
+
+        expect(meta.drivers[1].name).toBe('Vincenzo Maggio');
+        expect(meta.drivers[1].carNumber).toBe('86');
+        expect(meta.drivers[1].exitTime).toBe(250.0);
+        fs.unlinkSync(filePath);
+      });
+
+      it('extracts rotX, rotZ, physicsRpm, and detachablePartState in trajectory points', () => {
+        const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+        const headerBuf = Buffer.from(headerText, 'ascii');
+        const irsrBuf = Buffer.from('IRSR', 'ascii');
+        const verBuf = Buffer.alloc(4);
+        verBuf.writeUInt32LE(0x80000008, 0);
+        const streamPrefix = Buffer.alloc(4);
+
+        // Build 10 trajectory slices with pitch (rotX), roll (rotZ), RPM, and damage
+        const sliceBufs: Buffer[] = [];
+        for (let i = 0; i < 10; i++) {
+          const sBuf = Buffer.alloc(6);
+          sBuf.writeFloatLE(10.0 + i * 0.1, 0);
+          sBuf.writeUInt16LE(1, 4); // 1 event
+
+          const evHdr = Buffer.alloc(4);
+          evHdr.writeUInt32LE((65 << 8) | 1, 0); // sz=65, drv=1, class=0
+          const evPad = Buffer.from([0]);
+
+          const evData = Buffer.alloc(65);
+          // info1 at offset 0: rpm = 7200 -> (7200 << 18)
+          evData.writeUInt32LE(7200 << 18, 0);
+          // info2 at offset 4: detachablePartState = 42
+          evData.writeUInt32LE(42, 4);
+
+          // Position
+          evData.writeFloatLE(100.0 + i * 10, 41);
+          evData.writeFloatLE(5.0, 45);
+          evData.writeFloatLE(200.0, 49);
+
+          // 3D orientation: rotX = -0.05 (pitch), rotY = 1.57, rotZ = 0.02 (roll)
+          evData.writeFloatLE(-0.05, 53);
+          evData.writeFloatLE(1.57, 57);
+          evData.writeFloatLE(0.02, 61);
+
+          sliceBufs.push(sBuf, evHdr, evPad, evData);
+        }
+
+        const framesBuf = Buffer.concat([streamPrefix, ...sliceBufs]);
+
+        function makeStr4(str: string): Buffer {
+          const sBuf = Buffer.from(str, 'utf8');
+          const lBuf = Buffer.alloc(4);
+          lBuf.writeUInt32LE(sBuf.length, 0);
+          return Buffer.concat([lBuf, sBuf]);
+        }
+
+        const metaParts = [
+          makeStr4(JSON.stringify({ eventTitle: 'Telemetry Test' })),
+          makeStr4('T.SCN'),
+          makeStr4('T.AIW'),
+          makeStr4('Track'),
+          makeStr4('1.0'),
+          makeStr4('mod'),
+          makeStr4('path'),
+          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+        ];
+        const trailer = Buffer.alloc(28);
+        trailer.writeUInt32LE(10, 4);
+        trailer.writeUInt32LE(10, 8);
+        trailer.writeFloatLE(10.0, 12);
+        trailer.writeFloatLE(11.0, 16);
+        metaParts.push(trailer);
+
+        const metaBuf = Buffer.concat(metaParts);
+        const metaOffset = 57 + framesBuf.length;
+        const offsetBuf = Buffer.alloc(4);
+        offsetBuf.writeUInt32LE(metaOffset, 0);
+
+        const fullBuf = Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, framesBuf, metaBuf]);
+        const filePath = path.join(tempDir, '3d_telemetry_test.vcr');
+        fs.writeFileSync(filePath, fullBuf);
+
+        const traj = extractReplayTrajectory(filePath, { driverSlot: 1 });
+        expect(traj.points.length).toBeGreaterThan(0);
+        const pt = traj.points[0];
+        expect(pt.rpm).toBe(7200);
+        expect(pt.rotX).toBe(-0.05);
+        expect(pt.rotZ).toBe(0.02);
+        expect(pt.detachablePartState).toBe(42);
+        fs.unlinkSync(filePath);
+      });
+
+      it('extracts penalties and pit lane events from slice streams', () => {
+        const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+        const headerBuf = Buffer.from(headerText, 'ascii');
+        const irsrBuf = Buffer.from('IRSR', 'ascii');
+        const verBuf = Buffer.alloc(4);
+        verBuf.writeUInt32LE(0x80000008, 0);
+        const streamPrefix = Buffer.alloc(4);
+
+        const sliceBufs: Buffer[] = [];
+        // Slice 1: Car position + Class 2 Type 5 (Penalty given: "Cut track")
+        const sBuf1 = Buffer.alloc(6);
+        sBuf1.writeFloatLE(25.5, 0);
+        sBuf1.writeUInt16LE(2, 4); // 2 events
+
+        // Event 1: Motion (sz=65)
+        const evHdr1 = Buffer.alloc(4);
+        evHdr1.writeUInt32LE((65 << 8) | 1, 0);
+        const evData1 = Buffer.alloc(65);
+        evData1.writeFloatLE(100, 41);
+        evData1.writeFloatLE(0, 45);
+        evData1.writeFloatLE(200, 49);
+
+        // Event 2: Class 2 Type 5 Penalty Given: "Cut track warning"
+        // class = 2 (1 << 30), type = 5 (5 << 17), drv = 1
+        const penaltyText = Buffer.from('Cut track warning', 'utf8');
+        const penaltySize = 3 + penaltyText.length;
+        const evHdr2 = Buffer.alloc(4);
+        const hVal = (2 << 29) | (5 << 17) | (penaltySize << 8) | 1;
+        evHdr2.writeUInt32LE(hVal >>> 0, 0);
+        const evData2 = Buffer.concat([Buffer.from([1, 0, 0]), penaltyText]); // 3-byte prefix + string
+
+        sliceBufs.push(sBuf1, evHdr1, Buffer.from([0]), evData1, evHdr2, Buffer.from([0]), evData2);
+
+        // Slice 2: Motion + Class 5 Type 2 Pit Event (code 34 = entered pit lane)
+        const sBuf2 = Buffer.alloc(6);
+        sBuf2.writeFloatLE(30.0, 0);
+        sBuf2.writeUInt16LE(2, 4);
+
+        const evHdr3 = Buffer.alloc(4);
+        evHdr3.writeUInt32LE((65 << 8) | 1, 0);
+        const evData3 = Buffer.alloc(65);
+        evData3.writeFloatLE(120, 41);
+        evData3.writeFloatLE(0, 45);
+        evData3.writeFloatLE(220, 49);
+
+        const evHdr4 = Buffer.alloc(4);
+        // class = 5 (5 << 29), type = 2 (2 << 17), size = 1, drv = 1
+        const pitVal = ((5 << 29) | (2 << 17) | (1 << 8) | 1) >>> 0;
+        evHdr4.writeUInt32LE(pitVal, 0);
+        const evData4 = Buffer.from([34]); // code 34: entered pit lane
+
+        sliceBufs.push(sBuf2, evHdr3, Buffer.from([0]), evData3, evHdr4, Buffer.from([0]), evData4);
+
+        const framesBuf = Buffer.concat([streamPrefix, ...sliceBufs]);
+
+        function makeStr4(str: string): Buffer {
+          const sBuf = Buffer.from(str, 'utf8');
+          const lBuf = Buffer.alloc(4);
+          lBuf.writeUInt32LE(sBuf.length, 0);
+          return Buffer.concat([lBuf, sBuf]);
+        }
+
+        const metaParts = [
+          makeStr4(JSON.stringify({ eventTitle: 'Penalty/Pit Test' })),
+          makeStr4('T.SCN'),
+          makeStr4('T.AIW'),
+          makeStr4('Track'),
+          makeStr4('1.0'),
+          makeStr4('mod'),
+          makeStr4('path'),
+          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+        ];
+        const trailer = Buffer.alloc(28);
+        metaParts.push(trailer);
+
+        const metaBuf = Buffer.concat(metaParts);
+        const metaOffset = 57 + framesBuf.length;
+        const offsetBuf = Buffer.alloc(4);
+        offsetBuf.writeUInt32LE(metaOffset, 0);
+
+        const fullBuf = Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, framesBuf, metaBuf]);
+        const filePath = path.join(tempDir, 'penalty_pit_test.vcr');
+        fs.writeFileSync(filePath, fullBuf);
+
+        const traj = extractReplayTrajectory(filePath, { driverSlot: 1 });
+        expect(traj.penalties).toBeDefined();
+        expect(traj.penalties?.length).toBe(1);
+        expect(traj.penalties?.[0].penaltyText).toBe('Cut track warning');
+        expect(traj.penalties?.[0].action).toBe('given');
+
+        expect(traj.pitEvents).toBeDefined();
+        expect(traj.pitEvents?.length).toBe(1);
+        expect(traj.pitEvents?.[0].code).toBe(34);
+        expect(traj.pitEvents?.[0].action).toBe('entered pit lane');
+        fs.unlinkSync(filePath);
+      });
+
+      const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
+      const realP1File = path.join(steamReplays, 'Algarve International Circuit P1 39.Vcr');
+      const realQ1File = path.join(steamReplays, 'Algarve International Circuit Q1 10.Vcr');
+
+      if (fs.existsSync(realP1File) && fs.existsSync(realQ1File)) {
+        it('validates sessionType, modUid, trackPath, and structured drivers on real LMU replay files', () => {
+          const p1Meta = parseReplayMetadata(realP1File);
+          expect(p1Meta.sessionType).toBe('Practice');
+          expect(p1Meta.privateSession).toBe(false);
+          expect(p1Meta.modUid).toBeDefined();
+          expect(p1Meta.trackPath).toContain('Locations');
+          expect(p1Meta.drivers.length).toBe(21);
+          expect(p1Meta.drivers[0].entryTime).toBeDefined();
+
+          const q1Meta = parseReplayMetadata(realQ1File);
+          expect(q1Meta.sessionType).toBe('Qualifying');
+          expect(q1Meta.privateSession).toBe(true);
+          expect(q1Meta.drivers.length).toBe(20);
+        });
+      }
+    });
 });
+

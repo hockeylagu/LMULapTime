@@ -396,6 +396,9 @@ export interface ReplayDriverEntry {
   carClass?: string;
   team?: string;
   carNumber?: string;
+  livery?: string;
+  entryTime?: number;
+  exitTime?: number;
   isPlayer?: boolean;
 }
 
@@ -406,10 +409,14 @@ export interface ReplayMetadata {
   mtimeMs: number;
   eventInfo?: ReplayEventInfo | null;
   eventTitle?: string;
+  sessionType?: string;
+  privateSession?: boolean;
   scn?: string;
   aiw?: string;
   trackName?: string;
   trackVersion?: string;
+  modUid?: string;
+  trackPath?: string;
   timeSliceCount: number;
   totalEvents: number;
   durationSec: number;
@@ -423,7 +430,9 @@ export interface ReplayTrajectoryPoint {
   x: number;
   y: number;
   z: number;
+  rotX?: number;
   rotY?: number;
+  rotZ?: number;
   speedKmh?: number;
   throttle?: number;
   brake?: number;
@@ -437,6 +446,25 @@ export interface ReplayTrajectoryPoint {
   absActive?: boolean;
   pitLimiter?: boolean;
   isOffTrack?: boolean;
+  detachablePartState?: number;
+}
+
+export interface ReplayPenaltyEvent {
+  driverSlot: number;
+  driverName?: string;
+  timeSec: number;
+  penaltyText: string;
+  penaltyType?: string;
+  action: 'given' | 'served' | 'removed';
+}
+
+export interface ReplayPitEvent {
+  driverSlot: number;
+  driverName?: string;
+  timeSec: number;
+  code: number;
+  action: string;
+  details?: string;
 }
 
 export type ReplayTelemetryPoint = ReplayTrajectoryPoint;
@@ -501,6 +529,9 @@ export interface ReplayTrajectoryData {
     spanZ: number;
   };
   points: ReplayTrajectoryPoint[];
+  penalties?: ReplayPenaltyEvent[];
+  pitEvents?: ReplayPitEvent[];
+  sessionRunningOrder?: number[];
   validation?: ReplayTrajectoryValidation | null;
 }
 
