@@ -478,6 +478,7 @@ export interface ReplayLapSummary {
   s3Sec: number;
   isOutlap?: boolean;
   isBest?: boolean;
+  isValid?: boolean;
   startFrame?: number;
   endFrame?: number;
   // Validation info from matched session log (if available)

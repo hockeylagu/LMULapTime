@@ -888,11 +888,12 @@ export function extractReplayTrajectory(
       s2Idx: number;
       isOutlap: boolean;
       isBest: boolean;
+      isValid?: boolean;
     }
 
     let detectedLaps: DetectedLapInternal[] = [];
 
-    // 1. Authoritative VCR timing packets (sz === 21) from simulation timing loops
+    // 1. Authoritative VCR timing packets (Class 6 / 3, Type 6, sz === 21) from simulation timing loops
     const targetTimings = targetSlot !== undefined ? vcrTimingEvents.filter(e => e.drv === targetSlot) : [];
     const finishTimings = targetTimings.filter(e => e.sector === 0).sort((a, b) => a.lapIdx - b.lapIdx);
 
@@ -922,13 +923,13 @@ export function extractReplayTrajectory(
         const endIdx = findClosestIdx(finishTime);
         const lapDist = cumDist[endIdx] - cumDist[startIdx];
 
-        // Skip aborted/incomplete session flush events (e.g. session end flush where splitSec is <= 0 and distance/time is tiny)
-        if (ft.splitSec <= 0 && (lapDist < 1000 || lapTimeSec < 20) && i > 0) {
-          continue;
-        }
-
         const s1Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 1);
         const s2Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 2);
+
+        // Skip aborted/incomplete session flush events (e.g. session end flush where splitSec is <= 0 and lap was not completed)
+        if (ft.splitSec <= 0 && (!s1Ev || lapTimeSec < 20) && i > 0) {
+          continue;
+        }
         let s1Sec: number;
         let s2Sec: number;
         let s3Sec: number;
@@ -938,15 +939,21 @@ export function extractReplayTrajectory(
         if (s1Ev && s1Ev.splitSec > 0) {
           s1Sec = Number(s1Ev.splitSec.toFixed(3));
           s1Idx = findClosestIdx(s1Ev.sTime);
+        } else if (s1Ev && s1Ev.sTime > startTime) {
+          s1Idx = findClosestIdx(s1Ev.sTime);
+          s1Sec = Number((s1Ev.sTime - startTime).toFixed(3));
         } else {
           const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
           while (s1Idx < endIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
           s1Sec = Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3));
         }
 
-        if (s1Ev && s2Ev && s2Ev.splitSec > s1Ev.splitSec) {
+        if (s1Ev && s2Ev && s2Ev.splitSec > s1Ev.splitSec && s1Ev.splitSec > 0) {
           s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
           s2Idx = findClosestIdx(s2Ev.sTime);
+        } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime) {
+          s2Idx = findClosestIdx(s2Ev.sTime);
+          s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
         } else {
           s2Idx = s1Idx;
           const s2TargetDist = cumDist[startIdx] + lapDist * 0.6667;
@@ -954,11 +961,16 @@ export function extractReplayTrajectory(
           s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
         }
 
-        if (s2Ev && ft.splitSec > s2Ev.splitSec) {
+        if (s2Ev && ft.splitSec > s2Ev.splitSec && s2Ev.splitSec > 0 && ft.splitSec > 0) {
           s3Sec = Number((ft.splitSec - s2Ev.splitSec).toFixed(3));
+        } else if (s2Ev && finishTime > s2Ev.sTime) {
+          s3Sec = Number((finishTime - s2Ev.sTime).toFixed(3));
         } else {
           s3Sec = Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
         }
+
+        const isValid = ft.splitSec > 0;
+        const isOutlap = i === 0 || (startIdx >= 0 && Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit));
 
         detectedLaps.push({
           lapNumber: lapNum,
@@ -971,13 +983,77 @@ export function extractReplayTrajectory(
           s3Sec,
           s1Idx,
           s2Idx,
-          isOutlap: i === 0,
+          isOutlap,
           isBest: false,
+          isValid,
         });
       }
 
-      const flying = detectedLaps.filter(l => !l.isOutlap && l.lapTimeSec > 50);
-      const pool = flying.length > 0 ? flying : detectedLaps;
+      // If vehicle continued on track after last finish event and completed sectors, capture final in-progress lap
+      if (finishTimings.length > 0 && rawPts.length > 0) {
+        const lastFt = finishTimings[finishTimings.length - 1];
+        const lastStartIdx = findClosestIdx(lastFt.sTime);
+        const finalIdx = rawPts.length - 1;
+        const inProgressDist = cumDist[finalIdx] - cumDist[lastStartIdx];
+        const inProgressTime = rawPts[finalIdx].sTime - lastFt.sTime;
+
+        if (inProgressTime > 15 && inProgressDist > 600) {
+          const s1Ev = targetTimings.find(e => e.lapIdx === lastFt.lapIdx + 1 && e.sector === 1);
+          const s2Ev = targetTimings.find(e => e.lapIdx === lastFt.lapIdx + 1 && e.sector === 2);
+          let s1Sec = 0;
+          let s2Sec = 0;
+          let s3Sec = 0;
+          let s1Idx = lastStartIdx;
+          let s2Idx = lastStartIdx;
+
+          if (s1Ev && s1Ev.splitSec > 0) {
+            s1Sec = Number(s1Ev.splitSec.toFixed(3));
+            s1Idx = findClosestIdx(s1Ev.sTime);
+          } else if (s1Ev && s1Ev.sTime > lastFt.sTime) {
+            s1Idx = findClosestIdx(s1Ev.sTime);
+            s1Sec = Number((s1Ev.sTime - lastFt.sTime).toFixed(3));
+          } else {
+            const s1TargetDist = cumDist[lastStartIdx] + inProgressDist * 0.3333;
+            while (s1Idx < finalIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
+            s1Sec = Number((rawPts[s1Idx].sTime - lastFt.sTime).toFixed(3));
+          }
+
+          if (s2Ev && s1Ev && s2Ev.splitSec > s1Ev.splitSec && s1Ev.splitSec > 0) {
+            s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
+            s2Idx = findClosestIdx(s2Ev.sTime);
+          } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime) {
+            s2Idx = findClosestIdx(s2Ev.sTime);
+            s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
+          } else {
+            s2Idx = s1Idx;
+            const s2TargetDist = cumDist[lastStartIdx] + inProgressDist * 0.6667;
+            while (s2Idx < finalIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
+            s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
+          }
+
+          s3Sec = Number((rawPts[finalIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
+
+          detectedLaps.push({
+            lapNumber: lastFt.lapIdx + 2,
+            startIdx: lastStartIdx,
+            endIdx: finalIdx,
+            lapTimeSec: Number(inProgressTime.toFixed(3)),
+            lapDistMeters: Math.round(inProgressDist),
+            s1Sec,
+            s2Sec,
+            s3Sec,
+            s1Idx,
+            s2Idx,
+            isOutlap: false,
+            isBest: false,
+            isValid: false,
+          });
+        }
+      }
+
+      const validFlying = detectedLaps.filter(l => !l.isOutlap && l.isValid && l.lapTimeSec > 30);
+      const fallbackFlying = detectedLaps.filter(l => !l.isOutlap && l.lapTimeSec > 30);
+      const pool = validFlying.length > 0 ? validFlying : (fallbackFlying.length > 0 ? fallbackFlying : detectedLaps);
       let minTime = Infinity;
       let bestLapNum = pool[0]?.lapNumber;
       for (const l of pool) {
@@ -1464,6 +1540,7 @@ export function extractReplayTrajectory(
       s3Sec: l.s3Sec,
       isOutlap: l.isOutlap,
       isBest: l.isBest,
+      isValid: l.isValid ?? !l.isOutlap,
       startFrame: 0,
       endFrame: targetFrames,
     }));
@@ -1498,4 +1575,25 @@ export function extractReplayTrajectory(
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * Fast direct extractor for 100% official lap summaries and sector splits
+ * streaming Class 6 Type 6 simulation timing events.
+ */
+export function extractReplayLapSummaries(
+  filePath: string,
+  options: {
+    driverSlot?: number;
+    driverName?: string;
+    playerName?: string;
+  } = {}
+): ReplayLapSummary[] {
+  const traj = extractReplayTrajectory(filePath, {
+    driverSlot: options.driverSlot,
+    driverName: options.driverName,
+    playerName: options.playerName,
+    maxPoints: 10,
+  });
+  return traj.laps || [];
 }

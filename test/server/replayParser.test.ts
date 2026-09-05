@@ -7,6 +7,7 @@ import {
   mapVehicleIdToModel,
   detectPlayerName,
   KNOWN_TRACK_SF_COORDS,
+  extractReplayLapSummaries,
 } from '../../server/replayParser';
 
 function createMockVcrBuffer(): Buffer {
@@ -1679,6 +1680,132 @@ describe('replayParser', () => {
           expect(q1Meta.sessionType).toBe('Qualifying');
           expect(q1Meta.privateSession).toBe(true);
           expect(q1Meta.drivers.length).toBe(20);
+        });
+      }
+
+      it('extracts 100% official lap summaries, sector splits, and lap validity via extractReplayLapSummaries', () => {
+        // Build a VCR buffer with 2 full laps:
+        // Lap 1: valid flying lap (S1 = 25.0s, S2 cum = 60.0s -> S2 = 35.0s, Finish = 95.0s -> S3 = 35.0s)
+        // Lap 2: cut/invalidated lap (splitSec = -1)
+        const slices: any[] = [];
+        let t = 100.0;
+
+        // Out-lap / approach to S/F line
+        for (let i = 0; i < 5; i++) {
+          t += 1.0;
+          slices.push({ sTime: t, driverSlot: 1, x: 0, y: 0, z: i * 20 });
+        }
+        // Crossing S/F to start Lap 1
+        const lap1StartTime = t;
+        slices.push({
+          sTime: lap1StartTime,
+          driverSlot: 1,
+          x: 0,
+          y: 0,
+          z: 100,
+          timing: { splitSec: -1, sector: 0, lapIdx: 0 },
+        });
+
+        // Driving Sector 1
+        t += 25.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 200,
+          y: 0,
+          z: 500,
+          timing: { splitSec: 25.0, sector: 1, lapIdx: 1 },
+        });
+
+        // Driving Sector 2
+        t += 35.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 400,
+          y: 0,
+          z: 1000,
+          timing: { splitSec: 60.0, sector: 2, lapIdx: 1 },
+        });
+
+        // Completing Lap 1 at S/F line
+        t += 35.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 0,
+          y: 0,
+          z: 100,
+          timing: { splitSec: 95.0, sector: 0, lapIdx: 1 },
+        });
+
+        // Driving Lap 2 (cut lap)
+        t += 24.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 200,
+          y: 0,
+          z: 500,
+          timing: { splitSec: 24.0, sector: 1, lapIdx: 2 },
+        });
+        t += 34.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 400,
+          y: 0,
+          z: 1000,
+          timing: { splitSec: 58.0, sector: 2, lapIdx: 2 },
+        });
+        t += 36.0;
+        slices.push({
+          sTime: t,
+          driverSlot: 1,
+          x: 0,
+          y: 0,
+          z: 100,
+          timing: { splitSec: -1.0, sector: 0, lapIdx: 2 },
+        });
+
+        const vcrPath = path.join(tempDir, 'official_laps_test.vcr');
+        fs.writeFileSync(vcrPath, createSliceVcrBuffer({ slices }));
+
+        const laps = extractReplayLapSummaries(vcrPath, { driverSlot: 1 });
+        expect(laps.length).toBeGreaterThanOrEqual(2);
+
+        // Lap 1: valid flying lap
+        const lap1 = laps.find(l => l.lapNumber === 2);
+        expect(lap1).toBeDefined();
+        expect(lap1?.lapTimeSec).toBe(95.0);
+        expect(lap1?.s1Sec).toBe(25.0);
+        expect(lap1?.s2Sec).toBe(35.0);
+        expect(lap1?.s3Sec).toBe(35.0);
+        expect(lap1?.isValid).toBe(true);
+        expect(lap1?.isBest).toBe(true);
+
+        // Lap 2: cut lap
+        const lap2 = laps.find(l => l.lapNumber === 3);
+        expect(lap2).toBeDefined();
+        expect(lap2?.isValid).toBe(false);
+        expect(lap2?.lapTimeSec).toBeCloseTo(94.0, 0);
+
+        fs.unlinkSync(vcrPath);
+      });
+
+      const p1_41_File = path.join(steamReplays, 'Algarve International Circuit P1 41.Vcr');
+      if (fs.existsSync(p1_41_File)) {
+        it('extracts official lap summaries directly from Class 6 Type 6 events on real Algarve P1 41 replay', () => {
+          // Driver slot 2 had 19 timing events in our inspection
+          const laps = extractReplayLapSummaries(p1_41_File, { driverSlot: 2 });
+          expect(laps.length).toBeGreaterThan(0);
+          // Has valid flying lap with lapTimeSec = 106.805s
+          const lap17 = laps.find(l => l.lapTimeSec === 106.805 || l.lapNumber === 17);
+          expect(lap17).toBeDefined();
+          if (lap17) {
+            expect(lap17.isValid).toBe(true);
+            expect(lap17.lapTimeSec).toBeCloseTo(106.805, 1);
+          }
         });
       }
     });

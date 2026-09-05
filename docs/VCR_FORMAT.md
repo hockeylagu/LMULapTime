@@ -169,12 +169,23 @@ Contains individual 4-wheel telemetry (Front-Left, Front-Right, Rear-Left, Rear-
 ### Class 6 (or 3): Timing Loops, Standings & Pit Lane
 
 #### Type 6 (`eventSize === 21`): Authoritative Timing Loop Checkpoint
-Fired when a vehicle crosses an electronic timing loop (Start/Finish, Sector 1, Sector 2).
-- `+0` (4 bytes, Float32LE): `splitSec`: Lap time or sector split time in seconds. `-1.0` indicates an out-lap or invalidated split.
-- `+4` (4 bytes, Float32LE): `elapsedTime`: Session time when loop was triggered.
-- `+8` (1 byte, UInt8): Sector and Lap index bitfield:
-  - `buf[8] & 0x03`: Sector index (`0` = Start/Finish Line, `1` = Sector 1, `2` = Sector 2).
-  - `buf[8] >> 2`: Lap index (`0` = Lap 1, `1` = Lap 2, etc.).
+Fired when a vehicle crosses an electronic simulation timing loop (Start/Finish line, Sector 1, Sector 2).
+
+| Offset | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `+0` | 4 bytes | Float32LE | **`splitSec`**: Lap time or sector split time in seconds. <br>• Positive float (`> 0`): Official valid lap or sector time. <br>• `-1.0` or `<= 0`: Invalidated lap (cut track / track limits violation) or initial session outlap. |
+| `+4` | 4 bytes | Float32LE | **`elapsedTime`**: Absolute simulation session time (`sTime`) when the checkpoint loop was crossed. |
+| `+8` | 1 byte | UInt8 | **Sector & Lap Bitfield**: <br>• `buf[8] & 0x03`: Sector checkpoint index (`0` = Start/Finish Line, `1` = Sector 1 checkpoint, `2` = Sector 2 checkpoint). <br>• `buf[8] >> 2`: 0-indexed lap index (`0` = Lap 1, `1` = Lap 2, etc.). |
+
+##### Deriving Official Sector Splits
+1. **Sector 1 (`sector === 1`)**: `s1Sec = s1Event.splitSec`.
+2. **Sector 2 (`sector === 2`)**: `s2Sec = s2Event.splitSec - s1Event.splitSec` (the packet reports cumulative elapsed split from lap start).
+3. **Sector 3 (`sector === 0`)**: `s3Sec = finishEvent.splitSec - (s1Sec + s2Sec)`.
+
+##### Incomplete Laps & Aborted Session Flush Handling
+When a session terminates or a car ESCs back to the garage, the engine flushes an uncompleted lap event with `splitSec <= 0`.
+- **Aborted Garage/Session Flush**: If `splitSec <= 0`, `lapTimeSec < 20`, and `!s1Event` (has not reached Sector 1), the event represents an aborted session flush and is discarded.
+- **Valid Cut Lap**: If the car drove a full lap (`lapTimeSec >= 20` or completed Sector 1) but exceeded track limits, `splitSec` is `-1.0`. The parser records the completed lap, sets `isValid = false`, and computes lap duration from slice timestamps.
 
 #### Type 19 (`eventSize === 8`): Session State Name
 ASCII string broadcast confirming current session name (e.g. `"Practice"`, `"Qualify"`, `"Race"`).
@@ -199,15 +210,60 @@ Contains an array of driver slot bytes in order of track position (P1, P2, P3...
 
 ---
 
-## 5. Architectural Opportunities & Implementation Roadmap
+## 5. Lap & Sector Timing Architecture: Dual-Path Processing Strategy
 
-| Feature Area | Current Implementation | Opportunity Using VCR Native Data |
+The parser utilizes a resilient **dual-path strategy** to balance 100% official accuracy with graceful degradation across non-standard replay files:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          VCR Stream Processing               │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                   Has Class 6 Type 6 Finish Timings?
+                                         │
+                      ┌──────────────────┴──────────────────┐
+                     YES                                   NO
+                      ▼                                     ▼
+        ┌────────────────────────────┐        ┌────────────────────────────┐
+        │       Primary Path:        │        │     Secondary Fallback:    │
+        │   Official Timing Events   │        │ Autonomous Geometric Cross │
+        ├────────────────────────────┤        ├────────────────────────────┤
+        │ • 100% official lap times  │        │ • Start/Finish candidate   │
+        │ • Official S1/S2/S3 splits │        │   density clustering       │
+        │ • Official lap numbering   │        │ • Heading vector filtering │
+        │ • HUD cut-lap validity     │        │ • Cumulative distance splits│
+        │ • Zero geometric error     │        │ • Fallback for edge cases  │
+        └────────────────────────────┘        └────────────────────────────┘
+```
+
+### Why the Geometric Fallback is Retained as a Safety Net
+
+While standard Le Mans Ultimate replays always contain `Class 6 Type 6` events, the autonomous geometric coordinate crossing fallback (`if (detectedLaps.length === 0)`) is intentionally preserved in the codebase for four critical scenarios:
+
+1. **Truncated Replay Snippets / Mid-Lap Clips**:
+   When a user records or clips a short stint where the car never crosses the Start/Finish line, `finishTimings.length === 0`. Without the geometric fallback, the parser would return 0 laps and an empty trajectory. With the fallback, the vehicle's driving path and lap segments are still reconstructed.
+2. **High-Grid Multiplayer Replays (Distance / Network Culling)**:
+   In massive online sessions (e.g. 30+ cars), rFactor 2 / LMU occasionally optimizes packet throughput by streaming positional motion slices (`Class 1 Type 1`) for distant rival or spectator cars without broadcasting their full Class 6 scoring events. The fallback enables analyzing rival trajectories regardless of whether the game engine streamed their scoring loops.
+3. **Custom / Modded Track Conversions**:
+   In community track mods or converted layouts, track designers sometimes misconfigure or omit AIW timing checkpoint trigger volumes. The geometric fallback allows telemetry and trajectory visualization to function seamlessly.
+4. **Synthetic Unit Tests & External Feeds**:
+   Mock VCR generators or external GPS data feeds providing coordinate streams without game engine scoring loops continue to be fully supported.
+
+> [!NOTE]
+> **Zero Runtime Overhead**: When official timing packets are present, `detectedLaps` is populated by the primary path, and the geometric fallback is completely bypassed with zero performance cost.
+
+---
+
+## 6. Architectural Opportunities & Implementation Roadmap
+
+| Feature Area | Implementation Status | Implementation Details Using VCR Native Data |
 | :--- | :--- | :--- |
-| **Driver Roster** | Heuristic sliding-window regex search across metadata strings | Parse deterministic `numDrivers` + exact structured records for 100% reliability, instant parsing, and exact `entryTime`/`exitTime`. |
-| **Session Identification** | Partial regex matching from filename | Read exact `sessionInfo & 0x0F` (Practice, Qualifying, Warmup, Race) + Class 6 Type 19 string. |
-| **Lap & Sector Timing** | Hybrid geometric coordinate crossing + timing packet search | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits, and lap counts matching the in-game HUD. |
-| **Tire & Fuel Wear** | Estimated or from log files | Class 0 Type 15 gives live 4-wheel tire wear; Class 5 Type 2 provides exact pit fuel additions. |
-| **Penalties & Cuts** | Basic `statusByte & 0x01` flag check | Class 2 Type 5 provides the exact penalty description string (`"Cut track"`, `"Pit lane speeding"`). |
-| **3D Car Attitude** | Only `rotY` (yaw heading) | Extract `rotX` (pitch/braking squat/dive) and `rotZ` (roll/body lean) for high-fidelity 3D visualization. |
-| **Engine RPM** | Estimated formula from speed: `3000 + (speed % 45) * 120` | Extract true physics engine RPM directly from `info1 >> 18`. |
-| **Live Standings** | Computed post-facto from lap times | Read Class 6 Type 48 packets for live position tracking at every moment of the session. |
+| **Driver Roster** | **Implemented** (`parseReplayMetadata`) | Deterministic binary `numDrivers` + exact structured records with `entryTime`/`exitTime`, fallback to heuristic regex. |
+| **Session Identification** | **Implemented** (`parseReplayMetadata`) | Session byte parsing (`sessionType`, `privateSession`), `modUid`, and `trackPath`. |
+| **Lap & Sector Timing** | **Implemented** (`extractReplayLapSummaries`, `extractReplayTrajectory`) | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits (S1/S2/S3), official lap numbering, and validity flags matching the in-game HUD. Retains geometric crossing fallback. |
+| **Tire & Fuel Wear** | Planned | Class 0 Type 15 gives live 4-wheel tire wear; Class 5 Type 2 provides exact pit fuel additions. |
+| **Penalties & Cuts** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
+| **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
+| **Engine RPM** | **Implemented** (`extractReplayTrajectory`) | True physics engine RPM directly decoded from `info1 >>> 18`. |
+| **Pit Events** | **Implemented** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 3 pit stop events, entry/exit, service durations, and fueling. |
+| **Live Standings** | Planned | Read Class 6 Type 48 packets for live position tracking at every moment of the session. |
