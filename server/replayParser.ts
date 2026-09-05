@@ -92,6 +92,11 @@ export function parseReplayMetadata(
 ): ReplayMetadata {
   const effectivePlayerName = options?.playerName || detectPlayerName(filePath);
   const stat = fs.statSync(filePath);
+
+  if (stat.size < 64) {
+    throw new Error(`Invalid LMU replay file: file too small (${stat.size} bytes) in ${filePath}`);
+  }
+
   const fd = fs.openSync(filePath, 'r');
 
   try {
@@ -117,7 +122,7 @@ export function parseReplayMetadata(
       if (off + 4 > meta.length) return '';
       const l = meta.readUInt32LE(off);
       off += 4;
-      if (l <= 0 || off + l > meta.length) return '';
+      if (l === 0 || l > 65536 || off + l > meta.length) return '';
       const s = meta.subarray(off, off + l).toString('utf8');
       off += l;
       return s;
@@ -152,8 +157,10 @@ export function parseReplayMetadata(
       const trailer = meta.subarray(meta.length - 28);
       timeSliceCount = trailer.readUInt32LE(4);
       totalEvents = trailer.readUInt32LE(8);
-      startTimeSec = trailer.readFloatLE(12);
-      endTimeSec = trailer.readFloatLE(16);
+      const rawStart = trailer.readFloatLE(12);
+      const rawEnd = trailer.readFloatLE(16);
+      startTimeSec = isFinite(rawStart) ? rawStart : 0;
+      endTimeSec = isFinite(rawEnd) ? rawEnd : 0;
       if (endTimeSec > startTimeSec) {
         durationSec = endTimeSec - startTimeSec;
       }
@@ -257,7 +264,9 @@ export function parseReplayMetadata(
           !str.includes('Team') &&
           !str.includes('Racing') &&
           !str.includes('WEC') &&
-          !str.includes('Corsa');
+          !str.includes('Corsa') &&
+          !str.includes('Hybrid') &&
+          !str.includes('Ambulante');
 
         if (isDriverName && !seenNames.has(str)) {
           seenNames.add(str);
@@ -836,8 +845,9 @@ export function extractReplayTrajectory(
               }
             }
 
-            const dt = rawPts[cIdx + 1].sTime - rawPts[cIdx].sTime;
-            const dist = Math.hypot(rawPts[cIdx + 1].x - rawPts[cIdx].x, rawPts[cIdx + 1].z - rawPts[cIdx].z);
+            const nextIdx = Math.min(cIdx + 1, rawPts.length - 1);
+            const dt = rawPts[nextIdx].sTime - rawPts[cIdx].sTime;
+            const dist = Math.hypot(rawPts[nextIdx].x - rawPts[cIdx].x, rawPts[nextIdx].z - rawPts[cIdx].z);
             const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
 
             evaluated.push({
