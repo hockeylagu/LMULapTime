@@ -16,6 +16,7 @@ import {
   TrackSummary,
   ComparableLap,
 } from './types.js';
+import { parseReplayMetadata } from './replayParser.js';
 import {
   formatTime,
   formatElapsedSeconds,
@@ -166,13 +167,17 @@ const xmlParser = new XMLParser({
   trimValues: true,
 });
 
-interface ReplayFileEntry {
+export interface ReplayFileEntry {
   name: string;
   path: string;
   sizeBytes: number;
   trackName: string;
   sessionCode: string; // e.g. P1, Q1, R1
   mtime: number;
+  eventTitle?: string;
+  splitNo?: number;
+  eventType?: string;
+  durationSec?: number;
 }
 
 const updateMinTime = (current: number | null, next: number | null): number | null =>
@@ -226,6 +231,10 @@ export class LmuParser {
     if (replaysDir && fs.existsSync(replaysDir)) {
       this.indexReplays(replaysDir);
     }
+  }
+
+  public getReplaysList(): ReplayFileEntry[] {
+    return [...this.replaysMap];
   }
 
   public detectPlayerName(baseDir?: string) {
@@ -526,11 +535,30 @@ export class LmuParser {
         drivers,
         playerDriver,
         bestSessionLap,
-        matchingReplayFile: matchingReplay ? {
-          name: matchingReplay.name,
-          path: matchingReplay.path,
-          sizeBytes: matchingReplay.sizeBytes,
-        } : undefined,
+        matchingReplayFile: matchingReplay ? (() => {
+          if (!matchingReplay.eventTitle && !matchingReplay.durationSec) {
+            try {
+              const rMeta = parseReplayMetadata(matchingReplay.path);
+              if (rMeta.eventInfo) {
+                matchingReplay.eventTitle = rMeta.eventInfo.eventTitle;
+                matchingReplay.splitNo = rMeta.eventInfo.splitNo;
+                matchingReplay.eventType = rMeta.eventInfo.eventType;
+              }
+              matchingReplay.durationSec = rMeta.durationSec;
+            } catch {
+              // Ignore metadata read failures
+            }
+          }
+          return {
+            name: matchingReplay.name,
+            path: matchingReplay.path,
+            sizeBytes: matchingReplay.sizeBytes,
+            eventTitle: matchingReplay.eventTitle,
+            splitNo: matchingReplay.splitNo,
+            eventType: matchingReplay.eventType,
+            durationSec: matchingReplay.durationSec,
+          };
+        })() : undefined,
       };
     } catch (err) {
       console.error(`Failed to parse XML file ${filePath}:`, err);
