@@ -115,7 +115,7 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   }, [svgPoints]);
 
   const isStationary = useMemo(() => {
-    return (bounds.spanX < 25 && bounds.spanZ < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1));
+    return ((bounds?.spanX ?? 0) < 25 && (bounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1));
   }, [bounds, points]);
 
   // Calculate forward travel heading in SVG degrees (0 deg = straight up along -Y)

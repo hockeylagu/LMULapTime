@@ -26,9 +26,9 @@ export const SectorSplitsRow: React.FC<SectorSplitsRowProps> = ({
 
   return (
     <div className={`flex items-center justify-between text-xs font-mono pt-1 text-lmu-muted ${className}`}>
-      <span>S1: <strong className="text-white">{s1Val}</strong></span>
-      <span>S2: <strong className="text-white">{s2Val}</strong></span>
-      <span>S3: <strong className="text-white">{s3Val}</strong></span>
+      <span><span className="text-lmu-gold font-semibold">S1:</span> <strong className="text-white">{s1Val}</strong></span>
+      <span><span className="text-lmu-blue font-semibold">S2:</span> <strong className="text-white">{s2Val}</strong></span>
+      <span><span className="text-lmu-green font-semibold">S3:</span> <strong className="text-white">{s3Val}</strong></span>
     </div>
   );
 };

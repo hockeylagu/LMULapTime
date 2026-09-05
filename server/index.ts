@@ -427,6 +427,73 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       lapNumber,
     });
 
+    // Validate replay against matched session log (decoupled validation layer)
+    try {
+      const sessions = loadSessions();
+      const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
+      if (matchedSession) {
+        let matchedDriver = driverName
+          ? matchedSession.drivers.find(d => d.driverName.toLowerCase().includes(driverName.toLowerCase()))
+          : undefined;
+
+        if (!matchedDriver && typeof driverSlot === 'number') {
+          try {
+            const meta = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
+            const replayDriver = meta.drivers.find(d => d.slot === driverSlot);
+            if (replayDriver) {
+              matchedDriver = matchedSession.drivers.find(d =>
+                d.driverName.toLowerCase() === replayDriver.name.toLowerCase() ||
+                (replayDriver.carNumber && d.carNumber === replayDriver.carNumber)
+              );
+            }
+          } catch {
+            // Ignore metadata read errors
+          }
+        }
+
+        if (!matchedDriver) {
+          matchedDriver = matchedSession.playerDriver || matchedSession.drivers[0];
+        }
+
+        if (matchedDriver?.laps && matchedDriver.laps.length > 0) {
+          const officialLaps = matchedDriver.laps.map(sl => ({
+            lapNumber: sl.lapNum ?? (sl as any).lapNumber,
+            lapTimeSec: sl.lapTime,
+            s1Sec: sl.s1,
+            s2Sec: sl.s2,
+            s3Sec: sl.s3,
+            isValid: sl.isValid,
+          }));
+
+          // Attach validation metrics to each detected replay lap
+          if (trajectory.laps) {
+            for (const l of trajectory.laps) {
+              const match = officialLaps.find(o => o.lapNumber === l.lapNumber);
+              if (match && typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0) {
+                l.validatedTimeSec = Number(match.lapTimeSec.toFixed(3));
+                l.validatedS1Sec = typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null;
+                l.validatedS2Sec = typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null;
+                l.validatedS3Sec = typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null;
+                l.timeDiffSec = Number((l.lapTimeSec - match.lapTimeSec).toFixed(3));
+              }
+            }
+          }
+
+          trajectory.validation = {
+            matchedSessionId: matchedSession.id,
+            sessionType: matchedSession.sessionType,
+            trackName: matchedSession.trackVenue,
+            driverName: matchedDriver.driverName,
+            totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
+            officialBestLapTime: matchedDriver.bestLapTime,
+            officialLaps,
+          };
+        }
+      }
+    } catch {
+      // Ignore validation lookup errors
+    }
+
     res.json(trajectory);
   } catch (err: unknown) {
     console.error(`Failed to extract replay trajectory for ${req.params.name}:`, err);

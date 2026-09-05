@@ -165,19 +165,19 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         <div className="absolute top-0 left-0 right-0 h-4 z-20 pointer-events-none flex text-[8px] sm:text-[9px] font-mono font-bold tracking-wider">
           <div
             style={{ width: `${s1Pct}%` }}
-            className="h-full border-r border-amber-400/40 bg-amber-400/5 text-amber-300/80 flex items-center justify-center truncate px-1"
+            className="h-full border-r border-lmu-gold/40 bg-lmu-gold/10 text-lmu-gold flex items-center justify-center truncate px-1"
           >
             SECTOR 1
           </div>
           <div
             style={{ width: `${s2Pct - s1Pct}%` }}
-            className="h-full border-r border-cyan-400/40 bg-cyan-400/5 text-cyan-300/80 flex items-center justify-center truncate px-1"
+            className="h-full border-r border-lmu-blue/40 bg-lmu-blue/10 text-lmu-blue flex items-center justify-center truncate px-1"
           >
             SECTOR 2
           </div>
           <div
             style={{ width: `${100 - s2Pct}%` }}
-            className="h-full bg-purple-400/5 text-purple-300/80 flex items-center justify-center truncate px-1"
+            className="h-full bg-lmu-green/10 text-lmu-green flex items-center justify-center truncate px-1"
           >
             SECTOR 3
           </div>
@@ -216,11 +216,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
         {/* Live Value Tag at Cursor */}
         <div
-          className="absolute top-1 pointer-events-none -translate-x-1/2 z-30 transition-all duration-75"
+          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center ${
+            cursorPct < 15 ? 'bottom-2' : 'top-2'
+          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-1.5 py-0.5 rounded bg-sky-500 text-black font-mono font-black text-[10px] shadow-lg">
-            {currentPoint?.speedKmh ?? 0}
+          <span className="px-2 py-0.5 rounded-md bg-[#070c18] text-sky-300 border border-sky-400/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            {currentPoint?.speedKmh ?? 0} <span className="text-[9px] font-normal text-sky-400/70">km/h</span>
           </span>
         </div>
       </div>
@@ -265,11 +267,18 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
         {/* Live Value Tag at Cursor */}
         <div
-          className="absolute top-1 pointer-events-none -translate-x-1/2 z-30 transition-all duration-75"
+          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center ${
+            cursorPct < 15 ? 'bottom-2' : 'top-2'
+          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-black font-mono font-black text-[10px] shadow-lg">
+          <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+            currentPoint?.tcActive ? 'border-amber-400 text-amber-300' : 'border-emerald-400/80 text-emerald-300'
+          }`}>
             {(currentPoint?.throttle ?? 0).toFixed(0)}%
+            {currentPoint?.tcActive && (
+              <span className="text-[9px] font-black px-1 rounded bg-amber-500 text-black ml-1">TC</span>
+            )}
           </span>
         </div>
       </div>
@@ -314,11 +323,18 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
         {/* Live Value Tag at Cursor */}
         <div
-          className="absolute top-1 pointer-events-none -translate-x-1/2 z-30 transition-all duration-75"
+          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center ${
+            cursorPct < 15 ? 'bottom-2' : 'top-2'
+          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white font-mono font-black text-[10px] shadow-lg">
+          <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+            currentPoint?.absActive ? 'border-cyan-400 text-cyan-300' : 'border-rose-400/80 text-rose-300'
+          }`}>
             {(currentPoint?.brake ?? 0).toFixed(0)}%
+            {currentPoint?.absActive && (
+              <span className="text-[9px] font-black px-1 rounded bg-cyan-400 text-black ml-1">ABS</span>
+            )}
           </span>
         </div>
       </div>
@@ -360,11 +376,16 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
         {/* Live Value Tag at Cursor */}
         <div
-          className="absolute top-1 pointer-events-none -translate-x-1/2 z-30 transition-all duration-75"
+          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center ${
+            cursorPct < 15 ? 'bottom-2' : 'top-2'
+          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-1.5 py-0.5 rounded bg-indigo-500 text-white font-mono font-black text-[10px] shadow-lg">
-            {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : ''}
+          <span className="px-2 py-0.5 rounded-md bg-[#070c18] text-indigo-300 border border-indigo-400/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            {Math.abs(currentPoint?.steerYaw ?? 0)}°{' '}
+            <span className="text-[9px] font-semibold text-indigo-400/80">
+              {(currentPoint?.steerYaw ?? 0) < -5 ? 'LEFT' : (currentPoint?.steerYaw ?? 0) > 5 ? 'RIGHT' : 'CTR'}
+            </span>
           </span>
         </div>
       </div>
@@ -398,11 +419,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
         {/* Live Gear Tag at Cursor */}
         <div
-          className="absolute bottom-1 pointer-events-none -translate-x-1/2 z-30 transition-all duration-75"
+          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center ${
+            cursorPct < 15 ? 'bottom-2' : 'top-2'
+          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-1.5 py-0.5 rounded bg-cyan-500 text-black font-mono font-black text-[10px] shadow-lg">
-            G{currentPoint?.speedKmh && currentPoint.speedKmh > 5 ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1) : 1}
+          <span className="px-2 py-0.5 rounded-md bg-[#070c18] text-cyan-300 border border-cyan-400/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            GEAR {currentPoint?.speedKmh && currentPoint.speedKmh > 5 ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1) : 1}
           </span>
         </div>
       </div>
@@ -413,10 +436,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
           className="absolute top-0 bottom-0 pointer-events-none z-30 -translate-x-1/2 flex flex-col items-center"
           style={{ left: `${s1Pct}%` }}
         >
-          <div className="px-1.5 py-0.5 rounded-b bg-amber-500 text-black font-mono font-black text-[9px] tracking-wider shadow-[0_2px_8px_rgba(245,158,11,0.5)]">
+          <div className="px-1.5 py-0.5 rounded-b bg-lmu-gold text-black font-mono font-black text-[9px] tracking-wider shadow-[0_2px_8px_rgba(255,183,3,0.5)]">
             S1 | S2
           </div>
-          <div className="w-[1.5px] h-full border-l-[1.5px] border-dashed border-amber-400/80 shadow-[0_0_8px_rgba(245,158,11,0.3)]" />
+          <div className="w-[1.5px] h-full border-l-[1.5px] border-dashed border-lmu-gold/80 shadow-[0_0_8px_rgba(255,183,3,0.3)]" />
         </div>
       )}
 
@@ -426,10 +449,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
           className="absolute top-0 bottom-0 pointer-events-none z-30 -translate-x-1/2 flex flex-col items-center"
           style={{ left: `${s2Pct}%` }}
         >
-          <div className="px-1.5 py-0.5 rounded-b bg-cyan-500 text-black font-mono font-black text-[9px] tracking-wider shadow-[0_2px_8px_rgba(6,182,212,0.5)]">
+          <div className="px-1.5 py-0.5 rounded-b bg-lmu-blue text-white font-mono font-black text-[9px] tracking-wider shadow-[0_2px_8px_rgba(33,158,188,0.5)]">
             S2 | S3
           </div>
-          <div className="w-[1.5px] h-full border-l-[1.5px] border-dashed border-cyan-400/80 shadow-[0_0_8px_rgba(6,182,212,0.3)]" />
+          <div className="w-[1.5px] h-full border-l-[1.5px] border-dashed border-lmu-blue/80 shadow-[0_0_8px_rgba(33,158,188,0.3)]" />
         </div>
       )}
 

@@ -11,7 +11,6 @@ import {
   Clock,
   HardDrive,
   Flag,
-  User,
   ArrowLeft,
   Search,
 } from 'lucide-react';
@@ -24,12 +23,16 @@ export interface ReplayInspectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   replayName: string | null;
+  initialLapNumber?: number;
+  onLapChange?: (lapNumber: number) => void;
 }
 
 export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   isOpen,
   onClose,
   replayName,
+  initialLapNumber,
+  onLapChange,
 }) => {
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
   const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
@@ -74,10 +77,12 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setIsLoading(true);
     setError(null);
 
+    const lapQuery = initialLapNumber && initialLapNumber > 0 ? `&lap=${initialLapNumber}` : '';
+
     Promise.all([
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/metadata`)
         .then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?maxPoints=1200`)
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?maxPoints=1200${lapQuery}`)
         .then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, trajData]) => {
@@ -89,13 +94,16 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
         }
         if (trajData) {
           setTrajectory(trajData);
+          if (trajData.currentLap) {
+            onLapChange?.(trajData.currentLap);
+          }
           const defaultSlot = trajData.driverSlot ??
-            metaData?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer || d.name.toLowerCase().includes('samuel'))?.slot ??
+            metaData?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer)?.slot ??
             metaData?.drivers?.[0]?.slot ??
             null;
           setSelectedDriverSlot(defaultSlot);
         } else if (metaData?.drivers?.length) {
-          const player = metaData.drivers.find((d: ReplayDriverEntry) => d.isPlayer || d.name.toLowerCase().includes('samuel')) || metaData.drivers[0];
+          const player = metaData.drivers.find((d: ReplayDriverEntry) => d.isPlayer) || metaData.drivers[0];
           if (player && typeof player.slot === 'number') {
             setSelectedDriverSlot(player.slot);
           }
@@ -111,7 +119,14 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, replayName]);
+  }, [isOpen, replayName, initialLapNumber]);
+
+  // React to initialLapNumber changes if modal is already open
+  useEffect(() => {
+    if (isOpen && initialLapNumber && trajectory && trajectory.currentLap !== initialLapNumber) {
+      handleSelectLap(initialLapNumber);
+    }
+  }, [isOpen, initialLapNumber]);
 
   // Load trajectory for a specific driver
   const handleSelectDriver = (slot: number) => {
@@ -140,6 +155,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setIsTrajLoading(true);
     setIsPlaying(false);
     setCurrentIndex(0);
+    onLapChange?.(lapNum);
 
     const slotParam = typeof selectedDriverSlot === 'number' ? `&driverSlot=${selectedDriverSlot}` : '';
     fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?maxPoints=1200&lap=${lapNum}${slotParam}`)
@@ -210,7 +226,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     metadata?.drivers?.find(d => d.name === trajectory?.driverName);
 
   const playerDriver = useMemo(() => {
-    return metadata?.drivers?.find(d => d.isPlayer || d.name.toLowerCase().includes('samuel'));
+    return metadata?.drivers?.find(d => d.isPlayer);
   }, [metadata?.drivers]);
 
   const filteredDrivers = useMemo(() => {
@@ -271,6 +287,14 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     {typeof metadata.eventInfo.splitNo === 'number' && ` (Split ${metadata.eventInfo.splitNo})`}
                   </span>
                 )}
+                {trajectory?.validation && (
+                  <span
+                    className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-semibold text-[10px] shrink-0"
+                    title={`Validated against Session Log ${trajectory.validation.matchedSessionId} (${trajectory.validation.totalSessionLaps} laps)`}
+                  >
+                    ✓ Log Validated
+                  </span>
+                )}
               </div>
               <div className="hidden lg:flex items-center gap-3 text-[11px] text-lmu-muted">
                 {metadata?.trackName && (
@@ -296,33 +320,8 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
           </div>
         </div>
 
-        {/* Center: Driver Selector Dropdown */}
+        {/* Center: Lap Selector & Live State */}
         <div className="flex items-center gap-2">
-          {metadata?.drivers && metadata.drivers.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="hidden xl:flex items-center gap-1 text-[11px] text-lmu-muted">
-                <User className="w-3.5 h-3.5 text-lmu-accent" />
-                Driver:
-              </span>
-              <select
-                aria-label="Select Driver"
-                value={selectedDriverSlot ?? ''}
-                onChange={e => handleSelectDriver(parseInt(e.target.value, 10))}
-                className="bg-lmu-card border border-lmu-border rounded-xl px-2.5 py-1 text-xs text-white font-semibold focus:outline-none focus:border-lmu-accent cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
-              >
-                {metadata.drivers.map((d, i) => {
-                  const val = typeof d.slot === 'number' ? d.slot : i;
-                  const isPlayer = Boolean(d.isPlayer || d.name.toLowerCase().includes('samuel'));
-                  return (
-                    <option key={val} value={val}>
-                      {isPlayer ? '★ ' : ''}{d.carNumber ? `#${d.carNumber} ` : ''}{d.name} {isPlayer ? '(You) ' : ''}{d.carModel ? `[${d.carModel}]` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          )}
-
           {/* Lap Selector */}
           {trajectory?.laps && trajectory.laps.length > 0 && (
             <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5 shadow-sm">
@@ -342,11 +341,17 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                 aria-label="Select Lap"
                 value={trajectory.currentLap ?? 1}
                 onChange={e => handleSelectLap(parseInt(e.target.value, 10))}
-                className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate py-0.5"
+                className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate py-0.5"
               >
                 {trajectory.laps.map(l => (
                   <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
-                    Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : l.isOutlap ? ' • Out' : ''}
+                    Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.validatedTimeSec ? ` [Log ${formatLapTime(l.validatedTimeSec)}]` : ''}{l.isBest ? ' ★' : l.isOutlap ? ' • Out' : ''}
+                  </option>
+                ))}
+                {/* Last resort fallback: if session log recorded additional laps not present in replay */}
+                {trajectory.validation?.officialLaps?.filter(ol => !trajectory.laps?.some(tl => tl.lapNumber === ol.lapNumber)).map(ol => (
+                  <option key={`log-${ol.lapNumber}`} value={ol.lapNumber} className="bg-[#0b101d] text-lmu-muted" disabled>
+                    Lap {ol.lapNumber} ({formatLapTime(ol.lapTimeSec)}) [Log only]
                   </option>
                 ))}
               </select>
@@ -475,9 +480,17 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         Outlap
                       </span>
                     )}
-                    <span className="text-xs font-mono font-bold text-emerald-400">
+                    <span className="text-xs font-mono font-bold text-emerald-400" title="Replay GPS Lap Time">
                       {formatLapTime(currentLapSummary.lapTimeSec)}
                     </span>
+                    {currentLapSummary.validatedTimeSec ? (
+                      <span
+                        className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-400/10 border border-cyan-400/30 text-cyan-300"
+                        title={`Session Log Official Time: ${formatLapTime(currentLapSummary.validatedTimeSec)}${typeof currentLapSummary.timeDiffSec === 'number' ? `\nDelta: ${currentLapSummary.timeDiffSec > 0 ? '+' : ''}${currentLapSummary.timeDiffSec.toFixed(3)}s` : ''}`}
+                      >
+                        Log: {formatLapTime(currentLapSummary.validatedTimeSec)}
+                      </span>
+                    ) : null}
                     {currentLapSummary.lapDistMeters ? (
                       <span className="hidden sm:inline text-[10px] font-mono text-lmu-muted">
                         ({currentLapSummary.lapDistMeters.toLocaleString()}m)
@@ -487,16 +500,16 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
 
                   {/* 3 Sectors Summary Pills */}
                   <div className="flex items-center gap-1.5 text-[10px] font-mono pr-1">
-                    <div className="px-2 py-0.5 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-300 flex items-center gap-1">
-                      <span className="font-bold text-amber-400/80">S1:</span>
+                    <div className="px-2 py-0.5 rounded-lg bg-lmu-gold/10 border border-lmu-gold/30 text-lmu-gold flex items-center gap-1">
+                      <span className="font-bold text-lmu-gold/80">S1:</span>
                       <span className="font-black">{currentLapSummary.s1Sec ? currentLapSummary.s1Sec.toFixed(3) + 's' : '--'}</span>
                     </div>
-                    <div className="px-2 py-0.5 rounded-lg bg-cyan-400/10 border border-cyan-400/30 text-cyan-300 flex items-center gap-1">
-                      <span className="font-bold text-cyan-400/80">S2:</span>
+                    <div className="px-2 py-0.5 rounded-lg bg-lmu-blue/10 border border-lmu-blue/30 text-lmu-blue flex items-center gap-1">
+                      <span className="font-bold text-lmu-blue/80">S2:</span>
                       <span className="font-black">{currentLapSummary.s2Sec ? currentLapSummary.s2Sec.toFixed(3) + 's' : '--'}</span>
                     </div>
-                    <div className="px-2 py-0.5 rounded-lg bg-purple-400/10 border border-purple-400/30 text-purple-300 flex items-center gap-1">
-                      <span className="font-bold text-purple-400/80">S3:</span>
+                    <div className="px-2 py-0.5 rounded-lg bg-lmu-green/10 border border-lmu-green/30 text-lmu-green flex items-center gap-1">
+                      <span className="font-bold text-lmu-green/80">S3:</span>
                       <span className="font-black">{currentLapSummary.s3Sec ? currentLapSummary.s3Sec.toFixed(3) + 's' : '--'}</span>
                     </div>
                     <div className="hidden md:flex px-2 py-0.5 rounded-lg bg-lmu-dark border border-lmu-border text-lmu-muted items-center gap-1">
@@ -612,7 +625,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                           <span className="text-xs font-bold text-white truncate">
                             {selectedDriver?.name || trajectory.driverName || 'Driver'}
                           </span>
-                          {Boolean(selectedDriver?.isPlayer || selectedDriver?.name?.toLowerCase().includes('samuel')) && (
+                          {Boolean(selectedDriver?.isPlayer) && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-600/80 text-purple-100 font-bold border border-purple-400/40 shadow-sm">
                               YOU
                             </span>
@@ -902,7 +915,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         {filteredDrivers && filteredDrivers.length > 0 ? (
                           filteredDrivers.map((d, idx) => {
                             const isCurrent = typeof selectedDriverSlot === 'number' && d.slot === selectedDriverSlot;
-                            const isPlayer = Boolean(d.isPlayer || d.name.toLowerCase().includes('samuel'));
+                            const isPlayer = Boolean(d.isPlayer);
                             return (
                               <tr
                                 key={typeof d.slot === 'number' ? d.slot : idx}

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ReplaySummary } from '../../../server/types.js';
 import { ReplayInspectorModal } from '../replay/ReplayInspectorModal';
+import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
 
 export interface ReplaysViewProps {
   onSelectSession?: (sessionId: string) => void;
@@ -20,7 +21,32 @@ export const ReplaysView: React.FC<ReplaysViewProps> = ({ onSelectSession }) => 
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sessionFilter, setSessionFilter] = useState<string>('all');
-  const [selectedReplayForModal, setSelectedReplayForModal] = useState<string | null>(null);
+  const [selectedReplayForModal, setSelectedReplayForModal] = useState<string | null>(() => {
+    const { params } = getHashRouteAndParams();
+    return params.get('replay') || null;
+  });
+  const [selectedLapForModal, setSelectedLapForModal] = useState<number | undefined>(() => {
+    const { params } = getHashRouteAndParams();
+    const l = params.get('lap') || params.get('lapNum');
+    return l ? parseInt(l, 10) : undefined;
+  });
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const { params } = getHashRouteAndParams();
+      const rep = params.get('replay');
+      const l = params.get('lap') || params.get('lapNum');
+      setSelectedReplayForModal(rep || null);
+      setSelectedLapForModal(l ? parseInt(l, 10) : undefined);
+    };
+
+    window.addEventListener('hashchange', syncFromUrl);
+    window.addEventListener('popstate', syncFromUrl);
+    return () => {
+      window.removeEventListener('hashchange', syncFromUrl);
+      window.removeEventListener('popstate', syncFromUrl);
+    };
+  }, []);
 
   const fetchReplays = () => {
     setIsLoading(true);
@@ -215,7 +241,10 @@ export const ReplaysView: React.FC<ReplaysViewProps> = ({ onSelectSession }) => 
                 {/* Card Actions */}
                 <div className="flex items-center gap-2 pt-2">
                   <button
-                    onClick={() => setSelectedReplayForModal(replay.name)}
+                    onClick={() => {
+                      setSelectedReplayForModal(replay.name);
+                      updateHashParams({ replay: replay.name });
+                    }}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-lmu-dark hover:bg-lmu-accent hover:text-white border border-lmu-border text-xs font-bold text-white transition-all shadow-sm"
                   >
                     <Activity className="w-3.5 h-3.5 text-lmu-accent" />
@@ -245,8 +274,17 @@ export const ReplaysView: React.FC<ReplaysViewProps> = ({ onSelectSession }) => 
       {/* Replay Inspector Modal */}
       <ReplayInspectorModal
         isOpen={Boolean(selectedReplayForModal)}
-        onClose={() => setSelectedReplayForModal(null)}
+        onClose={() => {
+          setSelectedReplayForModal(null);
+          setSelectedLapForModal(undefined);
+          updateHashParams({ replay: null, lap: null, lapNum: null });
+        }}
         replayName={selectedReplayForModal}
+        initialLapNumber={selectedLapForModal}
+        onLapChange={(newLap) => {
+          setSelectedLapForModal(newLap);
+          updateHashParams({ lap: String(newLap) });
+        }}
       />
     </div>
   );

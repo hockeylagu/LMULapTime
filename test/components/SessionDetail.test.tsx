@@ -1265,4 +1265,91 @@ describe('SessionDetail component', () => {
     // Lap 2: 0.75 pts -> Orange
     expect(badges[1].className).toContain('text-orange-300');
   });
+
+  it('opens replay with lap number when clicking row Replay button and updates URL params', async () => {
+    window.location.hash = '#/session/sess123';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            replayName: 'spa_replay.vcr',
+            drivers: [{ slot: 1, name: 'Sim Driver', isPlayer: true }],
+          }),
+        });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            driverName: 'Sim Driver',
+            driverSlot: 1,
+            currentLap: 2,
+            laps: [{ lapNumber: 2, lapTimeSec: 122.0 }],
+            bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+            points: [{ x: 0, y: 0, z: 0, speedKmh: 100, throttle: 100, brake: 0, timeSec: 10.0 }],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    const replayButtons = screen.getAllByTitle(/Inspect Replay for Lap/i);
+    expect(replayButtons.length).toBeGreaterThan(0);
+
+    // Click replay for Lap 2
+    fireEvent.click(replayButtons[1]);
+
+    expect(window.location.hash).toContain('replay=1');
+    expect(window.location.hash).toContain('lap=2');
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'));
+    });
+  });
+
+  it('automatically opens replay modal and queries lap when URL contains replay and lap params', async () => {
+    window.location.hash = '#/session/sess123?replay=1&lap=3';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            replayName: 'spa_replay.vcr',
+            drivers: [{ slot: 1, name: 'Sim Driver', isPlayer: true }],
+          }),
+        });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            driverName: 'Sim Driver',
+            driverSlot: 1,
+            currentLap: 3,
+            laps: [{ lapNumber: 3, lapTimeSec: 135.0 }],
+            bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+            points: [{ x: 0, y: 0, z: 0, speedKmh: 100, throttle: 100, brake: 0, timeSec: 10.0 }],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=3'));
+    });
+  });
 });

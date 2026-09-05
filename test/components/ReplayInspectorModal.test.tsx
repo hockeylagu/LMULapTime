@@ -22,8 +22,8 @@ describe('ReplayInspectorModal', () => {
     totalEvents: 70000,
     durationSec: 500,
     drivers: [
-      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21' },
-      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32' },
+      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true },
+      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false },
     ],
   };
 
@@ -105,8 +105,12 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
     });
 
-    const driverSelect = screen.getByLabelText(/Select Driver/i);
-    fireEvent.change(driverSelect, { target: { value: '2' } });
+    // Select driver via Driver Roster tab
+    const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
+    fireEvent.click(rosterTab);
+
+    const rivalCell = screen.getByText('Rival Racer');
+    fireEvent.click(rivalCell);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'));
