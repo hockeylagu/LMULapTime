@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Activity, Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../server/types.js';
 import { PointComparison } from '../../utils/replayComparison.js';
@@ -16,7 +16,7 @@ export interface TelemetryPedalsChannelProps {
   cursorPct: number;
 }
 
-export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = ({
+export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = React.memo(({
   throttlePath,
   throttleArea,
   baselineThrottlePath,
@@ -28,6 +28,38 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = ({
   isCursorInView,
   cursorPct,
 }) => {
+  const throttleSvg = useMemo(() => (
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+      <defs>
+        <linearGradient id="throttleGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d={throttleArea} fill="url(#throttleGrad)" opacity="0.35" />
+      {baselineThrottlePath && (
+        <path d={baselineThrottlePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+      )}
+      <path d={throttlePath} fill="none" stroke="#10b981" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ), [throttleArea, baselineThrottlePath, throttlePath]);
+
+  const brakeSvg = useMemo(() => (
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+      <defs>
+        <linearGradient id="brakeGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d={brakeArea} fill="url(#brakeGrad)" opacity="0.35" />
+      {baselineBrakePath && (
+        <path d={baselineBrakePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+      )}
+      <path d={brakePath} fill="none" stroke="#ef4444" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ), [brakeArea, baselineBrakePath, brakePath]);
+
   return (
     <>
       {/* THROTTLE CHANNEL */}
@@ -53,23 +85,11 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = ({
           <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400">0%</div>
         </div>
 
-        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-          <defs>
-            <linearGradient id="throttleGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-          <path d={throttleArea} fill="url(#throttleGrad)" opacity="0.35" />
-          {baselineThrottlePath && (
-            <path d={baselineThrottlePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
-          )}
-          <path d={throttlePath} fill="none" stroke="#10b981" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {throttleSvg}
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center gap-1 ${
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
               cursorPct < 15 ? 'bottom-2' : 'top-2'
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
@@ -114,23 +134,11 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = ({
           <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400">0%</div>
         </div>
 
-        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-          <defs>
-            <linearGradient id="brakeGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-          <path d={brakeArea} fill="url(#brakeGrad)" opacity="0.35" />
-          {baselineBrakePath && (
-            <path d={baselineBrakePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
-          )}
-          <path d={brakePath} fill="none" stroke="#ef4444" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {brakeSvg}
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center gap-1 ${
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
               cursorPct < 15 ? 'bottom-2' : 'top-2'
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
@@ -153,4 +161,4 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = ({
       </div>
     </>
   );
-};
+});

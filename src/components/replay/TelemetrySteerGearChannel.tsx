@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Compass, Layers } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../server/types.js';
 import { PointComparison } from '../../utils/replayComparison.js';
@@ -14,7 +14,7 @@ export interface TelemetrySteerGearChannelProps {
   cursorPct: number;
 }
 
-export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps> = ({
+export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps> = React.memo(({
   steerPath,
   baselineSteerPath,
   gearPath,
@@ -27,6 +27,25 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
   const currentGear = currentPoint?.speedKmh && currentPoint.speedKmh > 5
     ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1)
     : 1;
+
+  const steerSvg = useMemo(() => (
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+      <line x1="0" y1="50" x2="1000" y2="50" stroke="#818cf8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.3" />
+      {baselineSteerPath && (
+        <path d={baselineSteerPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+      )}
+      <path d={steerPath} fill="none" stroke="#818cf8" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ), [baselineSteerPath, steerPath]);
+
+  const gearSvg = useMemo(() => (
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+      {baselineGearPath && (
+        <path d={baselineGearPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+      )}
+      <path d={gearPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ), [baselineGearPath, gearPath]);
 
   return (
     <>
@@ -53,17 +72,11 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
           <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">-180° (Left)</div>
         </div>
 
-        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-          <line x1="0" y1="50" x2="1000" y2="50" stroke="#818cf8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.3" />
-          {baselineSteerPath && (
-            <path d={baselineSteerPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
-          )}
-          <path d={steerPath} fill="none" stroke="#818cf8" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {steerSvg}
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center gap-1 ${
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
               cursorPct < 15 ? 'bottom-2' : 'top-2'
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
@@ -98,16 +111,11 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
           <div className="border-b border-amber-400/40 w-full text-[9px] text-amber-400">1</div>
         </div>
 
-        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-          {baselineGearPath && (
-            <path d={baselineGearPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
-          )}
-          <path d={gearPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {gearSvg}
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center gap-1 ${
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
               cursorPct < 15 ? 'bottom-2' : 'top-2'
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
@@ -120,4 +128,4 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
       </div>
     </>
   );
-};
+});

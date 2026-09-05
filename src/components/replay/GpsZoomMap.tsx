@@ -106,16 +106,33 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     return { visibleSegments: segments, carHeadingDeg: heading };
   }, [points, currentPoint, safeIndex, zoomRadius, colorBy, CENTER]);
 
+  const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
+  const baseDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
+
   const { baselineVisiblePath, baselineGhostPos } = useMemo(() => {
-    if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0 || !currentPoint) {
+    if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0 || !currentPoint || baseDists.length === 0 || primaryDists.length === 0) {
       return { baselineVisiblePath: '', baselineGhostPos: null };
     }
     const scale = (CENTER - 40) / zoomRadius;
     const maxVisibleDist = zoomRadius * 1.6;
+    const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
+    const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
+    const fraction = primaryDists[safeIndex] / totalPrimary;
+    const targetDist = fraction * totalBase;
+    const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
+
+    let low = 0, high = baseDists.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (baseDists[mid] < targetDist) low = mid + 1; else high = mid - 1;
+    }
+    const win = Math.max(60, Math.round(zoomRadius * 1.5));
+    const startB = Math.max(0, low - win);
+    const endB = Math.min(baselinePoints.length, low + win);
+
     let bPath = '';
     let hasStarted = false;
-
-    for (let i = 0; i < baselinePoints.length; i++) {
+    for (let i = startB; i < endB; i++) {
       const bp = baselinePoints[i];
       const distToCenter = Math.hypot(bp.x - currentPoint.x, bp.z - currentPoint.z);
       if (distToCenter <= maxVisibleDist) {
@@ -134,13 +151,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
       }
     }
 
-    const primaryDists = computeCumulativeDistances(points);
-    const baseDists = computeCumulativeDistances(baselinePoints);
-    const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
-    const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
-    const fraction = primaryDists[safeIndex] / totalPrimary;
-    const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, fraction * totalBase);
-
     return {
       baselineVisiblePath: bPath,
       baselineGhostPos: {
@@ -150,7 +160,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         point: ghostPt,
       },
     };
-  }, [points, baselinePoints, currentPoint, safeIndex, zoomRadius, CENTER]);
+  }, [points, baselinePoints, currentPoint, safeIndex, zoomRadius, CENTER, primaryDists, baseDists]);
 
   if (!points || points.length === 0 || !currentPoint) {
     return (
@@ -188,46 +198,14 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         </div>
 
         <div className="flex items-center gap-1 bg-[#0a0e17]/90 p-0.5 rounded-lg border border-white/10 backdrop-blur-sm pointer-events-auto">
-          <button
-            onClick={() => setZoomRadius(r => Math.max(15, Math.round(r * 0.8)))}
-            aria-label="Zoom in"
-            title="Zoom in closer (+)"
-            className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setZoomRadius(r => Math.min(300, Math.round(r * 1.25)))}
-            aria-label="Zoom out"
-            title="Zoom out wider (-)"
-            className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
+          <button onClick={() => setZoomRadius(r => Math.max(15, Math.round(r * 0.8)))} aria-label="Zoom in" title="Zoom in closer (+)" className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setZoomRadius(r => Math.min(300, Math.round(r * 1.25)))} aria-label="Zoom out" title="Zoom out wider (-)" className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"><Minus className="w-3.5 h-3.5" /></button>
           <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
           {[40, 80, 150].map(r => (
-            <button
-              key={r}
-              onClick={() => {
-                setZoomRadius(r);
-                setPanOffset({ x: 0, y: 0 });
-              }}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all ${
-                zoomRadius === r ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
-              }`}
-            >
-              {r}m
-            </button>
+            <button key={r} onClick={() => { setZoomRadius(r); setPanOffset({ x: 0, y: 0 }); }} className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all ${zoomRadius === r ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'}`}>{r}m</button>
           ))}
           {(panOffset.x !== 0 || panOffset.y !== 0) && (
-            <button
-              onClick={() => setPanOffset({ x: 0, y: 0 })}
-              aria-label="Recenter"
-              title="Recenter view on car"
-              className="p-1 rounded text-cyan-400 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <RotateCcw className="w-3 h-3" />
-            </button>
+            <button onClick={() => setPanOffset({ x: 0, y: 0 })} aria-label="Recenter" title="Recenter view on car" className="p-1 rounded text-cyan-400 hover:text-white hover:bg-white/10 transition-colors"><RotateCcw className="w-3 h-3" /></button>
           )}
         </div>
       </div>
@@ -247,15 +225,8 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             <g>
               {visibleSegments.map((seg, i) => (
                 <path
-                  key={`line-${i}`}
-                  d={seg.pathD}
-                  stroke={seg.color}
-                  strokeWidth="4.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                  className="cursor-pointer hover:stroke-white hover:stroke-[6]"
-                  onClick={() => onSelectIndex?.(seg.idx)}
+                  key={`line-${i}`} d={seg.pathD} stroke={seg.color} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none"
+                  className="cursor-pointer hover:stroke-white hover:stroke-[6]" onClick={() => onSelectIndex?.(seg.idx)}
                 >
                   <title>Frame {seg.idx} • {seg.avgSpeed} km/h</title>
                 </path>
@@ -264,7 +235,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             {baselineGhostPos && (
               <line x1={CENTER} y1={CENTER} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.75" />
             )}
-
             {baselineGhostPos && (
               <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
                 <circle r="12" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
@@ -272,7 +242,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
                 <text y="-10" textAnchor="middle" className="fill-amber-300 text-[10px] font-mono font-bold">GHOST ({baselineGhostPos.distMeters.toFixed(1)}m)</text>
               </g>
             )}
-
             <g transform={`translate(${CENTER}, ${CENTER})`}>
               <circle r="14" fill="#38bdf8" opacity="0.15" className="animate-ping" />
               <circle r="7" fill="#38bdf8" stroke="#ffffff" strokeWidth="2" className="shadow-[0_0_10px_#38bdf8]" />

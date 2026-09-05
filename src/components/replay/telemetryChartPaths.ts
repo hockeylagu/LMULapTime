@@ -1,6 +1,12 @@
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
 import { PointComparison } from '../../utils/replayComparison.js';
 
+export interface DeltaGradientStop {
+  offset: string;
+  color: string;
+  opacity: number;
+}
+
 export interface TelemetryChartPathsResult {
   speedPath: string;
   throttlePath: string;
@@ -16,6 +22,9 @@ export interface TelemetryChartPathsResult {
   baselineGearPath: string;
   deltaTimePath: string;
   deltaTimeArea: string;
+  deltaGainArea: string;
+  deltaLossArea: string;
+  deltaGradientStops: DeltaGradientStop[];
   maxDeltaSec: number;
 }
 
@@ -42,6 +51,9 @@ export function computeTelemetryChartPaths(
       baselineGearPath: '',
       deltaTimePath: '',
       deltaTimeArea: '',
+      deltaGainArea: '',
+      deltaLossArea: '',
+      deltaGradientStops: [],
       maxDeltaSec: 1,
     };
   }
@@ -65,6 +77,8 @@ export function computeTelemetryChartPaths(
   let bGr = '';
 
   let maxDelta = 1.0;
+  const rates = new Map<number, number>();
+
   if (pointComparisons.length > 0) {
     const visibleComps = pointComparisons.slice(viewStart, viewEnd + 1);
     const deltas = visibleComps
@@ -72,9 +86,30 @@ export function computeTelemetryChartPaths(
       .filter(d => !isNaN(d) && isFinite(d));
     const rawMax = Math.max(0.5, ...deltas);
     maxDelta = Math.min(8, Math.max(1.0, Math.ceil(rawMax * 2) / 2));
+
+    // Pre-calculate smoothed rate of change using a centered window (+/- 3 points)
+    // Rate < 0: gaining time (becoming faster). Rate > 0: losing time (becoming slower).
+    const W = 3;
+    for (let i = viewStart; i <= viewEnd; i++) {
+      if (!pointComparisons[i]) continue;
+      const iPrev = Math.max(viewStart, i - W);
+      const iNext = Math.min(viewEnd, i + W);
+      const cPrev = pointComparisons[iPrev] || pointComparisons[i];
+      const cNext = pointComparisons[iNext] || pointComparisons[i];
+      const dtDiff = cNext.deltaTimeSec - cPrev.deltaTimeSec;
+      const tDiff = Math.max(0.04, (points[iNext]?.timeSec ?? 0) - (points[iPrev]?.timeSec ?? 0));
+      rates.set(i, dtDiff / tDiff);
+    }
   }
 
   let dtPath = '';
+  let dtGainArea = '';
+  let dtLossArea = '';
+  let prevDtX = 0;
+  let prevDtY = 50;
+  let firstDtX: number | null = null;
+  let lastDtX = 0;
+  let prevComp: PointComparison | null = null;
 
   for (let i = viewStart; i <= viewEnd; i++) {
     const p = points[i];
@@ -147,6 +182,79 @@ export function computeTelemetryChartPaths(
       const dtNorm = Math.max(-1, Math.min(1, comp.deltaTimeSec / maxDelta));
       const dty = 50 + dtNorm * 40;
       dtPath += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${dty.toFixed(1)} `;
+
+      if (firstDtX === null) firstDtX = x;
+      lastDtX = x;
+
+      if (!isFirst && prevComp) {
+        // Suppress jitter in steady/flat zones: only assign to gain/loss trapezoids when rate exceeds deadband
+        const rate = rates.get(i) ?? 0;
+        const trapezoid = `M ${prevDtX.toFixed(1)} 50 L ${prevDtX.toFixed(1)} ${prevDtY.toFixed(1)} L ${x.toFixed(1)} ${dty.toFixed(1)} L ${x.toFixed(1)} 50 Z `;
+        if (rate < -0.015) {
+          dtGainArea += trapezoid;
+        } else if (rate > 0.015) {
+          dtLossArea += trapezoid;
+        }
+      }
+
+      prevDtX = x;
+      prevDtY = dty;
+      prevComp = comp;
+    }
+  }
+
+  // Generate smooth horizontal gradient stops with dynamic intensity and deadband fading
+  const dtStops: DeltaGradientStop[] = [];
+  if (pointComparisons.length > 0) {
+    const totalComps = viewEnd - viewStart + 1;
+    const step = Math.max(1, Math.floor(totalComps / 100));
+    let prevColor: string | null = null;
+
+    for (let i = viewStart; i <= viewEnd; i += step) {
+      if (!pointComparisons[i]) continue;
+      const pct = Math.max(0, Math.min(100, ((i - viewStart) / viewSpan) * 100));
+      const rate = rates.get(i) ?? 0;
+      const absRate = Math.abs(rate);
+
+      let opacity = 0;
+      const color = rate < 0 ? '#10b981' : '#ef4444';
+
+      if (absRate >= 0.015) {
+        // High delta rate of change -> rich vibrant color (opacity up to 0.75)
+        const norm = Math.min(1.0, (absRate - 0.015) / (0.16 - 0.015));
+        const smooth = norm * norm * (3 - 2 * norm);
+        opacity = 0.08 + 0.67 * smooth;
+      }
+
+      // If transitioning between green and red, insert zero-opacity stops to prevent color bleed
+      if (prevColor && prevColor !== color && opacity > 0) {
+        dtStops.push({
+          offset: `${Math.max(0, pct - 0.2).toFixed(1)}%`,
+          color: prevColor,
+          opacity: 0,
+        });
+        dtStops.push({
+          offset: `${pct.toFixed(1)}%`,
+          color,
+          opacity: 0,
+        });
+      }
+
+      dtStops.push({
+        offset: `${pct.toFixed(1)}%`,
+        color,
+        opacity: Number(opacity.toFixed(2)),
+      });
+      prevColor = color;
+    }
+
+    if (dtStops.length > 0 && parseFloat(dtStops[dtStops.length - 1].offset) < 99.5) {
+      const lastStop = dtStops[dtStops.length - 1];
+      dtStops.push({
+        offset: '100%',
+        color: lastStop.color,
+        opacity: lastStop.opacity,
+      });
     }
   }
 
@@ -164,7 +272,10 @@ export function computeTelemetryChartPaths(
     baselineSteerPath: bStr,
     baselineGearPath: bGr,
     deltaTimePath: dtPath,
-    deltaTimeArea: dtPath ? `${dtPath} L 1000 50 L 0 50 Z` : '',
+    deltaTimeArea: dtPath && firstDtX !== null ? `${dtPath} L ${lastDtX.toFixed(1)} 50 L ${firstDtX.toFixed(1)} 50 Z` : '',
+    deltaGainArea: dtGainArea,
+    deltaLossArea: dtLossArea,
+    deltaGradientStops: dtStops,
     maxDeltaSec: maxDelta,
   };
 }

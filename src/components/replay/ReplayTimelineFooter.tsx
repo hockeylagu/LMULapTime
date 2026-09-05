@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Activity } from 'lucide-react';
 
 export interface ReplayTimelineFooterProps {
@@ -8,12 +8,33 @@ export interface ReplayTimelineFooterProps {
   onChangeIndex: (index: number) => void;
 }
 
-export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = ({
+export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = React.memo(({
   currentIndex,
   totalPoints,
   currentTimeSec,
   onChangeIndex,
 }) => {
+  const rafRef = useRef<number | null>(null);
+  const pendingValRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const handleSliderChange = (val: number) => {
+    pendingValRef.current = val;
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        if (pendingValRef.current !== null) {
+          onChangeIndex(pendingValRef.current);
+        }
+      });
+    }
+  };
+
   return (
     <div className="p-3 rounded-xl bg-lmu-card/80 border border-lmu-border flex flex-col gap-2 shrink-0">
       <div className="flex items-center justify-between text-xs text-lmu-muted">
@@ -36,9 +57,9 @@ export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = ({
         min="0"
         max={Math.max(0, totalPoints - 1)}
         value={currentIndex}
-        onChange={e => onChangeIndex(parseInt(e.target.value, 10))}
+        onChange={e => handleSliderChange(parseInt(e.target.value, 10))}
         className="w-full accent-lmu-accent cursor-pointer h-2 rounded-lg bg-lmu-border"
       />
     </div>
   );
-};
+});

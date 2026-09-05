@@ -38,7 +38,7 @@ export interface ReplayInspectorHeaderProps {
   formatLapTime: (sec?: number | null) => string;
 }
 
-export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = ({
+export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React.memo(({
   onClose,
   replayName,
   metadata,
@@ -295,4 +295,4 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = ({
       </div>
     </header>
   );
-};
+});

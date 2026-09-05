@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../server/types.js';
 import { PointComparison } from '../../utils/replayComparison.js';
@@ -12,7 +12,7 @@ export interface TelemetrySpeedChannelProps {
   cursorPct: number;
 }
 
-export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = ({
+export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React.memo(({
   speedPath,
   baselineSpeedPath,
   currentPoint,
@@ -20,6 +20,31 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = ({
   isCursorInView,
   cursorPct,
 }) => {
+  const chartSvg = useMemo(() => (
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+      {baselineSpeedPath && (
+        <path
+          d={baselineSpeedPath}
+          fill="none"
+          stroke="#f59e0b"
+          strokeWidth="1.2"
+          strokeDasharray="4 3"
+          vectorEffect="non-scaling-stroke"
+          opacity="0.85"
+        />
+      )}
+      <path
+        d={speedPath}
+        fill="none"
+        stroke="#38bdf8"
+        strokeWidth="1.2"
+        vectorEffect="non-scaling-stroke"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ), [speedPath, baselineSpeedPath]);
+
   return (
     <div className="relative flex-1 border-b border-lmu-border/40 min-h-[85px] group bg-[#0b101d]/60">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
@@ -47,32 +72,11 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = ({
         <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400">0 km/h</div>
       </div>
 
-      <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-        {baselineSpeedPath && (
-          <path
-            d={baselineSpeedPath}
-            fill="none"
-            stroke="#f59e0b"
-            strokeWidth="1.2"
-            strokeDasharray="4 3"
-            vectorEffect="non-scaling-stroke"
-            opacity="0.85"
-          />
-        )}
-        <path
-          d={speedPath}
-          fill="none"
-          stroke="#38bdf8"
-          strokeWidth="1.2"
-          vectorEffect="non-scaling-stroke"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      {chartSvg}
 
       {isCursorInView && (
         <div
-          className={`absolute pointer-events-none z-50 transition-all duration-75 flex items-center gap-1 ${
+          className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
             cursorPct < 15 ? 'bottom-2' : 'top-2'
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
@@ -92,4 +96,4 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = ({
       )}
     </div>
   );
-};
+});

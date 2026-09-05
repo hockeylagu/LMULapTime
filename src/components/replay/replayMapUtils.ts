@@ -91,18 +91,13 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
   return d;
 }
 
-export function computeGhostProjection(
-  points: ReplayTelemetryPoint[],
+export function computeBaselinePath(
   baselinePoints: ReplayTelemetryPoint[],
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
-  currentIndex: number,
   viewBoxSize: number,
   padding: number
-) {
-  if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0) {
-    return { baselinePathD: '', baselineGhostPos: null };
-  }
-
+): string {
+  if (!baselinePoints || baselinePoints.length === 0) return '';
   const { minX, minZ, spanX, spanZ } = bounds;
   const maxSpan = Math.max(spanX, spanZ, 1);
   const scale = (viewBoxSize - 2 * padding) / maxSpan;
@@ -116,24 +111,71 @@ export function computeGhostProjection(
     z: p.z,
     isTeleport: p.isTeleport,
   }));
-  const baselinePathD = buildContinuousSvgPath(bSvgPts);
+  return buildContinuousSvgPath(bSvgPts);
+}
 
-  const primaryDists = computeCumulativeDistances(points);
-  const baseDists = computeCumulativeDistances(baselinePoints);
+export function computeGhostPosition(
+  primaryDists: number[],
+  baseDists: number[],
+  baselinePoints: ReplayTelemetryPoint[],
+  currentIndex: number,
+  bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
+  viewBoxSize: number,
+  padding: number
+) {
+  if (
+    !baselinePoints || baselinePoints.length === 0 ||
+    !primaryDists || primaryDists.length === 0 ||
+    !baseDists || baseDists.length === 0
+  ) {
+    return null;
+  }
+
+  const { minX, minZ, spanX, spanZ } = bounds;
+  const maxSpan = Math.max(spanX, spanZ, 1);
+  const scale = (viewBoxSize - 2 * padding) / maxSpan;
+  const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
+  const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
+
   const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
   const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
 
-  const safeIdx = Math.min(currentIndex, points.length - 1);
+  const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
   const fraction = primaryDists[safeIdx] / totalPrimary;
   const targetDist = fraction * totalBase;
   const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
 
   return {
-    baselinePathD,
-    baselineGhostPos: {
-      sx: offsetX + (ghostPt.x - minX) * scale,
-      sy: viewBoxSize - (offsetZ + (ghostPt.z - minZ) * scale),
-      point: ghostPt,
-    },
+    sx: offsetX + (ghostPt.x - minX) * scale,
+    sy: viewBoxSize - (offsetZ + (ghostPt.z - minZ) * scale),
+    point: ghostPt,
   };
+}
+
+export function computeGhostProjection(
+  points: ReplayTelemetryPoint[],
+  baselinePoints: ReplayTelemetryPoint[],
+  bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
+  currentIndex: number,
+  viewBoxSize: number,
+  padding: number
+) {
+  if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0) {
+    return { baselinePathD: '', baselineGhostPos: null };
+  }
+
+  const baselinePathD = computeBaselinePath(baselinePoints, bounds, viewBoxSize, padding);
+  const primaryDists = computeCumulativeDistances(points);
+  const baseDists = computeCumulativeDistances(baselinePoints);
+  const baselineGhostPos = computeGhostPosition(
+    primaryDists,
+    baseDists,
+    baselinePoints,
+    currentIndex,
+    bounds,
+    viewBoxSize,
+    padding
+  );
+
+  return { baselinePathD, baselineGhostPos };
 }

@@ -128,8 +128,16 @@ describe('TelemetryStripCharts', () => {
     expect(screen.getByText('Primary')).toBeInTheDocument();
     expect(screen.getByText('Lap 2 (Best)')).toBeInTheDocument();
 
+    // Delta gain/loss legend must be rendered to explain gradient colors
+    expect(screen.getByText(/Gaining Time/i)).toBeInTheDocument();
+    expect(screen.getByText(/Slower \(Time Lost\)/i)).toBeInTheDocument();
+
     // Baseline live badges should be present in DOM (showing 'B: 170' for baseline speed at idx 1)
     expect(screen.getByText(/B: 170/i)).toBeInTheDocument();
+
+    // SVG must define and use the gain/loss gradients
+    expect(container.querySelector('linearGradient#gainDeltaGrad')).toBeInTheDocument();
+    expect(container.querySelector('linearGradient#lossDeltaGrad')).toBeInTheDocument();
 
     // Dashed amber curves should be rendered in the SVGs
     const dashedLines = container.querySelectorAll('path[stroke="#f59e0b"]');

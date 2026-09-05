@@ -5,7 +5,7 @@ export interface ReplayTelemetryHudProps {
   currentPoint?: ReplayTelemetryPoint | null;
 }
 
-export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = ({ currentPoint }) => {
+export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(({ currentPoint }) => {
   const currentGear = currentPoint?.speedKmh && currentPoint.speedKmh > 5
     ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1)
     : 1;
@@ -25,7 +25,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = ({ currentP
       </div>
 
       {/* Throttle */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-all ${
+      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
         currentPoint?.tcActive ? 'border-amber-500/70 bg-amber-500/10 shadow-[0_0_8px_rgba(245,158,11,0.25)]' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
@@ -41,7 +41,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = ({ currentP
       </div>
 
       {/* Brake */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-all ${
+      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
         currentPoint?.absActive ? 'border-cyan-500/70 bg-cyan-500/10 shadow-[0_0_8px_rgba(6,182,212,0.25)]' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
@@ -59,19 +59,21 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = ({ currentP
       {/* Steering */}
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
         <span className="text-[9px] text-indigo-400 font-bold">STEER</span>
-        <span className="text-xs font-black text-indigo-400 font-mono">{Math.abs(currentPoint?.steerYaw ?? 0)}°</span>
-        <span className="text-[8px] text-lmu-muted">{(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}</span>
+        <span className="text-xs font-black text-indigo-300 font-mono">
+          {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
+        </span>
+        <span className="text-[8px] text-lmu-muted">angle</span>
       </div>
 
       {/* RPM */}
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
         <span className="text-[9px] text-amber-400 font-bold">RPM</span>
-        <span className="text-xs font-black text-white font-mono">{currentPoint?.rpm ? (currentPoint.rpm / 1000).toFixed(1) + 'k' : '-'}</span>
+        <span className="text-xs font-black text-amber-300 font-mono">{currentPoint?.rpm ?? '--'}</span>
         <span className="text-[8px] text-lmu-muted">engine</span>
       </div>
 
       {/* Status / Track State */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-all ${
+      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
           ? 'border-fuchsia-500/70 bg-fuchsia-500/15 shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse'
           : currentPoint?.isOffTrack
@@ -98,4 +100,4 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = ({ currentP
       </div>
     </div>
   );
-};
+});

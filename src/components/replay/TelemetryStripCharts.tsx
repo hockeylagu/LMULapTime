@@ -48,35 +48,32 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const rectRef = useRef<{ left: number; width: number } | null>(null);
+  const pendingIndexRef = useRef<number | null>(null);
+  const rafIdRef = useRef<number | null>(null);
 
   const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
-  const [dragSelection, setDragSelection] = useState<{
-    startX: number;
-    currentX: number;
-    startPct: number;
-    currentPct: number;
-  } | null>(null);
+  const [dragSelection, setDragSelection] = useState<{ startX: number; currentX: number; startPct: number; currentPct: number } | null>(null);
 
   const activeZoomRange = zoomRange !== undefined ? zoomRange : internalZoomRange;
 
-  const updateZoomRange = useCallback(
-    (range: { start: number; end: number } | null) => {
-      setInternalZoomRange(range);
-      onZoomRangeChange?.(range);
-    },
-    [onZoomRangeChange]
-  );
+  const updateZoomRange = useCallback((range: { start: number; end: number } | null) => {
+    setInternalZoomRange(range);
+    onZoomRangeChange?.(range);
+  }, [onZoomRangeChange]);
 
-  const handleResetZoom = useCallback(() => {
-    updateZoomRange(null);
-  }, [updateZoomRange]);
+  const handleResetZoom = useCallback(() => updateZoomRange(null), [updateZoomRange]);
 
   useEffect(() => {
-    if (activeZoomRange && (points.length === 0 || activeZoomRange.end >= points.length)) {
-      updateZoomRange(null);
-    }
+    if (activeZoomRange && (points.length === 0 || activeZoomRange.end >= points.length)) updateZoomRange(null);
   }, [points.length, activeZoomRange, updateZoomRange]);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
 
   const totalPoints = points.length;
   const isZoomed = !!(activeZoomRange && totalPoints > 0 && activeZoomRange.end > activeZoomRange.start);
@@ -91,6 +88,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     if ((e.target as HTMLElement).closest('button, input, select, a')) return;
     if (!containerRef.current || points.length === 0) return;
     const rect = containerRef.current.getBoundingClientRect();
+    rectRef.current = { left: rect.left, width: rect.width };
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const pct = rect.width > 0 ? (x / rect.width) * 100 : 0;
 
@@ -108,7 +106,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current || points.length === 0) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = rectRef.current || containerRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const pct = rect.width > 0 ? (x / rect.width) * 100 : 0;
 
@@ -116,11 +114,30 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       setDragSelection(prev => (prev ? { ...prev, currentX: x, currentPct: pct } : null));
     } else if (isDraggingRef.current) {
       const ratio = rect.width > 0 ? x / rect.width : 0;
-      onSelectIndex(Math.max(0, Math.min(totalPoints - 1, Math.round(viewStart + ratio * viewSpan))));
+      const nextIdx = Math.max(0, Math.min(totalPoints - 1, Math.round(viewStart + ratio * viewSpan)));
+      pendingIndexRef.current = nextIdx;
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (pendingIndexRef.current !== null) {
+            onSelectIndex(pendingIndexRef.current);
+          }
+        });
+      }
     }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    if (pendingIndexRef.current !== null) {
+      onSelectIndex(pendingIndexRef.current);
+      pendingIndexRef.current = null;
+    }
+    rectRef.current = null;
+
     if (dragSelection && containerRef.current) {
       const dist = Math.abs(dragSelection.currentX - dragSelection.startX);
       if (dist >= 10) {
@@ -179,63 +196,47 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => { setDragSelection(null); isDraggingRef.current = false; }}
+      onPointerCancel={() => {
+        if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+        rectRef.current = null;
+        setDragSelection(null);
+        isDraggingRef.current = false;
+      }}
       onDoubleClick={handleResetZoom}
       className={`relative select-none flex flex-col justify-between h-full bg-[#0a0e17] rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
     >
       {/* SECTOR INDICATOR ZONES BANNER */}
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
         <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[8px] sm:text-[9px] font-mono font-bold tracking-wider overflow-hidden">
-          {s1Clamped > 0 && (
-            <div style={{ width: `${s1Clamped}%` }} className="h-full border-r border-lmu-gold/40 bg-lmu-gold/15 text-lmu-gold flex items-center justify-center truncate px-1">
-              SECTOR 1
-            </div>
-          )}
-          {s2Clamped > s1Clamped && (
-            <div style={{ width: `${s2Clamped - s1Clamped}%` }} className="h-full border-r border-lmu-blue/40 bg-lmu-blue/15 text-lmu-blue flex items-center justify-center truncate px-1">
-              SECTOR 2
-            </div>
-          )}
-          {100 > s2Clamped && (
-            <div style={{ width: `${100 - s2Clamped}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">
-              SECTOR 3
-            </div>
-          )}
+          {s1Clamped > 0 && <div style={{ width: `${s1Clamped}%` }} className="h-full border-r border-lmu-gold/40 bg-lmu-gold/15 text-lmu-gold flex items-center justify-center truncate px-1">SECTOR 1</div>}
+          {s2Clamped > s1Clamped && <div style={{ width: `${s2Clamped - s1Clamped}%` }} className="h-full border-r border-lmu-blue/40 bg-lmu-blue/15 text-lmu-blue flex items-center justify-center truncate px-1">SECTOR 2</div>}
+          {100 > s2Clamped && <div style={{ width: `${100 - s2Clamped}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>}
         </div>
       )}
 
       <TelemetryStripToolbar
-        interactionMode={interactionMode}
-        onChangeInteractionMode={setInteractionMode}
-        isZoomed={isZoomed}
-        viewStart={viewStart}
-        viewEnd={viewEnd}
+        interactionMode={interactionMode} onChangeInteractionMode={setInteractionMode}
+        isZoomed={isZoomed} viewStart={viewStart} viewEnd={viewEnd}
         spanTimeSec={points[viewStart]?.timeSec !== undefined && points[viewEnd]?.timeSec !== undefined ? (points[viewEnd].timeSec || 0) - (points[viewStart].timeSec || 0) : undefined}
-        onResetZoom={handleResetZoom}
-        hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
+        onResetZoom={handleResetZoom} hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
         baselineLabel={baselineLabel || (baselineLapNumber ? `Lap ${baselineLapNumber}` : 'Baseline')}
-        telemetryResolution={telemetryResolution}
-        onChangeResolution={onChangeResolution}
-        pointsCount={points.length}
-        rawPointsCount={rawPointsCount}
-        rawSampleRateHz={rawSampleRateHz}
-        isFullResolution={isFullResolution}
+        telemetryResolution={telemetryResolution} onChangeResolution={onChangeResolution}
+        pointsCount={points.length} rawPointsCount={rawPointsCount} rawSampleRateHz={rawSampleRateHz} isFullResolution={isFullResolution}
       />
 
       {/* 1. SPEED */}
       <TelemetrySpeedChannel
-        speedPath={paths.speedPath}
-        baselineSpeedPath={paths.baselineSpeedPath}
-        currentPoint={currentPoint}
-        currentComparison={currentComparison}
-        isCursorInView={isCursorInView}
-        cursorPct={cursorPct}
+        speedPath={paths.speedPath} baselineSpeedPath={paths.baselineSpeedPath}
+        currentPoint={currentPoint} currentComparison={currentComparison}
+        isCursorInView={isCursorInView} cursorPct={cursorPct}
       />
 
       {/* 2. TIME DELTA (when comparing laps) */}
       {pointComparisons.length > 0 && (
         <TelemetryDeltaChannel
           deltaTimePath={paths.deltaTimePath} deltaTimeArea={paths.deltaTimeArea}
+          deltaGainArea={paths.deltaGainArea} deltaLossArea={paths.deltaLossArea}
+          deltaGradientStops={paths.deltaGradientStops}
           maxDeltaSec={paths.maxDeltaSec} currentComparison={currentComparison}
           isCursorInView={isCursorInView} cursorPct={cursorPct}
         />
