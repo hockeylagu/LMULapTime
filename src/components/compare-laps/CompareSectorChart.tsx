@@ -141,8 +141,8 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
             <button
               type="button"
               onClick={onCompareTelemetry}
-              className="px-3 py-1 rounded-lg bg-gradient-to-r from-lmu-accent to-indigo-600 hover:from-lmu-accent/90 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm border border-white/20 cursor-pointer mr-1"
-              title="Compare full telemetry traces for these 2 laps"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/25 border border-emerald-400/40 cursor-pointer mr-1"
+              title="Compare full telemetry traces (Speed, Throttle, Brake, Delta Time, GPS) for these 2 laps"
             >
               <Activity className="w-3.5 h-3.5" />
               Compare Telemetry

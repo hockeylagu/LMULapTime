@@ -58,6 +58,8 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setPlaybackSpeed,
     chartZoomRange,
     setChartZoomRange,
+    telemetryResolution,
+    handleChangeResolution,
     handleSelectDriver,
     handleSelectLap,
     maxSpeed,
@@ -166,6 +168,11 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                   baselineLapNumber={baselineTrajectory?.currentLap ?? baselineLapNumber ?? undefined}
                   zoomRange={chartZoomRange}
                   onZoomRangeChange={setChartZoomRange}
+                  telemetryResolution={telemetryResolution}
+                  onChangeResolution={handleChangeResolution}
+                  rawPointsCount={trajectory.rawPointsCount}
+                  rawSampleRateHz={trajectory.rawSampleRateHz}
+                  isFullResolution={trajectory.isFullResolution}
                 />
               </div>
 

@@ -416,7 +416,10 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
 
     const driverSlot = req.query.driverSlot ? parseInt(req.query.driverSlot as string, 10) : undefined;
     const driverName = (req.query.driverName as string | undefined) || (!req.query.driverSlot ? parser.configuredPlayerName : undefined);
-    const maxPoints = req.query.maxPoints ? parseInt(req.query.maxPoints as string, 10) : 1200;
+    const maxPointsParam = req.query.maxPoints as string | undefined;
+    const maxPoints = maxPointsParam !== undefined
+      ? (maxPointsParam === '0' || maxPointsParam.toLowerCase() === 'raw' ? 0 : parseInt(maxPointsParam, 10))
+      : 1200;
     const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
 
     const trajectory = extractReplayTrajectory(filePath, {
@@ -433,7 +436,7 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       if (matchedSession) {
         let matchedDriver = driverName
-          ? matchedSession.drivers.find(d => d.driverName.toLowerCase().includes(driverName.toLowerCase()))
+          ? matchedSession.drivers.find(d => (d.driverName || d.name || '').toLowerCase().includes(driverName.toLowerCase()))
           : undefined;
 
         if (!matchedDriver && typeof driverSlot === 'number') {
@@ -442,7 +445,7 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
             const replayDriver = meta.drivers.find(d => d.slot === driverSlot);
             if (replayDriver) {
               matchedDriver = matchedSession.drivers.find(d =>
-                d.driverName.toLowerCase() === replayDriver.name.toLowerCase() ||
+                (d.driverName || d.name || '').toLowerCase() === replayDriver.name.toLowerCase() ||
                 (replayDriver.carNumber && d.carNumber === replayDriver.carNumber)
               );
             }

@@ -1,5 +1,6 @@
-import React from 'react';
-import { Play, ZoomIn } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, ZoomIn, Activity } from 'lucide-react';
+import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -11,6 +12,12 @@ export interface TelemetryStripToolbarProps {
   onResetZoom: () => void;
   hasBaseline: boolean;
   baselineLabel?: string;
+  telemetryResolution?: number;
+  onChangeResolution?: (res: number) => void;
+  pointsCount?: number;
+  rawPointsCount?: number;
+  rawSampleRateHz?: number;
+  isFullResolution?: boolean;
 }
 
 export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = ({
@@ -23,7 +30,15 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = ({
   onResetZoom,
   hasBaseline,
   baselineLabel,
+  telemetryResolution,
+  onChangeResolution,
+  pointsCount,
+  rawPointsCount,
+  rawSampleRateHz,
+  isFullResolution,
 }) => {
+  const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
+
   return (
     <div className="pt-3.5 px-3 py-1 flex items-center justify-between bg-[#080c14] border-b border-lmu-border/40 shrink-0 select-none z-20">
       <div className="flex items-center gap-2">
@@ -62,6 +77,46 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = ({
             Zoom Range
           </button>
         </div>
+
+        {/* Resolution & Sample Rate Button */}
+        {onChangeResolution && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsResPopoverOpen(!isResPopoverOpen);
+              }}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
+                isResPopoverOpen
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                  : 'bg-black/40 border-white/10 text-lmu-muted hover:text-white hover:border-cyan-400/40'
+              }`}
+              title="Telemetry sample rate (Hz) and resolution settings"
+            >
+              <Activity className="w-2.5 h-2.5 text-cyan-400" />
+              <span>
+                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} •{' '}
+                {isFullResolution || telemetryResolution === 0
+                  ? 'Full Raw'
+                  : `${telemetryResolution || pointsCount || 0} pts`}
+              </span>
+            </button>
+
+            <TelemetryResolutionPopover
+              isOpen={isResPopoverOpen}
+              onClose={() => setIsResPopoverOpen(false)}
+              telemetryResolution={telemetryResolution ?? 2400}
+              onChangeResolution={onChangeResolution}
+              pointsCount={pointsCount ?? 0}
+              rawPointsCount={rawPointsCount}
+              rawSampleRateHz={rawSampleRateHz}
+              isFullResolution={isFullResolution}
+              isZoomed={isZoomed}
+              zoomedPointsCount={isZoomed ? viewEnd - viewStart + 1 : undefined}
+            />
+          </div>
+        )}
 
         {/* Zoom status indicator & Reset Button */}
         {isZoomed ? (

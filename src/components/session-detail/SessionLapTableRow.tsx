@@ -1,6 +1,6 @@
 import React from 'react';
 import { DetailedSession, DriverData, LapData } from '../../../server/types.js';
-import { formatTime } from '../../utils/formatters.js';
+import { formatTime, getDisplayTrackName } from '../../utils/formatters.js';
 import { computeLapToLapDelta } from '../../utils/lapComparison.js';
 import { updateHashParams } from '../../utils/urlParams.js';
 import { PaceBadge } from '../common';

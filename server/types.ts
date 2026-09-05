@@ -150,6 +150,8 @@ export interface DriverData {
   classPosition: number;
   bestLapTime: number | null;
   bestLapTimeString: string;
+  bestLapNum?: number | null;
+  driverName?: string;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
@@ -245,6 +247,7 @@ export interface SessionMetadata {
 
 export interface DetailedSession extends SessionMetadata {
   drivers: DriverData[];
+  totalLapsCount?: number;
 }
 
 export interface SessionProgressionPoint {
@@ -390,6 +393,7 @@ export interface ReplayDriverEntry {
   name: string;
   vehicleId?: string;
   carModel?: string;
+  carClass?: string;
   team?: string;
   carNumber?: string;
   isPlayer?: boolean;
@@ -401,6 +405,7 @@ export interface ReplayMetadata {
   fileSizeBytes: number;
   mtimeMs: number;
   eventInfo?: ReplayEventInfo | null;
+  eventTitle?: string;
   scn?: string;
   aiw?: string;
   trackName?: string;
@@ -411,13 +416,14 @@ export interface ReplayMetadata {
   startTimeSec?: number;
   endTimeSec?: number;
   drivers: ReplayDriverEntry[];
+  laps?: ReplayLapSummary[];
 }
 
 export interface ReplayTrajectoryPoint {
   x: number;
   y: number;
   z: number;
-  rotY: number;
+  rotY?: number;
   speedKmh?: number;
   throttle?: number;
   brake?: number;
@@ -432,6 +438,8 @@ export interface ReplayTrajectoryPoint {
   pitLimiter?: boolean;
   isOffTrack?: boolean;
 }
+
+export type ReplayTelemetryPoint = ReplayTrajectoryPoint;
 
 export interface ReplayLapSummary {
   lapNumber: number;
@@ -461,7 +469,7 @@ export interface ReplayTrajectoryValidation {
   officialBestLapTime?: number | null;
   officialLaps?: Array<{
     lapNumber: number;
-    lapTimeSec: number;
+    lapTimeSec?: number | null;
     s1Sec?: number | null;
     s2Sec?: number | null;
     s3Sec?: number | null;
@@ -500,7 +508,9 @@ export interface ReplaySummary {
   name: string;
   path: string;
   sizeBytes: number;
+  fileSizeBytes?: number;
   mtime: number;
+  mtimeMs?: number;
   trackName?: string;
   sessionCode?: string;
   durationSec?: number;

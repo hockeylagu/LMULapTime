@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flag, ArrowLeftRight, Activity } from 'lucide-react';
+import { Flag, ArrowLeftRight } from 'lucide-react';
 import { ComparableLap, computeLapDeltas } from '../../utils/lapComparison';
 import { ReferenceLaptimeEntry } from '../../../server/types';
 import { CompareLapCard } from './CompareLapCard';
@@ -18,7 +18,6 @@ export interface CompareLapsDeckProps {
   allLaps: ComparableLap[];
   selectedCarClass: string;
   lapColors: string[];
-  onCompareTelemetry?: () => void;
 }
 
 export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
@@ -34,7 +33,6 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
   allLaps,
   selectedCarClass,
   lapColors,
-  onCompareTelemetry,
 }) => {
   if (selectedLaps.length === 0) {
     return (
@@ -63,17 +61,6 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {selectedLaps.length === 2 && onCompareTelemetry && (
-            <button
-              type="button"
-              onClick={onCompareTelemetry}
-              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-lmu-accent to-indigo-600 hover:from-lmu-accent/90 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-lmu-accent/25 border border-white/20 cursor-pointer"
-              title="Compare full telemetry traces (Speed, Throttle, Brake, Delta Time, GPS) for these 2 laps"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              Compare Telemetry
-            </button>
-          )}
           <span className="text-xs font-bold text-white uppercase tracking-wider">
             Active Baseline Lap:
           </span>

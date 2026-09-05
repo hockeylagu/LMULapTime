@@ -493,6 +493,35 @@ describe('replayParser', () => {
       fs.unlinkSync(sliceVcrPath);
     });
 
+    it('calculates rawSampleRateHz and supports uncompressed full raw trajectory (maxPoints: 0)', () => {
+      const resVcrPath = path.join(tempDir, 'resolution_test.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10 },
+          { sTime: 1.05, driverSlot: 1, x: 15, y: 0, z: 15 },
+          { sTime: 1.10, driverSlot: 1, x: 20, y: 0, z: 20 },
+          { sTime: 1.15, driverSlot: 1, x: 25, y: 0, z: 25 },
+        ],
+      });
+      fs.writeFileSync(resVcrPath, buf);
+
+      // Downsampled extraction
+      const downsampleTraj = extractReplayTrajectory(resVcrPath, { driverSlot: 1, maxPoints: 2 });
+      expect(downsampleTraj.rawPointsCount).toBe(4);
+      expect(downsampleTraj.rawSampleRateHz).toBe(20);
+      expect(downsampleTraj.isFullResolution).toBe(false);
+      expect(downsampleTraj.points.length).toBe(2);
+
+      // Uncompressed raw extraction (maxPoints: 0)
+      const rawTraj = extractReplayTrajectory(resVcrPath, { driverSlot: 1, maxPoints: 0 });
+      expect(rawTraj.rawPointsCount).toBe(4);
+      expect(rawTraj.rawSampleRateHz).toBe(20);
+      expect(rawTraj.isFullResolution).toBe(true);
+      expect(rawTraj.points.length).toBe(4);
+
+      fs.unlinkSync(resVcrPath);
+    });
+
     it('selects rival driver trajectory by driverSlot and driverName', () => {
       const multiDriverPath = path.join(tempDir, 'multi_driver.vcr');
       const buf = createSliceVcrBuffer({
