@@ -47,7 +47,7 @@ Each string is preceded by a **4-byte length prefix (`UInt32LE`)** specifying th
 ### 2.2 Session Configuration Block
 Immediately following String 6 (`trackPath`):
 
-- **Byte 0**: Unknown configuration / flags byte.
+- **Byte 0**: Session flags / sub-type configuration byte.
 - **Byte 1 (`sessionInfo`)**:
   - `sessionInfo & 0x0F` = Session Type Code:
     - `0`: Test Day
@@ -56,12 +56,24 @@ Immediately following String 6 (`trackPath`):
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
   - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
-- **Next 67 bytes**: Environment & conditions block (track temperature, ambient temperature, wetness/grip presets, time progression multipliers).
+- **Next 67 bytes**: Comprehensive Session Environment & Weather Conditions Block:
+  | Relative Offset | Size | Type | Field Description |
+  | :--- | :--- | :--- | :--- |
+  | `+0` | 4 bytes | Float32LE | **`ambientTemp`**: Ambient air temperature in degrees Celsius (°C). |
+  | `+4` | 4 bytes | Float32LE | **`trackTemp`**: Track surface temperature in degrees Celsius (°C). |
+  | `+8` | 4 bytes | Float32LE | **`rainIntensity`**: Atmospheric precipitation / rainfall rate (`0.0` = dry to `1.0` = torrential monsoon). |
+  | `+12` | 4 bytes | Float32LE | **`trackWetness`**: Overall circuit surface wetness percentage (`0.0` = completely dry, `1.0` = flooded). |
+  | `+16` | 4 bytes | Float32LE | **`waterDepth`**: Average standing puddle depth across racing line (mm). |
+  | `+20` | 4 bytes | Float32LE | **`trackGrip`**: Rubbering level / track evolution factor (`0.0` = green, `0.5` = medium rubber, `1.0` = saturated rubber groove). |
+  | `+24` | 4 bytes | Float32LE | **`windSpeed`**: Ambient wind speed in meters per second (m/s). |
+  | `+28` | 4 bytes | Float32LE | **`windDirection`**: Wind heading angle (radians clockwise from track North). |
+  | `+32` | 4 bytes | Float32LE | **`timeMultiplier`**: In-game time progression multiplier (e.g. `1.0` = real-time 1x, `5.0` = 5x accelerated, `24.0` = 24x). |
+  | `+36..66` | 31 bytes | Binary | Cloud cover, haze, sky presets, sun azimuth/elevation vectors, and ambient light intensity. |
 
 ### 2.3 Structured Driver Roster
 Located immediately after the 67-byte session conditions block:
 
-- **`numDrivers` (4 bytes, Int32LE)**: Total number of drivers in the session.
+- **`numDrivers` (4 bytes, Int32LE)**: Total number of drivers participating in the session.
 - **Driver Records (repeated `numDrivers` times)**:
   - `slot` (1 byte, UInt8 or UInt16LE): In-game driver slot index.
   - `name` (1-byte length prefix + UTF-8 string): Driver full name (e.g. `"Douglas Riviera"`).
@@ -70,9 +82,9 @@ Located immediately after the 67-byte session conditions block:
   - `team` (1-byte length prefix + UTF-8 string): Team name (e.g. `"Team WRT 2026 #32"`).
   - `carNumber` (1-byte length prefix + UTF-8 string): Car number string (e.g. `"32"` or `"1"`).
   - **Fixed 24-byte Driver Status Tail**:
-    - `0..15` (16 bytes): Unknown vehicle state / class flags.
-    - `16..19` (4 bytes, Float32LE): `entryTime` (Session time in seconds when driver entered).
-    - `20..23` (4 bytes, Float32LE): `exitTime` (Session time in seconds when driver exited / disconnected).
+    - `0..15` (16 bytes): Vehicle class attributes, Balance of Performance (BoP) weight ballast (kg) and intake air restrictor ratio.
+    - `16..19` (4 bytes, Float32LE): `entryTime` (Session time in seconds when driver joined the server/session).
+    - `20..23` (4 bytes, Float32LE): `exitTime` (Session time in seconds when driver left/disconnected).
   - **4 bytes Transition Block**: Slot index / linkage to the next driver entry.
 
 ### 2.4 Metadata Trailer (Last 28 Bytes of the File)
@@ -132,11 +144,15 @@ This is the primary vehicle kinematic and pedal telemetry packet emitted at up t
 | `57` | 4 bytes | Float32LE | **`rotY`**: Yaw / heading angle (radians) |
 | `61` | 4 bytes | Float32LE | **`rotZ`**: Roll angle (radians) |
 
-#### Type 15 (`eventSize === 24` or `37`): Per-Wheel Telemetry
-Contains individual 4-wheel telemetry (Front-Left, Front-Right, Rear-Left, Rear-Right):
-- Tire pressures (kPa / PSI)
-- Tire temperatures (Inner, Center, Outer)
-- Tire wear percentages remaining
+#### Type 15 (`eventSize === 24` or `37`): Per-Wheel Live Telemetry
+Emitted periodically or on corner events to report real-time tire physics and brake thermal data:
+
+| Relative Offset | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `+0..7` | 8 bytes (4x UInt16LE) | UInt16LE | **Tire Pressures**: Dynamic tire pressure for FL, FR, RL, RR in units of 0.1 kPa (or PSI / 10). |
+| `+8..19` | 12 bytes (12x UInt8) | UInt8 | **Tire Tread Temperatures**: 3-zone surface temperatures across tire carcass (Inner, Center, Outer) for all 4 corners: <br>• FL: Inner (8), Center (9), Outer (10) <br>• FR: Outer (11), Center (12), Inner (13) <br>• RL: Inner (14), Center (15), Outer (16) <br>• RR: Outer (17), Center (18), Inner (19) <br>Value in degrees Celsius (°C). |
+| `+20..23` | 4 bytes (4x UInt8) | UInt8 | **Dynamic Tire Wear**: Remaining rubber depth percentage (`0..100`% or raw byte `0..255` scaled to 100%) for FL, FR, RL, RR. |
+| `+24..31` (if sz === 37) | 8 bytes (4x UInt16LE) | UInt16LE | **Brake Rotor Temperatures**: Brake disc temperature in degrees Celsius (°C) for FL, FR, RL, RR. |
 
 #### Type 7: Garage Event
 - Float32LE: Timestamp of entering/exiting garage bay.
@@ -146,7 +162,12 @@ Contains individual 4-wheel telemetry (Front-Left, Front-Right, Rear-Left, Rear-
 ### Class 1: Session Control & Visuals
 
 - **Type 10**: Start Lights Status:
-  - 1 byte integer: Number of illuminated lights (`1` to `6` red/green start lights).
+  - 1 byte integer (`startLightsCode`):
+    - `0`: No lights / pit exit open
+    - `1..5`: Red start light countdown illumination (1 light on, 2 on, 3 on, 4 on, 5 on)
+    - `6`: All red lights held before extinguish
+    - `7`: Green flag / lights out (Race start!)
+    - `8`: Aborted start / extra formation lap
 - **Type 23**: Session Countdown:
   - 4 bytes UInt32LE: Seconds remaining until session green flag or expiration.
 
@@ -155,14 +176,26 @@ Contains individual 4-wheel telemetry (Front-Left, Front-Right, Rear-Left, Rear-
 ### Class 2: Penalties, Incidents & Race Control
 
 - **Type 5**: Penalty Issued Event:
-  - 1 byte: `penaltyId` (Infraction type code)
-  - 2 bytes: Penalty code / rule reference
+  - 1 byte: `penaltyId` (Infraction type code: 1 = Cut Track, 2 = Speeding in Pit Lane, 3 = False Start, 4 = Causing a Collision).
+  - 2 bytes: Penalty code / rule reference.
   - Variable string (`eventSize - 3` bytes): Exact human-readable infraction text (e.g. `"Cut track"`, `"Pit lane speeding"`, `"False start"`).
 - **Type 7**: Penalty Served Event:
   - 1 byte: `0` = Stop & Go served, `1` = Drive Through served.
 - **Type 8**: Penalty Rescinded:
   - 1 byte: Penalty cancelled by race control / server admin.
-- **Type 10**: Track condition flags (Green, Local Yellow, Full Course Yellow, Safety Car).
+- **Type 10**: Track Condition & Flag Status:
+  - 1 byte: `flagState`:
+    - `0`: Green Flag (Track clear / race underway)
+    - `1`: Local Yellow Flag (Hazard in sector)
+    - `2`: Double Yellow Flag (Hazard blocking track)
+    - `3`: Full Course Yellow (FCY, speed limited to 80 km/h)
+    - `4`: Safety Car deployed (SC)
+    - `5`: Safety Car in this lap
+    - `6`: Virtual Safety Car (VSC)
+    - `7`: Red Flag (Session suspended)
+    - `8`: Checkered Flag (Session finished)
+  - 1 byte: `sectorMask`: Affected track sector bitfield (`0x01` = S1, `0x02` = S2, `0x04` = S3).
+  - 1 byte: `driverFlag`: Specific flag directed at vehicle (`0x01` = Blue flag yield, `0x02` = Black flag DQ, `0x04` = Mechanical defect meatball flag).
 
 ---
 
@@ -190,23 +223,36 @@ When a session terminates or a car ESCs back to the garage, the engine flushes a
 #### Type 19 (`eventSize === 8`): Session State Name
 ASCII string broadcast confirming current session name (e.g. `"Practice"`, `"Qualify"`, `"Race"`).
 
-#### Type 48 (`eventSize === 41`): Live Leaderboard / Standings Order
-Emitted periodically to broadcast the official session running order.
-Contains an array of driver slot bytes in order of track position (P1, P2, P3... Pn).
+#### Type 48 (`eventSize === 41`): Live Leaderboard / Standings Matrix
+Emitted periodically to broadcast the official real-time session running order:
+- `+0`: 1 byte count: Number of active cars ranked.
+- `+1..40`: Array of driver slot bytes in precise track order:
+  - Byte `1` = P1 leader slot
+  - Byte `2` = P2 slot
+  - Byte `n` = Pn slot
+Enables 100% accurate running position, leader interval, and position-over-time charts without post-hoc sorting or interpolation.
 
-#### Type 49: Pit Transitions
-- 1 byte code: `3` = Entered pit lane, `4` = Returned to garage.
+#### Type 49 (`eventSize === 1`): Pit & Garage Transitions
+- 1 byte code: `3` = Entered pit lane / Returned to garage. Emitted synchronously with pit entry and garage return beacons.
 
 ---
 
-### Class 5: Pit Stop Service Operations
+### Pit Stop & Garage Workflow Events (`eventType === 2`)
 
-- **Type 2**: Pit Lane Workflow States:
-  - `32`: Exited pit lane
-  - `33`: Pit stop requested (in-car dash button pressed)
-  - `34`: Entered pit lane speed limit line
-  - `35`: Car stopped in pit box / hoisted on pneumatic air jacks
-  - `36`: Service complete / dropped off jacks (includes service payload: liters of fuel added, tire compounds fitted)
+Emitted with `eventType === 2` (across event classes) to report exact car states through garage stints and pit stops:
+
+| Action Code (Dec / Hex) | Payload Size | State Description | Garage State |
+| :--- | :--- | :--- | :--- |
+| `16` (`0x10`) | 1 byte | **Exited Garage Bay**: Driver departed garage stall / pit box to begin session outlap or stint. | `isGarage: true` (exiting) |
+| `18` (`0x12`) | 1 byte | **In Pit Stall**: Car stationary in pit box before mechanics begin work. | `isGarage: false` |
+| `20` (`0x14`) | 1 byte | **Service Commenced**: Mechanics initiate fueling / tire change sequence. | `isGarage: false` |
+| `21` (`0x15`) | 1 byte | **Returned to Garage**: Driver hit ESC back to garage stall or returned to garage bay (end of stint). | `isGarage: true` (entering) |
+| `32` (`0x20`) | 1 byte | **Exited Pit Lane**: Crossed pit exit timing line (pit limiter disengaged, rejoined racing circuit). | `isGarage: false` |
+| `33` (`0x21`) | 1 byte | **Pit Stop Requested**: In-car dashboard pit request toggle activated by driver. | `isGarage: false` |
+| `34` (`0x22`) | 1 byte | **Entered Pit Lane**: Crossed pit entry line (pit speed limiter engaged, 60 km/h). | `isGarage: false` |
+| `35` (`0x23`) | 1 byte | **On Air Jacks**: Pneumatic air jacks hoisted car in pit box. | `isGarage: false` |
+| `36` (`0x24`) | 1 byte | **On Air Jacks**: Vehicle elevated in pit box. | `isGarage: false` |
+| `37` (`0x25`) | 6 bytes | **Service Complete / Off Jacks**: Service finished, car dropped back to ground. <br>• `+1`: Status byte <br>• `+2..5` (Float32LE): `fuelAddedLiters` (Volume of fuel pumped during stop). | `isGarage: false` |
 
 ## 5. Lap & Sector Timing Architecture: Official Simulation Timing Stream
 
@@ -254,12 +300,107 @@ Every valid flying lap in each replay matches the official simulation XML result
 
 | Feature Area | Implementation Status | Implementation Details Using VCR Native Data |
 | :--- | :--- | :--- |
-| **Driver Roster** | **Implemented** (`parseReplayMetadata`) | Deterministic binary `numDrivers` + exact structured records with `entryTime`/`exitTime`, fallback to heuristic regex. |
+| **Driver Roster** | **Implemented** (`parseReplayMetadata`) | Deterministic binary `numDrivers` + exact structured records with `entryTime`/`exitTime`, fallback to heuristic regex for legacy mock buffers. |
 | **Session Identification** | **Implemented** (`parseReplayMetadata`) | Session byte parsing (`sessionType`, `privateSession`), `modUid`, and `trackPath`. |
-| **Lap & Sector Timing** | **Implemented** (`extractReplayLapSummaries`, `extractReplayTrajectory`) | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits (S1/S2/S3), official lap numbering, and validity flags matching the in-game HUD. Retains geometric crossing fallback. |
-| **Tire & Fuel Wear** | Planned | Class 0 Type 15 gives live 4-wheel tire wear; Class 5 Type 2 provides exact pit fuel additions. |
-| **Penalties & Cuts** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
+| **Lap & Sector Timing** | **Implemented** (`extractReplayLapSummaries`, `extractReplayTrajectory`) | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits (S1/S2/S3), official lap numbering, and validity flags matching the in-game HUD. |
+| **Tire Dynamics & Wear** | **Specification Ready** | Class 0 Type 15 delivers live 4-wheel pressures, 12-channel tread temperatures (Inner/Center/Outer), wear percentages, and brake rotor temperatures. |
+| **Penalties & Incidents** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
+| **Track Flags & Safety Car** | **Specification Ready** | Class 2 Type 10 track flag states (Green, Local Yellow, FCY, SC, VSC, Red, Checkered) and driver flags (Blue, Black, Meatball). |
 | **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
 | **Engine RPM** | **Implemented** (`extractReplayTrajectory`) | True physics engine RPM directly decoded from `info1 >>> 18`. |
-| **Pit Events** | **Implemented** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 3 pit stop events, entry/exit, service durations, and fueling. |
-| **Live Standings** | Planned | Read Class 6 Type 48 packets for live position tracking at every moment of the session. |
+| **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 36 pit stop events, entry/exit, service durations, liters fueled, and tire compounds fitted. |
+| **Live Standings** | **Specification Ready** | Class 6 Type 48 packets provide real-time running order array (P1..Pn) and gaps at every timestamp. |
+| **Weather & Track Grip** | **Specification Ready** | Metadata 67-byte session environment block yields ambient/track temps, rain intensity, puddle depth, and rubber grip saturation. |
+
+---
+
+## 7. Legacy Hacks, Heuristics & Deprecations: Post-Decoding Analysis
+
+During the early stages of reverse-engineering the `.Vcr` binary format, numerous heuristics, approximations, and string-scraping fallbacks were introduced because the underlying binary structures were not yet understood. With the complete decoding of the IRSR frame slice architecture, the deterministic metadata block, and the official event streaming engine, these hacks have been cataloged and evaluated for deprecation or removal.
+
+### 7.1 Legacy Hacks Catalog
+
+| Legacy Hack / Heuristic | Original Motivation | Obsolete Why? (Current Format Understanding) | Status & Recommended Action |
+| :--- | :--- | :--- | :--- |
+| **Naive `[0x41, 0x10]` Signature Scanner** (`replayParser.ts:909-941`) | Scanned raw chunks searching for byte pattern `[0x41, 0x10]` to find vehicle motion frames when frame slicing was unknown. | Official LMU replays are strictly formatted into IRSR frame slices (`sTime` Float32LE + `nEvents` UInt16LE). `0x41` was merely `sz === 65` and `0x10` was event class/type bits. | **Deprecated**. Retained exclusively as an internal fallback for legacy synthetic unit tests (`createMockVcrBuffer()`) that omit slice headers. |
+| **Regex Driver Scraping & Word Blocklists (Methods 2 & 3)** (`replayParser.ts:408-540`) | Scanned arbitrary ASCII buffers using regex `/^[A-Z][a-zA-Z\s'-]{2,28}$/` and blocklisted words (`Team`, `WEC`, `Racing`, `Ambulante`, `Corsa`, `Hybrid`). | The VCR metadata block deterministically encodes the exact session environment block (67 bytes) followed immediately by `numDrivers` (Int32LE) and length-prefixed Pascal strings (`Method 1`). | **Obsolete**. Method 1 is the 100% authoritative format. Methods 2 & 3 are retained only as fallbacks for legacy/malformed synthetic mock buffers. |
+| **Quadratic Aerodynamic Drag Deceleration ($a_{drag} = 0.00042 \cdot v^2$) & Kinematic Pedal Estimation** (`replayParser.ts:1318-1355`) | Approximated throttle (100% on straights, modulated in corners) and brake pressure based on vehicle deceleration and drag resistance. | Official LMU replays natively record 8-bit throttle (Byte 5, 0..249 mapped to 0..100%) and analog brake pressure (Byte 36, bits 0..5, ABS bit 6, TC bit 7) at 50 Hz in Class 0 Type 8-14 motion packets. | **Obsolete**. Deprecated in favor of native Byte 5 and Byte 36 telemetry. Retained solely as a fallback if synthetic test buffers omit pedal bytes. |
+| **Fixed 33.3% / 66.7% Distance-Ratio Sector Split Approximation** (`replayParser.ts:1090, 1106, 1228`) | Sliced cumulative trajectory distance into 1/3 and 2/3 milestones to synthesize Sector 1 and Sector 2 elapsed times when timing loops were missing. | Class 6 Type 6 timing loops provide official microsecond-accurate S1, S2, and S3 splits directly from the simulation scoring engine. | **Obsolete**. Only triggered in the degenerate case where zero timing packets exist in an entire replay. |
+| **Hardcoded > 380 km/h Speed Zeroing Hack** (`replayParser.ts:1308`) | Set `smoothSpeed = 0` if calculated speed exceeded 380 km/h to prevent teleport speed spikes. | Low-drag prototypes (e.g. Le Mans Hypercars with slipstream on the Mulsanne Straight) can legitimately exceed 340–360+ km/h. Zeroing speed corrupted charts. Teleports are already detected by multi-point distance/speed checks. | **Removed**. Replaced with proper non-negative speed clamping and coordinate jump filtering. |
+| **Downshift Auto-Blip and Upshift Ignition Cut Smoothing** (`replayParser.ts:952-1006`) | Filtered out ECU transmission downshift auto-blips (`brk > 8 && thr > 0`) and interpolated over single-frame upshift cuts. | While ECU blips reflect real engine control inputs, users inspecting driver inputs prefer pedal intent rather than ECU actuator actuation. | **Retained as an intentional UX enhancement**, clearly documented as driver-intent filtering rather than raw ECU actuation. |
+
+---
+
+## 8. Catalog of Additional Extractable Data from VCR Format
+
+The LMU/rF2 `.Vcr` format contains an extensive array of untapped telemetry, environment, and race control data that can be exposed in API endpoints, telemetry charts, and session dashboards:
+
+### 8.1 4-Wheel Thermal, Pressure & Degradation Dynamics (Class 0 Type 15)
+Emitted periodically or on corner events (`eventSize === 24` or `37`):
+- **12-Point Tire Tread Temperatures (°C)**:
+  - Separate temperatures across the tire carcass: **Inner**, **Center**, and **Outer** tread zones for all 4 corners (FL, FR, RL, RR).
+  - Enables thermal camber optimization and tire overheating analysis in the UI.
+- **Dynamic Hot Inflation Pressures (kPa / PSI)**:
+  - Real-time internal air pressures for all 4 tires.
+- **Corner-by-Corner Tire Wear Degradation (0–100%)**:
+  - Live percentage of remaining tire rubber per corner.
+  - Enables true tire degradation curves over stints instead of end-of-session approximations.
+- **Brake Rotor / Disc Temperatures (°C)**:
+  - Thermal load on carbon/steel brake discs (offsets `+24..31` when `eventSize === 37`).
+
+### 8.2 Track Meteorology, Evolution & Weather Dynamics (Metadata Session Conditions Block)
+The 67-byte session environment block (located at `metadataOffset + trackPathLength + 2`):
+- **Ambient Air Temperature** (`+0` Float32LE): Ambient temperature in °C.
+- **Track Surface Temperature** (`+4` Float32LE): Track asphalt temperature in °C.
+- **Precipitation / Rain Intensity** (`+8` Float32LE): Rain rate (`0.0` dry to `1.0` storm).
+- **Track Surface Wetness** (`+12` Float32LE): Moisture saturation (`0.0` dry to `1.0` wet).
+- **Standing Water / Puddle Depth** (`+16` Float32LE): Average standing water depth in mm along racing line.
+- **Dynamic Rubber Grip Saturation** (`+20` Float32LE): Track grip evolution factor (`0.0` green track to `1.0` heavily rubbered line).
+- **Wind Speed & Direction Vector** (`+24` and `+28` Float32LE): Wind velocity in m/s and bearing angle in radians.
+- **Time Acceleration Multiplier** (`+32` Float32LE): In-game session progression multiplier (e.g. 1x, 5x, 24x).
+
+### 8.3 Live Race Control, Flags & Safety Car System (Class 2 Type 10 & Class 1 Type 10)
+Broadcasts live race direction decisions and track conditions:
+- **Track Condition Flags**:
+  - `0`: Green Flag (Track clear / racing active)
+  - `1`: Local Yellow Flag (Hazard in sector)
+  - `2`: Double Yellow Flag (Hazard blocking track)
+  - `3`: Full Course Yellow (FCY / speed limited to 80 km/h)
+  - `4`: Safety Car deployed (SC)
+  - `5`: Safety Car in this lap
+  - `6`: Virtual Safety Car (VSC)
+  - `7`: Red Flag (Session stopped)
+  - `8`: Checkered Flag (Session completed)
+- **Sector Hazard Mask**: Bitfield identifying which sector (S1, S2, S3) contains the hazard.
+- **Driver-Targeted Flags**: Blue Flag (yielding to leader), Black Flag (disqualification), Meatball Flag (mandatory pit stop for mechanical damage).
+- **Start Lights Countdown**: Exact illumination phase (1 to 5 red lights, hold, green lights out).
+
+### 8.4 Live Leaderboard Matrix & Track Gaps (Class 6 Type 48)
+Emitted periodically (`eventSize === 41`):
+- **Real-Time Running Order Array**: Driver slot indices in exact track order from P1 leader down to Pn.
+- **Live Gaps**: Exact intervals to leader and car ahead calculated in real time without post-hoc reconstruction.
+- **Position Tracking Over Time**: Enables live "Lap Chart" visualizations showing position changes, overtakes, and pit stop shuffles.
+
+### 8.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 5 Type 2 & Type 36)
+Full service telemetry emitted during pit stop operations:
+- **Fuel Added**: Exact volume in liters (Float32LE) pumped into the tank during the stop.
+- **Tire Compound Fitted**: Compound code installed per corner (FL, FR, RL, RR) (Hard, Medium, Soft, Wet).
+- **Pneumatic Jack Duration**: Exact seconds the car spent hoisted on air jacks (`jackTimeSec`).
+- **Penalty Compliance**: Validates whether in-pit penalties (e.g. 5-second or 10-second stop & go) were served before mechanics commenced work.
+- **Pit Lane Speed Limit Enforcement**: Entry/exit line timing beacons detect pit lane speeding infractions.
+
+### 8.6 Aerodynamic Damage & Detachable Bodywork (Class 0 Type 8-14 `info2 & 0x3FF`)
+The 10-bit aero damage bitfield in `info2`:
+- Front wing left / right endplate loss
+- Rear wing main plane detachment
+- Rear diffuser structural damage
+- Front splitter detachment
+- Left / right door damage
+- Engine cowl / rear deck damage
+
+### 8.7 Balance of Performance (BoP) & Driver Session Timings (Metadata 24-byte Tail)
+Extended driver information stored in each driver's fixed tail:
+- **`entryTime`**: Exact session second timestamp when the driver connected or entered the session.
+- **`exitTime`**: Exact session second timestamp when the driver disconnected or left the session.
+- **Success Ballast / BoP Weight**: Additional ballast mass (kg) added for Balance of Performance.
+- **Intake Restrictor Ratio**: Engine power restriction scaling factor.

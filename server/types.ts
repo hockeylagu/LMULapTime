@@ -466,6 +466,8 @@ export interface ReplayPitEvent {
   timeSec: number;
   code: number;
   action: string;
+  isGarage?: boolean;
+  durationSec?: number;
   details?: string;
 }
 

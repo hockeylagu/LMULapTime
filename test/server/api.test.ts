@@ -134,4 +134,10 @@ describe('Server API routes', () => {
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('error');
   });
+
+  it('GET /api/replays/:name/pit-events returns 404 for nonexistent file', async () => {
+    const res = await request(app).get('/api/replays/nonexistent.vcr/pit-events');
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty('error');
+  });
 });
