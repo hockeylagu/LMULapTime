@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
 import { DetailedSession, ReplaySummary } from './types.js';
-import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries } from './replayParser.js';
+import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries, extractReplayPitEvents } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty } from '../src/utils/formatters.js';
@@ -566,6 +566,36 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
   } catch (err: unknown) {
     console.error(`Failed to extract replay trajectory for ${req.params.name}:`, err);
     const message = err instanceof Error ? err.message : 'Failed to extract replay trajectory';
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get('/api/replays/:name/pit-events', (req, res) => {
+  try {
+    const replayName = req.params.name;
+    const filePath = path.join(currentReplaysDir, replayName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+    }
+
+    const driverSlot = req.query.driverSlot ? Number(req.query.driverSlot) : undefined;
+    const driverName = req.query.driverName as string | undefined;
+
+    const pitEvents = extractReplayPitEvents(filePath, {
+      driverSlot,
+      driverName,
+      playerName: parser.configuredPlayerName,
+    });
+
+    res.json({
+      replayName,
+      count: pitEvents.length,
+      pitEvents,
+    });
+  } catch (err: unknown) {
+    console.error(`Failed to extract pit events for ${req.params.name}:`, err);
+    const message = err instanceof Error ? err.message : 'Failed to extract pit events';
     res.status(500).json({ error: message });
   }
 });

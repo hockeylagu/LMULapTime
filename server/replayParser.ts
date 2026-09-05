@@ -877,23 +877,63 @@ export function extractReplayTrajectory(
                 action: 'removed',
               });
             }
-          } else if (evClass === 5 && evType === 2 && sz >= 1 && eventSp + 5 + sz <= activeLen) {
+          } else if (((evType === 2 || evClass === 5) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
+                     (evType === 49 && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
             const drvName = driverNameMap.get(drv);
-            const PIT_CODE_MAP: Record<number, string> = {
-              32: 'exited pit lane',
-              33: 'requested pit',
-              34: 'entered pit lane',
-              35: 'on jacks',
-              36: 'off jacks',
+            const PIT_CODE_MAP: Record<number, { action: string; isGarage?: boolean }> = {
+              16: { action: 'exited garage', isGarage: true },
+              18: { action: 'stopped in pit stall', isGarage: false },
+              20: { action: 'service started', isGarage: false },
+              21: { action: 'returned to garage', isGarage: true },
+              32: { action: 'exited pit lane', isGarage: false },
+              33: { action: 'requested pit', isGarage: false },
+              34: { action: 'entered pit lane', isGarage: false },
+              35: { action: 'on jacks', isGarage: false },
+              36: { action: 'on jacks', isGarage: false },
+              37: { action: 'service complete', isGarage: false },
             };
-            replayPitEvents.push({
-              driverSlot: drv,
-              driverName: drvName,
-              timeSec: Number(sTime.toFixed(2)),
-              code: pCode,
-              action: PIT_CODE_MAP[pCode] || `pit action ${pCode}`,
-            });
+
+            if (evType === 49) {
+              if (pCode === 3) {
+                replayPitEvents.push({
+                  driverSlot: drv,
+                  driverName: drvName,
+                  timeSec: Number(sTime.toFixed(2)),
+                  code: 49,
+                  action: 'entered pit / garage',
+                  isGarage: true,
+                });
+              }
+            } else {
+              const meta = PIT_CODE_MAP[pCode];
+              if (meta) {
+                let details: string | undefined;
+                if (pCode === 37 && sz >= 6) {
+                  const candidateFuel = buf.readFloatLE(eventSp + 5 + 2);
+                  if (isFinite(candidateFuel) && candidateFuel > 0 && candidateFuel < 150) {
+                    details = `Fuel: ${candidateFuel.toFixed(1)}L`;
+                  }
+                }
+                replayPitEvents.push({
+                  driverSlot: drv,
+                  driverName: drvName,
+                  timeSec: Number(sTime.toFixed(2)),
+                  code: pCode,
+                  action: meta.action,
+                  isGarage: meta.isGarage,
+                  details,
+                });
+              } else {
+                replayPitEvents.push({
+                  driverSlot: drv,
+                  driverName: drvName,
+                  timeSec: Number(sTime.toFixed(2)),
+                  code: pCode,
+                  action: `pit action ${pCode}`,
+                });
+              }
+            }
           }
           eventSp += 4 + 1 + sz;
         }
@@ -1295,6 +1335,44 @@ export function extractReplayTrajectory(
       rawSpeeds.push(speed);
     }
 
+    // Build garage and pit intervals for the target vehicle to accurately determine inGarage and inPit states
+    const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
+    const garageIntervals: Array<{ start: number; end: number }> = [];
+    const pitIntervals: Array<{ start: number; end: number }> = [];
+
+    // Check if vehicle started in the garage (prior to first garage exit event)
+    const firstGarageExit = targetPitEvents.find(e => e.code === 16);
+    if (firstGarageExit && firstGarageExit.timeSec > 0) {
+      garageIntervals.push({ start: 0, end: firstGarageExit.timeSec });
+    }
+
+    for (let p = 0; p < targetPitEvents.length; p++) {
+      const ev = targetPitEvents[p];
+      // Garage returns (code 21 or code 49)
+      if (ev.code === 21 || ev.code === 49) {
+        const nextExit = targetPitEvents.slice(p + 1).find(e => e.code === 16);
+        garageIntervals.push({
+          start: ev.timeSec,
+          end: nextExit ? nextExit.timeSec : Infinity,
+        });
+      }
+      // Pit lane entries (code 34)
+      if (ev.code === 34) {
+        const nextPitExit = targetPitEvents.slice(p + 1).find(e => e.code === 32);
+        pitIntervals.push({
+          start: ev.timeSec,
+          end: nextPitExit ? nextPitExit.timeSec : ev.timeSec + 120,
+        });
+      }
+    }
+
+    function isTimeInIntervals(t: number, intervals: Array<{ start: number; end: number }>): boolean {
+      for (const inv of intervals) {
+        if (t >= inv.start && t <= inv.end) return true;
+      }
+      return false;
+    }
+
     // Smooth speed, calculate acceleration, throttle, and brake
     const finalPoints: ReplayTrajectoryPoint[] = [];
     for (let i = 0; i < downsampled.length; i++) {
@@ -1304,8 +1382,8 @@ export function extractReplayTrajectory(
       const nextSpeed = i < downsampled.length - 1 ? rawSpeeds[i + 1] : rawSpeeds[i];
       let smoothSpeed = (prevSpeed + curSpeed + nextSpeed) / 3;
 
+      // Remove sensor noise for stationary vehicles; negative speeds are guarded
       if (smoothSpeed < 1.5) smoothSpeed = 0;
-      if (smoothSpeed > 380) smoothSpeed = 0;
 
       let accel = 0;
       if (i > 0 && i < downsampled.length - 1) {
@@ -1315,18 +1393,16 @@ export function extractReplayTrajectory(
         }
       }
 
-      // Physics-informed vehicle dynamics estimation
-      // Aerodynamic drag increases with v^2, naturally reducing net vehicle acceleration at high speeds.
-      // Total engine force required = inertial acceleration + aero drag resistance.
-      const vKmh = smoothSpeed;
-      const aDrag = 0.00042 * (vKmh * vKmh); // m/s^2 drag deceleration
-      const effectiveEngineAccel = accel + aDrag;
-
-      // Use raw replay telemetry if available; otherwise fall back to physics estimation
+      // Legacy fallback: In official LMU replays, native Class 0 Type 8-14 motion packets provide
+      // Byte 5 (rawThrottle 0-100%) and Byte 36 (rawBrake 0-100%, ABS bit 6, TC bit 7).
+      // If a synthetic mock test buffer omits these bytes, fall back to physics-informed estimation.
       let throttle = cur.rawThrottle ?? 0;
       let brake = cur.rawBrake ?? 0;
 
       if (cur.rawThrottle === undefined && cur.rawBrake === undefined && smoothSpeed >= 1.0) {
+        const vKmh = smoothSpeed;
+        const aDrag = 0.00042 * (vKmh * vKmh); // m/s^2 drag deceleration
+        const effectiveEngineAccel = accel + aDrag;
         if (accel < -0.8) {
           // Hard braking zone
           throttle = 0;
@@ -1368,7 +1444,10 @@ export function extractReplayTrajectory(
         }
       }
 
-      const inGarage = smoothSpeed < 1;
+      // True garage state based on simulation events; fallback to stationary in pit
+      const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
+        (garageIntervals.length === 0 && Boolean(cur.inPit) && smoothSpeed < 1);
+      const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals) || inGarage;
 
       finalPoints.push({
         x: Number(cur.x.toFixed(2)),
@@ -1382,7 +1461,7 @@ export function extractReplayTrajectory(
         brake,
         steerYaw: cur.steerYaw ?? 0,
         rpm,
-        inPit: cur.inPit,
+        inPit,
         isOffTrack: cur.isOffTrack,
         inGarage,
         isTeleport,
@@ -1475,4 +1554,27 @@ export function extractReplayLapSummaries(
     maxPoints: 10,
   });
   return traj.laps || [];
+}
+
+/**
+ * Extracts pit stop and garage events for a replay session.
+ */
+export function extractReplayPitEvents(
+  filePath: string,
+  options: {
+    driverSlot?: number;
+    driverName?: string;
+    playerName?: string;
+  } = {}
+): ReplayPitEvent[] {
+  const traj = extractReplayTrajectory(filePath, {
+    driverSlot: options.driverSlot,
+    driverName: options.driverName,
+    playerName: options.playerName,
+    maxPoints: 10,
+  });
+  if (options.driverSlot !== undefined) {
+    return (traj.pitEvents || []).filter(e => e.driverSlot === options.driverSlot);
+  }
+  return traj.pitEvents || [];
 }

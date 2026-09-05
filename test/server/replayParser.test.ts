@@ -7,6 +7,7 @@ import {
   mapVehicleIdToModel,
   detectPlayerName,
   extractReplayLapSummaries,
+  extractReplayPitEvents,
 } from '../../server/replayParser';
 import { LmuParser } from '../../server/parser';
 
@@ -1941,6 +1942,70 @@ describe('replayParser', () => {
           });
         }
       }
+    });
+
+    describe('pit stop and garage info extraction', () => {
+      const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
+      const daytonaRace = path.join(steamReplays, 'Daytona International Speedway Road Course R1 3.Vcr');
+      const lagunaPractice = path.join(steamReplays, 'WeatherTech Raceway Laguna Seca P1 5.Vcr');
+
+      it('extracts full pitstop lifecycle across all drivers in online race replay (Daytona R1 3)', () => {
+        if (!fs.existsSync(daytonaRace)) return;
+
+        const allPitEvents = extractReplayPitEvents(daytonaRace);
+        expect(allPitEvents.length).toBeGreaterThan(100);
+
+        // Verify driver slot 32 pit sequence
+        const slot32Events = extractReplayPitEvents(daytonaRace, { driverSlot: 32 });
+        expect(slot32Events.length).toBeGreaterThanOrEqual(4);
+        expect(slot32Events.every(e => e.driverSlot === 32)).toBe(true);
+
+        const actions = slot32Events.map(e => e.action);
+        expect(actions).toContain('requested pit');
+        expect(actions).toContain('entered pit lane');
+        expect(actions).toContain('on jacks');
+        expect(actions).toContain('service complete');
+        expect(actions).toContain('exited pit lane');
+
+        // Verify trajectory also carries pitEvents
+        const traj = extractReplayTrajectory(daytonaRace, { driverSlot: 32, maxPoints: 50 });
+        expect(traj.pitEvents).toBeDefined();
+        expect(traj.pitEvents?.length).toBeGreaterThan(100);
+      });
+
+      it('extracts garage exits and returns during practice sessions (Laguna Seca P1 5)', () => {
+        if (!fs.existsSync(lagunaPractice)) return;
+
+        const pitEvents = extractReplayPitEvents(lagunaPractice, { driverSlot: 0 });
+        expect(pitEvents.length).toBeGreaterThanOrEqual(4);
+
+        const garageExits = pitEvents.filter(e => e.code === 16 && e.action === 'exited garage');
+        const garageReturns = pitEvents.filter(e => (e.code === 21 || e.code === 49) && (e.action === 'returned to garage' || e.action === 'entered pit / garage'));
+
+        expect(garageExits.length).toBeGreaterThanOrEqual(2);
+        expect(garageReturns.length).toBeGreaterThanOrEqual(2);
+        expect(garageExits.every(e => e.isGarage === true)).toBe(true);
+        expect(garageReturns.every(e => e.isGarage === true)).toBe(true);
+      });
+
+      it('correctly sets inGarage and inPit flags on trajectory points based on event intervals', () => {
+        if (!fs.existsSync(lagunaPractice)) return;
+
+        // Extract full points around the first stint start (time 0 to 40s)
+        const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 0 });
+        expect(traj.points.length).toBeGreaterThan(50);
+
+        // First garage exit for driver 0 in Laguna Seca P1 5 is at 28.41s
+        const garagePoints = traj.points.filter(p => p.timeSec !== undefined && p.timeSec < 28.0);
+        const flyingPoints = traj.points.filter(p => p.timeSec !== undefined && p.timeSec > 35.0 && p.timeSec < 340.0 && (p.speedKmh ?? 0) > 40);
+
+        if (garagePoints.length > 0) {
+          expect(garagePoints.every(p => p.inGarage === true)).toBe(true);
+        }
+        if (flyingPoints.length > 0) {
+          expect(flyingPoints.every(p => p.inGarage === false && p.inPit === false)).toBe(true);
+        }
+      });
     });
 });
 
