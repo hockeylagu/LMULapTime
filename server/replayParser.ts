@@ -469,81 +469,6 @@ export function parseReplayMetadata(
       }
     }
 
-    // Method 3: Fallback parser for synthetic mock buffers or non-standard replay files
-    if (drivers.length === 0) {
-      const driverRegion = meta.subarray(off, meta.length >= 28 ? meta.length - 28 : meta.length);
-      const seenNames = new Set<string>();
-      const extractedStrings: string[] = [];
-      let curBytes: number[] = [];
-      for (let i = 0; i < driverRegion.length; i++) {
-        const b = driverRegion[i];
-        if (b >= 32 && b <= 126) {
-          curBytes.push(b);
-        } else {
-          if (curBytes.length >= 2) {
-            extractedStrings.push(Buffer.from(curBytes).toString('utf8').trim());
-          }
-          curBytes = [];
-        }
-      }
-      if (curBytes.length >= 2) {
-        extractedStrings.push(Buffer.from(curBytes).toString('utf8').trim());
-      }
-
-      for (let i = 0; i < extractedStrings.length; i++) {
-        const str = extractedStrings[i];
-        const isDriverName = /^[A-Z][a-zA-Z\s'-]{2,28}$/.test(str) &&
-          !str.includes('.SCN') &&
-          !str.includes('.AIW') &&
-          !str.includes('Team') &&
-          !str.includes('Racing') &&
-          !str.includes('WEC') &&
-          !str.includes('Corsa') &&
-          !str.includes('Hybrid') &&
-          !str.includes('Ambulante');
-
-        if (isDriverName && !seenNames.has(str)) {
-          seenNames.add(str);
-          const name = str;
-          let vehicleId = '';
-          let team = '';
-          let carNumber = '';
-
-          for (let j = 1; j <= 4 && i + j < extractedStrings.length; j++) {
-            const cand = extractedStrings[i + j];
-            if (/^\d+_[0-9A-Z_]+$/i.test(cand) || cand.includes('MUSTANG') || cand.includes('992S')) {
-              if (!vehicleId) vehicleId = cand;
-            } else if (cand.includes('Team') || cand.includes('Racing') || cand.includes('Corsa') || cand.includes('Lynx') || cand.includes('Porsche') || cand.includes('Garage') || cand.includes('Proton')) {
-              if (!team) team = cand;
-            } else if (/^\d{1,3}$/.test(cand) && !carNumber) {
-              carNumber = cand;
-            }
-          }
-
-          const slot = drivers.length + 1;
-          const carModel = mapVehicleIdToModel(vehicleId);
-          const carClass = mapVehicleIdToClass(vehicleId, carModel);
-          const isPlayer = Boolean(
-            effectivePlayerName && (
-              name.toLowerCase() === effectivePlayerName.toLowerCase() ||
-              name.toLowerCase().includes(effectivePlayerName.toLowerCase())
-            )
-          );
-
-          drivers.push({
-            slot,
-            name,
-            vehicleId: vehicleId || undefined,
-            carModel,
-            carClass: carClass || undefined,
-            team: team || undefined,
-            carNumber: carNumber || undefined,
-            isPlayer,
-          });
-        }
-      }
-    }
-
     if (effectivePlayerName && drivers.length > 0) {
       const explicitName = options?.playerName?.trim().toLowerCase();
       const profileName = !explicitName ? detectPlayerName(filePath)?.trim().toLowerCase() : undefined;
@@ -988,40 +913,6 @@ export function extractReplayTrajectory(
       }
     }
 
-    // Fallback parser for synthetic mock test buffers or non-standard streams
-    if (slicesFound === 0 || (rawPts.length === 0 && driverPoints.size === 0)) {
-      const sig = Buffer.from([0x41, 0x10]);
-      let scanPos = 0;
-      let mockTime = 0;
-      const fullBuf = Buffer.alloc(Math.min(frameStreamBytes, 10 * 1024 * 1024));
-      fs.readSync(fd, fullBuf, 0, fullBuf.length, 57);
-
-      while (scanPos < fullBuf.length - 70) {
-        const idx = fullBuf.indexOf(sig, scanPos);
-        if (idx === -1 || idx + 68 > fullBuf.length) break;
-
-        if (idx > 0) {
-          const slot = fullBuf[idx - 1];
-          const rec = fullBuf.subarray(idx - 1, idx - 1 + 70);
-          const x = rec.readFloatLE(46);
-          const y = rec.readFloatLE(50);
-          const z = rec.readFloatLE(54);
-          const rotY = rec.readFloatLE(62);
-
-          if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
-            let pts = driverPoints.get(slot);
-            if (!pts) {
-              pts = [];
-              driverPoints.set(slot, pts);
-            }
-            mockTime += 0.02;
-            pts.push({ sTime: mockTime, x, y, z, rotY });
-          }
-        }
-        scanPos = idx + 2;
-      }
-    }
-
     if (rawPts.length === 0 && targetSlot !== undefined && driverPoints.has(targetSlot)) {
       rawPts.push(...driverPoints.get(targetSlot)!);
     } else if (rawPts.length === 0 && targetSlot === undefined && driverPoints.size > 0) {
@@ -1435,40 +1326,8 @@ export function extractReplayTrajectory(
         }
       }
 
-      // Legacy fallback: In official LMU replays, native Class 0 Type 8-14 motion packets provide
-      // Byte 5 (rawThrottle 0-100%) and Byte 36 (rawBrake 0-100%, ABS bit 6, TC bit 7).
-      // If a synthetic mock test buffer omits these bytes, fall back to physics-informed estimation.
-      let throttle = cur.rawThrottle ?? 0;
-      let brake = cur.rawBrake ?? 0;
-
-      if (cur.rawThrottle === undefined && cur.rawBrake === undefined && smoothSpeed >= 1.0) {
-        const vKmh = smoothSpeed;
-        const aDrag = 0.00042 * (vKmh * vKmh); // m/s^2 drag deceleration
-        const effectiveEngineAccel = accel + aDrag;
-        if (accel < -0.8) {
-          // Hard braking zone
-          throttle = 0;
-          brake = Math.min(100, Math.max(0, Math.round(((-accel) / 10.0) * 100)));
-        } else if (accel < -0.2) {
-          // Coasting / lift-off phase before braking
-          throttle = 0;
-          brake = Math.min(25, Math.max(0, Math.round(((-accel) / 1.0) * 25)));
-        } else if (effectiveEngineAccel > 0.4) {
-          // Active acceleration phase
-          const steerAngle = Math.abs(cur.steerYaw ?? 0);
-          if (steerAngle < 25 && accel > 0.12) {
-            // Accelerating down a straight in a race car is 100% full throttle
-            throttle = 100;
-          } else {
-            // Corner exit or partial throttle modulation
-            const expectedMaxA = Math.max(1.8, 3.8 - (vKmh / 200));
-            throttle = Math.min(100, Math.max(20, Math.round((effectiveEngineAccel / expectedMaxA) * 100)));
-          }
-        } else {
-          // Holding steady speed / corner balancing
-          throttle = Math.min(30, Math.max(5, Math.round(smoothSpeed / 10)));
-        }
-      }
+      const throttle = cur.rawThrottle ?? 0;
+      const brake = cur.rawBrake ?? 0;
 
       const rpm = cur.physicsRpm !== undefined
         ? cur.physicsRpm

@@ -329,28 +329,11 @@ Every valid flying lap in each replay matches the official simulation XML result
 
 ---
 
-## 7. Legacy Hacks, Heuristics & Deprecations: Post-Decoding Analysis
-
-During the early stages of reverse-engineering the `.Vcr` binary format, numerous heuristics, approximations, and string-scraping fallbacks were introduced because the underlying binary structures were not yet understood. With the complete decoding of the IRSR frame slice architecture, the deterministic metadata block, and the official event streaming engine, these hacks have been cataloged and evaluated for deprecation or removal.
-
-### 7.1 Legacy Hacks Catalog
-
-| Legacy Hack / Heuristic | Original Motivation | Obsolete Why? (Current Format Understanding) | Status & Recommended Action |
-| :--- | :--- | :--- | :--- |
-| **Naive `[0x41, 0x10]` Signature Scanner** (`replayParser.ts:909-941`) | Scanned raw chunks searching for byte pattern `[0x41, 0x10]` to find vehicle motion frames when frame slicing was unknown. | Official LMU replays are strictly formatted into IRSR frame slices (`sTime` Float32LE + `nEvents` UInt16LE). `0x41` was merely `sz === 65` and `0x10` was event class/type bits. | **Deprecated**. Retained exclusively as an internal fallback for legacy synthetic unit tests (`createMockVcrBuffer()`) that omit slice headers. |
-| **Regex Driver Scraping & Word Blocklists (Methods 2 & 3)** (`replayParser.ts:408-540`) | Scanned arbitrary ASCII buffers using regex `/^[A-Z][a-zA-Z\s'-]{2,28}$/` and blocklisted words (`Team`, `WEC`, `Racing`, `Ambulante`, `Corsa`, `Hybrid`). | The VCR metadata block deterministically encodes the exact session environment block (67 bytes) followed immediately by `numDrivers` (Int32LE) and length-prefixed Pascal strings (`Method 1`). | **Obsolete**. Method 1 is the 100% authoritative format. Methods 2 & 3 are retained only as fallbacks for legacy/malformed synthetic mock buffers. |
-| **Quadratic Aerodynamic Drag Deceleration ($a_{drag} = 0.00042 \cdot v^2$) & Kinematic Pedal Estimation** (`replayParser.ts:1318-1355`) | Approximated throttle (100% on straights, modulated in corners) and brake pressure based on vehicle deceleration and drag resistance. | Official LMU replays natively record 8-bit throttle (Byte 5, 0..249 mapped to 0..100%) and analog brake pressure (Byte 36, bits 0..5, ABS bit 6, TC bit 7) at 50 Hz in Class 0 Type 8-14 motion packets. | **Obsolete**. Deprecated in favor of native Byte 5 and Byte 36 telemetry. Retained solely as a fallback if synthetic test buffers omit pedal bytes. |
-| **Fixed 33.3% / 66.7% Distance-Ratio Sector Split Approximation** (`replayParser.ts:1090, 1106, 1228`) | Sliced cumulative trajectory distance into 1/3 and 2/3 milestones to synthesize Sector 1 and Sector 2 elapsed times when timing loops were missing. | Class 6 Type 6 timing loops provide official microsecond-accurate S1, S2, and S3 splits directly from the simulation scoring engine. | **Obsolete**. Only triggered in the degenerate case where zero timing packets exist in an entire replay. |
-| **Hardcoded > 380 km/h Speed Zeroing Hack** (`replayParser.ts:1308`) | Set `smoothSpeed = 0` if calculated speed exceeded 380 km/h to prevent teleport speed spikes. | Low-drag prototypes (e.g. Le Mans Hypercars with slipstream on the Mulsanne Straight) can legitimately exceed 340–360+ km/h. Zeroing speed corrupted charts. Teleports are already detected by multi-point distance/speed checks. | **Removed**. Replaced with proper non-negative speed clamping and coordinate jump filtering. |
-| **Downshift Auto-Blip and Upshift Ignition Cut Smoothing** (`replayParser.ts:952-1006`) | Filtered out ECU transmission downshift auto-blips (`brk > 8 && thr > 0`) and interpolated over single-frame upshift cuts. | While ECU blips reflect real engine control inputs, users inspecting driver inputs prefer pedal intent rather than ECU actuator actuation. | **Retained as an intentional UX enhancement**, clearly documented as driver-intent filtering rather than raw ECU actuation. |
-
----
-
-## 8. Catalog of Additional Extractable Data from VCR Format
+## 7. Catalog of Additional Extractable Data from VCR Format
 
 The LMU/rF2 `.Vcr` format contains an extensive array of untapped telemetry, environment, and race control data that can be exposed in API endpoints, telemetry charts, and session dashboards:
 
-### 8.1 4-Wheel Thermal, Pressure & Degradation Dynamics (Class 0 Type 15)
+### 7.1 4-Wheel Thermal, Pressure & Degradation Dynamics (Class 0 Type 15)
 Emitted periodically or on corner events (`eventSize === 24` or `37`):
 - **12-Point Tire Tread Temperatures (°C)**:
   - Separate temperatures across the tire carcass: **Inner**, **Center**, and **Outer** tread zones for all 4 corners (FL, FR, RL, RR).
@@ -363,7 +346,7 @@ Emitted periodically or on corner events (`eventSize === 24` or `37`):
 - **Brake Rotor / Disc Temperatures (°C)**:
   - Thermal load on carbon/steel brake discs (offsets `+24..31` when `eventSize === 37`).
 
-### 8.2 Track Meteorology, Evolution & Weather Dynamics (Metadata Session Conditions Block)
+### 7.2 Track Meteorology, Evolution & Weather Dynamics (Metadata Session Conditions Block)
 The 67-byte session environment block (located at `metadataOffset + trackPathLength + 2`):
 - **Ambient Air Temperature** (`+0` Float32LE): Ambient temperature in °C.
 - **Track Surface Temperature** (`+4` Float32LE): Track asphalt temperature in °C.
@@ -374,7 +357,7 @@ The 67-byte session environment block (located at `metadataOffset + trackPathLen
 - **Wind Speed & Direction Vector** (`+24` and `+28` Float32LE): Wind velocity in m/s and bearing angle in radians.
 - **Time Acceleration Multiplier** (`+32` Float32LE): In-game session progression multiplier (e.g. 1x, 5x, 24x).
 
-### 8.3 Live Race Control, Flags & Safety Car System (Class 2 Type 10 & Class 1 Type 10)
+### 7.3 Live Race Control, Flags & Safety Car System (Class 2 Type 10 & Class 1 Type 10)
 Broadcasts live race direction decisions and track conditions:
 - **Track Condition Flags**:
   - `0`: Green Flag (Track clear / racing active)
@@ -390,13 +373,13 @@ Broadcasts live race direction decisions and track conditions:
 - **Driver-Targeted Flags**: Blue Flag (yielding to leader), Black Flag (disqualification), Meatball Flag (mandatory pit stop for mechanical damage).
 - **Start Lights Countdown**: Exact illumination phase (1 to 5 red lights, hold, green lights out).
 
-### 8.4 Live Leaderboard Matrix & Track Gaps (Class 6 Type 48)
+### 7.4 Live Leaderboard Matrix & Track Gaps (Class 6 Type 48)
 Emitted periodically (`eventSize === 41`):
 - **Real-Time Running Order Array**: Driver slot indices in exact track order from P1 leader down to Pn.
 - **Live Gaps**: Exact intervals to leader and car ahead calculated in real time without post-hoc reconstruction.
 - **Position Tracking Over Time**: Enables live "Lap Chart" visualizations showing position changes, overtakes, and pit stop shuffles.
 
-### 8.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 5 Type 2 & Type 36)
+### 7.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 5 Type 2 & Type 36)
 Full service telemetry emitted during pit stop operations:
 - **Fuel Added**: Exact volume in liters (Float32LE) pumped into the tank during the stop.
 - **Tire Compound Fitted**: Compound code installed per corner (FL, FR, RL, RR) (Hard, Medium, Soft, Wet).
@@ -404,7 +387,7 @@ Full service telemetry emitted during pit stop operations:
 - **Penalty Compliance**: Validates whether in-pit penalties (e.g. 5-second or 10-second stop & go) were served before mechanics commenced work.
 - **Pit Lane Speed Limit Enforcement**: Entry/exit line timing beacons detect pit lane speeding infractions.
 
-### 8.6 Aerodynamic Damage & Detachable Bodywork (Class 0 Type 8-14 `info2 & 0x3FF`)
+### 7.6 Aerodynamic Damage & Detachable Bodywork (Class 0 Type 8-14 `info2 & 0x3FF`)
 The 10-bit aero damage bitfield in `info2`:
 - Front wing left / right endplate loss
 - Rear wing main plane detachment
@@ -413,7 +396,7 @@ The 10-bit aero damage bitfield in `info2`:
 - Left / right door damage
 - Engine cowl / rear deck damage
 
-### 8.7 Balance of Performance (BoP) & Driver Session Timings (Metadata 24-byte Tail)
+### 7.7 Balance of Performance (BoP) & Driver Session Timings (Metadata 24-byte Tail)
 Extended driver information stored in each driver's fixed tail:
 - **`entryTime`**: Exact session second timestamp when the driver connected or entered the session.
 - **`exitTime`**: Exact session second timestamp when the driver disconnected or left the session.
