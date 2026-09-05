@@ -943,8 +943,12 @@ export class LmuParser {
 
     if (candidates.length === 0) return undefined;
 
-    candidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
-    return candidates[0];
+    // Strictly prefer candidates whose sessionCode matches the XML session (e.g. R1 == R1, Q1 == Q1)
+    const matchingSessionCandidates = candidates.filter(v => v.sessionCode.toLowerCase() === normSession);
+    const pool = matchingSessionCandidates.length > 0 ? matchingSessionCandidates : candidates;
+
+    pool.sort((a, b) => getMinDiff(a) - getMinDiff(b));
+    return pool[0];
   }
 
   private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {
