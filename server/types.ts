@@ -424,6 +424,8 @@ export interface ReplayMetadata {
   endTimeSec?: number;
   drivers: ReplayDriverEntry[];
   laps?: ReplayLapSummary[];
+  carClass?: string;
+  carModel?: string;
 }
 
 export interface ReplayTrajectoryPoint {
@@ -551,4 +553,7 @@ export interface ReplaySummary {
   eventType?: string;
   driversCount?: number;
   matchedSessionId?: string;
+  carClass?: string;
+  carModel?: string;
+  carClasses?: string[];
 }

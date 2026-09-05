@@ -267,7 +267,10 @@ export function filterCompatibleReplays(
 
     // Vehicle class rule (if vehicle class specified)
     if (currentCarClass && currentCarClass !== 'All') {
-      const isClassMatch = matchesCarClass(r.eventTitle || '', '', currentCarClass);
+      const isClassMatch =
+        (r.carClass || r.carModel)
+          ? matchesCarClass(r.carClass || '', r.carModel || '', currentCarClass)
+          : matchesCarClass(r.eventTitle || '', '', currentCarClass);
       if (!isClassMatch) {
         return false;
       }
@@ -275,4 +278,117 @@ export function filterCompatibleReplays(
 
     return true;
   });
+}
+
+/**
+ * Maps vehicle model or vehicle ID string to standardized LMU car class (LMGT3, LMH, LMP2, LMP2elms, GTE, LMP3).
+ */
+export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): string {
+  const combined = `${vehicleId || ''} ${carModel || ''}`.toUpperCase();
+
+  // GTE
+  if (
+    combined.includes('GTE') ||
+    combined.includes('DSTATI') ||
+    combined.includes('KESSEL') ||
+    combined.includes('RSR') ||
+    combined.includes('REXY') ||
+    combined.includes('488')
+  ) {
+    return 'GTE';
+  }
+
+  // GT3 / LMGT3
+  if (
+    combined.includes('GT3') ||
+    combined.includes('AFCO') ||
+    combined.includes('296') ||
+    combined.includes('WRT') ||
+    combined.includes('M4') ||
+    combined.includes('MUSTANG') ||
+    combined.includes('PROT') ||
+    combined.includes('VANTAGE') ||
+    combined.includes('MANT') ||
+    combined.includes('911') ||
+    combined.includes('GARA') ||
+    combined.includes('720S') ||
+    combined.includes('GCHAL') ||
+    combined.includes('HURACAN') ||
+    combined.includes('IRON') ||
+    combined.includes('CORVETTE') ||
+    combined.includes('TFSP') ||
+    combined.includes('LEXUS') ||
+    combined.includes('AKKO') ||
+    combined.includes('AMG')
+  ) {
+    return 'LMGT3';
+  }
+
+  // Hypercar / LMH / LMDh
+  if (
+    combined.includes('499P') ||
+    combined.includes('963') ||
+    combined.includes('CADILLAC') ||
+    combined.includes('CADIL') ||
+    combined.includes('V-SERIES') ||
+    combined.includes('VLMDH') ||
+    combined.includes('WTR') ||
+    combined.includes('TOYOTA') ||
+    combined.includes('GR010') ||
+    combined.includes('TR010') ||
+    combined.includes('PEUGEOT') ||
+    combined.includes('PEUG') ||
+    combined.includes('9X8') ||
+    combined.includes('ALPINE') ||
+    combined.includes('ALPI') ||
+    combined.includes('A424') ||
+    combined.includes('SC63') ||
+    combined.includes('ISOTTA') ||
+    combined.includes('M HYBRID') ||
+    combined.includes('BMW_HY') ||
+    combined.includes('BMWMH') ||
+    combined.includes('VALKYRIE') ||
+    combined.includes('THO7') ||
+    combined.includes('007_') ||
+    combined.includes('GENESIS') ||
+    combined.includes('GENE') ||
+    combined.includes('GMR001') ||
+    combined.includes('HYPER') ||
+    combined.includes('LMH') ||
+    combined.includes('LMDH')
+  ) {
+    return 'LMH';
+  }
+
+  // LMP3
+  if (
+    combined.includes('LMP3') ||
+    combined.includes('GINETTA') ||
+    combined.includes('G61') ||
+    combined.includes('DUQUEINE') ||
+    combined.includes('D09') ||
+    combined.includes('D08') ||
+    combined.includes('LIGIER') ||
+    combined.includes('JSP') ||
+    combined.includes('ADESS') ||
+    combined.includes('AD25')
+  ) {
+    return 'LMP3';
+  }
+
+  // LMP2
+  if (
+    combined.includes('ORECA') ||
+    combined.includes('LMP2') ||
+    combined.includes('VECTOR') ||
+    combined.includes('DKR')
+  ) {
+    return combined.includes('ELMS') ? 'LMP2elms' : 'LMP2';
+  }
+
+  if (combined.includes('992S') || combined.includes('SAFETY')) {
+    return 'Safety Car';
+  }
+
+  return '';
 }

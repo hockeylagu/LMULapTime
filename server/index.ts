@@ -359,6 +359,14 @@ app.get('/api/replays', (_req, res) => {
         }
 
         const matched = sessions.find(s => s.matchingReplayFile?.name === f);
+        const playerDriver = meta?.drivers?.find((d: any) => d.isPlayer) || meta?.drivers?.[0];
+        const replayCarClass = matched?.playerDriver?.carClass || playerDriver?.carClass || meta?.carClass;
+        const replayCarModel = matched?.playerDriver?.carType || playerDriver?.carModel || meta?.carModel;
+        const allCarClasses = Array.from(new Set([
+          ...(meta?.drivers?.map((d: any) => d.carClass).filter(Boolean) || []),
+          ...(matched?.drivers?.map((d: any) => d.carClass).filter(Boolean) || []),
+          ...(replayCarClass ? [replayCarClass] : []),
+        ]));
 
         summaries.push({
           name: f,
@@ -372,6 +380,9 @@ app.get('/api/replays', (_req, res) => {
           eventType: meta?.eventInfo?.eventType,
           driversCount: meta?.drivers?.length,
           matchedSessionId: matched?.id,
+          carClass: replayCarClass || undefined,
+          carModel: replayCarModel || undefined,
+          carClasses: allCarClasses.length > 0 ? allCarClasses : undefined,
         });
       } catch {
         // Skip unreadable files
@@ -403,6 +414,20 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       if (matchedSession) {
         const driver = matchedSession.playerDriver || matchedSession.drivers[0];
+        if (driver?.carClass) {
+          metadata.carClass = driver.carClass;
+          const p = metadata.drivers?.find(d => d.isPlayer) || metadata.drivers?.[0];
+          if (p && !p.carClass) {
+            p.carClass = driver.carClass;
+          }
+        }
+        if (driver?.carType) {
+          metadata.carModel = driver.carType;
+          const p = metadata.drivers?.find(d => d.isPlayer) || metadata.drivers?.[0];
+          if (p && !p.carModel) {
+            p.carModel = driver.carType;
+          }
+        }
         if (driver?.laps && driver.laps.length > 0) {
           metadata.laps = driver.laps
             .filter(sl => typeof sl.lapTime === 'number' && sl.lapTime > 0)

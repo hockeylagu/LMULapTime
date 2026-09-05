@@ -194,7 +194,9 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               >
                 <option value={replayName || ''} className="bg-[#0b101d] text-white">This Replay</option>
                 {compatibleReplays.map(cr => (
-                  <option key={cr.name} value={cr.name} className="bg-[#0b101d] text-amber-300">{cr.name}</option>
+                  <option key={cr.name} value={cr.name} className="bg-[#0b101d] text-amber-300">
+                    {cr.name}{cr.carClass ? ` [${cr.carClass}]` : ''}
+                  </option>
                 ))}
               </select>
             )}

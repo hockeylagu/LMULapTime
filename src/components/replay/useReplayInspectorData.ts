@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplaySummary } from '../../../server/types.js';
-import { filterCompatibleReplays } from '../../utils/replayComparison.js';
+import { filterCompatibleReplays, mapVehicleIdToClass } from '../../utils/replayComparison.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -113,8 +113,8 @@ export function useReplayInspectorData({
   // Fetch compatible candidate replays
   useEffect(() => {
     if (!isOpen || !metadata?.trackName) { setCompatibleReplays([]); return; }
-    const playerDriver = metadata.drivers?.find(d => d.slot === selectedDriverSlot) || metadata.drivers?.find(d => d.isPlayer) || metadata.drivers?.[0];
-    const carClass = playerDriver?.carClass || metadata.eventTitle;
+    const activeDriver = metadata.drivers?.find(d => d.slot === selectedDriverSlot) || metadata.drivers?.find(d => d.isPlayer) || metadata.drivers?.[0];
+    const carClass = activeDriver?.carClass || metadata.carClass || (activeDriver ? mapVehicleIdToClass(activeDriver.vehicleId, activeDriver.carModel) : undefined) || metadata.eventTitle;
 
     fetch('http://localhost:3001/api/replays')
       .then(r => (r.ok ? r.json() : []))
