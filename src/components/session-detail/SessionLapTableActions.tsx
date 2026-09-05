@@ -17,13 +17,15 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
   onOpenTelemetry,
 }) => {
   return (
-    <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+    <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
       <button
+        type="button"
         onClick={onOpenTelemetry}
-        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shadow-sm ${
+        aria-label="Telemetry"
+        className={`p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer shadow-sm ${
           session.matchingReplayFile
-            ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
-            : 'bg-lmu-accent/20 hover:bg-lmu-accent/30 text-lmu-accent border border-lmu-accent/40'
+            ? 'bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 hover:text-emerald-100 border border-emerald-500/40'
+            : 'bg-lmu-accent/20 hover:bg-lmu-accent/35 text-lmu-accent hover:text-white border border-lmu-accent/40'
         }`}
         title={
           session.matchingReplayFile
@@ -31,11 +33,11 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
             : `Open Lap ${lapNum} in Telemetry Studio`
         }
       >
-        <Activity className="w-3 h-3" />
-        <span>Telemetry</span>
+        <Activity className="w-3.5 h-3.5" />
       </button>
 
       <button
+        type="button"
         onClick={() => {
           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
           const carClass = selectedDriver?.carClass || 'LMGT3';
@@ -43,11 +45,11 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
             carClass
           )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`;
         }}
-        className="px-2 py-1 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
+        aria-label="Compare"
+        className="p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border transition-all flex items-center justify-center cursor-pointer"
         title={`Compare Lap ${lapNum} in Telemetry Studio`}
       >
-        <ArrowLeftRight className="w-3 h-3" />
-        <span>Compare</span>
+        <ArrowLeftRight className="w-3.5 h-3.5" />
       </button>
     </div>
   );

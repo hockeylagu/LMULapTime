@@ -88,7 +88,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
                 <th className="px-3 py-3 text-center">{hasVirtualEnergyData ? 'Fuel & VE' : 'Fuel'}</th>
               )}
               <th className="px-3 py-3 text-center">Status</th>
-              <th className="px-3 py-3 text-center">Telemetry & Compare</th>
+              <th className="px-2 py-3 text-center w-16" title="Telemetry & Compare">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-lmu-border/50 font-mono">

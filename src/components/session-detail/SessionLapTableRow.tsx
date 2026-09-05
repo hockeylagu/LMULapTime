@@ -280,7 +280,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           incompleteTooltip={incompleteTooltip}
         />
       </td>
-      <td className="px-3 py-2.5 text-center font-sans">
+      <td className="px-2 py-2 text-center font-sans">
         <SessionLapTableActions
           session={session}
           lapNum={l.lapNum}

@@ -371,6 +371,7 @@ export interface ComparableLap {
   benchmarkCategory?: string;
   isPlayer?: boolean;
   tag?: string;
+  matchingReplayFile?: string;
 }
 
 export interface ReplayEventInfo {
@@ -473,6 +474,10 @@ export interface ReplayTrajectoryData {
   driverSlot?: number;
   driverName?: string;
   pointsCount: number;
+  rawPointsCount?: number;
+  rawSampleRateHz?: number;
+  maxPoints?: number;
+  isFullResolution?: boolean;
   currentLap?: number;
   laps?: ReplayLapSummary[];
   sectors?: {

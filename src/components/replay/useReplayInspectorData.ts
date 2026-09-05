@@ -7,6 +7,9 @@ export interface UseReplayInspectorDataProps {
   replayName: string | null;
   initialLapNumber?: number;
   onLapChange?: (lapNumber: number) => void;
+  initialCompareMode?: boolean;
+  initialBaselineReplayName?: string | null;
+  initialBaselineLapNumber?: number | null;
 }
 
 export function useReplayInspectorData({
@@ -14,6 +17,9 @@ export function useReplayInspectorData({
   replayName,
   initialLapNumber,
   onLapChange,
+  initialCompareMode,
+  initialBaselineReplayName,
+  initialBaselineLapNumber,
 }: UseReplayInspectorDataProps) {
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
   const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
@@ -23,9 +29,9 @@ export function useReplayInspectorData({
   const [error, setError] = useState<string | null>(null);
 
   // Lap comparison states
-  const [isCompareMode, setIsCompareMode] = useState<boolean>(false);
-  const [baselineReplayName, setBaselineReplayName] = useState<string | null>(null);
-  const [baselineLapNumber, setBaselineLapNumber] = useState<number | null>(null);
+  const [isCompareMode, setIsCompareMode] = useState<boolean>(initialCompareMode ?? false);
+  const [baselineReplayName, setBaselineReplayName] = useState<string | null>(initialBaselineReplayName ?? null);
+  const [baselineLapNumber, setBaselineLapNumber] = useState<number | null>(initialBaselineLapNumber ?? null);
   const [baselineTrajectory, setBaselineTrajectory] = useState<ReplayTrajectoryData | null>(null);
   const [baselineMetadata, setBaselineMetadata] = useState<ReplayMetadata | null>(null);
   const [isBaselineLoading, setIsBaselineLoading] = useState<boolean>(false);
@@ -66,6 +72,10 @@ export function useReplayInspectorData({
       return;
     }
 
+    setIsCompareMode(initialCompareMode ?? false);
+    setBaselineReplayName(initialBaselineReplayName ?? (initialCompareMode ? replayName : null));
+    setBaselineLapNumber(initialBaselineLapNumber ?? null);
+
     let isMounted = true;
     setIsLoading(true);
     setError(null);
@@ -100,7 +110,7 @@ export function useReplayInspectorData({
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, replayName, initialLapNumber]);
+  }, [isOpen, replayName, initialLapNumber, initialCompareMode, initialBaselineReplayName, initialBaselineLapNumber]);
 
   // Fetch compatible candidate replays
   useEffect(() => {

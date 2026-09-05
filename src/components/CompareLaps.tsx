@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { AlertCircle, X } from 'lucide-react';
 import { CompareLapsHeader } from './compare-laps/CompareLapsHeader';
 import { CompareLapsFilters } from './compare-laps/CompareLapsFilters';
 import { CompareLapsDeck } from './compare-laps/CompareLapsDeck';
 import { CompareSectorChart } from './compare-laps/CompareSectorChart';
 import { CompareLapsTable } from './compare-laps/CompareLapsTable';
+import { ReplayInspectorModal } from './replay/ReplayInspectorModal';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './compare-laps/useCompareLapsData';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };
@@ -75,6 +77,71 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialLapNum,
   });
 
+  const [telemetryModalOpen, setTelemetryModalOpen] = useState(false);
+  const [telemetryTargetReplay, setTelemetryTargetReplay] = useState<string>('');
+  const [telemetryTargetLap, setTelemetryTargetLap] = useState<number>(1);
+  const [telemetryBaselineReplay, setTelemetryBaselineReplay] = useState<string | null>(null);
+  const [telemetryBaselineLap, setTelemetryBaselineLap] = useState<number | null>(null);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+
+  const handleCompareTelemetry = async () => {
+    if (selectedLaps.length !== 2) return;
+    setTelemetryError(null);
+
+    const lap1 = selectedLaps[0];
+    const lap2 = selectedLaps[1];
+    const baseLap = baselineLap?.id === lap2.id ? lap2 : lap1;
+    const targetLap = baseLap.id === lap1.id ? lap2 : lap1;
+
+    const findReplayForLap = async (lap: typeof lap1): Promise<string | null> => {
+      if (lap.matchingReplayFile) {
+        return lap.matchingReplayFile;
+      }
+      const sess = sessions.find((s) => s.id === lap.sessionId);
+      if (sess?.matchingReplayFile?.name) {
+        return sess.matchingReplayFile.name;
+      }
+      try {
+        const res = await fetch('/api/replays');
+        if (res.ok) {
+          const replays = await res.json();
+          const match = replays.find((r: any) => r.matchedSessionId === lap.sessionId);
+          if (match?.name) return match.name;
+          const trackMatch = replays.find(
+            (r: any) => r.trackName && selectedTrack && r.trackName.toLowerCase().includes(selectedTrack.toLowerCase())
+          );
+          if (trackMatch?.name) return trackMatch.name;
+        }
+      } catch (err) {
+        console.error('Failed to locate replay for lap:', err);
+      }
+      return null;
+    };
+
+    const [targetReplay, baseReplay] = await Promise.all([
+      findReplayForLap(targetLap),
+      findReplayForLap(baseLap),
+    ]);
+
+    if (!targetReplay || !baseReplay) {
+      const missing: string[] = [];
+      if (!baseReplay) missing.push(`Baseline (${baseLap.driverName} Lap ${baseLap.lapNum || '-'})`);
+      if (!targetReplay) missing.push(`Target (${targetLap.driverName} Lap ${targetLap.lapNum || '-'})`);
+      setTelemetryError(
+        `Unable to locate replay recording (.vcr) for: ${missing.join(', ')}. Telemetry comparison requires recorded replay telemetry.`
+      );
+      return;
+    }
+
+    setTelemetryTargetReplay(targetReplay);
+    setTelemetryTargetLap(targetLap.lapNum ?? 1);
+    setTelemetryBaselineReplay(baseReplay);
+    setTelemetryBaselineLap(baseLap.lapNum ?? 1);
+    setTelemetryModalOpen(true);
+  };
+
+  const onCompareTelemetry = selectedLaps.length === 2 ? handleCompareTelemetry : undefined;
+
   return (
     <div className="space-y-6">
       <div className="glass-panel p-6 rounded-2xl space-y-4">
@@ -90,6 +157,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           onAddTheoreticalBest={handleAddTheoreticalBest}
           onAddOverallTrackBest={handleAddOverallTrackBest}
           onClearAll={handleClearAll}
+          onCompareTelemetry={onCompareTelemetry}
         />
         <CompareLapsFilters
           availableTracks={availableTracks}
@@ -105,6 +173,23 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         />
       </div>
 
+      {telemetryError && (
+        <div className="glass-panel p-4 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{telemetryError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTelemetryError(null)}
+            className="p-1 hover:bg-rose-900/60 rounded text-rose-400 hover:text-white cursor-pointer"
+            title="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <CompareLapsDeck
         selectedLaps={selectedLaps}
         baselineLap={baselineLap}
@@ -119,6 +204,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         allLaps={apiData.laps}
         selectedCarClass={selectedCarClass}
         lapColors={LAP_COLORS}
+        onCompareTelemetry={onCompareTelemetry}
       />
 
       {selectedLaps.length > 1 && baselineLap && (
@@ -128,6 +214,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
             comparedLaps={comparedLaps}
             baselineLap={baselineLap}
             chartData={chartData}
+            onCompareTelemetry={onCompareTelemetry}
           />
         </div>
       )}
@@ -150,6 +237,18 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         bestAvailableS3={bestAvailableS3}
         onToggleLap={handleToggleLap}
       />
+
+      {telemetryModalOpen && telemetryTargetReplay && (
+        <ReplayInspectorModal
+          isOpen={telemetryModalOpen}
+          onClose={() => setTelemetryModalOpen(false)}
+          replayName={telemetryTargetReplay}
+          initialLapNumber={telemetryTargetLap}
+          initialCompareMode={true}
+          initialBaselineReplayName={telemetryBaselineReplay}
+          initialBaselineLapNumber={telemetryBaselineLap}
+        />
+      )}
     </div>
   );
 };
