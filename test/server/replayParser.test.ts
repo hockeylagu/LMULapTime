@@ -134,6 +134,12 @@ function createSliceVcrBuffer(options?: {
     abs?: boolean;
     offTrack?: boolean;
     pitLimiter?: boolean;
+    timing?: { splitSec: number; sector: number; lapIdx: number };
+    wheel?: {
+      tireTemps: [number, number, number, number];
+      tireWear?: [number, number, number, number];
+      brakeTemps?: [number, number, number, number];
+    };
   }[];
   drivers?: { name: string; vehicleId: string; team: string; carNumber: string }[];
   eventInfo?: any;
@@ -156,7 +162,36 @@ function createSliceVcrBuffer(options?: {
     const sBuf = Buffer.alloc(6);
     sBuf.writeFloatLE(sl.sTime, 0);
     const hasTiming = Boolean(sl.timing);
-    sBuf.writeUInt16LE(hasTiming ? 2 : 1, 4); // 1 or 2 events in this slice
+    const hasWheel = Boolean(sl.wheel);
+    const eventCount = 1 + (hasTiming ? 1 : 0) + (hasWheel ? 1 : 0);
+    sBuf.writeUInt16LE(eventCount, 4);
+
+    sliceBufs.push(sBuf);
+
+    if (sl.wheel) {
+      const sz = sl.wheel.brakeTemps ? 37 : 24;
+      const wHdr = Buffer.alloc(4);
+      wHdr.writeUInt32LE((15 << 17) | (sz << 8) | (sl.driverSlot & 0xff), 0);
+      const wPad = Buffer.from([0]);
+      const wData = Buffer.alloc(sz);
+      wData.writeUInt16LE(sl.wheel.tireTemps[0], 2);
+      wData.writeUInt16LE(sl.wheel.tireTemps[1], 6);
+      wData.writeUInt16LE(sl.wheel.tireTemps[2], 10);
+      wData.writeUInt16LE(sl.wheel.tireTemps[3], 14);
+      if (sl.wheel.tireWear) {
+        wData[19] = sl.wheel.tireWear[0];
+        wData[20] = sl.wheel.tireWear[1];
+        wData[21] = sl.wheel.tireWear[2];
+        wData[22] = sl.wheel.tireWear[3];
+      }
+      if (sl.wheel.brakeTemps && sz === 37) {
+        wData.writeUInt16LE(sl.wheel.brakeTemps[0], 24);
+        wData.writeUInt16LE(sl.wheel.brakeTemps[1], 26);
+        wData.writeUInt16LE(sl.wheel.brakeTemps[2], 28);
+        wData.writeUInt16LE(sl.wheel.brakeTemps[3], 30);
+      }
+      sliceBufs.push(wHdr, wPad, wData);
+    }
 
     const evHdr = Buffer.alloc(4);
     evHdr.writeUInt32LE((65 << 8) | (sl.driverSlot & 0xff), 0);
@@ -188,7 +223,7 @@ function createSliceVcrBuffer(options?: {
     evData.writeFloatLE(sl.z, 49);
     evData.writeFloatLE(0.0, 57); // rotY
 
-    sliceBufs.push(sBuf, evHdr, evPad, evData);
+    sliceBufs.push(evHdr, evPad, evData);
 
     if (sl.timing) {
       const timHdr = Buffer.alloc(4);
@@ -2005,6 +2040,82 @@ describe('replayParser', () => {
         if (flyingPoints.length > 0) {
           expect(flyingPoints.every(p => p.inGarage === false && p.inPit === false)).toBe(true);
         }
+      });
+
+      it('extracts live 4-wheel telemetry (tire temperatures, dynamic wear) on real replays (Laguna Seca P1 5)', () => {
+        if (!fs.existsSync(lagunaPractice)) return;
+
+        const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 200 });
+        expect(traj.wheelTelemetryAvailable).toBe(true);
+        expect(traj.points.length).toBeGreaterThan(10);
+
+        const pointsWithWheel = traj.points.filter(p => p.tireTemps !== undefined);
+        expect(pointsWithWheel.length).toBeGreaterThan(0);
+
+        const sample = pointsWithWheel[0];
+        expect(sample.tireTemps).toBeDefined();
+        expect(sample.tireTemps?.length).toBe(4);
+        // All four corners [FL, FR, RL, RR] have non-zero plausible temperatures (°C)
+        expect(sample.tireTemps![0]).toBeGreaterThan(30);
+        expect(sample.tireTemps![0]).toBeLessThan(350);
+        expect(sample.tireTemps![1]).toBeGreaterThan(30);
+        expect(sample.tireTemps![1]).toBeLessThan(350);
+        expect(sample.tireTemps![2]).toBeGreaterThan(30);
+        expect(sample.tireTemps![2]).toBeLessThan(350);
+        expect(sample.tireTemps![3]).toBeGreaterThan(30);
+        expect(sample.tireTemps![3]).toBeLessThan(350);
+
+        if (sample.tireWear) {
+          expect(sample.tireWear.length).toBe(4);
+        }
+      });
+
+      it('parses synthetic Class 0 Type 15 packet (sz === 24 and sz === 37) and synchronizes with vehicle trajectory points', () => {
+        const wheelVcrPath = path.join(tempDir, 'synthetic_wheel.vcr');
+        const buf = createSliceVcrBuffer({
+          slices: [
+            {
+              sTime: 1.0,
+              driverSlot: 1,
+              x: 10,
+              y: 0,
+              z: 10,
+              wheel: {
+                tireTemps: [92, 95, 88, 89],
+                tireWear: [240, 241, 238, 239],
+              },
+            },
+            {
+              sTime: 1.1,
+              driverSlot: 1,
+              x: 20,
+              y: 0,
+              z: 20,
+              wheel: {
+                tireTemps: [105, 108, 97, 99],
+                tireWear: [238, 239, 236, 237],
+                brakeTemps: [520, 530, 410, 420],
+              },
+            },
+          ],
+        });
+        fs.writeFileSync(wheelVcrPath, buf);
+
+        const traj = extractReplayTrajectory(wheelVcrPath, { driverSlot: 1, maxPoints: 10 });
+        expect(traj.wheelTelemetryAvailable).toBe(true);
+        expect(traj.points.length).toBe(2);
+
+        // Point 0 (sz 24)
+        expect(traj.points[0].tireTemps).toEqual([92, 95, 88, 89]);
+        expect(traj.points[0].tireWear).toEqual([240, 241, 238, 239]);
+        expect(traj.points[0].brakeTemps).toBeUndefined();
+
+        // Point 1 (sz 37 with brake rotor temps)
+        expect(traj.points[1].tireTemps).toEqual([105, 108, 97, 99]);
+        expect(traj.points[1].tireWear).toEqual([238, 239, 236, 237]);
+        expect(traj.points[1].brakeTemps).toEqual([520, 530, 410, 420]);
+
+        fs.unlinkSync(wheelVcrPath);
       });
     });
 });

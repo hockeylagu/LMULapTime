@@ -145,14 +145,29 @@ This is the primary vehicle kinematic and pedal telemetry packet emitted at up t
 | `61` | 4 bytes | Float32LE | **`rotZ`**: Roll angle (radians) |
 
 #### Type 15 (`eventSize === 24` or `37`): Per-Wheel Live Telemetry
-Emitted periodically or on corner events to report real-time tire physics and brake thermal data:
+Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to report real-time per-wheel tire physics, dynamic wear, and brake thermal load across all four corners `[Front-Left, Front-Right, Rear-Left, Rear-Right]`:
 
-| Relative Offset | Size | Type | Field Description |
+| Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `+0..7` | 8 bytes (4x UInt16LE) | UInt16LE | **Tire Pressures**: Dynamic tire pressure for FL, FR, RL, RR in units of 0.1 kPa (or PSI / 10). |
-| `+8..19` | 12 bytes (12x UInt8) | UInt8 | **Tire Tread Temperatures**: 3-zone surface temperatures across tire carcass (Inner, Center, Outer) for all 4 corners: <br>• FL: Inner (8), Center (9), Outer (10) <br>• FR: Outer (11), Center (12), Inner (13) <br>• RL: Inner (14), Center (15), Outer (16) <br>• RR: Outer (17), Center (18), Inner (19) <br>Value in degrees Celsius (°C). |
-| `+20..23` | 4 bytes (4x UInt8) | UInt8 | **Dynamic Tire Wear**: Remaining rubber depth percentage (`0..100`% or raw byte `0..255` scaled to 100%) for FL, FR, RL, RR. |
-| `+24..31` (if sz === 37) | 8 bytes (4x UInt16LE) | UInt16LE | **Brake Rotor Temperatures**: Brake disc temperature in degrees Celsius (°C) for FL, FR, RL, RR. |
+| `0..1` | 2 bytes | UInt16LE | **FL Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
+| `2..3` | 2 bytes | UInt16LE | **FL Tire Temperature**: Front-Left tire carcass/surface temperature in degrees Celsius (°C). |
+| `4..5` | 2 bytes | UInt16LE | **FR Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
+| `6..7` | 2 bytes | UInt16LE | **FR Tire Temperature**: Front-Right tire carcass/surface temperature in degrees Celsius (°C). |
+| `8..9` | 2 bytes | UInt16LE | **RL Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
+| `10..11` | 2 bytes | UInt16LE | **RL Tire Temperature**: Rear-Left tire carcass/surface temperature in degrees Celsius (°C). |
+| `12..13` | 2 bytes | UInt16LE | **RR Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
+| `14..15` | 2 bytes | UInt16LE | **RR Tire Temperature**: Rear-Right tire carcass/surface temperature in degrees Celsius (°C). |
+| `16..18` | 3 bytes | Binary | Reserved wheel rotation & camber state. |
+| `19` | 1 byte | UInt8 | **FL Dynamic Tire Wear**: Front-Left remaining rubber counter (monotonic wear degradation). |
+| `20` | 1 byte | UInt8 | **FR Dynamic Tire Wear**: Front-Right remaining rubber counter. |
+| `21` | 1 byte | UInt8 | **RL Dynamic Tire Wear**: Rear-Left remaining rubber counter. |
+| `22` | 1 byte | UInt8 | **RR Dynamic Tire Wear**: Rear-Right remaining rubber counter. |
+| `23` | 1 byte | UInt8 | Wheel telemetry packet status & sync flags. |
+| `24..25` (sz === 37) | 2 bytes | UInt16LE | **FL Brake Rotor Temperature**: Front-Left brake disc temperature in °C (reaches 500°C–800°C under threshold braking). |
+| `26..27` (sz === 37) | 2 bytes | UInt16LE | **FR Brake Rotor Temperature**: Front-Right brake disc temperature in °C. |
+| `28..29` (sz === 37) | 2 bytes | UInt16LE | **RL Brake Rotor Temperature**: Rear-Left brake disc temperature in °C. |
+| `30..31` (sz === 37) | 2 bytes | UInt16LE | **RR Brake Rotor Temperature**: Rear-Right brake disc temperature in °C. |
+| `32..36` (sz === 37) | 5 bytes | Binary | Brake caliper pressure & thermal dissipation flags. |
 
 #### Type 7: Garage Event
 - Float32LE: Timestamp of entering/exiting garage bay.
@@ -303,7 +318,7 @@ Every valid flying lap in each replay matches the official simulation XML result
 | **Driver Roster** | **Implemented** (`parseReplayMetadata`) | Deterministic binary `numDrivers` + exact structured records with `entryTime`/`exitTime`, fallback to heuristic regex for legacy mock buffers. |
 | **Session Identification** | **Implemented** (`parseReplayMetadata`) | Session byte parsing (`sessionType`, `privateSession`), `modUid`, and `trackPath`. |
 | **Lap & Sector Timing** | **Implemented** (`extractReplayLapSummaries`, `extractReplayTrajectory`) | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits (S1/S2/S3), official lap numbering, and validity flags matching the in-game HUD. |
-| **Tire Dynamics & Wear** | **Specification Ready** | Class 0 Type 15 delivers live 4-wheel pressures, 12-channel tread temperatures (Inner/Center/Outer), wear percentages, and brake rotor temperatures. |
+| **Tire Dynamics & Wear** | **Implemented** (`extractReplayTrajectory`) | Class 0 Type 15 (`sz === 24` or `37`) delivers live 4-wheel tire temperatures (°C), dynamic corner wear degradation counters, and brake rotor temperatures attached to downsampled trajectory points and accessible via API. |
 | **Penalties & Incidents** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
 | **Track Flags & Safety Car** | **Specification Ready** | Class 2 Type 10 track flag states (Green, Local Yellow, FCY, SC, VSC, Red, Checkered) and driver flags (Blue, Black, Meatball). |
 | **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
