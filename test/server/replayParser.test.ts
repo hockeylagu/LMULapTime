@@ -441,8 +441,15 @@ describe('replayParser', () => {
       expect(mapVehicleIdToModel('23_26_THOR59931582')).toBe('Aston Martin Vantage GT3');
       expect(mapVehicleIdToModel('91_26_MANT18218509')).toBe('Porsche 911 GT3 R');
       expect(mapVehicleIdToModel('58_26_GARA17941687')).toBe('McLaren 720S GT3 Evo');
+      expect(mapVehicleIdToModel('8_26_GCHAL79481284')).toBe('McLaren 720S GT3 Evo');
       expect(mapVehicleIdToModel('61_26_IRON57024276')).toBe('Lamborghini Huracan GT3 Evo2');
       expect(mapVehicleIdToModel('50_26_499P_123456')).toBe('Ferrari 499P');
+      expect(mapVehicleIdToModel('101_26_WTR51729170')).toBe('Cadillac V-Series.R');
+      expect(mapVehicleIdToModel('93_26_PEUG27100541')).toBe('Peugeot 9X8');
+      expect(mapVehicleIdToModel('007_26_THO73564855')).toBe('Aston Martin Valkyrie LMH');
+      expect(mapVehicleIdToModel('10_VECTOR_C18BEE4')).toBe('Oreca 07 LMP2');
+      expect(mapVehicleIdToModel('4_25_DKR_E8E7FBE8C')).toBe('Oreca 07 LMP2');
+      expect(mapVehicleIdToModel('777_DSTATI5BFA7EF3')).toBe('Aston Martin Vantage AMR');
       expect(mapVehicleIdToModel('992S_PC')).toBe('Porsche 992 (Safety Car)');
     });
 
@@ -475,8 +482,11 @@ describe('replayParser', () => {
       const samuel = meta.drivers.find(d => d.name === 'Samuel Lague');
       expect(samuel).toBeDefined();
       expect(samuel?.carModel).toBe('Ferrari 296 GT3');
+      expect(samuel?.carClass).toBe('LMGT3');
       expect(samuel?.team).toBe('Vista AF Corsa');
       expect(samuel?.carNumber).toBe('21');
+      expect(meta.carClass).toBe('LMGT3');
+      expect(meta.carModel).toBe('Ferrari 296 GT3');
     });
 
     it('throws error for invalid files', () => {
