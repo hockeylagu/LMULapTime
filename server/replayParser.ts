@@ -349,6 +349,18 @@ export function extractReplayTrajectory(
     maxPoints?: number;
     playerName?: string;
     lapNumber?: number;
+    sessionLaps?: Array<{
+      lapNum?: number;
+      lapNumber?: number;
+      lapTime?: number | null;
+      lapTimeSec?: number | null;
+      elapsedSeconds?: number | null;
+      s1?: number | null;
+      s2?: number | null;
+      s3?: number | null;
+      isValid?: boolean;
+      isOutLap?: boolean;
+    }>;
   } = {}
 ): ReplayTrajectoryData {
   const effectivePlayerName = options.playerName || detectPlayerName(filePath);
@@ -609,7 +621,7 @@ export function extractReplayTrajectory(
     const cumDist: number[] = [0];
     for (let i = 1; i < rawPts.length; i++) {
       const d = Math.hypot(rawPts[i].x - rawPts[i - 1].x, rawPts[i].z - rawPts[i - 1].z);
-      if (d < 60) {
+      if (d < 200) {
         cumDist.push(cumDist[cumDist.length - 1] + d);
       } else {
         cumDist.push(cumDist[cumDist.length - 1]);
@@ -633,50 +645,191 @@ export function extractReplayTrajectory(
 
     let detectedLaps: DetectedLapInternal[] = [];
 
+    // 1. Autonomous geometric lap and Start/Finish line detection (does not rely on XML results)
     if (rawPts.length >= 30) {
-      let refIdx = rawPts.findIndex((_, i) => cumDist[i] > 100);
-      if (refIdx === -1) refIdx = 0;
-      const refPt = rawPts[refIdx];
-      const nextPt = rawPts[Math.min(rawPts.length - 1, refIdx + 5)];
-      const refHeading = Math.atan2(nextPt.z - refPt.z, nextPt.x - refPt.x);
+      function findCrossingsForCandidate(cIdx: number, minIntervalSec = 20) {
+        const refPt = rawPts[cIdx];
+        const step = Math.min(5, Math.max(1, Math.floor((rawPts.length - 1 - cIdx) / 10)));
+        const nextPt = rawPts[Math.min(rawPts.length - 1, cIdx + step)];
+        const refHeading = Math.atan2(nextPt.z - refPt.z, nextPt.x - refPt.x);
 
-      const candidateCrossings: { idx: number; t: number; d: number }[] = [];
-      for (let i = refIdx + 50; i < rawPts.length - 5; i++) {
-        const d = Math.hypot(rawPts[i].x - refPt.x, rawPts[i].z - refPt.z);
-        if (d < 25) {
-          const heading = Math.atan2(rawPts[i + 5].z - rawPts[i].z, rawPts[i + 5].x - rawPts[i].x);
-          const headingDiff = Math.abs(Math.atan2(Math.sin(heading - refHeading), Math.cos(heading - refHeading)));
-          if (headingDiff < 0.8) {
-            candidateCrossings.push({ idx: i, t: rawPts[i].sTime, d });
+        const crossings: number[] = [cIdx];
+        let lastCrossingTime = rawPts[cIdx].sTime;
+        let curCluster: { idx: number; t: number; d: number }[] = [];
+
+        const minScanDist = (cumDist[cIdx] || 0) + 80;
+        const minScanTime = rawPts[cIdx].sTime + 5;
+        let scanStart = cIdx + 1;
+        while (scanStart < rawPts.length - 3 && (cumDist[scanStart] < minScanDist || rawPts[scanStart].sTime < minScanTime)) {
+          scanStart++;
+        }
+
+        for (let i = scanStart; i < rawPts.length - 1; i++) {
+          const d = Math.hypot(rawPts[i].x - refPt.x, rawPts[i].z - refPt.z);
+          if (d < 30) {
+            const hStep = Math.min(5, Math.max(1, rawPts.length - 1 - i));
+            const heading = Math.atan2(rawPts[i + hStep].z - rawPts[i].z, rawPts[i + hStep].x - rawPts[i].x);
+            const headingDiff = Math.abs(Math.atan2(Math.sin(heading - refHeading), Math.cos(heading - refHeading)));
+            if (headingDiff < 0.8) {
+              const t = rawPts[i].sTime;
+              if (t - lastCrossingTime > minIntervalSec) {
+                if (curCluster.length === 0 || t - curCluster[curCluster.length - 1].t < 5) {
+                  curCluster.push({ idx: i, t, d });
+                } else {
+                  const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
+                  crossings.push(best.idx);
+                  lastCrossingTime = best.t;
+                  curCluster = [{ idx: i, t, d }];
+                }
+              }
+            }
+          }
+        }
+        if (curCluster.length > 0) {
+          const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
+          crossings.push(best.idx);
+        }
+        return crossings;
+      }
+
+      // Candidate 1: Legacy reference point at cumDist > 100
+      let legacyIdx = rawPts.findIndex((_, i) => cumDist[i] > 100);
+      if (legacyIdx === -1) legacyIdx = 0;
+      let bestCrossings = findCrossingsForCandidate(legacyIdx, 35);
+      let bestCandidateIdx = legacyIdx;
+
+      // Pit points for pit-lane proximity identification
+      const pitPts = rawPts.filter(p => p.pitLimiter || p.inPit);
+      const startsInPit = rawPts[0].pitLimiter || rawPts[0].inPit || (rawPts[legacyIdx] && (rawPts[legacyIdx].pitLimiter || rawPts[legacyIdx].inPit));
+
+      // Candidate 2: If vehicle starts in pit lane / garage (or legacy point yields <= 2 crossings),
+      // search on-track candidates to find the true Start/Finish line on the main straight
+      if (startsInPit || bestCrossings.length <= 2) {
+        const trackIndices: number[] = [];
+        for (let i = 0; i < rawPts.length - 5; i++) {
+          const p = rawPts[i];
+          if (p.pitLimiter || p.inPit) continue;
+          const dt = rawPts[i + 1].sTime - p.sTime;
+          const dist = Math.hypot(rawPts[i + 1].x - p.x, rawPts[i + 1].z - p.z);
+          const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
+          if (speed > 50 && cumDist[i] > 100) {
+            trackIndices.push(i);
+          }
+        }
+
+        const pool = trackIndices.length > 5
+          ? trackIndices
+          : rawPts.map((_, i) => i).filter(i => cumDist[i] > 100);
+
+        if (pool.length > 0) {
+          const baseDist = cumDist[pool[0]];
+          const candidates: number[] = [];
+          for (let targetD = baseDist + 150; targetD <= baseDist + 8000; targetD += 150) {
+            const idx = pool.find(i => cumDist[i] >= targetD);
+            if (idx !== undefined && !candidates.includes(idx)) {
+              candidates.push(idx);
+            }
+          }
+
+          interface EvaluatedCandidate {
+            cIdx: number;
+            crossings: number[];
+            lapTimes: number[];
+            stdDev: number;
+            minPitD: number;
+            speed: number;
+          }
+
+          const evaluated: EvaluatedCandidate[] = [];
+          let maxCrossingsCount = 0;
+
+          for (const cIdx of candidates) {
+            const crossings = findCrossingsForCandidate(cIdx, 25);
+            if (crossings.length > maxCrossingsCount) {
+              maxCrossingsCount = crossings.length;
+            }
+            const lapTimes = crossings.slice(1).map((idx, i) => rawPts[idx].sTime - rawPts[crossings[i]].sTime);
+            const avgLap = lapTimes.length > 0 ? lapTimes.reduce((a, b) => a + b, 0) / lapTimes.length : 0;
+            const variance = lapTimes.length > 1
+              ? lapTimes.reduce((sum, t) => sum + Math.pow(t - avgLap, 2), 0) / lapTimes.length
+              : 999;
+            const stdDev = Math.sqrt(variance);
+
+            let minPitD = Infinity;
+            if (pitPts.length > 0) {
+              for (let k = 0; k < pitPts.length; k += 8) {
+                const d = Math.hypot(pitPts[k].x - rawPts[cIdx].x, pitPts[k].z - rawPts[cIdx].z);
+                if (d < minPitD) minPitD = d;
+              }
+            }
+
+            const dt = rawPts[cIdx + 1].sTime - rawPts[cIdx].sTime;
+            const dist = Math.hypot(rawPts[cIdx + 1].x - rawPts[cIdx].x, rawPts[cIdx + 1].z - rawPts[cIdx].z);
+            const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
+
+            evaluated.push({
+              cIdx,
+              crossings,
+              lapTimes,
+              stdDev,
+              minPitD,
+              speed,
+            });
+          }
+
+          const bestPool = evaluated.filter(c => c.crossings.length === maxCrossingsCount);
+          if (bestPool.length > 0) {
+            const pitAdjacent = bestPool.filter(c => c.minPitD < 120 && c.speed > 100);
+            if (pitAdjacent.length > 0) {
+              pitAdjacent.sort((a, b) => {
+                if (Math.abs(a.stdDev - b.stdDev) > 0.15) return a.stdDev - b.stdDev;
+                return b.speed - a.speed;
+              });
+              bestCrossings = pitAdjacent[0].crossings;
+              bestCandidateIdx = pitAdjacent[0].cIdx;
+            } else {
+              bestPool.sort((a, b) => a.stdDev - b.stdDev);
+              bestCrossings = bestPool[0].crossings;
+              bestCandidateIdx = bestPool[0].cIdx;
+            }
           }
         }
       }
 
-      const lapCrossings: number[] = [refIdx];
-      let lastCrossingTime = rawPts[refIdx].sTime;
-      let curCluster: { idx: number; t: number; d: number }[] = [];
+      if (bestCrossings.length > 1) {
+        // If candidate started after an outlap (e.g. leaving pit/garage)
+        if (bestCrossings[0] > 5 && (rawPts[0].pitLimiter || rawPts[0].inPit || cumDist[bestCrossings[0]] > 300)) {
+          const outlapStart = 0;
+          const outlapEnd = bestCrossings[0];
+          const lapTime = Number((rawPts[outlapEnd].sTime - rawPts[outlapStart].sTime).toFixed(3));
+          const lapDist = cumDist[outlapEnd] - cumDist[outlapStart];
+          const s1TargetDist = cumDist[outlapStart] + lapDist * 0.3333;
+          const s2TargetDist = cumDist[outlapStart] + lapDist * 0.6667;
+          let s1Idx = outlapStart;
+          while (s1Idx < outlapEnd && cumDist[s1Idx] < s1TargetDist) s1Idx++;
+          let s2Idx = s1Idx;
+          while (s2Idx < outlapEnd && cumDist[s2Idx] < s2TargetDist) s2Idx++;
 
-      for (const c of candidateCrossings) {
-        if (c.t - lastCrossingTime > 40) {
-          if (curCluster.length === 0 || c.t - curCluster[curCluster.length - 1].t < 5) {
-            curCluster.push(c);
-          } else {
-            const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
-            lapCrossings.push(best.idx);
-            lastCrossingTime = best.t;
-            curCluster = [c];
-          }
+          detectedLaps.push({
+            lapNumber: 1,
+            startIdx: outlapStart,
+            endIdx: outlapEnd,
+            lapTimeSec: lapTime,
+            lapDistMeters: Math.round(lapDist),
+            s1Sec: Number((rawPts[s1Idx].sTime - rawPts[outlapStart].sTime).toFixed(3)),
+            s2Sec: Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3)),
+            s3Sec: Number((rawPts[outlapEnd].sTime - rawPts[s2Idx].sTime).toFixed(3)),
+            s1Idx,
+            s2Idx,
+            isOutlap: true,
+            isBest: false,
+          });
         }
-      }
-      if (curCluster.length > 0) {
-        const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
-        lapCrossings.push(best.idx);
-      }
 
-      if (lapCrossings.length > 1) {
-        for (let l = 0; l < lapCrossings.length - 1; l++) {
-          const startIdx = lapCrossings[l];
-          const endIdx = lapCrossings[l + 1];
+        const lapOffset = detectedLaps.length;
+        for (let l = 0; l < bestCrossings.length - 1; l++) {
+          const startIdx = bestCrossings[l];
+          const endIdx = bestCrossings[l + 1];
           const lapTime = rawPts[endIdx].sTime - rawPts[startIdx].sTime;
           const lapDist = cumDist[endIdx] - cumDist[startIdx];
           const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
@@ -687,7 +840,7 @@ export function extractReplayTrajectory(
           while (s2Idx < endIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
 
           detectedLaps.push({
-            lapNumber: l + 1,
+            lapNumber: lapOffset + l + 1,
             startIdx,
             endIdx,
             lapTimeSec: Number(lapTime.toFixed(3)),
@@ -697,7 +850,7 @@ export function extractReplayTrajectory(
             s3Sec: Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3)),
             s1Idx,
             s2Idx,
-            isOutlap: l === 0,
+            isOutlap: lapOffset === 0 && l === 0,
             isBest: false,
           });
         }

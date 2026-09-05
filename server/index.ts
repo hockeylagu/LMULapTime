@@ -397,6 +397,29 @@ app.get('/api/replays/:name/metadata', (req, res) => {
     }
 
     const metadata = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
+
+    try {
+      const sessions = loadSessions();
+      const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
+      if (matchedSession) {
+        const driver = matchedSession.playerDriver || matchedSession.drivers[0];
+        if (driver?.laps && driver.laps.length > 0) {
+          metadata.laps = driver.laps
+            .filter(sl => typeof sl.lapTime === 'number' && sl.lapTime > 0)
+            .map(sl => ({
+              lapNumber: sl.lapNum,
+              lapTimeSec: sl.lapTime as number,
+              s1Sec: sl.s1 || 0,
+              s2Sec: sl.s2 || 0,
+              s3Sec: sl.s3 || 0,
+              isBest: Boolean(driver.bestLapTime && sl.lapTime === driver.bestLapTime),
+            }));
+        }
+      }
+    } catch {
+      // Ignore session loading errors
+    }
+
     res.json(metadata);
   } catch (err: unknown) {
     console.error(`Failed to parse replay metadata for ${req.params.name}:`, err);
@@ -422,21 +445,14 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       : 1200;
     const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
 
-    const trajectory = extractReplayTrajectory(filePath, {
-      driverSlot,
-      driverName,
-      maxPoints,
-      playerName: parser.configuredPlayerName,
-      lapNumber,
-    });
-
-    // Validate replay against matched session log (decoupled validation layer)
+    let matchedSession: any = undefined;
+    let matchedDriver: any = undefined;
     try {
       const sessions = loadSessions();
-      const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
+      matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       if (matchedSession) {
-        let matchedDriver = driverName
-          ? matchedSession.drivers.find(d => (d.driverName || d.name || '').toLowerCase().includes(driverName.toLowerCase()))
+        matchedDriver = driverName
+          ? matchedSession.drivers.find((d: any) => (d.driverName || d.name || '').toLowerCase().includes(driverName.toLowerCase()))
           : undefined;
 
         if (!matchedDriver && typeof driverSlot === 'number') {
@@ -444,7 +460,7 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
             const meta = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
             const replayDriver = meta.drivers.find(d => d.slot === driverSlot);
             if (replayDriver) {
-              matchedDriver = matchedSession.drivers.find(d =>
+              matchedDriver = matchedSession.drivers.find((d: any) =>
                 (d.driverName || d.name || '').toLowerCase() === replayDriver.name.toLowerCase() ||
                 (replayDriver.carNumber && d.carNumber === replayDriver.carNumber)
               );
@@ -457,8 +473,22 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
         if (!matchedDriver) {
           matchedDriver = matchedSession.playerDriver || matchedSession.drivers[0];
         }
+      }
+    } catch {
+      // Ignore session loading errors
+    }
 
-        if (matchedDriver?.laps && matchedDriver.laps.length > 0) {
+    const trajectory = extractReplayTrajectory(filePath, {
+      driverSlot,
+      driverName,
+      maxPoints,
+      playerName: parser.configuredPlayerName,
+      lapNumber,
+    });
+
+    // Validate replay against matched session log (decoupled validation layer)
+    try {
+      if (matchedSession && matchedDriver?.laps && matchedDriver.laps.length > 0) {
           const officialLaps = matchedDriver.laps.map(sl => ({
             lapNumber: sl.lapNum ?? (sl as any).lapNumber,
             lapTimeSec: sl.lapTime,
@@ -492,10 +522,9 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
             officialLaps,
           };
         }
+      } catch {
+        // Ignore validation lookup errors
       }
-    } catch {
-      // Ignore validation lookup errors
-    }
 
     res.json(trajectory);
   } catch (err: unknown) {

@@ -67,6 +67,20 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
           <span className="text-xs font-mono font-bold text-lmu-gold bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-lg">
             {baselineLap ? `${baselineLap.driverName} — ${baselineLap.lapTimeString}` : 'None'}
           </span>
+          {selectedLaps.length === 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                const other = selectedLaps.find(l => l.id !== baselineLap?.id);
+                if (other) setBaselineLapId(other.id);
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+              title="Swap Baseline Lap (⇄)"
+            >
+              <ArrowLeftRight className="w-3 h-3" />
+              <span>Swap Baseline</span>
+            </button>
+          )}
         </div>
       </div>
 

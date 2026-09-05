@@ -324,5 +324,197 @@ describe('ReplayInspectorModal', () => {
     expect(fastestBadge.className).toContain('text-lmu-gold');
     expect(fastestBadge.className).toContain('border-lmu-gold/40');
   });
+
+  it('allows swapping primary and baseline lap using the Swap button', async () => {
+    const mockTrajWith2Laps = {
+      ...mockTraj,
+      currentLap: 1,
+      laps: [
+        { lapNumber: 1, lapTimeSec: 135.5, s1Sec: 40.0, s2Sec: 50.0, s3Sec: 45.5, isBest: false },
+        { lapNumber: 2, lapTimeSec: 134.0, s1Sec: 39.5, s2Sec: 49.5, s3Sec: 45.0, isBest: true },
+      ],
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/trajectory')) {
+        const lapMatch = url.match(/lap=(\d+)/);
+        const requestedLap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockTrajWith2Laps,
+            currentLap: requestedLap,
+          }),
+        });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal
+        isOpen={true}
+        onClose={vi.fn()}
+        replayName="Test_Replay.vcr"
+        initialCompareMode={true}
+        initialBaselineLapNumber={2}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Swap/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/Select Baseline Lap/i)).toBeInTheDocument();
+    });
+
+    const baselineSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
+    expect(baselineSelect.value).toBe('2');
+
+    // Click Swap
+    const swapBtn = screen.getByRole('button', { name: /Swap/i });
+    fireEvent.click(swapBtn);
+
+    // After swap, baseline should now be Lap 1
+    await waitFor(() => {
+      const updatedSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
+      expect(updatedSelect.value).toBe('1');
+    });
+  });
+
+  it('does not deselect baseline when changing the primary lap', async () => {
+    const mockTrajWith3Laps = {
+      ...mockTraj,
+      currentLap: 1,
+      laps: [
+        { lapNumber: 1, lapTimeSec: 135.5, s1Sec: 40.0, s2Sec: 50.0, s3Sec: 45.5, isBest: false },
+        { lapNumber: 2, lapTimeSec: 134.0, s1Sec: 39.5, s2Sec: 49.5, s3Sec: 45.0, isBest: true },
+        { lapNumber: 3, lapTimeSec: 136.0, s1Sec: 40.5, s2Sec: 50.5, s3Sec: 45.0, isBest: false },
+      ],
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/trajectory')) {
+        const lapMatch = url.match(/lap=(\d+)/);
+        const requestedLap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockTrajWith3Laps,
+            currentLap: requestedLap,
+          }),
+        });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal
+        isOpen={true}
+        onClose={vi.fn()}
+        replayName="Test_Replay.vcr"
+        initialCompareMode={true}
+        initialBaselineLapNumber={2}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Select Baseline Lap/i)).toBeInTheDocument();
+    });
+
+    const baselineSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
+    expect(baselineSelect.value).toBe('2');
+
+    // Change primary lap to Lap 3
+    const primarySelect = screen.getByLabelText(/Select Lap/i) as HTMLSelectElement;
+    fireEvent.change(primarySelect, { target: { value: '3' } });
+
+    // Baseline should still be Lap 2 and compare mode must remain active
+    await waitFor(() => {
+      const activeBaseline = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
+      expect(activeBaseline).toBeInTheDocument();
+      expect(activeBaseline.value).toBe('2');
+    });
+  });
+
+  it('displays distinct baseline replay laps instead of current session laps when another replay is selected', async () => {
+    const otherMeta = {
+      ...mockMeta,
+      filename: 'Other_Spa_Replay.vcr',
+      laps: [
+        { lapNumber: 8, lapTimeSec: 133.2, s1Sec: 39.0, s2Sec: 49.0, s3Sec: 45.2, isBest: true },
+        { lapNumber: 9, lapTimeSec: 134.1, s1Sec: 39.2, s2Sec: 49.4, s3Sec: 45.5, isBest: false },
+      ],
+    };
+
+    const otherTraj = {
+      replayName: 'Other_Spa_Replay.vcr',
+      driverSlot: 1,
+      currentLap: 8,
+      pointsCount: 2,
+      bounds: { minX: 100, maxX: 200, minZ: 200, maxZ: 240, spanX: 100, spanZ: 40 },
+      points: [
+        { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
+      ],
+      laps: otherMeta.laps,
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('Other_Spa_Replay.vcr') && url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(otherMeta) });
+      }
+      if (url.includes('Other_Spa_Replay.vcr') && url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(otherTraj) });
+      }
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/replays') && !url.includes('/trajectory') && !url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            { name: 'Other_Spa_Replay.vcr', trackName: 'Spa-Francorchamps', eventTitle: 'LMGT3 Fixed' },
+          ]),
+        });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockTraj,
+            currentLap: 1,
+            laps: [{ lapNumber: 1, lapTimeSec: 135.5, isBest: true }],
+          }),
+        });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal
+        isOpen={true}
+        onClose={vi.fn()}
+        replayName="Test_Replay.vcr"
+        initialCompareMode={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Select Baseline Replay/i)).toBeInTheDocument();
+    });
+
+    // Select Other_Spa_Replay.vcr
+    const replaySelect = screen.getByLabelText(/Select Baseline Replay/i);
+    fireEvent.change(replaySelect, { target: { value: 'Other_Spa_Replay.vcr' } });
+
+    // Baseline lap dropdown must display Lap 8 and Lap 9 from Other_Spa_Replay, NOT Lap 1 from current replay!
+    await waitFor(() => {
+      expect(screen.getByText(/Lap 8/i)).toBeInTheDocument();
+      expect(screen.getByText(/Lap 9/i)).toBeInTheDocument();
+    });
+  });
 });
 
