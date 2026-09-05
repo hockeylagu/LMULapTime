@@ -337,6 +337,33 @@ interface RawPoint {
   isOffTrack?: boolean;
 }
 
+export const KNOWN_TRACK_SF_COORDS: Array<{ layoutName?: string; keywords: string[]; x: number; z: number }> = [
+  // Specific layouts & variants first (must precede generic circuit keywords)
+  { layoutName: 'Bahrain Paddock', keywords: ['bahrainwec_paddock', 'bahrain paddock', 'paddock circuit'], x: -197.75, z: 250.12 },
+  { layoutName: 'Bahrain Outer', keywords: ['bahrainwec_outer', 'bahrain outer', 'outer circuit'], x: 410.69, z: 367.95 },
+  { layoutName: 'Bahrain Grand Prix', keywords: ['bahrain'], x: 410.69, z: 367.95 },
+
+  { layoutName: 'Sebring School', keywords: ['sebringwec_school', 'sebring school', 'school circuit'], x: -245.16, z: -213.06 },
+  { layoutName: 'Sebring 12h Full', keywords: ['sebring'], x: 198.41, z: 0.61 },
+
+  { layoutName: 'Monza Curva Grande', keywords: ['monzawec_grande', 'curva grande'], x: -270.98, z: -100.87 },
+  { layoutName: 'Monza Grand Prix', keywords: ['monza'], x: -269.53, z: -407.92 },
+
+  { layoutName: 'Daytona Road Course', keywords: ['daytonarc', 'daytona'], x: -112.47, z: -37.36 },
+  { layoutName: 'Imola Grand Prix', keywords: ['imolaelms', 'imola', 'dino ferrari'], x: 224.71, z: -319.37 },
+  { layoutName: 'Laguna Seca', keywords: ['lagunaseca', 'laguna'], x: -31.81, z: -122.68 },
+  { layoutName: 'Spa-Francorchamps', keywords: ['spaelms', 'spawec', 'spa', 'francorchamps'], x: -232.3, z: 735.2 },
+  { layoutName: 'Fuji Speedway', keywords: ['fujiwec', 'fuji'], x: -225.77, z: -157.93 },
+  { layoutName: 'Circuit of the Americas', keywords: ['cotawec', 'americas', 'cota'], x: -508.72, z: -306.28 },
+  { layoutName: 'Algarve / Portimao', keywords: ['portimaowec', 'algarve', 'portimao'], x: -108.49, z: -26.35 },
+  { layoutName: 'Silverstone', keywords: ['silverstonewec', 'silverstone'], x: -34.93, z: -5.37 },
+  { layoutName: 'Lusail Short', keywords: ['qatarwec_short', 'lusail short', 'lusail', 'losail', 'qatar'], x: -26.73, z: 52.26 },
+  { layoutName: 'Paul Ricard Short', keywords: ['paulricard', 'paul ricard', 'ricard'], x: -248.39, z: 192.00 },
+  { layoutName: 'Barcelona', keywords: ['barcelonaelms', 'barcelona', 'catalunya'], x: -72.33, z: -146.63 },
+  { layoutName: 'Circuit de la Sarthe', keywords: ['lemanswec', 'sarthe', 'le mans'], x: 1387.55, z: 1640.82 },
+  { layoutName: 'Interlagos', keywords: ['interlagoswec', 'pace', 'interlagos'], x: -81.02, z: -219.94 },
+];
+
 /**
  * Extracts downsampled 2D/3D car trajectory and live inputs from replay frames.
  */
@@ -399,11 +426,16 @@ export function extractReplayTrajectory(
 
     // Default to player driver (priority 1)
     if (targetSlot === undefined) {
-      const player = meta.drivers.find(d =>
-        d.isPlayer ||
-        (effectivePlayerName && d.name.toLowerCase().includes(effectivePlayerName.toLowerCase())) ||
-        (options.driverName && d.name.toLowerCase().includes(options.driverName.toLowerCase()))
-      );
+      let player = meta.drivers.find(d => d.isPlayer);
+      if (!player && effectivePlayerName) {
+        player = meta.drivers.find(d => d.name.toLowerCase() === effectivePlayerName.toLowerCase());
+      }
+      if (!player) {
+        player = meta.drivers.find(d =>
+          (effectivePlayerName && d.name.toLowerCase().includes(effectivePlayerName.toLowerCase())) ||
+          (options.driverName && d.name.toLowerCase().includes(options.driverName.toLowerCase()))
+        );
+      }
       if (player && typeof player.slot === 'number') {
         targetSlot = player.slot;
       }
@@ -692,30 +724,71 @@ export function extractReplayTrajectory(
         return crossings;
       }
 
-      // Candidate 1: Legacy reference point at cumDist > 100
-      let legacyIdx = rawPts.findIndex((_, i) => cumDist[i] > 100);
-      if (legacyIdx === -1) legacyIdx = 0;
-      let bestCrossings = findCrossingsForCandidate(legacyIdx, 35);
-      let bestCandidateIdx = legacyIdx;
+      let bestCrossings: number[] = [];
+      let bestCandidateIdx = -1;
 
-      // Pit points for pit-lane proximity identification
-      const pitPts = rawPts.filter(p => p.pitLimiter || p.inPit);
-      const startsInPit = rawPts[0].pitLimiter || rawPts[0].inPit || (rawPts[legacyIdx] && (rawPts[legacyIdx].pitLimiter || rawPts[legacyIdx].inPit));
+      // Priority 1: Check known circuit and layout version Start/Finish line catalog
+      // Synchronizes the lap start/finish point universally across all session types (Race, Qualifying, Practice)
+      const trackIdentifier = `${meta.aiw || ''} ${meta.scn || ''} ${meta.trackName || ''} ${meta.trackVersion || ''} ${path.basename(filePath)}`.toLowerCase();
+      const knownTrack = KNOWN_TRACK_SF_COORDS.find(entry => entry.keywords.some(k => trackIdentifier.includes(k)));
 
-      // Candidate 2: If vehicle starts in pit lane / garage (or legacy point yields <= 2 crossings),
-      // search on-track candidates to find the true Start/Finish line on the main straight
-      if (startsInPit || bestCrossings.length <= 2) {
-        const trackIndices: number[] = [];
+      if (knownTrack) {
+        let firstPassIdx = -1;
+        let inCluster = false;
+        let cluster: { idx: number; d: number }[] = [];
+
         for (let i = 0; i < rawPts.length - 5; i++) {
-          const p = rawPts[i];
-          if (p.pitLimiter || p.inPit) continue;
-          const dt = rawPts[i + 1].sTime - p.sTime;
-          const dist = Math.hypot(rawPts[i + 1].x - p.x, rawPts[i + 1].z - p.z);
-          const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
-          if (speed > 50 && cumDist[i] > 100) {
-            trackIndices.push(i);
+          if (rawPts[i].pitLimiter || rawPts[i].inPit) continue;
+          const d = Math.hypot(rawPts[i].x - knownTrack.x, rawPts[i].z - knownTrack.z);
+          if (d < 35) {
+            cluster.push({ idx: i, d });
+            inCluster = true;
+          } else if (inCluster) {
+            const best = cluster.reduce((min, p) => (p.d < min.d ? p : min), cluster[0]);
+            firstPassIdx = best.idx;
+            break;
           }
         }
+        if (firstPassIdx === -1 && cluster.length > 0) {
+          const best = cluster.reduce((min, p) => (p.d < min.d ? p : min), cluster[0]);
+          firstPassIdx = best.idx;
+        }
+
+        if (firstPassIdx !== -1) {
+          const crossings = findCrossingsForCandidate(firstPassIdx, 25);
+          if (crossings.length >= 2) {
+            bestCrossings = crossings;
+            bestCandidateIdx = firstPassIdx;
+          }
+        }
+      }
+
+      // Priority 2: Fall back to autonomous candidate search if uncataloged or < 2 crossings
+      if (bestCrossings.length <= 1) {
+        // Candidate 1: Legacy reference point at cumDist > 100
+        let legacyIdx = rawPts.findIndex((_, i) => cumDist[i] > 100);
+        if (legacyIdx === -1) legacyIdx = 0;
+        bestCrossings = findCrossingsForCandidate(legacyIdx, 35);
+        bestCandidateIdx = legacyIdx;
+
+        // Pit points for pit-lane proximity identification
+        const pitPts = rawPts.filter(p => p.pitLimiter || p.inPit);
+        const startsInPit = rawPts[0].pitLimiter || rawPts[0].inPit || (rawPts[legacyIdx] && (rawPts[legacyIdx].pitLimiter || rawPts[legacyIdx].inPit));
+
+        // Candidate 2: If vehicle starts in pit lane / garage (or legacy point yields <= 2 crossings),
+        // search on-track candidates to find the true Start/Finish line on the main straight
+        if (startsInPit || bestCrossings.length <= 2) {
+          const trackIndices: number[] = [];
+          for (let i = 0; i < rawPts.length - 5; i++) {
+            const p = rawPts[i];
+            if (p.pitLimiter || p.inPit) continue;
+            const dt = rawPts[i + 1].sTime - p.sTime;
+            const dist = Math.hypot(rawPts[i + 1].x - p.x, rawPts[i + 1].z - p.z);
+            const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
+            if (speed > 50 && cumDist[i] > 100) {
+              trackIndices.push(i);
+            }
+          }
 
         const pool = trackIndices.length > 5
           ? trackIndices
@@ -794,6 +867,7 @@ export function extractReplayTrajectory(
             }
           }
         }
+      }
       }
 
       if (bestCrossings.length > 1) {
