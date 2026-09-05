@@ -11,7 +11,8 @@ import {
   type LegendPayload,
 } from 'recharts';
 import { DetailedSession, DriverData, FuelStrategyData } from '../../../server/types.js';
-import { formatTime } from '../../utils/formatters.js';
+import { formatTime, getDisplayTrackName } from '../../utils/formatters.js';
+import { updateHashParams } from '../../utils/urlParams.js';
 import { SessionFuelStrategyCard } from './SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
@@ -56,6 +57,23 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
     sessionChartData,
   } = useSessionChartData({ session, selectedDriver, isMultiClass });
 
+  const handleChartClick = (state: any) => {
+    if (state && state.activeLabel !== undefined) {
+      const lapNum = parseInt(String(state.activeLabel), 10);
+      if (!isNaN(lapNum) && lapNum > 0) {
+        if (session.matchingReplayFile) {
+          updateHashParams({ replay: '1', lap: String(lapNum) });
+        } else {
+          const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+          const carClass = selectedDriver?.carClass || 'LMGT3';
+          window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+            carClass
+          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`;
+        }
+      }
+    }
+  };
+
   return (
     <div className="glass-panel p-5 rounded-2xl relative space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
@@ -72,12 +90,12 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
             {activeChartMetric === 'positions'
-              ? `Lap-by-lap position chart isolated to ${selectedDriver.carClass || 'same class'} competitors. Click legend items to toggle drivers.`
+              ? `Lap-by-lap position chart isolated to ${selectedDriver.carClass || 'same class'} competitors. Click any lap point to open telemetry.`
               : activeChartMetric === 'tireWear'
-              ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints. Click legend items to toggle.'
+              ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints. Click any lap to open telemetry.'
               : activeChartMetric === 'fuelEnergy'
-              ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh).'
-              : 'Session lap pace progression, session average, sector splits (S1/S2/S3), and sector averages. Click legend to toggle lines.'}
+              ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh). Click any lap to open telemetry.'
+              : 'Session lap pace progression, session average, and sector splits. Click any lap point to inspect its telemetry.'}
           </p>
         </div>
 
@@ -174,6 +192,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
           <LineChart
             data={activeChartMetric === 'positions' ? positionChartData : sessionChartData}
             margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+            onClick={handleChartClick}
+            className="cursor-pointer"
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.6} />
             <XAxis dataKey="lapNum" stroke="#718096" fontSize={11} tickLine={false} />

@@ -182,6 +182,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
       )}
 
       <DriverTimingMetricsRow
+        session={session}
         selectedDriver={selectedDriver}
         isRaceSession={isRaceSession}
         isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}

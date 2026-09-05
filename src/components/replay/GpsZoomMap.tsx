@@ -2,12 +2,13 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Navigation, Plus, Minus, RotateCcw } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
 import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
+import { getHeatmapColor, MapColorMode } from './replayMapUtils.js';
 
 export interface GpsZoomMapProps {
   points: ReplayTrajectoryPoint[];
   currentIndex: number;
   onSelectIndex?: (index: number) => void;
-  colorBy?: 'speed' | 'throttle' | 'brake' | 'steering' | 'default';
+  colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];
 }
@@ -23,14 +24,12 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   const VIEWBOX_SIZE = 600;
   const CENTER = VIEWBOX_SIZE / 2;
 
-  // Independent zoom radius in meters: 15m (ultra-tight) to 300m (sector/complex)
   const [zoomRadius, setZoomRadius] = useState<number>(80);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const isDraggingRef = useRef<boolean>(false);
   const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number }>({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Smooth independent mouse wheel zooming without scrolling behind
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -38,41 +37,28 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-
       if (e.deltaY < 0) {
-        // Zoom in closer (reduce visible radius)
         setZoomRadius(r => Math.max(15, Math.round(r * 0.85)));
       } else {
-        // Zoom out wider (expand visible radius)
         setZoomRadius(r => Math.min(300, Math.round(r * 1.18)));
       }
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-    };
+    return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Independent click & drag to pan apex map
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDraggingRef.current = true;
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      panX: panOffset.x,
-      panY: panOffset.y,
-    };
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX: panOffset.x, panY: panOffset.y };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
     setPanOffset({
-      x: dragStartRef.current.panX + dx,
-      y: dragStartRef.current.panY + dy,
+      x: dragStartRef.current.panX + (e.clientX - dragStartRef.current.x),
+      y: dragStartRef.current.panY + (e.clientY - dragStartRef.current.y),
     });
   };
 
@@ -84,64 +70,22 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   const safeIndex = Math.max(0, Math.min(currentIndex, points.length - 1));
   const currentPoint = points[safeIndex];
 
-  // Calculate local window centered at current car point
   const { visibleSegments, carHeadingDeg } = useMemo(() => {
     if (!points || points.length === 0 || !currentPoint) {
       return { visibleSegments: [], carHeadingDeg: 0 };
     }
 
-    const R = zoomRadius;
-    // Scale: meters to SVG pixels
-    const scale = (CENTER - 40) / R;
-
-    // Heatmap color logic
-    const getSegmentColor = (p: ReplayTrajectoryPoint) => {
-      if (colorBy === 'throttle') {
-        const th = p.throttle || 0;
-        if (th > 75) return '#10b981'; // Green
-        if (th > 25) return '#34d399';
-        return '#475569';
-      }
-      if (colorBy === 'brake') {
-        const brk = p.brake || 0;
-        if (brk > 60) return '#ef4444'; // Red
-        if (brk > 15) return '#f87171';
-        return '#475569';
-      }
-      if (colorBy === 'steering') {
-        const absSteer = Math.abs(p.steerYaw || 0);
-        if (absSteer > 45) return '#818cf8'; // Indigo
-        if (absSteer > 15) return '#a5b4fc';
-        return '#475569';
-      }
-      // Speed heatmap (Thermal: Blue = Slow/Apex -> Green = Exit -> Orange = Fast -> Purple = Top Speed)
-      const spd = p.speedKmh || 0;
-      if (spd > 230) return '#c026d3'; // Purple (Top Speed)
-      if (spd > 160) return '#f59e0b'; // Amber/Orange (High Speed)
-      if (spd > 90) return '#10b981'; // Emerald Green (Mid Speed)
-      return '#0284c7'; // Blue (Apex / Low Speed)
-    };
-
-    // Window of frames around current corner pass: scaled dynamically to zoom radius
+    const scale = (CENTER - 40) / zoomRadius;
     const windowSize = Math.max(50, Math.min(160, Math.round(zoomRadius * 1.2)));
     const minFrame = Math.max(0, safeIndex - windowSize);
     const maxFrame = Math.min(points.length - 1, safeIndex + windowSize);
 
-    type Segment = {
-      pathD: string;
-      color: string;
-      avgSpeed: number;
-      idx: number;
-    };
-    const segments: Segment[] = [];
+    const segments: Array<{ pathD: string; color: string; avgSpeed: number; idx: number }> = [];
 
-    // Directly build continuous segments between consecutive points
     for (let i = minFrame; i < maxFrame; i++) {
       const p1 = points[i];
       const p2 = points[i + 1];
-
       const worldDist = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-      // Skip teleport jumps across infield
       if ((p2.isTeleport && worldDist > 30) || worldDist > 75) continue;
 
       const sx1 = CENTER + (p1.x - currentPoint.x) * scale;
@@ -151,13 +95,12 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
 
       segments.push({
         pathD: `M ${sx1.toFixed(1)} ${sy1.toFixed(1)} L ${sx2.toFixed(1)} ${sy2.toFixed(1)}`,
-        color: getSegmentColor(p2),
+        color: getHeatmapColor(p2, colorBy),
         avgSpeed: Math.round(((p1.speedKmh || 0) + (p2.speedKmh || 0)) / 2),
         idx: i + 1,
       });
     }
 
-    // Car heading angle in SVG coordinates
     let heading = 0;
     const prevIdx = Math.max(0, safeIndex - 2);
     const nextIdx = Math.min(points.length - 1, safeIndex + 2);
@@ -171,13 +114,9 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
       }
     }
 
-    return {
-      visibleSegments: segments,
-      carHeadingDeg: heading,
-    };
+    return { visibleSegments: segments, carHeadingDeg: heading };
   }, [points, currentPoint, safeIndex, zoomRadius, colorBy, CENTER]);
 
-  // Baseline visible segments and ghost position in zoom local coordinates
   const { baselineVisiblePath, baselineGhostPos } = useMemo(() => {
     if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0 || !currentPoint) {
       return { baselineVisiblePath: '', baselineGhostPos: null };
@@ -185,8 +124,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
 
     const scale = (CENTER - 40) / zoomRadius;
     const maxVisibleDist = zoomRadius * 1.6;
-
-    // Collect baseline points close to current car
     let bPath = '';
     let hasStarted = false;
 
@@ -204,18 +141,13 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         } else {
           const prev = baselinePoints[i - 1];
           const stepDist = prev ? Math.hypot(bp.x - prev.x, bp.z - prev.z) : 0;
-          if (bp.isTeleport || stepDist > 25) {
-            bPath += ` M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
-          } else {
-            bPath += ` L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
-          }
+          bPath += bp.isTeleport || stepDist > 25 ? ` M ${sx.toFixed(1)} ${sy.toFixed(1)}` : ` L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
         }
       } else {
         hasStarted = false;
       }
     }
 
-    // Distance-aligned ghost position
     const primaryDists = computeCumulativeDistances(points);
     const baseDists = computeCumulativeDistances(baselinePoints);
     const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
@@ -225,16 +157,12 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     const targetDist = fraction * totalBase;
     const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
 
-    const ghostSx = CENTER + (ghostPt.x - currentPoint.x) * scale;
-    const ghostSy = CENTER - (ghostPt.z - currentPoint.z) * scale;
-    const distMeters = Math.hypot(ghostPt.x - currentPoint.x, ghostPt.z - currentPoint.z);
-
     return {
       baselineVisiblePath: bPath,
       baselineGhostPos: {
-        sx: ghostSx,
-        sy: ghostSy,
-        distMeters,
+        sx: CENTER + (ghostPt.x - currentPoint.x) * scale,
+        sy: CENTER - (ghostPt.z - currentPoint.z) * scale,
+        distMeters: Math.hypot(ghostPt.x - currentPoint.x, ghostPt.z - currentPoint.z),
         point: ghostPt,
       },
     };
@@ -251,8 +179,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   const scale = (CENTER - 40) / zoomRadius;
   const ring1Dist = zoomRadius <= 30 ? 10 : zoomRadius <= 60 ? 15 : zoomRadius <= 120 ? 25 : 50;
   const ring2Dist = zoomRadius <= 30 ? 20 : zoomRadius <= 60 ? 30 : zoomRadius <= 120 ? 50 : 100;
-  const radiusRing1 = ring1Dist * scale;
-  const radiusRing2 = ring2Dist * scale;
 
   return (
     <div
@@ -264,7 +190,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         panOffset.x !== 0 || panOffset.y !== 0 ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
       } ${className}`}
     >
-      {/* Top Banner: Zoom controls & Corner mode */}
       <div className="absolute top-2 left-2.5 right-2.5 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-1.5 bg-[#0a0e17]/90 px-2 py-1 rounded-lg border border-white/10 backdrop-blur-sm pointer-events-auto">
           <Navigation className="w-3 h-3 text-cyan-400" />
@@ -278,7 +203,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
           )}
         </div>
 
-        {/* Independent Zoom & Pan Toolbar */}
         <div className="flex items-center gap-1 bg-[#0a0e17]/90 p-0.5 rounded-lg border border-white/10 backdrop-blur-sm pointer-events-auto">
           <button
             onClick={() => setZoomRadius(r => Math.max(15, Math.round(r * 0.8)))}
@@ -286,7 +210,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             title="Zoom in closer (+)"
             className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
           >
-            <Plus className="w-3 h-3" />
+            <Plus className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setZoomRadius(r => Math.min(300, Math.round(r * 1.25)))}
@@ -294,7 +218,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             title="Zoom out wider (-)"
             className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
           >
-            <Minus className="w-3 h-3" />
+            <Minus className="w-3.5 h-3.5" />
           </button>
           <div className="w-[1px] h-3 bg-white/10 mx-0.5" />
           {[40, 80, 150].map(r => (
@@ -305,9 +229,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
                 setPanOffset({ x: 0, y: 0 });
               }}
               className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all ${
-                zoomRadius === r
-                  ? 'bg-lmu-accent text-white shadow'
-                  : 'text-lmu-muted hover:text-white'
+                zoomRadius === r ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
               }`}
             >
               {r}m
@@ -326,92 +248,21 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         </div>
       </div>
 
-      {/* Interactive Close-Up SVG Canvas */}
       <div className="w-full h-full flex-1 min-h-0 flex items-center justify-center p-1">
-        <svg
-          viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}
-          className="w-full h-full drop-shadow-md"
-          preserveAspectRatio="xMidYMid meet"
-        >
+        <svg viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`} className="w-full h-full drop-shadow-md" preserveAspectRatio="xMidYMid meet">
           <g transform={panOffset.x !== 0 || panOffset.y !== 0 ? `translate(${panOffset.x.toFixed(1)}, ${panOffset.y.toFixed(1)})` : undefined}>
-            {/* Subtle Radar Distance Rings */}
-            <circle
-              cx={CENTER}
-              cy={CENTER}
-              r={radiusRing1}
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="0.8"
-              strokeDasharray="3 3"
-              opacity="0.2"
-            />
-            <text
-              x={CENTER + radiusRing1 + 4}
-              y={CENTER + 3}
-              fill="#38bdf8"
-              fontSize="9"
-              fontFamily="monospace"
-              opacity="0.4"
-            >
-              {ring1Dist}m
-            </text>
+            <circle cx={CENTER} cy={CENTER} r={ring1Dist * scale} fill="none" stroke="#38bdf8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.2" />
+            <text x={CENTER + ring1Dist * scale + 4} y={CENTER + 3} fill="#38bdf8" fontSize="9" fontFamily="monospace" opacity="0.4">{ring1Dist}m</text>
+            <circle cx={CENTER} cy={CENTER} r={ring2Dist * scale} fill="none" stroke="#38bdf8" strokeWidth="0.8" strokeDasharray="4 4" opacity="0.15" />
+            <text x={CENTER + ring2Dist * scale + 4} y={CENTER + 3} fill="#38bdf8" fontSize="9" fontFamily="monospace" opacity="0.3">{ring2Dist}m</text>
 
-            <circle
-              cx={CENTER}
-              cy={CENTER}
-              r={radiusRing2}
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="0.8"
-              strokeDasharray="4 4"
-              opacity="0.15"
-            />
-            <text
-              x={CENTER + radiusRing2 + 4}
-              y={CENTER + 3}
-              fill="#38bdf8"
-              fontSize="9"
-              fontFamily="monospace"
-              opacity="0.3"
-            >
-              {ring2Dist}m
-            </text>
+            <line x1={CENTER - 15} y1={CENTER} x2={CENTER + 15} y2={CENTER} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
+            <line x1={CENTER} y1={CENTER - 15} x2={CENTER} y2={CENTER + 15} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
 
-            {/* Crosshair reference lines */}
-            <line
-              x1={CENTER - 15}
-              y1={CENTER}
-              x2={CENTER + 15}
-              y2={CENTER}
-              stroke="#ffffff"
-              strokeWidth="0.8"
-              opacity="0.25"
-            />
-            <line
-              x1={CENTER}
-              y1={CENTER - 15}
-              x2={CENTER}
-              y2={CENTER + 15}
-              stroke="#ffffff"
-              strokeWidth="0.8"
-              opacity="0.25"
-            />
-
-            {/* Baseline Racing Line (Dashed Amber) */}
             {baselineVisiblePath && (
-              <path
-                d={baselineVisiblePath}
-                stroke="#f59e0b"
-                strokeWidth="4"
-                strokeDasharray="8 6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                opacity="0.85"
-              />
+              <path d={baselineVisiblePath} stroke="#f59e0b" strokeWidth="4" strokeDasharray="8 6" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
             )}
 
-            {/* High-Resolution Colored Racing Line Traces */}
             <g>
               {visibleSegments.map((seg, i) => (
                 <path
@@ -430,106 +281,33 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
               ))}
             </g>
 
-            {/* Tether line to baseline ghost car */}
             {baselineGhostPos && (
-              <line
-                x1={CENTER}
-                y1={CENTER}
-                x2={baselineGhostPos.sx}
-                y2={baselineGhostPos.sy}
-                stroke="#f59e0b"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                opacity="0.75"
-              />
+              <line x1={CENTER} y1={CENTER} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.75" />
             )}
 
-            {/* Baseline Ghost Car Marker */}
             {baselineGhostPos && (
               <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
-                <circle
-                  r="12"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="1.5"
-                  opacity="0.5"
-                  className="animate-pulse"
-                />
-                <circle
-                  r="6.5"
-                  fill="#f59e0b"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  opacity="0.95"
-                />
-                <text
-                  y="-10"
-                  textAnchor="middle"
-                  className="fill-amber-300 text-[10px] font-mono font-bold"
-                >
-                  GHOST ({baselineGhostPos.distMeters.toFixed(1)}m)
-                </text>
+                <circle r="12" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
+                <circle r="6.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" opacity="0.95" />
+                <text y="-10" textAnchor="middle" className="fill-amber-300 text-[10px] font-mono font-bold">GHOST ({baselineGhostPos.distMeters.toFixed(1)}m)</text>
               </g>
             )}
 
-            {/* Current Car Marker (Locked in center of view) */}
             <g transform={`translate(${CENTER}, ${CENTER})`}>
-              {/* Outer halo */}
-              <circle
-                r="14"
-                fill="#38bdf8"
-                opacity="0.15"
-                className="animate-ping"
-              />
-              {/* Solid glow */}
-              <circle
-                r="7"
-                fill="#38bdf8"
-                stroke="#ffffff"
-                strokeWidth="2"
-                className="shadow-[0_0_10px_#38bdf8]"
-              />
-
-              {/* Direction Arrow oriented to forward travel vector */}
+              <circle r="14" fill="#38bdf8" opacity="0.15" className="animate-ping" />
+              <circle r="7" fill="#38bdf8" stroke="#ffffff" strokeWidth="2" className="shadow-[0_0_10px_#38bdf8]" />
               <g transform={`rotate(${carHeadingDeg})`}>
-                <polygon
-                  points="0,-16 5,-6 -5,-6"
-                  fill="#facc15"
-                  stroke="#000000"
-                  strokeWidth="0.8"
-                />
+                <polygon points="0,-16 5,-6 -5,-6" fill="#facc15" stroke="#000000" strokeWidth="0.8" />
               </g>
             </g>
           </g>
         </svg>
       </div>
 
-      {/* Bottom Live Corner Telemetry Pill with Legend */}
       <div className="absolute bottom-2 left-2.5 right-2.5 z-20 flex items-center justify-between pointer-events-none text-[10px] font-mono">
         <div className="flex items-center gap-2 bg-[#0a0e17]/90 px-2 py-0.5 rounded border border-white/10 text-white font-bold backdrop-blur-sm">
           <span>{currentPoint.speedKmh ?? 0} km/h</span>
-          {colorBy === 'speed' && (
-            <span className="text-[9px] font-normal text-lmu-muted flex items-center gap-1 border-l border-white/10 pl-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0284c7]" title="Apex / Low Speed (<90 km/h)" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" title="Mid Speed (90-160 km/h)" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" title="High Speed (160-230 km/h)" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#c026d3]" title="Top Speed (>230 km/h)" />
-            </span>
-          )}
-          {colorBy === 'throttle' && (
-            <span className="text-[9px] font-normal text-lmu-muted flex items-center gap-1 border-l border-white/10 pl-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#475569]" title="Off Throttle" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" title="Full Throttle" />
-            </span>
-          )}
-          {colorBy === 'brake' && (
-            <span className="text-[9px] font-normal text-lmu-muted flex items-center gap-1 border-l border-white/10 pl-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#475569]" title="No Brake" />
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" title="Heavy Brake" />
-            </span>
-          )}
         </div>
-
         <span className="bg-[#0a0e17]/90 px-2 py-0.5 rounded border border-white/10 text-indigo-400 font-bold backdrop-blur-sm">
           {Math.abs(currentPoint.steerYaw ?? 0)}° {(currentPoint.steerYaw ?? 0) < -5 ? 'LEFT' : (currentPoint.steerYaw ?? 0) > 5 ? 'RIGHT' : 'CTR'}
         </span>

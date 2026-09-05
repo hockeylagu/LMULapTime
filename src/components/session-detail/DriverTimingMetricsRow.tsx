@@ -1,8 +1,11 @@
-import { DriverData } from '../../../server/types.js';
-import { formatTime } from '../../utils/formatters.js';
+import { Activity } from 'lucide-react';
+import { DetailedSession, DriverData } from '../../../server/types.js';
+import { formatTime, getDisplayTrackName } from '../../utils/formatters.js';
+import { updateHashParams } from '../../utils/urlParams.js';
 import { PaceBadge } from '../common';
 
 export interface DriverTimingMetricsRowProps {
+  session?: DetailedSession;
   selectedDriver: DriverData;
   isRaceSession: boolean;
   isCurrentSessionAllTimePB: boolean;
@@ -23,6 +26,7 @@ export interface DriverTimingMetricsRowProps {
 }
 
 export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
+  session,
   selectedDriver,
   isRaceSession,
   isCurrentSessionAllTimePB,
@@ -41,6 +45,28 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
   avgS2,
   avgS3,
 }) => {
+  const bestLapNum =
+    selectedDriver.bestLapNum ||
+    (selectedDriver.bestLapTime
+      ? selectedDriver.laps?.find(
+          (l) => l.lapTime && Math.abs(l.lapTime - selectedDriver.bestLapTime!) < 0.001
+        )?.lapNum
+      : undefined) ||
+    (selectedDriver.laps && selectedDriver.laps.length > 0 ? selectedDriver.laps[0].lapNum : 1);
+
+  const handleOpenBestLapTelemetry = () => {
+    if (!bestLapNum) return;
+    if (session?.matchingReplayFile) {
+      updateHashParams({ replay: '1', lap: String(bestLapNum) });
+    } else if (session) {
+      const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+      const carClass = selectedDriver.carClass || 'LMGT3';
+      window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+        carClass
+      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`;
+    }
+  };
+
   return (
     <div
       className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 ${
@@ -48,19 +74,33 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
       }`}
     >
       {/* 1. Best Lap */}
-      <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
+      <div
+        onClick={handleOpenBestLapTelemetry}
+        className={`p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between transition-all ${
+          bestLapNum
+            ? 'cursor-pointer hover:border-lmu-gold/60 hover:bg-lmu-card/80 group/card shadow-sm'
+            : ''
+        }`}
+        title={bestLapNum ? `Click to open telemetry for Best Lap (Lap ${bestLapNum})` : undefined}
+      >
         <div>
-          <p
-            className={`text-[10px] uppercase font-semibold ${
-              isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold flex items-center gap-1' : 'text-lmu-muted'
-            }`}
-          >
-            {isCurrentSessionAllTimePB ? `⭐ Personal Best` : 'Session Best Lap'}
-          </p>
+          <div className="flex items-center justify-between gap-1">
+            <p
+              className={`text-[10px] uppercase font-semibold flex items-center gap-1 ${
+                isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold' : 'text-lmu-gold/90 font-semibold'
+              }`}
+            >
+              {isCurrentSessionAllTimePB ? `⭐ Personal Best` : '★ Session Best Lap'}
+            </p>
+            {bestLapNum && (
+              <span className="text-[9px] text-lmu-muted group-hover/card:text-lmu-gold transition-colors font-sans flex items-center gap-0.5">
+                <Activity className="w-2.5 h-2.5" />
+                <span>L{bestLapNum} Telemetry →</span>
+              </span>
+            )}
+          </div>
           <h4
-            className={`text-xl font-extrabold font-mono mt-0.5 ${
-              isCurrentSessionAllTimePB ? 'text-lmu-gold' : 'text-white'
-            }`}
+            className="text-xl font-extrabold font-mono mt-0.5 text-lmu-gold"
           >
             {selectedDriver.bestLapTimeString}
           </h4>

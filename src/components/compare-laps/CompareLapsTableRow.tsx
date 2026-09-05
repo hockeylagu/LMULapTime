@@ -35,7 +35,15 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
   return (
     <tr
       className={`hover:bg-lmu-card/50 transition-colors ${
-        isBaseline ? 'bg-lmu-gold/15' : isSelected ? 'bg-lmu-blue/15' : ''
+        isBaseline
+          ? 'bg-lmu-gold/15'
+          : isAllTimePB
+          ? 'bg-lmu-gold/15'
+          : lap.isSessionBest
+          ? 'bg-lmu-gold/10'
+          : isSelected
+          ? 'bg-lmu-blue/15'
+          : ''
       }`}
     >
       <td className="px-3 py-2.5 font-sans">
@@ -81,7 +89,7 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
           isAllTimePB
             ? 'text-lmu-gold font-extrabold'
             : lap.isSessionBest
-            ? 'text-lmu-blue'
+            ? 'text-lmu-gold font-bold'
             : lap.isInferred
             ? 'text-amber-300/80 italic font-mono'
             : 'text-white'

@@ -1352,4 +1352,60 @@ describe('SessionDetail component', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=3'));
     });
   });
+
+  it('opens telemetry when clicking a lap table row or clicking the Best Lap card in timing metrics', async () => {
+    window.location.hash = '#/session/sess123';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            replayName: 'spa_replay.vcr',
+            drivers: [{ slot: 1, name: 'Sim Driver', isPlayer: true }],
+          }),
+        });
+      }
+      if (url.includes('/trajectory')) {
+        const lapMatch = url.match(/lap=(\d+)/);
+        const requestedLap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            driverName: 'Sim Driver',
+            driverSlot: 1,
+            currentLap: requestedLap,
+            laps: [{ lapNumber: 1, lapTimeSec: 135.0 }, { lapNumber: 2, lapTimeSec: 134.0 }],
+            bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+            points: [{ x: 0, y: 0, z: 0, speedKmh: 100, throttle: 100, brake: 0, timeSec: 10.0 }],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
+    });
+
+    // 1. Click row for Lap 1
+    const lap1Row = screen.getByTitle('Click to open telemetry for Lap 1');
+    fireEvent.click(lap1Row);
+
+    expect(window.location.hash).toContain('replay=1');
+    expect(window.location.hash).toContain('lap=1');
+
+    // Close replay modal
+    const closeBtn = screen.getByTitle('Close');
+    fireEvent.click(closeBtn);
+
+    // 2. Click Best Lap card (best lap is Lap 2 with time 122.0)
+    const bestLapCard = screen.getByTitle(/Click to open telemetry for Best Lap/i);
+    fireEvent.click(bestLapCard);
+
+    expect(window.location.hash).toContain('replay=1');
+    expect(window.location.hash).toContain('lap=2');
+  });
 });
+
