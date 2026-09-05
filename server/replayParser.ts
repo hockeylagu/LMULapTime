@@ -621,6 +621,9 @@ interface RawPoint {
   isOffTrack?: boolean;
   physicsRpm?: number;
   detachablePartState?: number;
+  tireTemps?: [number, number, number, number];
+  tireWear?: [number, number, number, number];
+  brakeTemps?: [number, number, number, number];
 }
 
 /**
@@ -709,6 +712,11 @@ export function extractReplayTrajectory(
     const vcrTimingEvents: Array<{ sTime: number; drv: number; splitSec: number; sector: number; lapIdx: number }> = [];
     const replayPenalties: ReplayPenaltyEvent[] = [];
     const replayPitEvents: ReplayPitEvent[] = [];
+    const driverWheelTelemetry = new Map<number, {
+      tireTemps?: [number, number, number, number];
+      tireWear?: [number, number, number, number];
+      brakeTemps?: [number, number, number, number];
+    }>();
 
     // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
     const CHUNK_SIZE = 16 * 1024 * 1024;
@@ -810,6 +818,7 @@ export function extractReplayTrajectory(
               const isOffTrack = Boolean(statusByte & 0x01);
               const pitLimiter = Boolean(statusByte & 0x04);
               const inPit = Boolean(statusByte & 0x80);
+              const latestWheel = driverWheelTelemetry.get(drv);
 
               const pt: RawPoint = {
                 sTime,
@@ -829,6 +838,9 @@ export function extractReplayTrajectory(
                 isOffTrack,
                 physicsRpm,
                 detachablePartState,
+                tireTemps: latestWheel?.tireTemps ? [...latestWheel.tireTemps] : undefined,
+                tireWear: latestWheel?.tireWear ? [...latestWheel.tireWear] : undefined,
+                brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
               };
 
               if (targetSlot !== undefined) {
@@ -934,6 +946,36 @@ export function extractReplayTrajectory(
                 });
               }
             }
+          } else if (evType === 15 && (sz === 24 || sz === 37) && eventSp + 5 + sz <= activeLen) {
+            // Live 4-Wheel Telemetry (Class 0/1 Type 15): Tire temperatures, dynamic wear counters, brake rotor temps
+            // Corner ordering: [FL, FR, RL, RR]
+            const flTemp = buf.readUInt16LE(eventSp + 5 + 2);
+            const frTemp = buf.readUInt16LE(eventSp + 5 + 6);
+            const rlTemp = buf.readUInt16LE(eventSp + 5 + 10);
+            const rrTemp = buf.readUInt16LE(eventSp + 5 + 14);
+
+            let brakeTemps: [number, number, number, number] | undefined = undefined;
+            if (sz === 37) {
+              const flBrake = buf.readUInt16LE(eventSp + 5 + 24);
+              const frBrake = buf.readUInt16LE(eventSp + 5 + 26);
+              const rlBrake = buf.readUInt16LE(eventSp + 5 + 28);
+              const rrBrake = buf.readUInt16LE(eventSp + 5 + 30);
+              if (flBrake > 0 || frBrake > 0 || rlBrake > 0 || rrBrake > 0) {
+                brakeTemps = [flBrake, frBrake, rlBrake, rrBrake];
+              }
+            }
+
+            // Dynamic tire wear counters in bytes 19..22 (0-255 wear indicator scale)
+            const flWear = buf[eventSp + 5 + 19];
+            const frWear = buf[eventSp + 5 + 20];
+            const rlWear = buf[eventSp + 5 + 21];
+            const rrWear = buf[eventSp + 5 + 22];
+
+            driverWheelTelemetry.set(drv, {
+              tireTemps: [flTemp, frTemp, rlTemp, rrTemp],
+              tireWear: [flWear, frWear, rlWear, rrWear],
+              brakeTemps,
+            });
           }
           eventSp += 4 + 1 + sz;
         }
@@ -1470,6 +1512,9 @@ export function extractReplayTrajectory(
         absActive: cur.absActive,
         pitLimiter: cur.pitLimiter,
         detachablePartState: cur.detachablePartState,
+        tireTemps: cur.tireTemps,
+        tireWear: cur.tireWear,
+        brakeTemps: cur.brakeTemps,
       });
     }
 
@@ -1529,6 +1574,7 @@ export function extractReplayTrajectory(
       points: finalPoints,
       penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
       pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
+      wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.tireTemps !== undefined)),
     };
   } finally {
     fs.closeSync(fd);

@@ -449,6 +449,9 @@ export interface ReplayTrajectoryPoint {
   pitLimiter?: boolean;
   isOffTrack?: boolean;
   detachablePartState?: number;
+  tireTemps?: [number, number, number, number];
+  tireWear?: [number, number, number, number];
+  brakeTemps?: [number, number, number, number];
 }
 
 export interface ReplayPenaltyEvent {
@@ -538,6 +541,7 @@ export interface ReplayTrajectoryData {
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];
   validation?: ReplayTrajectoryValidation | null;
+  wheelTelemetryAvailable?: boolean;
 }
 
 export interface ReplaySummary {
