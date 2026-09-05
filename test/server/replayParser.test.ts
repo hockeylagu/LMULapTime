@@ -12,108 +12,31 @@ import {
 import { LmuParser } from '../../server/parser';
 
 function createMockVcrBuffer(): Buffer {
-  const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
-  const headerBuf = Buffer.from(headerText, 'ascii'); // 45 bytes
-  const irsrBuf = Buffer.from('IRSR', 'ascii'); // 4 bytes
-  const verBuf = Buffer.alloc(4);
-  verBuf.writeUInt32LE(0x80000008, 0); // 4 bytes
-
-  // Frames block: 3 frames for car slot 1
-  const frames: Buffer[] = [];
-  const coords = [
-    { x: 100.0, y: 10.0, z: 200.0, rotY: 1.57 },
-    { x: 120.0, y: 10.2, z: 215.0, rotY: 1.60 },
-    { x: 145.0, y: 10.5, z: 230.0, rotY: 1.65 },
-  ];
-
-  for (const c of coords) {
-    const frame = Buffer.alloc(70);
-    frame[0] = 1; // slot 1
-    frame[1] = 0x41;
-    frame[2] = 0x10;
-    frame[3] = 0x04;
-    // live inputs (info1) at offset 4 (steer, throttle, inPit)
-    frame.writeUInt32LE(0 | (30 << 11) | (150 << 18), 4);
-    // x, y, z at 46, 50, 54
-    frame.writeFloatLE(c.x, 46);
-    frame.writeFloatLE(c.y, 50);
-    frame.writeFloatLE(c.z, 54);
-    // rotY at 62
-    frame.writeFloatLE(c.rotY, 62);
-    frames.push(frame);
-  }
-
-  const framesBuf = Buffer.concat(frames);
-
-  // Metadata block
-  const eventJson = JSON.stringify({
-    eventTitle: 'LMGT3 Fixed',
-    eventType: 'daily',
-    splitNo: 2,
-    session: 'PRACTICE',
+  return createSliceVcrBuffer({
+    scn: 'MOCK.SCN',
+    aiw: 'MOCK.AIW',
+    trackName: 'Mock_Track_2026',
+    trackPath: 'C:\\Tracks\\Mock_Track',
+    timeSliceCount: 3,
+    totalEvents: 15,
+    startTime: 10.0,
+    endTime: 100.5,
+    eventInfo: {
+      eventTitle: 'LMGT3 Fixed',
+      eventType: 'daily',
+      splitNo: 2,
+      session: 'PRACTICE',
+    },
+    drivers: [
+      { name: 'Samuel Lague', vehicleId: '21_26_AFCO95641716', team: 'Vista AF Corsa', carNumber: '21' },
+      { name: 'Test Rival', vehicleId: '32_26_WRT_83524148', team: 'Team WRT', carNumber: '32' },
+    ],
+    slices: [
+      { sTime: 10.00, driverSlot: 1, x: 100.0, y: 10.0, z: 200.0, throttle: 30, brake: 0 },
+      { sTime: 10.02, driverSlot: 1, x: 120.0, y: 10.2, z: 215.0, throttle: 30, brake: 0 },
+      { sTime: 10.04, driverSlot: 1, x: 145.0, y: 10.5, z: 230.0, throttle: 30, brake: 0 },
+    ],
   });
-
-  function makeStr4(str: string): Buffer {
-    const sBuf = Buffer.from(str, 'utf8');
-    const lBuf = Buffer.alloc(4);
-    lBuf.writeUInt32LE(sBuf.length, 0);
-    return Buffer.concat([lBuf, sBuf]);
-  }
-
-  const metaParts: Buffer[] = [
-    makeStr4(eventJson),
-    makeStr4('MOCK.SCN'),
-    makeStr4('MOCK.AIW'),
-    makeStr4('Mock_Track_2026'),
-    makeStr4('1.00'),
-    makeStr4('hash_abc123'),
-    makeStr4('C:\\Tracks\\Mock_Track'),
-  ];
-
-  // Drivers string region:
-  const driverStrings = [
-    'Samuel Lague',
-    '21_26_AFCO95641716',
-    'Vista AF Corsa',
-    '21',
-    'Test Rival',
-    '32_26_WRT_83524148',
-    'Team WRT',
-    '32',
-  ];
-
-  const driverParts: Buffer[] = [];
-  for (const s of driverStrings) {
-    driverParts.push(Buffer.from(s, 'utf8'));
-    driverParts.push(Buffer.from([0])); // null delimiter
-  }
-
-  const driverBuf = Buffer.concat(driverParts);
-  metaParts.push(driverBuf);
-
-  // Trailer (28 bytes)
-  const trailer = Buffer.alloc(28);
-  trailer.writeUInt32LE(3, 4); // timeSliceCount = 3
-  trailer.writeUInt32LE(15, 8); // totalEvents = 15
-  trailer.writeFloatLE(10.0, 12); // startTime
-  trailer.writeFloatLE(100.5, 16); // endTime
-
-  metaParts.push(trailer);
-  const metadataBuf = Buffer.concat(metaParts);
-
-  // Offset to metadata: header (45) + irsr (4) + ver (4) + offset (4) = 57 + framesBuf.length
-  const metaOffset = 57 + framesBuf.length;
-  const offsetBuf = Buffer.alloc(4);
-  offsetBuf.writeUInt32LE(metaOffset, 0);
-
-  return Buffer.concat([
-    headerBuf,
-    irsrBuf,
-    verBuf,
-    offsetBuf,
-    framesBuf,
-    metadataBuf,
-  ]);
 }
 
 /**
@@ -145,6 +68,15 @@ function createSliceVcrBuffer(options?: {
   eventInfo?: any;
   corruptMetaOffset?: boolean;
   rawEventInfoString?: string;
+  trackName?: string;
+  scn?: string;
+  aiw?: string;
+  trackVersion?: string;
+  trackPath?: string;
+  timeSliceCount?: number;
+  totalEvents?: number;
+  startTime?: number;
+  endTime?: number;
 }): Buffer {
   const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
   const headerBuf = Buffer.from(headerText, 'ascii'); // 45 bytes
@@ -245,39 +177,61 @@ function createSliceVcrBuffer(options?: {
     return Buffer.concat([lBuf, sBuf]);
   }
 
+  function makePascal(str: string): Buffer {
+    const b = Buffer.from(str, 'utf8');
+    return Buffer.concat([Buffer.from([b.length]), b]);
+  }
+
   const rawEvStr = options?.rawEventInfoString !== undefined
     ? options.rawEventInfoString
     : JSON.stringify(options?.eventInfo || { eventTitle: 'Test Event', eventType: 'practice', splitNo: 1, session: 'PRACTICE' });
 
   const metaParts: Buffer[] = [
     makeStr4(rawEvStr),
-    makeStr4('TEST.SCN'),
-    makeStr4('TEST.AIW'),
-    makeStr4('Test_Track'),
-    makeStr4('1.00'),
+    makeStr4(options?.scn || 'TEST.SCN'),
+    makeStr4(options?.aiw || 'TEST.AIW'),
+    makeStr4(options?.trackName || 'Test_Track'),
+    makeStr4(options?.trackVersion || '1.00'),
     makeStr4('hash_123'),
-    makeStr4('C:\\Tracks\\Test'),
+    makeStr4(options?.trackPath || 'C:\\Tracks\\Test'),
   ];
 
-  const defaultDrivers = options?.drivers || [
+  const defaultDrivers = options?.drivers !== undefined ? options.drivers : [
     { name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' },
     { name: 'Rival Driver', vehicleId: '32_26_WRT_83524148', team: 'WRT Team Racing', carNumber: '32' },
   ];
 
-  const driverParts: Buffer[] = [];
-  for (const d of defaultDrivers) {
-    for (const field of [d.name, d.vehicleId, d.team, d.carNumber]) {
-      driverParts.push(Buffer.from(field, 'utf8'));
-      driverParts.push(Buffer.from([0]));
+  const envBlock = Buffer.alloc(69);
+  const countBuf = Buffer.alloc(4);
+  countBuf.writeInt32LE(defaultDrivers.length, 0);
+
+  const driverRecords: Buffer[] = [];
+  for (let i = 0; i < defaultDrivers.length; i++) {
+    const d = defaultDrivers[i];
+    const slot = i + 1;
+    if (i === 0) {
+      driverRecords.push(Buffer.from([slot]));
+    } else {
+      const idxSlot = Buffer.alloc(4);
+      idxSlot.writeUInt16BE(i, 0);
+      idxSlot.writeUInt16BE(slot, 2);
+      driverRecords.push(idxSlot);
     }
+    driverRecords.push(makePascal(d.name));
+    driverRecords.push(makePascal(d.vehicleId));
+    driverRecords.push(makePascal(''));
+    driverRecords.push(makePascal(d.team || ''));
+    driverRecords.push(makePascal(d.carNumber || ''));
+    driverRecords.push(Buffer.alloc(24));
   }
-  metaParts.push(Buffer.concat(driverParts));
+
+  metaParts.push(envBlock, countBuf, ...driverRecords);
 
   const trailer = Buffer.alloc(28);
-  trailer.writeUInt32LE(slices.length, 4);
-  trailer.writeUInt32LE(slices.length, 8);
-  trailer.writeFloatLE(slices[0]?.sTime ?? 0.0, 12);
-  trailer.writeFloatLE(slices[slices.length - 1]?.sTime ?? 100.0, 16);
+  trailer.writeUInt32LE(options?.timeSliceCount ?? slices.length, 4);
+  trailer.writeUInt32LE(options?.totalEvents ?? slices.length, 8);
+  trailer.writeFloatLE(options?.startTime ?? (slices[0]?.sTime ?? 0.0), 12);
+  trailer.writeFloatLE(options?.endTime ?? (slices[slices.length - 1]?.sTime ?? 100.0), 16);
   metaParts.push(trailer);
 
   const metadataBuf = Buffer.concat(metaParts);
