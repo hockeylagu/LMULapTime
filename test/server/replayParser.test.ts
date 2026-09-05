@@ -697,6 +697,60 @@ describe('replayParser', () => {
         });
       }
 
+      const daytonaR1File = path.join(steamReplaysDir, 'Daytona International Speedway Road Course R1 6.Vcr');
+      if (fs.existsSync(daytonaQ1File) && fs.existsSync(daytonaR1File)) {
+        it('synchronizes lap start position between Race (rolling start) and Qualifying replays within < 2 meters', () => {
+          const q1Traj = extractReplayTrajectory(daytonaQ1File, { maxPoints: 0, lapNumber: 2 });
+          const r1Traj = extractReplayTrajectory(daytonaR1File, { maxPoints: 0, lapNumber: 2 });
+
+          expect(q1Traj.points.length).toBeGreaterThan(0);
+          expect(r1Traj.points.length).toBeGreaterThan(0);
+
+          const q1Start = q1Traj.points[0];
+          const r1Start = r1Traj.points[0];
+          const distanceMeters = Math.hypot(q1Start.x - r1Start.x, q1Start.z - r1Start.z);
+
+          // Before synchronization, laps were offset by 787+ meters due to rolling start formation lap!
+          // Now, both Q1 and R1 flying laps begin at the exact physical Start/Finish line (< 2 meters deviation).
+          expect(distanceMeters).toBeLessThan(2);
+        });
+      }
+
+      const bahrainPaddockFile = path.join(steamReplaysDir, 'Bahrain Paddock Circuit R1 2.Vcr');
+      const bahrainGpFile = path.join(steamReplaysDir, 'Bahrain International Circuit P1 14.Vcr');
+      if (fs.existsSync(bahrainPaddockFile) && fs.existsSync(bahrainGpFile)) {
+        it('uses correct layout-specific Start/Finish coordinates for Bahrain Paddock vs Grand Prix', () => {
+          const paddockTraj = extractReplayTrajectory(bahrainPaddockFile, { maxPoints: 0, lapNumber: 2 });
+          const gpTraj = extractReplayTrajectory(bahrainGpFile, { maxPoints: 0, lapNumber: 2 });
+
+          expect(paddockTraj.points.length).toBeGreaterThan(0);
+          expect(gpTraj.points.length).toBeGreaterThan(0);
+
+          // Paddock layout starts on the paddock straight (~ -197, 250)
+          expect(paddockTraj.points[0].x).toBeCloseTo(-197.75, 0);
+          expect(paddockTraj.points[0].z).toBeCloseTo(250.12, 0);
+
+          // GP layout starts on the main pit straight (~ 410, 368)
+          expect(gpTraj.points[0].x).toBeCloseTo(410.69, 0);
+          expect(gpTraj.points[0].z).toBeCloseTo(367.95, 0);
+        });
+      }
+
+      const spaR1File = path.join(steamReplaysDir, 'Circuit de Spa-Francorchamps R1 35.Vcr');
+      if (fs.existsSync(spaR1File)) {
+        it('detects all 14+ racing laps in Spa race replay instead of collapsing into single 33-minute lap', () => {
+          const traj = extractReplayTrajectory(spaR1File, { maxPoints: 500 });
+          expect(traj.driverSlot).toBe(32);
+          expect(traj.driverName).toContain('Samuel Lague');
+          expect(traj.laps.length).toBeGreaterThanOrEqual(14);
+          expect(traj.laps[0].isOutlap).toBe(true);
+          // Racing laps are ~2:10 - 2:22 (130s - 142s)
+          expect(traj.laps[1].lapTimeSec).toBeCloseTo(142.3, 0);
+          expect(traj.laps[2].lapTimeSec).toBeCloseTo(134.0, 0);
+          expect(traj.laps[3].lapTimeSec).toBeCloseTo(138.4, 0);
+        });
+      }
+
       it('autonomously detects multi-lap circuit when vehicle starts in pit lane with pit limiter', () => {
         // Synthetic test: car starts in pit lane for 100m, then does two 50-second circular laps
         const slices: any[] = [];
