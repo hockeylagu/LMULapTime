@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
+import { computeCumulativeDistances } from '../../utils/replayComparison.js';
 import {
   getHeatmapColor,
   MapColorMode,
   projectTrajectoryPoints,
   buildContinuousSvgPath,
-  computeGhostProjection,
+  computeBaselinePath,
+  computeGhostPosition,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -69,9 +71,17 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
     return ((bounds?.spanX ?? 0) < 25 && (bounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1));
   }, [bounds, points]);
 
-  const { baselinePathD, baselineGhostPos } = useMemo(
-    () => computeGhostProjection(points, baselinePoints || [], bounds, currentIndex, VIEWBOX_SIZE, PADDING),
-    [points, baselinePoints, bounds, currentIndex]
+  const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
+  const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
+
+  const baselinePathD = useMemo(
+    () => computeBaselinePath(baselinePoints || [], bounds, VIEWBOX_SIZE, PADDING),
+    [baselinePoints, bounds]
+  );
+
+  const baselineGhostPos = useMemo(
+    () => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, bounds, VIEWBOX_SIZE, PADDING),
+    [primaryDists, baselineDists, baselinePoints, currentIndex, bounds]
   );
 
   const carHeadingDeg = useMemo(() => {

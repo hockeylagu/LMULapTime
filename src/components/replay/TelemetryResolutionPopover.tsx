@@ -47,7 +47,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   return (
     <div
       ref={popoverRef}
-      className="absolute top-9 left-0 z-50 w-80 sm:w-96 p-4 rounded-xl bg-[#090d16] border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-fadeIn backdrop-blur-md"
+      className="absolute top-9 left-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-[#0c101d] border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-fadeIn backdrop-blur-md"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between border-b border-lmu-border/60 pb-2">

@@ -8,7 +8,7 @@ export interface ReplayDriverHeaderPillProps {
   onOpenRoster: () => void;
 }
 
-export const ReplayDriverHeaderPill: React.FC<ReplayDriverHeaderPillProps> = ({
+export const ReplayDriverHeaderPill: React.FC<ReplayDriverHeaderPillProps> = React.memo(({
   selectedDriver,
   fallbackDriverName,
   onOpenRoster,
@@ -46,4 +46,4 @@ export const ReplayDriverHeaderPill: React.FC<ReplayDriverHeaderPillProps> = ({
       </button>
     </div>
   );
-};
+});

@@ -19,7 +19,7 @@ export interface ReplayPerformanceHeaderProps {
   formatLapTime: (sec?: number | null) => string;
 }
 
-export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = ({
+export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = React.memo(({
   currentLap,
   currentLapSummary,
   isCompareMode,
@@ -58,9 +58,9 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = (
         {currentLapSummary.validatedTimeSec ? (
           <span
             className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-400/10 border border-cyan-400/30 text-cyan-300"
-            title={`Session Log Official Time: ${formatLapTime(currentLapSummary.validatedTimeSec)}${typeof currentLapSummary.timeDiffSec === 'number' ? `\nDelta: ${currentLapSummary.timeDiffSec > 0 ? '+' : ''}${currentLapSummary.timeDiffSec.toFixed(3)}s` : ''}`}
+            title="Official Logged Session Lap Time"
           >
-            Log: {formatLapTime(currentLapSummary.validatedTimeSec)}
+            Official: {formatLapTime(currentLapSummary.validatedTimeSec)}
           </span>
         ) : null}
 
@@ -81,37 +81,44 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = (
         )}
       </div>
 
-      {/* 3 Sectors Summary Pills */}
-      <div className="flex items-center gap-1.5 text-[10px] font-mono pr-1">
-        <div className="px-2 py-0.5 rounded-lg bg-lmu-gold/10 border border-lmu-gold/30 text-lmu-gold flex items-center gap-1">
-          <span className="font-bold text-lmu-gold/80">S1:</span>
-          <span className="font-black">{currentLapSummary.s1Sec ? currentLapSummary.s1Sec.toFixed(3) + 's' : '--'}</span>
-          {lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
-            <span className={`text-[9px] font-bold pl-1 border-l border-lmu-gold/30 ${
-              lapDeltas.s1Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}>
+      <div className="flex items-center gap-2 text-xs font-mono">
+        <div className="flex items-center gap-1.5">
+          <span className="text-lmu-muted text-[10px]">S1</span>
+          <span className="text-white font-bold">{currentLapSummary.s1Sec?.toFixed(2) ?? '--'}s</span>
+          {isCompareMode && lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
+            <span
+              className={`text-[10px] font-bold ${
+                lapDeltas.s1Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
               {lapDeltas.s1Delta <= 0 ? '' : '+'}{lapDeltas.s1Delta.toFixed(2)}s
             </span>
           )}
         </div>
-        <div className="px-2 py-0.5 rounded-lg bg-lmu-blue/10 border border-lmu-blue/30 text-lmu-blue flex items-center gap-1">
-          <span className="font-bold text-lmu-blue/80">S2:</span>
-          <span className="font-black">{currentLapSummary.s2Sec ? currentLapSummary.s2Sec.toFixed(3) + 's' : '--'}</span>
-          {lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
-            <span className={`text-[9px] font-bold pl-1 border-l border-lmu-blue/30 ${
-              lapDeltas.s2Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}>
+        <span className="text-white/20">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-lmu-muted text-[10px]">S2</span>
+          <span className="text-white font-bold">{currentLapSummary.s2Sec?.toFixed(2) ?? '--'}s</span>
+          {isCompareMode && lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
+            <span
+              className={`text-[10px] font-bold ${
+                lapDeltas.s2Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
               {lapDeltas.s2Delta <= 0 ? '' : '+'}{lapDeltas.s2Delta.toFixed(2)}s
             </span>
           )}
         </div>
-        <div className="px-2 py-0.5 rounded-lg bg-lmu-green/10 border border-lmu-green/30 text-lmu-green flex items-center gap-1">
-          <span className="font-bold text-lmu-green/80">S3:</span>
-          <span className="font-black">{currentLapSummary.s3Sec ? currentLapSummary.s3Sec.toFixed(3) + 's' : '--'}</span>
-          {lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
-            <span className={`text-[9px] font-bold pl-1 border-l border-lmu-green/30 ${
-              lapDeltas.s3Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}>
+        <span className="text-white/20">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-lmu-muted text-[10px]">S3</span>
+          <span className="text-white font-bold">{currentLapSummary.s3Sec?.toFixed(2) ?? '--'}s</span>
+          {isCompareMode && lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
+            <span
+              className={`text-[10px] font-bold ${
+                lapDeltas.s3Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
               {lapDeltas.s3Delta <= 0 ? '' : '+'}{lapDeltas.s3Delta.toFixed(2)}s
             </span>
           )}
@@ -122,4 +129,4 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = (
       </div>
     </div>
   );
-};
+});
