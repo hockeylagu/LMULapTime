@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, Trophy, Sparkles, Award, RotateCcw } from 'lucide-react';
+import { ArrowLeftRight, Trophy, Sparkles, Award, RotateCcw, Activity } from 'lucide-react';
 import { formatTime } from '../../utils/formatters';
 import { ComparableLap } from '../../utils/lapComparison';
 
@@ -15,6 +15,7 @@ export interface CompareLapsHeaderProps {
   onAddTheoreticalBest: () => void;
   onAddOverallTrackBest: () => void;
   onClearAll: () => void;
+  onCompareTelemetry?: () => void;
 }
 
 export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
@@ -29,6 +30,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   onAddTheoreticalBest,
   onAddOverallTrackBest,
   onClearAll,
+  onCompareTelemetry,
 }) => {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -83,6 +85,18 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           >
             <Award className="w-3.5 h-3.5 text-amber-400" />
             + All-Time Best ({overallTrackBestObject.lapTimeString})
+          </button>
+        )}
+
+        {selectedLapsCount === 2 && onCompareTelemetry && (
+          <button
+            type="button"
+            onClick={onCompareTelemetry}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-lmu-accent to-indigo-600 hover:from-lmu-accent/90 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-lmu-accent/25 border border-white/20 cursor-pointer animate-fadeIn"
+            title="Inspect & Compare Telemetry traces (Speed, Throttle, Brake, Delta Time, GPS) for these 2 laps"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Compare Telemetry
           </button>
         )}
 

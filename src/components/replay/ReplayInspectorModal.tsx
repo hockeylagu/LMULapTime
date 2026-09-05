@@ -16,6 +16,9 @@ export interface ReplayInspectorModalProps {
   replayName: string | null;
   initialLapNumber?: number;
   onLapChange?: (lapNumber: number) => void;
+  initialCompareMode?: boolean;
+  initialBaselineReplayName?: string | null;
+  initialBaselineLapNumber?: number | null;
 }
 
 export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
@@ -24,6 +27,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   replayName,
   initialLapNumber,
   onLapChange,
+  initialCompareMode,
+  initialBaselineReplayName,
+  initialBaselineLapNumber,
 }) => {
   const {
     metadata,
@@ -63,6 +69,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     replayName,
     initialLapNumber,
     onLapChange,
+    initialCompareMode,
+    initialBaselineReplayName,
+    initialBaselineLapNumber,
   });
 
   const [activeTab, setActiveTab] = useState<'map' | 'roster'>('map');
@@ -79,7 +88,11 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#07090e] text-white w-screen h-screen overflow-hidden select-none overscroll-none animate-fadeIn">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex flex-col bg-[#07090e] text-white w-screen h-screen overflow-hidden select-none overscroll-none animate-fadeIn"
+    >
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={replayName}

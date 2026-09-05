@@ -1438,6 +1438,7 @@ export function extractComparableLaps(
               pacePercentage: l.pacePercentage || null,
               isOverallTrackBest: true,
               tag: `🏆 All-Time Best (${d.name})`,
+              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
             };
           }
 
@@ -1485,6 +1486,7 @@ export function extractComparableLaps(
               isAllTimePB: true,
               isPlayer: true,
               tag: '⭐ Personal Best',
+              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
             };
           }
         }
@@ -1569,6 +1571,7 @@ export function extractComparableLaps(
           pacePercentage: l.pacePercentage || null,
           isSessionBest,
           isPlayer,
+          matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
         };
 
         if (l.isValid && l.lapTime && l.lapTime > 0) {

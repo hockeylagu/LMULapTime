@@ -11,7 +11,7 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { Clock } from 'lucide-react';
+import { Clock, Activity } from 'lucide-react';
 import { ComparableLap } from '../../utils/lapComparison';
 import { formatTime } from '../../utils/formatters';
 
@@ -33,6 +33,7 @@ export interface CompareSectorChartProps {
   comparedLaps: ComparableLap[];
   baselineLap: ComparableLap | null;
   chartData: CompareSectorChartDataItem[];
+  onCompareTelemetry?: () => void;
 }
 
 export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
@@ -40,6 +41,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
   comparedLaps,
   baselineLap,
   chartData,
+  onCompareTelemetry,
 }) => {
   if (selectedLaps.length <= 1 || !baselineLap) return null;
 
@@ -134,7 +136,18 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
           </p>
         </div>
 
-        <div className="text-[11px] font-mono flex items-center gap-3">
+        <div className="text-[11px] font-mono flex flex-wrap items-center gap-3">
+          {selectedLaps.length === 2 && onCompareTelemetry && (
+            <button
+              type="button"
+              onClick={onCompareTelemetry}
+              className="px-3 py-1 rounded-lg bg-gradient-to-r from-lmu-accent to-indigo-600 hover:from-lmu-accent/90 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm border border-white/20 cursor-pointer mr-1"
+              title="Compare full telemetry traces for these 2 laps"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              Compare Telemetry
+            </button>
+          )}
           <span className="text-emerald-400 font-semibold flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
             Negative = Faster

@@ -412,5 +412,50 @@ describe('CompareLaps component', () => {
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
   });
+
+  it('renders Compare Telemetry button when 2 laps are selected and launches comparison modal', async () => {
+    const sessionsWithReplay = [
+      {
+        ...mockSessions[0],
+        matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr' },
+      },
+    ];
+
+    render(
+      <CompareLaps
+        sessions={sessionsWithReplay as any}
+        initialTrack="Spa GP"
+        initialCarClass="LMGT3"
+        initialSessionId="sess1"
+        initialLapNum={1}
+      />
+    );
+
+    // Two laps (Lap 1 & Personal Best Lap 2) are selected initially (2/4)
+    await waitFor(() => {
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+    });
+
+    // "Compare Telemetry" button is visible
+    const compareTelemetryButtons = screen.getAllByRole('button', { name: /Compare Telemetry/i });
+    expect(compareTelemetryButtons.length).toBeGreaterThan(0);
+
+    // Click "Compare Telemetry"
+    fireEvent.click(compareTelemetryButtons[0]);
+
+    // Modal dialog opens with return button
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByTitle('Return to Lap Times')).toBeInTheDocument();
+    });
+
+    // Close the modal
+    fireEvent.click(screen.getByTitle('Return to Lap Times'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
 });
+
 
