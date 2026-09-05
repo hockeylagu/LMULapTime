@@ -116,4 +116,22 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('entriesCount', 50);
   });
+
+  it('GET /api/replays returns replay summaries list', async () => {
+    const res = await request(app).get('/api/replays');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/replays/:name/metadata returns 404 for nonexistent file', async () => {
+    const res = await request(app).get('/api/replays/nonexistent.vcr/metadata');
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty('error');
+  });
+
+  it('GET /api/replays/:name/trajectory returns 404 for nonexistent file', async () => {
+    const res = await request(app).get('/api/replays/nonexistent.vcr/trajectory');
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty('error');
+  });
 });

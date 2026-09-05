@@ -5,6 +5,7 @@ import { getDisplayTrackName } from '../../utils/formatters.js';
 import { SessionRulesCard } from './SessionRulesCard.js';
 import { SessionReferenceAndSafety } from './SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from './sessionDetailHelpers.js';
+import { ReplayInspectorModal } from '../replay/ReplayInspectorModal';
 
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
@@ -33,6 +34,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   handleExportCsv,
   refEntry,
 }) => {
+  const [showReplayModal, setShowReplayModal] = React.useState(false);
+
   return (
     <>
       {/* Top Action Bar */}
@@ -47,18 +50,38 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
         <div className="flex items-center gap-3">
           {session.matchingReplayFile && (
-            <button
-              onClick={handleCopyReplayPath}
-              title={`Matching Replay: ${session.matchingReplayFile.name}\nPath: ${session.matchingReplayFile.path}\nClick to copy path`}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
-                copiedReplay
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : 'bg-lmu-card text-emerald-400 border-lmu-border hover:border-emerald-500/40 hover:bg-emerald-500/10'
-              }`}
-            >
-              <Video className="w-4 h-4 text-emerald-400" />
-              {copiedReplay ? 'Path Copied!' : 'Copy Replay (.VCR)'}
-            </button>
+            <>
+              <button
+                onClick={() => setShowReplayModal(true)}
+                title={`Matching Replay: ${session.matchingReplayFile.name}\nClick to inspect trajectory and telemetry`}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition-all shadow-sm"
+              >
+                <Video className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {session.matchingReplayFile.eventTitle
+                    ? `${session.matchingReplayFile.eventTitle}${session.matchingReplayFile.splitNo ? ` (Split ${session.matchingReplayFile.splitNo})` : ''}`
+                    : 'Inspect Replay (.VCR)'}
+                </span>
+              </button>
+
+              <button
+                onClick={handleCopyReplayPath}
+                title={`Matching Replay: ${session.matchingReplayFile.name}\nPath: ${session.matchingReplayFile.path}\nClick to copy path`}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
+                  copiedReplay
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-lmu-card text-lmu-muted border-lmu-border hover:text-white hover:border-lmu-accent'
+                }`}
+              >
+                {copiedReplay ? 'Path Copied!' : 'Copy Replay'}
+              </button>
+
+              <ReplayInspectorModal
+                isOpen={showReplayModal}
+                onClose={() => setShowReplayModal(false)}
+                replayName={session.matchingReplayFile.name}
+              />
+            </>
           )}
 
           {relatedSession && (

@@ -3,7 +3,8 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
-import { DetailedSession } from './types.js';
+import { DetailedSession, ReplaySummary } from './types.js';
+import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty } from '../src/utils/formatters.js';
@@ -331,6 +332,107 @@ app.get('/api/compare/laps', (req, res) => {
     ...comparisonData,
     benchmarks,
   });
+});
+
+// Replays API routes
+app.get('/api/replays', (_req, res) => {
+  try {
+    if (!fs.existsSync(currentReplaysDir)) {
+      return res.json([]);
+    }
+
+    const files = fs.readdirSync(currentReplaysDir);
+    const sessions = loadSessions();
+    const vcrFiles = files.filter(f => f.toLowerCase().endsWith('.vcr'));
+
+    const summaries: ReplaySummary[] = [];
+
+    for (const f of vcrFiles) {
+      const filePath = path.join(currentReplaysDir, f);
+      try {
+        const stat = fs.statSync(filePath);
+        let meta: any = null;
+        try {
+          meta = parseReplayMetadata(filePath);
+        } catch {
+          // Ignore invalid or active recording files
+        }
+
+        const matched = sessions.find(s => s.matchingReplayFile?.name === f);
+
+        summaries.push({
+          name: f,
+          path: filePath,
+          sizeBytes: stat.size,
+          mtime: stat.mtime.getTime(),
+          trackName: meta?.trackName,
+          durationSec: meta?.durationSec,
+          eventTitle: meta?.eventInfo?.eventTitle,
+          splitNo: meta?.eventInfo?.splitNo,
+          eventType: meta?.eventInfo?.eventType,
+          driversCount: meta?.drivers?.length,
+          matchedSessionId: matched?.id,
+        });
+      } catch {
+        // Skip unreadable files
+      }
+    }
+
+    summaries.sort((a, b) => b.mtime - a.mtime);
+    res.json(summaries);
+  } catch (err: unknown) {
+    console.error('Failed to list replays:', err);
+    const message = err instanceof Error ? err.message : 'Failed to list replays';
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get('/api/replays/:name/metadata', (req, res) => {
+  try {
+    const replayName = req.params.name;
+    const filePath = path.join(currentReplaysDir, replayName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+    }
+
+    const metadata = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
+    res.json(metadata);
+  } catch (err: unknown) {
+    console.error(`Failed to parse replay metadata for ${req.params.name}:`, err);
+    const message = err instanceof Error ? err.message : 'Failed to parse replay metadata';
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get('/api/replays/:name/trajectory', (req, res) => {
+  try {
+    const replayName = req.params.name;
+    const filePath = path.join(currentReplaysDir, replayName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+    }
+
+    const driverSlot = req.query.driverSlot ? parseInt(req.query.driverSlot as string, 10) : undefined;
+    const driverName = (req.query.driverName as string | undefined) || (!req.query.driverSlot ? parser.configuredPlayerName : undefined);
+    const maxPoints = req.query.maxPoints ? parseInt(req.query.maxPoints as string, 10) : 1200;
+    const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
+
+    const trajectory = extractReplayTrajectory(filePath, {
+      driverSlot,
+      driverName,
+      maxPoints,
+      playerName: parser.configuredPlayerName,
+      lapNumber,
+    });
+
+    res.json(trajectory);
+  } catch (err: unknown) {
+    console.error(`Failed to extract replay trajectory for ${req.params.name}:`, err);
+    const message = err instanceof Error ? err.message : 'Failed to extract replay trajectory';
+    res.status(500).json({ error: message });
+  }
 });
 
 if (process.env.NODE_ENV !== 'test') {

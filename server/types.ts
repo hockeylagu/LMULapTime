@@ -236,6 +236,10 @@ export interface SessionMetadata {
     name: string;
     path: string;
     sizeBytes: number;
+    eventTitle?: string;
+    splitNo?: number;
+    eventType?: string;
+    durationSec?: number;
   };
 }
 
@@ -367,4 +371,113 @@ export interface ComparableLap {
   benchmarkCategory?: string;
   isPlayer?: boolean;
   tag?: string;
+}
+
+export interface ReplayEventInfo {
+  eventId?: string;
+  eventTitle?: string;
+  eventType?: string;
+  sceneDesc?: string;
+  seriesId?: string;
+  session?: string;
+  splitNo?: number;
+  [key: string]: unknown;
+}
+
+export interface ReplayDriverEntry {
+  slot?: number;
+  name: string;
+  vehicleId?: string;
+  carModel?: string;
+  team?: string;
+  carNumber?: string;
+  isPlayer?: boolean;
+}
+
+export interface ReplayMetadata {
+  filename: string;
+  filePath: string;
+  fileSizeBytes: number;
+  mtimeMs: number;
+  eventInfo?: ReplayEventInfo | null;
+  scn?: string;
+  aiw?: string;
+  trackName?: string;
+  trackVersion?: string;
+  timeSliceCount: number;
+  totalEvents: number;
+  durationSec: number;
+  startTimeSec?: number;
+  endTimeSec?: number;
+  drivers: ReplayDriverEntry[];
+}
+
+export interface ReplayTrajectoryPoint {
+  x: number;
+  y: number;
+  z: number;
+  rotY: number;
+  speedKmh?: number;
+  throttle?: number;
+  brake?: number;
+  steerYaw?: number;
+  rpm?: number;
+  inPit?: boolean;
+  inGarage?: boolean;
+  isTeleport?: boolean;
+  timeSec?: number;
+  tcActive?: boolean;
+  absActive?: boolean;
+  pitLimiter?: boolean;
+  isOffTrack?: boolean;
+}
+
+export interface ReplayLapSummary {
+  lapNumber: number;
+  lapTimeSec: number;
+  lapDistMeters?: number;
+  s1Sec: number;
+  s2Sec: number;
+  s3Sec: number;
+  isOutlap?: boolean;
+  isBest?: boolean;
+  startFrame?: number;
+  endFrame?: number;
+}
+
+export interface ReplayTrajectoryData {
+  replayName: string;
+  driverSlot?: number;
+  driverName?: string;
+  pointsCount: number;
+  currentLap?: number;
+  laps?: ReplayLapSummary[];
+  sectors?: {
+    s1Frame: number;
+    s2Frame: number;
+  };
+  bounds: {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+    spanX: number;
+    spanZ: number;
+  };
+  points: ReplayTrajectoryPoint[];
+}
+
+export interface ReplaySummary {
+  name: string;
+  path: string;
+  sizeBytes: number;
+  mtime: number;
+  trackName?: string;
+  sessionCode?: string;
+  durationSec?: number;
+  eventTitle?: string;
+  splitNo?: number;
+  eventType?: string;
+  driversCount?: number;
+  matchedSessionId?: string;
 }
