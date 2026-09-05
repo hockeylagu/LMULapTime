@@ -135,10 +135,10 @@ describe('replayComparison utility', () => {
 
   describe('filterCompatibleReplays', () => {
     const allReplays: ReplaySummary[] = [
-      { name: 'Spa_GT3_1.vcr', trackName: 'Spa-Francorchamps', eventTitle: 'LMGT3 Fixed', fileSizeBytes: 1000, mtimeMs: 1 },
-      { name: 'Spa_GT3_2.vcr', trackName: 'Circuit de Spa', eventTitle: 'LMGT3 Sprint', fileSizeBytes: 1000, mtimeMs: 2 },
-      { name: 'Spa_Hypercar.vcr', trackName: 'Spa-Francorchamps', eventTitle: 'Hypercar Series', fileSizeBytes: 1000, mtimeMs: 3 },
-      { name: 'Monza_GT3.vcr', trackName: 'Autodromo Nazionale Monza', eventTitle: 'LMGT3 Fixed', fileSizeBytes: 1000, mtimeMs: 4 },
+      { name: 'Spa_GT3_1.vcr', path: '/Spa_GT3_1.vcr', sizeBytes: 1000, mtime: 1, trackName: 'Spa-Francorchamps', eventTitle: 'LMGT3 Fixed', fileSizeBytes: 1000, mtimeMs: 1 },
+      { name: 'Spa_GT3_2.vcr', path: '/Spa_GT3_2.vcr', sizeBytes: 1000, mtime: 2, trackName: 'Circuit de Spa', eventTitle: 'LMGT3 Sprint', fileSizeBytes: 1000, mtimeMs: 2 },
+      { name: 'Spa_Hypercar.vcr', path: '/Spa_Hypercar.vcr', sizeBytes: 1000, mtime: 3, trackName: 'Spa-Francorchamps', eventTitle: 'Hypercar Series', fileSizeBytes: 1000, mtimeMs: 3 },
+      { name: 'Monza_GT3.vcr', path: '/Monza_GT3.vcr', sizeBytes: 1000, mtime: 4, trackName: 'Autodromo Nazionale Monza', eventTitle: 'LMGT3 Fixed', fileSizeBytes: 1000, mtimeMs: 4 },
     ];
 
     it('filters replays sharing the same track and car class while excluding current replay', () => {

@@ -22,6 +22,11 @@ export interface TelemetryStripChartsProps {
   baselineLapNumber?: number;
   zoomRange?: { start: number; end: number } | null;
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
+  telemetryResolution?: number;
+  onChangeResolution?: (res: number) => void;
+  rawPointsCount?: number;
+  rawSampleRateHz?: number;
+  isFullResolution?: boolean;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
@@ -35,6 +40,11 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   baselineLapNumber,
   zoomRange,
   onZoomRangeChange,
+  telemetryResolution,
+  onChangeResolution,
+  rawPointsCount,
+  rawSampleRateHz,
+  isFullResolution,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -204,6 +214,12 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         onResetZoom={handleResetZoom}
         hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
         baselineLabel={baselineLabel || (baselineLapNumber ? `Lap ${baselineLapNumber}` : 'Baseline')}
+        telemetryResolution={telemetryResolution}
+        onChangeResolution={onChangeResolution}
+        pointsCount={points.length}
+        rawPointsCount={rawPointsCount}
+        rawSampleRateHz={rawSampleRateHz}
+        isFullResolution={isFullResolution}
       />
 
       {/* 1. SPEED */}
@@ -219,39 +235,27 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       {/* 2. TIME DELTA (when comparing laps) */}
       {pointComparisons.length > 0 && (
         <TelemetryDeltaChannel
-          deltaTimePath={paths.deltaTimePath}
-          deltaTimeArea={paths.deltaTimeArea}
-          maxDeltaSec={paths.maxDeltaSec}
-          currentComparison={currentComparison}
-          isCursorInView={isCursorInView}
-          cursorPct={cursorPct}
+          deltaTimePath={paths.deltaTimePath} deltaTimeArea={paths.deltaTimeArea}
+          maxDeltaSec={paths.maxDeltaSec} currentComparison={currentComparison}
+          isCursorInView={isCursorInView} cursorPct={cursorPct}
         />
       )}
 
       {/* 3 & 4. THROTTLE & BRAKE */}
       <TelemetryPedalsChannel
-        throttlePath={paths.throttlePath}
-        throttleArea={paths.throttleArea}
-        baselineThrottlePath={paths.baselineThrottlePath}
-        brakePath={paths.brakePath}
-        brakeArea={paths.brakeArea}
-        baselineBrakePath={paths.baselineBrakePath}
-        currentPoint={currentPoint}
-        currentComparison={currentComparison}
-        isCursorInView={isCursorInView}
-        cursorPct={cursorPct}
+        throttlePath={paths.throttlePath} throttleArea={paths.throttleArea}
+        baselineThrottlePath={paths.baselineThrottlePath} brakePath={paths.brakePath}
+        brakeArea={paths.brakeArea} baselineBrakePath={paths.baselineBrakePath}
+        currentPoint={currentPoint} currentComparison={currentComparison}
+        isCursorInView={isCursorInView} cursorPct={cursorPct}
       />
 
       {/* 5 & 6. STEERING & GEAR */}
       <TelemetrySteerGearChannel
-        steerPath={paths.steerPath}
-        baselineSteerPath={paths.baselineSteerPath}
-        gearPath={paths.gearPath}
-        baselineGearPath={paths.baselineGearPath}
-        currentPoint={currentPoint}
-        currentComparison={currentComparison}
-        isCursorInView={isCursorInView}
-        cursorPct={cursorPct}
+        steerPath={paths.steerPath} baselineSteerPath={paths.baselineSteerPath}
+        gearPath={paths.gearPath} baselineGearPath={paths.baselineGearPath}
+        currentPoint={currentPoint} currentComparison={currentComparison}
+        isCursorInView={isCursorInView} cursorPct={cursorPct}
       />
 
       {/* SECTOR SPLIT VERTICAL DIVIDERS */}
@@ -268,19 +272,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
       {/* SYNCHRONIZED VERTICAL CURSOR LINE */}
       {isCursorInView && (
-        <div
-          style={{ left: `${cursorPct}%` }}
-          className="absolute top-3.5 bottom-0 w-[1.5px] bg-white pointer-events-none z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]"
-        />
+        <div style={{ left: `${cursorPct}%` }} className="absolute top-3.5 bottom-0 w-[1.5px] bg-white pointer-events-none z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
       )}
 
       {/* DRAG-TO-ZOOM SELECTION HIGHLIGHT */}
       {dragSelection && (
         <div
-          style={{
-            left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`,
-            width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%`,
-          }}
+          style={{ left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`, width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%` }}
           className="absolute top-3.5 bottom-0 bg-sky-500/25 border-x-2 border-sky-400 pointer-events-none z-40 backdrop-blur-[1px]"
         />
       )}

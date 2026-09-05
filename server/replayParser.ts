@@ -402,7 +402,6 @@ export function extractReplayTrajectory(
     }
 
     const driverPoints = new Map<number, RawPoint[]>();
-    const driverMotion = new Map<number, { minX: number; maxX: number; minZ: number; maxZ: number; count: number }>();
     const rawPts: RawPoint[] = [];
 
     // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
@@ -547,7 +546,7 @@ export function extractReplayTrajectory(
       rawPts.push(...driverPoints.get(targetSlot)!);
     }
 
-    const maxPoints = options.maxPoints || 1200;
+    const maxPoints = options.maxPoints !== undefined ? options.maxPoints : 1200;
 
     // Filter out transmission-actuated upshift ignition cuts and downshift rev-match blips
     // to preserve true driver pedal intent in telemetry traces.
@@ -755,10 +754,15 @@ export function extractReplayTrajectory(
 
     // Slice raw points strictly for the chosen lap
     const lapRawPts = rawPts.slice(chosen.startIdx, chosen.endIdx + 1);
+    const rawPointsCount = lapRawPts.length;
+    const lapDuration = chosen.lapTimeSec || (rawPts.length > 0 ? Math.max(0.001, rawPts[chosen.endIdx].sTime - rawPts[chosen.startIdx].sTime) : 0);
+    const rawSampleRateHz = lapDuration > 0 && rawPointsCount > 1
+      ? Math.round((rawPointsCount - 1) / lapDuration)
+      : 0;
 
-    // Downsample chosen lap to maxPoints (1200 frames)
+    // Downsample chosen lap to maxPoints (e.g. 1200, 2400; if maxPoints is 0, preserve 100% full raw fidelity)
     let downsampled = lapRawPts;
-    if (lapRawPts.length > maxPoints) {
+    if (maxPoints > 0 && lapRawPts.length > maxPoints) {
       const step = lapRawPts.length / maxPoints;
       downsampled = [];
       for (let i = 0; i < maxPoints; i++) {
@@ -917,6 +921,10 @@ export function extractReplayTrajectory(
       driverSlot: targetSlot,
       driverName,
       pointsCount: finalPoints.length,
+      rawPointsCount,
+      rawSampleRateHz,
+      maxPoints: options.maxPoints,
+      isFullResolution: finalPoints.length >= rawPointsCount,
       currentLap: chosen.lapNumber,
       laps: lapsSummary,
       sectors: {

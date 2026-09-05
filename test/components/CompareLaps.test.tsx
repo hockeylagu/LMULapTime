@@ -436,9 +436,11 @@ describe('CompareLaps component', () => {
       expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
     });
 
-    // "Compare Telemetry" button is visible
+    // "Compare Telemetry" button is visible ONLY ONCE (in the chart header) and styled with green gradient
     const compareTelemetryButtons = screen.getAllByRole('button', { name: /Compare Telemetry/i });
-    expect(compareTelemetryButtons.length).toBeGreaterThan(0);
+    expect(compareTelemetryButtons).toHaveLength(1);
+    expect(compareTelemetryButtons[0].className).toContain('from-emerald-500');
+    expect(compareTelemetryButtons[0].className).toContain('to-teal-600');
 
     // Click "Compare Telemetry"
     fireEvent.click(compareTelemetryButtons[0]);

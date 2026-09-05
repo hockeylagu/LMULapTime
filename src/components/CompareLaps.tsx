@@ -157,7 +157,6 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           onAddTheoreticalBest={handleAddTheoreticalBest}
           onAddOverallTrackBest={handleAddOverallTrackBest}
           onClearAll={handleClearAll}
-          onCompareTelemetry={onCompareTelemetry}
         />
         <CompareLapsFilters
           availableTracks={availableTracks}
@@ -204,7 +203,6 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         allLaps={apiData.laps}
         selectedCarClass={selectedCarClass}
         lapColors={LAP_COLORS}
-        onCompareTelemetry={onCompareTelemetry}
       />
 
       {selectedLaps.length > 1 && baselineLap && (
