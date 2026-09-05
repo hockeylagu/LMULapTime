@@ -13,11 +13,13 @@ import {
   Flag,
   ArrowLeft,
   Search,
+  Scale,
 } from 'lucide-react';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../server/types.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplaySummary } from '../../../server/types.js';
 import { GpsTrackMap } from './GpsTrackMap';
 import { GpsZoomMap } from './GpsZoomMap';
 import { TelemetryStripCharts } from './TelemetryStripCharts';
+import { filterCompatibleReplays } from '../../utils/replayComparison.js';
 
 export interface ReplayInspectorModalProps {
   isOpen: boolean;
@@ -41,6 +43,15 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const [isTrajLoading, setIsTrajLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Lap comparison states
+  const [isCompareMode, setIsCompareMode] = useState<boolean>(false);
+  const [baselineReplayName, setBaselineReplayName] = useState<string | null>(null);
+  const [baselineLapNumber, setBaselineLapNumber] = useState<number | null>(null);
+  const [baselineTrajectory, setBaselineTrajectory] = useState<ReplayTrajectoryData | null>(null);
+  const [baselineMetadata, setBaselineMetadata] = useState<ReplayMetadata | null>(null);
+  const [isBaselineLoading, setIsBaselineLoading] = useState<boolean>(false);
+  const [compatibleReplays, setCompatibleReplays] = useState<ReplaySummary[]>([]);
+
   const [activeTab, setActiveTab] = useState<'map' | 'roster'>('map');
   const [rosterSearch, setRosterSearch] = useState<string>('');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -48,6 +59,8 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [colorBy, setColorBy] = useState<'speed' | 'throttle' | 'brake' | 'steering'>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
+
+  const [chartZoomRange, setChartZoomRange] = useState<{ start: number; end: number } | null>(null);
 
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
@@ -70,6 +83,12 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
       setSelectedDriverSlot(null);
       setCurrentIndex(0);
       setIsPlaying(false);
+      setIsCompareMode(false);
+      setBaselineReplayName(null);
+      setBaselineLapNumber(null);
+      setBaselineTrajectory(null);
+      setBaselineMetadata(null);
+      setChartZoomRange(null);
       return;
     }
 
@@ -121,6 +140,101 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     };
   }, [isOpen, replayName, initialLapNumber]);
 
+  // Fetch candidate replays on same track and car class
+  useEffect(() => {
+    if (!isOpen || !metadata?.trackName) {
+      setCompatibleReplays([]);
+      return;
+    }
+
+    const playerDriver = metadata.drivers?.find(d => d.slot === selectedDriverSlot) ||
+      metadata.drivers?.find(d => d.isPlayer) ||
+      metadata.drivers?.[0];
+    const carClass = playerDriver?.carClass || metadata.eventTitle;
+
+    fetch('http://localhost:3001/api/replays')
+      .then(r => (r.ok ? r.json() : []))
+      .then((allReplays: ReplaySummary[]) => {
+        const matching = filterCompatibleReplays(allReplays, metadata.trackName, carClass, replayName || undefined);
+        setCompatibleReplays(matching);
+      })
+      .catch(() => {
+        setCompatibleReplays([]);
+      });
+  }, [isOpen, metadata?.trackName, replayName, selectedDriverSlot]);
+
+  // Toggle compare mode
+  const handleToggleCompare = () => {
+    setIsCompareMode(prev => {
+      const next = !prev;
+      if (next && !baselineReplayName) {
+        setBaselineReplayName(replayName);
+        const bestLap = trajectory?.laps?.find(l => l.isBest)?.lapNumber;
+        const currentLap = trajectory?.currentLap ?? 1;
+        const candidateLap = bestLap && bestLap !== currentLap
+          ? bestLap
+          : trajectory?.laps?.find(l => l.lapNumber !== currentLap)?.lapNumber || currentLap;
+        setBaselineLapNumber(candidateLap);
+      }
+      return next;
+    });
+  };
+
+  // Load baseline trajectory when comparison mode is active
+  useEffect(() => {
+    if (!isCompareMode || !baselineReplayName) {
+      setBaselineTrajectory(null);
+      setBaselineMetadata(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsBaselineLoading(true);
+
+    const targetReplay = baselineReplayName;
+    const targetLap = baselineLapNumber ?? 1;
+
+    const fetchMeta = targetReplay === replayName && metadata
+      ? Promise.resolve(metadata)
+      : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`)
+          .then(r => (r.ok ? r.json() : null));
+
+    fetchMeta.then(meta => {
+      if (!isMounted) return;
+      if (targetReplay !== replayName) {
+        setBaselineMetadata(meta);
+      }
+
+      let validLap = targetLap;
+      if (meta?.laps && meta.laps.length > 0) {
+        const hasLap = meta.laps.some((l: any) => l.lapNumber === validLap);
+        if (!hasLap) {
+          validLap = meta.laps.find((l: any) => l.isBest)?.lapNumber || meta.laps[0].lapNumber;
+          setBaselineLapNumber(validLap);
+        }
+      }
+
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=1200&lap=${validLap}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((traj: ReplayTrajectoryData | null) => {
+          if (!isMounted) return;
+          setBaselineTrajectory(traj);
+          setIsBaselineLoading(false);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setIsBaselineLoading(false);
+        });
+    }).catch(() => {
+      if (!isMounted) return;
+      setIsBaselineLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isCompareMode, baselineReplayName, baselineLapNumber, replayName, metadata]);
+
   // React to initialLapNumber changes if modal is already open
   useEffect(() => {
     if (isOpen && initialLapNumber && trajectory && trajectory.currentLap !== initialLapNumber) {
@@ -135,6 +249,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setIsTrajLoading(true);
     setIsPlaying(false);
     setCurrentIndex(0);
+    setChartZoomRange(null);
 
     fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?driverSlot=${slot}&maxPoints=1200`)
       .then(r => (r.ok ? r.json() : null))
@@ -155,6 +270,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setIsTrajLoading(true);
     setIsPlaying(false);
     setCurrentIndex(0);
+    setChartZoomRange(null);
     onLapChange?.(lapNum);
 
     const slotParam = typeof selectedDriverSlot === 'number' ? `&driverSlot=${selectedDriverSlot}` : '';
@@ -241,10 +357,34 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     );
   }, [metadata?.drivers, rosterSearch]);
 
-  if (!isOpen) return null;
-
   const currentPoint = trajectory?.points[currentIndex];
   const currentLapSummary = trajectory?.laps?.find(l => l.lapNumber === trajectory.currentLap) || trajectory?.laps?.[0];
+
+  const baselineLapSummary = useMemo(() => {
+    if (!baselineTrajectory) return null;
+    const laps = baselineTrajectory.laps || baselineMetadata?.laps || [];
+    const cur = baselineTrajectory.currentLap ?? baselineLapNumber ?? 1;
+    return laps.find(l => l.lapNumber === cur) || laps[0] || null;
+  }, [baselineTrajectory, baselineMetadata, baselineLapNumber]);
+
+  const lapDeltas = useMemo(() => {
+    if (!currentLapSummary || !baselineLapSummary) return null;
+    const lapDelta = typeof currentLapSummary.lapTimeSec === 'number' && typeof baselineLapSummary.lapTimeSec === 'number'
+      ? currentLapSummary.lapTimeSec - baselineLapSummary.lapTimeSec
+      : null;
+    const s1Delta = typeof currentLapSummary.s1Sec === 'number' && typeof baselineLapSummary.s1Sec === 'number'
+      ? currentLapSummary.s1Sec - baselineLapSummary.s1Sec
+      : null;
+    const s2Delta = typeof currentLapSummary.s2Sec === 'number' && typeof baselineLapSummary.s2Sec === 'number'
+      ? currentLapSummary.s2Sec - baselineLapSummary.s2Sec
+      : null;
+    const s3Delta = typeof currentLapSummary.s3Sec === 'number' && typeof baselineLapSummary.s3Sec === 'number'
+      ? currentLapSummary.s3Sec - baselineLapSummary.s3Sec
+      : null;
+    return { lapDelta, s1Delta, s2Delta, s3Delta };
+  }, [currentLapSummary, baselineLapSummary]);
+
+  if (!isOpen) return null;
 
   const formatBytes = (bytes: number): string => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -366,6 +506,69 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
             </div>
           )}
 
+          {/* Compare Laps Button */}
+          <button
+            onClick={handleToggleCompare}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+              isCompareMode
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                : 'bg-lmu-card hover:bg-white/10 border-lmu-border text-lmu-muted hover:text-white'
+            }`}
+            title={isCompareMode ? 'Exit Lap Comparison Mode' : 'Compare 2 Laps (Overlay Speed, Throttle, Line, Time Delta)'}
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>{isCompareMode ? 'Comparing' : 'Compare'}</span>
+          </button>
+
+          {/* Baseline Lap & Replay Selector (Visible when compare mode is ON) */}
+          {isCompareMode && (
+            <div className="flex items-center gap-1.5 bg-[#0f1422] border border-amber-500/50 rounded-xl px-2 py-0.5 shadow-sm text-xs animate-fadeIn">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider hidden sm:inline">
+                Base:
+              </span>
+
+              {/* Replay Source Selector (if other compatible replays on same track & class exist) */}
+              {compatibleReplays.length > 0 && (
+                <select
+                  aria-label="Select Baseline Replay"
+                  value={baselineReplayName || replayName || ''}
+                  onChange={e => {
+                    setBaselineReplayName(e.target.value);
+                    setBaselineLapNumber(null);
+                  }}
+                  className="bg-transparent text-amber-300 text-xs font-semibold focus:outline-none cursor-pointer max-w-[110px] sm:max-w-[150px] truncate py-0.5 border-r border-white/10 pr-1 mr-1"
+                >
+                  <option value={replayName || ''} className="bg-[#0b101d] text-white">
+                    This Replay
+                  </option>
+                  {compatibleReplays.map(cr => (
+                    <option key={cr.name} value={cr.name} className="bg-[#0b101d] text-amber-300">
+                      {cr.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* Baseline Lap Selector */}
+              <select
+                aria-label="Select Baseline Lap"
+                value={baselineLapNumber ?? 1}
+                onChange={e => setBaselineLapNumber(parseInt(e.target.value, 10))}
+                className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate py-0.5"
+              >
+                {((baselineReplayName === replayName ? trajectory?.laps : baselineMetadata?.laps) || trajectory?.laps || []).map(l => (
+                  <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
+                    Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {isBaselineLoading && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping ml-1" title="Loading baseline lap..." />
+              )}
+            </div>
+          )}
+
           {isStationary ? (
             <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-semibold items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -412,7 +615,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
 
           {/* Speed Multiplier */}
           <div className="hidden md:flex items-center gap-1 text-xs">
-            {[1, 2, 5].map(spd => (
+            {[0.5, 1, 2].map(spd => (
               <button
                 key={spd}
                 onClick={() => setPlaybackSpeed(spd)}
@@ -465,13 +668,13 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
               {/* Lap & Sector Performance Header */}
               {currentLapSummary && (
                 <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 rounded-xl bg-[#090d16] border border-lmu-border/60 shrink-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5 pl-1">
                       <Flag className="w-3.5 h-3.5 text-lmu-accent" />
                       Lap {trajectory.currentLap ?? 1}
                     </span>
                     {currentLapSummary.isBest && (
-                      <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 font-bold text-[10px]">
+                      <span className="px-2 py-0.5 rounded-full bg-lmu-gold/20 border border-lmu-gold/40 text-lmu-gold font-bold text-[10px] shadow-sm">
                         ★ Fastest Lap
                       </span>
                     )}
@@ -480,7 +683,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         Outlap
                       </span>
                     )}
-                    <span className="text-xs font-mono font-bold text-emerald-400" title="Replay GPS Lap Time">
+                    <span className={`text-xs font-mono font-bold ${currentLapSummary.isBest ? 'text-lmu-gold font-extrabold' : 'text-emerald-400'}`} title="Replay GPS Lap Time">
                       {formatLapTime(currentLapSummary.lapTimeSec)}
                     </span>
                     {currentLapSummary.validatedTimeSec ? (
@@ -491,11 +694,22 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         Log: {formatLapTime(currentLapSummary.validatedTimeSec)}
                       </span>
                     ) : null}
-                    {currentLapSummary.lapDistMeters ? (
-                      <span className="hidden sm:inline text-[10px] font-mono text-lmu-muted">
-                        ({currentLapSummary.lapDistMeters.toLocaleString()}m)
-                      </span>
-                    ) : null}
+
+                    {/* Overall Lap Delta Pill against Baseline */}
+                    {isCompareMode && baselineTrajectory && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#131024] border border-amber-500/40 text-[11px] font-mono shadow-sm">
+                        <span className="text-amber-400 font-bold text-[10px]">
+                          vs {baselineReplayName === replayName ? `L${baselineTrajectory.currentLap ?? baselineLapNumber}` : `${baselineReplayName?.slice(0, 14)}… L${baselineTrajectory.currentLap ?? baselineLapNumber}`}:
+                        </span>
+                        {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
+                          <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})
+                          </span>
+                        ) : (
+                          <span className="text-lmu-muted">--</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 3 Sectors Summary Pills */}
@@ -503,14 +717,35 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     <div className="px-2 py-0.5 rounded-lg bg-lmu-gold/10 border border-lmu-gold/30 text-lmu-gold flex items-center gap-1">
                       <span className="font-bold text-lmu-gold/80">S1:</span>
                       <span className="font-black">{currentLapSummary.s1Sec ? currentLapSummary.s1Sec.toFixed(3) + 's' : '--'}</span>
+                      {lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
+                        <span className={`text-[9px] font-bold pl-1 border-l border-lmu-gold/30 ${
+                          lapDeltas.s1Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}>
+                          {lapDeltas.s1Delta <= 0 ? '' : '+'}{lapDeltas.s1Delta.toFixed(2)}s
+                        </span>
+                      )}
                     </div>
                     <div className="px-2 py-0.5 rounded-lg bg-lmu-blue/10 border border-lmu-blue/30 text-lmu-blue flex items-center gap-1">
                       <span className="font-bold text-lmu-blue/80">S2:</span>
                       <span className="font-black">{currentLapSummary.s2Sec ? currentLapSummary.s2Sec.toFixed(3) + 's' : '--'}</span>
+                      {lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
+                        <span className={`text-[9px] font-bold pl-1 border-l border-lmu-blue/30 ${
+                          lapDeltas.s2Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}>
+                          {lapDeltas.s2Delta <= 0 ? '' : '+'}{lapDeltas.s2Delta.toFixed(2)}s
+                        </span>
+                      )}
                     </div>
                     <div className="px-2 py-0.5 rounded-lg bg-lmu-green/10 border border-lmu-green/30 text-lmu-green flex items-center gap-1">
                       <span className="font-bold text-lmu-green/80">S3:</span>
                       <span className="font-black">{currentLapSummary.s3Sec ? currentLapSummary.s3Sec.toFixed(3) + 's' : '--'}</span>
+                      {lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
+                        <span className={`text-[9px] font-bold pl-1 border-l border-lmu-green/30 ${
+                          lapDeltas.s3Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}>
+                          {lapDeltas.s3Delta <= 0 ? '' : '+'}{lapDeltas.s3Delta.toFixed(2)}s
+                        </span>
+                      )}
                     </div>
                     <div className="hidden md:flex px-2 py-0.5 rounded-lg bg-lmu-dark border border-lmu-border text-lmu-muted items-center gap-1">
                       <span>1,200 pts</span>
@@ -527,6 +762,17 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                   onSelectIndex={idx => setCurrentIndex(idx)}
                   sectors={trajectory.sectors}
                   className="w-full h-full"
+                  baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
+                  baselineLabel={
+                    isCompareMode && baselineTrajectory
+                      ? baselineReplayName === replayName
+                        ? `Lap ${baselineTrajectory.currentLap ?? baselineLapNumber ?? 1}`
+                        : `${baselineReplayName} (L${baselineTrajectory.currentLap ?? baselineLapNumber ?? 1})`
+                      : undefined
+                  }
+                  baselineLapNumber={baselineTrajectory?.currentLap ?? baselineLapNumber ?? undefined}
+                  zoomRange={chartZoomRange}
+                  onZoomRangeChange={setChartZoomRange}
                 />
               </div>
 
@@ -542,7 +788,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                       {currentPoint?.timeSec?.toFixed(2) ?? '0.00'}s
                     </span>
                     <span>
-                      Frame {currentIndex + 1} / {trajectory.points.length} ({((currentIndex / Math.max(1, trajectory.points.length - 1)) * 100).toFixed(0)}%)
+                      Frame {(currentIndex + 1).toLocaleString()} / {trajectory.points.length.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -732,6 +978,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                           onSelectIndex={idx => setCurrentIndex(idx)}
                           colorBy={colorBy}
                           className="w-full h-full"
+                          baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
                         />
                       </div>
 
@@ -743,6 +990,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                           onSelectIndex={idx => setCurrentIndex(idx)}
                           colorBy={colorBy}
                           className="w-full h-full"
+                          baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
                         />
                       </div>
                     </div>
@@ -756,6 +1004,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         onSelectIndex={idx => setCurrentIndex(idx)}
                         colorBy={colorBy}
                         className="w-full h-full"
+                        baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
                       />
                     </div>
                   ) : (
@@ -767,6 +1016,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                         onSelectIndex={idx => setCurrentIndex(idx)}
                         colorBy={colorBy}
                         className="w-full h-full"
+                        baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
                       />
                     </div>
                   )}

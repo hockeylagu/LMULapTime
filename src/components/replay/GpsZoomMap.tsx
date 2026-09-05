@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Navigation, Plus, Minus, RotateCcw } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
+import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
 
 export interface GpsZoomMapProps {
   points: ReplayTrajectoryPoint[];
@@ -8,6 +9,7 @@ export interface GpsZoomMapProps {
   onSelectIndex?: (index: number) => void;
   colorBy?: 'speed' | 'throttle' | 'brake' | 'steering' | 'default';
   className?: string;
+  baselinePoints?: ReplayTrajectoryPoint[];
 }
 
 export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
@@ -16,6 +18,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   onSelectIndex,
   colorBy = 'speed',
   className = '',
+  baselinePoints,
 }) => {
   const VIEWBOX_SIZE = 600;
   const CENTER = VIEWBOX_SIZE / 2;
@@ -174,6 +177,69 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     };
   }, [points, currentPoint, safeIndex, zoomRadius, colorBy, CENTER]);
 
+  // Baseline visible segments and ghost position in zoom local coordinates
+  const { baselineVisiblePath, baselineGhostPos } = useMemo(() => {
+    if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0 || !currentPoint) {
+      return { baselineVisiblePath: '', baselineGhostPos: null };
+    }
+
+    const scale = (CENTER - 40) / zoomRadius;
+    const maxVisibleDist = zoomRadius * 1.6;
+
+    // Collect baseline points close to current car
+    let bPath = '';
+    let hasStarted = false;
+
+    for (let i = 0; i < baselinePoints.length; i++) {
+      const bp = baselinePoints[i];
+      const distToCenter = Math.hypot(bp.x - currentPoint.x, bp.z - currentPoint.z);
+
+      if (distToCenter <= maxVisibleDist) {
+        const sx = CENTER + (bp.x - currentPoint.x) * scale;
+        const sy = CENTER - (bp.z - currentPoint.z) * scale;
+
+        if (!hasStarted) {
+          bPath += `M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+          hasStarted = true;
+        } else {
+          const prev = baselinePoints[i - 1];
+          const stepDist = prev ? Math.hypot(bp.x - prev.x, bp.z - prev.z) : 0;
+          if (bp.isTeleport || stepDist > 25) {
+            bPath += ` M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+          } else {
+            bPath += ` L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+          }
+        }
+      } else {
+        hasStarted = false;
+      }
+    }
+
+    // Distance-aligned ghost position
+    const primaryDists = computeCumulativeDistances(points);
+    const baseDists = computeCumulativeDistances(baselinePoints);
+    const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
+    const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
+
+    const fraction = primaryDists[safeIndex] / totalPrimary;
+    const targetDist = fraction * totalBase;
+    const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
+
+    const ghostSx = CENTER + (ghostPt.x - currentPoint.x) * scale;
+    const ghostSy = CENTER - (ghostPt.z - currentPoint.z) * scale;
+    const distMeters = Math.hypot(ghostPt.x - currentPoint.x, ghostPt.z - currentPoint.z);
+
+    return {
+      baselineVisiblePath: bPath,
+      baselineGhostPos: {
+        sx: ghostSx,
+        sy: ghostSy,
+        distMeters,
+        point: ghostPt,
+      },
+    };
+  }, [points, baselinePoints, currentPoint, safeIndex, zoomRadius, CENTER]);
+
   if (!points || points.length === 0 || !currentPoint) {
     return (
       <div className={`flex items-center justify-center h-48 text-lmu-muted text-xs ${className}`}>
@@ -205,6 +271,11 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
           <span className="text-[10px] font-bold text-white uppercase tracking-wider">
             Apex Detail ({zoomRadius}m)
           </span>
+          {baselineGhostPos && (
+            <span className="ml-1 px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono font-bold">
+              Ghost: {baselineGhostPos.distMeters.toFixed(1)}m
+            </span>
+          )}
         </div>
 
         {/* Independent Zoom & Pan Toolbar */}
@@ -326,6 +397,20 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
               opacity="0.25"
             />
 
+            {/* Baseline Racing Line (Dashed Amber) */}
+            {baselineVisiblePath && (
+              <path
+                d={baselineVisiblePath}
+                stroke="#f59e0b"
+                strokeWidth="4"
+                strokeDasharray="8 6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                opacity="0.85"
+              />
+            )}
+
             {/* High-Resolution Colored Racing Line Traces */}
             <g>
               {visibleSegments.map((seg, i) => (
@@ -344,6 +429,48 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
                 </path>
               ))}
             </g>
+
+            {/* Tether line to baseline ghost car */}
+            {baselineGhostPos && (
+              <line
+                x1={CENTER}
+                y1={CENTER}
+                x2={baselineGhostPos.sx}
+                y2={baselineGhostPos.sy}
+                stroke="#f59e0b"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+                opacity="0.75"
+              />
+            )}
+
+            {/* Baseline Ghost Car Marker */}
+            {baselineGhostPos && (
+              <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
+                <circle
+                  r="12"
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth="1.5"
+                  opacity="0.5"
+                  className="animate-pulse"
+                />
+                <circle
+                  r="6.5"
+                  fill="#f59e0b"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  opacity="0.95"
+                />
+                <text
+                  y="-10"
+                  textAnchor="middle"
+                  className="fill-amber-300 text-[10px] font-mono font-bold"
+                >
+                  GHOST ({baselineGhostPos.distMeters.toFixed(1)}m)
+                </text>
+              </g>
+            )}
 
             {/* Current Car Marker (Locked in center of view) */}
             <g transform={`translate(${CENTER}, ${CENTER})`}>
