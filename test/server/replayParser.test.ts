@@ -153,7 +153,8 @@ function createSliceVcrBuffer(options?: {
   for (const sl of slices) {
     const sBuf = Buffer.alloc(6);
     sBuf.writeFloatLE(sl.sTime, 0);
-    sBuf.writeUInt16LE(1, 4); // 1 event in this slice
+    const hasTiming = Boolean(sl.timing);
+    sBuf.writeUInt16LE(hasTiming ? 2 : 1, 4); // 1 or 2 events in this slice
 
     const evHdr = Buffer.alloc(4);
     evHdr.writeUInt32LE((65 << 8) | (sl.driverSlot & 0xff), 0);
@@ -186,6 +187,16 @@ function createSliceVcrBuffer(options?: {
     evData.writeFloatLE(0.0, 57); // rotY
 
     sliceBufs.push(sBuf, evHdr, evPad, evData);
+
+    if (sl.timing) {
+      const timHdr = Buffer.alloc(4);
+      timHdr.writeUInt32LE((21 << 8) | (sl.driverSlot & 0xff), 0);
+      const timPad = Buffer.from([0]);
+      const timData = Buffer.alloc(21);
+      timData.writeFloatLE(sl.timing.splitSec, 0);
+      timData[8] = (sl.timing.lapIdx << 2) | (sl.timing.sector & 3);
+      sliceBufs.push(timHdr, timPad, timData);
+    }
   }
 
   const framesBuf = Buffer.concat([streamPrefix, ...sliceBufs]);
@@ -982,6 +993,114 @@ describe('replayParser', () => {
     });
   });
 
+  describe('VCR timing packet and XML cross-validation unit tests', () => {
+    it('validates VCR sz=21 timing packets match XML lap timings and sector splits identically without regression', () => {
+      // Mock XML lap data structure
+      const mockXmlLaps = [
+        { num: 1, et: 120.0, s1: 25.500, s2: 34.250, s3: 47.125, lapTime: 106.875 },
+        { num: 2, et: 226.875, s1: 21.100, s2: 32.400, s3: 46.500, lapTime: 100.000 },
+        { num: 3, et: 326.875, s1: 20.800, s2: 32.100, s3: 46.200, lapTime: 99.100 },
+      ];
+
+      // Build corresponding slices with motion (sz=65) and timing (sz=21) packets
+      const slices: any[] = [];
+      let t = 13.125; // start of lap 1
+
+      // Lap 1
+      slices.push({ sTime: t, driverSlot: 1, x: 1.45, y: 0, z: 10.80 });
+      t += 25.500;
+      slices.push({ sTime: t, driverSlot: 1, x: 50, y: 0, z: 100, timing: { splitSec: 25.500, sector: 1, lapIdx: 0 } });
+      t += 34.250;
+      slices.push({ sTime: t, driverSlot: 1, x: -50, y: 0, z: -100, timing: { splitSec: 59.750, sector: 2, lapIdx: 0 } });
+      t += 47.125;
+      slices.push({ sTime: t, driverSlot: 1, x: 1.45, y: 0, z: 10.80, timing: { splitSec: 106.875, sector: 0, lapIdx: 0 } });
+
+      // Lap 2
+      t += 21.100;
+      slices.push({ sTime: t, driverSlot: 1, x: 50, y: 0, z: 100, timing: { splitSec: 21.100, sector: 1, lapIdx: 1 } });
+      t += 32.400;
+      slices.push({ sTime: t, driverSlot: 1, x: -50, y: 0, z: -100, timing: { splitSec: 53.500, sector: 2, lapIdx: 1 } });
+      t += 46.500;
+      slices.push({ sTime: t, driverSlot: 1, x: 1.45, y: 0, z: 10.80, timing: { splitSec: 100.000, sector: 0, lapIdx: 1 } });
+
+      // Lap 3
+      t += 20.800;
+      slices.push({ sTime: t, driverSlot: 1, x: 50, y: 0, z: 100, timing: { splitSec: 20.800, sector: 1, lapIdx: 2 } });
+      t += 32.100;
+      slices.push({ sTime: t, driverSlot: 1, x: -50, y: 0, z: -100, timing: { splitSec: 52.900, sector: 2, lapIdx: 2 } });
+      t += 46.200;
+      slices.push({ sTime: t, driverSlot: 1, x: 1.45, y: 0, z: 10.80, timing: { splitSec: 99.100, sector: 0, lapIdx: 2 } });
+
+      const tmpVcr = path.join(tempDir, 'timing_cross_val_test.vcr');
+      fs.writeFileSync(tmpVcr, createSliceVcrBuffer({
+        slices,
+        drivers: [{ name: 'Samuel Lague', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' }],
+      }));
+
+      const traj = extractReplayTrajectory(tmpVcr, { driverSlot: 1 });
+      expect(traj.laps).toBeDefined();
+      expect(traj.laps?.length).toBe(3);
+
+      for (let i = 0; i < 3; i++) {
+        const vcrLap = traj.laps![i];
+        const xmlLap = mockXmlLaps[i];
+        expect(vcrLap.lapNumber).toBe(xmlLap.num);
+        expect(vcrLap.lapTimeSec).toBeCloseTo(xmlLap.lapTime, 3);
+        expect(vcrLap.s1Sec).toBeCloseTo(xmlLap.s1, 3);
+        expect(vcrLap.s2Sec).toBeCloseTo(xmlLap.s2, 3);
+        expect(vcrLap.s3Sec).toBeCloseTo(xmlLap.s3, 3);
+      }
+
+      // Lap 3 is the fastest lap (99.1s)
+      expect(traj.laps![2].isBest).toBe(true);
+
+      fs.unlinkSync(tmpVcr);
+    });
+
+    it('guards against Imola Tamburello regression by validating front straight Start/Finish line catalog coordinates', () => {
+      const imolaKeywords = ['imolaelms', 'imola', 'dino ferrari', 'Autodromo Enzo e Dino Ferrari'];
+      for (const kw of imolaKeywords) {
+        const matched = KNOWN_TRACK_SF_COORDS.find(entry => entry.keywords.some(k => kw.toLowerCase().includes(k)));
+        expect(matched).toBeDefined();
+        // S/F line must be on the main pit straight near x=1.45, z=10.80 (z > 0)
+        expect(matched!.x).toBeCloseTo(1.45, 1);
+        expect(matched!.z).toBeCloseTo(10.80, 1);
+        expect(matched!.z).toBeGreaterThan(0);
+        // Explicitly guard against the old Tamburello corner coordinate regression (z ~ -319)
+        expect(matched!.z).not.toBeCloseTo(-319.37, 0);
+      }
+    });
+
+    it('ignores aborted incomplete laps flushed at session end with negative splitSec and small distance', () => {
+      const slices: any[] = [];
+      let t = 0;
+      // Lap 1 (valid flying lap, 100s)
+      slices.push({ sTime: t, driverSlot: 1, x: 0, y: 0, z: 0 });
+      t += 50;
+      slices.push({ sTime: t, driverSlot: 1, x: 500, y: 0, z: 500, timing: { splitSec: 50.0, sector: 1, lapIdx: 0 } });
+      t += 50;
+      slices.push({ sTime: t, driverSlot: 1, x: 0, y: 0, z: 0, timing: { splitSec: 100.0, sector: 0, lapIdx: 0 } });
+
+      // Session end flush event (e.g. car travels only 15m in 5 seconds and disconnects/ESCs)
+      t += 5;
+      slices.push({ sTime: t, driverSlot: 1, x: 15, y: 0, z: 0, timing: { splitSec: -1, sector: 0, lapIdx: 1 } });
+
+      const tmpVcr = path.join(tempDir, 'aborted_lap_unit_test.vcr');
+      fs.writeFileSync(tmpVcr, createSliceVcrBuffer({
+        slices,
+        drivers: [{ name: 'Test Driver', vehicleId: 'V1', team: 'Test Team', carNumber: '1' }],
+      }));
+
+      const traj = extractReplayTrajectory(tmpVcr, { driverSlot: 1 });
+      expect(traj.laps).toBeDefined();
+      // Should have only 1 valid completed lap, filtering out the aborted session-end flush
+      expect(traj.laps!.length).toBe(1);
+      expect(traj.laps![0].lapTimeSec).toBeCloseTo(100.0, 1);
+
+      fs.unlinkSync(tmpVcr);
+    });
+  });
+
   // Test against real files if present
   const steamReplaysDir = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
   const realFile = path.join(steamReplaysDir, 'WeatherTech Raceway Laguna Seca R1 1.Vcr');
@@ -1027,6 +1146,7 @@ describe('replayParser', () => {
       }
 
       const imolaFile = path.join(steamReplaysDir, 'Autodromo Enzo e Dino Ferrari R1 8.Vcr');
+      const imolaXmlFile = path.join(process.env.PROGRAMFILES_X86 || 'C:\\Program Files (x86)', 'Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Log\\Results\\2026_09_04_14_15_58-09R1.xml');
       if (fs.existsSync(imolaFile)) {
         it('detects all 16 laps independently in full 360MB+ race replay without truncation', () => {
           const traj = extractReplayTrajectory(imolaFile, {
@@ -1035,10 +1155,60 @@ describe('replayParser', () => {
           expect(traj.laps).toBeDefined();
           expect(traj.laps?.length).toBe(16);
           expect(traj.laps?.[0].lapTimeSec).toBeGreaterThan(100);
-          expect(traj.laps?.[1].lapTimeSec).toBeCloseTo(102.54, 1);
-          expect(traj.laps?.[12].lapTimeSec).toBeCloseTo(100.68, 1);
+          expect(traj.laps?.[1].lapTimeSec).toBeCloseTo(102.16, 1);
+          expect(traj.laps?.[12].lapTimeSec).toBeCloseTo(100.52, 1);
           expect(traj.laps?.[12].isBest).toBe(true);
+
+          // Start/Finish line coordinate must be situated on the front pit straight (~ 1.45, 10.80),
+          // not at the Tamburello regression (z ~ -319)
+          const lap2 = extractReplayTrajectory(imolaFile, { playerName: 'Samuel', lapNumber: 2 });
+          expect(lap2.points[0].x).toBeCloseTo(1.45, 0);
+          expect(Math.abs(lap2.points[0].z - 10.80)).toBeLessThan(5);
+          expect(lap2.points[0].z).toBeGreaterThan(0);
         });
+
+        if (fs.existsSync(imolaXmlFile)) {
+          it('validates VCR extracted lap timings match official XML results for every lap', () => {
+            const traj = extractReplayTrajectory(imolaFile, { playerName: 'Samuel' });
+            expect(traj.laps?.length).toBe(16);
+
+            const xmlContent = fs.readFileSync(imolaXmlFile, 'utf8');
+            const samuelIdx = xmlContent.indexOf('<Name>Samuel Lague</Name>');
+            expect(samuelIdx).toBeGreaterThan(-1);
+            const driverEndIdx = xmlContent.indexOf('</Driver>', samuelIdx);
+            const driverSection = xmlContent.slice(samuelIdx, driverEndIdx);
+            const lapRegex = /<Lap\s+([^>]+)>([^<]*)<\/Lap>/g;
+            const lapMatches = Array.from(driverSection.matchAll(lapRegex));
+            expect(lapMatches.length).toBe(16);
+
+            for (let i = 0; i < 16; i++) {
+              const attrs = lapMatches[i][1];
+              const text = lapMatches[i][2].trim();
+              const xmlLapNum = parseInt(attrs.match(/num="(\d+)"/)?.[1] || '0', 10);
+              const xmlLapTime = text !== '--.----' && text !== '' ? parseFloat(text) : null;
+              const xmlS1 = parseFloat(attrs.match(/s1="([\d\.]+)"/)?.[1] || '0');
+              const xmlS2 = parseFloat(attrs.match(/s2="([\d\.]+)"/)?.[1] || '0');
+              const s3Match = attrs.match(/s3="([\d\.]+)"/);
+              const xmlS3 = s3Match ? parseFloat(s3Match[1]) : null;
+
+              const vcrLap = traj.laps?.[i];
+              expect(vcrLap?.lapNumber).toBe(xmlLapNum);
+
+              if (xmlLapTime !== null && vcrLap?.lapTimeSec) {
+                expect(vcrLap.lapTimeSec).toBeCloseTo(xmlLapTime, 1);
+              }
+              if (vcrLap?.s1Sec && xmlS1 > 0) {
+                expect(vcrLap.s1Sec).toBeCloseTo(xmlS1, 1);
+              }
+              if (vcrLap?.s2Sec && xmlS2 > 0) {
+                expect(vcrLap.s2Sec).toBeCloseTo(xmlS2, 1);
+              }
+              if (vcrLap?.s3Sec && xmlS3 !== null) {
+                expect(vcrLap.s3Sec).toBeCloseTo(xmlS3, 1);
+              }
+            }
+          });
+        }
       }
 
       const daytonaQ1File = path.join(steamReplaysDir, 'Daytona International Speedway Road Course Q1 6.Vcr');
@@ -1091,9 +1261,9 @@ describe('replayParser', () => {
           expect(paddockTraj.points.length).toBeGreaterThan(0);
           expect(gpTraj.points.length).toBeGreaterThan(0);
 
-          // Paddock layout starts on the paddock straight (~ -197, 250)
-          expect(paddockTraj.points[0].x).toBeCloseTo(-197.75, 0);
-          expect(paddockTraj.points[0].z).toBeCloseTo(250.12, 0);
+          // Paddock layout starts on the paddock straight (~ -218, -270)
+          expect(paddockTraj.points[0].x).toBeCloseTo(-218.5, 0);
+          expect(paddockTraj.points[0].z).toBeCloseTo(-270.5, 0);
 
           // GP layout starts on the main pit straight (~ 410, 368)
           expect(gpTraj.points[0].x).toBeCloseTo(410.69, 0);
@@ -1109,10 +1279,10 @@ describe('replayParser', () => {
           expect(traj.driverName).toContain('Samuel Lague');
           expect(traj.laps.length).toBeGreaterThanOrEqual(14);
           expect(traj.laps[0].isOutlap).toBe(true);
-          // Racing laps are ~2:10 - 2:22 (130s - 142s)
-          expect(traj.laps[1].lapTimeSec).toBeCloseTo(142.3, 0);
-          expect(traj.laps[2].lapTimeSec).toBeCloseTo(134.0, 0);
-          expect(traj.laps[3].lapTimeSec).toBeCloseTo(138.4, 0);
+          // Racing laps are ~2:09 - 2:22 (129s - 142s)
+          expect(traj.laps[1].lapTimeSec).toBeCloseTo(134.0, 0);
+          expect(traj.laps[2].lapTimeSec).toBeCloseTo(138.4, 0);
+          expect(traj.laps[3].lapTimeSec).toBeCloseTo(132.6, 0);
         });
       }
 
