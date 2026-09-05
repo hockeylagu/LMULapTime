@@ -348,7 +348,7 @@ interface RawPoint {
 
 export const KNOWN_TRACK_SF_COORDS: Array<{ layoutName?: string; keywords: string[]; x: number; z: number }> = [
   // Specific layouts & variants first (must precede generic circuit keywords)
-  { layoutName: 'Bahrain Paddock', keywords: ['bahrainwec_paddock', 'bahrain paddock', 'paddock circuit'], x: -197.75, z: 250.12 },
+  { layoutName: 'Bahrain Paddock', keywords: ['bahrainwec_paddock', 'bahrain paddock', 'paddock circuit'], x: -218.5, z: -270.5 },
   { layoutName: 'Bahrain Outer', keywords: ['bahrainwec_outer', 'bahrain outer', 'outer circuit'], x: 410.69, z: 367.95 },
   { layoutName: 'Bahrain Grand Prix', keywords: ['bahrain'], x: 410.69, z: 367.95 },
 
@@ -359,7 +359,7 @@ export const KNOWN_TRACK_SF_COORDS: Array<{ layoutName?: string; keywords: strin
   { layoutName: 'Monza Grand Prix', keywords: ['monza'], x: -269.53, z: -407.92 },
 
   { layoutName: 'Daytona Road Course', keywords: ['daytonarc', 'daytona'], x: -112.47, z: -37.36 },
-  { layoutName: 'Imola Grand Prix', keywords: ['imolaelms', 'imola', 'dino ferrari'], x: 224.71, z: -319.37 },
+  { layoutName: 'Imola Grand Prix', keywords: ['imolaelms', 'imola', 'dino ferrari'], x: 1.45, z: 10.80 },
   { layoutName: 'Laguna Seca', keywords: ['lagunaseca', 'laguna'], x: -31.81, z: -122.68 },
   { layoutName: 'Spa-Francorchamps', keywords: ['spaelms', 'spawec', 'spa', 'francorchamps'], x: -232.3, z: 735.2 },
   { layoutName: 'Fuji Speedway', keywords: ['fujiwec', 'fuji'], x: -225.77, z: -157.93 },
@@ -456,6 +456,7 @@ export function extractReplayTrajectory(
 
     const driverPoints = new Map<number, RawPoint[]>();
     const rawPts: RawPoint[] = [];
+    const vcrTimingEvents: Array<{ sTime: number; drv: number; splitSec: number; sector: number; lapIdx: number }> = [];
 
     // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
     const CHUNK_SIZE = 16 * 1024 * 1024;
@@ -546,6 +547,11 @@ export function extractReplayTrajectory(
                 pts.push({ sTime, x, y, z, rotY, steerYaw, rawThrottle, rawBrake, tcActive, absActive, pitLimiter, inPit, isOffTrack });
               }
             }
+          } else if (sz === 21 && eventSp + 5 + 9 <= activeLen) {
+            const splitSec = buf.readFloatLE(eventSp + 5);
+            const sec = buf[eventSp + 5 + 8] & 3;
+            const lapIdx = buf[eventSp + 5 + 8] >> 2;
+            vcrTimingEvents.push({ sTime, drv, splitSec, sector: sec, lapIdx });
           }
           eventSp += 4 + 1 + sz;
         }
@@ -686,8 +692,107 @@ export function extractReplayTrajectory(
 
     let detectedLaps: DetectedLapInternal[] = [];
 
-    // 1. Autonomous geometric lap and Start/Finish line detection (does not rely on XML results)
-    if (rawPts.length >= 30) {
+    // 1. Authoritative VCR timing packets (sz === 21) from simulation timing loops
+    const targetTimings = targetSlot !== undefined ? vcrTimingEvents.filter(e => e.drv === targetSlot) : [];
+    const finishTimings = targetTimings.filter(e => e.sector === 0).sort((a, b) => a.lapIdx - b.lapIdx);
+
+    if (finishTimings.length >= 1 && rawPts.length >= 2) {
+      function findClosestIdx(sTime: number): number {
+        let low = 0, high = rawPts.length - 1;
+        while (low <= high) {
+          const mid = (low + high) >> 1;
+          if (rawPts[mid].sTime < sTime) low = mid + 1;
+          else high = mid - 1;
+        }
+        if (low >= rawPts.length) return rawPts.length - 1;
+        if (low === 0) return 0;
+        return Math.abs(rawPts[low].sTime - sTime) < Math.abs(rawPts[low - 1].sTime - sTime) ? low : low - 1;
+      }
+
+      for (let i = 0; i < finishTimings.length; i++) {
+        const ft = finishTimings[i];
+        const lapNum = ft.lapIdx + 1;
+        const finishTime = ft.sTime;
+        const startTime = i === 0
+          ? (ft.splitSec > 0 ? ft.sTime - ft.splitSec : rawPts[0].sTime)
+          : finishTimings[i - 1].sTime;
+        const lapTimeSec = ft.splitSec > 0 ? Number(ft.splitSec.toFixed(3)) : Number((finishTime - startTime).toFixed(3));
+
+        const startIdx = findClosestIdx(startTime);
+        const endIdx = findClosestIdx(finishTime);
+        const lapDist = cumDist[endIdx] - cumDist[startIdx];
+
+        // Skip aborted/incomplete session flush events (e.g. session end flush where splitSec is <= 0 and distance/time is tiny)
+        if (ft.splitSec <= 0 && (lapDist < 1000 || lapTimeSec < 20) && i > 0) {
+          continue;
+        }
+
+        const s1Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 1);
+        const s2Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 2);
+        let s1Sec: number;
+        let s2Sec: number;
+        let s3Sec: number;
+        let s1Idx = startIdx;
+        let s2Idx = startIdx;
+
+        if (s1Ev && s1Ev.splitSec > 0) {
+          s1Sec = Number(s1Ev.splitSec.toFixed(3));
+          s1Idx = findClosestIdx(s1Ev.sTime);
+        } else {
+          const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
+          while (s1Idx < endIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
+          s1Sec = Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3));
+        }
+
+        if (s1Ev && s2Ev && s2Ev.splitSec > s1Ev.splitSec) {
+          s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
+          s2Idx = findClosestIdx(s2Ev.sTime);
+        } else {
+          s2Idx = s1Idx;
+          const s2TargetDist = cumDist[startIdx] + lapDist * 0.6667;
+          while (s2Idx < endIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
+          s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
+        }
+
+        if (s2Ev && ft.splitSec > s2Ev.splitSec) {
+          s3Sec = Number((ft.splitSec - s2Ev.splitSec).toFixed(3));
+        } else {
+          s3Sec = Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
+        }
+
+        detectedLaps.push({
+          lapNumber: lapNum,
+          startIdx,
+          endIdx,
+          lapTimeSec,
+          lapDistMeters: Math.round(lapDist),
+          s1Sec,
+          s2Sec,
+          s3Sec,
+          s1Idx,
+          s2Idx,
+          isOutlap: i === 0,
+          isBest: false,
+        });
+      }
+
+      const flying = detectedLaps.filter(l => !l.isOutlap && l.lapTimeSec > 50);
+      const pool = flying.length > 0 ? flying : detectedLaps;
+      let minTime = Infinity;
+      let bestLapNum = pool[0]?.lapNumber;
+      for (const l of pool) {
+        if (l.lapTimeSec < minTime) {
+          minTime = l.lapTimeSec;
+          bestLapNum = l.lapNumber;
+        }
+      }
+      detectedLaps.forEach(l => {
+        if (l.lapNumber === bestLapNum) l.isBest = true;
+      });
+    }
+
+    // 2. Autonomous geometric lap and Start/Finish line detection fallback
+    if (detectedLaps.length === 0 && rawPts.length >= 30) {
       function findCrossingsForCandidate(cIdx: number, minIntervalSec = 20) {
         const refPt = rawPts[cIdx];
         const step = Math.min(5, Math.max(1, Math.floor((rawPts.length - 1 - cIdx) / 10)));
@@ -707,7 +812,7 @@ export function extractReplayTrajectory(
 
         for (let i = scanStart; i < rawPts.length - 1; i++) {
           const d = Math.hypot(rawPts[i].x - refPt.x, rawPts[i].z - refPt.z);
-          if (d < 30) {
+          if (d < 22) {
             const hStep = Math.min(5, Math.max(1, rawPts.length - 1 - i));
             const heading = Math.atan2(rawPts[i + hStep].z - rawPts[i].z, rawPts[i + hStep].x - rawPts[i].x);
             const headingDiff = Math.abs(Math.atan2(Math.sin(heading - refHeading), Math.cos(heading - refHeading)));
@@ -748,8 +853,13 @@ export function extractReplayTrajectory(
 
         for (let i = 0; i < rawPts.length - 5; i++) {
           if (rawPts[i].pitLimiter || rawPts[i].inPit) continue;
+          const dt = rawPts[i + 1].sTime - rawPts[i].sTime;
+          const dist = Math.hypot(rawPts[i + 1].x - rawPts[i].x, rawPts[i + 1].z - rawPts[i].z);
+          const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
+          if (speed < 30) continue;
+
           const d = Math.hypot(rawPts[i].x - knownTrack.x, rawPts[i].z - knownTrack.z);
-          if (d < 35) {
+          if (d < 22) {
             cluster.push({ idx: i, d });
             inCluster = true;
           } else if (inCluster) {
