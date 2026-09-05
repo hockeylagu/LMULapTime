@@ -21,6 +21,7 @@ export function useReplayInspectorData({
   initialBaselineReplayName,
   initialBaselineLapNumber,
 }: UseReplayInspectorDataProps) {
+  const [activeReplayName, setActiveReplayName] = useState<string | null>(replayName);
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
   const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
   const [selectedDriverSlot, setSelectedDriverSlot] = useState<number | null>(null);
@@ -42,6 +43,11 @@ export function useReplayInspectorData({
 
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const hasInitializedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    setActiveReplayName(replayName);
+  }, [replayName]);
 
   // Lock body scroll
   useEffect(() => {
@@ -51,18 +57,22 @@ export function useReplayInspectorData({
     return () => { document.body.style.overflow = prevOverflow; };
   }, [isOpen]);
 
-  // Load replay metadata & initial trajectory
+  // Load replay metadata & initial trajectory (only on open or when activeReplayName changes)
   useEffect(() => {
-    if (!isOpen || !replayName) {
+    if (!isOpen || !activeReplayName) {
+      hasInitializedRef.current = false;
       setMetadata(null); setTrajectory(null); setSelectedDriverSlot(null); setCurrentIndex(0);
       setIsPlaying(false); setIsCompareMode(false); setBaselineReplayName(null); setBaselineLapNumber(null);
       setBaselineTrajectory(null); setBaselineMetadata(null); setChartZoomRange(null);
       return;
     }
 
-    setIsCompareMode(initialCompareMode ?? false);
-    setBaselineReplayName(initialBaselineReplayName ?? (initialCompareMode ? replayName : null));
-    setBaselineLapNumber(initialBaselineLapNumber ?? null);
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      setIsCompareMode(initialCompareMode ?? false);
+      setBaselineReplayName(initialBaselineReplayName ?? (initialCompareMode ? activeReplayName : null));
+      setBaselineLapNumber(initialBaselineLapNumber ?? null);
+    }
 
     let isMounted = true;
     setIsLoading(true);
@@ -70,12 +80,12 @@ export function useReplayInspectorData({
     const lapQuery = initialLapNumber && initialLapNumber > 0 ? `&lap=${initialLapNumber}` : '';
 
     Promise.all([
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}`).then(r => (r.ok ? r.json() : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}`).then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, trajData]) => {
         if (!isMounted) return;
-        if (!metaData) setError(`Could not load metadata for replay ${replayName}`);
+        if (!metaData) setError(`Could not load metadata for replay ${activeReplayName}`);
         else setMetadata(metaData);
 
         if (trajData) {
@@ -98,7 +108,7 @@ export function useReplayInspectorData({
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, replayName, initialLapNumber, initialCompareMode, initialBaselineReplayName, initialBaselineLapNumber]);
+  }, [isOpen, activeReplayName]);
 
   // Fetch compatible candidate replays
   useEffect(() => {
@@ -109,23 +119,42 @@ export function useReplayInspectorData({
     fetch('http://localhost:3001/api/replays')
       .then(r => (r.ok ? r.json() : []))
       .then((allReplays: ReplaySummary[]) => {
-        setCompatibleReplays(filterCompatibleReplays(allReplays, metadata.trackName, carClass, replayName || undefined));
+        setCompatibleReplays(filterCompatibleReplays(allReplays, metadata.trackName, carClass, activeReplayName || undefined));
       })
       .catch(() => setCompatibleReplays([]));
-  }, [isOpen, metadata?.trackName, replayName, selectedDriverSlot]);
+  }, [isOpen, metadata?.trackName, activeReplayName, selectedDriverSlot]);
 
   // Toggle compare mode
   const handleToggleCompare = () => {
     setIsCompareMode(prev => {
       const next = !prev;
       if (next && !baselineReplayName) {
-        setBaselineReplayName(replayName);
+        setBaselineReplayName(activeReplayName);
         const bestLap = trajectory?.laps?.find(l => l.isBest)?.lapNumber;
         const currentLap = trajectory?.currentLap ?? 1;
         setBaselineLapNumber(bestLap && bestLap !== currentLap ? bestLap : trajectory?.laps?.find(l => l.lapNumber !== currentLap)?.lapNumber || currentLap);
       }
       return next;
     });
+  };
+
+  // Swap primary lap and baseline lap
+  const handleSwapBaseline = () => {
+    if (!isCompareMode) return;
+    const curPrimaryLap = trajectory?.currentLap ?? initialLapNumber ?? 1;
+    const curBaseLap = baselineLapNumber ?? 1;
+    const curPrimaryReplay = activeReplayName;
+    const curBaseReplay = baselineReplayName || activeReplayName;
+
+    if (curBaseReplay === curPrimaryReplay) {
+      handleSelectLap(curBaseLap);
+      setBaselineLapNumber(curPrimaryLap);
+    } else {
+      setActiveReplayName(curBaseReplay);
+      setBaselineReplayName(curPrimaryReplay);
+      setBaselineLapNumber(curPrimaryLap);
+      handleSelectLap(curBaseLap);
+    }
   };
 
   // Load baseline trajectory
@@ -138,13 +167,13 @@ export function useReplayInspectorData({
     const targetReplay = baselineReplayName;
     const targetLap = baselineLapNumber ?? 1;
 
-    const fetchMeta = targetReplay === replayName && metadata
+    const fetchMeta = targetReplay === activeReplayName && metadata
       ? Promise.resolve(metadata)
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
     fetchMeta.then(meta => {
       if (!isMounted) return;
-      if (targetReplay !== replayName) setBaselineMetadata(meta);
+      if (targetReplay !== activeReplayName) setBaselineMetadata(meta);
       let validLap = targetLap;
       if (meta?.laps && meta.laps.length > 0 && !meta.laps.some((l: any) => l.lapNumber === validLap)) {
         validLap = meta.laps.find((l: any) => l.isBest)?.lapNumber || meta.laps[0].lapNumber;
@@ -153,13 +182,19 @@ export function useReplayInspectorData({
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${validLap}`)
         .then(r => (r.ok ? r.json() : null))
         .then((traj: ReplayTrajectoryData | null) => {
-          if (isMounted) { setBaselineTrajectory(traj); setIsBaselineLoading(false); }
+          if (isMounted) {
+            setBaselineTrajectory(traj);
+            setIsBaselineLoading(false);
+            if (traj?.laps && traj.laps.length > 0 && !traj.laps.some(l => l.lapNumber === validLap)) {
+              setBaselineLapNumber(traj.currentLap || traj.laps.find(l => l.isBest)?.lapNumber || traj.laps[0].lapNumber);
+            }
+          }
         })
         .catch(() => { if (isMounted) setIsBaselineLoading(false); });
     }).catch(() => { if (isMounted) setIsBaselineLoading(false); });
 
     return () => { isMounted = false; };
-  }, [isCompareMode, baselineReplayName, baselineLapNumber, replayName, metadata, telemetryResolution]);
+  }, [isCompareMode, baselineReplayName, baselineLapNumber, activeReplayName, metadata, telemetryResolution]);
 
   // Handle external lap changes
   useEffect(() => {
@@ -169,12 +204,12 @@ export function useReplayInspectorData({
   }, [isOpen, initialLapNumber]);
 
   const fetchTrajectory = (lapNum?: number, slot?: number | null, res: number = telemetryResolution) => {
-    if (!replayName) return;
+    if (!activeReplayName) return;
     setIsTrajLoading(true);
     const targetLap = lapNum ?? trajectory?.currentLap ?? initialLapNumber ?? 1;
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
-    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(replayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}`)
+    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}`)
       .then(r => (r.ok ? r.json() : null))
       .then((trajData: ReplayTrajectoryData | null) => {
         if (trajData) {
@@ -187,24 +222,17 @@ export function useReplayInspectorData({
   };
 
   const handleSelectDriver = (slot: number) => {
-    setSelectedDriverSlot(slot);
-    setIsPlaying(false);
-    setCurrentIndex(0);
-    setChartZoomRange(null);
+    setSelectedDriverSlot(slot); setIsPlaying(false); setCurrentIndex(0); setChartZoomRange(null);
     fetchTrajectory(trajectory?.currentLap, slot);
   };
 
   const handleSelectLap = (lapNum: number) => {
-    setIsPlaying(false);
-    setCurrentIndex(0);
-    setChartZoomRange(null);
-    onLapChange?.(lapNum);
-    fetchTrajectory(lapNum, selectedDriverSlot);
+    setIsPlaying(false); setCurrentIndex(0); setChartZoomRange(null);
+    onLapChange?.(lapNum); fetchTrajectory(lapNum, selectedDriverSlot);
   };
 
   const handleChangeResolution = (res: number) => {
-    setTelemetryResolution(res);
-    fetchTrajectory(trajectory?.currentLap, selectedDriverSlot, res);
+    setTelemetryResolution(res); fetchTrajectory(trajectory?.currentLap, selectedDriverSlot, res);
   };
 
   // Playback animation loop
@@ -256,39 +284,13 @@ export function useReplayInspectorData({
   }, [currentLapSummary, baselineLapSummary]);
 
   return {
-    metadata,
-    trajectory,
-    selectedDriverSlot,
-    selectedDriver,
-    playerDriver,
-    isLoading,
-    isTrajLoading,
-    error,
-    isCompareMode,
-    handleToggleCompare,
-    compatibleReplays,
-    baselineReplayName,
-    setBaselineReplayName,
-    baselineLapNumber,
-    setBaselineLapNumber,
-    baselineTrajectory,
-    baselineMetadata,
-    isBaselineLoading,
-    currentIndex,
-    setCurrentIndex,
-    isPlaying,
-    setIsPlaying,
-    playbackSpeed,
-    setPlaybackSpeed,
-    chartZoomRange,
-    setChartZoomRange,
-    handleSelectDriver,
-    handleSelectLap,
-    telemetryResolution,
-    handleChangeResolution,
-    maxSpeed,
-    currentPoint,
-    currentLapSummary,
-    lapDeltas,
+    metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
+    isLoading, isTrajLoading, error, isCompareMode, handleToggleCompare,
+    handleSwapBaseline, compatibleReplays, baselineReplayName, setBaselineReplayName,
+    baselineLapNumber, setBaselineLapNumber, baselineTrajectory, baselineMetadata,
+    isBaselineLoading, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
+    playbackSpeed, setPlaybackSpeed, chartZoomRange, setChartZoomRange,
+    handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
+    maxSpeed, currentPoint, currentLapSummary, lapDeltas, activeReplayName,
   };
 }

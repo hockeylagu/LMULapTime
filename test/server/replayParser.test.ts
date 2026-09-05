@@ -675,7 +675,72 @@ describe('replayParser', () => {
           expect(traj.laps?.[12].isBest).toBe(true);
         });
       }
+
+      const daytonaQ1File = path.join(steamReplaysDir, 'Daytona International Speedway Road Course Q1 6.Vcr');
+      if (fs.existsSync(daytonaQ1File)) {
+        it('detects multiple distinct ~1:47-1:48 laps on Daytona Q1 replay instead of collapsing into single 11-minute lap', () => {
+          // Autonomous extraction without any sessionLaps provided
+          const traj = extractReplayTrajectory(daytonaQ1File, { maxPoints: 500 });
+          expect(traj.laps).toBeDefined();
+          expect(traj.laps.length).toBe(5);
+          // Lap 1 is outlap from pit lane
+          expect(traj.laps[0].isOutlap).toBe(true);
+          expect(traj.laps[0].lapTimeSec).toBeGreaterThan(120);
+
+          // Autonomous flying laps are ~1:47 - 1:48 (107s - 109s), matching official timing without relying on XML
+          expect(traj.laps[1].isOutlap).toBe(false);
+          expect(traj.laps[1].lapTimeSec).toBeCloseTo(108.9, 0); // ~1:48.9
+          expect(traj.laps[2].lapTimeSec).toBeCloseTo(108.0, 0); // ~1:48.0
+          expect(traj.laps[3].lapTimeSec).toBeCloseTo(107.3, 0); // ~1:47.3
+          expect(traj.laps[4].lapTimeSec).toBeCloseTo(107.1, 0); // ~1:47.1
+          expect(traj.laps[4].isBest).toBe(true);
+        });
+      }
+
+      it('autonomously detects multi-lap circuit when vehicle starts in pit lane with pit limiter', () => {
+        // Synthetic test: car starts in pit lane for 100m, then does two 50-second circular laps
+        const slices: any[] = [];
+        let t = 0;
+        // Pit lane segment: 20 points, pit limiter on, moving slowly along z
+        for (let i = 0; i < 20; i++) {
+          t += 1.0;
+          slices.push({
+            sTime: t,
+            driverSlot: 1,
+            x: 0,
+            y: 0,
+            z: -100 + i * 5,
+            pitLimiter: true,
+            throttle: 40,
+            brake: 0,
+          });
+        }
+        // Circuit: 2 full loops of radius 400m, circumference ~2513m, speed ~50 m/s (~180 km/h) -> ~50s per lap
+        for (let lap = 0; lap < 2; lap++) {
+          for (let angleDeg = 0; angleDeg < 360; angleDeg += 10) {
+            t += 1.4;
+            const rad = (angleDeg * Math.PI) / 180;
+            slices.push({
+              sTime: t,
+              driverSlot: 1,
+              x: 400 * Math.cos(rad),
+              y: 0,
+              z: 400 * Math.sin(rad),
+              pitLimiter: false,
+              throttle: 100,
+              brake: 0,
+            });
+          }
+        }
+
+        const pitVcr = path.join(tempDir, 'pit_start_test.vcr');
+        fs.writeFileSync(pitVcr, createSliceVcrBuffer({ slices }));
+        const traj = extractReplayTrajectory(pitVcr, { driverSlot: 1 });
+        expect(traj.laps.length).toBeGreaterThan(1);
+        fs.unlinkSync(pitVcr);
+      });
     });
   }
 });
+
 

@@ -66,6 +66,8 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     currentPoint,
     currentLapSummary,
     lapDeltas,
+    handleSwapBaseline,
+    activeReplayName,
   } = useReplayInspectorData({
     isOpen,
     replayName,
@@ -97,18 +99,20 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     >
       <ReplayInspectorHeader
         onClose={onClose}
-        replayName={replayName}
+        replayName={activeReplayName || replayName}
         metadata={metadata}
         trajectory={trajectory}
         onSelectLap={handleSelectLap}
         isCompareMode={isCompareMode}
         onToggleCompare={handleToggleCompare}
+        onSwapBaseline={handleSwapBaseline}
         compatibleReplays={compatibleReplays}
         baselineReplayName={baselineReplayName}
         onSelectBaselineReplay={name => { setBaselineReplayName(name); setBaselineLapNumber(null); }}
         baselineLapNumber={baselineLapNumber}
         onSelectBaselineLap={lap => setBaselineLapNumber(lap)}
         baselineMetadata={baselineMetadata}
+        baselineTrajectory={baselineTrajectory}
         isBaselineLoading={isBaselineLoading}
         isStationary={maxSpeed <= 1}
         isTrajLoading={isTrajLoading}

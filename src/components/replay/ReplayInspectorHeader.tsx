@@ -1,15 +1,6 @@
 import React from 'react';
 import {
-  X,
-  Play,
-  Pause,
-  RotateCcw,
-  Video,
-  Clock,
-  HardDrive,
-  Flag,
-  ArrowLeft,
-  Scale,
+  X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, Scale, ArrowLeftRight,
 } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplaySummary } from '../../../server/types.js';
 
@@ -21,12 +12,14 @@ export interface ReplayInspectorHeaderProps {
   onSelectLap: (lapNum: number) => void;
   isCompareMode: boolean;
   onToggleCompare: () => void;
+  onSwapBaseline?: () => void;
   compatibleReplays: ReplaySummary[];
   baselineReplayName: string | null;
   onSelectBaselineReplay: (name: string) => void;
   baselineLapNumber: number | null;
   onSelectBaselineLap: (lapNum: number) => void;
   baselineMetadata: ReplayMetadata | null;
+  baselineTrajectory?: ReplayTrajectoryData | null;
   isBaselineLoading: boolean;
   isStationary: boolean;
   isTrajLoading: boolean;
@@ -39,39 +32,19 @@ export interface ReplayInspectorHeaderProps {
 }
 
 export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React.memo(({
-  onClose,
-  replayName,
-  metadata,
-  trajectory,
-  onSelectLap,
-  isCompareMode,
-  onToggleCompare,
-  compatibleReplays,
-  baselineReplayName,
-  onSelectBaselineReplay,
-  baselineLapNumber,
-  onSelectBaselineLap,
-  baselineMetadata,
-  isBaselineLoading,
-  isStationary,
-  isTrajLoading,
-  isPlaying,
-  onTogglePlay,
-  onRewind,
-  playbackSpeed,
-  onSelectPlaybackSpeed,
-  formatLapTime,
+  onClose, replayName, metadata, trajectory, onSelectLap,
+  isCompareMode, onToggleCompare, onSwapBaseline, compatibleReplays,
+  baselineReplayName, onSelectBaselineReplay, baselineLapNumber, onSelectBaselineLap,
+  baselineMetadata, baselineTrajectory, isBaselineLoading, isStationary, isTrajLoading,
+  isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
 }) => {
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+  const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s`;
 
-  const formatDuration = (sec: number): string => {
-    const mins = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${mins}m ${s < 10 ? '0' : ''}${s}s`;
-  };
+  const baselineLaps = (baselineReplayName === replayName
+    ? trajectory?.laps
+    : (baselineTrajectory?.laps || baselineMetadata?.laps)
+  ) || [];
 
   return (
     <header className="h-14 px-4 bg-[#0a0e17] border-b border-lmu-border flex items-center justify-between shrink-0 z-30">
@@ -192,6 +165,20 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           <span>{isCompareMode ? 'Comparing' : 'Compare'}</span>
         </button>
 
+        {/* Swap Button (when comparing) */}
+        {isCompareMode && (
+          <button
+            type="button"
+            onClick={onSwapBaseline}
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
+            title="Swap Primary and Baseline laps (⇄)"
+            aria-label="Swap Primary and Baseline laps"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5 text-amber-300" />
+            <span className="hidden sm:inline">Swap</span>
+          </button>
+        )}
+
         {/* Baseline Lap & Replay Selector */}
         {isCompareMode && (
           <div className="flex items-center gap-1.5 bg-[#0f1422] border border-amber-500/50 rounded-xl px-2 py-0.5 shadow-sm text-xs animate-fadeIn">
@@ -213,15 +200,21 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             )}
             <select
               aria-label="Select Baseline Lap"
-              value={baselineLapNumber ?? 1}
+              value={baselineLapNumber ?? baselineLaps[0]?.lapNumber ?? 1}
               onChange={e => onSelectBaselineLap(parseInt(e.target.value, 10))}
               className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate py-0.5"
             >
-              {((baselineReplayName === replayName ? trajectory?.laps : baselineMetadata?.laps) || trajectory?.laps || []).map(l => (
-                <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
-                  Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : ''}
+              {baselineLaps.length === 0 ? (
+                <option value="" disabled className="bg-[#0b101d] text-lmu-muted">
+                  {isBaselineLoading ? 'Loading laps...' : 'No laps detected'}
                 </option>
-              ))}
+              ) : (
+                baselineLaps.map(l => (
+                  <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
+                    Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : ''}
+                  </option>
+                ))
+              )}
             </select>
             {isBaselineLoading && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping ml-1" title="Loading baseline lap..." />
