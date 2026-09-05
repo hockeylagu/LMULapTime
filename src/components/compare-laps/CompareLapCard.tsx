@@ -70,7 +70,11 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color }} />
-            <span className="text-xs font-bold text-white uppercase tracking-wider truncate">
+            <span
+              className={`text-xs font-bold uppercase tracking-wider truncate ${
+                lap.isAllTimePB || lap.isSessionBest || lap.isOverallTrackBest ? 'text-lmu-gold' : 'text-white'
+              }`}
+            >
               {lap.tag || `Lap ${lap.lapNum || '-'}`}
             </span>
           </div>
@@ -115,7 +119,13 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               </span>
             )}
           </div>
-          <h4 className="text-2xl font-extrabold font-mono text-white mt-0.5">{lap.lapTimeString}</h4>
+          <h4
+            className={`text-2xl font-extrabold font-mono mt-0.5 ${
+              lap.isAllTimePB || lap.isSessionBest || lap.isOverallTrackBest ? 'text-lmu-gold' : 'text-white'
+            }`}
+          >
+            {lap.lapTimeString}
+          </h4>
 
           {cat && (
             <div className="mt-1 flex items-center gap-1.5">

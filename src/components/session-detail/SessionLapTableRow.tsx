@@ -1,11 +1,11 @@
 import React from 'react';
-import { ArrowLeftRight, Video } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../server/types.js';
-import { formatTime, getDisplayTrackName } from '../../utils/formatters.js';
+import { formatTime } from '../../utils/formatters.js';
 import { computeLapToLapDelta } from '../../utils/lapComparison.js';
 import { updateHashParams } from '../../utils/urlParams.js';
 import { PaceBadge } from '../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
+import { SessionLapTableActions } from './SessionLapTableActions.js';
 
 export interface SessionLapTableRowProps {
   session: DetailedSession;
@@ -128,11 +128,25 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     ? `Incomplete Lap:\n${eventsTooltip}`
     : 'Incomplete Lap (lap not finished or missing sector timing)';
 
+  const handleOpenTelemetry = () => {
+    if (session.matchingReplayFile) {
+      updateHashParams({ replay: '1', lap: String(l.lapNum) });
+    } else {
+      const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+      const carClass = selectedDriver?.carClass || 'LMGT3';
+      window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+        carClass
+      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
+    }
+  };
+
   return (
     <tr
-      className={`hover:bg-lmu-card/50 transition-colors ${
-        isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-blue/10' : ''
+      onClick={handleOpenTelemetry}
+      className={`hover:bg-lmu-card/70 transition-colors cursor-pointer group ${
+        isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-gold/10' : ''
       }`}
+      title={`Click to open telemetry for Lap ${l.lapNum}`}
     >
       <td
         className="px-3 py-2.5 font-bold text-white"
@@ -151,7 +165,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           isLapAllTimePB
             ? 'text-lmu-gold font-extrabold'
             : isSessionBest
-            ? 'text-lmu-blue'
+            ? 'text-lmu-gold font-bold'
             : isInferredLap
             ? 'text-amber-300/80 italic font-mono'
             : 'text-white'
@@ -174,7 +188,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       <td className="px-3 py-2.5 text-right font-semibold text-xs">
         <span
           className={
-            isLapAllTimePB ? 'text-lmu-gold font-bold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-white'
+            isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-gold font-bold' : 'text-white'
           }
         >
           {deltaStr}
@@ -267,34 +281,12 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         />
       </td>
       <td className="px-3 py-2.5 text-center font-sans">
-        <div className="flex items-center justify-center gap-1.5">
-          <button
-            onClick={() => {
-              const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-              const carClass = selectedDriver?.carClass || 'LMGT3';
-              window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-                carClass
-              )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
-            }}
-            className="px-2 py-1 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
-            title={`Open Lap ${l.lapNum} in Telemetry Studio`}
-          >
-            <ArrowLeftRight className="w-3 h-3" />
-            <span>Compare</span>
-          </button>
-          {session.matchingReplayFile && (
-            <button
-              onClick={() => {
-                updateHashParams({ replay: '1', lap: String(l.lapNum) });
-              }}
-              className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
-              title={`Inspect Replay for Lap ${l.lapNum}`}
-            >
-              <Video className="w-3 h-3 text-emerald-400" />
-              <span>Replay</span>
-            </button>
-          )}
-        </div>
+        <SessionLapTableActions
+          session={session}
+          lapNum={l.lapNum}
+          selectedDriver={selectedDriver}
+          onOpenTelemetry={handleOpenTelemetry}
+        />
       </td>
     </tr>
   );

@@ -38,7 +38,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             <span>Lap Timing & Telemetry ({selectedDriver?.laps?.length || 0} Laps)</span>
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
-            Complete sector timings, speed traps, delta analysis, and pace benchmarks.
+            Click any lap row or Telemetry button to inspect rich telemetry, or compare side-by-side.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
                 <th className="px-3 py-3 text-center">{hasVirtualEnergyData ? 'Fuel & VE' : 'Fuel'}</th>
               )}
               <th className="px-3 py-3 text-center">Status</th>
-              <th className="px-3 py-3 text-center">Action</th>
+              <th className="px-3 py-3 text-center">Telemetry & Compare</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-lmu-border/50 font-mono">

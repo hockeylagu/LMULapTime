@@ -291,5 +291,38 @@ describe('ReplayInspectorModal', () => {
     expect(speedHalf.className).toContain('bg-lmu-accent');
     expect(speed1x.className).not.toContain('bg-lmu-accent');
   });
+
+  it('renders fastest lap badge and lap time using the lmu-gold color set', async () => {
+    const trajWithBestLap = {
+      ...mockTraj,
+      currentLap: 1,
+      laps: [
+        { lapNumber: 1, lapTimeSec: 135.5, s1Sec: 40.0, s2Sec: 50.0, s3Sec: 45.5, isBest: true },
+      ],
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(trajWithBestLap) });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Fastest Lap/i)).toBeInTheDocument();
+    });
+
+    const fastestBadge = screen.getByText(/Fastest Lap/i);
+    expect(fastestBadge.className).toContain('bg-lmu-gold/20');
+    expect(fastestBadge.className).toContain('text-lmu-gold');
+    expect(fastestBadge.className).toContain('border-lmu-gold/40');
+  });
 });
 
