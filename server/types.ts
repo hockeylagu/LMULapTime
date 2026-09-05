@@ -443,6 +443,29 @@ export interface ReplayLapSummary {
   isBest?: boolean;
   startFrame?: number;
   endFrame?: number;
+  // Validation info from matched session log (if available)
+  validatedTimeSec?: number | null;
+  validatedS1Sec?: number | null;
+  validatedS2Sec?: number | null;
+  validatedS3Sec?: number | null;
+  timeDiffSec?: number | null;
+}
+
+export interface ReplayTrajectoryValidation {
+  matchedSessionId: string;
+  sessionType?: string;
+  trackName?: string;
+  driverName?: string;
+  totalSessionLaps: number;
+  officialBestLapTime?: number | null;
+  officialLaps?: Array<{
+    lapNumber: number;
+    lapTimeSec: number;
+    s1Sec?: number | null;
+    s2Sec?: number | null;
+    s3Sec?: number | null;
+    isValid?: boolean;
+  }>;
 }
 
 export interface ReplayTrajectoryData {
@@ -465,6 +488,7 @@ export interface ReplayTrajectoryData {
     spanZ: number;
   };
   points: ReplayTrajectoryPoint[];
+  validation?: ReplayTrajectoryValidation | null;
 }
 
 export interface ReplaySummary {

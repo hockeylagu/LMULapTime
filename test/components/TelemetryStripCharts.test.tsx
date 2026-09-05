@@ -72,6 +72,25 @@ describe('TelemetryStripCharts', () => {
     expect(handleSelect).toHaveBeenCalledWith(1);
   });
 
+  it('renders live value tags elevated with z-50 so they are not underneath the scrubber line', () => {
+    const { container } = render(
+      <TelemetryStripCharts
+        points={mockPoints}
+        currentIndex={1}
+        onSelectIndex={vi.fn()}
+      />
+    );
+
+    const z50Badges = container.querySelectorAll('.z-50');
+    // All 5 channels (speed, throttle, brake, steering, gear) must have z-50 live tags
+    expect(z50Badges.length).toBe(5);
+    z50Badges.forEach(badge => {
+      // Must have offset class (ml-2.5) to stay clear of the vertical scrubber line
+      expect(badge.className).toContain('z-50');
+      expect(badge.className).toContain('ml-2.5');
+    });
+  });
+
   it('renders empty message when no points provided', () => {
     render(
       <TelemetryStripCharts

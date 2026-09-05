@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { parseReplayMetadata, extractReplayTrajectory, mapVehicleIdToModel } from '../../server/replayParser';
+import {
+  parseReplayMetadata,
+  extractReplayTrajectory,
+  mapVehicleIdToModel,
+  detectPlayerName,
+} from '../../server/replayParser';
 
 function createMockVcrBuffer(): Buffer {
   const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
@@ -108,6 +113,132 @@ function createMockVcrBuffer(): Buffer {
   ]);
 }
 
+/**
+ * Creates a binary VCR file containing realistic stream slices and event payloads.
+ * Supports telemetry inputs (throttle, brake, ABS, TC, off-track, pit limiter),
+ * multi-driver events, and custom metadata strings.
+ */
+function createSliceVcrBuffer(options?: {
+  slices?: {
+    sTime: number;
+    driverSlot: number;
+    x: number;
+    y: number;
+    z: number;
+    throttle?: number;
+    brake?: number;
+    tc?: boolean;
+    abs?: boolean;
+    offTrack?: boolean;
+    pitLimiter?: boolean;
+  }[];
+  drivers?: { name: string; vehicleId: string; team: string; carNumber: string }[];
+  eventInfo?: any;
+  corruptMetaOffset?: boolean;
+  rawEventInfoString?: string;
+}): Buffer {
+  const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+  const headerBuf = Buffer.from(headerText, 'ascii'); // 45 bytes
+  const irsrBuf = Buffer.from('IRSR', 'ascii'); // 4 bytes
+  const verBuf = Buffer.alloc(4);
+  verBuf.writeUInt32LE(0x80000008, 0); // 4 bytes
+
+  // 4-byte stream prefix for the first chunk
+  const streamPrefix = Buffer.alloc(4);
+
+  const sliceBufs: Buffer[] = [];
+  const slices = options?.slices || [];
+
+  for (const sl of slices) {
+    const sBuf = Buffer.alloc(6);
+    sBuf.writeFloatLE(sl.sTime, 0);
+    sBuf.writeUInt16LE(1, 4); // 1 event in this slice
+
+    const evHdr = Buffer.alloc(4);
+    evHdr.writeUInt32LE((65 << 8) | (sl.driverSlot & 0xff), 0);
+    const evPad = Buffer.from([0]);
+
+    const evData = Buffer.alloc(65);
+    // Steer at byte 4
+    evData.writeUInt16LE(512, 4);
+
+    // Throttle at byte 5: 1 + (pct * 2.48)
+    const thrByte = sl.throttle !== undefined ? Math.round(1 + (sl.throttle / 100) * 248) : 1;
+    evData[5] = Math.min(255, Math.max(0, thrByte));
+
+    // Brake at byte 36: bits 0..5 analog (0..63), bit 6 ABS (0x40), bit 7 TC (0x80)
+    let brkByte = sl.brake !== undefined ? Math.round((sl.brake / 100) * 63) : 0;
+    if (sl.abs) brkByte |= 0x40;
+    if (sl.tc) brkByte |= 0x80;
+    evData[36] = brkByte;
+
+    // Status at byte 38: bit 0 off-track (0x01), bit 2 pit limiter (0x04)
+    let stByte = 0;
+    if (sl.offTrack) stByte |= 0x01;
+    if (sl.pitLimiter) stByte |= 0x04;
+    evData[38] = stByte;
+
+    // Position coordinates (x, y, z) at bytes 41, 45, 49
+    evData.writeFloatLE(sl.x, 41);
+    evData.writeFloatLE(sl.y, 45);
+    evData.writeFloatLE(sl.z, 49);
+    evData.writeFloatLE(0.0, 57); // rotY
+
+    sliceBufs.push(sBuf, evHdr, evPad, evData);
+  }
+
+  const framesBuf = Buffer.concat([streamPrefix, ...sliceBufs]);
+
+  function makeStr4(str: string): Buffer {
+    const sBuf = Buffer.from(str, 'utf8');
+    const lBuf = Buffer.alloc(4);
+    lBuf.writeUInt32LE(sBuf.length, 0);
+    return Buffer.concat([lBuf, sBuf]);
+  }
+
+  const rawEvStr = options?.rawEventInfoString !== undefined
+    ? options.rawEventInfoString
+    : JSON.stringify(options?.eventInfo || { eventTitle: 'Test Event', eventType: 'practice', splitNo: 1, session: 'PRACTICE' });
+
+  const metaParts: Buffer[] = [
+    makeStr4(rawEvStr),
+    makeStr4('TEST.SCN'),
+    makeStr4('TEST.AIW'),
+    makeStr4('Test_Track'),
+    makeStr4('1.00'),
+    makeStr4('hash_123'),
+    makeStr4('C:\\Tracks\\Test'),
+  ];
+
+  const defaultDrivers = options?.drivers || [
+    { name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' },
+    { name: 'Rival Driver', vehicleId: '32_26_WRT_83524148', team: 'WRT Team Racing', carNumber: '32' },
+  ];
+
+  const driverParts: Buffer[] = [];
+  for (const d of defaultDrivers) {
+    for (const field of [d.name, d.vehicleId, d.team, d.carNumber]) {
+      driverParts.push(Buffer.from(field, 'utf8'));
+      driverParts.push(Buffer.from([0]));
+    }
+  }
+  metaParts.push(Buffer.concat(driverParts));
+
+  const trailer = Buffer.alloc(28);
+  trailer.writeUInt32LE(slices.length, 4);
+  trailer.writeUInt32LE(slices.length, 8);
+  trailer.writeFloatLE(slices[0]?.sTime ?? 0.0, 12);
+  trailer.writeFloatLE(slices[slices.length - 1]?.sTime ?? 100.0, 16);
+  metaParts.push(trailer);
+
+  const metadataBuf = Buffer.concat(metaParts);
+  const metaOffset = options?.corruptMetaOffset ? 99999999 : 57 + framesBuf.length;
+  const offsetBuf = Buffer.alloc(4);
+  offsetBuf.writeUInt32LE(metaOffset, 0);
+
+  return Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, framesBuf, metadataBuf]);
+}
+
 describe('replayParser', () => {
   const tempDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_temp');
   const tempVcrPath = path.join(tempDir, 'Test_Replay_P1.Vcr');
@@ -123,6 +254,69 @@ describe('replayParser', () => {
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  describe('detectPlayerName', () => {
+    it('detects player name from UserData/player/settings.json', () => {
+      const mockUdDir = path.join(tempDir, 'mock_ud', 'UserData', 'player');
+      fs.mkdirSync(mockUdDir, { recursive: true });
+      const settingsPath = path.join(mockUdDir, 'settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        DRIVER: {
+          'Player Name': 'Custom Test Driver',
+        },
+      }));
+
+      const detected = detectPlayerName(settingsPath);
+      expect(detected).toBe('Custom Test Driver');
+    });
+
+    it('detects player name using alternate PlayerName key and Settings.JSON casing', () => {
+      const mockUdDir = path.join(tempDir, 'mock_ud_alt', 'UserData', 'player');
+      fs.mkdirSync(mockUdDir, { recursive: true });
+      const settingsPath = path.join(mockUdDir, 'Settings.JSON');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        DRIVER: {
+          PlayerName: 'Alt Driver Name',
+        },
+      }));
+
+      const detected = detectPlayerName(settingsPath);
+      expect(detected).toBe('Alt Driver Name');
+    });
+
+    it('returns undefined when settings.json contains malformed JSON without crashing', () => {
+      const mockUdDir = path.join(tempDir, 'mock_ud_corrupt', 'UserData', 'player');
+      fs.mkdirSync(mockUdDir, { recursive: true });
+      const settingsPath = path.join(mockUdDir, 'settings.json');
+      fs.writeFileSync(settingsPath, '{{{ corrupt invalid json content');
+
+      const detected = detectPlayerName(settingsPath);
+      expect(detected).toBeUndefined();
+    });
+
+    it('prioritizes candidate directory player name over default Steam settings', () => {
+      const mockUdDir = path.join(tempDir, 'mock_ud_priority', 'UserData', 'player');
+      fs.mkdirSync(mockUdDir, { recursive: true });
+      const settingsPath = path.join(mockUdDir, 'settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({
+        DRIVER: {
+          'Player Name': 'Priority Custom Driver',
+        },
+      }));
+
+      const detected = detectPlayerName(settingsPath);
+      expect(detected).toBe('Priority Custom Driver');
+    });
+
+    it('returns undefined when no settings file exists anywhere', () => {
+      const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+      try {
+        expect(detectPlayerName('C:\\NonExistent\\UserData\\test.vcr')).toBeUndefined();
+      } finally {
+        existsSpy.mockRestore();
+      }
+    });
   });
 
   describe('mapVehicleIdToModel', () => {
@@ -177,6 +371,43 @@ describe('replayParser', () => {
       expect(() => parseReplayMetadata(invalidPath)).toThrow(/Invalid LMU replay file/);
       fs.unlinkSync(invalidPath);
     });
+
+    it('throws error when replay file is too small or missing IRSR magic tag', () => {
+      const tooSmallPath = path.join(tempDir, 'too_small.vcr');
+      fs.writeFileSync(tooSmallPath, Buffer.from('Short text'));
+      expect(() => parseReplayMetadata(tooSmallPath)).toThrow(/Invalid LMU replay file: missing IRSR/);
+      fs.unlinkSync(tooSmallPath);
+    });
+
+    it('throws error when replay file does not exist', () => {
+      const missingPath = path.join(tempDir, 'does_not_exist_replay.vcr');
+      expect(() => parseReplayMetadata(missingPath)).toThrow(/no such file or directory/i);
+    });
+
+    it('throws error when metadata offset points outside the file', () => {
+      const corruptOffsetPath = path.join(tempDir, 'corrupt_offset.vcr');
+      fs.writeFileSync(corruptOffsetPath, createSliceVcrBuffer({ corruptMetaOffset: true }));
+      expect(() => parseReplayMetadata(corruptOffsetPath)).toThrow(/Invalid metadata offset/);
+      fs.unlinkSync(corruptOffsetPath);
+    });
+
+    it('handles malformed non-JSON event info string without throwing', () => {
+      const malformedJsonPath = path.join(tempDir, 'malformed_event_info.vcr');
+      fs.writeFileSync(malformedJsonPath, createSliceVcrBuffer({ rawEventInfoString: '{ unclosed invalid json' }));
+      const meta = parseReplayMetadata(malformedJsonPath);
+      expect(meta.eventInfo).toEqual({ eventTitle: '{ unclosed invalid json' });
+      expect(meta.trackName).toBe('Test_Track');
+      expect(meta.drivers.length).toBe(2);
+      fs.unlinkSync(malformedJsonPath);
+    });
+
+    it('correctly sets isPlayer flag when explicit playerName is provided in options', () => {
+      const meta = parseReplayMetadata(tempVcrPath, { playerName: 'Test Rival' });
+      const rival = meta.drivers.find(d => d.name === 'Test Rival');
+      const samuel = meta.drivers.find(d => d.name === 'Samuel Lague');
+      expect(rival?.isPlayer).toBe(true);
+      expect(samuel?.isPlayer).toBe(false);
+    });
   });
 
   describe('extractReplayTrajectory', () => {
@@ -218,6 +449,142 @@ describe('replayParser', () => {
 
       const player = meta.drivers.find(d => d.name === 'Samuel Lague');
       expect(player?.isPlayer).toBe(true);
+    });
+
+    it('decodes telemetry flags (tcActive, absActive, pitLimiter, isOffTrack) and pedal inputs', () => {
+      const sliceVcrPath = path.join(tempDir, 'telemetry_flags.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          // Slice 0: full throttle, tcActive
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 100, brake: 0, tc: true, abs: false },
+          // Slice 1: mid brake, absActive
+          { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20, throttle: 0, brake: 60, tc: false, abs: true },
+          // Slice 2: pitLimiter and offTrack
+          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, throttle: 20, brake: 0, offTrack: true, pitLimiter: true },
+          // Slice 3: clean running
+          { sTime: 1.3, driverSlot: 1, x: 40, y: 0, z: 40, throttle: 80, brake: 0 },
+        ],
+      });
+      fs.writeFileSync(sliceVcrPath, buf);
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
+      expect(traj.pointsCount).toBe(4);
+
+      // Verify slice 0 telemetry
+      expect(traj.points[0].throttle).toBe(100);
+      expect(traj.points[0].tcActive).toBe(true);
+      expect(traj.points[0].absActive).toBe(false);
+
+      // Verify slice 1 telemetry
+      expect(traj.points[1].brake).toBeGreaterThan(50);
+      expect(traj.points[1].absActive).toBe(true);
+      expect(traj.points[1].tcActive).toBe(false);
+
+      // Verify slice 2 status flags
+      expect(traj.points[2].isOffTrack).toBe(true);
+      expect(traj.points[2].pitLimiter).toBe(true);
+
+      // Verify slice 3 clean flags
+      expect(traj.points[3].tcActive).toBe(false);
+      expect(traj.points[3].absActive).toBe(false);
+      expect(traj.points[3].isOffTrack).toBe(false);
+      expect(traj.points[3].pitLimiter).toBe(false);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('selects rival driver trajectory by driverSlot and driverName', () => {
+      const multiDriverPath = path.join(tempDir, 'multi_driver.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10 },
+          { sTime: 1.1, driverSlot: 1, x: 15, y: 0, z: 15 },
+          { sTime: 1.0, driverSlot: 2, x: 80, y: 0, z: 80 },
+          { sTime: 1.1, driverSlot: 2, x: 90, y: 0, z: 90 },
+        ],
+      });
+      fs.writeFileSync(multiDriverPath, buf);
+
+      // Extract slot 2 explicitly
+      const trajSlot2 = extractReplayTrajectory(multiDriverPath, { driverSlot: 2 });
+      expect(trajSlot2.driverSlot).toBe(2);
+      expect(trajSlot2.pointsCount).toBe(2);
+      expect(trajSlot2.points[0].x).toBe(80);
+
+      // Extract Rival Driver by name
+      const trajByName = extractReplayTrajectory(multiDriverPath, { driverName: 'Rival Driver' });
+      expect(trajByName.driverSlot).toBe(2);
+      expect(trajByName.driverName).toBe('Rival Driver');
+      expect(trajByName.points[0].x).toBe(80);
+
+      fs.unlinkSync(multiDriverPath);
+    });
+
+    it('handles non-existent driver slot gracefully without crashing', () => {
+      const sliceVcrPath = path.join(tempDir, 'slot_fallback.vcr');
+      fs.writeFileSync(sliceVcrPath, createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10 },
+        ],
+      }));
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 99 });
+      expect(traj.driverSlot).toBe(99);
+      expect(traj.pointsCount).toBe(0);
+      expect(traj.points).toEqual([]);
+      expect(traj.laps?.length).toBe(1);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('correctly filters out downshift rev-match throttle blips during heavy braking', () => {
+      const filterPath = path.join(tempDir, 'filter_blip.vcr');
+      // Create a sequence where brake is > 8, and a brief throttle blip occurs flanked by zero throttle
+      const slices = [
+        { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 0, brake: 50 },
+        { sTime: 1.02, driverSlot: 1, x: 11, y: 0, z: 11, throttle: 0, brake: 50 },
+        { sTime: 1.04, driverSlot: 1, x: 12, y: 0, z: 12, throttle: 65, brake: 50 }, // blip
+        { sTime: 1.06, driverSlot: 1, x: 13, y: 0, z: 13, throttle: 0, brake: 50 },
+        { sTime: 1.08, driverSlot: 1, x: 14, y: 0, z: 14, throttle: 0, brake: 50 },
+      ];
+      fs.writeFileSync(filterPath, createSliceVcrBuffer({ slices }));
+
+      const traj = extractReplayTrajectory(filterPath, { driverSlot: 1, maxPoints: 10 });
+      // Point 2 was a blip of 65 during heavy braking, should be filtered to 0
+      expect(traj.points[2].throttle).toBe(0);
+
+      fs.unlinkSync(filterPath);
+    });
+
+    it('interpolates brief upshift ignition cuts to preserve full throttle intent', () => {
+      const cutPath = path.join(tempDir, 'filter_cut.vcr');
+      // Sequence: throttle 100%, 100%, momentary cut to 10% for gear change, then back to 100%
+      const slices = [
+        { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 100, brake: 0 },
+        { sTime: 1.02, driverSlot: 1, x: 12, y: 0, z: 12, throttle: 100, brake: 0 },
+        { sTime: 1.04, driverSlot: 1, x: 14, y: 0, z: 14, throttle: 10, brake: 0 }, // upshift cut
+        { sTime: 1.06, driverSlot: 1, x: 16, y: 0, z: 16, throttle: 100, brake: 0 },
+        { sTime: 1.08, driverSlot: 1, x: 18, y: 0, z: 18, throttle: 100, brake: 0 },
+      ];
+      fs.writeFileSync(cutPath, createSliceVcrBuffer({ slices }));
+
+      const traj = extractReplayTrajectory(cutPath, { driverSlot: 1, maxPoints: 10 });
+      // Point 2 should be interpolated back up to ~100 instead of 10
+      expect(traj.points[2].throttle).toBeGreaterThanOrEqual(90);
+
+      fs.unlinkSync(cutPath);
+    });
+
+    it('gracefully falls back when requested lapNumber does not exist', () => {
+      const traj = extractReplayTrajectory(tempVcrPath, { lapNumber: 999 });
+      // Should fall back to best lap or lap 1 without crashing
+      expect(traj.currentLap).toBe(1);
+      expect(traj.pointsCount).toBeGreaterThan(0);
+    });
+
+    it('throws error when trajectory file does not exist', () => {
+      const missingPath = path.join(tempDir, 'nonexistent_traj.vcr');
+      expect(() => extractReplayTrajectory(missingPath)).toThrow(/no such file or directory/i);
     });
   });
 
@@ -264,6 +631,22 @@ describe('replayParser', () => {
           expect(lap2Traj.points.length).toBe(500);
         });
       }
+
+      const imolaFile = path.join(steamReplaysDir, 'Autodromo Enzo e Dino Ferrari R1 8.Vcr');
+      if (fs.existsSync(imolaFile)) {
+        it('detects all 16 laps independently in full 360MB+ race replay without truncation', () => {
+          const traj = extractReplayTrajectory(imolaFile, {
+            playerName: 'Samuel',
+          });
+          expect(traj.laps).toBeDefined();
+          expect(traj.laps?.length).toBe(16);
+          expect(traj.laps?.[0].lapTimeSec).toBeGreaterThan(100);
+          expect(traj.laps?.[1].lapTimeSec).toBeCloseTo(102.54, 1);
+          expect(traj.laps?.[12].lapTimeSec).toBeCloseTo(100.68, 1);
+          expect(traj.laps?.[12].isBest).toBe(true);
+        });
+      }
     });
   }
 });
+

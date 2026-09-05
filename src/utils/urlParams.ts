@@ -35,6 +35,11 @@ export function updateHashParams(updates: Record<string, string | boolean | null
   const paramStr = params.toString();
   const newHash = `#/${path}${paramStr ? `?${paramStr}` : ''}`;
   window.history.replaceState(null, '', newHash);
+  try {
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  } catch {
+    window.dispatchEvent(new Event('hashchange'));
+  }
 }
 
 export function setHashRoute(newPath: string, preserveParams = true): void {

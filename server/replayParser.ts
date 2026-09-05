@@ -38,6 +38,51 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
 }
 
 /**
+ * Dynamically detects the LMU player profile name from UserData/player/settings.json,
+ * avoiding any hardcoded player names.
+ */
+export function detectPlayerName(baseDirOrFile?: string): string | undefined {
+  try {
+    const candidateUserDataDirs: string[] = [];
+
+    if (baseDirOrFile) {
+      const uIdx = baseDirOrFile.indexOf('UserData');
+      if (uIdx !== -1) {
+        candidateUserDataDirs.push(baseDirOrFile.substring(0, uIdx + 8));
+      }
+    }
+
+    candidateUserDataDirs.push(
+      'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData',
+      path.join(process.cwd(), 'UserData')
+    );
+
+    for (const udDir of candidateUserDataDirs) {
+      if (!fs.existsSync(udDir)) continue;
+
+      const settingsPaths = [
+        path.join(udDir, 'player', 'settings.json'),
+        path.join(udDir, 'player', 'Settings.JSON'),
+      ];
+
+      for (const sp of settingsPaths) {
+        if (fs.existsSync(sp)) {
+          const raw = fs.readFileSync(sp, 'utf8');
+          const parsed = JSON.parse(raw);
+          const pName = parsed?.DRIVER?.['Player Name'] || parsed?.DRIVER?.PlayerName;
+          if (pName && typeof pName === 'string' && pName.trim()) {
+            return pName.trim();
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore fallback
+  }
+  return undefined;
+}
+
+/**
  * Parses replay header and extracts metadata block, driver roster, and session info.
  * Seeks directly to metadataOffset for sub-5ms performance.
  */
@@ -45,6 +90,7 @@ export function parseReplayMetadata(
   filePath: string,
   options?: { playerName?: string }
 ): ReplayMetadata {
+  const effectivePlayerName = options?.playerName || detectPlayerName(filePath);
   const stat = fs.statSync(filePath);
   const fd = fs.openSync(filePath, 'r');
 
@@ -163,8 +209,10 @@ export function parseReplayMetadata(
               const sCarNum = readPStr(driverRegion, np); np = sCarNum.nextOffset;
 
               const isPlayer = Boolean(
-                str.toLowerCase().includes('samuel') ||
-                (options?.playerName && str.toLowerCase() === options.playerName.toLowerCase())
+                effectivePlayerName && (
+                  str.toLowerCase() === effectivePlayerName.toLowerCase() ||
+                  str.toLowerCase().includes(effectivePlayerName.toLowerCase())
+                )
               );
 
               drivers.push({
@@ -232,8 +280,10 @@ export function parseReplayMetadata(
           const slot = drivers.length + 1;
           const carModel = mapVehicleIdToModel(vehicleId);
           const isPlayer = Boolean(
-            name.toLowerCase().includes('samuel') ||
-            (options?.playerName && name.toLowerCase() === options.playerName.toLowerCase())
+            effectivePlayerName && (
+              name.toLowerCase() === effectivePlayerName.toLowerCase() ||
+              name.toLowerCase().includes(effectivePlayerName.toLowerCase())
+            )
           );
 
           drivers.push({
@@ -301,7 +351,8 @@ export function extractReplayTrajectory(
     lapNumber?: number;
   } = {}
 ): ReplayTrajectoryData {
-  const meta = parseReplayMetadata(filePath, { playerName: options.playerName });
+  const effectivePlayerName = options.playerName || detectPlayerName(filePath);
+  const meta = parseReplayMetadata(filePath, { playerName: effectivePlayerName });
   const stat = fs.statSync(filePath);
   const fd = fs.openSync(filePath, 'r');
 
@@ -325,134 +376,6 @@ export function extractReplayTrajectory(
       };
     }
 
-    // Read frames in chunks to manage memory (up to 120MB for high-precision multi-lap scan)
-    const maxReadBytes = Math.min(frameStreamBytes, 120 * 1024 * 1024);
-    const buf = Buffer.alloc(maxReadBytes);
-    fs.readSync(fd, buf, 0, maxReadBytes, 57);
-
-    const driverPoints = new Map<number, RawPoint[]>();
-    const driverMotion = new Map<number, { minX: number; maxX: number; minZ: number; maxZ: number; count: number }>();
-
-    // Sequential slice parser
-    // Each slice starts with 4-byte slice time (floatLE) + 2-byte event count (uint16LE)
-    // Slices stream begins at offset 4 (after 4 leading zero bytes)
-    let sp = 4;
-    let slicesFound = 0;
-
-    while (sp + 6 < buf.length) {
-      const sTime = buf.readFloatLE(sp);
-      const nEvents = buf.readUInt16LE(sp + 4);
-      sp += 6;
-
-      // Validate slice headers
-      if (nEvents > 250 || sTime < 0 || sTime > 100000) break;
-      slicesFound++;
-
-      let sliceOk = true;
-      for (let e = 0; e < nEvents; e++) {
-        if (sp + 4 > buf.length) { sliceOk = false; break; }
-        const h = buf.readUInt32LE(sp);
-        const sz = (h >> 8) & 0x1ff;
-        const drv = h & 0xff;
-
-        if (sp + 4 + 1 + sz > buf.length) { sliceOk = false; break; }
-
-        if (sz === 65) {
-          const x = buf.readFloatLE(sp + 5 + 41);
-          const y = buf.readFloatLE(sp + 5 + 45);
-          const z = buf.readFloatLE(sp + 5 + 49);
-          const rotY = buf.readFloatLE(sp + 5 + 57);
-          const raw16 = buf.readUInt16LE(sp + 5 + 4);
-          const steer10 = raw16 & 0x3ff;
-          const steerYaw = Math.round(((steer10 - 512) / 512) * 540);
-
-          // Byte 5 is the raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
-          const rawThrByte = buf[sp + 5 + 5];
-          const rawThrottle = rawThrByte <= 1 ? 0 : Math.min(100, Math.round(((rawThrByte - 1) / 248) * 100));
-
-          // Byte 36 is the raw brake input (0 = 0%, bits 0..5 = analog brake pressure up to 63, bit 6 = ABS active, bit 7 = TC active)
-          const rawBrkByte = buf[sp + 5 + 36];
-          const rawBrake = rawBrkByte === 0 ? 0 : Math.min(100, Math.round(((rawBrkByte & 0x3f) / 63) * 100));
-          const absActive = Boolean(rawBrkByte & 0x40);
-          const tcActive = Boolean(rawBrkByte & 0x80);
-
-          // Byte 38 is vehicle status & surface/pit flags:
-          // bit 0 (0x01) = off-track surface / track limit cut
-          // bit 2 (0x04) = pit limiter active (holding 60 km/h)
-          // bit 7 (0x80) = inside pit lane boundary
-          const statusByte = buf[sp + 5 + 38];
-          const isOffTrack = Boolean(statusByte & 0x01);
-          const pitLimiter = Boolean(statusByte & 0x04);
-          const inPit = Boolean(statusByte & 0x80);
-
-          if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
-            let m = driverMotion.get(drv);
-            if (!m) {
-              m = { minX: x, maxX: x, minZ: z, maxZ: z, count: 0 };
-              driverMotion.set(drv, m);
-            }
-            m.minX = Math.min(m.minX, x);
-            m.maxX = Math.max(m.maxX, x);
-            m.minZ = Math.min(m.minZ, z);
-            m.maxZ = Math.max(m.maxZ, z);
-            m.count++;
-
-            let pts = driverPoints.get(drv);
-            if (!pts) {
-              pts = [];
-              driverPoints.set(drv, pts);
-            }
-            pts.push({ sTime, x, y, z, rotY, steerYaw, rawThrottle, rawBrake, tcActive, absActive, pitLimiter, inPit, isOffTrack });
-          }
-        }
-        sp += 4 + 1 + sz;
-      }
-      if (!sliceOk) break;
-    }
-
-    // Fallback parser for synthetic mock test buffers or non-standard streams
-    if (slicesFound === 0 || driverPoints.size === 0) {
-      const sig = Buffer.from([0x41, 0x10]);
-      let scanPos = 0;
-      let mockTime = 0;
-
-      while (scanPos < buf.length - 70) {
-        const idx = buf.indexOf(sig, scanPos);
-        if (idx === -1 || idx + 68 > buf.length) break;
-
-        if (idx > 0) {
-          const slot = buf[idx - 1];
-          const rec = buf.subarray(idx - 1, idx - 1 + 70);
-          const x = rec.readFloatLE(46);
-          const y = rec.readFloatLE(50);
-          const z = rec.readFloatLE(54);
-          const rotY = rec.readFloatLE(62);
-
-          if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
-            let m = driverMotion.get(slot);
-            if (!m) {
-              m = { minX: x, maxX: x, minZ: z, maxZ: z, count: 0 };
-              driverMotion.set(slot, m);
-            }
-            m.minX = Math.min(m.minX, x);
-            m.maxX = Math.max(m.maxX, x);
-            m.minZ = Math.min(m.minZ, z);
-            m.maxZ = Math.max(m.maxZ, z);
-            m.count++;
-
-            let pts = driverPoints.get(slot);
-            if (!pts) {
-              pts = [];
-              driverPoints.set(slot, pts);
-            }
-            mockTime += 0.02;
-            pts.push({ sTime: mockTime, x, y, z, rotY });
-          }
-        }
-        scanPos = idx + 2;
-      }
-    }
-
     // Target slot determination
     let targetSlot = options.driverSlot;
     if (targetSlot === undefined && options.driverName) {
@@ -466,8 +389,7 @@ export function extractReplayTrajectory(
     if (targetSlot === undefined) {
       const player = meta.drivers.find(d =>
         d.isPlayer ||
-        d.name.toLowerCase().includes('samuel') ||
-        (options.playerName && d.name.toLowerCase().includes(options.playerName.toLowerCase())) ||
+        (effectivePlayerName && d.name.toLowerCase().includes(effectivePlayerName.toLowerCase())) ||
         (options.driverName && d.name.toLowerCase().includes(options.driverName.toLowerCase()))
       );
       if (player && typeof player.slot === 'number') {
@@ -475,30 +397,156 @@ export function extractReplayTrajectory(
       }
     }
 
-    // If targetSlot is still undefined or has no points, fall back to active driver with largest motion span
-    if ((targetSlot === undefined || !driverPoints.has(targetSlot)) && driverPoints.size > 0) {
-      let maxSpan = -1;
-      let bestDriver: number | undefined;
-      for (const [drv, m] of driverMotion.entries()) {
-        if (drv === 104 && m.count > 0 && Math.hypot(m.maxX - m.minX, m.maxZ - m.minZ) < 5) {
-          continue; // skip parked safety car
+    if (targetSlot === undefined && meta.drivers.length > 0 && typeof meta.drivers[0].slot === 'number') {
+      targetSlot = meta.drivers[0].slot;
+    }
+
+    const driverPoints = new Map<number, RawPoint[]>();
+    const driverMotion = new Map<number, { minX: number; maxX: number; minZ: number; maxZ: number; count: number }>();
+    const rawPts: RawPoint[] = [];
+
+    // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
+    const CHUNK_SIZE = 16 * 1024 * 1024;
+    const buf = Buffer.alloc(Math.min(CHUNK_SIZE, frameStreamBytes + 16));
+    let filePos = 57;
+    let carryoverLen = 0;
+    let isFirstChunk = true;
+    let slicesFound = 0;
+
+    while (filePos < frameStreamEnd) {
+      const bytesToRead = Math.min(CHUNK_SIZE - carryoverLen, frameStreamEnd - filePos);
+      if (bytesToRead <= 0) break;
+
+      fs.readSync(fd, buf, carryoverLen, bytesToRead, filePos);
+      const activeLen = carryoverLen + bytesToRead;
+      filePos += bytesToRead;
+
+      let sp = isFirstChunk ? 4 : 0;
+      isFirstChunk = false;
+
+      while (true) {
+        if (sp + 6 > activeLen) break;
+        const sTime = buf.readFloatLE(sp);
+        const nEvents = buf.readUInt16LE(sp + 4);
+
+        if (nEvents > 250 || sTime < 0 || sTime > 100000) {
+          filePos = frameStreamEnd;
+          break;
         }
-        const span = Math.hypot(m.maxX - m.minX, m.maxZ - m.minZ);
-        if (span > maxSpan) {
-          maxSpan = span;
-          bestDriver = drv;
+
+        let tempSp = sp + 6;
+        let canParseSlice = true;
+        for (let e = 0; e < nEvents; e++) {
+          if (tempSp + 4 > activeLen) { canParseSlice = false; break; }
+          const h = buf.readUInt32LE(tempSp);
+          const sz = (h >> 8) & 0x1ff;
+          tempSp += 4 + 1 + sz;
+          if (tempSp > activeLen) { canParseSlice = false; break; }
         }
+        if (!canParseSlice) break;
+
+        slicesFound++;
+        let eventSp = sp + 6;
+        for (let e = 0; e < nEvents; e++) {
+          const h = buf.readUInt32LE(eventSp);
+          const sz = (h >> 8) & 0x1ff;
+          const drv = h & 0xff;
+
+          if (sz === 65) {
+            const x = buf.readFloatLE(eventSp + 5 + 41);
+            const y = buf.readFloatLE(eventSp + 5 + 45);
+            const z = buf.readFloatLE(eventSp + 5 + 49);
+            const rotY = buf.readFloatLE(eventSp + 5 + 57);
+            const raw16 = buf.readUInt16LE(eventSp + 5 + 4);
+            const steer10 = raw16 & 0x3ff;
+            const steerYaw = Math.round(((steer10 - 512) / 512) * 540);
+
+            // Byte 5 is the raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
+            const rawThrByte = buf[eventSp + 5 + 5];
+            const rawThrottle = rawThrByte <= 1 ? 0 : Math.min(100, Math.round(((rawThrByte - 1) / 248) * 100));
+
+            // Byte 36 is the raw brake input (0 = 0%, bits 0..5 = analog brake pressure up to 63, bit 6 = ABS active, bit 7 = TC active)
+            const rawBrkByte = buf[eventSp + 5 + 36];
+            const rawBrake = rawBrkByte === 0 ? 0 : Math.min(100, Math.round(((rawBrkByte & 0x3f) / 63) * 100));
+            const absActive = Boolean(rawBrkByte & 0x40);
+            const tcActive = Boolean(rawBrkByte & 0x80);
+
+            // Byte 38 is vehicle status & surface/pit flags:
+            // bit 0 (0x01) = off-track surface / track limit cut
+            // bit 2 (0x04) = pit limiter active (holding 60 km/h)
+            // bit 7 (0x80) = inside pit lane boundary
+            const statusByte = buf[eventSp + 5 + 38];
+            const isOffTrack = Boolean(statusByte & 0x01);
+            const pitLimiter = Boolean(statusByte & 0x04);
+            const inPit = Boolean(statusByte & 0x80);
+
+            if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
+              if (targetSlot !== undefined) {
+                if (drv === targetSlot) {
+                  rawPts.push({ sTime, x, y, z, rotY, steerYaw, rawThrottle, rawBrake, tcActive, absActive, pitLimiter, inPit, isOffTrack });
+                }
+              } else {
+                let pts = driverPoints.get(drv);
+                if (!pts) {
+                  pts = [];
+                  driverPoints.set(drv, pts);
+                }
+                pts.push({ sTime, x, y, z, rotY, steerYaw, rawThrottle, rawBrake, tcActive, absActive, pitLimiter, inPit, isOffTrack });
+              }
+            }
+          }
+          eventSp += 4 + 1 + sz;
+        }
+        sp = eventSp;
       }
-      if (targetSlot === undefined && bestDriver !== undefined) {
-        targetSlot = bestDriver;
+
+      carryoverLen = activeLen - sp;
+      if (carryoverLen > 0) {
+        buf.copy(buf, 0, sp, activeLen);
       }
     }
 
-    if (targetSlot === undefined && driverPoints.size > 0) {
+    // Fallback parser for synthetic mock test buffers or non-standard streams
+    if (slicesFound === 0 || (rawPts.length === 0 && driverPoints.size === 0)) {
+      const sig = Buffer.from([0x41, 0x10]);
+      let scanPos = 0;
+      let mockTime = 0;
+      const fullBuf = Buffer.alloc(Math.min(frameStreamBytes, 10 * 1024 * 1024));
+      fs.readSync(fd, fullBuf, 0, fullBuf.length, 57);
+
+      while (scanPos < fullBuf.length - 70) {
+        const idx = fullBuf.indexOf(sig, scanPos);
+        if (idx === -1 || idx + 68 > fullBuf.length) break;
+
+        if (idx > 0) {
+          const slot = fullBuf[idx - 1];
+          const rec = fullBuf.subarray(idx - 1, idx - 1 + 70);
+          const x = rec.readFloatLE(46);
+          const y = rec.readFloatLE(50);
+          const z = rec.readFloatLE(54);
+          const rotY = rec.readFloatLE(62);
+
+          if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
+            let pts = driverPoints.get(slot);
+            if (!pts) {
+              pts = [];
+              driverPoints.set(slot, pts);
+            }
+            mockTime += 0.02;
+            pts.push({ sTime: mockTime, x, y, z, rotY });
+          }
+        }
+        scanPos = idx + 2;
+      }
+    }
+
+    if (rawPts.length === 0 && targetSlot !== undefined && driverPoints.has(targetSlot)) {
+      rawPts.push(...driverPoints.get(targetSlot)!);
+    } else if (rawPts.length === 0 && targetSlot === undefined && driverPoints.size > 0) {
       targetSlot = Array.from(driverPoints.keys())[0];
+      rawPts.push(...driverPoints.get(targetSlot)!);
     }
 
-    const rawPts = (targetSlot !== undefined ? driverPoints.get(targetSlot) : null) || [];
     const maxPoints = options.maxPoints || 1200;
 
     // Filter out transmission-actuated upshift ignition cuts and downshift rev-match blips
