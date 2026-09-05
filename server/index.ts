@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
 import { DetailedSession, ReplaySummary } from './types.js';
-import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
+import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty } from '../src/utils/formatters.js';
@@ -418,6 +418,17 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       }
     } catch {
       // Ignore session loading errors
+    }
+
+    if (!metadata.laps || metadata.laps.length === 0) {
+      try {
+        const vcrLaps = extractReplayLapSummaries(filePath, { playerName: parser.configuredPlayerName });
+        if (vcrLaps && vcrLaps.length > 0) {
+          metadata.laps = vcrLaps;
+        }
+      } catch {
+        // Ignore fallback errors
+      }
     }
 
     res.json(metadata);

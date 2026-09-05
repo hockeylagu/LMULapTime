@@ -408,6 +408,33 @@ export function parseReplayMetadata(
       }
     }
 
+    if (effectivePlayerName && drivers.length > 0) {
+      const explicitName = options?.playerName?.trim().toLowerCase();
+      const profileName = !explicitName ? detectPlayerName(filePath)?.trim().toLowerCase() : undefined;
+      const targetLower = explicitName || profileName || effectivePlayerName.trim().toLowerCase();
+
+      // 1. Exact match with target name
+      let bestMatch = drivers.find(d => d.name.toLowerCase() === targetLower);
+
+      // 2. Substring match with target name
+      if (!bestMatch) {
+        const matched = drivers.filter(d => d.name.toLowerCase().includes(targetLower));
+        if (matched.length > 0) {
+          // If multiple candidates match (e.g. "Samuel Dominguez" vs "Samuel Lague" with target "samuel"),
+          // check if settings profileName matches one of them
+          const envProfile = detectPlayerName(filePath)?.trim().toLowerCase();
+          bestMatch = matched.find(d => envProfile && d.name.toLowerCase() === envProfile)
+            || matched.find(d => envProfile && d.name.toLowerCase().includes(envProfile))
+            || matched.find(d => new RegExp(`\\b${targetLower}\\b`, 'i').test(d.name))
+            || matched[0];
+        }
+      }
+
+      drivers.forEach(d => {
+        d.isPlayer = Boolean(bestMatch && d.slot === bestMatch.slot && d.name === bestMatch.name);
+      });
+    }
+
     return {
       filename: path.basename(filePath),
       filePath,
@@ -453,33 +480,6 @@ interface RawPoint {
   physicsRpm?: number;
   detachablePartState?: number;
 }
-
-export const KNOWN_TRACK_SF_COORDS: Array<{ layoutName?: string; keywords: string[]; x: number; z: number }> = [
-  // Specific layouts & variants first (must precede generic circuit keywords)
-  { layoutName: 'Bahrain Paddock', keywords: ['bahrainwec_paddock', 'bahrain paddock', 'paddock circuit'], x: -218.5, z: -270.5 },
-  { layoutName: 'Bahrain Outer', keywords: ['bahrainwec_outer', 'bahrain outer', 'outer circuit'], x: 410.69, z: 367.95 },
-  { layoutName: 'Bahrain Grand Prix', keywords: ['bahrain'], x: 410.69, z: 367.95 },
-
-  { layoutName: 'Sebring School', keywords: ['sebringwec_school', 'sebring school', 'school circuit'], x: -245.16, z: -213.06 },
-  { layoutName: 'Sebring 12h Full', keywords: ['sebring'], x: 198.41, z: 0.61 },
-
-  { layoutName: 'Monza Curva Grande', keywords: ['monzawec_grande', 'curva grande'], x: -270.98, z: -100.87 },
-  { layoutName: 'Monza Grand Prix', keywords: ['monza'], x: -269.53, z: -407.92 },
-
-  { layoutName: 'Daytona Road Course', keywords: ['daytonarc', 'daytona'], x: -112.47, z: -37.36 },
-  { layoutName: 'Imola Grand Prix', keywords: ['imolaelms', 'imola', 'dino ferrari'], x: 1.45, z: 10.80 },
-  { layoutName: 'Laguna Seca', keywords: ['lagunaseca', 'laguna'], x: -31.81, z: -122.68 },
-  { layoutName: 'Spa-Francorchamps', keywords: ['spaelms', 'spawec', 'spa', 'francorchamps'], x: -232.3, z: 735.2 },
-  { layoutName: 'Fuji Speedway', keywords: ['fujiwec', 'fuji'], x: -225.77, z: -157.93 },
-  { layoutName: 'Circuit of the Americas', keywords: ['cotawec', 'americas', 'cota'], x: -508.72, z: -306.28 },
-  { layoutName: 'Algarve / Portimao', keywords: ['portimaowec', 'algarve', 'portimao'], x: -108.49, z: -26.35 },
-  { layoutName: 'Silverstone', keywords: ['silverstonewec', 'silverstone'], x: -34.93, z: -5.37 },
-  { layoutName: 'Lusail Short', keywords: ['qatarwec_short', 'lusail short', 'lusail', 'losail', 'qatar'], x: -26.73, z: 52.26 },
-  { layoutName: 'Paul Ricard Short', keywords: ['paulricard', 'paul ricard', 'ricard'], x: -248.39, z: 192.00 },
-  { layoutName: 'Barcelona', keywords: ['barcelonaelms', 'barcelona', 'catalunya'], x: -72.33, z: -146.63 },
-  { layoutName: 'Circuit de la Sarthe', keywords: ['lemanswec', 'sarthe', 'le mans'], x: 1387.55, z: 1640.82 },
-  { layoutName: 'Interlagos', keywords: ['interlagoswec', 'pace', 'interlagos'], x: -81.02, z: -219.94 },
-];
 
 /**
  * Extracts downsampled 2D/3D car trajectory and live inputs from replay frames.
@@ -700,7 +700,7 @@ export function extractReplayTrajectory(
                 pts.push(pt);
               }
             }
-          } else if (sz === 21 && eventSp + 5 + 9 <= activeLen) {
+          } else if ((sz === 21 || sz === 18 || (evClass === 6 && evType === 6 && sz >= 9)) && eventSp + 5 + 9 <= activeLen) {
             const splitSec = buf.readFloatLE(eventSp + 5);
             const sec = buf[eventSp + 5 + 8] & 3;
             const lapIdx = buf[eventSp + 5 + 8] >> 2;
@@ -936,10 +936,12 @@ export function extractReplayTrajectory(
         let s1Idx = startIdx;
         let s2Idx = startIdx;
 
-        if (s1Ev && s1Ev.splitSec > 0) {
+        const isValidSplit = (v?: number) => typeof v === 'number' && isFinite(v) && v > 0 && v < 1800;
+
+        if (s1Ev && isValidSplit(s1Ev.splitSec)) {
           s1Sec = Number(s1Ev.splitSec.toFixed(3));
           s1Idx = findClosestIdx(s1Ev.sTime);
-        } else if (s1Ev && s1Ev.sTime > startTime) {
+        } else if (s1Ev && s1Ev.sTime > startTime && (s1Ev.sTime - startTime) < lapTimeSec) {
           s1Idx = findClosestIdx(s1Ev.sTime);
           s1Sec = Number((s1Ev.sTime - startTime).toFixed(3));
         } else {
@@ -948,12 +950,15 @@ export function extractReplayTrajectory(
           s1Sec = Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3));
         }
 
-        if (s1Ev && s2Ev && s2Ev.splitSec > s1Ev.splitSec && s1Ev.splitSec > 0) {
+        if (s1Ev && s2Ev && isValidSplit(s1Ev.splitSec) && isValidSplit(s2Ev.splitSec) && s2Ev.splitSec > s1Ev.splitSec && (s2Ev.splitSec - s1Ev.splitSec) < lapTimeSec) {
           s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
           s2Idx = findClosestIdx(s2Ev.sTime);
-        } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime) {
+        } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime && (s2Ev.sTime - s1Ev.sTime) < lapTimeSec) {
           s2Idx = findClosestIdx(s2Ev.sTime);
           s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
+        } else if (s2Ev && s2Ev.sTime > startTime && (s2Ev.sTime - startTime) < lapTimeSec && (s2Ev.sTime - startTime) > s1Sec) {
+          s2Idx = findClosestIdx(s2Ev.sTime);
+          s2Sec = Number((s2Ev.sTime - startTime - s1Sec).toFixed(3));
         } else {
           s2Idx = s1Idx;
           const s2TargetDist = cumDist[startIdx] + lapDist * 0.6667;
@@ -961,16 +966,18 @@ export function extractReplayTrajectory(
           s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
         }
 
-        if (s2Ev && ft.splitSec > s2Ev.splitSec && s2Ev.splitSec > 0 && ft.splitSec > 0) {
+        if (s2Ev && isValidSplit(ft.splitSec) && isValidSplit(s2Ev.splitSec) && ft.splitSec > s2Ev.splitSec && (ft.splitSec - s2Ev.splitSec) < lapTimeSec) {
           s3Sec = Number((ft.splitSec - s2Ev.splitSec).toFixed(3));
-        } else if (s2Ev && finishTime > s2Ev.sTime) {
+        } else if (s2Ev && finishTime > s2Ev.sTime && (finishTime - s2Ev.sTime) < lapTimeSec) {
           s3Sec = Number((finishTime - s2Ev.sTime).toFixed(3));
+        } else if (lapTimeSec > s1Sec + s2Sec && (lapTimeSec - s1Sec - s2Sec) > 0) {
+          s3Sec = Number((lapTimeSec - s1Sec - s2Sec).toFixed(3));
         } else {
           s3Sec = Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
         }
 
         const isValid = ft.splitSec > 0;
-        const isOutlap = i === 0 || (startIdx >= 0 && Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit));
+        const isOutlap = i === 0 || (startIdx >= 0 && Boolean(rawPts[startIdx]?.pitLimiter));
 
         detectedLaps.push({
           lapNumber: lapNum,
@@ -1044,16 +1051,21 @@ export function extractReplayTrajectory(
             s3Sec,
             s1Idx,
             s2Idx,
-            isOutlap: false,
+            isOutlap: true,
             isBest: false,
             isValid: false,
           });
         }
       }
 
-      const validFlying = detectedLaps.filter(l => !l.isOutlap && l.isValid && l.lapTimeSec > 30);
+      const validLaps = detectedLaps.filter(l => l.isValid && l.lapTimeSec > 30);
+      const validFlying = validLaps.filter(l => !l.isOutlap);
       const fallbackFlying = detectedLaps.filter(l => !l.isOutlap && l.lapTimeSec > 30);
-      const pool = validFlying.length > 0 ? validFlying : (fallbackFlying.length > 0 ? fallbackFlying : detectedLaps);
+      const pool = validFlying.length > 0
+        ? validFlying
+        : (validLaps.length > 0
+            ? validLaps
+            : (fallbackFlying.length > 0 ? fallbackFlying : detectedLaps));
       let minTime = Infinity;
       let bestLapNum = pool[0]?.lapNumber;
       for (const l of pool) {
@@ -1065,281 +1077,6 @@ export function extractReplayTrajectory(
       detectedLaps.forEach(l => {
         if (l.lapNumber === bestLapNum) l.isBest = true;
       });
-    }
-
-    // 2. Autonomous geometric lap and Start/Finish line detection fallback
-    if (detectedLaps.length === 0 && rawPts.length >= 30) {
-      function findCrossingsForCandidate(cIdx: number, minIntervalSec = 20) {
-        const refPt = rawPts[cIdx];
-        const step = Math.min(5, Math.max(1, Math.floor((rawPts.length - 1 - cIdx) / 10)));
-        const nextPt = rawPts[Math.min(rawPts.length - 1, cIdx + step)];
-        const refHeading = Math.atan2(nextPt.z - refPt.z, nextPt.x - refPt.x);
-
-        const crossings: number[] = [cIdx];
-        let lastCrossingTime = rawPts[cIdx].sTime;
-        let curCluster: { idx: number; t: number; d: number }[] = [];
-
-        const minScanDist = (cumDist[cIdx] || 0) + 80;
-        const minScanTime = rawPts[cIdx].sTime + 5;
-        let scanStart = cIdx + 1;
-        while (scanStart < rawPts.length - 3 && (cumDist[scanStart] < minScanDist || rawPts[scanStart].sTime < minScanTime)) {
-          scanStart++;
-        }
-
-        for (let i = scanStart; i < rawPts.length - 1; i++) {
-          const d = Math.hypot(rawPts[i].x - refPt.x, rawPts[i].z - refPt.z);
-          if (d < 22) {
-            const hStep = Math.min(5, Math.max(1, rawPts.length - 1 - i));
-            const heading = Math.atan2(rawPts[i + hStep].z - rawPts[i].z, rawPts[i + hStep].x - rawPts[i].x);
-            const headingDiff = Math.abs(Math.atan2(Math.sin(heading - refHeading), Math.cos(heading - refHeading)));
-            if (headingDiff < 0.8) {
-              const t = rawPts[i].sTime;
-              if (t - lastCrossingTime > minIntervalSec) {
-                if (curCluster.length === 0 || t - curCluster[curCluster.length - 1].t < 5) {
-                  curCluster.push({ idx: i, t, d });
-                } else {
-                  const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
-                  crossings.push(best.idx);
-                  lastCrossingTime = best.t;
-                  curCluster = [{ idx: i, t, d }];
-                }
-              }
-            }
-          }
-        }
-        if (curCluster.length > 0) {
-          const best = curCluster.reduce((min, p) => (p.d < min.d ? p : min), curCluster[0]);
-          crossings.push(best.idx);
-        }
-        return crossings;
-      }
-
-      let bestCrossings: number[] = [];
-      let bestCandidateIdx = -1;
-
-      // Priority 1: Check known circuit and layout version Start/Finish line catalog
-      // Synchronizes the lap start/finish point universally across all session types (Race, Qualifying, Practice)
-      const trackIdentifier = `${meta.aiw || ''} ${meta.scn || ''} ${meta.trackName || ''} ${meta.trackVersion || ''} ${path.basename(filePath)}`.toLowerCase();
-      const knownTrack = KNOWN_TRACK_SF_COORDS.find(entry => entry.keywords.some(k => trackIdentifier.includes(k)));
-
-      if (knownTrack) {
-        let firstPassIdx = -1;
-        let inCluster = false;
-        let cluster: { idx: number; d: number }[] = [];
-
-        for (let i = 0; i < rawPts.length - 5; i++) {
-          if (rawPts[i].pitLimiter || rawPts[i].inPit) continue;
-          const dt = rawPts[i + 1].sTime - rawPts[i].sTime;
-          const dist = Math.hypot(rawPts[i + 1].x - rawPts[i].x, rawPts[i + 1].z - rawPts[i].z);
-          const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
-          if (speed < 30) continue;
-
-          const d = Math.hypot(rawPts[i].x - knownTrack.x, rawPts[i].z - knownTrack.z);
-          if (d < 22) {
-            cluster.push({ idx: i, d });
-            inCluster = true;
-          } else if (inCluster) {
-            const best = cluster.reduce((min, p) => (p.d < min.d ? p : min), cluster[0]);
-            firstPassIdx = best.idx;
-            break;
-          }
-        }
-        if (firstPassIdx === -1 && cluster.length > 0) {
-          const best = cluster.reduce((min, p) => (p.d < min.d ? p : min), cluster[0]);
-          firstPassIdx = best.idx;
-        }
-
-        if (firstPassIdx !== -1) {
-          const crossings = findCrossingsForCandidate(firstPassIdx, 25);
-          if (crossings.length >= 2) {
-            bestCrossings = crossings;
-            bestCandidateIdx = firstPassIdx;
-          }
-        }
-      }
-
-      // Priority 2: Fall back to autonomous candidate search if uncataloged or < 2 crossings
-      if (bestCrossings.length <= 1) {
-        // Candidate 1: Legacy reference point at cumDist > 100
-        let legacyIdx = rawPts.findIndex((_, i) => cumDist[i] > 100);
-        if (legacyIdx === -1) legacyIdx = 0;
-        bestCrossings = findCrossingsForCandidate(legacyIdx, 35);
-        bestCandidateIdx = legacyIdx;
-
-        // Pit points for pit-lane proximity identification
-        const pitPts = rawPts.filter(p => p.pitLimiter || p.inPit);
-        const startsInPit = rawPts[0].pitLimiter || rawPts[0].inPit || (rawPts[legacyIdx] && (rawPts[legacyIdx].pitLimiter || rawPts[legacyIdx].inPit));
-
-        // Candidate 2: If vehicle starts in pit lane / garage (or legacy point yields <= 2 crossings),
-        // search on-track candidates to find the true Start/Finish line on the main straight
-        if (startsInPit || bestCrossings.length <= 2) {
-          const trackIndices: number[] = [];
-          for (let i = 0; i < rawPts.length - 5; i++) {
-            const p = rawPts[i];
-            if (p.pitLimiter || p.inPit) continue;
-            const dt = rawPts[i + 1].sTime - p.sTime;
-            const dist = Math.hypot(rawPts[i + 1].x - p.x, rawPts[i + 1].z - p.z);
-            const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
-            if (speed > 50 && cumDist[i] > 100) {
-              trackIndices.push(i);
-            }
-          }
-
-        const pool = trackIndices.length > 5
-          ? trackIndices
-          : rawPts.map((_, i) => i).filter(i => cumDist[i] > 100);
-
-        if (pool.length > 0) {
-          const baseDist = cumDist[pool[0]];
-          const candidates: number[] = [];
-          for (let targetD = baseDist + 150; targetD <= baseDist + 8000; targetD += 150) {
-            const idx = pool.find(i => cumDist[i] >= targetD);
-            if (idx !== undefined && !candidates.includes(idx)) {
-              candidates.push(idx);
-            }
-          }
-
-          interface EvaluatedCandidate {
-            cIdx: number;
-            crossings: number[];
-            lapTimes: number[];
-            stdDev: number;
-            minPitD: number;
-            speed: number;
-          }
-
-          const evaluated: EvaluatedCandidate[] = [];
-          let maxCrossingsCount = 0;
-
-          for (const cIdx of candidates) {
-            const crossings = findCrossingsForCandidate(cIdx, 25);
-            if (crossings.length > maxCrossingsCount) {
-              maxCrossingsCount = crossings.length;
-            }
-            const lapTimes = crossings.slice(1).map((idx, i) => rawPts[idx].sTime - rawPts[crossings[i]].sTime);
-            const avgLap = lapTimes.length > 0 ? lapTimes.reduce((a, b) => a + b, 0) / lapTimes.length : 0;
-            const variance = lapTimes.length > 1
-              ? lapTimes.reduce((sum, t) => sum + Math.pow(t - avgLap, 2), 0) / lapTimes.length
-              : 999;
-            const stdDev = Math.sqrt(variance);
-
-            let minPitD = Infinity;
-            if (pitPts.length > 0) {
-              for (let k = 0; k < pitPts.length; k += 8) {
-                const d = Math.hypot(pitPts[k].x - rawPts[cIdx].x, pitPts[k].z - rawPts[cIdx].z);
-                if (d < minPitD) minPitD = d;
-              }
-            }
-
-            const nextIdx = Math.min(cIdx + 1, rawPts.length - 1);
-            const dt = rawPts[nextIdx].sTime - rawPts[cIdx].sTime;
-            const dist = Math.hypot(rawPts[nextIdx].x - rawPts[cIdx].x, rawPts[nextIdx].z - rawPts[cIdx].z);
-            const speed = dt > 0.005 ? (dist / dt) * 3.6 : 0;
-
-            evaluated.push({
-              cIdx,
-              crossings,
-              lapTimes,
-              stdDev,
-              minPitD,
-              speed,
-            });
-          }
-
-          const bestPool = evaluated.filter(c => c.crossings.length === maxCrossingsCount);
-          if (bestPool.length > 0) {
-            const pitAdjacent = bestPool.filter(c => c.minPitD < 120 && c.speed > 100);
-            if (pitAdjacent.length > 0) {
-              pitAdjacent.sort((a, b) => {
-                if (Math.abs(a.stdDev - b.stdDev) > 0.15) return a.stdDev - b.stdDev;
-                return b.speed - a.speed;
-              });
-              bestCrossings = pitAdjacent[0].crossings;
-              bestCandidateIdx = pitAdjacent[0].cIdx;
-            } else {
-              bestPool.sort((a, b) => a.stdDev - b.stdDev);
-              bestCrossings = bestPool[0].crossings;
-              bestCandidateIdx = bestPool[0].cIdx;
-            }
-          }
-        }
-      }
-      }
-
-      if (bestCrossings.length > 1) {
-        // If candidate started after an outlap (e.g. leaving pit/garage)
-        if (bestCrossings[0] > 5 && (rawPts[0].pitLimiter || rawPts[0].inPit || cumDist[bestCrossings[0]] > 300)) {
-          const outlapStart = 0;
-          const outlapEnd = bestCrossings[0];
-          const lapTime = Number((rawPts[outlapEnd].sTime - rawPts[outlapStart].sTime).toFixed(3));
-          const lapDist = cumDist[outlapEnd] - cumDist[outlapStart];
-          const s1TargetDist = cumDist[outlapStart] + lapDist * 0.3333;
-          const s2TargetDist = cumDist[outlapStart] + lapDist * 0.6667;
-          let s1Idx = outlapStart;
-          while (s1Idx < outlapEnd && cumDist[s1Idx] < s1TargetDist) s1Idx++;
-          let s2Idx = s1Idx;
-          while (s2Idx < outlapEnd && cumDist[s2Idx] < s2TargetDist) s2Idx++;
-
-          detectedLaps.push({
-            lapNumber: 1,
-            startIdx: outlapStart,
-            endIdx: outlapEnd,
-            lapTimeSec: lapTime,
-            lapDistMeters: Math.round(lapDist),
-            s1Sec: Number((rawPts[s1Idx].sTime - rawPts[outlapStart].sTime).toFixed(3)),
-            s2Sec: Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3)),
-            s3Sec: Number((rawPts[outlapEnd].sTime - rawPts[s2Idx].sTime).toFixed(3)),
-            s1Idx,
-            s2Idx,
-            isOutlap: true,
-            isBest: false,
-          });
-        }
-
-        const lapOffset = detectedLaps.length;
-        for (let l = 0; l < bestCrossings.length - 1; l++) {
-          const startIdx = bestCrossings[l];
-          const endIdx = bestCrossings[l + 1];
-          const lapTime = rawPts[endIdx].sTime - rawPts[startIdx].sTime;
-          const lapDist = cumDist[endIdx] - cumDist[startIdx];
-          const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
-          const s2TargetDist = cumDist[startIdx] + lapDist * 0.6667;
-          let s1Idx = startIdx;
-          while (s1Idx < endIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
-          let s2Idx = s1Idx;
-          while (s2Idx < endIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
-
-          detectedLaps.push({
-            lapNumber: lapOffset + l + 1,
-            startIdx,
-            endIdx,
-            lapTimeSec: Number(lapTime.toFixed(3)),
-            lapDistMeters: Math.round(lapDist),
-            s1Sec: Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3)),
-            s2Sec: Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3)),
-            s3Sec: Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3)),
-            s1Idx,
-            s2Idx,
-            isOutlap: lapOffset === 0 && l === 0,
-            isBest: false,
-          });
-        }
-
-        // Find fastest flying lap
-        const flyingLaps = detectedLaps.filter(l => !l.isOutlap);
-        const pool = flyingLaps.length > 0 ? flyingLaps : detectedLaps;
-        let minTime = Infinity;
-        let bestLapNum = pool[0]?.lapNumber;
-        for (const l of pool) {
-          if (l.lapTimeSec < minTime) {
-            minTime = l.lapTimeSec;
-            bestLapNum = l.lapNumber;
-          }
-        }
-        detectedLaps.forEach(l => {
-          if (l.lapNumber === bestLapNum) l.isBest = true;
-        });
-      }
     }
 
     if (detectedLaps.length === 0) {
