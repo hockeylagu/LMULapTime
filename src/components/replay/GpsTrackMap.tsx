@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Plus, Minus, RotateCcw, Crosshair } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
+import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
 
 export interface GpsTrackMapProps {
   points: ReplayTrajectoryPoint[];
@@ -16,6 +17,7 @@ export interface GpsTrackMapProps {
   onSelectIndex?: (index: number) => void;
   colorBy?: 'speed' | 'throttle' | 'brake' | 'steering' | 'default';
   className?: string;
+  baselinePoints?: ReplayTrajectoryPoint[];
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
@@ -25,6 +27,7 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   onSelectIndex,
   colorBy = 'speed',
   className = '',
+  baselinePoints,
 }) => {
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -117,6 +120,59 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   const isStationary = useMemo(() => {
     return ((bounds?.spanX ?? 0) < 25 && (bounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1));
   }, [bounds, points]);
+
+  // Construct baseline SVG path and distance-aligned ghost car position
+  const { baselinePathD, baselineGhostPos } = useMemo(() => {
+    if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0) {
+      return { baselinePathD: '', baselineGhostPos: null };
+    }
+
+    const { minX, minZ, spanX, spanZ } = bounds;
+    const maxSpan = Math.max(spanX, spanZ, 1);
+    const scale = (VIEWBOX_SIZE - 2 * PADDING) / maxSpan;
+    const offsetX = PADDING + ((VIEWBOX_SIZE - 2 * PADDING) - spanX * scale) / 2;
+    const offsetZ = PADDING + ((VIEWBOX_SIZE - 2 * PADDING) - spanZ * scale) / 2;
+
+    let d = '';
+    for (let i = 0; i < baselinePoints.length; i++) {
+      const p = baselinePoints[i];
+      const sx = offsetX + (p.x - minX) * scale;
+      const sy = VIEWBOX_SIZE - (offsetZ + (p.z - minZ) * scale);
+      if (i === 0) {
+        d += `M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+      } else {
+        const prev = baselinePoints[i - 1];
+        const worldDist = Math.hypot(p.x - prev.x, p.z - prev.z);
+        if (p.isTeleport || worldDist > 25) {
+          d += ` M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+        } else {
+          d += ` L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
+        }
+      }
+    }
+
+    const primaryDists = computeCumulativeDistances(points);
+    const baseDists = computeCumulativeDistances(baselinePoints);
+    const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
+    const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
+
+    const safeIdx = Math.min(currentIndex, points.length - 1);
+    const fraction = primaryDists[safeIdx] / totalPrimary;
+    const targetDist = fraction * totalBase;
+    const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
+
+    const ghostSx = offsetX + (ghostPt.x - minX) * scale;
+    const ghostSy = VIEWBOX_SIZE - (offsetZ + (ghostPt.z - minZ) * scale);
+
+    return {
+      baselinePathD: d,
+      baselineGhostPos: {
+        sx: ghostSx,
+        sy: ghostSy,
+        point: ghostPt,
+      },
+    };
+  }, [points, baselinePoints, bounds, currentIndex, VIEWBOX_SIZE, PADDING]);
 
   // Calculate forward travel heading in SVG degrees (0 deg = straight up along -Y)
   const carHeadingDeg = useMemo(() => {
@@ -318,6 +374,9 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
           <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#38bdf8" floodOpacity="0.9" />
           </filter>
+          <filter id="ghostGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f59e0b" floodOpacity="0.9" />
+          </filter>
           <filter id="trackGlow" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
@@ -346,6 +405,19 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+
+        {/* Baseline circuit trajectory overlay (dashed amber line) */}
+        {baselinePathD && (
+          <path
+            d={baselinePathD}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="3.5"
+            strokeDasharray="8 6"
+            strokeOpacity="0.85"
+            strokeLinecap="round"
+          />
+        )}
 
         {/* Color-coded segments */}
         {svgPoints.map((p, i) => {
@@ -385,6 +457,48 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
           </g>
         )}
 
+        {/* Tether connecting line between primary car and baseline ghost car */}
+        {currentPos && baselineGhostPos && (
+          <line
+            x1={currentPos.sx}
+            y1={currentPos.sy}
+            x2={baselineGhostPos.sx}
+            y2={baselineGhostPos.sy}
+            stroke="#f59e0b"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            opacity="0.75"
+          />
+        )}
+
+        {/* Baseline Ghost Car Marker */}
+        {baselineGhostPos && (
+          <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
+            <circle
+              r="12"
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="1.5"
+              opacity="0.5"
+              className="animate-pulse"
+            />
+            <circle
+              r="6.5"
+              fill="#f59e0b"
+              stroke="#ffffff"
+              strokeWidth="2"
+              filter="url(#ghostGlow)"
+            />
+            <text
+              y="-10"
+              textAnchor="middle"
+              className="fill-amber-300 text-[10px] font-mono font-bold"
+            >
+              GHOST
+            </text>
+          </g>
+        )}
+
         {/* Current Car Marker */}
         {currentPos && (
           <g transform={`translate(${currentPos.sx}, ${currentPos.sy})`}>
@@ -414,6 +528,21 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
           </g>
         )}
       </svg>
+
+      {/* Comparison Ghost Map Legend (Top Left) */}
+      {baselineGhostPos && !isStationary && (
+        <div className="absolute top-2 left-2 z-20 flex items-center gap-2 bg-[#0a0e17]/90 backdrop-blur border border-white/10 px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-lg pointer-events-none">
+          <div className="flex items-center gap-1 text-sky-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]" />
+            <span className="font-bold">Primary</span>
+          </div>
+          <span className="text-white/30">|</span>
+          <div className="flex items-center gap-1 text-amber-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shadow-[0_0_6px_#f59e0b]" />
+            <span className="font-bold">Ghost Lap</span>
+          </div>
+        </div>
+      )}
 
       {/* Real-time telemetry overlay badge */}
       {isStationary && (
