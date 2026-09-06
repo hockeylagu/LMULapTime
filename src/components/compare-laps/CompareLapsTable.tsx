@@ -7,6 +7,7 @@ import { CompareLapsTableRow } from './CompareLapsTableRow';
 export interface CompareLapsTableProps {
   selectedTrack: string;
   selectedCarClass: string;
+  playerOnly: boolean;
   displayLaps: ComparableLap[];
   emptyCount: number;
   hideEmpty: boolean;
@@ -26,6 +27,7 @@ export interface CompareLapsTableProps {
 export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
   selectedTrack,
   selectedCarClass,
+  playerOnly,
   displayLaps,
   emptyCount,
   hideEmpty,
@@ -51,6 +53,7 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
             Filtered by vehicle class <strong className="text-white">{selectedCarClass}</strong> to guarantee fair telemetry comparisons.
+            {!playerOnly && <span className="text-lmu-accent"> Showing the fastest 100 all-driver laps.</span>}
           </p>
         </div>
 

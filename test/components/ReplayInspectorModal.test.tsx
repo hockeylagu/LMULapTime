@@ -246,9 +246,9 @@ describe('ReplayInspectorModal', () => {
     const compareBtn = screen.getByRole('button', { name: /Compare/i });
     fireEvent.click(compareBtn);
 
-    // Baseline selector should now be visible
+    // Available replay-backed lap picker should now be visible
     await waitFor(() => {
-      expect(screen.getByLabelText(/Select Baseline Lap/i)).toBeInTheDocument();
+      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
     });
 
     // Verify it requested the baseline trajectory
@@ -364,21 +364,22 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Swap/i })).toBeInTheDocument();
-      expect(screen.getByLabelText(/Select Baseline Lap/i)).toBeInTheDocument();
+      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
     });
 
-    const baselineSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
-    expect(baselineSelect.value).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: /Close comparison lap picker/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Swap comparison laps/i })).toBeInTheDocument();
+    });
 
     // Click Swap
-    const swapBtn = screen.getByRole('button', { name: /Swap/i });
+    const swapBtn = screen.getByRole('button', { name: /Swap comparison laps/i });
     fireEvent.click(swapBtn);
 
-    // After swap, baseline should now be Lap 1
+    // After swap, baseline loading should request the other lap.
     await waitFor(() => {
-      const updatedSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
-      expect(updatedSelect.value).toBe('1');
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=1'));
     });
   });
 
@@ -422,21 +423,16 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Select Baseline Lap/i)).toBeInTheDocument();
+      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
     });
-
-    const baselineSelect = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
-    expect(baselineSelect.value).toBe('2');
 
     // Change primary lap to Lap 3
     const primarySelect = screen.getByLabelText(/Select Lap/i) as HTMLSelectElement;
     fireEvent.change(primarySelect, { target: { value: '3' } });
 
-    // Baseline should still be Lap 2 and compare mode must remain active
+    // Baseline should still request Lap 2 and compare mode must remain active.
     await waitFor(() => {
-      const activeBaseline = screen.getByLabelText(/Select Baseline Lap/i) as HTMLSelectElement;
-      expect(activeBaseline).toBeInTheDocument();
-      expect(activeBaseline.value).toBe('2');
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'));
     });
   });
 
@@ -480,6 +476,29 @@ describe('ReplayInspectorModal', () => {
           ]),
         });
       }
+      if (url.includes('compare/laps')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            laps: otherMeta.laps.map((lap: { lapNumber: number; lapTimeSec: number; isBest: boolean }) => ({
+              id: `other_${lap.lapNumber}`,
+              sessionId: 'other-session',
+              sessionName: 'Q1',
+              sessionType: 'Qualifying',
+              dateString: '2026/06/01 12:00',
+              driverName: 'Rival Racer',
+              carType: 'BMW M4 GT3',
+              carClass: 'LMGT3',
+              lapNum: lap.lapNumber,
+              lapTime: lap.lapTimeSec,
+              lapTimeString: `2:${lap.lapTimeSec.toFixed(3)}`,
+              isBest: lap.isBest,
+              isValid: true,
+              matchingReplayFile: 'Other_Spa_Replay.vcr',
+            })),
+          }),
+        });
+      }
       if (url.includes('/trajectory')) {
         return Promise.resolve({
           ok: true,
@@ -503,18 +522,11 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Select Baseline Replay/i)).toBeInTheDocument();
+      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
     });
 
-    // Select Other_Spa_Replay.vcr
-    const replaySelect = screen.getByLabelText(/Select Baseline Replay/i);
-    fireEvent.change(replaySelect, { target: { value: 'Other_Spa_Replay.vcr' } });
-
-    // Baseline lap dropdown must display Lap 8 and Lap 9 from Other_Spa_Replay, NOT Lap 1 from current replay!
-    await waitFor(() => {
-      expect(screen.getByText(/Lap 8/i)).toBeInTheDocument();
-      expect(screen.getByText(/Lap 9/i)).toBeInTheDocument();
-    });
+    expect(screen.getByRole('button', { name: 'Player' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All Drivers' })).toBeInTheDocument();
   });
 });
 

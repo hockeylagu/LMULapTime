@@ -127,6 +127,11 @@ export function useCompareLapsData({
 
   const setPlayerOnly = (val: boolean) => {
     setPlayerOnlyState(val);
+    if (!val) {
+      setSelectedLaps([]);
+      setBaselineLapId('');
+      initializedScopeRef.current = '';
+    }
     updateHashParams({ playerOnly: val ? null : 'false' });
   };
 
@@ -191,6 +196,13 @@ export function useCompareLapsData({
 
     const candidates: ComparableLap[] = [];
 
+    if (!playerOnly) {
+      setSelectedLaps([]);
+      setBaselineLapId('');
+      initializedScopeRef.current = currentScope;
+      return;
+    }
+
     if (targetSessionId) {
       const found = apiData.laps.find(
         (l) => l.sessionId === targetSessionId && (targetLapNum === undefined || l.lapNum === targetLapNum)
@@ -250,7 +262,7 @@ export function useCompareLapsData({
     if (hideEmpty) {
       list = list.filter((l) => l.isValid && !l.isPitStop && l.lapTime !== null && l.lapTime > 0);
     }
-    return [...list].sort((a, b) => {
+    const sorted = [...list].sort((a, b) => {
       if (availableLapsSort === 'lap-asc') return (a.lapTime ?? 999999) - (b.lapTime ?? 999999);
       if (availableLapsSort === 'lap-desc') return (b.lapTime ?? -1) - (a.lapTime ?? -1);
       if (availableLapsSort === 'date-desc') return (b.dateString || '').localeCompare(a.dateString || '');
@@ -263,7 +275,8 @@ export function useCompareLapsData({
       if (availableLapsSort === 'pace-asc') return (a.pacePercentage ?? 999999) - (b.pacePercentage ?? 999999);
       return 0;
     });
-  }, [baseFilteredLaps, hideEmpty, availableLapsSort]);
+    return playerOnly ? sorted : sorted.slice(0, 100);
+  }, [baseFilteredLaps, hideEmpty, availableLapsSort, playerOnly]);
 
   const baselineLap = useMemo(() => {
     if (selectedLaps.length === 0) return null;
