@@ -2025,6 +2025,7 @@ describe('replayParser', () => {
       });
 
       it('parses synthetic Class 0 Type 15 packet (sz === 24 and sz === 37) and synchronizes with vehicle trajectory points', () => {
+        fs.mkdirSync(tempDir, { recursive: true });
         const wheelVcrPath = path.join(tempDir, 'synthetic_wheel.vcr');
         const buf = createSliceVcrBuffer({
           slices: [

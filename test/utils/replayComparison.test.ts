@@ -220,6 +220,34 @@ describe('replayComparison utility', () => {
       );
       expect(matchingHyper.map(r => r.name)).toEqual(['Circuit de Spa-Francorchamps P1 79.Vcr']);
     });
+
+    it('strictly isolates track layouts (Monza Curva Grande, Bahrain Outer/Paddock, Paul Ricard Short)', () => {
+      const layoutReplays: ReplaySummary[] = [
+        { name: 'Monza_GP.Vcr', path: '/Monza_GP.Vcr', sizeBytes: 1000, mtime: 1, trackName: 'Autodromo Nazionale Monza', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 1 },
+        { name: 'Monza_CurvaGrande.Vcr', path: '/Monza_CurvaGrande.Vcr', sizeBytes: 1000, mtime: 2, trackName: 'Monza Curva Grande Circuit', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 2 },
+        { name: 'Bahrain_GP.Vcr', path: '/Bahrain_GP.Vcr', sizeBytes: 1000, mtime: 3, trackName: 'Bahrain International Circuit', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 3 },
+        { name: 'Bahrain_Outer.Vcr', path: '/Bahrain_Outer.Vcr', sizeBytes: 1000, mtime: 4, trackName: 'Bahrain Outer Circuit', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 4 },
+        { name: 'Bahrain_Paddock.Vcr', path: '/Bahrain_Paddock.Vcr', sizeBytes: 1000, mtime: 5, trackName: 'Bahrain Paddock Circuit', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 5 },
+        { name: 'PaulRicard_Full.Vcr', path: '/PaulRicard_Full.Vcr', sizeBytes: 1000, mtime: 6, trackName: 'Circuit Paul Ricard', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 6 },
+        { name: 'PaulRicard_Short.Vcr', path: '/PaulRicard_Short.Vcr', sizeBytes: 1000, mtime: 7, trackName: 'Paul Ricard - 1A-V2-Short', carClass: 'LMGT3', fileSizeBytes: 1000, mtimeMs: 7 },
+      ];
+
+      // 1. Monza Curva Grande
+      const monzaMatches = filterCompatibleReplays(layoutReplays, 'Autodromo Nazionale Monza (Curva Grande Circuit)', 'LMGT3');
+      expect(monzaMatches.map(r => r.name)).toEqual(['Monza_CurvaGrande.Vcr']);
+
+      // 2. Bahrain Outer
+      const outerMatches = filterCompatibleReplays(layoutReplays, 'Bahrain International Circuit (Outer Circuit)', 'LMGT3');
+      expect(outerMatches.map(r => r.name)).toEqual(['Bahrain_Outer.Vcr']);
+
+      // 3. Bahrain Paddock
+      const paddockMatches = filterCompatibleReplays(layoutReplays, 'Bahrain International Circuit (Paddock Circuit)', 'LMGT3');
+      expect(paddockMatches.map(r => r.name)).toEqual(['Bahrain_Paddock.Vcr']);
+
+      // 4. Paul Ricard Short
+      const shortMatches = filterCompatibleReplays(layoutReplays, 'Paul Ricard Circuit (1A V2 Short)', 'LMGT3');
+      expect(shortMatches.map(r => r.name)).toEqual(['PaulRicard_Short.Vcr']);
+    });
   });
 
   describe('mapVehicleIdToClass', () => {

@@ -195,6 +195,124 @@ describe('parser server module', () => {
       expect(session?.matchingReplayFile).toBeDefined();
       expect(session?.matchingReplayFile?.name).toBe('Circuit de Spa-Francorchamps P1 78.Vcr');
     });
+
+    it('accurately matches Monza Curva Grande and does not match standard Monza GP replay', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readdirSync').mockReturnValue([
+        'Autodromo Nazionale Monza Q1 6.Vcr',
+        'Monza Curva Grande Circuit Q1 3.Vcr',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      vi.spyOn(fs, 'statSync').mockImplementation((p: fs.PathLike) => {
+        const str = String(p);
+        if (str.includes('Curva Grande')) {
+          return { size: 1048576, mtime: new Date(1780050000 * 1000) } as unknown as fs.Stats;
+        }
+        return { size: 1048576, mtime: new Date(1780050010 * 1000) } as unknown as fs.Stats;
+      });
+
+      const p = new LmuParser('C:\\Replays');
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleQualifyingXml);
+
+      const session = p.parseSessionXml('monza_cg.xml');
+      expect(session?.matchingReplayFile).toBeDefined();
+      expect(session?.matchingReplayFile?.name).toBe('Monza Curva Grande Circuit Q1 3.Vcr');
+    });
+
+    it('accurately matches Paul Ricard Short and does not match full layout replay', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readdirSync').mockReturnValue([
+        'Circuit Paul Ricard R1 5.Vcr',
+        'Paul Ricard - 1A-V2-Short R1 1.Vcr',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      vi.spyOn(fs, 'statSync').mockImplementation((p: fs.PathLike) => {
+        const str = String(p);
+        if (str.includes('Short')) {
+          return { size: 1048576, mtime: new Date(1780100000 * 1000) } as unknown as fs.Stats;
+        }
+        return { size: 1048576, mtime: new Date(1780100010 * 1000) } as unknown as fs.Stats;
+      });
+
+      const p = new LmuParser('C:\\Replays');
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleRaceXml);
+
+      const session = p.parseSessionXml('pr_short.xml');
+      expect(session?.matchingReplayFile).toBeDefined();
+      expect(session?.matchingReplayFile?.name).toBe('Paul Ricard - 1A-V2-Short R1 1.Vcr');
+    });
+
+    it('accurately matches Bahrain Outer and Bahrain Paddock without cross-matching', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readdirSync').mockReturnValue([
+        'Bahrain International Circuit P1 14.Vcr',
+        'Bahrain Outer Circuit P1 19.Vcr',
+        'Bahrain Paddock Circuit P1 18.Vcr',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      const outerXml = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Bahrain International Circuit</TrackVenue>
+    <TrackCourse>Bahrain Outer Circuit</TrackCourse>
+    <TimeString>2026/08/10 09:00</TimeString>
+    <DateTime>1786350000</DateTime>
+    <Practice1>
+      <Driver>
+        <Name>Sim Racer</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <BestLapTime>54.200</BestLapTime>
+        <Lap num="1" p="1" s1="15.000" s2="20.000" s3="19.200">54.200</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      const paddockXml = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Bahrain International Circuit</TrackVenue>
+    <TrackCourse>Bahrain Paddock Circuit</TrackCourse>
+    <TimeString>2026/08/12 18:50</TimeString>
+    <DateTime>1786550000</DateTime>
+    <Practice1>
+      <Driver>
+        <Name>Sim Racer</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Ferrari 499P</CarType>
+        <CarClass>Hypercar</CarClass>
+        <BestLapTime>62.100</BestLapTime>
+        <Lap num="1" p="1" s1="18.000" s2="22.000" s3="22.100">62.100</Lap>
+      </Driver>
+    </Practice1>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'statSync').mockImplementation((p: fs.PathLike) => {
+        const str = String(p);
+        if (str.includes('Outer')) {
+          return { size: 1048576, mtime: new Date(1786350000 * 1000) } as unknown as fs.Stats;
+        }
+        if (str.includes('Paddock')) {
+          return { size: 1048576, mtime: new Date(1786550000 * 1000) } as unknown as fs.Stats;
+        }
+        return { size: 1048576, mtime: new Date(1786350005 * 1000) } as unknown as fs.Stats;
+      });
+
+      const p = new LmuParser('C:\\Replays');
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(outerXml);
+      const outerSession = p.parseSessionXml('bahrain_outer.xml');
+      expect(outerSession?.matchingReplayFile).toBeDefined();
+      expect(outerSession?.matchingReplayFile?.name).toBe('Bahrain Outer Circuit P1 19.Vcr');
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(paddockXml);
+      const paddockSession = p.parseSessionXml('bahrain_paddock.xml');
+      expect(paddockSession?.matchingReplayFile).toBeDefined();
+      expect(paddockSession?.matchingReplayFile?.name).toBe('Bahrain Paddock Circuit P1 18.Vcr');
+    });
   });
 
   describe('computeProgression', () => {

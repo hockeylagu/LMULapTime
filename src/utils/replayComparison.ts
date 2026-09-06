@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/types.js';
-import { matchesTrack, matchesCarClass } from './paceCategory.js';
+import { matchesTrack, matchesCarClass, getTrackAndLayout } from './paceCategory.js';
 
 export interface InterpolatedPoint {
   timeSec: number;
@@ -257,11 +257,15 @@ export function filterCompatibleReplays(
     if (!r.trackName) return false;
 
     // Track matching rule
-    const normTrack = r.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isTrackMatch =
-      matchesTrack(r.trackName, currentTrackName, '') ||
-      normTrack.includes(normTarget) ||
-      normTarget.includes(normTrack);
+    let isTrackMatch = matchesTrack(r.trackName, currentTrackName, '');
+    if (!isTrackMatch) {
+      const qInfo = getTrackAndLayout(r.trackName, '');
+      const sInfo = getTrackAndLayout(currentTrackName, '');
+      if (!qInfo.isKnown && !sInfo.isKnown) {
+        const normTrack = r.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        isTrackMatch = normTrack.includes(normTarget) || normTarget.includes(normTrack);
+      }
+    }
 
     if (!isTrackMatch) return false;
 
