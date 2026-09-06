@@ -1,6 +1,12 @@
-# Le Mans Ultimate / rFactor 2 VCR Replay File Format Specification & Findings
+# Le Mans Ultimate / rFactor 2 VCR Replay File Format Specification
 
-This document details the complete binary structure of the `.Vcr` replay file format used by **Le Mans Ultimate (LMU)** and the **rFactor 2 (rF2 / gMotor)** engine. It consolidates reverse-engineered findings, byte alignments, bit masks, and event packet definitions discovered through analysis of real replay files and reference parsers.
+This document is the **reference** for the binary structure of the `.Vcr` replay file format used
+by **Le Mans Ultimate (LMU)** and the **rFactor 2 (rF2 / gMotor)** engine: byte offsets, bit
+masks and payload layouts. It states only what is established.
+
+For how these fields were discovered, confidence levels, open leads, superseded hypotheses,
+implementation status and future work, see **[VCR_ANALYSIS.md](VCR_ANALYSIS.md)**. Keep the two
+separate: no evidence or speculation in this file.
 
 ---
 
@@ -127,40 +133,36 @@ The event payload begins at `offset + 5` and extends for `eventSize` bytes.
 #### Type 8..14 (`eventSize === 65`): Vehicle Pose & Driver Inputs
 This is the primary vehicle kinematic and pedal telemetry packet emitted at up to ~50 Hz per car.
 
-**Gear is encoded directly in the event header's `eventType` field, not in the payload.**
+**Gear is encoded in the event header's `eventType` field, not in the payload.**
 `eventType` ranges 7..15 for these packets, mapping to `gear = eventType - 8`:
-`7` = reverse (-1), `8` = neutral (0), `9..15` = forward gears 1..7. This is available
-for every driver (player and AI), and is confirmed against a community reference parser.
-That parser additionally gates this on `eventClass === 0`,
-but current LMU samples inspected here use Class 0 for these packets. Implementations
-should retain the pose size/type checks while avoiding a hard class gate for revisions.
-The transmission
-genuinely passes through neutral for a few frames during every real up/downshift
-(clutch/dog-ring disengagement) — this is authentic telemetry, not noise.
+`7` = reverse (-1), `8` = neutral (0), `9..15` = forward gears 1..7. Available for every driver,
+player and AI. Retain the pose size/type checks but do not hard-gate on `eventClass`.
 
-**Engine RPM is NOT reliably decodable from this packet.** Bits 18..31 of `info1`
-(`info1 >>> 18`) were assumed to be a direct RPM integer (matching a community
-reference parser, which does the exact same shift with no further processing). Empirically
-this is unusable: even isolated to a single confirmed-constant
-gear over a 500+ frame contiguous stretch, the value swings randomly between ~0 and the
-14-bit max (16383) every ~20ms while speed changes smoothly, and its overall value
-distribution across a lap is flat (~9-11% in every 10%-wide bin from 0-16383) — the
-signature of noise/an unrelated counter, not a physical quantity with a normal operating
-band. No scaling/percentage-of-redline interpretation fixes this either (checked: noise
-is symmetric across the low/mid/high thirds of the range, not concentrated near the top
-the way rev-limiter flicker would be). **If real engine RPM is ever found elsewhere in
-the format (a different event type/offset, or a future replay format revision), document
-it here** rather than reusing `info1 >>> 18`.
+The transmission genuinely passes through neutral for 2-3 frames during every real up/downshift
+(clutch/dog-ring disengagement) - this is authentic telemetry, not noise. Code that detects gear
+transitions must therefore track the last non-zero gear rather than compare adjacent frames.
+
+**Engine RPM** is a 10-bit field spanning byte 6 bit 5 through byte 7 bit 6
+(absolute bits 53..62):
+
+```js
+const raw10 = (payload.readUInt16LE(6) >>> 5) & 0x3ff;
+const rpm   = 10.9228 * raw10;   // scale is absolute, not normalised per car
+```
+
+The scale is empirical (+/-0.02); see VCR_ANALYSIS.md 2.1. The field saturates at 1023, i.e.
+~11,170 rpm, and would wrap silently above that.
 
 | Offset in Payload | Size | Type | Field & Bitfield Description |
 | :--- | :--- | :--- | :--- |
-| `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: unreliable / not usable as RPM (see note above) |
+| `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: unidentified (**not** RPM) |
 | `4` | 4 bytes | UInt32LE | **`info2`**: <br>• Bits 0..9: `detachablePartState` (Bitmask of detached / damaged aero body parts) |
 | `4` | 2 bytes | UInt16LE | **`steer10`**: Steering wheel position: `(raw16 & 0x3FF)`, angle = `((steer10 - 512) / 512) * 540` deg |
 | `5` | 1 byte | UInt8 | **`rawThrottle`**: 8-bit throttle pedal position (1 = 0%, 249 = 100%) |
+| `6..7` | 10 bits | Bitfield | **`engineRpm`**: `(readUInt16LE(6) >>> 5) & 0x3FF`, rpm = `raw * 10.9228` |
 | `8..12` | 5 bytes | Binary | Speed / velocity vector info |
 | `13..35` | 23 bytes | Binary | Vehicle dynamics / suspension travel |
-| `36` | 1 byte | UInt8 | **`rawBrake` & Systems**: <br>• Bits 0..5: Analog brake pressure (0 to 63 = 0% to 100%) <br>• Bit 6 (`0x40`): ABS Active flag <br>• Bit 7 (`0x80`): Traction Control (TC) Active flag |
+| `36` | 1 byte | UInt8 | **`rawBrake`** & Systems: <br>• Bits 0..5: Analog brake pressure (0 to 63 = 0% to 100%) <br>• Bit 6 (`0x40`): ABS Active flag <br>• Bit 7 (`0x80`): Traction Control (TC) Active flag |
 | `38` | 1 byte | UInt8 | **`vehicleStatus`**: <br>• Bit 0 (`0x01`): Off-track / track limit cut violation <br>• Bit 2 (`0x04`): Pit limiter engaged (holding 60 km/h) <br>• Bit 7 (`0x80`): Inside pit lane boundary |
 | `41` | 4 bytes | Float32LE | **`x`**: World coordinates X (lateral position in meters) |
 | `45` | 4 bytes | Float32LE | **`y`**: World coordinates Y (elevation in meters) |
@@ -259,7 +261,6 @@ Fired when a vehicle crosses an electronic simulation timing loop (Start/Finish 
 When a session terminates or a car ESCs back to the garage, the engine flushes an uncompleted lap event with `splitSec <= 0`.
 - **Aborted Garage/Session Flush**: If `splitSec <= 0`, `lapTimeSec < 20`, and `!s1Event` (has not reached Sector 1), the event represents an aborted session flush and is discarded.
 - **Valid Cut Lap**: If the car drove a full lap (`lapTimeSec >= 20` or completed Sector 1) but exceeded track limits, `splitSec` is `-1.0`. The parser records the completed lap, sets `isValid = false`, and computes lap duration from slice timestamps.
-
 #### Type 19 (`eventSize === 8`): Session State Name
 ASCII string broadcast confirming current session name (e.g. `"Practice"`, `"Qualify"`, `"Race"`).
 
@@ -318,113 +319,5 @@ The parser directly streams official game engine scoring events (`Class 6 Type 6
                         └─────────────────────────────────┘
 ```
 
-### Multi-Track & Cross-Session Validation Suite
 
-The timing parser is cross-validated against official XML simulation logs across all session types and 10 official circuits:
-- **Imola (Autodromo Enzo e Dino Ferrari)**: Online Race (R1 8), Online Quali (Q1 8), Online Practice (P1 14)
-- **Sebring International Raceway**: Online Race (R1 13), Online Quali (Q1 13), Online Practice (P1 33)
-- **Circuit de Spa-Francorchamps**: Online Race (R1 35), Online Quali (Q1 27)
-- **Bahrain International Circuit**: Online Race (R1 2), Online Quali (Q1 2), Online Practice (P1 16)
-- **Daytona International Speedway Road Course**: Online Race (R1 3), Online Quali (Q1 3), Online Practice (P1 16)
-- **WeatherTech Raceway Laguna Seca**: Online Race (R1 4), Online Quali (Q1 1)
-- **Algarve International Circuit (Portimão)**: Online Race (R1 13), Online Quali (Q1 10), Online Practice (P1 41)
-- **Autodromo Nazionale Monza**: Offline Race (R1 6)
-- **Fuji Speedway**: Online Race (R1 24), Online Quali (Q1 16), Online Practice (P1 55)
-- **Circuit de la Sarthe (Le Mans)**: Online Race (R1 26), Online Quali (Q1 24)
 
-Every valid flying lap in each replay matches the official simulation XML results within floating-point precision, ensuring complete fidelity between replays and session logs.
-
----
-
-## 6. Architectural Opportunities & Implementation Roadmap
-
-| Feature Area | Implementation Status | Implementation Details Using VCR Native Data |
-| :--- | :--- | :--- |
-| **Driver Roster** | **Implemented** (`parseReplayMetadata`) | Deterministic binary `numDrivers` + exact structured records with `entryTime`/`exitTime`, fallback to heuristic regex for legacy mock buffers. |
-| **Session Identification** | **Implemented** (`parseReplayMetadata`) | Session byte parsing (`sessionType`, `privateSession`), `modUid`, and `trackPath`. |
-| **Lap & Sector Timing** | **Implemented** (`extractReplayLapSummaries`, `extractReplayTrajectory`) | Directly stream Class 6 Type 6 events to construct 100% official lap summaries, sector splits (S1/S2/S3), official lap numbering, and validity flags matching the in-game HUD. |
-| **Tire Dynamics & Wear** | **Implemented** (`extractReplayTrajectory`) | Class 0 Type 15 (`sz === 24` or `37`) delivers live 4-wheel tire temperatures (°C), dynamic corner wear degradation counters, and brake rotor temperatures attached to downsampled trajectory points and accessible via API. |
-| **Penalties & Incidents** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
-| **Track Flags & Safety Car** | **Specification Ready** | Class 2 Type 10 track flag states (Green, Local Yellow, FCY, SC, VSC, Red, Checkered) and driver flags (Blue, Black, Meatball). |
-| **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
-| **Engine RPM** | **Not usable** | Bits 18..31 of `info1` are unreliable noise, not real RPM — see note in Section 4 (Type 8..14). Removed from `extractReplayTrajectory` output; revisit only if a genuine RPM source is found. |
-| **Gear** | **Implemented** (`extractReplayTrajectory`) | Decoded from the vehicle pose event's `eventType` header field (`gear = eventType - 8`), available for every car including AI opponents. |
-| **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Current LMU Class 0/1/5 Type 2 and Class 2/7 Type 49 events provide pit and garage transitions; service details are decoded where present. |
-| **Live Standings** | **Specification Ready** | Class 6 Type 48 packets provide real-time running order array (P1..Pn) and gaps at every timestamp. |
-| **Weather & Track Grip** | **Specification Ready** | Metadata 67-byte session environment block yields ambient/track temps, rain intensity, puddle depth, and rubber grip saturation. |
-
----
-
-## 7. Catalog of Additional Extractable Data from VCR Format
-
-The LMU/rF2 `.Vcr` format contains an extensive array of untapped telemetry, environment, and race control data that can be exposed in API endpoints, telemetry charts, and session dashboards:
-
-### 7.1 4-Wheel Thermal, Pressure & Degradation Dynamics (Class 0 Type 15)
-Emitted periodically or on corner events (`eventSize === 24` or `37`):
-- **12-Point Tire Tread Temperatures (°C)**:
-  - Separate temperatures across the tire carcass: **Inner**, **Center**, and **Outer** tread zones for all 4 corners (FL, FR, RL, RR).
-  - Enables thermal camber optimization and tire overheating analysis in the UI.
-- **Dynamic Hot Inflation Pressures (kPa / PSI)**:
-  - Real-time internal air pressures for all 4 tires.
-- **Corner-by-Corner Tire Wear Degradation (0–100%)**:
-  - Live percentage of remaining tire rubber per corner.
-  - Enables true tire degradation curves over stints instead of end-of-session approximations.
-- **Brake Rotor / Disc Temperatures (°C)**:
-  - Thermal load on carbon/steel brake discs (offsets `+24..31` when `eventSize === 37`).
-
-### 7.2 Track Meteorology, Evolution & Weather Dynamics (Metadata Session Conditions Block)
-The 67-byte session environment block (located at `metadataOffset + trackPathLength + 2`):
-- **Ambient Air Temperature** (`+0` Float32LE): Ambient temperature in °C.
-- **Track Surface Temperature** (`+4` Float32LE): Track asphalt temperature in °C.
-- **Precipitation / Rain Intensity** (`+8` Float32LE): Rain rate (`0.0` dry to `1.0` storm).
-- **Track Surface Wetness** (`+12` Float32LE): Moisture saturation (`0.0` dry to `1.0` wet).
-- **Standing Water / Puddle Depth** (`+16` Float32LE): Average standing water depth in mm along racing line.
-- **Dynamic Rubber Grip Saturation** (`+20` Float32LE): Track grip evolution factor (`0.0` green track to `1.0` heavily rubbered line).
-- **Wind Speed & Direction Vector** (`+24` and `+28` Float32LE): Wind velocity in m/s and bearing angle in radians.
-- **Time Acceleration Multiplier** (`+32` Float32LE): In-game session progression multiplier (e.g. 1x, 5x, 24x).
-
-### 7.3 Live Race Control, Flags & Safety Car System (Class 2 Type 10 & Class 1 Type 10)
-Broadcasts live race direction decisions and track conditions:
-- **Track Condition Flags**:
-  - `0`: Green Flag (Track clear / racing active)
-  - `1`: Local Yellow Flag (Hazard in sector)
-  - `2`: Double Yellow Flag (Hazard blocking track)
-  - `3`: Full Course Yellow (FCY / speed limited to 80 km/h)
-  - `4`: Safety Car deployed (SC)
-  - `5`: Safety Car in this lap
-  - `6`: Virtual Safety Car (VSC)
-  - `7`: Red Flag (Session stopped)
-  - `8`: Checkered Flag (Session completed)
-- **Sector Hazard Mask**: Bitfield identifying which sector (S1, S2, S3) contains the hazard.
-- **Driver-Targeted Flags**: Blue Flag (yielding to leader), Black Flag (disqualification), Meatball Flag (mandatory pit stop for mechanical damage).
-- **Start Lights Countdown**: Exact illumination phase (1 to 5 red lights, hold, green lights out).
-
-### 7.4 Live Leaderboard Matrix & Track Gaps (Class 6 Type 48)
-Emitted periodically (`eventSize === 41`):
-- **Real-Time Running Order Array**: Driver slot indices in exact track order from P1 leader down to Pn.
-- **Live Gaps**: Exact intervals to leader and car ahead calculated in real time without post-hoc reconstruction.
-- **Position Tracking Over Time**: Enables live "Lap Chart" visualizations showing position changes, overtakes, and pit stop shuffles.
-
-### 7.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 0/1/5 Type 2 and Class 2/7 Type 49)
-Full service telemetry emitted during pit stop operations:
-- **Fuel Added**: Exact volume in liters (Float32LE) pumped into the tank during the stop.
-- **Tire Compound Fitted**: Compound code installed per corner (FL, FR, RL, RR) (Hard, Medium, Soft, Wet).
-- **Pneumatic Jack Duration**: Exact seconds the car spent hoisted on air jacks (`jackTimeSec`).
-- **Penalty Compliance**: Validates whether in-pit penalties (e.g. 5-second or 10-second stop & go) were served before mechanics commenced work.
-- **Pit Lane Speed Limit Enforcement**: Entry/exit line timing beacons detect pit lane speeding infractions.
-
-### 7.6 Aerodynamic Damage & Detachable Bodywork (Class 0 Type 8-14 `info2 & 0x3FF`)
-The 10-bit aero damage bitfield in `info2`:
-- Front wing left / right endplate loss
-- Rear wing main plane detachment
-- Rear diffuser structural damage
-- Front splitter detachment
-- Left / right door damage
-- Engine cowl / rear deck damage
-
-### 7.7 Balance of Performance (BoP) & Driver Session Timings (Metadata 24-byte Tail)
-Extended driver information stored in each driver's fixed tail:
-- **`entryTime`**: Exact session second timestamp when the driver connected or entered the session.
-- **`exitTime`**: Exact session second timestamp when the driver disconnected or left the session.
-- **Success Ballast / BoP Weight**: Additional ballast mass (kg) added for Balance of Performance.
-- **Intake Restrictor Ratio**: Engine power restriction scaling factor.
