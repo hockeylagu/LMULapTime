@@ -1476,7 +1476,7 @@ describe('replayParser', () => {
         fs.unlinkSync(filePath);
       });
 
-      it('extracts rotX, rotZ, physicsRpm, and detachablePartState in trajectory points', () => {
+      it('extracts rotX, rotZ, and detachablePartState in trajectory points', () => {
         const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
         const headerBuf = Buffer.from(headerText, 'ascii');
         const irsrBuf = Buffer.from('IRSR', 'ascii');
@@ -1484,7 +1484,7 @@ describe('replayParser', () => {
         verBuf.writeUInt32LE(0x80000008, 0);
         const streamPrefix = Buffer.alloc(4);
 
-        // Build 10 trajectory slices with pitch (rotX), roll (rotZ), RPM, and damage
+        // Build 10 trajectory slices with pitch (rotX), roll (rotZ), and damage
         const sliceBufs: Buffer[] = [];
         for (let i = 0; i < 10; i++) {
           const sBuf = Buffer.alloc(6);
@@ -1496,8 +1496,6 @@ describe('replayParser', () => {
           const evPad = Buffer.from([0]);
 
           const evData = Buffer.alloc(65);
-          // info1 at offset 0: rpm = 7200 -> (7200 << 18)
-          evData.writeUInt32LE(7200 << 18, 0);
           // info2 at offset 4: detachablePartState = 42
           evData.writeUInt32LE(42, 4);
 
@@ -1552,7 +1550,6 @@ describe('replayParser', () => {
         const traj = extractReplayTrajectory(filePath, { driverSlot: 1 });
         expect(traj.points.length).toBeGreaterThan(0);
         const pt = traj.points[0];
-        expect(pt.rpm).toBe(7200);
         expect(pt.rotX).toBe(-0.05);
         expect(pt.rotZ).toBe(0.02);
         expect(pt.detachablePartState).toBe(42);

@@ -9,7 +9,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
   const currentGear = Math.min(7, Math.max(1, currentPoint?.gear ?? 1));
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 shrink-0">
+    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 shrink-0">
       {/* Speed & Gear */}
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center justify-between">
         <span className="text-[9px] text-sky-400 font-bold">SPEED</span>
@@ -61,13 +61,6 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
           {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
         </span>
         <span className="text-[8px] text-lmu-muted">angle</span>
-      </div>
-
-      {/* RPM */}
-      <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
-        <span className="text-[9px] text-amber-400 font-bold">RPM</span>
-        <span className="text-xs font-black text-amber-300 font-mono">{currentPoint?.rpm ?? '--'}</span>
-        <span className="text-[8px] text-lmu-muted">engine</span>
       </div>
 
       {/* Status / Track State */}

@@ -137,9 +137,23 @@ implementations should not filter on `eventClass` when decoding gear. The transm
 genuinely passes through neutral for a few frames during every real up/downshift
 (clutch/dog-ring disengagement) — this is authentic telemetry, not noise.
 
+**Engine RPM is NOT reliably decodable from this packet.** Bits 18..31 of `info1`
+(`info1 >>> 18`) were assumed to be a direct RPM integer (matching the community
+`rF2ReplayOffice` reference parser, which does the exact same shift with no further
+processing). Empirically this is unusable: even isolated to a single confirmed-constant
+gear over a 500+ frame contiguous stretch, the value swings randomly between ~0 and the
+14-bit max (16383) every ~20ms while speed changes smoothly, and its overall value
+distribution across a lap is flat (~9-11% in every 10%-wide bin from 0-16383) — the
+signature of noise/an unrelated counter, not a physical quantity with a normal operating
+band. No scaling/percentage-of-redline interpretation fixes this either (checked: noise
+is symmetric across the low/mid/high thirds of the range, not concentrated near the top
+the way rev-limiter flicker would be). **If real engine RPM is ever found elsewhere in
+the format (a different event type/offset, or a future replay format revision), document
+it here** rather than reusing `info1 >>> 18`.
+
 | Offset in Payload | Size | Type | Field & Bitfield Description |
 | :--- | :--- | :--- | :--- |
-| `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: `engineRpm` (Direct RPM integer value) |
+| `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: unreliable / not usable as RPM (see note above) |
 | `4` | 4 bytes | UInt32LE | **`info2`**: <br>• Bits 0..9: `detachablePartState` (Bitmask of detached / damaged aero body parts) |
 | `4` | 2 bytes | UInt16LE | **`steer10`**: Steering wheel position: `(raw16 & 0x3FF)`, angle = `((steer10 - 512) / 512) * 540` deg |
 | `5` | 1 byte | UInt8 | **`rawThrottle`**: 8-bit throttle pedal position (1 = 0%, 249 = 100%) |
@@ -332,7 +346,7 @@ Every valid flying lap in each replay matches the official simulation XML result
 | **Penalties & Incidents** | **Implemented** (`extractReplayPenalties`) | Class 2 Type 5 extraction of penalty strings (`"Cut track"`, `"Pit lane speeding"`), lap indices, and slice timestamps. |
 | **Track Flags & Safety Car** | **Specification Ready** | Class 2 Type 10 track flag states (Green, Local Yellow, FCY, SC, VSC, Red, Checkered) and driver flags (Blue, Black, Meatball). |
 | **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
-| **Engine RPM** | **Implemented** (`extractReplayTrajectory`) | True physics engine RPM directly decoded from `info1 >>> 18`. |
+| **Engine RPM** | **Not usable** | Bits 18..31 of `info1` are unreliable noise, not real RPM — see note in Section 4 (Type 8..14). Removed from `extractReplayTrajectory` output; revisit only if a genuine RPM source is found. |
 | **Gear** | **Implemented** (`extractReplayTrajectory`) | Decoded from the vehicle pose event's `eventType` header field (`gear = eventType - 8`), available for every car including AI opponents. |
 | **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 36 pit stop events, entry/exit, service durations, liters fueled, and tire compounds fitted. |
 | **Live Standings** | **Specification Ready** | Class 6 Type 48 packets provide real-time running order array (P1..Pn) and gaps at every timestamp. |

@@ -12,7 +12,6 @@ export interface InterpolatedPoint {
   throttle: number;
   brake: number;
   steerYaw: number;
-  rpm?: number;
   gear: number;
   x: number;
   y: number;
@@ -90,7 +89,6 @@ export function interpolatePointAtDistance(
       throttle: p.throttle || 0,
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
-      rpm: p.rpm,
       gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
@@ -110,7 +108,6 @@ export function interpolatePointAtDistance(
       throttle: p.throttle || 0,
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
-      rpm: p.rpm,
       gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
@@ -144,7 +141,6 @@ export function interpolatePointAtDistance(
       throttle: p.throttle || 0,
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
-      rpm: p.rpm,
       gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
@@ -170,8 +166,7 @@ export function interpolatePointAtDistance(
     throttle: Math.round((p0.throttle || 0) + t * ((p1.throttle || 0) - (p0.throttle || 0))),
     brake: Math.round((p0.brake || 0) + t * ((p1.brake || 0) - (p0.brake || 0))),
     steerYaw: Number(((p0.steerYaw || 0) + t * ((p1.steerYaw || 0) - (p0.steerYaw || 0))).toFixed(1)),
-    rpm: p0.rpm && p1.rpm ? Math.round(p0.rpm + t * (p1.rpm - p0.rpm)) : p0.rpm,
-      gear: resolveGearValue(t < 0.5 ? p0 : p1),
+    gear: resolveGearValue(t < 0.5 ? p0 : p1),
     x: p0.x + t * (p1.x - p0.x),
     y: p0.y + t * (p1.y - p0.y),
     z: p0.z + t * (p1.z - p0.z),
