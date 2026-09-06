@@ -555,10 +555,38 @@ interface RawPoint {
   inPit?: boolean;
   isOffTrack?: boolean;
   gearRaw?: number;
+  speedKmhRaw?: number;
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
+}
+
+function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
+  const b0 = payload[offset];
+  const b1 = payload[offset + 1];
+  const b2 = payload[offset + 2];
+  const b3 = payload[offset + 3];
+  const b4 = payload[offset + 4];
+  if ((b0 | b1 | b2 | b3 | b4) === 0) return undefined;
+
+  const readSigned16 = (low: number, high: number): number => {
+    const value = low | (high << 8);
+    return value & 0x8000 ? value - 0x10000 : value;
+  };
+
+  const high1 = (b1 & 0x20) ? (b1 & 0x3f) + 192 : b1 & 0x3f;
+  const velocity1 = 3.6 * readSigned16(b0, high1) / 32;
+
+  const low2 = (b1 >> 6) + ((b2 & 0x3f) << 2);
+  const high2 = (b2 >> 6) + ((b3 & 1) << 2) + ((b3 & 2) ? 248 : 0);
+  const velocity2 = 3.6 * readSigned16(low2, high2) / 20;
+
+  const low3 = ((b3 & 0xfc) >> 2) + ((b4 & 3) << 6);
+  const high3 = (b4 & 0x80) ? (b4 >> 2) + 192 : b4 >> 2;
+  const velocity3 = 3.6 * readSigned16(low3, high3) / 32;
+  const speed = Math.hypot(velocity1, velocity2, velocity3);
+  return isFinite(speed) ? speed : undefined;
 }
 
 /**
@@ -750,6 +778,7 @@ export function extractReplayTrajectory(
               const isOffTrack = Boolean(statusByte & 0x01);
               const pitLimiter = Boolean(statusByte & 0x04);
               const inPit = Boolean(statusByte & 0x80);
+              const speedKmhRaw = decodePacketSpeedKmh(buf, eventSp + 5 + 8);
               const latestWheel = driverWheelTelemetry.get(drv);
 
               // Gear is encoded directly in the event header's type field (confirmed via the
@@ -777,6 +806,7 @@ export function extractReplayTrajectory(
                 inPit,
                 isOffTrack,
                 gearRaw,
+                speedKmhRaw,
                 detachablePartState,
                 tireTemps: latestWheel?.tireTemps ? [...latestWheel.tireTemps] : undefined,
                 tireWear: latestWheel?.tireWear ? [...latestWheel.tireWear] : undefined,
@@ -1282,7 +1312,7 @@ export function extractReplayTrajectory(
           speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
         }
       }
-      rawSpeeds.push(speed);
+      rawSpeeds.push(downsampled[i].speedKmhRaw ?? speed);
     }
 
     // Build garage and pit intervals for the target vehicle to accurately determine inGarage and inPit states
