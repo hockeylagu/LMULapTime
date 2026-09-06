@@ -42,11 +42,16 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     error,
     isCompareMode,
     handleToggleCompare,
-    compatibleReplays,
     baselineReplayName,
-    setBaselineReplayName,
     baselineLapNumber,
-    setBaselineLapNumber,
+    baselineDriverName,
+    isComparePickerOpen,
+    handleCloseComparePicker,
+    availableCompareLaps,
+    compareLapFilter,
+    isCompareLapsLoading,
+    setCompareLapFilter,
+    handleSelectCompareLap,
     baselineTrajectory,
     baselineMetadata,
     isBaselineLoading,
@@ -67,6 +72,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     currentLapSummary,
     lapDeltas,
     handleSwapBaseline,
+    handleRemoveCompare,
     activeReplayName,
   } = useReplayInspectorData({
     isOpen,
@@ -106,13 +112,18 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
         isCompareMode={isCompareMode}
         onToggleCompare={handleToggleCompare}
         onSwapBaseline={handleSwapBaseline}
-        compatibleReplays={compatibleReplays}
+        onRemoveCompare={handleRemoveCompare}
         baselineReplayName={baselineReplayName}
-        onSelectBaselineReplay={name => { setBaselineReplayName(name); setBaselineLapNumber(null); }}
         baselineLapNumber={baselineLapNumber}
-        onSelectBaselineLap={lap => setBaselineLapNumber(lap)}
-        baselineMetadata={baselineMetadata}
+        baselineDriverName={baselineDriverName}
         baselineTrajectory={baselineTrajectory}
+        isComparePickerOpen={isComparePickerOpen}
+        onCloseComparePicker={handleCloseComparePicker}
+        availableCompareLaps={availableCompareLaps}
+        compareLapFilter={compareLapFilter}
+        isCompareLapsLoading={isCompareLapsLoading}
+        onChangeCompareLapFilter={setCompareLapFilter}
+        onSelectCompareLap={handleSelectCompareLap}
         isBaselineLoading={isBaselineLoading}
         isStationary={maxSpeed <= 1}
         isTrajLoading={isTrajLoading}

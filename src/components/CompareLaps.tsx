@@ -143,6 +143,14 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
   const onCompareTelemetry = selectedLaps.length === 2 ? handleCompareTelemetry : undefined;
 
+  const handleCloseTelemetry = () => {
+    setTelemetryModalOpen(false);
+    setTelemetryTargetReplay('');
+    setTelemetryTargetLap(1);
+    setTelemetryBaselineReplay(null);
+    setTelemetryBaselineLap(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="glass-panel p-6 rounded-2xl space-y-4">
@@ -221,6 +229,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       <CompareLapsTable
         selectedTrack={selectedTrack}
         selectedCarClass={selectedCarClass}
+        playerOnly={playerOnly}
         displayLaps={displayLaps}
         emptyCount={emptyCount}
         hideEmpty={hideEmpty}
@@ -240,7 +249,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       {telemetryModalOpen && telemetryTargetReplay && (
         <ReplayInspectorModal
           isOpen={telemetryModalOpen}
-          onClose={() => setTelemetryModalOpen(false)}
+          onClose={handleCloseTelemetry}
           replayName={telemetryTargetReplay}
           initialLapNumber={telemetryTargetLap}
           initialCompareMode={true}

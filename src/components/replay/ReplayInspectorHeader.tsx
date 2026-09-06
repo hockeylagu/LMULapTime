@@ -2,7 +2,9 @@ import React from 'react';
 import {
   X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, Scale, ArrowLeftRight,
 } from 'lucide-react';
-import { ReplayMetadata, ReplayTrajectoryData, ReplaySummary } from '../../../server/types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../server/types.js';
+import { ComparableLap } from '../../utils/lapComparison.js';
+import { ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -13,13 +15,18 @@ export interface ReplayInspectorHeaderProps {
   isCompareMode: boolean;
   onToggleCompare: () => void;
   onSwapBaseline?: () => void;
-  compatibleReplays: ReplaySummary[];
+  onRemoveCompare: () => void;
   baselineReplayName: string | null;
-  onSelectBaselineReplay: (name: string) => void;
   baselineLapNumber: number | null;
-  onSelectBaselineLap: (lapNum: number) => void;
-  baselineMetadata: ReplayMetadata | null;
+  baselineDriverName?: string | null;
   baselineTrajectory?: ReplayTrajectoryData | null;
+  isComparePickerOpen: boolean;
+  onCloseComparePicker: () => void;
+  availableCompareLaps: ComparableLap[];
+  compareLapFilter: 'player' | 'all';
+  isCompareLapsLoading: boolean;
+  onChangeCompareLapFilter: (filter: 'player' | 'all') => void;
+  onSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
   isStationary: boolean;
   isTrajLoading: boolean;
@@ -33,24 +40,22 @@ export interface ReplayInspectorHeaderProps {
 
 export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React.memo(({
   onClose, replayName, metadata, trajectory, onSelectLap,
-  isCompareMode, onToggleCompare, onSwapBaseline, compatibleReplays,
-  baselineReplayName, onSelectBaselineReplay, baselineLapNumber, onSelectBaselineLap,
-  baselineMetadata, baselineTrajectory, isBaselineLoading, isStationary, isTrajLoading,
+  isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
+  baselineReplayName, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
+  isCompareLapsLoading, onChangeCompareLapFilter, onSelectCompareLap,
+  isBaselineLoading, isStationary, isTrajLoading,
   isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
 }) => {
   const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
   const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s`;
-
-  const baselineLaps = (baselineReplayName === replayName
-    ? trajectory?.laps
-    : (baselineTrajectory?.laps || baselineMetadata?.laps)
-  ) || [];
+  const baselineSummary = baselineTrajectory?.laps?.find(l => l.lapNumber === (baselineTrajectory.currentLap ?? baselineLapNumber)) || baselineTrajectory?.laps?.[0];
 
   return (
-    <header className="h-14 px-4 bg-[#0a0e17] border-b border-lmu-border flex items-center justify-between shrink-0 z-30">
+    <header className="relative h-14 px-4 bg-[#0a0e17] border-b border-lmu-border flex items-center justify-between shrink-0 z-[80]">
       {/* Left: Back button + Title & Info */}
       <div className="flex items-center gap-3 min-w-0">
         <button
+          type="button"
           onClick={onClose}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-white/10 text-white font-medium text-xs border border-lmu-border transition-colors shrink-0 cursor-pointer"
           title="Return to Lap Times"
@@ -151,77 +156,59 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           </div>
         )}
 
-        {/* Compare Laps Button */}
-        <button
-          onClick={onToggleCompare}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
-            isCompareMode
-              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-              : 'bg-lmu-card hover:bg-white/10 border-lmu-border text-lmu-muted hover:text-white'
-          }`}
-          title={isCompareMode ? 'Exit Lap Comparison Mode' : 'Compare 2 Laps (Overlay Speed, Throttle, Line, Time Delta)'}
-        >
-          <Scale className="w-3.5 h-3.5" />
-          <span>{isCompareMode ? 'Comparing' : 'Compare'}</span>
-        </button>
-
-        {/* Swap Button (when comparing) */}
-        {isCompareMode && (
+        {!isCompareMode ? (
           <button
             type="button"
-            onClick={onSwapBaseline}
-            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
-            title="Swap Primary and Baseline laps (⇄)"
-            aria-label="Swap Primary and Baseline laps"
+            onClick={onToggleCompare}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-bold text-xs border transition-all cursor-pointer bg-lmu-card hover:bg-white/10 border-lmu-border text-lmu-muted hover:text-white"
+            title="Choose a lap for telemetry comparison"
           >
-            <ArrowLeftRight className="w-3.5 h-3.5 text-amber-300" />
-            <span className="hidden sm:inline">Swap</span>
+            <Scale className="w-3.5 h-3.5" />
+            <span>Compare</span>
           </button>
+        ) : !isComparePickerOpen && (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-lmu-accent/10 border border-lmu-accent/30 px-2 py-1 text-[10px] font-mono text-lmu-accent max-w-[250px]" title="Selected comparison lap">
+              <span className="font-bold">vs</span>
+              <span className="truncate">{baselineDriverName || baselineReplayName || 'Baseline'} L{baselineTrajectory?.currentLap ?? baselineLapNumber ?? '?'}</span>
+              {baselineSummary?.lapTimeSec ? <span className="text-white">({formatLapTime(baselineSummary.lapTimeSec)})</span> : null}
+              <button
+                type="button"
+                onClick={onRemoveCompare}
+                className="ml-1 rounded text-lmu-muted hover:text-rose-300"
+                title="Remove comparison lap"
+                aria-label="Remove comparison lap"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+            <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onSwapBaseline}
+              className="flex items-center gap-1 px-2 py-1 rounded-xl bg-lmu-accent/15 hover:bg-lmu-accent/25 border border-lmu-accent/40 text-lmu-accent text-xs font-bold transition-all cursor-pointer"
+              title="Swap the compared and baseline laps"
+              aria-label="Swap comparison laps"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Swap</span>
+            </button>
+          </div>
+          </div>
         )}
 
-        {/* Baseline Lap & Replay Selector */}
-        {isCompareMode && (
-          <div className="flex items-center gap-1.5 bg-[#0f1422] border border-amber-500/50 rounded-xl px-2 py-0.5 shadow-sm text-xs animate-fadeIn">
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider hidden sm:inline">
-              Base:
-            </span>
-            {compatibleReplays.length > 0 && (
-              <select
-                aria-label="Select Baseline Replay"
-                value={baselineReplayName || replayName || ''}
-                onChange={e => onSelectBaselineReplay(e.target.value)}
-                className="bg-transparent text-amber-300 text-xs font-semibold focus:outline-none cursor-pointer max-w-[110px] sm:max-w-[150px] truncate py-0.5 border-r border-white/10 pr-1 mr-1"
-              >
-                <option value={replayName || ''} className="bg-[#0b101d] text-white">This Replay</option>
-                {compatibleReplays.map(cr => (
-                  <option key={cr.name} value={cr.name} className="bg-[#0b101d] text-amber-300">
-                    {cr.name}{cr.carClass ? ` [${cr.carClass}]` : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-            <select
-              aria-label="Select Baseline Lap"
-              value={baselineLapNumber ?? baselineLaps[0]?.lapNumber ?? 1}
-              onChange={e => onSelectBaselineLap(parseInt(e.target.value, 10))}
-              className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate py-0.5"
-            >
-              {baselineLaps.length === 0 ? (
-                <option value="" disabled className="bg-[#0b101d] text-lmu-muted">
-                  {isBaselineLoading ? 'Loading laps...' : 'No laps detected'}
-                </option>
-              ) : (
-                baselineLaps.map(l => (
-                  <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
-                    Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : ''}
-                  </option>
-                ))
-              )}
-            </select>
-            {isBaselineLoading && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping ml-1" title="Loading baseline lap..." />
-            )}
-          </div>
+        {isComparePickerOpen && (
+          <ReplayCompareLapPicker
+            laps={availableCompareLaps}
+            selectedReplayName={baselineReplayName}
+            selectedLapNumber={baselineLapNumber}
+            selectedDriverName={baselineDriverName}
+            filter={compareLapFilter}
+            isLoading={isCompareLapsLoading || isBaselineLoading}
+            onChangeFilter={onChangeCompareLapFilter}
+            onClose={onCloseComparePicker}
+            onSelectLap={onSelectCompareLap}
+          />
         )}
 
         {isStationary ? (

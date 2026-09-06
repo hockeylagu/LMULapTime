@@ -128,6 +128,7 @@ describe('CompareLaps component', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.location.hash = '#compare';
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/compare/laps')) {
         if (url.includes('playerOnly=false')) {
@@ -362,7 +363,7 @@ describe('CompareLaps component', () => {
     expect(bestS3Cells[0]).toHaveClass('text-lmu-green');
   });
 
-  it('preserves selected player lap when changing driver scope to allow comparing with another driver', async () => {
+  it('clears default selections when changing to all drivers', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     // Initial load selects player's PB lap (2:01.800)
@@ -375,10 +376,9 @@ describe('CompareLaps component', () => {
     const allDriversBtn = screen.getByRole('button', { name: /All Drivers/i });
     fireEvent.click(allDriversBtn);
 
-    // After data loads with all drivers, the selected player lap (2:01.800) is STILL present in comparison deck!
+    // All Drivers starts empty so the user can choose the comparison explicitly.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
-      expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
+      expect(screen.getByText('No Laps Selected for Comparison')).toBeInTheDocument();
     });
 
     // In the table, AI Driver's lap 3 is now available.
@@ -394,10 +394,9 @@ describe('CompareLaps component', () => {
       fireEvent.click(aiCompareBtn);
     }
 
-    // Both laps are now in the comparison deck (2/4)!
+    // The chosen all-driver lap is now in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
-      expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
 
@@ -405,10 +404,9 @@ describe('CompareLaps component', () => {
     const playerOnlyBtn = screen.getByRole('button', { name: /Player Only/i });
     fireEvent.click(playerOnlyBtn);
 
-    // Both laps remain in the comparison deck!
+    // The explicit all-driver selection remains in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
-      expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
   });
