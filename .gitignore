@@ -38,6 +38,13 @@ Thumbs.db
 .cache/
 .temp/
 tmp/
+
+# Telemetry recorder build output
+tools/telemetry-recorder/bin/
+tools/telemetry-recorder/obj/
+
+# Raw shared-memory captures (large; keep only derived track models)
+test/fixtures/telemetry/*.jsonl
 server/lmu_cache.db*
 *.db
 *.db-wal
