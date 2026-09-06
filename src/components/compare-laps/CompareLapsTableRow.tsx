@@ -36,13 +36,11 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
     <tr
       className={`hover:bg-lmu-card/50 transition-colors ${
         isBaseline
-          ? 'bg-lmu-gold/15'
+          ? 'bg-lmu-accent/10 border-l-lmu-accent'
           : isAllTimePB
-          ? 'bg-lmu-gold/15'
-          : lap.isSessionBest
-          ? 'bg-lmu-gold/10'
+          ? 'bg-lmu-card/70 border-l-lmu-accent/70'
           : isSelected
-          ? 'bg-lmu-blue/15'
+          ? 'bg-lmu-card/60 border-l-lmu-border'
           : ''
       }`}
     >
@@ -89,7 +87,7 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
           isAllTimePB
             ? 'text-lmu-gold font-extrabold'
             : lap.isSessionBest
-            ? 'text-lmu-gold font-bold'
+            ? 'text-lmu-blue font-bold'
             : lap.isInferred
             ? 'text-amber-300/80 italic font-mono'
             : 'text-white'

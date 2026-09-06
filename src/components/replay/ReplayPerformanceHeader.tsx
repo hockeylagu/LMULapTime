@@ -40,7 +40,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           Lap {currentLap}
         </span>
         {currentLapSummary.isBest && (
-          <span className="px-2 py-0.5 rounded-full bg-lmu-gold/20 border border-lmu-gold/40 text-lmu-gold font-bold text-[10px] shadow-sm">
+          <span className="px-2 py-0.5 rounded-full bg-lmu-blue/15 border border-lmu-blue/40 text-lmu-blue font-bold text-[10px] shadow-sm">
             ★ Fastest Lap
           </span>
         )}
@@ -50,7 +50,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           </span>
         )}
         <span
-          className={`text-xs font-mono font-bold ${currentLapSummary.isBest ? 'text-lmu-gold font-extrabold' : 'text-emerald-400'}`}
+          className={`text-xs font-mono font-bold ${currentLapSummary.isBest ? 'text-lmu-blue font-extrabold' : 'text-emerald-400'}`}
           title="Replay GPS Lap Time"
         >
           {formatLapTime(currentLapSummary.lapTimeSec)}

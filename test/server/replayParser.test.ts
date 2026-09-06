@@ -25,6 +25,7 @@ interface MockSlice {
   offTrack?: boolean;
   pitLimiter?: boolean;
   gear?: number;
+  poseType?: number;
   speedBytes?: [number, number, number, number, number];
   timing?: { splitSec: number; sector: number; lapIdx: number };
   wheel?: {
@@ -133,7 +134,7 @@ function createSliceVcrBuffer(options?: {
     const evHdr = Buffer.alloc(4);
     // eventType (bits 17..22) encodes gear as (gear + 8); eventClass (bits 29..31) is 1,
     // matching the real current-format LMU replay encoding.
-    const evType = sl.gear !== undefined ? sl.gear + 8 : 0;
+    const evType = sl.poseType ?? (sl.gear !== undefined ? sl.gear + 8 : 9);
     evHdr.writeUInt32LE((1 << 29) | (evType << 17) | (65 << 8) | (sl.driverSlot & 0xff), 0);
     const evPad = Buffer.from([0]);
 
@@ -170,7 +171,7 @@ function createSliceVcrBuffer(options?: {
 
     if (sl.timing) {
       const timHdr = Buffer.alloc(4);
-      timHdr.writeUInt32LE((21 << 8) | (sl.driverSlot & 0xff), 0);
+      timHdr.writeUInt32LE(((6 << 29) | (6 << 17) | (21 << 8) | (sl.driverSlot & 0xff)) >>> 0, 0);
       const timPad = Buffer.from([0]);
       const timData = Buffer.alloc(21);
       timData.writeFloatLE(sl.timing.splitSec, 0);
@@ -278,7 +279,7 @@ function createBinaryDriverVcrBuffer(options: {
     sBuf.writeFloatLE(sl.sTime, 0);
     sBuf.writeUInt16LE(1, 4);
     const evHdr = Buffer.alloc(4);
-    evHdr.writeUInt32LE((65 << 8) | (sl.driverSlot & 0xff), 0);
+    evHdr.writeUInt32LE((9 << 17) | (65 << 8) | (sl.driverSlot & 0xff), 0);
     const evPad = Buffer.from([0]);
     const evData = Buffer.alloc(65);
     evData.writeUInt16LE(512, 4);
@@ -638,6 +639,18 @@ describe('replayParser', () => {
       expect(traj.points[2].gear).toBe(7);
       expect(traj.points[3].gear).toBe(-1);
       expect(traj.points[4].gear).toBe(-1);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('ignores a 65-byte event whose type is not a vehicle pose type', () => {
+      const sliceVcrPath = path.join(tempDir, 'invalid_pose_type.vcr');
+      fs.writeFileSync(sliceVcrPath, createSliceVcrBuffer({
+        slices: [{ sTime: 1.0, driverSlot: 1, x: 100, y: 0, z: 100, poseType: 6 }],
+      }));
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 0 });
+      expect(traj.points).toHaveLength(0);
 
       fs.unlinkSync(sliceVcrPath);
     });
@@ -1005,7 +1018,7 @@ describe('replayParser', () => {
       fs.unlinkSync(extremePath);
     });
 
-    it('sets inPit flag when status byte bit 7 (0x80) is set', () => {
+    it('sets inPit from info1 bit 17, not the status byte bit 7', () => {
       const pitPath = path.join(tempDir, 'in_pit.vcr');
       const slices = [
         { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 40, brake: 0 },
@@ -1013,15 +1026,18 @@ describe('replayParser', () => {
       ];
       const buf = createSliceVcrBuffer({ slices });
 
-      // Manually set the inPit bit (0x80) on byte 38 of the second event's data payload
+      // Set the unrelated status bit on the first packet; it must not imply pit lane.
       // Each slice structure: 6 (sTime+nEvents) + 4 (evHdr) + 1 (evPad) + 65 (evData) = 76 bytes
       // Stream starts at byte 57 of file, first 4 bytes are streamPrefix
       // Event data starts at: 57 + 4 + 6 + 4 + 1 = 72 for slice 0's evData
       // Slice 1's evData starts at: 72 + 65 + 6 + 4 + 1 = 148
-      // Status byte is at evData[38] = 148 + 38 = 186
+      // Status byte is at evData[38].
       const sliceSize = 6 + 4 + 1 + 65; // 76
+      const slice0EvDataStart = 57 + 4 + 6 + 4 + 1;
       const slice1EvDataStart = 57 + 4 + sliceSize + 6 + 4 + 1; // 57+4+76+6+4+1 = 148
-      buf[slice1EvDataStart + 38] = 0x80; // set inPit bit
+      buf[slice0EvDataStart + 38] = 0x80;
+      // The authoritative pit-lane bit is info1 bit 17 at the payload start.
+      buf.writeUInt32LE(1 << 17, slice1EvDataStart);
 
       fs.writeFileSync(pitPath, buf);
 
@@ -1512,7 +1528,7 @@ describe('replayParser', () => {
           sBuf.writeUInt16LE(1, 4); // 1 event
 
           const evHdr = Buffer.alloc(4);
-          evHdr.writeUInt32LE((65 << 8) | 1, 0); // sz=65, drv=1, class=0
+          evHdr.writeUInt32LE((9 << 17) | (65 << 8) | 1, 0); // Type 9, sz=65, drv=1, class=0
           const evPad = Buffer.from([0]);
 
           const evData = Buffer.alloc(65);
@@ -1592,7 +1608,7 @@ describe('replayParser', () => {
 
         // Event 1: Motion (sz=65)
         const evHdr1 = Buffer.alloc(4);
-        evHdr1.writeUInt32LE((65 << 8) | 1, 0);
+        evHdr1.writeUInt32LE((9 << 17) | (65 << 8) | 1, 0);
         const evData1 = Buffer.alloc(65);
         evData1.writeFloatLE(100, 41);
         evData1.writeFloatLE(0, 45);
@@ -1615,7 +1631,7 @@ describe('replayParser', () => {
         sBuf2.writeUInt16LE(2, 4);
 
         const evHdr3 = Buffer.alloc(4);
-        evHdr3.writeUInt32LE((65 << 8) | 1, 0);
+        evHdr3.writeUInt32LE((9 << 17) | (65 << 8) | 1, 0);
         const evData3 = Buffer.alloc(65);
         evData3.writeFloatLE(120, 41);
         evData3.writeFloatLE(0, 45);

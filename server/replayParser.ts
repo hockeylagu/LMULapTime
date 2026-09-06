@@ -737,7 +737,7 @@ export function extractReplayTrajectory(
           const evClass = (h >>> 29);
           const evType = (h >>> 17) & 0x3f;
 
-          if (sz === 65) {
+          if (sz === 65 && evType >= 7 && evType <= 15) {
             if (targetSlot !== undefined && drv !== targetSlot) {
               eventSp += 4 + 1 + sz;
               continue;
@@ -770,23 +770,23 @@ export function extractReplayTrajectory(
               const absActive = Boolean(rawBrkByte & 0x40);
               const tcActive = Boolean(rawBrkByte & 0x80);
 
-              // Byte 38 is vehicle status & surface/pit flags:
+              // Byte 38 is vehicle status & surface/limiter flags:
               // bit 0 (0x01) = off-track surface / track limit cut
               // bit 2 (0x04) = pit limiter active (holding 60 km/h)
-              // bit 7 (0x80) = inside pit lane boundary
               const statusByte = buf[eventSp + 5 + 38];
               const isOffTrack = Boolean(statusByte & 0x01);
               const pitLimiter = Boolean(statusByte & 0x04);
-              const inPit = Boolean(statusByte & 0x80);
+              const info1 = buf.readUInt32LE(eventSp + 5);
+              const inPit = Boolean(info1 & (1 << 17));
               const speedKmhRaw = decodePacketSpeedKmh(buf, eventSp + 5 + 8);
               const latestWheel = driverWheelTelemetry.get(drv);
 
-              // Gear is encoded directly in the event header's type field (confirmed via the
-              // rF2ReplayOffice reference tool source): evType ranges 7-15 for vehicle pose
+              // Gear is encoded directly in the event header's type field (confirmed via a
+              // community reference parser): evType ranges 7-15 for vehicle pose
               // events, mapping to gear = evType - 8 (7 => reverse (-1), 8 => neutral, 9-15 =>
               // gears 1-7). Available for every driver, not just the local player. The
-              // reference tool gates this on evClass === 0, but current LMU replay format
-              // versions use evClass === 1 for these same vehicle pose events.
+              // The reference tool gates this on evClass === 0; current LMU pose packets
+              // observed here also use Class 0, but the class is left ungated for revisions.
               const gearRaw = evType >= 7 && evType <= 15 ? evType - 8 : undefined;
 
               const pt: RawPoint = {
@@ -824,7 +824,8 @@ export function extractReplayTrajectory(
                 pts.push(pt);
               }
             }
-          } else if ((sz === 21 || sz === 18 || (evClass === 6 && evType === 6 && sz >= 9)) && eventSp + 5 + 9 <= activeLen) {
+          } else if ((evClass === 3 || evClass === 6 || evClass === 7) && evType === 6 &&
+                     (sz === 18 || sz === 21) && eventSp + 5 + 9 <= activeLen) {
             const splitSec = buf.readFloatLE(eventSp + 5);
             const sec = buf[eventSp + 5 + 8] & 3;
             const lapIdx = buf[eventSp + 5 + 8] >> 2;
@@ -859,8 +860,8 @@ export function extractReplayTrajectory(
                 action: 'removed',
               });
             }
-          } else if (((evClass === 5 || (evType === 2 && evClass !== 2)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
-                     (evType === 49 && sz === 1 && eventSp + 5 + sz <= activeLen)) {
+          } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
+                     (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
             const drvName = driverNameMap.get(drv);
             const PIT_CODE_MAP: Record<number, { action: string; isGarage?: boolean }> = {
@@ -1312,7 +1313,10 @@ export function extractReplayTrajectory(
           speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
         }
       }
-      rawSpeeds.push(downsampled[i].speedKmhRaw ?? speed);
+      const packetSpeed = downsampled[i].speedKmhRaw;
+      rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH
+        ? packetSpeed
+        : speed);
     }
 
     // Build garage and pit intervals for the target vehicle to accurately determine inGarage and inPit states
@@ -1418,7 +1422,7 @@ export function extractReplayTrajectory(
       // True garage state based on simulation events; fallback to stationary in pit
       const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
         (garageIntervals.length === 0 && Boolean(cur.inPit) && smoothSpeed < 1);
-      const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals) || inGarage;
+      const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
 
       finalPoints.push({
         x: Number(cur.x.toFixed(2)),

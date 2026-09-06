@@ -54,10 +54,10 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           <button
             type="button"
             onClick={onAddPersonalBest}
-            className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
             title="Add your Personal Best lap for this track & category"
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <Trophy className="w-3.5 h-3.5 text-lmu-accent" />
             + Personal Best ({formatTime(allTimePBObject.lapTime)})
           </button>
         )}
@@ -66,10 +66,10 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           <button
             type="button"
             onClick={onAddTheoreticalBest}
-            className="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/40 text-purple-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
             title="Add all-time theoretical optimal lap for this track & category"
           >
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <Sparkles className="w-3.5 h-3.5 text-lmu-accent" />
             + Theoretical Best ({formatTime(theoreticalBestSec)})
           </button>
         )}
@@ -78,10 +78,10 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           <button
             type="button"
             onClick={onAddOverallTrackBest}
-            className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
             title={`Add all-time fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
           >
-            <Award className="w-3.5 h-3.5 text-amber-400" />
+            <Award className="w-3.5 h-3.5 text-lmu-accent" />
             + All-Time Best ({overallTrackBestObject.lapTimeString})
           </button>
         )}

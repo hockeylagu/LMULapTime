@@ -130,17 +130,18 @@ This is the primary vehicle kinematic and pedal telemetry packet emitted at up t
 **Gear is encoded directly in the event header's `eventType` field, not in the payload.**
 `eventType` ranges 7..15 for these packets, mapping to `gear = eventType - 8`:
 `7` = reverse (-1), `8` = neutral (0), `9..15` = forward gears 1..7. This is available
-for every driver (player and AI), and is confirmed against the community `rF2ReplayOffice`
-reference parser. Note: that reference tool additionally gates this on `eventClass === 0`,
-but current LMU replay format versions always use `eventClass === 1` for these packets, so
-implementations should not filter on `eventClass` when decoding gear. The transmission
+for every driver (player and AI), and is confirmed against a community reference parser.
+That parser additionally gates this on `eventClass === 0`,
+but current LMU samples inspected here use Class 0 for these packets. Implementations
+should retain the pose size/type checks while avoiding a hard class gate for revisions.
+The transmission
 genuinely passes through neutral for a few frames during every real up/downshift
 (clutch/dog-ring disengagement) — this is authentic telemetry, not noise.
 
 **Engine RPM is NOT reliably decodable from this packet.** Bits 18..31 of `info1`
-(`info1 >>> 18`) were assumed to be a direct RPM integer (matching the community
-`rF2ReplayOffice` reference parser, which does the exact same shift with no further
-processing). Empirically this is unusable: even isolated to a single confirmed-constant
+(`info1 >>> 18`) were assumed to be a direct RPM integer (matching a community
+reference parser, which does the exact same shift with no further processing). Empirically
+this is unusable: even isolated to a single confirmed-constant
 gear over a 500+ frame contiguous stretch, the value swings randomly between ~0 and the
 14-bit max (16383) every ~20ms while speed changes smoothly, and its overall value
 distribution across a lap is flat (~9-11% in every 10%-wide bin from 0-16383) — the
@@ -238,7 +239,7 @@ Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to re
 
 ---
 
-### Class 6 (or 3): Timing Loops, Standings & Pit Lane
+### Class 6/7 (or 3): Timing Loops, Standings & Pit Lane
 
 #### Type 6 (`eventSize === 21` in Online/Multiplayer, `eventSize === 18` in Offline/Single-Player Practice): Authoritative Timing Loop Checkpoint
 Fired when a vehicle crosses an electronic simulation timing loop (Start/Finish line, Sector 1, Sector 2). Note: In online/multiplayer sessions, the packet size is 21 bytes; in offline/single-player practice sessions, the packet size is 18 bytes. Both share the exact same binary payload offsets:
@@ -348,7 +349,7 @@ Every valid flying lap in each replay matches the official simulation XML result
 | **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
 | **Engine RPM** | **Not usable** | Bits 18..31 of `info1` are unreliable noise, not real RPM — see note in Section 4 (Type 8..14). Removed from `extractReplayTrajectory` output; revisit only if a genuine RPM source is found. |
 | **Gear** | **Implemented** (`extractReplayTrajectory`) | Decoded from the vehicle pose event's `eventType` header field (`gear = eventType - 8`), available for every car including AI opponents. |
-| **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 36 pit stop events, entry/exit, service durations, liters fueled, and tire compounds fitted. |
+| **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Current LMU Class 0/1/5 Type 2 and Class 2/7 Type 49 events provide pit and garage transitions; service details are decoded where present. |
 | **Live Standings** | **Specification Ready** | Class 6 Type 48 packets provide real-time running order array (P1..Pn) and gaps at every timestamp. |
 | **Weather & Track Grip** | **Specification Ready** | Metadata 67-byte session environment block yields ambient/track temps, rain intensity, puddle depth, and rubber grip saturation. |
 
@@ -404,7 +405,7 @@ Emitted periodically (`eventSize === 41`):
 - **Live Gaps**: Exact intervals to leader and car ahead calculated in real time without post-hoc reconstruction.
 - **Position Tracking Over Time**: Enables live "Lap Chart" visualizations showing position changes, overtakes, and pit stop shuffles.
 
-### 7.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 5 Type 2 & Type 36)
+### 7.5 Pit Stop Strategy, Fuel Ingestion & Tire Changes (Class 0/1/5 Type 2 and Class 2/7 Type 49)
 Full service telemetry emitted during pit stop operations:
 - **Fuel Added**: Exact volume in liters (Float32LE) pumped into the tank during the stop.
 - **Tire Compound Fitted**: Compound code installed per corner (FL, FR, RL, RR) (Hard, Medium, Soft, Wet).

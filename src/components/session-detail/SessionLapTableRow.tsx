@@ -144,7 +144,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     <tr
       onClick={handleOpenTelemetry}
       className={`hover:bg-lmu-card/70 transition-colors cursor-pointer group ${
-        isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-gold/10' : ''
+        isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-blue/10' : ''
       }`}
       title={`Click to open telemetry for Lap ${l.lapNum}`}
     >
@@ -165,7 +165,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           isLapAllTimePB
             ? 'text-lmu-gold font-extrabold'
             : isSessionBest
-            ? 'text-lmu-gold font-bold'
+            ? 'text-lmu-blue font-bold'
             : isInferredLap
             ? 'text-amber-300/80 italic font-mono'
             : 'text-white'
@@ -188,7 +188,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       <td className="px-3 py-2.5 text-right font-semibold text-xs">
         <span
           className={
-            isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-gold font-bold' : 'text-white'
+            isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-white'
           }
         >
           {deltaStr}
