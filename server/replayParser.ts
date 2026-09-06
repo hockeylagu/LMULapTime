@@ -554,7 +554,6 @@ interface RawPoint {
   pitLimiter?: boolean;
   inPit?: boolean;
   isOffTrack?: boolean;
-  physicsRpm?: number;
   gearRaw?: number;
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
@@ -725,11 +724,8 @@ export function extractReplayTrajectory(
               const rotY = buf.readFloatLE(eventSp + 5 + 57);
               const rotZ = buf.readFloatLE(eventSp + 5 + 61);
 
-              const info1 = buf.readUInt32LE(eventSp + 5);
               const info2 = buf.readUInt32LE(eventSp + 5 + 4);
 
-              const rawRpm = (info1 >>> 18);
-              const physicsRpm = rawRpm > 0 && rawRpm <= 16383 ? rawRpm : undefined;
               const detachablePartState = info2 & 0x3ff;
 
               const raw16 = buf.readUInt16LE(eventSp + 5 + 4);
@@ -780,7 +776,6 @@ export function extractReplayTrajectory(
                 pitLimiter,
                 inPit,
                 isOffTrack,
-                physicsRpm,
                 gearRaw,
                 detachablePartState,
                 tireTemps: latestWheel?.tireTemps ? [...latestWheel.tireTemps] : undefined,
@@ -1390,11 +1385,6 @@ export function extractReplayTrajectory(
       const throttle = cur.rawThrottle ?? 0;
       const brake = cur.rawBrake ?? 0;
 
-      const rpm = cur.physicsRpm !== undefined
-        ? cur.physicsRpm
-        : (smoothSpeed < 1 ? 950 : Math.min(8800, Math.max(2500, Math.round(3000 + (smoothSpeed % 45) * 120))));
-
-
       // True garage state based on simulation events; fallback to stationary in pit
       const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
         (garageIntervals.length === 0 && Boolean(cur.inPit) && smoothSpeed < 1);
@@ -1411,7 +1401,6 @@ export function extractReplayTrajectory(
         throttle,
         brake,
         steerYaw: cur.steerYaw ?? 0,
-        rpm,
         gear: finalGears[i],
         inPit,
         isOffTrack: cur.isOffTrack,

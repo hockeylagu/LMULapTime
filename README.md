@@ -19,7 +19,7 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
   - Renders the complete circuit layout with customizable colored racing lines (**Speed gradient**, **Throttle/Brake application**, and **Lateral Yaw**).
   - Synchronized interactive playback scrubber with live apex position tracking, corner metrics, and start/finish loops.
 - **Synchronized Telemetry Traces**:
-  - Real-time waveforms for **Speed** (km/h), **Throttle** (0–100%), **Brake** (0–100%), **Steering Yaw Angle**, **Gear**, and **Engine RPM**.
+  - Real-time waveforms for **Speed** (km/h), **Throttle** (0–100%), **Brake** (0–100%), **Steering Yaw Angle**, and **Gear**.
 - **Live 4-Wheel Corner Telemetry**:
   - Class 0 Type 15 packet decoding delivering independent 4-corner telemetry for **Tire Temperatures** (Carcass & Inner layers in °C), **Dynamic Tire Wear degradation**, and **Brake Disc Rotor Temperatures**.
 - **Pit Stop & Garage Lifecycle Intelligence**:
