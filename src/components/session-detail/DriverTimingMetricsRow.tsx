@@ -87,7 +87,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
           <div className="flex items-center justify-between gap-1">
             <p
               className={`text-[10px] uppercase font-semibold flex items-center gap-1 ${
-                isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold' : 'text-lmu-gold/90 font-semibold'
+                isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold' : 'text-lmu-blue font-semibold'
               }`}
             >
               {isCurrentSessionAllTimePB ? `⭐ Personal Best` : '★ Session Best Lap'}
@@ -100,7 +100,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             )}
           </div>
           <h4
-            className="text-xl font-extrabold font-mono mt-0.5 text-lmu-gold"
+            className={`text-xl font-extrabold font-mono mt-0.5 ${isCurrentSessionAllTimePB ? 'text-lmu-gold' : 'text-lmu-blue'}`}
           >
             {selectedDriver.bestLapTimeString}
           </h4>

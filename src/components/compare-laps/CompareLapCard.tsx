@@ -61,7 +61,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
     <div
       className={`p-4 rounded-2xl border transition-all relative flex flex-col justify-between ${
         isBaseline
-          ? 'bg-lmu-card/90 border-lmu-gold shadow-lg shadow-lmu-gold/10'
+          ? 'bg-lmu-card/90 border-lmu-accent shadow-lg shadow-lmu-accent/10'
           : 'bg-lmu-card/50 border-lmu-border hover:border-lmu-border/80'
       }`}
     >
@@ -72,7 +72,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color }} />
             <span
               className={`text-xs font-bold uppercase tracking-wider truncate ${
-                lap.isAllTimePB || lap.isSessionBest || lap.isOverallTrackBest ? 'text-lmu-gold' : 'text-white'
+                lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
               }`}
             >
               {lap.tag || `Lap ${lap.lapNum || '-'}`}
@@ -121,7 +121,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           </div>
           <h4
             className={`text-2xl font-extrabold font-mono mt-0.5 ${
-              lap.isAllTimePB || lap.isSessionBest || lap.isOverallTrackBest ? 'text-lmu-gold' : 'text-white'
+              lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
             }`}
           >
             {lap.lapTimeString}

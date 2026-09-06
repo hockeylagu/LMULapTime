@@ -292,7 +292,7 @@ describe('ReplayInspectorModal', () => {
     expect(speed1x.className).not.toContain('bg-lmu-accent');
   });
 
-  it('renders fastest lap badge and lap time using the lmu-gold color set', async () => {
+  it('renders fastest lap badge and lap time using the lmu-blue session-best color set', async () => {
     const trajWithBestLap = {
       ...mockTraj,
       currentLap: 1,
@@ -320,9 +320,9 @@ describe('ReplayInspectorModal', () => {
     });
 
     const fastestBadge = screen.getByText(/Fastest Lap/i);
-    expect(fastestBadge.className).toContain('bg-lmu-gold/20');
-    expect(fastestBadge.className).toContain('text-lmu-gold');
-    expect(fastestBadge.className).toContain('border-lmu-gold/40');
+    expect(fastestBadge.className).toContain('bg-lmu-blue/15');
+    expect(fastestBadge.className).toContain('text-lmu-blue');
+    expect(fastestBadge.className).toContain('border-lmu-blue/40');
   });
 
   it('allows swapping primary and baseline lap using the Swap button', async () => {

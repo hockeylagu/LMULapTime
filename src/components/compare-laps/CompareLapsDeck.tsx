@@ -53,18 +53,18 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-lmu-border/50">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Flag className="w-4 h-4 text-lmu-gold" />
+            <Flag className="w-4 h-4 text-lmu-accent" />
             Side-by-Side Lap Telemetry Comparison ({selectedLaps.length}/4)
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
-            Set any lap as the <strong className="text-lmu-gold">Baseline</strong> for instant sector and velocity delta calculations.
+            Set any lap as the <strong className="text-lmu-accent">Baseline</strong> for instant sector and velocity delta calculations.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-white uppercase tracking-wider">
             Active Baseline Lap:
           </span>
-          <span className="text-xs font-mono font-bold text-lmu-gold bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-lg">
+          <span className="text-xs font-mono font-bold text-lmu-accent bg-lmu-accent/10 border border-lmu-accent/30 px-2 py-0.5 rounded-lg">
             {baselineLap ? `${baselineLap.driverName} — ${baselineLap.lapTimeString}` : 'None'}
           </span>
           {selectedLaps.length === 2 && (
@@ -74,7 +74,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
                 const other = selectedLaps.find(l => l.id !== baselineLap?.id);
                 if (other) setBaselineLapId(other.id);
               }}
-              className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
               title="Swap Baseline Lap (⇄)"
             >
               <ArrowLeftRight className="w-3 h-3" />
