@@ -1,10 +1,10 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
-import { ReplayTrajectoryData } from '../../../server/types.js';
+import { ReplayTrajectoryData, ReplayLapSummary } from '../../../server/types.js';
 
 export interface ReplayPerformanceHeaderProps {
   currentLap: number;
-  currentLapSummary: any;
+  currentLapSummary: ReplayLapSummary | null | undefined;
   isCompareMode: boolean;
   baselineTrajectory: ReplayTrajectoryData | null;
   baselineReplayName: string | null;

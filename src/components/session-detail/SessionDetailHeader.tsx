@@ -193,11 +193,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 {session.sessionName} ({session.sessionType})
               </span>
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
-              {(session.weatherInfo || session.weather?.weatherString) && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded bg-lmu-bg border border-lmu-border text-white flex items-center gap-1">
-                  {session.weatherInfo || session.weather?.weatherString}
-                </span>
-              )}
             </div>
             <h2
               onClick={() => {

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Gauge, Flag, Settings, RefreshCw, ArrowLeftRight, Video } from 'lucide-react';
+import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, ArrowLeftRight } from 'lucide-react';
 
-export type NavTab = 'dashboard' | 'tracks' | 'compare' | 'replays' | 'settings';
+export type NavTab = 'dashboard' | 'tracks' | 'compare' | 'settings';
 
 interface NavbarProps {
   activeTab: NavTab;
@@ -80,24 +80,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('replays')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'replays'
-              ? 'bg-lmu-accent text-white shadow-md shadow-lmu-accent/20'
-              : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
-              }`}
-          >
-            <Video className="w-4 h-4" />
-            Replays
-          </button>
-
-          <button
             onClick={() => setActiveTab('settings')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'settings'
               ? 'bg-lmu-accent text-white shadow-md shadow-lmu-accent/20'
               : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
               }`}
           >
-            <Settings className="w-4 h-4" />
+            <SettingsIcon className="w-4 h-4" />
             Settings
           </button>
         </nav>

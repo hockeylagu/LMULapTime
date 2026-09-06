@@ -43,11 +43,6 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             >
               {s.sessionName || s.sessionType}
             </span>
-            {s.weatherInfo && (
-              <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-lmu-bg/80 border border-lmu-border/60 text-lmu-muted">
-                {s.weatherInfo}
-              </span>
-            )}
             {empty && (
               <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> Empty

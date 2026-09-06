@@ -457,8 +457,9 @@ export class LmuParser {
         }
       });
 
-      // Compute weather and track conditions
-      const weather = this.parseWeather(timeString, drivers);
+      // Check for explicit weather data in XML (if present)
+      const rawWeather = sessionDataNode?.Weather ?? raceResults.Weather;
+      const weather = this.parseWeather(timeString, rawWeather ? String(rawWeather) : undefined);
 
       // Match replay file
       const xmlFileMtime = fs.statSync(filePath).mtime.getTime();
@@ -528,7 +529,7 @@ export class LmuParser {
         sessionType,
         sessionName,
         weather,
-        weatherInfo: weather.weatherString,
+        weatherInfo: weather?.weatherString,
         settings,
         gameVersion: raceResults.GameVersion || '',
         driversCount: drivers.length,
@@ -539,14 +540,14 @@ export class LmuParser {
           if (!matchingReplay.eventTitle && !matchingReplay.durationSec) {
             try {
               const rMeta = parseReplayMetadata(matchingReplay.path);
-              if (rMeta.eventInfo) {
+              if (rMeta?.eventInfo) {
                 matchingReplay.eventTitle = rMeta.eventInfo.eventTitle;
                 matchingReplay.splitNo = rMeta.eventInfo.splitNo;
                 matchingReplay.eventType = rMeta.eventInfo.eventType;
               }
               matchingReplay.durationSec = rMeta.durationSec;
             } catch {
-              // Ignore metadata read failures
+              // ignore
             }
           }
           return {
@@ -566,14 +567,12 @@ export class LmuParser {
     }
   }
 
-  public parseWeather(timeString: string, drivers: DriverData[]): SessionWeather {
-    const isWet = (comp?: string) => /wet|rain|inter/i.test(comp || '');
-    const hasWetTires = drivers.some(d =>
-      d.laps?.some(l => isWet(l.fCompound) || isWet(l.rCompound))
-    );
+  public parseWeather(timeString?: string, rawWeather?: string): SessionWeather | undefined {
+    if (!rawWeather) {
+      return undefined;
+    }
 
-    const condition: 'Dry' | 'Wet' = hasWetTires ? 'Wet' : 'Dry';
-
+    const condition = String(rawWeather);
     let hourNum = 14;
     if (timeString) {
       const match = timeString.match(/\s(\d{1,2}):/);
@@ -586,7 +585,8 @@ export class LmuParser {
     else if (hourNum >= 18 && hourNum < 21) timeOfDay = 'Evening';
     else timeOfDay = 'Night';
 
-    const conditionIcon = condition === 'Wet' ? '🌧️' : timeOfDay === 'Night' ? '🌙' : timeOfDay === 'Evening' ? '🌇' : timeOfDay === 'Morning' ? '🌅' : '☀️';
+    const isWet = /wet|rain|inter/i.test(condition);
+    const conditionIcon = isWet ? '🌧️' : timeOfDay === 'Night' ? '🌙' : timeOfDay === 'Evening' ? '🌇' : timeOfDay === 'Morning' ? '🌅' : '☀️';
     const weatherString = `${conditionIcon} ${condition} • ${timeOfDay}`;
 
     return {

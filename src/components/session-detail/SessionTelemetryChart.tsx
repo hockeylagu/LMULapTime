@@ -57,7 +57,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
     sessionChartData,
   } = useSessionChartData({ session, selectedDriver, isMultiClass });
 
-  const handleChartClick = (state: any) => {
+  const handleChartClick = (state: { activeLabel?: string | number } | null | undefined) => {
     if (state && state.activeLabel !== undefined) {
       const lapNum = parseInt(String(state.activeLabel), 10);
       if (!isNaN(lapNum) && lapNum > 0) {

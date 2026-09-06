@@ -10,6 +10,27 @@ import {
   extractReplayPitEvents,
 } from '../../server/replayParser';
 import { LmuParser } from '../../server/parser';
+import { ReplayEventInfo } from '../../server/types';
+
+interface MockSlice {
+  sTime: number;
+  driverSlot: number;
+  x: number;
+  y: number;
+  z: number;
+  throttle?: number;
+  brake?: number;
+  tc?: boolean;
+  abs?: boolean;
+  offTrack?: boolean;
+  pitLimiter?: boolean;
+  timing?: { splitSec: number; sector: number; lapIdx: number };
+  wheel?: {
+    tireTemps: [number, number, number, number];
+    tireWear?: [number, number, number, number];
+    brakeTemps?: [number, number, number, number];
+  };
+}
 
 function createMockVcrBuffer(): Buffer {
   return createSliceVcrBuffer({
@@ -45,27 +66,9 @@ function createMockVcrBuffer(): Buffer {
  * multi-driver events, and custom metadata strings.
  */
 function createSliceVcrBuffer(options?: {
-  slices?: {
-    sTime: number;
-    driverSlot: number;
-    x: number;
-    y: number;
-    z: number;
-    throttle?: number;
-    brake?: number;
-    tc?: boolean;
-    abs?: boolean;
-    offTrack?: boolean;
-    pitLimiter?: boolean;
-    timing?: { splitSec: number; sector: number; lapIdx: number };
-    wheel?: {
-      tireTemps: [number, number, number, number];
-      tireWear?: [number, number, number, number];
-      brakeTemps?: [number, number, number, number];
-    };
-  }[];
+  slices?: MockSlice[];
   drivers?: { name: string; vehicleId: string; team: string; carNumber: string }[];
-  eventInfo?: any;
+  eventInfo?: ReplayEventInfo;
   corruptMetaOffset?: boolean;
   rawEventInfoString?: string;
   trackName?: string;
@@ -250,7 +253,7 @@ function createSliceVcrBuffer(options?: {
 function createBinaryDriverVcrBuffer(options: {
   drivers: { slot: number; name: string; vehicleId: string; livery?: string; team: string; carNumber: string }[];
   slices?: { sTime: number; driverSlot: number; x: number; y: number; z: number }[];
-  eventInfo?: any;
+  eventInfo?: ReplayEventInfo;
 }): Buffer {
   const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
   const headerBuf = Buffer.from(headerText, 'ascii');
@@ -961,7 +964,7 @@ describe('replayParser', () => {
       ];
 
       // Build corresponding slices with motion (sz=65) and timing (sz=21) packets
-      const slices: any[] = [];
+      const slices: MockSlice[] = [];
       let t = 13.125; // start of lap 1
 
       // Lap 1
@@ -1016,7 +1019,7 @@ describe('replayParser', () => {
     });
 
     it('ignores aborted incomplete laps flushed at session end with negative splitSec and small distance', () => {
-      const slices: any[] = [];
+      const slices: MockSlice[] = [];
       let t = 0;
       // Lap 1 (valid flying lap, 100s)
       slices.push({ sTime: t, driverSlot: 1, x: 0, y: 0, z: 0 });
@@ -1165,18 +1168,19 @@ describe('replayParser', () => {
           // Autonomous extraction without any sessionLaps provided
           const traj = extractReplayTrajectory(daytonaQ1File, { maxPoints: 500 });
           expect(traj.laps).toBeDefined();
-          expect(traj.laps.length).toBe(5);
+          const laps = traj.laps!;
+          expect(laps.length).toBe(5);
           // Lap 1 is outlap from pit lane
-          expect(traj.laps[0].isOutlap).toBe(true);
-          expect(traj.laps[0].lapTimeSec).toBeGreaterThan(120);
+          expect(laps[0].isOutlap).toBe(true);
+          expect(laps[0].lapTimeSec).toBeGreaterThan(120);
 
           // Autonomous flying laps are ~1:47 - 1:48 (107s - 109s), matching official timing without relying on XML
-          expect(traj.laps[1].isOutlap).toBe(false);
-          expect(traj.laps[1].lapTimeSec).toBeCloseTo(108.9, 0); // ~1:48.9
-          expect(traj.laps[2].lapTimeSec).toBeCloseTo(108.0, 0); // ~1:48.0
-          expect(traj.laps[3].lapTimeSec).toBeCloseTo(107.3, 0); // ~1:47.3
-          expect(traj.laps[4].lapTimeSec).toBeCloseTo(107.1, 0); // ~1:47.1
-          expect(traj.laps[4].isBest).toBe(true);
+          expect(laps[1].isOutlap).toBe(false);
+          expect(laps[1].lapTimeSec).toBeCloseTo(108.9, 0); // ~1:48.9
+          expect(laps[2].lapTimeSec).toBeCloseTo(108.0, 0); // ~1:48.0
+          expect(laps[3].lapTimeSec).toBeCloseTo(107.3, 0); // ~1:47.3
+          expect(laps[4].lapTimeSec).toBeCloseTo(107.1, 0); // ~1:47.1
+          expect(laps[4].isBest).toBe(true);
         });
       }
 
@@ -1225,17 +1229,18 @@ describe('replayParser', () => {
           const traj = extractReplayTrajectory(spaR1File, { maxPoints: 500 });
           expect(traj.driverSlot).toBe(32);
           expect(traj.driverName).toContain('Samuel Lague');
-          expect(traj.laps.length).toBeGreaterThanOrEqual(14);
-          expect(traj.laps[0].isOutlap).toBe(true);
+          const laps = traj.laps!;
+          expect(laps.length).toBeGreaterThanOrEqual(14);
+          expect(laps[0].isOutlap).toBe(true);
           // Racing laps are ~2:09 - 2:22 (129s - 142s)
-          expect(traj.laps[1].lapTimeSec).toBeCloseTo(134.0, 0);
-          expect(traj.laps[2].lapTimeSec).toBeCloseTo(138.4, 0);
-          expect(traj.laps[3].lapTimeSec).toBeCloseTo(132.6, 0);
+          expect(laps[1].lapTimeSec).toBeCloseTo(134.0, 0);
+          expect(laps[2].lapTimeSec).toBeCloseTo(138.4, 0);
+          expect(laps[3].lapTimeSec).toBeCloseTo(132.6, 0);
         });
       }
 
       it('gracefully handles replays without timing packets by producing a single continuous trajectory lap', () => {
-        const slices: any[] = [];
+        const slices: MockSlice[] = [];
         let t = 0;
         for (let i = 0; i < 20; i++) {
           t += 1.0;
@@ -1254,8 +1259,8 @@ describe('replayParser', () => {
         const noTimingVcr = path.join(tempDir, 'no_timing_test.vcr');
         fs.writeFileSync(noTimingVcr, createSliceVcrBuffer({ slices }));
         const traj = extractReplayTrajectory(noTimingVcr, { driverSlot: 1 });
-        expect(traj.laps.length).toBe(1);
-        expect(traj.laps[0].lapNumber).toBe(1);
+        expect(traj.laps!.length).toBe(1);
+        expect(traj.laps![0].lapNumber).toBe(1);
         fs.unlinkSync(noTimingVcr);
       });
     });
@@ -1616,7 +1621,7 @@ describe('replayParser', () => {
         // Build a VCR buffer with 2 full laps:
         // Lap 1: valid flying lap (S1 = 25.0s, S2 cum = 60.0s -> S2 = 35.0s, Finish = 95.0s -> S3 = 35.0s)
         // Lap 2: cut/invalidated lap (splitSec = -1)
-        const slices: any[] = [];
+        const slices: MockSlice[] = [];
         let t = 100.0;
 
         // Out-lap / approach to S/F line

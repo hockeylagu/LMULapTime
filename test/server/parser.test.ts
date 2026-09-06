@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName, extractComparableLaps } from '../../server/parser';
-import { DetailedSession, DriverData } from '../../server/types';
+import { DetailedSession } from '../../server/types';
 import fs from 'fs';
 
 const samplePracticeXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -120,25 +120,34 @@ describe('parser server module', () => {
       expect(session?.playerDriver?.laps[2].isPitStop).toBe(true);
     });
 
-    it('parses Qualifying session with wet weather and night time', () => {
+    it('parses Qualifying session and does not infer weather from tire compounds', () => {
       vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleQualifyingXml);
       vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('dummy_qual.xml');
       expect(session?.sessionType).toBe('Qualifying');
       expect(session?.sessionName).toBe('Q1');
-      expect(session?.weather?.condition).toBe('Wet');
-      expect(session?.weather?.timeOfDay).toBe('Night');
+      expect(session?.weather).toBeUndefined();
     });
 
-    it('parses Race session with morning time', () => {
+    it('parses Race session and does not infer weather from tire compounds', () => {
       vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleRaceXml);
       vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
 
       const session = parser.parseSessionXml('dummy_race.xml');
       expect(session?.sessionType).toBe('Race');
       expect(session?.sessionName).toBe('R1');
-      expect(session?.weather?.timeOfDay).toBe('Morning');
+      expect(session?.weather).toBeUndefined();
+    });
+
+    it('parses weather when explicit Weather tag is present in XML', () => {
+      const xmlWithWeather = sampleQualifyingXml.replace('</RaceResults>', '<Weather>Wet</Weather></RaceResults>');
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlWithWeather);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+
+      const session = parser.parseSessionXml('dummy_qual_weather.xml');
+      expect(session?.weather?.condition).toBe('Wet');
+      expect(session?.weather?.timeOfDay).toBe('Night');
     });
 
     it('infers session type from filename suffix if xml node is generic', () => {
@@ -164,21 +173,27 @@ describe('parser server module', () => {
   });
 
   describe('parseWeather', () => {
-    it('detects wet tires and various times of day', () => {
-      const wetWeather = parser.parseWeather('2026/05/28 15:00', [
-        { laps: [{ fCompound: 'Wet Tire', rCompound: 'Slick' }] } as unknown as DriverData,
-      ]);
-      expect(wetWeather.condition).toBe('Wet');
-      expect(wetWeather.timeOfDay).toBe('Daytime');
+    it('returns undefined when no explicit weather data is in the XML', () => {
+      expect(parser.parseWeather('2026/05/28 15:00', undefined)).toBeUndefined();
+      expect(parser.parseWeather('2026/05/28 15:00', '')).toBeUndefined();
+    });
 
-      const evening = parser.parseWeather('2026/05/28 19:30', []);
-      expect(evening.timeOfDay).toBe('Evening');
+    it('parses explicit XML weather data when provided', () => {
+      const wetWeather = parser.parseWeather('2026/05/28 15:00', 'Wet');
+      expect(wetWeather).toBeDefined();
+      expect(wetWeather?.condition).toBe('Wet');
+      expect(wetWeather?.timeOfDay).toBe('Daytime');
+      expect(wetWeather?.weatherString).toContain('Wet');
 
-      const morning = parser.parseWeather('2026/05/28 07:00', []);
-      expect(morning.timeOfDay).toBe('Morning');
+      const evening = parser.parseWeather('2026/05/28 19:30', 'Clear');
+      expect(evening?.timeOfDay).toBe('Evening');
 
-      const night = parser.parseWeather('2026/05/28 23:00', []);
-      expect(night.timeOfDay).toBe('Night');
+      const morning = parser.parseWeather('2026/05/28 07:00', 'Dry');
+      expect(morning?.timeOfDay).toBe('Morning');
+
+      const night = parser.parseWeather('2026/05/28 23:00', 'Rain');
+      expect(night?.timeOfDay).toBe('Night');
+      expect(night?.weatherString).toContain('Rain');
     });
   });
 
