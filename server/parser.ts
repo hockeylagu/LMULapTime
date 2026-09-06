@@ -28,7 +28,7 @@ import {
   compareSessions,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack } from '../src/utils/paceCategory.js';
+import { matchesTrack, getTrackAndLayout } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -462,7 +462,7 @@ export class LmuParser {
 
       // Match replay file
       const xmlFileMtime = fs.statSync(filePath).mtime.getTime();
-      const matchingReplay = this.findMatchingReplay(trackVenue, sessionName, timestamp, xmlFileMtime);
+      const matchingReplay = this.findMatchingReplay(trackVenue, trackCourse, sessionName, timestamp, xmlFileMtime);
 
       // Parse Session Settings & Server Rules
       const parseNum = (val: unknown): number | undefined => {
@@ -918,14 +918,43 @@ export class LmuParser {
 
   private findMatchingReplay(
     trackVenue: string,
+    trackCourse: string,
     sessionCode: string,
     sessionTimestampMs: number,
     xmlFileMtimeMs: number
+  ): ReplayFileEntry | undefined;
+  private findMatchingReplay(
+    trackVenue: string,
+    sessionCode: string,
+    sessionTimestampMs: number,
+    xmlFileMtimeMs: number
+  ): ReplayFileEntry | undefined;
+  private findMatchingReplay(
+    trackVenue: string,
+    arg2: string,
+    arg3: string | number,
+    arg4?: number,
+    arg5?: number
   ): ReplayFileEntry | undefined {
     if (this.replaysMap.length === 0) return undefined;
 
-    const normXmlTrack = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normSession = sessionCode.toLowerCase();
+    let trackCourse = trackVenue;
+    let sessionCode = '';
+    let sessionTimestampMs = 0;
+    let xmlFileMtimeMs = 0;
+
+    if (typeof arg3 === 'string') {
+      trackCourse = arg2 || trackVenue;
+      sessionCode = arg3;
+      sessionTimestampMs = typeof arg4 === 'number' ? arg4 : 0;
+      xmlFileMtimeMs = typeof arg5 === 'number' ? arg5 : 0;
+    } else {
+      sessionCode = arg2;
+      sessionTimestampMs = typeof arg3 === 'number' ? arg3 : 0;
+      xmlFileMtimeMs = typeof arg4 === 'number' ? arg4 : 0;
+    }
+
+    const normSession = (sessionCode || '').toLowerCase();
 
     const getMinDiff = (v: ReplayFileEntry) =>
       Math.min(Math.abs(v.mtime - sessionTimestampMs), Math.abs(v.mtime - xmlFileMtimeMs));
@@ -934,10 +963,21 @@ export class LmuParser {
       const minDiff = getMinDiff(v);
       if (minDiff > 600000) return false;
 
-      const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const trackMatches = matchesTrack(v.trackName, trackVenue, '') || normXmlTrack.includes(normVcrTrack) || normVcrTrack.includes(normXmlTrack);
-      const sessionMatches = v.sessionCode.toLowerCase() === normSession;
+      let trackMatches = matchesTrack(v.trackName, trackVenue, trackCourse);
+      if (!trackMatches) {
+        const qInfo = getTrackAndLayout(v.trackName, '');
+        const sInfo = getTrackAndLayout(trackVenue, trackCourse);
+        if (!qInfo.isKnown && !sInfo.isKnown) {
+          const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normXmlCourse = (trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normXmlVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
+          trackMatches =
+            (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
+            (!trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)));
+        }
+      }
 
+      const sessionMatches = v.sessionCode.toLowerCase() === normSession;
       return trackMatches && (sessionMatches || minDiff < 180000);
     });
 
