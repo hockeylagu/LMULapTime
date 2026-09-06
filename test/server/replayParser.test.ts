@@ -25,6 +25,7 @@ interface MockSlice {
   offTrack?: boolean;
   pitLimiter?: boolean;
   gear?: number;
+  speedBytes?: [number, number, number, number, number];
   timing?: { splitSec: number; sector: number; lapIdx: number };
   wheel?: {
     tireTemps: [number, number, number, number];
@@ -137,6 +138,9 @@ function createSliceVcrBuffer(options?: {
     const evPad = Buffer.from([0]);
 
     const evData = Buffer.alloc(65);
+    if (sl.speedBytes) {
+      Buffer.from(sl.speedBytes).copy(evData, 8);
+    }
     // Steer at byte 4
     evData.writeUInt16LE(512, 4);
 
@@ -961,6 +965,22 @@ describe('replayParser', () => {
         expect(s).toBeGreaterThan(200);
         expect(s).toBeLessThan(400);
       }
+
+      fs.unlinkSync(speedPath);
+    });
+
+    it('uses embedded packet speed when pose coordinates do not advance', () => {
+      const speedPath = path.join(tempDir, 'packet_speed.vcr');
+      fs.writeFileSync(speedPath, createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.00, driverSlot: 1, x: 25, y: 0, z: 40, speedBytes: [136, 63, 0, 32, 242] },
+          { sTime: 1.02, driverSlot: 1, x: 25, y: 0, z: 40, speedBytes: [136, 63, 0, 32, 242] },
+          { sTime: 1.04, driverSlot: 1, x: 25, y: 0, z: 40, speedBytes: [136, 63, 0, 32, 242] },
+        ],
+      }));
+
+      const traj = extractReplayTrajectory(speedPath, { driverSlot: 1, maxPoints: 0 });
+      expect(traj.points.map(point => point.speedKmh)).toEqual([101, 101, 101]);
 
       fs.unlinkSync(speedPath);
     });
