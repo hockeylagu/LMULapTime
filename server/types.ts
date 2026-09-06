@@ -440,6 +440,7 @@ export interface ReplayTrajectoryPoint {
   brake?: number;
   steerYaw?: number;
   rpm?: number;
+  gear?: number;
   inPit?: boolean;
   inGarage?: boolean;
   isTeleport?: boolean;

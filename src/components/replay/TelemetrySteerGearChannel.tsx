@@ -24,9 +24,7 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
   isCursorInView,
   cursorPct,
 }) => {
-  const currentGear = currentPoint?.speedKmh && currentPoint.speedKmh > 5
-    ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1)
-    : 1;
+  const currentGear = Math.min(7, Math.max(1, currentPoint?.gear ?? 1));
 
   const steerSvg = useMemo(() => (
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">

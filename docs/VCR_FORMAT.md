@@ -127,6 +127,16 @@ The event payload begins at `offset + 5` and extends for `eventSize` bytes.
 #### Type 8..14 (`eventSize === 65`): Vehicle Pose & Driver Inputs
 This is the primary vehicle kinematic and pedal telemetry packet emitted at up to ~50 Hz per car.
 
+**Gear is encoded directly in the event header's `eventType` field, not in the payload.**
+`eventType` ranges 7..15 for these packets, mapping to `gear = eventType - 8`:
+`7` = reverse (-1), `8` = neutral (0), `9..15` = forward gears 1..7. This is available
+for every driver (player and AI), and is confirmed against the community `rF2ReplayOffice`
+reference parser. Note: that reference tool additionally gates this on `eventClass === 0`,
+but current LMU replay format versions always use `eventClass === 1` for these packets, so
+implementations should not filter on `eventClass` when decoding gear. The transmission
+genuinely passes through neutral for a few frames during every real up/downshift
+(clutch/dog-ring disengagement) — this is authentic telemetry, not noise.
+
 | Offset in Payload | Size | Type | Field & Bitfield Description |
 | :--- | :--- | :--- | :--- |
 | `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: `engineRpm` (Direct RPM integer value) |
@@ -323,6 +333,7 @@ Every valid flying lap in each replay matches the official simulation XML result
 | **Track Flags & Safety Car** | **Specification Ready** | Class 2 Type 10 track flag states (Green, Local Yellow, FCY, SC, VSC, Red, Checkered) and driver flags (Blue, Black, Meatball). |
 | **3D Car Attitude** | **Implemented** (`extractReplayTrajectory`) | Full 3D attitude extraction: `rotX` (pitch), `rotY` (yaw), `rotZ` (roll), and `detachablePartState`. |
 | **Engine RPM** | **Implemented** (`extractReplayTrajectory`) | True physics engine RPM directly decoded from `info1 >>> 18`. |
+| **Gear** | **Implemented** (`extractReplayTrajectory`) | Decoded from the vehicle pose event's `eventType` header field (`gear = eventType - 8`), available for every car including AI opponents. |
 | **Pit Events & Strategy** | **Implemented / Expanded** (`extractReplayPitEvents`) | Class 5 Type 2 & Type 36 pit stop events, entry/exit, service durations, liters fueled, and tire compounds fitted. |
 | **Live Standings** | **Specification Ready** | Class 6 Type 48 packets provide real-time running order array (P1..Pn) and gaps at every timestamp. |
 | **Weather & Track Grip** | **Specification Ready** | Metadata 67-byte session environment block yields ambient/track temps, rain intensity, puddle depth, and rubber grip saturation. |

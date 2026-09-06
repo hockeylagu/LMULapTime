@@ -1,6 +1,12 @@
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
 import { PointComparison } from '../../utils/replayComparison.js';
 
+// Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
+// forward gears 1-7.
+function resolveGear(p: ReplayTrajectoryPoint): number {
+  return Math.min(7, Math.max(1, p.gear ?? 1));
+}
+
 export interface DeltaGradientStop {
   offset: string;
   color: string;
@@ -137,13 +143,13 @@ export function computeTelemetryChartPaths(
     str += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${sty.toFixed(1)} `;
 
     // Gear: 1 to 7 -> 95 to 15 in SVG Y
-    const gear = Math.min(7, Math.max(1, p.speedKmh && p.speedKmh > 5 ? Math.min(7, Math.floor(p.speedKmh / 38) + 1) : 1));
+    const gear = resolveGear(p);
     const gy = 95 - (gear / 7) * 80;
     if (isFirst) {
       gr += `M ${x.toFixed(1)} ${gy.toFixed(1)} `;
     } else {
       const prevP = points[i - 1];
-      const prevGear = Math.min(7, Math.max(1, prevP.speedKmh && prevP.speedKmh > 5 ? Math.min(7, Math.floor(prevP.speedKmh / 38) + 1) : 1));
+      const prevGear = resolveGear(prevP);
       const prevGy = 95 - (prevGear / 7) * 80;
       gr += `L ${x.toFixed(1)} ${prevGy.toFixed(1)} L ${x.toFixed(1)} ${gy.toFixed(1)} `;
     }
