@@ -6,7 +6,6 @@ import { SessionDetail } from './components/SessionDetail';
 import { TrackDetail } from './components/TrackDetail';
 import { Settings } from './components/Settings';
 import { CompareLaps } from './components/CompareLaps';
-import { ReplaysView } from './components/replays/ReplaysView';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 import { AppStatus, DetailedSession, SessionProgressionPoint, TrackSummary } from '../server/types.js';
 
@@ -41,7 +40,7 @@ export default function App() {
     } else if (pathPart.startsWith('track/')) {
       tab = 'tracks';
       trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
-    } else if (['tracks', 'compare', 'replays', 'settings', 'dashboard'].includes(pathPart)) {
+    } else if (['tracks', 'compare', 'settings', 'dashboard'].includes(pathPart)) {
       tab = pathPart as NavTab;
     }
 
@@ -224,8 +223,6 @@ export default function App() {
             initialSessionId={compareParams?.get('sessionId') || undefined}
             initialLapNum={compareParams?.get('lapNum') ? parseInt(compareParams.get('lapNum')!, 10) : undefined}
           />
-        ) : activeTab === 'replays' ? (
-          <ReplaysView onSelectSession={handleSelectSession} />
         ) : activeTab === 'settings' ? (
           <Settings
             status={status}

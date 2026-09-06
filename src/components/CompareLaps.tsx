@@ -7,6 +7,7 @@ import { CompareSectorChart } from './compare-laps/CompareSectorChart';
 import { CompareLapsTable } from './compare-laps/CompareLapsTable';
 import { ReplayInspectorModal } from './replay/ReplayInspectorModal';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './compare-laps/useCompareLapsData';
+import { ReplaySummary } from '../../server/types.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };
 
@@ -104,11 +105,11 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       try {
         const res = await fetch('/api/replays');
         if (res.ok) {
-          const replays = await res.json();
-          const match = replays.find((r: any) => r.matchedSessionId === lap.sessionId);
+          const replays: ReplaySummary[] = await res.json();
+          const match = replays.find((r: ReplaySummary) => r.matchedSessionId === lap.sessionId);
           if (match?.name) return match.name;
           const trackMatch = replays.find(
-            (r: any) => r.trackName && selectedTrack && r.trackName.toLowerCase().includes(selectedTrack.toLowerCase())
+            (r: ReplaySummary) => r.trackName && selectedTrack && r.trackName.toLowerCase().includes(selectedTrack.toLowerCase())
           );
           if (trackMatch?.name) return trackMatch.name;
         }

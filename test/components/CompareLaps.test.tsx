@@ -417,13 +417,13 @@ describe('CompareLaps component', () => {
     const sessionsWithReplay = [
       {
         ...mockSessions[0],
-        matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr' },
+        matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr', sizeBytes: 1024 },
       },
     ];
 
     render(
       <CompareLaps
-        sessions={sessionsWithReplay as any}
+        sessions={sessionsWithReplay}
         initialTrack="Spa GP"
         initialCarClass="LMGT3"
         initialSessionId="sess1"

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplaySummary } from '../../../server/types.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplaySummary, ReplayLapSummary } from '../../../server/types.js';
 import { filterCompatibleReplays, mapVehicleIdToClass } from '../../utils/replayComparison.js';
 
 export interface UseReplayInspectorDataProps {
@@ -171,12 +171,12 @@ export function useReplayInspectorData({
       ? Promise.resolve(metadata)
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
-    fetchMeta.then(meta => {
+    fetchMeta.then((meta: ReplayMetadata | null) => {
       if (!isMounted) return;
       if (targetReplay !== activeReplayName) setBaselineMetadata(meta);
       let validLap = targetLap;
-      if (meta?.laps && meta.laps.length > 0 && !meta.laps.some((l: any) => l.lapNumber === validLap)) {
-        validLap = meta.laps.find((l: any) => l.isBest)?.lapNumber || meta.laps[0].lapNumber;
+      if (meta?.laps && meta.laps.length > 0 && !meta.laps.some((l: ReplayLapSummary) => l.lapNumber === validLap)) {
+        validLap = meta.laps.find((l: ReplayLapSummary) => l.isBest)?.lapNumber || meta.laps[0].lapNumber;
         setBaselineLapNumber(validLap);
       }
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${validLap}`)

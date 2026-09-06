@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
-import { DetailedSession, ReplaySummary } from './types.js';
+import { DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry } from './types.js';
 import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries, extractReplayPitEvents } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
@@ -351,7 +351,7 @@ app.get('/api/replays', (_req, res) => {
       const filePath = path.join(currentReplaysDir, f);
       try {
         const stat = fs.statSync(filePath);
-        let meta: any = null;
+        let meta: ReplayMetadata | null = null;
         try {
           meta = parseReplayMetadata(filePath);
         } catch {
@@ -359,12 +359,12 @@ app.get('/api/replays', (_req, res) => {
         }
 
         const matched = sessions.find(s => s.matchingReplayFile?.name === f);
-        const playerDriver = meta?.drivers?.find((d: any) => d.isPlayer) || meta?.drivers?.[0];
+        const playerDriver = meta?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer) || meta?.drivers?.[0];
         const replayCarClass = matched?.playerDriver?.carClass || playerDriver?.carClass || meta?.carClass;
         const replayCarModel = matched?.playerDriver?.carType || playerDriver?.carModel || meta?.carModel;
         const allCarClasses = Array.from(new Set([
-          ...(meta?.drivers?.map((d: any) => d.carClass).filter(Boolean) || []),
-          ...(matched?.drivers?.map((d: any) => d.carClass).filter(Boolean) || []),
+          ...(meta?.drivers?.map((d: ReplayDriverEntry) => d.carClass).filter((c): c is string => Boolean(c)) || []),
+          ...(matched?.drivers?.map((d: DriverData) => d.carClass).filter((c): c is string => Boolean(c)) || []),
           ...(replayCarClass ? [replayCarClass] : []),
         ]));
 
@@ -481,14 +481,14 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       : 1200;
     const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
 
-    let matchedSession: any = undefined;
-    let matchedDriver: any = undefined;
+    let matchedSession: DetailedSession | undefined = undefined;
+    let matchedDriver: DriverData | undefined = undefined;
     try {
       const sessions = loadSessions();
       matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       if (matchedSession) {
         matchedDriver = driverName
-          ? matchedSession.drivers.find((d: any) => (d.driverName || d.name || '').toLowerCase().includes(driverName.toLowerCase()))
+          ? matchedSession.drivers.find((d: DriverData) => (d.driverName || d.name || '').toLowerCase().includes(driverName.toLowerCase()))
           : undefined;
 
         if (!matchedDriver && typeof driverSlot === 'number') {
@@ -496,9 +496,9 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
             const meta = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
             const replayDriver = meta.drivers.find(d => d.slot === driverSlot);
             if (replayDriver) {
-              matchedDriver = matchedSession.drivers.find((d: any) =>
+              matchedDriver = matchedSession.drivers.find((d: DriverData) =>
                 (d.driverName || d.name || '').toLowerCase() === replayDriver.name.toLowerCase() ||
-                (replayDriver.carNumber && d.carNumber === replayDriver.carNumber)
+                (replayDriver.carNumber !== undefined && d.carNumber === replayDriver.carNumber)
               );
             }
           } catch {
@@ -525,42 +525,42 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
     // Validate replay against matched session log (decoupled validation layer)
     try {
       if (matchedSession && matchedDriver?.laps && matchedDriver.laps.length > 0) {
-          const officialLaps = matchedDriver.laps.map(sl => ({
-            lapNumber: sl.lapNum ?? (sl as any).lapNumber,
-            lapTimeSec: sl.lapTime,
-            s1Sec: sl.s1,
-            s2Sec: sl.s2,
-            s3Sec: sl.s3,
-            isValid: sl.isValid,
-          }));
+        const officialLaps = matchedDriver.laps.map((sl: LapData) => ({
+          lapNumber: sl.lapNum,
+          lapTimeSec: sl.lapTime,
+          s1Sec: sl.s1,
+          s2Sec: sl.s2,
+          s3Sec: sl.s3,
+          isValid: sl.isValid,
+        }));
 
-          // Attach validation metrics to each detected replay lap
-          if (trajectory.laps) {
-            for (const l of trajectory.laps) {
-              const match = officialLaps.find(o => o.lapNumber === l.lapNumber);
-              if (match && typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0) {
-                l.validatedTimeSec = Number(match.lapTimeSec.toFixed(3));
-                l.validatedS1Sec = typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null;
-                l.validatedS2Sec = typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null;
-                l.validatedS3Sec = typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null;
-                l.timeDiffSec = Number((l.lapTimeSec - match.lapTimeSec).toFixed(3));
-              }
+        // Attach validation metrics to each detected replay lap
+        if (trajectory.laps) {
+          for (const l of trajectory.laps) {
+            const match = officialLaps.find(o => o.lapNumber === l.lapNumber);
+            if (match && typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0) {
+              l.validatedTimeSec = Number(match.lapTimeSec.toFixed(3));
+              l.validatedS1Sec = typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null;
+              l.validatedS2Sec = typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null;
+              l.validatedS3Sec = typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null;
+              l.timeDiffSec = Number((l.lapTimeSec - match.lapTimeSec).toFixed(3));
             }
           }
-
-          trajectory.validation = {
-            matchedSessionId: matchedSession.id,
-            sessionType: matchedSession.sessionType,
-            trackName: matchedSession.trackVenue,
-            driverName: matchedDriver.driverName,
-            totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
-            officialBestLapTime: matchedDriver.bestLapTime,
-            officialLaps,
-          };
         }
-      } catch {
-        // Ignore validation lookup errors
+
+        trajectory.validation = {
+          matchedSessionId: matchedSession.id,
+          sessionType: matchedSession.sessionType,
+          trackName: matchedSession.trackVenue,
+          driverName: matchedDriver.driverName || matchedDriver.name,
+          totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
+          officialBestLapTime: matchedDriver.bestLapTime,
+          officialLaps,
+        };
       }
+    } catch {
+      // Ignore validation lookup errors
+    }
 
     res.json(trajectory);
   } catch (err: unknown) {

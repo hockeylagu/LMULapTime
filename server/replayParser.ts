@@ -1318,14 +1318,6 @@ export function extractReplayTrajectory(
       // Remove sensor noise for stationary vehicles; negative speeds are guarded
       if (smoothSpeed < 1.5) smoothSpeed = 0;
 
-      let accel = 0;
-      if (i > 0 && i < downsampled.length - 1) {
-        const dt = downsampled[i + 1].sTime - downsampled[i - 1].sTime;
-        if (dt > 0.01) {
-          accel = ((rawSpeeds[i + 1] - rawSpeeds[i - 1]) / 3.6) / dt; // m/s^2
-        }
-      }
-
       const throttle = cur.rawThrottle ?? 0;
       const brake = cur.rawBrake ?? 0;
 

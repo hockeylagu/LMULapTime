@@ -188,7 +188,7 @@ export interface DriverData {
 }
 
 export interface SessionWeather {
-  condition: 'Dry' | 'Wet';
+  condition: 'Dry' | 'Wet' | string;
   timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night';
   weatherString: string;
 }
