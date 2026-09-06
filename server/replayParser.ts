@@ -12,9 +12,18 @@ import {
 } from './types.js';
 
 // Friendly car name mapping from known LMU skin/vehicle ID tokens
+// NOTE: Specific tokens (RSR, 499P, DSTATI) must be checked BEFORE generic substrings
+// (911, 296) to prevent false matches on vehicle IDs like "911_RSR".
 export function mapVehicleIdToModel(vehicleId?: string): string {
   if (!vehicleId) return 'Unknown Vehicle';
   const v = vehicleId.toUpperCase();
+
+  // --- GTE: specific tokens first to avoid being swallowed by generic GT3 checks ---
+  if (v.includes('DSTATI')) return 'Aston Martin Vantage AMR';
+  if (v.includes('RSR') || v.includes('REXY')) return 'Porsche 911 RSR-19';
+  if (v.includes('KESSEL') || v.includes('488')) return 'Ferrari 488 GTE EVO';
+
+  // --- GT3 ---
   if (v.includes('AFCO') || v.includes('296')) return 'Ferrari 296 GT3';
   if (v.includes('WRT') || v.includes('M4')) return 'BMW M4 GT3';
   if (v.includes('MUSTANG')) return 'Ford Mustang GT3';
@@ -26,7 +35,9 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
   if (v.includes('TFSP') || v.includes('CORVETTE')) return 'Corvette Z06 GT3.R';
   if (v.includes('AKKO') || v.includes('LEXUS')) return 'Lexus RC F GT3';
   if (v.includes('AMG') || v.includes('MERCEDES')) return 'Mercedes-AMG GT3';
+  if (v.includes('THOR') || v.includes('VANTAGE')) return 'Aston Martin Vantage GT3';
 
+  // --- Hypercar / LMH / LMDh ---
   if (v.includes('499P')) return 'Ferrari 499P';
   if (v.includes('963')) return 'Porsche 963';
   if (v.includes('WTR') || v.includes('V-SERIES') || v.includes('CADILLAC') || v.includes('CADIL') || v.includes('VLMDH')) return 'Cadillac V-Series.R';
@@ -38,17 +49,14 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
   if (v.includes('BMW_HY') || v.includes('M_HYBRID') || v.includes('BMWMH')) return 'BMW M Hybrid V8';
   if (v.includes('VALKYRIE') || v.includes('THO7') || v.includes('007_')) return 'Aston Martin Valkyrie LMH';
   if (v.includes('GENESIS') || v.includes('GENE') || v.includes('GMR001')) return 'Genesis GMR001 Hypercar';
-  if (v.includes('THOR') || v.includes('VANTAGE')) return 'Aston Martin Vantage GT3';
 
-  if (v.includes('DSTATI')) return 'Aston Martin Vantage AMR';
-  if (v.includes('KESSEL') || v.includes('488')) return 'Ferrari 488 GTE EVO';
-  if (v.includes('RSR') || v.includes('REXY')) return 'Porsche 911 RSR-19';
-
+  // --- LMP3 ---
   if (v.includes('GINETTA') || v.includes('G61')) return 'Ginetta G61-LT-P325 Evo';
   if (v.includes('DUQUEINE') || v.includes('D09') || v.includes('D08')) return 'Duqueine D09 P3';
   if (v.includes('LIGIER') || v.includes('JSP')) return 'Ligier JS P325';
   if (v.includes('ADESS') || v.includes('AD25')) return 'ADESS AD25 LMP3';
 
+  // --- LMP2 ---
   if (v.includes('ORECA') || v.includes('VECTOR') || v.includes('DKR') || v.includes('LMP2') || v.includes('07_LMP2')) return 'Oreca 07 LMP2';
   if (v.includes('992S') || v.includes('SAFETY')) return 'Porsche 992 (Safety Car)';
   return vehicleId;
@@ -218,7 +226,8 @@ export function parseReplayMetadata(
   filePath: string,
   options?: { playerName?: string }
 ): ReplayMetadata {
-  const effectivePlayerName = options?.playerName || detectPlayerName(filePath);
+  const detectedName = detectPlayerName(filePath);
+  const effectivePlayerName = options?.playerName || detectedName;
   const stat = fs.statSync(filePath);
 
   if (stat.size < 64) {
@@ -471,7 +480,8 @@ export function parseReplayMetadata(
 
     if (effectivePlayerName && drivers.length > 0) {
       const explicitName = options?.playerName?.trim().toLowerCase();
-      const profileName = !explicitName ? detectPlayerName(filePath)?.trim().toLowerCase() : undefined;
+      // Reuse the cached detectedName instead of re-reading settings.json from disk
+      const profileName = !explicitName ? detectedName?.trim().toLowerCase() : undefined;
       const targetLower = explicitName || profileName || effectivePlayerName.trim().toLowerCase();
 
       // 1. Exact match with target name
@@ -482,8 +492,8 @@ export function parseReplayMetadata(
         const matched = drivers.filter(d => d.name.toLowerCase().includes(targetLower));
         if (matched.length > 0) {
           // If multiple candidates match (e.g. "Samuel Dominguez" vs "Samuel Lague" with target "samuel"),
-          // check if settings profileName matches one of them
-          const envProfile = detectPlayerName(filePath)?.trim().toLowerCase();
+          // check if settings profileName matches one of them (reuse cached detectedName)
+          const envProfile = detectedName?.trim().toLowerCase();
           bestMatch = matched.find(d => envProfile && d.name.toLowerCase() === envProfile)
             || matched.find(d => envProfile && d.name.toLowerCase().includes(envProfile))
             || matched.find(d => new RegExp(`\\b${targetLower}\\b`, 'i').test(d.name))
@@ -545,6 +555,7 @@ interface RawPoint {
   inPit?: boolean;
   isOffTrack?: boolean;
   physicsRpm?: number;
+  gearRaw?: number;
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
@@ -745,6 +756,14 @@ export function extractReplayTrajectory(
               const inPit = Boolean(statusByte & 0x80);
               const latestWheel = driverWheelTelemetry.get(drv);
 
+              // Gear is encoded directly in the event header's type field (confirmed via the
+              // rF2ReplayOffice reference tool source): evType ranges 7-15 for vehicle pose
+              // events, mapping to gear = evType - 8 (7 => reverse (-1), 8 => neutral, 9-15 =>
+              // gears 1-7). Available for every driver, not just the local player. The
+              // reference tool gates this on evClass === 0, but current LMU replay format
+              // versions use evClass === 1 for these same vehicle pose events.
+              const gearRaw = evType >= 7 && evType <= 15 ? evType - 8 : undefined;
+
               const pt: RawPoint = {
                 sTime,
                 x,
@@ -762,6 +781,7 @@ export function extractReplayTrajectory(
                 inPit,
                 isOffTrack,
                 physicsRpm,
+                gearRaw,
                 detachablePartState,
                 tireTemps: latestWheel?.tireTemps ? [...latestWheel.tireTemps] : undefined,
                 tireWear: latestWheel?.tireWear ? [...latestWheel.tireWear] : undefined,
@@ -814,7 +834,7 @@ export function extractReplayTrajectory(
                 action: 'removed',
               });
             }
-          } else if (((evType === 2 || evClass === 5) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
+          } else if (((evClass === 5 || (evType === 2 && evClass !== 2)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
                      (evType === 49 && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
             const drvName = driverNameMap.get(drv);
@@ -843,8 +863,8 @@ export function extractReplayTrajectory(
                 });
               }
             } else {
-              const meta = PIT_CODE_MAP[pCode];
-              if (meta) {
+              const pitCodeEntry = PIT_CODE_MAP[pCode];
+              if (pitCodeEntry) {
                 let details: string | undefined;
                 if (pCode === 37 && sz >= 6) {
                   const candidateFuel = buf.readFloatLE(eventSp + 5 + 2);
@@ -857,8 +877,8 @@ export function extractReplayTrajectory(
                   driverName: drvName,
                   timeSec: Number(sTime.toFixed(2)),
                   code: pCode,
-                  action: meta.action,
-                  isGarage: meta.isGarage,
+                  action: pitCodeEntry.action,
+                  isGarage: pitCodeEntry.isGarage,
                   details,
                 });
               } else {
@@ -1166,7 +1186,7 @@ export function extractReplayTrajectory(
             s3Sec,
             s1Idx,
             s2Idx,
-            isOutlap: true,
+            isOutlap: Boolean(rawPts[lastStartIdx]?.pitLimiter || rawPts[lastStartIdx]?.inPit),
             isBest: false,
             isValid: false,
           });
@@ -1252,7 +1272,9 @@ export function extractReplayTrajectory(
     const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
     const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
 
-    // Calculate speeds between points
+    // Calculate speeds between points, capping at realistic maximum to prevent
+    // anomalous position jumps from creating spikes in the smoothed speed trace.
+    const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
     const rawSpeeds: number[] = [];
     for (let i = 0; i < downsampled.length; i++) {
       const cur = downsampled[i];
@@ -1262,7 +1284,7 @@ export function extractReplayTrajectory(
         const dt = cur.sTime - prev.sTime;
         const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
         if (dt > 0.005 && dist < 60) {
-          speed = (dist / dt) * 3.6;
+          speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
         }
       }
       rawSpeeds.push(speed);
@@ -1306,6 +1328,53 @@ export function extractReplayTrajectory(
       return false;
     }
 
+    // Smooth speed over a 3-frame window (kept as its own array so gear detection below
+    // can look across multiple frames without recomputing it inline).
+    const smoothedSpeeds: number[] = [];
+    for (let i = 0; i < downsampled.length; i++) {
+      const prevSpeed = i > 0 ? rawSpeeds[i - 1] : rawSpeeds[i];
+      const curSpeed = rawSpeeds[i];
+      const nextSpeed = i < downsampled.length - 1 ? rawSpeeds[i + 1] : rawSpeeds[i];
+      let s = (prevSpeed + curSpeed + nextSpeed) / 3;
+      if (s < 1.5) s = 0; // remove sensor noise for stationary vehicles
+      smoothedSpeeds.push(s);
+    }
+
+    // Gear is read directly from each point's authoritative gearRaw (evType - 8, see above),
+    // available for every driver. Carry the last known value forward for the rare frame
+    // where evType falls outside the known 7-15 range.
+    const finalGears: number[] = [];
+    let curGear = 1;
+    for (let i = 0; i < downsampled.length; i++) {
+      if (downsampled[i].gearRaw !== undefined) {
+        curGear = downsampled[i].gearRaw!;
+      }
+      finalGears.push(curGear);
+    }
+    // The transmission passes through neutral (gear 0) for a few frames during every real
+    // shift (clutch/dog-ring disengagement). Bridge these short neutral gaps directly to
+    // the new gear so the displayed value jumps straight from the old gear to the new one
+    // instead of visibly dipping to neutral. Long neutral stretches (e.g. parked/coasting)
+    // are left untouched.
+    const NEUTRAL_MAX_FRAMES = 6;
+    for (let i = 0; i < finalGears.length; i++) {
+      if (finalGears[i] !== 0) continue;
+      let j = i;
+      while (j < finalGears.length && finalGears[j] === 0) j++;
+      const beforeGear = i > 0 ? finalGears[i - 1] : undefined;
+      const afterGear = j < finalGears.length ? finalGears[j] : undefined;
+      if (j - i <= NEUTRAL_MAX_FRAMES && beforeGear && afterGear) {
+        for (let k = i; k < j; k++) finalGears[k] = afterGear;
+      }
+      i = j;
+    }
+    // Filter momentary 1-frame shift anomalies
+    for (let i = 1; i < finalGears.length - 1; i++) {
+      if (finalGears[i] !== finalGears[i - 1] && finalGears[i - 1] === finalGears[i + 1]) {
+        finalGears[i] = finalGears[i - 1];
+      }
+    }
+
     // Smooth speed, calculate acceleration, throttle, and brake
     const finalPoints: ReplayTrajectoryPoint[] = [];
     for (let i = 0; i < downsampled.length; i++) {
@@ -1325,17 +1394,6 @@ export function extractReplayTrajectory(
         ? cur.physicsRpm
         : (smoothSpeed < 1 ? 950 : Math.min(8800, Math.max(2500, Math.round(3000 + (smoothSpeed % 45) * 120))));
 
-      // Detect unnatural teleports, returns to garage, and resets
-      let isTeleport = false;
-      if (i > 0) {
-        const prev = downsampled[i - 1];
-        const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
-        const dt = cur.sTime - prev.sTime;
-        const impliedSpeed = dt > 0.001 ? (dist / dt) * 3.6 : 0;
-        if (dist > 85 || impliedSpeed > 420 || (dist > 25 && prevSpeed === 0 && curSpeed === 0)) {
-          isTeleport = true;
-        }
-      }
 
       // True garage state based on simulation events; fallback to stationary in pit
       const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
@@ -1354,10 +1412,11 @@ export function extractReplayTrajectory(
         brake,
         steerYaw: cur.steerYaw ?? 0,
         rpm,
+        gear: finalGears[i],
         inPit,
         isOffTrack: cur.isOffTrack,
         inGarage,
-        isTeleport,
+        isTeleport: false,
         timeSec: Number(cur.sTime.toFixed(2)),
         tcActive: cur.tcActive,
         absActive: cur.absActive,

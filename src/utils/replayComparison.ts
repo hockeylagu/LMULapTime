@@ -1,6 +1,11 @@
 import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/types.js';
 import { matchesTrack, matchesCarClass, getTrackAndLayout } from './paceCategory.js';
 
+// Neutral (0) / reverse (-1) are clamped to 1 for chart/comparison display.
+function resolveGearValue(p: ReplayTrajectoryPoint): number {
+  return Math.min(7, Math.max(1, p.gear ?? 1));
+}
+
 export interface InterpolatedPoint {
   timeSec: number;
   speedKmh: number;
@@ -86,7 +91,7 @@ export function interpolatePointAtDistance(
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
       rpm: p.rpm,
-      gear: spd > 5 ? Math.min(7, Math.floor(spd / 38) + 1) : 1,
+      gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
       z: p.z,
@@ -106,7 +111,7 @@ export function interpolatePointAtDistance(
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
       rpm: p.rpm,
-      gear: spd > 5 ? Math.min(7, Math.floor(spd / 38) + 1) : 1,
+      gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
       z: p.z,
@@ -140,7 +145,7 @@ export function interpolatePointAtDistance(
       brake: p.brake || 0,
       steerYaw: p.steerYaw || 0,
       rpm: p.rpm,
-      gear: spd > 5 ? Math.min(7, Math.floor(spd / 38) + 1) : 1,
+      gear: resolveGearValue(p),
       x: p.x,
       y: p.y,
       z: p.z,
@@ -166,7 +171,7 @@ export function interpolatePointAtDistance(
     brake: Math.round((p0.brake || 0) + t * ((p1.brake || 0) - (p0.brake || 0))),
     steerYaw: Number(((p0.steerYaw || 0) + t * ((p1.steerYaw || 0) - (p0.steerYaw || 0))).toFixed(1)),
     rpm: p0.rpm && p1.rpm ? Math.round(p0.rpm + t * (p1.rpm - p0.rpm)) : p0.rpm,
-    gear: spd > 5 ? Math.min(7, Math.floor(spd / 38) + 1) : 1,
+      gear: resolveGearValue(t < 0.5 ? p0 : p1),
     x: p0.x + t * (p1.x - p0.x),
     y: p0.y + t * (p1.y - p0.y),
     z: p0.z + t * (p1.z - p0.z),

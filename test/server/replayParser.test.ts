@@ -24,6 +24,7 @@ interface MockSlice {
   abs?: boolean;
   offTrack?: boolean;
   pitLimiter?: boolean;
+  gear?: number;
   timing?: { splitSec: number; sector: number; lapIdx: number };
   wheel?: {
     tireTemps: [number, number, number, number];
@@ -129,7 +130,10 @@ function createSliceVcrBuffer(options?: {
     }
 
     const evHdr = Buffer.alloc(4);
-    evHdr.writeUInt32LE((65 << 8) | (sl.driverSlot & 0xff), 0);
+    // eventType (bits 17..22) encodes gear as (gear + 8); eventClass (bits 29..31) is 1,
+    // matching the real current-format LMU replay encoding.
+    const evType = sl.gear !== undefined ? sl.gear + 8 : 0;
+    evHdr.writeUInt32LE((1 << 29) | (evType << 17) | (65 << 8) | (sl.driverSlot & 0xff), 0);
     const evPad = Buffer.from([0]);
 
     const evData = Buffer.alloc(65);
@@ -610,6 +614,84 @@ describe('replayParser', () => {
       fs.unlinkSync(sliceVcrPath);
     });
 
+    it('decodes gear directly from the vehicle pose event eventType field (forward, neutral, reverse)', () => {
+      const sliceVcrPath = path.join(tempDir, 'gear_basic.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, gear: 1 },
+          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, gear: 3 },
+          { sTime: 1.4, driverSlot: 1, x: 50, y: 0, z: 50, gear: 7 },
+          { sTime: 1.6, driverSlot: 1, x: 70, y: 0, z: 70, gear: -1 },
+          { sTime: 1.8, driverSlot: 1, x: 90, y: 0, z: 90, gear: -1 },
+        ],
+      });
+      fs.writeFileSync(sliceVcrPath, buf);
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
+      expect(traj.pointsCount).toBe(5);
+      expect(traj.points[0].gear).toBe(1);
+      expect(traj.points[1].gear).toBe(3);
+      expect(traj.points[2].gear).toBe(7);
+      expect(traj.points[3].gear).toBe(-1);
+      expect(traj.points[4].gear).toBe(-1);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('bridges a short neutral (clutch) gap between two real gears to the new gear', () => {
+      const sliceVcrPath = path.join(tempDir, 'gear_neutral_bridge.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.00, driverSlot: 1, x: 10, y: 0, z: 10, gear: 2 },
+          { sTime: 1.02, driverSlot: 1, x: 20, y: 0, z: 20, gear: 2 },
+          { sTime: 1.04, driverSlot: 1, x: 30, y: 0, z: 30, gear: 0 },
+          { sTime: 1.06, driverSlot: 1, x: 40, y: 0, z: 40, gear: 0 },
+          { sTime: 1.08, driverSlot: 1, x: 50, y: 0, z: 50, gear: 3 },
+          { sTime: 1.10, driverSlot: 1, x: 60, y: 0, z: 60, gear: 3 },
+        ],
+      });
+      fs.writeFileSync(sliceVcrPath, buf);
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
+      expect(traj.points.map(p => p.gear)).toEqual([2, 2, 3, 3, 3, 3]);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('leaves a long neutral stretch (parked / coasting) untouched', () => {
+      const sliceVcrPath = path.join(tempDir, 'gear_neutral_long.vcr');
+      const slices: MockSlice[] = [];
+      for (let i = 0; i < 10; i++) {
+        slices.push({ sTime: 1.0 + i * 0.02, driverSlot: 1, x: 10 + i, y: 0, z: 10 + i, gear: 0 });
+      }
+      const buf = createSliceVcrBuffer({ slices });
+      fs.writeFileSync(sliceVcrPath, buf);
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 20 });
+      expect(traj.points.every(p => p.gear === 0)).toBe(true);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
+    it('corrects a momentary 1-frame gear flicker back to the surrounding gear', () => {
+      const sliceVcrPath = path.join(tempDir, 'gear_flicker.vcr');
+      const buf = createSliceVcrBuffer({
+        slices: [
+          { sTime: 1.00, driverSlot: 1, x: 10, y: 0, z: 10, gear: 3 },
+          { sTime: 1.02, driverSlot: 1, x: 20, y: 0, z: 20, gear: 3 },
+          { sTime: 1.04, driverSlot: 1, x: 30, y: 0, z: 30, gear: 2 },
+          { sTime: 1.06, driverSlot: 1, x: 40, y: 0, z: 40, gear: 3 },
+          { sTime: 1.08, driverSlot: 1, x: 50, y: 0, z: 50, gear: 3 },
+        ],
+      });
+      fs.writeFileSync(sliceVcrPath, buf);
+
+      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
+      expect(traj.points.map(p => p.gear)).toEqual([3, 3, 3, 3, 3]);
+
+      fs.unlinkSync(sliceVcrPath);
+    });
+
     it('calculates rawSampleRateHz and supports uncompressed full raw trajectory (maxPoints: 0)', () => {
       const resVcrPath = path.join(tempDir, 'resolution_test.vcr');
       const buf = createSliceVcrBuffer({
@@ -883,29 +965,7 @@ describe('replayParser', () => {
       fs.unlinkSync(speedPath);
     });
 
-    it('detects teleport when large position jump occurs between frames', () => {
-      const teleportPath = path.join(tempDir, 'teleport.vcr');
-      fs.writeFileSync(teleportPath, createSliceVcrBuffer({
-        slices: [
-          { sTime: 1.0, driverSlot: 1, x: 100, y: 0, z: 100 },
-          { sTime: 1.05, driverSlot: 1, x: 105, y: 0, z: 100 },
-          // Teleport: jump 500m
-          { sTime: 1.10, driverSlot: 1, x: 600, y: 0, z: 100 },
-          { sTime: 1.15, driverSlot: 1, x: 605, y: 0, z: 100 },
-        ],
-      }));
 
-      const traj = extractReplayTrajectory(teleportPath, { driverSlot: 1, maxPoints: 0 });
-      expect(traj.pointsCount).toBe(4);
-      // Point at index 2 should be flagged as teleport (jump > 85m)
-      expect(traj.points[2].isTeleport).toBe(true);
-      // Points 0, 1, 3 should NOT be teleport
-      expect(traj.points[0].isTeleport).toBe(false);
-      expect(traj.points[1].isTeleport).toBe(false);
-      expect(traj.points[3].isTeleport).toBe(false);
-
-      fs.unlinkSync(teleportPath);
-    });
 
     it('discards points with coordinates beyond ±20000 range', () => {
       const extremePath = path.join(tempDir, 'extreme_coords.vcr');

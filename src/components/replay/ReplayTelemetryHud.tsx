@@ -6,9 +6,7 @@ export interface ReplayTelemetryHudProps {
 }
 
 export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(({ currentPoint }) => {
-  const currentGear = currentPoint?.speedKmh && currentPoint.speedKmh > 5
-    ? Math.min(7, Math.floor(currentPoint.speedKmh / 38) + 1)
-    : 1;
+  const currentGear = Math.min(7, Math.max(1, currentPoint?.gear ?? 1));
 
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 shrink-0">
