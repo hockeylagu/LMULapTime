@@ -169,7 +169,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
               stroke="#718096"
               tick={{ fill: '#A0AEC0', fontSize: 11 }}
               tickFormatter={(val) =>
-                val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(2)}s` : `${val.toFixed(2)}s`
+                val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(3)}s` : `${val.toFixed(3)}s`
               }
             />
             <Tooltip content={<CompareSectorTooltip />} />

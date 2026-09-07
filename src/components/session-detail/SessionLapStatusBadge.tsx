@@ -1,6 +1,7 @@
 import React from 'react';
-import { Flag, ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
+import { Flag } from 'lucide-react';
 import { LapData } from '../../../server/types.js';
+import { LapStatusBadge } from '../common/index.js';
 import {
   getWorstTrackLimitSeverity,
   getTrackLimitBadgeClasses,
@@ -33,19 +34,12 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   return (
     <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
       {isPitStop && l.lapTime !== null && l.lapTime > 0 ? (
-        <span
-          className="px-2 py-0.5 rounded bg-lmu-accent/20 text-lmu-accent text-xs font-semibold"
-          title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
-        >
-          PIT STOP
-        </span>
+        <LapStatusBadge
+          isPitStop
+          pitTooltip={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
+        />
       ) : isOutLap ? (
-        <span
-          className="inline-flex items-center gap-1 text-cyan-400 text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30"
-          title="Out Lap (rejoining track from pit lane — excluded from flying consistency)"
-        >
-          Out Lap
-        </span>
+        <LapStatusBadge isOutLap />
       ) : l.lapNum === 1 ? (
         <span
           className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
@@ -58,27 +52,8 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
           <Flag className="w-3.5 h-3.5" />
           Start Lap
         </span>
-      ) : l.isValid ? (
-        <span className="inline-flex items-center gap-1 text-lmu-green text-xs font-medium">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          Valid
-        </span>
-      ) : isInferredLap ? (
-        <span
-          className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium cursor-help"
-          title={incompleteTooltip}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          Incomplete
-        </span>
       ) : (
-        <span
-          className="inline-flex items-center gap-1 text-lmu-gold text-xs font-medium cursor-help"
-          title={incompleteTooltip}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Incomplete
-        </span>
+        <LapStatusBadge isValid={l.isValid} isInferred={isInferredLap} incompleteTooltip={incompleteTooltip} />
       )}
 
       {/* Compact Incident & Penalty Badges */}
@@ -109,3 +84,4 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
     </div>
   );
 };
+

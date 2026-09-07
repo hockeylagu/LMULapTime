@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMap } from '../../src/components/replay/GpsTrackMap';
 import { ReplayTrajectoryPoint } from '../../server/types';
 
@@ -84,5 +84,58 @@ describe('GpsTrackMap', () => {
       const lineLen = Math.hypot(x2 - x1, y2 - y1);
       expect(lineLen).toBeLessThan(400);
     }
+  });
+
+  it('renders a T# marker for each detected corner, matching the corner analysis table', () => {
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        corners={[{ cornerNumber: 1, minDistM: 0 }, { cornerNumber: 2, minDistM: 100 }]}
+      />
+    );
+
+    expect(screen.getByText('T1')).toBeInTheDocument();
+    expect(screen.getByText('T2')).toBeInTheDocument();
+  });
+
+  it('highlights the selected corner marker and clicking it selects the corner and jumps the scrubber', () => {
+    const onSelectCornerNumber = vi.fn();
+    const onSelectIndex = vi.fn();
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        corners={[{ cornerNumber: 1, minDistM: 0 }]}
+        selectedCornerNumber={1}
+        onSelectCornerNumber={onSelectCornerNumber}
+        onSelectIndex={onSelectIndex}
+      />
+    );
+
+    const markerText = screen.getByText('T1');
+    const markerGroup = markerText.closest('g');
+    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#f43f5e');
+
+    fireEvent.click(markerText);
+    expect(onSelectCornerNumber).toHaveBeenCalledWith(1);
+    expect(onSelectIndex).toHaveBeenCalledWith(0);
+  });
+
+  it('renders unselected corner markers with the default (non-highlighted) style', () => {
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        corners={[{ cornerNumber: 1, minDistM: 0 }]}
+        selectedCornerNumber={null}
+      />
+    );
+
+    const markerGroup = screen.getByText('T1').closest('g');
+    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#0f172a');
   });
 });

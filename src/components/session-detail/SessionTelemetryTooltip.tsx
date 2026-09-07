@@ -1,5 +1,6 @@
 import React from 'react';
 import { DetailedSession, DriverData } from '../../../server/types.js';
+import { LapStatusBadge } from '../common/index.js';
 
 export interface SessionTelemetryPointData {
   lapNum?: string;
@@ -90,9 +91,9 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
               </div>
               <div className="flex items-center gap-1 shrink-0 text-[11px]">
                 {d.isPit ? (
-                  <span className="text-amber-400 font-bold text-[10px]">PIT</span>
+                  <LapStatusBadge isPitStop size="xs" />
                 ) : d.isOutLap ? (
-                  <span className="text-cyan-400 font-semibold text-[10px]">OUT</span>
+                  <LapStatusBadge isOutLap size="xs" />
                 ) : (
                   <span>{d.lapTime || '-'}</span>
                 )}
@@ -108,11 +109,13 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
     <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1 font-mono">
       <p className="font-bold text-white border-b border-lmu-border/60 pb-1 flex items-center justify-between gap-3 font-sans">
         <span>{data.lapNum}</span>
-        {data.isPitStop && <span className="text-amber-400 font-bold text-[10px]">PIT STOP</span>}
-        {data.isOutLap && <span className="text-cyan-400 font-semibold text-[10px]">OUT LAP</span>}
-        {!data.isPitStop && !data.isOutLap && !data.isValid && (
-          <span className="text-rose-400 text-[10px]">INVALID</span>
-        )}
+        {data.isPitStop ? (
+          <LapStatusBadge isPitStop size="xs" />
+        ) : data.isOutLap ? (
+          <LapStatusBadge isOutLap size="xs" />
+        ) : !data.isValid ? (
+          <LapStatusBadge isValid={data.isValid} isInferred={data.isInferred} size="xs" />
+        ) : null}
       </p>
       {activeChartMetric === 'lapTime' && (
         <>

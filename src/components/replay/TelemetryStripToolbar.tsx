@@ -87,15 +87,27 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 setIsResPopoverOpen(prev => !prev);
               }}
               className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
-                isResPopoverOpen
+                telemetryResolution === 1200 && !isFullResolution
+                  ? isResPopoverOpen
+                    ? 'bg-sky-500/30 border-sky-400/70 text-sky-200 font-bold shadow-[0_0_10px_rgba(56,189,248,0.4)]'
+                    : 'bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20'
+                  : telemetryResolution === 2400 && !isFullResolution
+                  ? isResPopoverOpen
+                    ? 'bg-emerald-500/30 border-emerald-400/70 text-emerald-200 font-bold shadow-[0_0_10px_rgba(16,185,129,0.4)]'
+                    : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                  : isResPopoverOpen
                   ? 'bg-purple-600/40 border-purple-400/80 text-purple-200 font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-                  : isFullResolution || telemetryResolution === 0
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
                   : 'bg-purple-500/10 border-purple-500/30 text-purple-300 hover:bg-purple-500/20'
               }`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
-              <Activity className="w-2.5 h-2.5 text-purple-400" />
+              <Activity className={`w-2.5 h-2.5 ${
+                telemetryResolution === 1200 && !isFullResolution
+                  ? 'text-sky-400'
+                  : telemetryResolution === 2400 && !isFullResolution
+                  ? 'text-emerald-400'
+                  : 'text-purple-400'
+              }`} />
               <span>
                 {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 0 ? 'Full Raw' : `${telemetryResolution || pointsCount || 0} pts`}
               </span>

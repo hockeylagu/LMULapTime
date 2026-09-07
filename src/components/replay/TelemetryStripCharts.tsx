@@ -8,6 +8,13 @@ import { TelemetryDeltaChannel } from './TelemetryDeltaChannel.js';
 import { TelemetryPedalsChannel } from './TelemetryPedalsChannel.js';
 import { TelemetrySteerGearChannel } from './TelemetrySteerGearChannel.js';
 
+export interface SelectedCornerMarkers {
+  cornerNumber: number;
+  entryFrame: number;
+  minFrame: number;
+  exitFrame: number;
+}
+
 export interface TelemetryStripChartsProps {
   points: ReplayTrajectoryPoint[];
   currentIndex: number;
@@ -27,6 +34,7 @@ export interface TelemetryStripChartsProps {
   rawPointsCount?: number;
   rawSampleRateHz?: number;
   isFullResolution?: boolean;
+  selectedCornerMarkers?: SelectedCornerMarkers | null;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
@@ -45,6 +53,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   rawPointsCount,
   rawSampleRateHz,
   isFullResolution,
+  selectedCornerMarkers,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -182,6 +191,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const s1Clamped = sectors && sectors.s1Frame > 0 ? Math.max(0, Math.min(100, ((sectors.s1Frame - viewStart) / viewSpan) * 100)) : 0;
   const s2Clamped = sectors && sectors.s2Frame > 0 ? Math.max(0, Math.min(100, ((sectors.s2Frame - viewStart) / viewSpan) * 100)) : 0;
 
+  const cornerEntryPct = selectedCornerMarkers && selectedCornerMarkers.entryFrame > viewStart && selectedCornerMarkers.entryFrame < viewEnd
+    ? ((selectedCornerMarkers.entryFrame - viewStart) / viewSpan) * 100 : null;
+  const cornerMinPct = selectedCornerMarkers && selectedCornerMarkers.minFrame > viewStart && selectedCornerMarkers.minFrame < viewEnd
+    ? ((selectedCornerMarkers.minFrame - viewStart) / viewSpan) * 100 : null;
+  const cornerExitPct = selectedCornerMarkers && selectedCornerMarkers.exitFrame > viewStart && selectedCornerMarkers.exitFrame < viewEnd
+    ? ((selectedCornerMarkers.exitFrame - viewStart) / viewSpan) * 100 : null;
+
   if (points.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-lmu-muted text-sm">
@@ -268,6 +284,29 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       {s2Pct !== null && (
         <div style={{ left: `${s2Pct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-blue/50 pointer-events-none z-10">
           <span className="absolute top-1 left-1 px-1 py-0.2 rounded bg-lmu-blue/20 text-lmu-blue text-[8px] font-mono font-bold">S2</span>
+        </div>
+      )}
+
+      {/* SELECTED CORNER ENTRY / MIN-SPEED / EXIT MARKERS */}
+      {cornerEntryPct !== null && (
+        <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-cyan-400/60 pointer-events-none z-10 border-l border-dashed border-cyan-400/60">
+          <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-mono font-bold whitespace-nowrap">
+            T{selectedCornerMarkers?.cornerNumber} IN
+          </span>
+        </div>
+      )}
+      {cornerMinPct !== null && (
+        <div style={{ left: `${cornerMinPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-rose-400/70 pointer-events-none z-10 border-l border-dashed border-rose-400/70">
+          <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[8px] font-mono font-bold whitespace-nowrap">
+            T{selectedCornerMarkers?.cornerNumber} APEX
+          </span>
+        </div>
+      )}
+      {cornerExitPct !== null && (
+        <div style={{ left: `${cornerExitPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-emerald-400/60 pointer-events-none z-10 border-l border-dashed border-emerald-400/60">
+          <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-bold whitespace-nowrap">
+            T{selectedCornerMarkers?.cornerNumber} OUT
+          </span>
         </div>
       )}
 

@@ -1,15 +1,10 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
-import { VehicleClassPills, SortDropdown, SortOption } from '../common';
+import { VehicleClassPills, SortDropdown } from '../common';
+import { TRACK_SORT_OPTIONS } from './tracksSortOptions.js';
+import type { TracksSortOption } from './tracksSortOptions.js';
 
-export type TracksSortOption = 'name-asc' | 'name-desc' | 'pace-asc' | 'last-session-desc';
-
-export const TRACK_SORT_OPTIONS: readonly SortOption<TracksSortOption>[] = [
-  { value: 'name-asc', label: 'Name (A-Z)' },
-  { value: 'name-desc', label: 'Name (Z-A)' },
-  { value: 'pace-asc', label: 'Pace / Benchmark (Best First)' },
-  { value: 'last-session-desc', label: 'Last Session (Newest First)' },
-];
+export type { TracksSortOption };
 
 interface TrackSummariesHeaderProps {
   totalTracks: number;
