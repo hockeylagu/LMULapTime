@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { computeCumulativeDistances } from '../../utils/replayComparison.js';
+import { computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
 import {
   getHeatmapColor,
   MapColorMode,
@@ -11,6 +11,11 @@ import {
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
+
+export interface GpsTrackMapCorner {
+  cornerNumber: number;
+  minDistM: number;
+}
 
 export interface GpsTrackMapProps {
   points: ReplayTrajectoryPoint[];
@@ -27,6 +32,9 @@ export interface GpsTrackMapProps {
   colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];
+  corners?: GpsTrackMapCorner[];
+  selectedCornerNumber?: number | null;
+  onSelectCornerNumber?: (cornerNumber: number) => void;
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
@@ -37,6 +45,9 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   colorBy = 'speed',
   className = '',
   baselinePoints,
+  corners,
+  selectedCornerNumber,
+  onSelectCornerNumber,
 }) => {
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -83,6 +94,19 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
     () => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, bounds, VIEWBOX_SIZE, PADDING),
     [primaryDists, baselineDists, baselinePoints, currentIndex, bounds]
   );
+
+  // Projects each detected corner's apex distance onto the rendered track path so the "T#"
+  // label matches the same corner number shown in the corner analysis table.
+  const cornerMarkers = useMemo(() => {
+    if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
+    return corners
+      .map(c => {
+        const idx = findIndexAtDistance(primaryDists, c.minDistM);
+        const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
+        return pt ? { cornerNumber: c.cornerNumber, sx: pt.sx, sy: pt.sy, idx: pt.idx } : null;
+      })
+      .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number } => m !== null);
+  }, [corners, primaryDists, svgPoints]);
 
   const carHeadingDeg = useMemo(() => {
     if (!svgPoints || svgPoints.length < 2 || currentIndex === undefined) return 0;
@@ -216,6 +240,26 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
             <text y="-10" textAnchor="middle" className="fill-amber-300 text-[11px] font-bold">START</text>
           </g>
         )}
+
+        {cornerMarkers.map(m => {
+          const isSelected = m.cornerNumber === selectedCornerNumber;
+          return (
+            <g
+              key={`corner-${m.cornerNumber}`}
+              transform={`translate(${m.sx.toFixed(1)}, ${m.sy.toFixed(1)})`}
+              className="cursor-pointer"
+              onClick={() => {
+                onSelectCornerNumber?.(m.cornerNumber);
+                onSelectIndex?.(m.idx);
+              }}
+            >
+              <circle r={isSelected ? 10 : 7} fill={isSelected ? '#f43f5e' : '#0f172a'} stroke={isSelected ? '#ffffff' : '#94a3b8'} strokeWidth={isSelected ? 2 : 1.5} className={isSelected ? 'animate-pulse' : ''} />
+              <text y="3.5" textAnchor="middle" className={`font-mono font-bold pointer-events-none ${isSelected ? 'fill-white text-[9px]' : 'fill-slate-300 text-[7.5px]'}`}>
+                T{m.cornerNumber}
+              </text>
+            </g>
+          );
+        })}
 
         {currentPos && baselineGhostPos && (
           <line

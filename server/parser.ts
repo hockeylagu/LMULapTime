@@ -1571,7 +1571,11 @@ export function extractComparableLaps(
       (d.laps || []).forEach(l => {
         const isSessionBest = l.lapTime !== null && sessionBestTime !== null && Math.abs(l.lapTime - sessionBestTime) < 0.0005;
         const isPlayer = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
-        
+        // isAllTimePB is corrected in a final pass below (keyed by array index, not lapNum,
+        // since duplicate lapNum values in the source data can otherwise flag more than one
+        // lap per driver as their personal best).
+        const isAllTimePB = false;
+
         const lapItem = {
           id: `${s.id}_${d.name}_lap_${l.lapNum}`,
           sessionId: s.id,
@@ -1614,6 +1618,7 @@ export function extractComparableLaps(
           paceCategory: l.paceCategory || null,
           pacePercentage: l.pacePercentage || null,
           isSessionBest,
+          isAllTimePB,
           isPlayer,
           matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
         };
@@ -1632,6 +1637,23 @@ export function extractComparableLaps(
         }
       });
     });
+  });
+
+  // Flag exactly one lap per driver as isAllTimePB (their fastest valid lap in this result
+  // set), keyed by array index so duplicate lapNum values in the source data can never cause
+  // two different laps to both win.
+  const bestLapIndexByDriver = new Map<string, number>();
+  laps.forEach((item, idx) => {
+    if (!item.isValid || item.lapTime === null || item.lapTime <= 0) return;
+    const key = item.driverName.toLowerCase().trim();
+    const bestIdx = bestLapIndexByDriver.get(key);
+    if (bestIdx === undefined || (laps[bestIdx].lapTime ?? Infinity) > item.lapTime) {
+      bestLapIndexByDriver.set(key, idx);
+    }
+  });
+  const bestLapIndices = new Set(bestLapIndexByDriver.values());
+  laps.forEach((item, idx) => {
+    item.isAllTimePB = bestLapIndices.has(idx);
   });
 
   const theoreticalBestSec = bestS1 !== null && bestS2 !== null && bestS3 !== null

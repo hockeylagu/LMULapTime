@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Gauge, Timer, Users } from 'lucide-react';
 import { TelemetryStripCharts } from './TelemetryStripCharts.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { ReplayTimelineFooter } from './ReplayTimelineFooter.js';
-import { ReplayDriverHeaderPill } from './ReplayDriverHeaderPill.js';
 import { ReplayDriverRosterTable } from './ReplayDriverRosterTable.js';
 import { ReplayMapContainer } from './ReplayMapContainer.js';
 import { CornerSpeedTable } from './CornerSpeedTable.js';
@@ -89,6 +88,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const [activeTab, setActiveTab] = useState<'map' | 'roster' | 'corners'>('map');
   const [colorBy, setColorBy] = useState<MapColorMode>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
+  const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
 
   const lapSegments = useMemo(
     () => (isCompareMode && trajectory && baselineTrajectory
@@ -96,8 +96,49 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
       : []),
     [isCompareMode, trajectory, baselineTrajectory]
   );
-  const cornerCount = useMemo(() => lapSegments.filter(s => s.type === 'corner').length, [lapSegments]);
+  const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
+  const cornerCount = cornerSegments.length;
+
+  // Best sector times across this replay's own laps, used to highlight the current lap's
+  // best sectors the same way the rest of the site marks S1/S2/S3 personal bests.
+  const bestSectors = useMemo(() => {
+    let s1: number | null = null;
+    let s2: number | null = null;
+    let s3: number | null = null;
+    (trajectory?.laps || []).forEach(l => {
+      if (l.isValid === false) return;
+      if (l.s1Sec && (s1 === null || l.s1Sec < s1)) s1 = l.s1Sec;
+      if (l.s2Sec && (s2 === null || l.s2Sec < s2)) s2 = l.s2Sec;
+      if (l.s3Sec && (s3 === null || l.s3Sec < s3)) s3 = l.s3Sec;
+    });
+    return { s1, s2, s3 };
+  }, [trajectory]);
   const primaryDists = useMemo(() => computeCumulativeDistances(trajectory?.points || []), [trajectory]);
+
+  // Clear the selected corner whenever a different lap/replay is loaded so a stale selection
+  // never points at a corner that no longer exists in the new lap's segment list.
+  useEffect(() => {
+    setSelectedCornerNumber(null);
+  }, [trajectory, baselineTrajectory]);
+
+  const selectedCorner = useMemo(
+    () => cornerSegments.find(s => s.cornerNumber === selectedCornerNumber) || null,
+    [cornerSegments, selectedCornerNumber]
+  );
+  const selectedCornerMarkers = useMemo(() => {
+    if (!selectedCorner || primaryDists.length === 0) return null;
+    return {
+      cornerNumber: selectedCorner.cornerNumber,
+      entryFrame: findIndexAtDistance(primaryDists, selectedCorner.entryDistM),
+      minFrame: findIndexAtDistance(primaryDists, selectedCorner.minDistM),
+      exitFrame: findIndexAtDistance(primaryDists, selectedCorner.exitDistM),
+    };
+  }, [selectedCorner, primaryDists]);
+
+  // Clicking the already-selected corner (in the table or on the map) deselects it.
+  const handleSelectCorner = (cornerNumber: number | null) => {
+    setSelectedCornerNumber(prev => (cornerNumber !== null && prev === cornerNumber ? null : cornerNumber));
+  };
 
   const formatLapTime = (sec?: number | null): string => {
     if (!sec || isNaN(sec) || sec <= 0) return '--:--.---';
@@ -120,6 +161,10 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
         metadata={metadata}
         trajectory={trajectory}
         onSelectLap={handleSelectLap}
+        selectedDriver={selectedDriver}
+        fallbackDriverName={trajectory?.driverName}
+        driverCount={metadata?.drivers?.length || 0}
+        onOpenRoster={() => setActiveTab('roster')}
         isCompareMode={isCompareMode}
         onToggleCompare={handleToggleCompare}
         onSwapBaseline={handleSwapBaseline}
@@ -167,6 +212,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
               <ReplayPerformanceHeader
                 currentLap={trajectory.currentLap ?? 1}
                 currentLapSummary={currentLapSummary}
+                bestS1Sec={bestSectors.s1}
+                bestS2Sec={bestSectors.s2}
+                bestS3Sec={bestSectors.s3}
                 isCompareMode={isCompareMode}
                 baselineTrajectory={baselineTrajectory}
                 baselineReplayName={baselineReplayName}
@@ -199,13 +247,14 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                   rawPointsCount={trajectory.rawPointsCount}
                   rawSampleRateHz={trajectory.rawSampleRateHz}
                   isFullResolution={trajectory.isFullResolution}
+                  selectedCornerMarkers={selectedCornerMarkers}
                 />
               </div>
 
               <ReplayTimelineFooter
                 currentIndex={currentIndex}
                 totalPoints={trajectory.points.length}
-                currentTimeSec={currentPoint?.timeSec}
+                currentTimeSec={currentPoint && trajectory.points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (trajectory.points[0].timeSec || 0)) : undefined}
                 onChangeIndex={idx => { setCurrentIndex(idx); setIsPlaying(false); }}
               />
             </div>
@@ -265,12 +314,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
 
               {activeTab === 'map' ? (
                 <div className="flex-1 flex flex-col min-h-0 h-full p-3 gap-2.5 overflow-hidden">
-                  <ReplayDriverHeaderPill
-                    selectedDriver={selectedDriver}
-                    fallbackDriverName={trajectory.driverName}
-                    onOpenRoster={() => setActiveTab('roster')}
-                  />
-
                   <ReplayMapContainer
                     trajectory={trajectory}
                     currentIndex={currentIndex}
@@ -281,6 +324,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     isCompareMode={isCompareMode}
                     baselineTrajectory={baselineTrajectory}
                     currentPoint={currentPoint}
+                    corners={cornerSegments}
+                    selectedCornerNumber={selectedCornerNumber}
+                    onSelectCornerNumber={handleSelectCorner}
                   />
                 </div>
               ) : activeTab === 'roster' ? (
@@ -303,6 +349,8 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                       : `${baselineReplayName} (L${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1})`
                   }
                   onSelectDistance={distM => setCurrentIndex(findIndexAtDistance(primaryDists, distM))}
+                  selectedCornerNumber={selectedCornerNumber}
+                  onSelectCorner={handleSelectCorner}
                   className="flex-1 min-h-0"
                 />
               )}

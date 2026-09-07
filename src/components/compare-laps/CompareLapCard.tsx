@@ -4,7 +4,7 @@ import { ComparableLap, computeLapDeltas } from '../../utils/lapComparison';
 import { ReferenceLaptimeEntry } from '../../../server/types';
 import { formatTime } from '../../utils/formatters';
 import { matchesCarClass, getPaceCategoryFromPercentage } from '../../utils/paceCategory';
-import { PaceBadge } from '../common';
+import { PaceBadge, LapStatusBadge } from '../common';
 
 export interface CompareLapCardProps {
   lap: ComparableLap;
@@ -207,9 +207,14 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
                 Wear: {lap.tireWear.avg}% avg
               </span>
             ) : (
-              <span className="text-[10px] text-lmu-muted">
-                {lap.isPitStop ? '🛑 Pit Stop' : lap.isValid ? '✓ Valid Lap' : '⚠️ Incomplete'}
-              </span>
+              <LapStatusBadge
+                isPitStop={lap.isPitStop}
+                isOutLap={lap.isOutLap}
+                isValid={lap.isValid}
+                isInferred={lap.isInferred}
+                pitTooltip={lap.pitStopDurationString ? `Estimated pit loss: ${lap.pitStopDurationString}` : undefined}
+                size="xs"
+              />
             )}
           </div>
         </div>

@@ -7,3 +7,5 @@ export * from './RankBadge';
 export * from './SectorSplitsRow';
 export * from './ReplayIndicator';
 export * from './BenchmarkTargetsGrid';
+export * from './LapStatusBadge';
+export * from './lapStatus';

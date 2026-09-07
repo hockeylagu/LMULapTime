@@ -8,6 +8,15 @@ export interface ReplayTimelineFooterProps {
   onChangeIndex: (index: number) => void;
 }
 
+// Formats lap-elapsed seconds as m:ss.sss (matching the site-wide lap time format), but unlike
+// formatLapTime a genuine 0 is shown as 0:00.000 rather than a '--:--.---' placeholder.
+function formatElapsed(sec?: number): string {
+  const s = sec !== undefined && isFinite(sec) && sec >= 0 ? sec : 0;
+  const mins = Math.floor(s / 60);
+  const rem = (s % 60).toFixed(3).padStart(6, '0');
+  return `${mins}:${rem}`;
+}
+
 export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = React.memo(({
   currentIndex,
   totalPoints,
@@ -44,7 +53,7 @@ export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = React.m
         </span>
         <div className="flex items-center gap-3 font-mono text-[11px]">
           <span className="text-white font-bold">
-            {currentTimeSec?.toFixed(2) ?? '0.00'}s
+            {formatElapsed(currentTimeSec)}
           </span>
           <span>
             Frame {(currentIndex + 1).toLocaleString()} / {totalPoints.toLocaleString()}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
 
 describe('ReplayInspectorModal', () => {
@@ -71,9 +71,10 @@ describe('ReplayInspectorModal', () => {
     const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
     fireEvent.click(rosterTab);
 
-    expect(screen.getByText('Samuel Lague')).toBeInTheDocument();
-    expect(screen.getByText('Ferrari 296 GT3')).toBeInTheDocument();
-    expect(screen.getByText('Vista AF Corsa')).toBeInTheDocument();
+    const rosterTable = screen.getByRole('table');
+    expect(within(rosterTable).getByText('Samuel Lague')).toBeInTheDocument();
+    expect(within(rosterTable).getByText('Ferrari 296 GT3')).toBeInTheDocument();
+    expect(within(rosterTable).getByText('Vista AF Corsa')).toBeInTheDocument();
   });
 
   it('allows switching drivers from the selector and reloads trajectory', async () => {
@@ -168,7 +169,8 @@ describe('ReplayInspectorModal', () => {
     // Verify exactly ONE Current badge is rendered initially (for slot 1 - Samuel Lague)
     const currentBadges = screen.getAllByText('Current');
     expect(currentBadges).toHaveLength(1);
-    expect(screen.getByText('YOU')).toBeInTheDocument();
+    const rosterTable = screen.getByRole('table');
+    expect(within(rosterTable).getByText('YOU')).toBeInTheDocument();
 
     // Click on Rival Racer row to select them
     const rivalCell = screen.getByText('Rival Racer');
@@ -205,8 +207,9 @@ describe('ReplayInspectorModal', () => {
     const searchInput = screen.getByPlaceholderText(/Search driver/i);
     fireEvent.change(searchInput, { target: { value: 'Rival' } });
 
-    expect(screen.getByText('Rival Racer')).toBeInTheDocument();
-    expect(screen.queryByText('Samuel Lague')).not.toBeInTheDocument();
+    const rosterTable = screen.getByRole('table');
+    expect(within(rosterTable).getByText('Rival Racer')).toBeInTheDocument();
+    expect(within(rosterTable).queryByText('Samuel Lague')).not.toBeInTheDocument();
   });
 
   it('toggles compare mode and allows comparing with a baseline lap', async () => {
@@ -292,7 +295,7 @@ describe('ReplayInspectorModal', () => {
     expect(speed1x.className).not.toContain('bg-lmu-accent');
   });
 
-  it('renders fastest lap badge and lap time using the lmu-blue session-best color set', async () => {
+  it('renders fastest lap badge and lap time using the lmu-gold personal-best color set', async () => {
     const trajWithBestLap = {
       ...mockTraj,
       currentLap: 1,
@@ -320,9 +323,9 @@ describe('ReplayInspectorModal', () => {
     });
 
     const fastestBadge = screen.getByText(/Fastest Lap/i);
-    expect(fastestBadge.className).toContain('bg-lmu-blue/15');
-    expect(fastestBadge.className).toContain('text-lmu-blue');
-    expect(fastestBadge.className).toContain('border-lmu-blue/40');
+    expect(fastestBadge.className).toContain('bg-lmu-gold/15');
+    expect(fastestBadge.className).toContain('text-lmu-gold');
+    expect(fastestBadge.className).toContain('border-lmu-gold/40');
   });
 
   it('allows swapping primary and baseline lap using the Swap button', async () => {

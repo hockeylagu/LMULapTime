@@ -76,7 +76,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   if (displayLapTime && bestLap) {
     const delta = displayLapTime - bestLap;
     if (Math.abs(delta) < 0.0005 && l.isValid && !l.isPitStop && !isOutLap) {
-      deltaStr = isLapAllTimePB ? '⭐ PERSONAL BEST' : 'SESSION BEST';
+      deltaStr = isLapAllTimePB ? '⭐ Personal Best' : '★ Session Best';
     } else {
       deltaStr = `+${delta.toFixed(3)}s`;
     }

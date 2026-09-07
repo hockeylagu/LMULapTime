@@ -7,6 +7,8 @@ export interface CornerSpeedTableProps {
   primaryLabel?: string;
   baselineLabel?: string;
   onSelectDistance?: (distM: number) => void;
+  selectedCornerNumber?: number | null;
+  onSelectCorner?: (cornerNumber: number) => void;
   className?: string;
 }
 
@@ -26,8 +28,8 @@ function formatSpeedDelta(delta: number): string {
 }
 
 function formatTimeDelta(delta: number): string {
-  if (Math.abs(delta) < 0.02) return '±0.00s';
-  return delta < 0 ? `${delta.toFixed(2)}s` : `+${delta.toFixed(2)}s`;
+  if (Math.abs(delta) < 0.02) return '±0.000s';
+  return delta < 0 ? `${delta.toFixed(3)}s` : `+${delta.toFixed(3)}s`;
 }
 
 // Braking/throttle deltas are in meters. "Later brake" and "earlier throttle" are each the
@@ -53,6 +55,8 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
   primaryLabel = 'My Lap',
   baselineLabel = 'Baseline',
   onSelectDistance,
+  selectedCornerNumber,
+  onSelectCorner,
   className = '',
 }) => {
   if (!segments || segments.length === 0) {
@@ -90,14 +94,19 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
             {segments.map(s => (
               <tr
                 key={s.segmentIndex}
-                className="border-t border-lmu-border/40 hover:bg-lmu-card/50 transition-colors cursor-pointer"
-                onClick={() => onSelectDistance?.(s.type === 'corner' ? s.minDistM : Math.round((s.entryDistM + s.exitDistM) / 2))}
+                className={`border-t border-lmu-border/40 hover:bg-lmu-card/50 transition-colors cursor-pointer ${
+                  s.type === 'corner' && s.cornerNumber === selectedCornerNumber ? 'bg-lmu-accent/15' : ''
+                }`}
+                onClick={() => {
+                  onSelectDistance?.(s.type === 'corner' ? s.minDistM : Math.round((s.entryDistM + s.exitDistM) / 2));
+                  if (s.type === 'corner') onSelectCorner?.(s.cornerNumber);
+                }}
               >
                 {s.type === 'corner' ? (
                   <>
                     <td className="px-2 py-1.5 font-bold text-white">
-                      <span className="inline-flex items-center gap-1">
-                        <Flag className="w-2.5 h-2.5 text-lmu-muted" />
+                      <span className={`inline-flex items-center gap-1 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : ''}`}>
+                        <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : 'text-lmu-muted'}`} />
                         T{s.cornerNumber}
                       </span>
                     </td>
