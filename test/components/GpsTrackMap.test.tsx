@@ -138,4 +138,29 @@ describe('GpsTrackMap', () => {
     const markerGroup = screen.getByText('T1').closest('g');
     expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#0f172a');
   });
+
+  it('rescales a corner\'s baseline-lap distance onto the primary lap so the marker lands on the same physical corner', () => {
+    // minDistM (5) is measured along a much shorter baseline lap (total 10m); on the ~107.7m
+    // primary lap that same 50%-of-lap point falls near primary point index 1, not index 0
+    // (which is where a naive un-rescaled lookup of raw distance 5 would land).
+    const shortBaselinePoints: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
+      { x: 10, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.1 },
+    ];
+    const onSelectIndex = vi.fn();
+
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        baselinePoints={shortBaselinePoints}
+        corners={[{ cornerNumber: 1, minDistM: 5 }]}
+        onSelectIndex={onSelectIndex}
+      />
+    );
+
+    fireEvent.click(screen.getByText('T1'));
+    expect(onSelectIndex).toHaveBeenCalledWith(1);
+  });
 });
