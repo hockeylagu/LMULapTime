@@ -414,6 +414,9 @@ export interface ReplayMetadata {
   scn?: string;
   aiw?: string;
   trackName?: string;
+  trackVenue?: string;
+  trackCourse?: string;
+  displayTrack?: string;
   trackVersion?: string;
   modUid?: string;
   trackPath?: string;
@@ -552,6 +555,9 @@ export interface ReplaySummary {
   mtime: number;
   mtimeMs?: number;
   trackName?: string;
+  trackVenue?: string;
+  trackCourse?: string;
+  displayTrack?: string;
   sessionCode?: string;
   durationSec?: number;
   eventTitle?: string;

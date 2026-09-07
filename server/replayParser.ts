@@ -510,8 +510,12 @@ export function parseReplayMetadata(
     const replayCarClass = playerDriver?.carClass;
     const replayCarModel = playerDriver?.carModel;
 
+    const baseName = path.basename(filePath);
+    const filenameMatch = baseName.match(/^(.+?)\s+([PQR]\d+)\b/i);
+    const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
+
     return {
-      filename: path.basename(filePath),
+      filename: baseName,
       filePath,
       fileSizeBytes: stat.size,
       mtimeMs: stat.mtime.getTime(),
@@ -521,6 +525,8 @@ export function parseReplayMetadata(
       scn: scn || undefined,
       aiw: aiw || undefined,
       trackName: trackName || undefined,
+      trackCourse: filenameTrack || undefined,
+      displayTrack: filenameTrack || trackName || undefined,
       trackVersion: trackVersion || undefined,
       modUid: modUid || undefined,
       trackPath: trackPath || undefined,

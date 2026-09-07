@@ -3,6 +3,8 @@ import {
   computeCumulativeDistances,
   interpolatePointAtDistance,
   computeLapComparisons,
+  computeLapSegmentComparisons,
+  findIndexAtDistance,
   filterCompatibleReplays,
   mapVehicleIdToClass,
 } from '../../src/utils/replayComparison';
@@ -131,6 +133,126 @@ describe('replayComparison utility', () => {
       expect(comps).toHaveLength(1);
       expect(comps[0].deltaTimeSec).toBe(0);
       expect(isNaN(comps[0].deltaTimeSec)).toBe(false);
+    });
+  });
+
+  describe('computeLapSegmentComparisons', () => {
+    // Speed trace with genuine turning points at both ends (100->200->minSpeed->200->100),
+    // so the boundary "max" points actually register - not a flat plateau the algorithm
+    // can't turn around on. Corner window: entry@30m, min@70m, exit@110m; lap ends at 140m.
+    function buildLap(minSpeedKmh: number, extraTimeThroughCorner: number): ReplayTrajectoryPoint[] {
+      const speeds = [100, 150, 200, 200, 180, 150, minSpeedKmh, minSpeedKmh, 150, 180, 200, 200, 180, 150, 100];
+      let t = 0;
+      return speeds.map((speedKmh, i) => {
+        const distM = i * 10;
+        // Corner spans (30, 110]; add the extra delay across just that stretch.
+        t += distM > 30 && distM <= 110 ? extraTimeThroughCorner : 0.3;
+        return { x: distM, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: t };
+      });
+    }
+
+    function withBrakeThrottle(points: ReplayTrajectoryPoint[], brakeOnDistM: number, throttleOnDistM: number): ReplayTrajectoryPoint[] {
+      return points.map(p => ({
+        ...p,
+        brake: p.x >= brakeOnDistM && p.x < 70 ? 60 : 0,
+        throttle: p.x >= throttleOnDistM ? 100 : 0,
+      }));
+    }
+
+    it('builds a contiguous straight -> corner -> straight breakdown of the whole lap', () => {
+      const baseline = buildLap(100, 0.3);
+      const primary = buildLap(90, 0.3);
+
+      const segments = computeLapSegmentComparisons(primary, baseline);
+
+      expect(segments.map(s => s.type)).toEqual(['straight', 'corner', 'straight']);
+      expect(segments[0].entryDistM).toBe(0);
+      expect(segments[0].exitDistM).toBe(30);
+      expect(segments[2].entryDistM).toBe(110);
+      expect(segments[2].exitDistM).toBe(140);
+
+      const corner = segments[1];
+      if (corner.type !== 'corner') throw new Error('expected corner segment');
+      expect(corner.cornerNumber).toBe(1);
+      expect(corner.entryDistM).toBe(30);
+      expect(corner.minDistM).toBe(70);
+      expect(corner.exitDistM).toBe(110);
+      expect(corner.baselineEntrySpeedKmh).toBe(200);
+      expect(corner.baselineMinSpeedKmh).toBe(100);
+      expect(corner.baselineExitSpeedKmh).toBe(200);
+      expect(corner.primaryMinSpeedKmh).toBe(90);
+      expect(corner.minSpeedDeltaKmh).toBe(-10);
+    });
+
+    it('reports a positive (lost time) delta isolated to the corner segment only', () => {
+      const baseline = buildLap(100, 0.3);
+      const primary = buildLap(100, 0.5); // same speeds, but slower through the corner stretch
+
+      const segments = computeLapSegmentComparisons(primary, baseline);
+      const corner = segments.find(s => s.type === 'corner');
+      if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
+
+      // 8 steps of 10m each between entry(30) and exit(110) get the extra 0.2s delay.
+      expect(corner.timeDeltaSec).toBeCloseTo(1.6, 2);
+      // No extra delay was applied outside the corner, so the straights should show ~0 delta.
+      for (const s of segments) {
+        if (s.type === 'straight') expect(s.timeDeltaSec).toBeCloseTo(0, 2);
+      }
+    });
+
+    it('computes braking point and throttle-on point deltas within a corner', () => {
+      const baseline = withBrakeThrottle(buildLap(100, 0.3), 40, 80);
+      const primary = withBrakeThrottle(buildLap(100, 0.3), 50, 70);
+
+      const segments = computeLapSegmentComparisons(primary, baseline);
+      const corner = segments.find(s => s.type === 'corner');
+      if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
+
+      // Brake/throttle ramp linearly between 10m-spaced samples, so the detected threshold
+      // crossing lands a bit before the raw keyframe distance - the delta between the two
+      // laps is unaffected since both ramps are shaped identically, just offset by 10m.
+      expect(corner.baselineBrakingDistM).toBe(32);
+      expect(corner.primaryBrakingDistM).toBe(42);
+      expect(corner.brakingPointDeltaM).toBe(10); // primary braked 10m later than baseline
+
+      expect(corner.baselineThrottleOnDistM).toBe(80);
+      expect(corner.primaryThrottleOnDistM).toBe(70);
+      expect(corner.throttleOnDeltaM).toBe(-10); // primary got back to full throttle 10m earlier
+    });
+
+    it('returns an empty array when either lap has no points', () => {
+      expect(computeLapSegmentComparisons([], buildLap(100, 0.3))).toEqual([]);
+      expect(computeLapSegmentComparisons(buildLap(100, 0.3), [])).toEqual([]);
+    });
+
+    it('ignores noise dips below the prominence threshold (no corner rows, still covers the lap)', () => {
+      const speeds = [100, 150, 200, 200, 195, 200, 200, 180, 150, 100]; // only a 5 km/h dip
+      const toPoints = (s: number[]) => s.map((speedKmh, i) => ({
+        x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3,
+      }));
+      const segments = computeLapSegmentComparisons(toPoints(speeds), toPoints(speeds));
+
+      expect(segments.filter(s => s.type === 'corner')).toHaveLength(0);
+      expect(segments.some(s => s.type === 'straight')).toBe(true);
+    });
+  });
+
+  describe('findIndexAtDistance', () => {
+    it('finds the closest index for an exact and an in-between distance', () => {
+      const dists = [0, 10, 20, 30, 40];
+      expect(findIndexAtDistance(dists, 20)).toBe(2);
+      expect(findIndexAtDistance(dists, 22)).toBe(2);
+      expect(findIndexAtDistance(dists, 28)).toBe(3);
+    });
+
+    it('clamps to the first/last index when out of range', () => {
+      const dists = [0, 10, 20];
+      expect(findIndexAtDistance(dists, -5)).toBe(0);
+      expect(findIndexAtDistance(dists, 100)).toBe(2);
+    });
+
+    it('returns 0 for an empty distance array', () => {
+      expect(findIndexAtDistance([], 10)).toBe(0);
     });
   });
 

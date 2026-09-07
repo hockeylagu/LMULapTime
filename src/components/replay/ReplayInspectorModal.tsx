@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Gauge, Users } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Gauge, Timer, Users } from 'lucide-react';
 import { TelemetryStripCharts } from './TelemetryStripCharts.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
@@ -7,8 +7,10 @@ import { ReplayTimelineFooter } from './ReplayTimelineFooter.js';
 import { ReplayDriverHeaderPill } from './ReplayDriverHeaderPill.js';
 import { ReplayDriverRosterTable } from './ReplayDriverRosterTable.js';
 import { ReplayMapContainer } from './ReplayMapContainer.js';
+import { CornerSpeedTable } from './CornerSpeedTable.js';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { MapColorMode } from './replayMapUtils.js';
+import { computeLapSegmentComparisons, computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
 
 export interface ReplayInspectorModalProps {
   isOpen: boolean;
@@ -84,9 +86,18 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     initialBaselineLapNumber,
   });
 
-  const [activeTab, setActiveTab] = useState<'map' | 'roster'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'roster' | 'corners'>('map');
   const [colorBy, setColorBy] = useState<MapColorMode>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
+
+  const lapSegments = useMemo(
+    () => (isCompareMode && trajectory && baselineTrajectory
+      ? computeLapSegmentComparisons(trajectory.points, baselineTrajectory.points)
+      : []),
+    [isCompareMode, trajectory, baselineTrajectory]
+  );
+  const cornerCount = useMemo(() => lapSegments.filter(s => s.type === 'corner').length, [lapSegments]);
+  const primaryDists = useMemo(() => computeCumulativeDistances(trajectory?.points || []), [trajectory]);
 
   const formatLapTime = (sec?: number | null): string => {
     if (!sec || isNaN(sec) || sec <= 0) return '--:--.---';
@@ -221,6 +232,17 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     <Users className="w-3.5 h-3.5" />
                     Driver Roster ({metadata?.drivers?.length || 0})
                   </button>
+                  {isCompareMode && baselineTrajectory && (
+                    <button
+                      onClick={() => setActiveTab('corners')}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                        activeTab === 'corners' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'
+                      }`}
+                    >
+                      <Timer className="w-3.5 h-3.5" />
+                      Corners ({cornerCount})
+                    </button>
+                  )}
                 </div>
 
                 {activeTab === 'map' && (
@@ -261,7 +283,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     currentPoint={currentPoint}
                   />
                 </div>
-              ) : (
+              ) : activeTab === 'roster' ? (
                 <ReplayDriverRosterTable
                   drivers={metadata?.drivers || []}
                   selectedDriverSlot={selectedDriverSlot}
@@ -270,6 +292,18 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     handleSelectDriver(slot);
                     setActiveTab('map');
                   }}
+                />
+              ) : (
+                <CornerSpeedTable
+                  segments={lapSegments}
+                  primaryLabel={replayName === baselineReplayName ? `Lap ${trajectory.currentLap ?? 1}` : (activeReplayName || 'My Lap')}
+                  baselineLabel={
+                    baselineReplayName === replayName
+                      ? `Lap ${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1}`
+                      : `${baselineReplayName} (L${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1})`
+                  }
+                  onSelectDistance={distM => setCurrentIndex(findIndexAtDistance(primaryDists, distM))}
+                  className="flex-1 min-h-0"
                 />
               )}
             </div>

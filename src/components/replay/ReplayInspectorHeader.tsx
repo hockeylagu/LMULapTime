@@ -89,10 +89,10 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               )}
             </div>
             <div className="hidden lg:flex items-center gap-3 text-[11px] text-lmu-muted">
-              {metadata?.trackName && (
+              {(metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName) && (
                 <span className="flex items-center gap-1">
                   <Flag className="w-3 h-3 text-lmu-accent" />
-                  {metadata.trackName}
+                  {metadata.displayTrack || metadata.trackCourse || metadata.trackName}
                 </span>
               )}
               {metadata?.durationSec ? (
