@@ -77,6 +77,34 @@ describe('ReplayInspectorModal', () => {
     expect(within(rosterTable).getByText('Vista AF Corsa')).toBeInTheDocument();
   });
 
+  it('shows the Corners tab for self-analysis even without a baseline lap loaded', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Spa-Francorchamps/i)).toBeInTheDocument();
+    });
+
+    const cornersTab = screen.getByRole('button', { name: /Corners/i });
+    fireEvent.click(cornersTab);
+
+    // This mock lap's speed trace doesn't have a full braking->apex->accel cycle, so no
+    // corners are detected - but the tab/table render at all (without compare mode) is the point.
+    expect(screen.getByText(/Straight \(/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Whole lap:/i)).not.toBeInTheDocument();
+  });
+
   it('allows switching drivers from the selector and reloads trajectory', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {

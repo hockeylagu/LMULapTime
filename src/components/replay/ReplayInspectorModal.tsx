@@ -9,7 +9,8 @@ import { ReplayMapContainer } from './ReplayMapContainer.js';
 import { CornerSpeedTable } from './CornerSpeedTable.js';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { MapColorMode } from './replayMapUtils.js';
-import { computeLapSegmentComparisons, computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
+import { computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
+import { computeLapSegmentComparisons } from '../../utils/cornerAnalysis.js';
 
 export interface ReplayInspectorModalProps {
   isOpen: boolean;
@@ -90,14 +91,16 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
 
-  const lapSegments = useMemo(
-    () => (isCompareMode && trajectory && baselineTrajectory
-      ? computeLapSegmentComparisons(trajectory.points, baselineTrajectory.points)
-      : []),
-    [isCompareMode, trajectory, baselineTrajectory]
-  );
+  const lapSegments = useMemo(() => {
+    if (!trajectory) return [];
+    // With no baseline lap loaded, self-compare the lap against itself so corner speeds,
+    // braking/throttle points, and segment lengths are still available (deltas read as zero).
+    const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
+    return computeLapSegmentComparisons(trajectory.points, baseline);
+  }, [isCompareMode, trajectory, baselineTrajectory]);
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
   const cornerCount = cornerSegments.length;
+  const isSelfAnalysis = !isCompareMode || !baselineTrajectory;
 
   // Best sector times across this replay's own laps, used to highlight the current lap's
   // best sectors the same way the rest of the site marks S1/S2/S3 personal bests.
@@ -281,17 +284,15 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     <Users className="w-3.5 h-3.5" />
                     Driver Roster ({metadata?.drivers?.length || 0})
                   </button>
-                  {isCompareMode && baselineTrajectory && (
-                    <button
-                      onClick={() => setActiveTab('corners')}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                        activeTab === 'corners' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'
-                      }`}
-                    >
-                      <Timer className="w-3.5 h-3.5" />
-                      Corners ({cornerCount})
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setActiveTab('corners')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      activeTab === 'corners' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'
+                    }`}
+                  >
+                    <Timer className="w-3.5 h-3.5" />
+                    Corners ({cornerCount})
+                  </button>
                 </div>
 
                 {activeTab === 'map' && (
@@ -342,6 +343,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
               ) : (
                 <CornerSpeedTable
                   segments={lapSegments}
+                  selfAnalysis={isSelfAnalysis}
                   primaryLabel={replayName === baselineReplayName ? `Lap ${trajectory.currentLap ?? 1}` : (activeReplayName || 'My Lap')}
                   baselineLabel={
                     baselineReplayName === replayName

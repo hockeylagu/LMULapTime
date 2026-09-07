@@ -5,7 +5,8 @@ import { GpsZoomMap } from './GpsZoomMap.js';
 import { ReplayTelemetryHud } from './ReplayTelemetryHud.js';
 import { CornerApexChart } from './CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
-import { CornerSegmentComparison, computeCumulativeDistances } from '../../utils/replayComparison.js';
+import { computeCumulativeDistances } from '../../utils/replayComparison.js';
+import { CornerSegmentComparison } from '../../utils/cornerAnalysis.js';
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData;

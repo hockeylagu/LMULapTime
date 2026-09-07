@@ -1,11 +1,14 @@
 import React from 'react';
 import { Flag, ArrowUpRight } from 'lucide-react';
-import { LapSegmentComparison } from '../../utils/replayComparison.js';
+import { LapSegmentComparison } from '../../utils/cornerAnalysis.js';
 
 export interface CornerSpeedTableProps {
   segments: LapSegmentComparison[];
   primaryLabel?: string;
   baselineLabel?: string;
+  // No baseline lap to compare against - shows absolute entry/min/exit speed and brake/
+  // throttle point/segment length instead of deltas (which would always read zero).
+  selfAnalysis?: boolean;
   onSelectDistance?: (distM: number) => void;
   selectedCornerNumber?: number | null;
   onSelectCorner?: (cornerNumber: number) => void;
@@ -50,10 +53,17 @@ function throttleDeltaClass(delta: number | null): string {
   return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium'; // earlier throttle = faster
 }
 
+// Absolute distance-into-lap for a braking/throttle point in self-analysis mode (no baseline
+// lap to compare against, so there's no delta - just where along the lap it happened).
+function formatDistPoint(distM: number | null): string {
+  return distM === null ? '--' : `${distM}m`;
+}
+
 export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
   segments,
   primaryLabel = 'My Lap',
   baselineLabel = 'Baseline',
+  selfAnalysis = false,
   onSelectDistance,
   selectedCornerNumber,
   onSelectCorner,
@@ -62,7 +72,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
   if (!segments || segments.length === 0) {
     return (
       <div className={`flex items-center justify-center h-32 text-lmu-muted text-xs text-center px-4 ${className}`}>
-        Not enough distinct braking/apex events detected in the baseline lap to break down this lap.
+        Not enough distinct braking/apex events detected in this lap to break it down.
       </div>
     );
   }
@@ -72,10 +82,12 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
   return (
     <div className={`flex flex-col min-h-0 ${className}`}>
       <div className="flex items-center justify-between px-3 py-2 shrink-0 text-[11px] font-mono text-lmu-muted border-b border-lmu-border/60">
-        <span className="truncate">{primaryLabel} vs {baselineLabel}</span>
-        <span className={`font-bold ${timeDeltaClass(totalTimeDelta)}`}>
-          Whole lap: {formatTimeDelta(totalTimeDelta)}
-        </span>
+        <span className="truncate">{selfAnalysis ? primaryLabel : `${primaryLabel} vs ${baselineLabel}`}</span>
+        {!selfAnalysis && (
+          <span className={`font-bold ${timeDeltaClass(totalTimeDelta)}`}>
+            Whole lap: {formatTimeDelta(totalTimeDelta)}
+          </span>
+        )}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         <table className="w-full text-[11px] font-mono border-collapse">
@@ -85,9 +97,9 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               <th className="px-2 py-1.5 text-right">Entry</th>
               <th className="px-2 py-1.5 text-right">Min</th>
               <th className="px-2 py-1.5 text-right">Exit/Top</th>
-              <th className="px-2 py-1.5 text-right">Brake Δ</th>
-              <th className="px-2 py-1.5 text-right">Thr Δ</th>
-              <th className="px-2 py-1.5 text-right">Δ Time</th>
+              <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Brake' : 'Brake Δ'}</th>
+              <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Throttle' : 'Thr Δ'}</th>
+              <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Length' : 'Δ Time'}</th>
             </tr>
           </thead>
           <tbody>
@@ -112,22 +124,31 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <span className="text-white">{s.primaryEntrySpeedKmh}</span>
-                      <span className={`ml-1 ${speedDeltaClass(s.entrySpeedDeltaKmh)}`}>{formatSpeedDelta(s.entrySpeedDeltaKmh)}</span>
+                      {!selfAnalysis && <span className={`ml-1 ${speedDeltaClass(s.entrySpeedDeltaKmh)}`}>{formatSpeedDelta(s.entrySpeedDeltaKmh)}</span>}
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <span className="text-white">{s.primaryMinSpeedKmh}</span>
-                      <span className={`ml-1 ${speedDeltaClass(s.minSpeedDeltaKmh)}`}>{formatSpeedDelta(s.minSpeedDeltaKmh)}</span>
+                      {!selfAnalysis && <span className={`ml-1 ${speedDeltaClass(s.minSpeedDeltaKmh)}`}>{formatSpeedDelta(s.minSpeedDeltaKmh)}</span>}
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <span className="text-white">{s.primaryExitSpeedKmh}</span>
-                      <span className={`ml-1 ${speedDeltaClass(s.exitSpeedDeltaKmh)}`}>{formatSpeedDelta(s.exitSpeedDeltaKmh)}</span>
+                      {!selfAnalysis && <span className={`ml-1 ${speedDeltaClass(s.exitSpeedDeltaKmh)}`}>{formatSpeedDelta(s.exitSpeedDeltaKmh)}</span>}
                     </td>
-                    <td className={`px-2 py-1.5 text-right ${brakingDeltaClass(s.brakingPointDeltaM)}`}>
-                      {formatBrakingDelta(s.brakingPointDeltaM)}
-                    </td>
-                    <td className={`px-2 py-1.5 text-right ${throttleDeltaClass(s.throttleOnDeltaM)}`}>
-                      {formatBrakingDelta(s.throttleOnDeltaM)}
-                    </td>
+                    {selfAnalysis ? (
+                      <>
+                        <td className="px-2 py-1.5 text-right text-white">{formatDistPoint(s.primaryBrakingDistM)}</td>
+                        <td className="px-2 py-1.5 text-right text-white">{formatDistPoint(s.primaryThrottleOnDistM)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className={`px-2 py-1.5 text-right ${brakingDeltaClass(s.brakingPointDeltaM)}`}>
+                          {formatBrakingDelta(s.brakingPointDeltaM)}
+                        </td>
+                        <td className={`px-2 py-1.5 text-right ${throttleDeltaClass(s.throttleOnDeltaM)}`}>
+                          {formatBrakingDelta(s.throttleOnDeltaM)}
+                        </td>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -141,15 +162,27 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                     <td className="px-2 py-1.5 text-right text-lmu-muted">--</td>
                     <td className="px-2 py-1.5 text-right">
                       <span className="text-white">{s.primaryTopSpeedKmh}</span>
-                      <span className={`ml-1 ${speedDeltaClass(s.topSpeedDeltaKmh)}`}>{formatSpeedDelta(s.topSpeedDeltaKmh)}</span>
+                      {!selfAnalysis && <span className={`ml-1 ${speedDeltaClass(s.topSpeedDeltaKmh)}`}>{formatSpeedDelta(s.topSpeedDeltaKmh)}</span>}
+                      {/* Top speed can occur mid-straight (lift before braking) - show the actual
+                          exit-boundary speed too when it differs, e.g. the lap's finish-line straight. */}
+                      {Math.abs(s.primaryTopSpeedKmh - s.primaryExitSpeedKmh) >= 1 && (
+                        <div className="text-[9px] leading-tight text-lmu-muted">
+                          exit {s.primaryExitSpeedKmh}
+                          {!selfAnalysis && <span className={`ml-0.5 ${speedDeltaClass(s.exitSpeedDeltaKmh)}`}>{formatSpeedDelta(s.exitSpeedDeltaKmh)}</span>}
+                        </div>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-right text-lmu-muted">--</td>
                     <td className="px-2 py-1.5 text-right text-lmu-muted">--</td>
                   </>
                 )}
-                <td className={`px-2 py-1.5 text-right font-bold ${timeDeltaClass(s.timeDeltaSec)}`}>
-                  {formatTimeDelta(s.timeDeltaSec)}
-                </td>
+                {selfAnalysis ? (
+                  <td className="px-2 py-1.5 text-right font-bold text-white">{s.lengthM}m</td>
+                ) : (
+                  <td className={`px-2 py-1.5 text-right font-bold ${timeDeltaClass(s.timeDeltaSec)}`}>
+                    {formatTimeDelta(s.timeDeltaSec)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

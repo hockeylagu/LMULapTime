@@ -96,17 +96,24 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   );
 
   // Projects each detected corner's apex distance onto the rendered track path so the "T#"
-  // label matches the same corner number shown in the corner analysis table.
+  // label matches the same corner number shown in the corner analysis table. `minDistM` is
+  // measured along the BASELINE lap (see computeLapSegmentComparisons), so it must be rescaled
+  // by the two laps' relative lengths before indexing into the PRIMARY lap's own distance
+  // array — otherwise the marker drifts off the real corner whenever the laps differ in length.
   const cornerMarkers = useMemo(() => {
     if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
+    const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
+    const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
+    const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
     return corners
       .map(c => {
-        const idx = findIndexAtDistance(primaryDists, c.minDistM);
+        const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
+        const idx = findIndexAtDistance(primaryDists, targetDist);
         const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
         return pt ? { cornerNumber: c.cornerNumber, sx: pt.sx, sy: pt.sy, idx: pt.idx } : null;
       })
       .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number } => m !== null);
-  }, [corners, primaryDists, svgPoints]);
+  }, [corners, primaryDists, baselineDists, svgPoints]);
 
   const carHeadingDeg = useMemo(() => {
     if (!svgPoints || svgPoints.length < 2 || currentIndex === undefined) return 0;

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ReplayMapContainer } from '../../src/components/replay/ReplayMapContainer';
 import { ReplayTrajectoryData } from '../../server/types';
-import { CornerSegmentComparison } from '../../src/utils/replayComparison';
+import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis';
 
 describe('ReplayMapContainer', () => {
   const trajectory: ReplayTrajectoryData = {

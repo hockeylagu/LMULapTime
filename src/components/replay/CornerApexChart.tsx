@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { X, Flag } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { CornerSegmentComparison, interpolatePointAtDistance } from '../../utils/replayComparison.js';
+import { interpolatePointAtDistance } from '../../utils/replayComparison.js';
+import { CornerSegmentComparison } from '../../utils/cornerAnalysis.js';
 
 export interface CornerApexChartProps {
   corner: CornerSegmentComparison;

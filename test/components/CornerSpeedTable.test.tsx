@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CornerSpeedTable } from '../../src/components/replay/CornerSpeedTable';
-import { LapSegmentComparison } from '../../src/utils/replayComparison';
+import { LapSegmentComparison } from '../../src/utils/cornerAnalysis';
 
 describe('CornerSpeedTable', () => {
   const cornerSegment: LapSegmentComparison = {
@@ -40,6 +40,9 @@ describe('CornerSpeedTable', () => {
     primaryTopSpeedKmh: 280,
     baselineTopSpeedKmh: 275,
     topSpeedDeltaKmh: 5,
+    primaryExitSpeedKmh: 280,
+    baselineExitSpeedKmh: 275,
+    exitSpeedDeltaKmh: 5,
     timeDeltaSec: 0.1,
   };
 
@@ -105,5 +108,23 @@ describe('CornerSpeedTable', () => {
 
     const row = screen.getByText('T1').closest('tr');
     expect(row?.className).toContain('bg-lmu-accent/15');
+  });
+
+  it('shows absolute entry/min/exit speeds and brake/throttle points (no deltas) in self-analysis mode', () => {
+    render(
+      <CornerSpeedTable
+        segments={[cornerSegment, straightSegment]}
+        selfAnalysis
+        primaryLabel="Lap 3"
+      />
+    );
+
+    expect(screen.getByText('Lap 3')).toBeInTheDocument();
+    expect(screen.queryByText(/vs/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Whole lap:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/-10/)).not.toBeInTheDocument(); // no delta annotations
+    expect(screen.getByText('35m')).toBeInTheDocument(); // absolute braking point
+    expect(screen.getByText('60m')).toBeInTheDocument(); // absolute throttle-on point
+    expect(screen.getByText('40m')).toBeInTheDocument(); // corner segment length
   });
 });
