@@ -7,7 +7,7 @@ import { DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, Re
 import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries, extractReplayPitEvents } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
-import { matchesSessionType, isSessionEmpty } from '../src/utils/formatters.js';
+import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/utils/formatters.js';
 import { getSessionDatabase } from './db.js';
 
 const app = express();
@@ -368,12 +368,21 @@ app.get('/api/replays', (_req, res) => {
           ...(replayCarClass ? [replayCarClass] : []),
         ]));
 
+        const filenameMatch = f.match(/^(.+?)\s+([PQR]\d+)\b/i);
+        const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
+        const displayTrack = matched
+          ? getDisplayTrackName(matched.trackVenue, matched.trackCourse)
+          : (meta?.displayTrack || filenameTrack || meta?.trackName);
+
         summaries.push({
           name: f,
           path: filePath,
           sizeBytes: stat.size,
           mtime: stat.mtime.getTime(),
-          trackName: meta?.trackName,
+          trackName: displayTrack,
+          trackVenue: matched?.trackVenue || meta?.trackVenue,
+          trackCourse: matched?.trackCourse || meta?.trackCourse || filenameTrack || undefined,
+          displayTrack,
           durationSec: meta?.durationSec,
           eventTitle: meta?.eventInfo?.eventTitle,
           splitNo: meta?.eventInfo?.splitNo,
@@ -413,6 +422,10 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       const sessions = loadSessions();
       const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       if (matchedSession) {
+        metadata.trackVenue = matchedSession.trackVenue;
+        metadata.trackCourse = matchedSession.trackCourse;
+        metadata.displayTrack = getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse);
+        metadata.trackName = metadata.displayTrack;
         const driver = matchedSession.playerDriver || matchedSession.drivers[0];
         if (driver?.carClass) {
           metadata.carClass = driver.carClass;
@@ -439,6 +452,14 @@ app.get('/api/replays/:name/metadata', (req, res) => {
               s3Sec: sl.s3 || 0,
               isBest: Boolean(driver.bestLapTime && sl.lapTime === driver.bestLapTime),
             }));
+        }
+      } else {
+        const filenameMatch = replayName.match(/^(.+?)\s+([PQR]\d+)\b/i);
+        const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
+        if (filenameTrack) {
+          metadata.trackCourse = filenameTrack;
+          metadata.displayTrack = filenameTrack;
+          metadata.trackName = filenameTrack;
         }
       }
     } catch {
@@ -551,7 +572,7 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
         trajectory.validation = {
           matchedSessionId: matchedSession.id,
           sessionType: matchedSession.sessionType,
-          trackName: matchedSession.trackVenue,
+          trackName: getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse),
           driverName: matchedDriver.driverName || matchedDriver.name,
           totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
           officialBestLapTime: matchedDriver.bestLapTime,

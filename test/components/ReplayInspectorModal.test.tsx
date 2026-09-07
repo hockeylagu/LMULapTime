@@ -528,5 +528,48 @@ describe('ReplayInspectorModal', () => {
     expect(screen.getByRole('button', { name: 'Player' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'All Drivers' })).toBeInTheDocument();
   });
+
+  it('queries compare laps using the resolved track layout rather than raw mod venue ID', async () => {
+    let capturedCompareUrl = '';
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockMeta,
+            trackName: 'BahrainWEC_2023',
+            displayTrack: 'Bahrain International Circuit (Outer Circuit)',
+            trackCourse: 'Bahrain Outer Circuit',
+          }),
+        });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
+      }
+      if (url.includes('compare/laps')) {
+        capturedCompareUrl = url;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ laps: [] }),
+        });
+      }
+      return Promise.reject(new Error(`Unknown URL: ${url}`));
+    });
+
+    render(
+      <ReplayInspectorModal
+        isOpen={true}
+        onClose={vi.fn()}
+        replayName="Bahrain Outer Circuit R1 11.vcr"
+        initialCompareMode={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(capturedCompareUrl).toMatch(/track=Bahrain\+(Outer|International\+Circuit\+%28Outer)/);
+    });
+
+    expect(capturedCompareUrl).not.toContain('track=BahrainWEC_2023');
+  });
 });
 

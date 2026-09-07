@@ -128,15 +128,18 @@ export function useReplayInspectorData({
   // Fetch replay-backed comparison laps. Player laps are the safe default; the
   // all-driver view exposes the same candidate pool as Compare Laps.
   useEffect(() => {
-    if (!isOpen || !metadata?.trackName) {
+    const filenameMatch = activeReplayName ? activeReplayName.match(/^(.+?)\s+([PQR]\d+)\b/i) : null;
+    const filenameTrack = filenameMatch ? filenameMatch[1].trim() : null;
+    const trackToQuery = metadata?.displayTrack || metadata?.trackCourse || filenameTrack || metadata?.trackName;
+    if (!isOpen || !trackToQuery) {
       setAvailableCompareLaps([]); setIsCompareLapsLoading(false);
       return;
     }
     setIsCompareLapsLoading(true);
-    const activeDriver = metadata.drivers?.find(d => d.slot === selectedDriverSlot) || metadata.drivers?.find(d => d.isPlayer) || metadata.drivers?.[0];
-    const carClass = metadata.carClass || activeDriver?.carClass || (activeDriver ? mapVehicleIdToClass(activeDriver.vehicleId, activeDriver.carModel) : undefined);
+    const activeDriver = metadata?.drivers?.find(d => d.slot === selectedDriverSlot) || metadata?.drivers?.find(d => d.isPlayer) || metadata?.drivers?.[0];
+    const carClass = metadata?.carClass || activeDriver?.carClass || (activeDriver ? mapVehicleIdToClass(activeDriver.vehicleId, activeDriver.carModel) : undefined);
     const query = new URLSearchParams({
-      track: metadata.trackName,
+      track: trackToQuery,
       playerOnly: String(compareLapFilter === 'player'),
     });
     if (carClass) query.set('carClass', carClass);
@@ -152,7 +155,7 @@ export function useReplayInspectorData({
         setIsCompareLapsLoading(false);
       })
       .catch(() => { setAvailableCompareLaps([]); setIsCompareLapsLoading(false); });
-  }, [isOpen, metadata?.trackName, metadata?.carClass, selectedDriverSlot, compareLapFilter]);
+  }, [isOpen, metadata?.displayTrack, metadata?.trackCourse, metadata?.trackName, activeReplayName, metadata?.carClass, selectedDriverSlot, compareLapFilter]);
 
   // Open the comparison lap picker. Comparison stays active until explicitly removed.
   const handleToggleCompare = () => {

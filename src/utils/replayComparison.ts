@@ -39,6 +39,24 @@ export interface PointComparison {
 }
 
 /**
+ * Finds the point index whose cumulative distance is closest to targetDist (binary search).
+ * Useful for jumping the playback scrubber to a distance-based marker (e.g. a detected corner).
+ */
+export function findIndexAtDistance(cumDists: number[], targetDist: number): number {
+  if (cumDists.length === 0) return 0;
+  let low = 0;
+  let high = cumDists.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (cumDists[mid] < targetDist) low = mid + 1;
+    else high = mid - 1;
+  }
+  const idx = Math.max(0, Math.min(cumDists.length - 1, low));
+  if (idx > 0 && Math.abs(cumDists[idx - 1] - targetDist) < Math.abs(cumDists[idx] - targetDist)) return idx - 1;
+  return idx;
+}
+
+/**
  * Computes cumulative distance in meters along the trajectory path,
  * filtering out teleport / pit-lane jump anomalies.
  */
@@ -235,6 +253,241 @@ export function computeLapComparisons(
       deltaSteer,
     };
   });
+}
+
+interface BaseSegmentComparison {
+  segmentIndex: number;
+  entryDistM: number;
+  exitDistM: number;
+  lengthM: number;
+  timeDeltaSec: number;
+}
+
+export interface CornerSegmentComparison extends BaseSegmentComparison {
+  type: 'corner';
+  cornerNumber: number;
+  minDistM: number;
+  primaryEntrySpeedKmh: number;
+  baselineEntrySpeedKmh: number;
+  entrySpeedDeltaKmh: number;
+  primaryMinSpeedKmh: number;
+  baselineMinSpeedKmh: number;
+  minSpeedDeltaKmh: number;
+  primaryExitSpeedKmh: number;
+  baselineExitSpeedKmh: number;
+  exitSpeedDeltaKmh: number;
+  // Distance (m) into the corner window where brake/throttle first crosses its threshold; null
+  // if it never crosses (e.g. a flat-out kink, or partial throttle the whole way through).
+  primaryBrakingDistM: number | null;
+  baselineBrakingDistM: number | null;
+  brakingPointDeltaM: number | null;
+  primaryThrottleOnDistM: number | null;
+  baselineThrottleOnDistM: number | null;
+  throttleOnDeltaM: number | null;
+}
+
+export interface StraightSegmentComparison extends BaseSegmentComparison {
+  type: 'straight';
+  primaryTopSpeedKmh: number;
+  baselineTopSpeedKmh: number;
+  topSpeedDeltaKmh: number;
+}
+
+export type LapSegmentComparison = CornerSegmentComparison | StraightSegmentComparison;
+
+interface SpeedTurningPoint {
+  index: number;
+  distM: number;
+  type: 'max' | 'min';
+}
+
+/**
+ * Extracts alternating local speed maxima/minima from a speed-vs-distance trace, requiring
+ * each swing to exceed `minProminenceKmh` before it counts, to reject telemetry noise.
+ */
+function findSpeedTurningPoints(points: ReplayTrajectoryPoint[], dists: number[], minProminenceKmh: number): SpeedTurningPoint[] {
+  if (points.length < 3) return [];
+  const turningPoints: SpeedTurningPoint[] = [];
+  let direction: 'up' | 'down' | null = null;
+  let extremeIdx = 0;
+  let extremeVal = points[0].speedKmh || 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const v = points[i].speedKmh || 0;
+    if (direction === null) {
+      if (v > extremeVal) direction = 'up';
+      else if (v < extremeVal) direction = 'down';
+      continue;
+    }
+    if (direction === 'up') {
+      if (v >= extremeVal) {
+        extremeVal = v;
+        extremeIdx = i;
+      } else if (extremeVal - v >= minProminenceKmh) {
+        turningPoints.push({ index: extremeIdx, distM: dists[extremeIdx], type: 'max' });
+        direction = 'down';
+        extremeVal = v;
+        extremeIdx = i;
+      }
+    } else {
+      if (v <= extremeVal) {
+        extremeVal = v;
+        extremeIdx = i;
+      } else if (v - extremeVal >= minProminenceKmh) {
+        turningPoints.push({ index: extremeIdx, distM: dists[extremeIdx], type: 'min' });
+        direction = 'up';
+        extremeVal = v;
+        extremeIdx = i;
+      }
+    }
+  }
+  return turningPoints;
+}
+
+const SEGMENT_SCAN_STEP_M = 2;
+const BRAKE_ON_THRESHOLD_PCT = 10;
+const THROTTLE_ON_THRESHOLD_PCT = 90;
+const MIN_STRAIGHT_LENGTH_M = 5;
+
+/**
+ * Scans forward from fromDist to toDist (in fixed steps) and returns the distance where the
+ * sampled channel first reaches `threshold`, or null if it never does within the window.
+ */
+function findThresholdCrossingDistM(
+  points: ReplayTrajectoryPoint[],
+  dists: number[],
+  fromDist: number,
+  toDist: number,
+  getValue: (p: InterpolatedPoint) => number,
+  threshold: number
+): number | null {
+  if (toDist <= fromDist) return null;
+  for (let d = fromDist; d < toDist; d += SEGMENT_SCAN_STEP_M) {
+    if (getValue(interpolatePointAtDistance(points, dists, d)) >= threshold) return Math.round(d);
+  }
+  return getValue(interpolatePointAtDistance(points, dists, toDist)) >= threshold ? Math.round(toDist) : null;
+}
+
+/**
+ * Returns the highest speed sampled between fromDist and toDist (fixed-step scan) for one lap.
+ */
+function maxSpeedInRangeKmh(points: ReplayTrajectoryPoint[], dists: number[], fromDist: number, toDist: number): number {
+  let maxV = 0;
+  for (let d = fromDist; d <= toDist; d += SEGMENT_SCAN_STEP_M) {
+    maxV = Math.max(maxV, interpolatePointAtDistance(points, dists, d).speedKmh);
+  }
+  maxV = Math.max(maxV, interpolatePointAtDistance(points, dists, toDist).speedKmh);
+  return maxV;
+}
+
+/**
+ * Detects corners (braking -> apex -> acceleration) from the baseline lap's speed trace and
+ * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
+ * them) comparing primary vs baseline. Each segment's `timeDeltaSec` isolates the time
+ * gained/lost across just that stretch (not cumulative drift from earlier on), so the full
+ * list sums to the lap's total time delta - together this explains where the overall gap
+ * comes from, not just how big it is.
+ */
+export function computeLapSegmentComparisons(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  minProminenceKmh = 10
+): LapSegmentComparison[] {
+  if (!primaryPoints?.length || !baselinePoints?.length) return [];
+
+  const primaryDists = computeCumulativeDistances(primaryPoints);
+  const baselineDists = computeCumulativeDistances(baselinePoints);
+  const turningPoints = findSpeedTurningPoints(baselinePoints, baselineDists, minProminenceKmh);
+  const totalDistM = baselineDists[baselineDists.length - 1] || 0;
+
+  const deltaAt = (distM: number): number => {
+    const p = interpolatePointAtDistance(primaryPoints, primaryDists, distM);
+    const b = interpolatePointAtDistance(baselinePoints, baselineDists, distM);
+    return p.timeSec - b.timeSec;
+  };
+
+  const buildStraight = (fromDist: number, toDist: number): StraightSegmentComparison | null => {
+    if (toDist - fromDist < MIN_STRAIGHT_LENGTH_M) return null;
+    const primaryTop = maxSpeedInRangeKmh(primaryPoints, primaryDists, fromDist, toDist);
+    const baselineTop = maxSpeedInRangeKmh(baselinePoints, baselineDists, fromDist, toDist);
+    return {
+      type: 'straight',
+      segmentIndex: 0,
+      entryDistM: Math.round(fromDist),
+      exitDistM: Math.round(toDist),
+      lengthM: Math.round(toDist - fromDist),
+      primaryTopSpeedKmh: Math.round(primaryTop),
+      baselineTopSpeedKmh: Math.round(baselineTop),
+      topSpeedDeltaKmh: Math.round(primaryTop - baselineTop),
+      timeDeltaSec: Number((deltaAt(toDist) - deltaAt(fromDist)).toFixed(3)),
+    };
+  };
+
+  const buildCorner = (cornerNumber: number, entry: SpeedTurningPoint, min: SpeedTurningPoint, exit: SpeedTurningPoint): CornerSegmentComparison => {
+    const primaryAtEntry = interpolatePointAtDistance(primaryPoints, primaryDists, entry.distM);
+    const primaryAtMin = interpolatePointAtDistance(primaryPoints, primaryDists, min.distM);
+    const primaryAtExit = interpolatePointAtDistance(primaryPoints, primaryDists, exit.distM);
+    const baselineAtEntry = interpolatePointAtDistance(baselinePoints, baselineDists, entry.distM);
+    const baselineAtMin = interpolatePointAtDistance(baselinePoints, baselineDists, min.distM);
+    const baselineAtExit = interpolatePointAtDistance(baselinePoints, baselineDists, exit.distM);
+
+    const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
+    const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
+    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
+    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
+
+    return {
+      type: 'corner',
+      segmentIndex: 0,
+      cornerNumber,
+      entryDistM: Math.round(entry.distM),
+      minDistM: Math.round(min.distM),
+      exitDistM: Math.round(exit.distM),
+      lengthM: Math.round(exit.distM - entry.distM),
+      primaryEntrySpeedKmh: Math.round(primaryAtEntry.speedKmh),
+      baselineEntrySpeedKmh: Math.round(baselineAtEntry.speedKmh),
+      entrySpeedDeltaKmh: Math.round(primaryAtEntry.speedKmh - baselineAtEntry.speedKmh),
+      primaryMinSpeedKmh: Math.round(primaryAtMin.speedKmh),
+      baselineMinSpeedKmh: Math.round(baselineAtMin.speedKmh),
+      minSpeedDeltaKmh: Math.round(primaryAtMin.speedKmh - baselineAtMin.speedKmh),
+      primaryExitSpeedKmh: Math.round(primaryAtExit.speedKmh),
+      baselineExitSpeedKmh: Math.round(baselineAtExit.speedKmh),
+      exitSpeedDeltaKmh: Math.round(primaryAtExit.speedKmh - baselineAtExit.speedKmh),
+      primaryBrakingDistM,
+      baselineBrakingDistM,
+      brakingPointDeltaM: primaryBrakingDistM !== null && baselineBrakingDistM !== null ? Math.round(primaryBrakingDistM - baselineBrakingDistM) : null,
+      primaryThrottleOnDistM,
+      baselineThrottleOnDistM,
+      throttleOnDeltaM: primaryThrottleOnDistM !== null && baselineThrottleOnDistM !== null ? Math.round(primaryThrottleOnDistM - baselineThrottleOnDistM) : null,
+      // Isolating the delta swing across just this segment (rather than the raw cumulative
+      // delta at either end) attributes time gained/lost to this specific corner.
+      timeDeltaSec: Number((deltaAt(exit.distM) - deltaAt(entry.distM)).toFixed(3)),
+    };
+  };
+
+  const segments: LapSegmentComparison[] = [];
+  let cornerNumber = 0;
+  let prevBoundaryDist = 0;
+
+  for (let i = 1; i < turningPoints.length - 1; i++) {
+    const min = turningPoints[i];
+    const entry = turningPoints[i - 1];
+    const exit = turningPoints[i + 1];
+    if (min.type !== 'min' || entry.type !== 'max' || exit.type !== 'max') continue;
+
+    const straight = buildStraight(prevBoundaryDist, entry.distM);
+    if (straight) segments.push(straight);
+
+    cornerNumber++;
+    segments.push(buildCorner(cornerNumber, entry, min, exit));
+    prevBoundaryDist = exit.distM;
+  }
+
+  const trailing = buildStraight(prevBoundaryDist, totalDistM);
+  if (trailing) segments.push(trailing);
+
+  segments.forEach((s, idx) => { s.segmentIndex = idx; });
+  return segments;
 }
 
 /**
