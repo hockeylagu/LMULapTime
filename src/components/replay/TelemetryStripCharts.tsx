@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { computeLapComparisons, PointComparison } from '../../utils/replayComparison.js';
+import { computeLapComparisons, computeCumulativeDistances, findIndexAtDistance, PointComparison } from '../../utils/replayComparison.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetrySpeedChannel } from './TelemetrySpeedChannel.js';
@@ -88,7 +88,17 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const isZoomed = !!(activeZoomRange && totalPoints > 0 && activeZoomRange.end > activeZoomRange.start);
   const viewStart = isZoomed ? Math.max(0, Math.min(activeZoomRange.start, totalPoints - 2)) : 0;
   const viewEnd = isZoomed ? Math.min(totalPoints - 1, Math.max(activeZoomRange.end, viewStart + 1)) : Math.max(0, totalPoints - 1);
-  const viewSpan = Math.max(1, viewEnd - viewStart);
+
+  // The chart's x axis represents cumulative lap distance (meters), not frame index or time,
+  // so pointer interactions must map pixel position -> distance -> nearest frame index.
+  const cumDists = useMemo(() => computeCumulativeDistances(points), [points]);
+  const distStart = cumDists[viewStart] ?? 0;
+  const distEnd = cumDists[viewEnd] ?? distStart;
+  const distSpan = Math.max(1e-6, distEnd - distStart);
+  const indexAtRatio = useCallback((ratio: number): number => {
+    const targetDist = distStart + Math.max(0, Math.min(1, ratio)) * distSpan;
+    return Math.max(0, Math.min(totalPoints - 1, findIndexAtDistance(cumDists, targetDist)));
+  }, [cumDists, distStart, distSpan, totalPoints]);
 
   const safeIndex = Math.max(0, Math.min(currentIndex, totalPoints - 1));
   const currentPoint = points[safeIndex];
@@ -108,7 +118,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       isDraggingRef.current = true;
       setDragSelection(null);
       const ratio = rect.width > 0 ? x / rect.width : 0;
-      onSelectIndex(Math.max(0, Math.min(totalPoints - 1, Math.round(viewStart + ratio * viewSpan))));
+      onSelectIndex(indexAtRatio(ratio));
     }
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
@@ -123,7 +133,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       setDragSelection(prev => (prev ? { ...prev, currentX: x, currentPct: pct } : null));
     } else if (isDraggingRef.current) {
       const ratio = rect.width > 0 ? x / rect.width : 0;
-      const nextIdx = Math.max(0, Math.min(totalPoints - 1, Math.round(viewStart + ratio * viewSpan)));
+      const nextIdx = indexAtRatio(ratio);
       pendingIndexRef.current = nextIdx;
       if (rafIdRef.current === null) {
         rafIdRef.current = requestAnimationFrame(() => {
@@ -152,8 +162,8 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       if (dist >= 10) {
         const minPct = Math.min(dragSelection.startPct, dragSelection.currentPct) / 100;
         const maxPct = Math.max(dragSelection.startPct, dragSelection.currentPct) / 100;
-        const newStart = Math.round(viewStart + minPct * viewSpan);
-        const newEnd = Math.round(viewStart + maxPct * viewSpan);
+        const newStart = indexAtRatio(minPct);
+        const newEnd = indexAtRatio(maxPct);
         if (newEnd - newStart >= 3) {
           updateZoomRange({ start: newStart, end: newEnd });
           if (safeIndex < newStart || safeIndex > newEnd) {
@@ -163,7 +173,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       } else {
         const rect = containerRef.current.getBoundingClientRect();
         const ratio = rect.width > 0 ? dragSelection.startX / rect.width : 0;
-        onSelectIndex(Math.max(0, Math.min(totalPoints - 1, Math.round(viewStart + ratio * viewSpan))));
+        onSelectIndex(indexAtRatio(ratio));
       }
       setDragSelection(null);
     }
@@ -179,24 +189,25 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const currentComparison = pointComparisons[safeIndex] || null;
 
   const paths = useMemo(
-    () => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, viewSpan),
-    [points, pointComparisons, viewStart, viewEnd, viewSpan]
+    () => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd),
+    [points, pointComparisons, viewStart, viewEnd]
   );
 
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
-  const cursorPct = viewSpan > 0 ? ((safeIndex - viewStart) / viewSpan) * 100 : 0;
+  const pctForIndex = (i: number): number => Math.max(0, Math.min(100, ((cumDists[i] ?? distStart) - distStart) / distSpan * 100));
+  const cursorPct = pctForIndex(safeIndex);
 
-  const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? ((sectors.s1Frame - viewStart) / viewSpan) * 100 : null;
-  const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? ((sectors.s2Frame - viewStart) / viewSpan) * 100 : null;
-  const s1Clamped = sectors && sectors.s1Frame > 0 ? Math.max(0, Math.min(100, ((sectors.s1Frame - viewStart) / viewSpan) * 100)) : 0;
-  const s2Clamped = sectors && sectors.s2Frame > 0 ? Math.max(0, Math.min(100, ((sectors.s2Frame - viewStart) / viewSpan) * 100)) : 0;
+  const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
+  const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
+  const s1Clamped = sectors && sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0;
+  const s2Clamped = sectors && sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0;
 
   const cornerEntryPct = selectedCornerMarkers && selectedCornerMarkers.entryFrame > viewStart && selectedCornerMarkers.entryFrame < viewEnd
-    ? ((selectedCornerMarkers.entryFrame - viewStart) / viewSpan) * 100 : null;
+    ? pctForIndex(selectedCornerMarkers.entryFrame) : null;
   const cornerMinPct = selectedCornerMarkers && selectedCornerMarkers.minFrame > viewStart && selectedCornerMarkers.minFrame < viewEnd
-    ? ((selectedCornerMarkers.minFrame - viewStart) / viewSpan) * 100 : null;
+    ? pctForIndex(selectedCornerMarkers.minFrame) : null;
   const cornerExitPct = selectedCornerMarkers && selectedCornerMarkers.exitFrame > viewStart && selectedCornerMarkers.exitFrame < viewEnd
-    ? ((selectedCornerMarkers.exitFrame - viewStart) / viewSpan) * 100 : null;
+    ? pctForIndex(selectedCornerMarkers.exitFrame) : null;
 
   if (points.length === 0) {
     return (

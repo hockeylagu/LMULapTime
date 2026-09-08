@@ -36,7 +36,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
   });
 
   it('returns empty result when points array is empty', () => {
-    const result = computeTelemetryChartPaths([], [], 0, 0, 1);
+    const result = computeTelemetryChartPaths([], [], 0, 0);
     expect(result.deltaTimePath).toBe('');
     expect(result.deltaGradientStops).toEqual([]);
     expect(result.deltaGainArea).toBe('');
@@ -55,7 +55,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Active stops should be emerald green with high opacity (> 0.4)
@@ -79,7 +79,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     const activeStops = result.deltaGradientStops.filter(s => s.opacity > 0.4);
@@ -102,7 +102,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 30, 30);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 30);
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // All stops in the flat zone should be faded to 0 opacity
@@ -127,7 +127,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Verify there are both green stops (during gain) and red stops (during loss)
@@ -152,7 +152,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       createMockComparison(p2, -0.3),
     ];
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 2, 2);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 2);
     expect(result.deltaTimeArea).toContain('50 Z');
     expect(result.deltaTimeArea).toMatch(/^M \d+\.\d+ \d+\.\d+ L .* L \d+\.\d+ 50 L \d+\.\d+ 50 Z$/);
   });

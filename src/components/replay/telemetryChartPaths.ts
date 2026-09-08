@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { PointComparison } from '../../utils/replayComparison.js';
+import { PointComparison, computeCumulativeDistances } from '../../utils/replayComparison.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
 // forward gears 1-7.
@@ -38,8 +38,7 @@ export function computeTelemetryChartPaths(
   points: ReplayTrajectoryPoint[],
   pointComparisons: PointComparison[],
   viewStart: number,
-  viewEnd: number,
-  viewSpan: number
+  viewEnd: number
 ): TelemetryChartPathsResult {
   if (points.length === 0) {
     return {
@@ -69,6 +68,14 @@ export function computeTelemetryChartPaths(
     ...points.map(p => p.speedKmh || 0),
     ...(pointComparisons.map(c => c.baseline.speedKmh) || [])
   );
+
+  // X axis is plotted by cumulative lap distance (meters) rather than by frame index or
+  // elapsed time, so that comparisons against a baseline lap align on the same track position.
+  const cumDists = computeCumulativeDistances(points);
+  const distStart = cumDists[viewStart] ?? 0;
+  const distEnd = cumDists[viewEnd] ?? distStart;
+  const distSpan = Math.max(1e-6, distEnd - distStart);
+  const xForIndex = (i: number): number => ((cumDists[i] - distStart) / distSpan) * 1000;
 
   let spd = '';
   let thr = '';
@@ -119,7 +126,7 @@ export function computeTelemetryChartPaths(
 
   for (let i = viewStart; i <= viewEnd; i++) {
     const p = points[i];
-    const x = ((i - viewStart) / viewSpan) * 1000;
+    const x = xForIndex(i);
     const isFirst = i === viewStart;
 
     // Speed: 0 to maxSpd km/h -> 95 to 10 in SVG Y
@@ -218,7 +225,7 @@ export function computeTelemetryChartPaths(
 
     for (let i = viewStart; i <= viewEnd; i += step) {
       if (!pointComparisons[i]) continue;
-      const pct = Math.max(0, Math.min(100, ((i - viewStart) / viewSpan) * 100));
+      const pct = Math.max(0, Math.min(100, xForIndex(i) / 10));
       const rate = rates.get(i) ?? 0;
       const absRate = Math.abs(rate);
 
