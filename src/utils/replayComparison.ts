@@ -195,7 +195,10 @@ export function interpolatePointAtDistance(
 
 /**
  * Computes comparative telemetry points for the primary lap against a baseline lap,
- * normalized along the distance dimension of the lap (0% to 100%).
+ * matched by absolute cumulative distance (meters) along the track rather than by
+ * lap-fraction, so both laps are compared on the exact same physical track position —
+ * this keeps the comparison correct even when the two laps have different total lengths
+ * (e.g. off-track excursions, pit stops, or corner-cutting).
  */
 export function computeLapComparisons(
   primaryPoints: ReplayTrajectoryPoint[],
@@ -207,8 +210,6 @@ export function computeLapComparisons(
 
   const primaryDists = computeCumulativeDistances(primaryPoints);
   const baselineDists = computeCumulativeDistances(baselinePoints);
-
-  const totalPrimaryDist = Math.max(1, primaryDists[primaryDists.length - 1]);
   const totalBaselineDist = Math.max(1, baselineDists[baselineDists.length - 1]);
 
   const n = primaryPoints.length;
@@ -220,8 +221,9 @@ export function computeLapComparisons(
   const finishLineDelta = primaryTotalLapTime - baselineTotalLapTime;
 
   return primaryPoints.map((p, i) => {
-    const fraction = primaryDists[i] / totalPrimaryDist;
-    const targetBaselineDist = fraction * totalBaselineDist;
+    // Match on the same absolute distance traveled, clamped to the baseline's own track length
+    // so a primary lap that runs slightly longer/shorter doesn't distort the comparison point.
+    const targetBaselineDist = Math.min(primaryDists[i], totalBaselineDist);
     const basePoint = interpolatePointAtDistance(baselinePoints, baselineDists, targetBaselineDist);
 
     const primaryRelativeT = Math.max(0, (p.timeSec || 0) - primaryStartT);
@@ -230,8 +232,9 @@ export function computeLapComparisons(
     if (i === 0) {
       // Start line boundary: elapsed time is identically 0 for both laps
       deltaTimeSec = 0;
-    } else if (i === n - 1) {
-      // Finish line boundary: exact difference in total lap times
+    } else if (i === n - 1 && targetBaselineDist >= totalBaselineDist) {
+      // Finish line boundary: exact difference in total lap times (only when both laps
+      // have actually reached their finish distance at this sample)
       deltaTimeSec = Number(finishLineDelta.toFixed(3));
     } else {
       const rawDelta = primaryRelativeT - basePoint.timeSec;

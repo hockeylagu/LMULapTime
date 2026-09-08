@@ -1,5 +1,9 @@
 import { ReplayTrajectoryPoint } from '../../server/types.js';
-import { InterpolatedPoint, computeCumulativeDistances, interpolatePointAtDistance } from './replayComparison.js';
+import {
+  InterpolatedPoint,
+  computeCumulativeDistances,
+  interpolatePointAtDistance,
+} from './replayComparison.js';
 
 interface BaseSegmentComparison {
   segmentIndex: number;

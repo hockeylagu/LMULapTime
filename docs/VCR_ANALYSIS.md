@@ -165,6 +165,8 @@ forward-gear-to-forward-gear errors.
 
 | Channel | Best candidate | r (controlled) | Notes |
 |---|---|---|---|
+| lateral acceleration / lateral G (`LocalAccel.X`) | `i8 @14` | −0.76 to −0.97 | Strong lead from the two valid Algarve captures. `Algarve International Circuit P1 45.Vcr` paired with `Algarve-International-Circuit_20260906-175519.jsonl` gives r = −0.7646 overall; `P1 47.Vcr` paired with `Algarve-International-Circuit_20260906-182704.jsonl` gives r = −0.9060 overall, −0.9522 above 80 km/h, and −0.9664 below 80 km/h. Controls rediscovered throttle/brake/steering/RPM in the same `P1 47` run. Treat as a lead, not ground truth, until the sign/scale and axis naming are confirmed with a purpose-built left/right slalom capture. In rF2 local coordinates, X is expected to be lateral, so G would be `LocalAccel.X / 9.80665`. |
+| longitudinal acceleration / longitudinal G (`LocalAccel.Z`) | unresolved; brake-region aliases around `bits@33..36` | 0.69 to 0.90 in one valid capture | Not enough to promote. The best rows overlap the known brake payload byte (`@36`), and the high-speed window where `LocalAccel.Z` reaches r = 0.9025 is also where the brake control scores r = 0.9992 on the same bit region. This currently looks like brake/deceleration confounding, not an independent longitudinal-G field. |
 | rideHeight FL | `i16 @18` | −0.83 (Portimão), −0.72 (Monza quali), −0.77 (Monza race) | Reproduces across 3 independent sessions with consistent sign and offset; not shared with any other channel. Strong enough to treat as a semi-confirmed suspension/ride-height field around bytes 16–19, pending a purpose-built kerb/braking capture to confirm scale (§7.3). |
 
 ### 2.4 Known artifacts — do not pursue
