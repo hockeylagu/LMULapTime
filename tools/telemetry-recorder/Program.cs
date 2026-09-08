@@ -504,6 +504,12 @@ internal static class Program
             ["ambientTempC"] = R(info.AmbientTemp, 2),
             ["trackTempC"] = R(info.TrackTemp, 2),
             ["raining"] = R(info.Raining, 4),
+            ["windX"] = R(info.Wind.X, 3),
+            ["windY"] = R(info.Wind.Y, 3),
+            ["windZ"] = R(info.Wind.Z, 3),
+            ["minPathWetness"] = R(info.MinPathWetness, 4),
+            ["maxPathWetness"] = R(info.MaxPathWetness, 4),
+            ["avgPathWetness"] = R(info.AvgPathWetness, 4),
             ["telemetryVehicleOffset"] = telCal?.Offset,
             ["telemetryVehicleStride"] = telCal?.Stride,
             ["scoringOnly"] = telCal is null,
@@ -531,6 +537,7 @@ internal static class Program
                 {
                     ["id"] = v.ID,
                     ["driver"] = Rf2Layout.AsciiZ(v.DriverName),
+                    ["vehicleClass"] = Rf2Layout.AsciiZ(v.VehicleClass),
                     ["isPlayer"] = v.IsPlayer != 0,
                     ["control"] = v.Control,
                     ["lap"] = v.TotalLaps,
@@ -546,7 +553,9 @@ internal static class Program
                     ["place"] = v.Place,
                     ["timeIntoLap"] = R(v.TimeIntoLap, 3),
                     ["lastLap"] = R(v.LastLapTime, 3),
-                    ["bestLap"] = R(v.BestLapTime, 3)
+                    ["bestLap"] = R(v.BestLapTime, 3),
+                    ["upgradePackHex"] = Convert.ToHexString(v.UpgradePack),
+                    ["pitGroupHex"] = Convert.ToHexString(v.PitGroup)
                 });
             }
 
@@ -560,8 +569,16 @@ internal static class Program
             ["phase"] = info.GamePhase,
             ["inRealtime"] = info.InRealtime != 0,
             ["yellow"] = info.YellowFlagState,
+            ["startLight"] = info.StartLight,
+            ["numRedLights"] = info.NumRedLights,
             ["trackTempC"] = R(info.TrackTemp, 2),
             ["raining"] = R(info.Raining, 4),
+            ["windX"] = R(info.Wind.X, 3),
+            ["windY"] = R(info.Wind.Y, 3),
+            ["windZ"] = R(info.Wind.Z, 3),
+            ["minPathWetness"] = R(info.MinPathWetness, 4),
+            ["maxPathWetness"] = R(info.MaxPathWetness, 4),
+            ["avgPathWetness"] = R(info.AvgPathWetness, 4),
             ["veh"] = vehicles
         }, JsonOptions));
     }
@@ -598,6 +615,10 @@ internal static class Program
             ["oilTempC"] = R(t.EngineOilTemp, 3),
             ["turboBoost"] = R(t.TurboBoostPressure, 3),
             ["rearBrakeBias"] = R(t.RearBrakeBias, 4),
+            ["frontTireCompoundIndex"] = t.FrontTireCompoundIndex,
+            ["rearTireCompoundIndex"] = t.RearTireCompoundIndex,
+            ["frontTireCompoundName"] = Rf2Layout.AsciiZ(t.FrontTireCompoundName),
+            ["rearTireCompoundName"] = Rf2Layout.AsciiZ(t.RearTireCompoundName),
             ["speedKmh"] = R(speedKmh, 4),
 
             ["batteryCharge"] = R(t.BatteryChargeFraction, 5),
@@ -638,6 +659,12 @@ internal static class Program
             ["rotX"] = R(t.LocalRot.X, 5),
             ["rotY"] = R(t.LocalRot.Y, 5),
             ["rotZ"] = R(t.LocalRot.Z, 5),
+            ["rotAccelX"] = R(t.LocalRotAccel.X, 5),
+            ["rotAccelY"] = R(t.LocalRotAccel.Y, 5),
+            ["rotAccelZ"] = R(t.LocalRotAccel.Z, 5),
+            ["frontWingHeight"] = R(t.FrontWingHeight, 4),
+            ["rearRideHeight"] = R(t.RearRideHeight, 4),
+            ["frontRideHeight"] = R(t.FrontRideHeight, 4),
 
             ["limiter"] = t.SpeedLimiter,
             ["ignition"] = t.IgnitionStarter,
@@ -659,6 +686,7 @@ internal static class Program
                 ["terrain"] = Rf2Layout.AsciiZ(w.TerrainName),
                 ["surface"] = w.SurfaceType,
                 ["brakeTempC"] = R(w.BrakeTemp - 273.15, 3),
+                ["brakePressure"] = R(w.BrakePressure, 3),
                 ["tempC"] = new[] { R(w.Temperature[0] - 273.15, 3), R(w.Temperature[1] - 273.15, 3), R(w.Temperature[2] - 273.15, 3) },
                 ["carcassTempC"] = R(w.TireCarcassTemperature - 273.15, 3),
                 ["pressure"] = R(w.Pressure, 3),
@@ -670,6 +698,13 @@ internal static class Program
                 ["suspDeflection"] = R(w.SuspensionDeflection, 5),
                 ["rotation"] = R(w.Rotation, 4),
                 ["camber"] = R(w.Camber, 5),
+                ["lateralForce"] = R(w.LateralForce, 3),
+                ["longitudinalForce"] = R(w.LongitudinalForce, 3),
+                ["lateralPatchVel"] = R(w.LateralPatchVel, 4),
+                ["longitudinalPatchVel"] = R(w.LongitudinalPatchVel, 4),
+                ["lateralGroundVel"] = R(w.LateralGroundVel, 4),
+                ["longitudinalGroundVel"] = R(w.LongitudinalGroundVel, 4),
+                ["toe"] = R(w.Toe, 5),
                 ["flat"] = w.Flat,
                 ["detached"] = w.Detached
             }).ToArray()
