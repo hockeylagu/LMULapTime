@@ -62,19 +62,7 @@ Immediately following String 6 (`trackPath`):
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
   - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
-- **Next 67 bytes**: Comprehensive Session Environment & Weather Conditions Block:
-  | Relative Offset | Size | Type | Field Description |
-  | :--- | :--- | :--- | :--- |
-  | `+0` | 4 bytes | Float32LE | **`ambientTemp`**: Ambient air temperature in degrees Celsius (°C). |
-  | `+4` | 4 bytes | Float32LE | **`trackTemp`**: Track surface temperature in degrees Celsius (°C). |
-  | `+8` | 4 bytes | Float32LE | **`rainIntensity`**: Atmospheric precipitation / rainfall rate (`0.0` = dry to `1.0` = torrential monsoon). |
-  | `+12` | 4 bytes | Float32LE | **`trackWetness`**: Overall circuit surface wetness percentage (`0.0` = completely dry, `1.0` = flooded). |
-  | `+16` | 4 bytes | Float32LE | **`waterDepth`**: Average standing puddle depth across racing line (mm). |
-  | `+20` | 4 bytes | Float32LE | **`trackGrip`**: Rubbering level / track evolution factor (`0.0` = green, `0.5` = medium rubber, `1.0` = saturated rubber groove). |
-  | `+24` | 4 bytes | Float32LE | **`windSpeed`**: Ambient wind speed in meters per second (m/s). |
-  | `+28` | 4 bytes | Float32LE | **`windDirection`**: Wind heading angle (radians clockwise from track North). |
-  | `+32` | 4 bytes | Float32LE | **`timeMultiplier`**: In-game time progression multiplier (e.g. `1.0` = real-time 1x, `5.0` = 5x accelerated, `24.0` = 24x). |
-  | `+36..66` | 31 bytes | Binary | Cloud cover, haze, sky presets, sun azimuth/elevation vectors, and ambient light intensity. |
+- **Next 67 bytes**: Session conditions block. Layout not established.
 
 ### 2.3 Structured Driver Roster
 Located immediately after the 67-byte session conditions block:
@@ -150,8 +138,7 @@ const raw10 = (payload.readUInt16LE(6) >>> 5) & 0x3ff;
 const rpm   = 10.9228 * raw10;   // scale is absolute, not normalised per car
 ```
 
-The scale is empirical (+/-0.02); see VCR_ANALYSIS.md 2.1. The field saturates at 1023, i.e.
-~11,170 rpm, and would wrap silently above that.
+The field saturates at 1023, i.e. ~11,170 rpm, and would wrap silently above that.
 
 | Offset in Payload | Size | Type | Field & Bitfield Description |
 | :--- | :--- | :--- | :--- |
@@ -203,15 +190,10 @@ Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to re
 
 ### Class 1: Session Control & Visuals
 
-- **Type 10**: Start Lights Status:
-  - 1 byte integer (`startLightsCode`):
-    - `0`: No lights / pit exit open
-    - `1..5`: Red start light countdown illumination (1 light on, 2 on, 3 on, 4 on, 5 on)
-    - `6`: All red lights held before extinguish
-    - `7`: Green flag / lights out (Race start!)
-    - `8`: Aborted start / extra formation lap
-- **Type 23**: Session Countdown:
-  - 4 bytes UInt32LE: Seconds remaining until session green flag or expiration.
+- **Type 10**: payload size and layout not established (a documented single-byte `startLightsCode`
+  variant has not been observed).
+- **Type 23**: payload size and layout not established (a documented 4-byte countdown variant has
+  not been observed).
 
 ---
 
@@ -225,7 +207,7 @@ Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to re
   - 1 byte: `0` = Stop & Go served, `1` = Drive Through served.
 - **Type 8**: Penalty Rescinded:
   - 1 byte: Penalty cancelled by race control / server admin.
-- **Type 10**: Track Condition & Flag Status:
+- **Type 10**: Track Condition & Flag Status (**Class 3**, payload always 3 bytes):
   - 1 byte: `flagState`:
     - `0`: Green Flag (Track clear / race underway)
     - `1`: Local Yellow Flag (Hazard in sector)
@@ -236,8 +218,8 @@ Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to re
     - `6`: Virtual Safety Car (VSC)
     - `7`: Red Flag (Session suspended)
     - `8`: Checkered Flag (Session finished)
-  - 1 byte: `sectorMask`: Affected track sector bitfield (`0x01` = S1, `0x02` = S2, `0x04` = S3).
-  - 1 byte: `driverFlag`: Specific flag directed at vehicle (`0x01` = Blue flag yield, `0x02` = Black flag DQ, `0x04` = Mechanical defect meatball flag).
+  - 1 byte: second byte, meaning not established.
+  - 1 byte: third byte, meaning not established.
 
 ---
 
@@ -261,16 +243,19 @@ Fired when a vehicle crosses an electronic simulation timing loop (Start/Finish 
 When a session terminates or a car ESCs back to the garage, the engine flushes an uncompleted lap event with `splitSec <= 0`.
 - **Aborted Garage/Session Flush**: If `splitSec <= 0`, `lapTimeSec < 20`, and `!s1Event` (has not reached Sector 1), the event represents an aborted session flush and is discarded.
 - **Valid Cut Lap**: If the car drove a full lap (`lapTimeSec >= 20` or completed Sector 1) but exceeded track limits, `splitSec` is `-1.0`. The parser records the completed lap, sets `isValid = false`, and computes lap duration from slice timestamps.
-#### Type 19 (`eventSize === 8`): Session State Name
-ASCII string broadcast confirming current session name (e.g. `"Practice"`, `"Qualify"`, `"Race"`).
+#### Type 19: Session State Name
+ASCII string (Class 7, length matches the session name exactly, e.g. `"Race"`) broadcast at
+session start confirming the current session name. A separate single-byte variant of Type 19
+also occurs repeatedly through a session; its meaning is not established.
 
 #### Type 48 (`eventSize === 41`): Live Leaderboard / Standings Matrix
-Emitted periodically to broadcast the official real-time session running order:
+Emitted periodically (Class 7) to broadcast the official real-time session running order:
 - `+0`: 1 byte count: Number of active cars ranked.
-- `+1..40`: Array of driver slot bytes in precise track order:
-  - Byte `1` = P1 leader slot
-  - Byte `2` = P2 slot
-  - Byte `n` = Pn slot
+- `+1..20`: 20 bytes, meaning not established.
+- `+21..40`: Array of up to 20 driver slot bytes in track order:
+  - Byte `21` = P1 leader slot
+  - Byte `22` = P2 slot
+  - Byte `21+n-1` = Pn slot
 Enables 100% accurate running position, leader interval, and position-over-time charts without post-hoc sorting or interpolation.
 
 #### Type 49 (`eventSize === 1`): Pit & Garage Transitions

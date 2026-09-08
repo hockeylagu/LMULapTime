@@ -9,6 +9,8 @@ import {
   ReplayLapSummary,
   ReplayPenaltyEvent,
   ReplayPitEvent,
+  ReplayFlagEvent,
+  ReplayStandingsSnapshot,
 } from './types.js';
 
 // Friendly car name mapping from known LMU skin/vehicle ID tokens
@@ -563,6 +565,7 @@ interface RawPoint {
   gearRaw?: number;
   speedKmhRaw?: number;
   detachablePartState?: number;
+  engineRpm?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
@@ -681,6 +684,8 @@ export function extractReplayTrajectory(
     const vcrTimingEvents: Array<{ sTime: number; drv: number; splitSec: number; sector: number; lapIdx: number }> = [];
     const replayPenalties: ReplayPenaltyEvent[] = [];
     const replayPitEvents: ReplayPitEvent[] = [];
+    const replayFlagEvents: ReplayFlagEvent[] = [];
+    const standingsHistory: ReplayStandingsSnapshot[] = [];
     const driverWheelTelemetry = new Map<number, {
       tireTemps?: [number, number, number, number];
       tireWear?: [number, number, number, number];
@@ -787,6 +792,10 @@ export function extractReplayTrajectory(
               const speedKmhRaw = decodePacketSpeedKmh(buf, eventSp + 5 + 8);
               const latestWheel = driverWheelTelemetry.get(drv);
 
+              // Engine RPM: 10-bit field spanning byte 6 bit 5 through byte 7 bit 6 (VCR_FORMAT.md §4)
+              const rpmRaw10 = (buf.readUInt16LE(eventSp + 5 + 6) >>> 5) & 0x3ff;
+              const engineRpm = rpmRaw10 < 1023 ? Math.round(rpmRaw10 * 10.9228) : undefined;
+
               // Gear is encoded directly in the event header's type field (confirmed via a
               // community reference parser): evType ranges 7-15 for vehicle pose
               // events, mapping to gear = evType - 8 (7 => reverse (-1), 8 => neutral, 9-15 =>
@@ -814,6 +823,7 @@ export function extractReplayTrajectory(
                 gearRaw,
                 speedKmhRaw,
                 detachablePartState,
+                engineRpm,
                 tireTemps: latestWheel?.tireTemps ? [...latestWheel.tireTemps] : undefined,
                 tireWear: latestWheel?.tireWear ? [...latestWheel.tireWear] : undefined,
                 brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
@@ -866,6 +876,35 @@ export function extractReplayTrajectory(
                 action: 'removed',
               });
             }
+          } else if (evClass === 3 && evType === 10 && sz === 3 && eventSp + 5 + sz <= activeLen) {
+            // Track Condition & Flag Status (Class 3 Type 10, always 3 bytes): flagState confirmed by
+            // inspection (toggles 1<->0 around race-start green flag); bytes 1-2 unconfirmed, kept raw.
+            const FLAG_NAMES: Record<number, string> = {
+              0: 'Green', 1: 'Local Yellow', 2: 'Double Yellow', 3: 'Full Course Yellow',
+              4: 'Safety Car', 5: 'Safety Car In This Lap', 6: 'Virtual Safety Car', 7: 'Red', 8: 'Checkered',
+            };
+            const flagState = buf[eventSp + 5];
+            const sectorMask = buf[eventSp + 5 + 1];
+            const driverFlag = buf[eventSp + 5 + 2];
+            replayFlagEvents.push({
+              timeSec: Number(sTime.toFixed(2)),
+              flagState,
+              flagName: FLAG_NAMES[flagState] || `Unknown (${flagState})`,
+              sectorMask,
+              driverSlot: drv,
+              driverFlag,
+            });
+          } else if (evType === 48 && (evClass === 3 || evClass === 6 || evClass === 7) && sz === 41 && eventSp + 5 + sz <= activeLen) {
+            // Live Leaderboard (Type 48, always 41 bytes): byte 0 = car count, bytes 1-20 unconfirmed
+            // (reserved/session floats), bytes 21..21+count-1 = slot order P1..Pn (confirmed by inspection).
+            const count = buf[eventSp + 5];
+            if (count > 0 && count <= 20 && 21 + count <= sz) {
+              const order: number[] = [];
+              for (let i = 0; i < count; i++) {
+                order.push(buf[eventSp + 5 + 21 + i]);
+              }
+              standingsHistory.push({ timeSec: Number(sTime.toFixed(2)), order });
+            }
           } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
                      (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
@@ -898,10 +937,12 @@ export function extractReplayTrajectory(
               const pitCodeEntry = PIT_CODE_MAP[pCode];
               if (pitCodeEntry) {
                 let details: string | undefined;
+                let fuelAddedLiters: number | undefined;
                 if (pCode === 37 && sz >= 6) {
                   const candidateFuel = buf.readFloatLE(eventSp + 5 + 2);
                   if (isFinite(candidateFuel) && candidateFuel > 0 && candidateFuel < 150) {
                     details = `Fuel: ${candidateFuel.toFixed(1)}L`;
+                    fuelAddedLiters = Number(candidateFuel.toFixed(1));
                   }
                 }
                 replayPitEvents.push({
@@ -912,6 +953,7 @@ export function extractReplayTrajectory(
                   action: pitCodeEntry.action,
                   isGarage: pitCodeEntry.isGarage,
                   details,
+                  fuelAddedLiters,
                 });
               } else {
                 replayPitEvents.push({
@@ -1454,6 +1496,7 @@ export function extractReplayTrajectory(
         tireTemps: cur.tireTemps,
         tireWear: cur.tireWear,
         brakeTemps: cur.brakeTemps,
+        engineRpm: cur.engineRpm,
       });
     }
 
@@ -1513,6 +1556,9 @@ export function extractReplayTrajectory(
       points: finalPoints,
       penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
       pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
+      flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
+      standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
+      sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
       wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.tireTemps !== undefined)),
     };
   } finally {

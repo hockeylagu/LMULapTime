@@ -50,6 +50,16 @@ correlation before pairing samples.
 - **Track geometry fields are scoring-only**, i.e. 5 Hz: `mLapDist`, `mPathLateral`, `mTrackEdge`
   are `rF2VehicleScoring` members, not telemetry members.
 
+**Available ground-truth captures** (`test/fixtures/telemetry/`, paired `.Vcr` in the game's
+Replays folder):
+
+| Track | Session | Telemetry file | Paired replay |
+|---|---|---|---|
+| Algarve (Portimão) | — | `Algarve-International-Circuit_20260906-175519.jsonl` | — |
+| Algarve (Portimão) | — | `Algarve-International-Circuit_20260906-182704.jsonl` | — |
+| Autodromo Nazionale Monza | Quali | `Autodromo-Nazionale-Monza_20260908-090349.jsonl` | `Autodromo Nazionale Monza Q1 11.Vcr` |
+| Autodromo Nazionale Monza | Race | `Autodromo-Nazionale-Monza_20260908-091320.jsonl` | `Autodromo Nazionale Monza R1 11.Vcr` |
+
 ### 1.3 Interpreting results (critical)
 
 The sweep enumerates ~12k candidate extractions (u8/i8/u16/i16/u32/i32/f32 at every offset, plus
@@ -138,6 +148,11 @@ at its limiter would report the same raw value:
 current content approaches this (max observed 823), but a higher-revving car would wrap silently.
 A guard is warranted.
 
+**Further cross-validation (Monza quali + race, 20260908).** Field rediscovered independently at
+the documented offset in two more sessions: **r = 0.9997** (quali) and **r = 0.9996** (race).
+Same car/rev-limiter as prior captures, so this does not help resolve the scale constant — still
+needs a different car with a known, different rev limiter on the limiter.
+
 ### 2.2 Gear — independently re-validated
 
 `gear = eventType - 8` was originally derived by decompiling the reference tool
@@ -150,7 +165,7 @@ forward-gear-to-forward-gear errors.
 
 | Channel | Best candidate | r (controlled) | Notes |
 |---|---|---|---|
-| rideHeight FL | `i16 @18` | −0.83 | Strongest remaining lead; not shared with any other channel, suggesting suspension/ride-height data around bytes 16–19. |
+| rideHeight FL | `i16 @18` | −0.83 (Portimão), −0.72 (Monza quali), −0.77 (Monza race) | Reproduces across 3 independent sessions with consistent sign and offset; not shared with any other channel. Strong enough to treat as a semi-confirmed suspension/ride-height field around bytes 16–19, pending a purpose-built kerb/braking capture to confirm scale (§7.3). |
 
 ### 2.4 Known artifacts — do not pursue
 
@@ -160,6 +175,10 @@ forward-gear-to-forward-gear errors.
   weakly tracks every monotonic drift.
 - **Fuel scoring r = 1.00 inside a short stationary window** is degenerate: both fuel and any
   monotonic counter are near-constant there. Isolating fuel needs a long constant-pace stint.
+- **Turbo boost candidate moves offset between sessions.** Scored r = −0.76 at `bits@26>>24&7b`
+  (Monza quali) but r = −0.72 at `bits@15>>19&6b` (Monza race, same car/track) — a real field
+  would stay at a fixed offset. This is the drifting-monotonic-counter artifact, not a discovery;
+  do not pursue without a candidate that is stable across sessions.
 
 ### 2.5 Superseded hypotheses
 
@@ -169,6 +188,66 @@ forward-gear-to-forward-gear errors.
   10%-wide bin) — the signature of an unrelated counter, not a physical quantity. No
   scaling or percentage-of-redline interpretation rescues it. Superseded by the confirmed field
   at bits 53–62; **do not reintroduce without new evidence.**
+
+### 2.6 Wiring pass corrections (Monza race replay, 20260908)
+
+While wiring already-"specification-ready" fields from VCR_FORMAT.md into the parser, three of
+them failed verification against the real replay bytes and/or ground-truth telemetry. This is
+evidence that those parts of VCR_FORMAT.md were never actually confirmed before being written
+down as fact — a violation of this project's own documented convention. Corrected below; the
+corresponding VCR_FORMAT.md sections have been fixed to match.
+
+- **Track flags (Type 10) are Class 3, not Class 2.** Class 2 Type 10 never occurs in real
+  files (Class 2 Type 10 collides with nothing — it's simply absent; real flag events are
+  `evClass === 3`). Confirmed on the Monza R1 11 replay: `flagState` toggles `1` (Local Yellow) for
+  the first ~66s of the race then drops to `0` (Green) — an exact match for a
+  full-course-caution rolling/formation start followed by the green-flag drop. The payload is
+  **always exactly 3 bytes** (not variable-length as previously written). `flagState` (byte 0) is
+  now confirmed; bytes 1-2 (previously labelled `sectorMask`/`driverFlag`) remain unconfirmed —
+  byte 1 was observed constant per stint (33, then 17, then 1 near the checkered flag) which does
+  not fit a sector bitmask interpretation, and byte 2 was `0` almost always with one brief `0x10`
+  excursion. Kept as raw fields, not trusted as documented.
+- **Live standings (Type 48) slots start at byte 21, not byte 1.** Brute-inspected a real
+  payload (`14 00 00 80 bf 00 00 80 bf 00 00 80 bf ff ff ff 7f 00 00 80 42 0f 00 12 0c 06 0d 02
+  04 07 08 11 10 05 13 01 0a 09 0e 03 0b`, Monza race, sTime 4.09s): byte 0 = `20` (car count);
+  bytes 1-20 decode as 5 float32s (`-1, -1, -1, NaN, 64`) that don't correspond to slot indices —
+  reading slots from there (the previous doc's assumption) produces garbage. Bytes 21-40 are 20
+  small integers in `0..19`, exactly matching the count byte and exactly the shape of a slot
+  array. The 20-byte gap (bytes 1-20) is unconfirmed/reserved, not part of the ranking data.
+- **The 67-byte "session conditions / weather" block is disproved, not just unconfirmed.**
+  Ground truth from the paired telemetry capture for the Monza race: `ambientTempC=33.03`,
+  `trackTempC=54.18`. Brute-force search for these values (±1.0 tolerance, float32, both LE) across
+  the **entire replay file** (metadata block and frame stream) found zero matches anywhere near
+  the documented offsets, and the handful of full-file matches elsewhere were scattered at
+  effectively random offsets (the classic false-positive floor for a value range that collides
+  with unrelated position/rotation floats — see §1.3's methodology on this exact failure mode).
+  Manually dumping the block's raw bytes shows small integers (`1, 1, 100, 2, 1, 1, 2, 0, 20, ...`)
+  consistent with session config flags (fuel/tire/damage multipliers, time-acceleration steps),
+  not 9 consecutive float32 weather fields as documented. **Do not wire this block until it is
+  properly re-derived** with the correlation methodology (§1), not simple offset guessing.
+  Removed from the parser rather than shipping wrong data.
+- **Engine RPM wiring confirmed correct on first try** — no corrections needed; the documented
+  bits 53-62 / scale 10.9228 field decoded plausible values (4140-7963 rpm) on every point of the
+  Monza race replay, consistent with prior findings (§2.1).
+- **Pit stop `fuelAddedLiters`** (Type 37 payload +2..+5) required no correction; this was already
+  implemented as a `details` string, only needed a structured numeric field added alongside it.
+- **Start Lights (Class 1 Type 10) and Session Countdown (Class 1 Type 23) not observed as
+  documented.** Scanned the entire Monza race replay: Class 1 Type 10 only ever occurs at
+  `sz === 65` (ordinary vehicle pose packets, since gear=2 encodes as `evType===10`) or
+  `sz === 80` (553 occurrences, an unidentified per-slice block, first 4 bytes a monotonically
+  increasing float — plausibly a clock/distance counter — clustered in the opening ~40s of the
+  race). A single-byte `startLightsCode` variant never occurs. Class 1 Type 23 never occurs at
+  all (0 events). This session used a rolling/formation start under yellow (§2.6 flag finding
+  above), so the documented red-light sequence may simply not apply to offline AI races — this is
+  **not observed**, not conclusively disproved; needs checking against an online or standing-start
+  replay before ruling it out entirely. VCR_FORMAT.md's claims were unearned regardless (no
+  evidence trail existed before this pass) and have been walked back to "not established."
+- **Type 19 "Session State Name" is Class 7, and the size is the string length, not a fixed 8
+  bytes.** Confirmed `sz===4, "Race"` at the very start of the session (`sTime` 1.00 and 2.00,
+  Class 7). A separate single-byte variant of Type 19 (`sz===1`, values 1/2/3, 92 occurrences
+  across the race, both Class 1 and Class 7) also exists and is undocumented; it doesn't obviously
+  align with the Class 3 Type 10 flag-state events already confirmed above, so it's logged here as
+  an open lead rather than guessed at.
 
 ---
 
@@ -232,11 +311,11 @@ floating-point precision.
 | **Penalties & Incidents** | Implemented | Class 2 Type 5 penalty strings, lap indices, timestamps. |
 | **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |
 | **Gear** | Implemented (`extractReplayTrajectory`) | Header `eventType - 8`, all cars including AI. |
-| **Engine RPM** | **Specification ready — not yet wired in** | Confirmed field at bits 53–62 (§2.1). Needs a saturation guard. |
-| **Pit Events & Strategy** | Implemented (`extractReplayPitEvents`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. |
-| **Track Flags & Safety Car** | Specification ready | Class 2 Type 10 flag states and driver flags. |
-| **Live Standings** | Specification ready | Class 6 Type 48 running-order array. |
-| **Weather & Track Grip** | Specification ready | Metadata 67-byte environment block. |
+| **Engine RPM** | Implemented (`extractReplayTrajectory`) | Bits 53-62 (§2.1), scale 10.9228, saturation guard at raw10 === 1023. |
+| **Pit Events & Strategy** | Implemented (`extractReplayPitEvents`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. |
+| **Track Flags & Safety Car** | Implemented (`extractReplayTrajectory`), partially confirmed | Class **3** (not 2) Type 10, always 3 bytes. `flagState` confirmed (§2.6); other 2 bytes decoded but unconfirmed. |
+| **Live Standings** | Implemented (`extractReplayTrajectory`), partially confirmed | Class 7 Type 48. Count + slot array confirmed at the corrected offset (§2.6); 20-byte gap between them still unconfirmed. |
+| **Weather & Track Grip** | **Disproved, removed from parser** | The documented 67-byte float32 block does not match ground-truth ambient/track temp anywhere in the file (§2.6). Needs re-derivation via the correlation methodology, not offset guessing. |
 
 **Unrelated defect noticed:** ~20 of 45 drivers in the Imola race replay have `carClass`
 unresolved (`?`), falling back to raw vehicleId strings like `99_25_AO_E58B41E50`. This will
