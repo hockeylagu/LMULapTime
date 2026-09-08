@@ -411,6 +411,26 @@ describe('CompareLaps component', () => {
     });
   });
 
+  it('restores the comparison session, driver, and lap as the active baseline', async () => {
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa"
+        initialCarClass="LMGT3"
+        initialSessionId="sess1"
+        initialLapNum={1}
+        initialCompareSessionId="sess1"
+        initialCompareDriver="Sim Driver"
+        initialCompareLapNum={2}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Active Baseline Lap:/i).parentElement).toHaveTextContent('Sim Driver — 2:01.800');
+    });
+  });
+
   it('renders Compare Telemetry button when 2 laps are selected and launches comparison modal', async () => {
     const sessionsWithReplay = [
       {

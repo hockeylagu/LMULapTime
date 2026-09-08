@@ -12,10 +12,9 @@ export interface ReplayInspectorHeaderProps {
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
   onSelectLap: (lapNum: number) => void;
-  selectedDriver?: ReplayDriverEntry;
-  fallbackDriverName?: string;
-  driverCount?: number;
-  onOpenRoster?: () => void;
+  drivers: ReplayDriverEntry[];
+  selectedDriverSlot: number | null;
+  onSelectDriver: (slot: number) => void;
   isCompareMode: boolean;
   onToggleCompare: () => void;
   onSwapBaseline?: () => void;
@@ -44,7 +43,7 @@ export interface ReplayInspectorHeaderProps {
 
 export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React.memo(({
   onClose, replayName, metadata, trajectory, onSelectLap,
-  selectedDriver, fallbackDriverName, driverCount, onOpenRoster,
+  drivers, selectedDriverSlot, onSelectDriver,
   isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
   baselineReplayName, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
   isCompareLapsLoading, onChangeCompareLapFilter, onSelectCompareLap,
@@ -56,7 +55,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   const baselineSummary = baselineTrajectory?.laps?.find(l => l.lapNumber === (baselineTrajectory.currentLap ?? baselineLapNumber)) || baselineTrajectory?.laps?.[0];
 
   return (
-    <header className="relative h-14 px-4 bg-[#0a0e17] border-b border-lmu-border flex items-center justify-between shrink-0 z-[80]">
+    <header className="relative h-14 px-4 bg-[#0a0e17] border-b border-lmu-border grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center shrink-0 z-[80]">
       {/* Left: Back button + Title & Info */}
       <div className="flex items-center gap-3 min-w-0">
         <button
@@ -110,29 +109,23 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
       </div>
 
       {/* Center: Driver Selector, Lap Selector & Live State */}
-      <div className="flex items-center gap-2">
-        {onOpenRoster && (selectedDriver || fallbackDriverName) && (
-          <button
-            type="button"
-            onClick={onOpenRoster}
-            className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl bg-lmu-card border border-lmu-border hover:border-lmu-accent/50 hover:bg-lmu-accent/10 transition-all cursor-pointer shrink-0"
-            title={`Open Driver Roster${driverCount ? ` (${driverCount})` : ''} to select a different driver`}
-          >
-            <span className="w-5 h-5 rounded bg-lmu-dark border border-lmu-border flex items-center justify-center font-bold text-amber-400 text-[10px] font-mono shrink-0">
-              {selectedDriver?.carNumber || '#-'}
-            </span>
-            <span className="hidden sm:flex items-center gap-1 max-w-[140px]">
-              <span className="text-[11px] font-bold text-white truncate">
-                {selectedDriver?.name || fallbackDriverName || 'Driver'}
-              </span>
-              {Boolean(selectedDriver?.isPlayer) && (
-                <span className="px-1 py-0.1 rounded text-[8px] bg-purple-600/80 text-purple-100 font-bold border border-purple-400/40 shrink-0">
-                  YOU
-                </span>
-              )}
-            </span>
+      <div className="flex items-center gap-2 justify-self-center min-w-0">
+        {drivers.length > 0 && (
+          <label className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-xl bg-lmu-card border border-lmu-border hover:border-lmu-accent/50 transition-colors shrink-0">
             <Users className="w-3.5 h-3.5 text-lmu-accent shrink-0" />
-          </button>
+            <select
+              aria-label="Select Driver"
+              value={selectedDriverSlot ?? ''}
+              onChange={e => onSelectDriver(parseInt(e.target.value, 10))}
+              className="bg-transparent text-[11px] font-bold text-white focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] truncate py-0.5"
+            >
+              {drivers.filter(driver => typeof driver.slot === 'number').map(driver => (
+                <option key={driver.slot} value={driver.slot} className="bg-[#0b101d] text-white">
+                  {driver.carNumber ? `#${driver.carNumber} ` : ''}{driver.name}{driver.isPlayer ? ' (You)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {trajectory?.laps && trajectory.laps.length > 0 && (
@@ -242,15 +235,13 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           </span>
         )}
 
-        {isTrajLoading && (
-          <span className="text-[10px] text-lmu-muted animate-pulse hidden md:inline">
+        <span className={`min-w-[92px] text-[10px] text-lmu-muted animate-pulse hidden md:inline ${isTrajLoading ? '' : 'invisible'}`}>
             Loading driver...
-          </span>
-        )}
+        </span>
       </div>
 
       {/* Right: Playback Controls & Close */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 justify-self-end">
         <button
           onClick={onRewind}
           aria-label="Rewind to start"

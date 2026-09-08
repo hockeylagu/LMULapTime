@@ -86,6 +86,28 @@ describe('GpsTrackMap', () => {
     }
   });
 
+  it('renders the dashed baseline above the primary line when both laps overlap', () => {
+    const continuousPoints: ReplayTrajectoryPoint[] = [
+      { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
+      { x: 101, y: 10, z: 201, rotY: 0, speedKmh: 160, throttle: 80, brake: 0, timeSec: 0.1 },
+      { x: 102, y: 10, z: 202, rotY: 0, speedKmh: 170, throttle: 80, brake: 0, timeSec: 0.2 },
+    ];
+    const { container } = render(
+      <GpsTrackMap
+        points={continuousPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        baselinePoints={continuousPoints}
+      />
+    );
+
+    const primaryLine = container.querySelector('[data-track-line="primary"]');
+    const baselineLine = container.querySelector('[data-track-line="baseline"]');
+    expect(primaryLine).toBeTruthy();
+    expect(baselineLine).toBeTruthy();
+    expect(primaryLine?.compareDocumentPosition(baselineLine!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('renders a T# marker for each detected corner, matching the corner analysis table', () => {
     render(
       <GpsTrackMap

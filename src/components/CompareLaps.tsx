@@ -18,6 +18,9 @@ interface CompareLapsProps {
   initialCarClass?: string;
   initialSessionId?: string;
   initialLapNum?: number;
+  initialCompareSessionId?: string;
+  initialCompareDriver?: string;
+  initialCompareLapNum?: number;
   onSelectSession?: (sessionId: string) => void;
 }
 
@@ -29,6 +32,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   initialCarClass,
   initialSessionId,
   initialLapNum,
+  initialCompareSessionId,
+  initialCompareDriver,
+  initialCompareLapNum,
   onSelectSession,
 }) => {
   const {
@@ -77,6 +83,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialCarClass,
     initialSessionId,
     initialLapNum,
+    initialCompareSessionId,
+    initialCompareDriver,
+    initialCompareLapNum,
   });
 
   const [telemetryModalOpen, setTelemetryModalOpen] = useState(false);

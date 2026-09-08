@@ -39,6 +39,9 @@ export interface UseCompareLapsParams {
   initialCarClass?: string;
   initialSessionId?: string;
   initialLapNum?: number;
+  initialCompareSessionId?: string;
+  initialCompareDriver?: string;
+  initialCompareLapNum?: number;
 }
 
 export function useCompareLapsData({
@@ -47,6 +50,9 @@ export function useCompareLapsData({
   initialCarClass,
   initialSessionId,
   initialLapNum,
+  initialCompareSessionId,
+  initialCompareDriver,
+  initialCompareLapNum,
 }: UseCompareLapsParams) {
   const { params } = getHashRouteAndParams();
 
@@ -168,11 +174,19 @@ export function useCompareLapsData({
       : params.get('lapNum')
       ? parseInt(params.get('lapNum')!, 10)
       : undefined;
+  const targetCompareSessionId = initialCompareSessionId || params.get('compareSessionId') || undefined;
+  const targetCompareDriver = initialCompareDriver || params.get('compareDriver') || undefined;
+  const targetCompareLapNum =
+    initialCompareLapNum !== undefined
+      ? initialCompareLapNum
+      : params.get('compareLapNum')
+      ? parseInt(params.get('compareLapNum')!, 10)
+      : undefined;
 
   useEffect(() => {
     if (!hasFetchedRef.current) return;
 
-    const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNum ?? ''}`;
+    const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNum ?? ''}__${targetCompareSessionId || ''}__${targetCompareDriver || ''}__${targetCompareLapNum ?? ''}`;
 
     // If already initialized for this track and vehicle class scope,
     // preserve whatever laps the user has selected (keeps player laps when changing driver scope)
@@ -203,16 +217,18 @@ export function useCompareLapsData({
       return;
     }
 
-    if (targetSessionId) {
-      const found = apiData.laps.find(
-        (l) => l.sessionId === targetSessionId && (targetLapNum === undefined || l.lapNum === targetLapNum)
-      );
-      if (found) {
-        candidates.push({
-          ...found,
-          tag: found.tag || `Lap ${found.lapNum}`,
-        });
-      }
+    const findSessionLap = (sessionId?: string, driverName?: string, lapNum?: number) => apiData.laps.find(
+      lap => lap.sessionId === sessionId &&
+        (driverName === undefined || lap.driverName === driverName) &&
+        (lapNum === undefined || lap.lapNum === lapNum)
+    );
+
+    const compareLap = findSessionLap(targetCompareSessionId, targetCompareDriver, targetCompareLapNum);
+    if (compareLap) candidates.push({ ...compareLap, tag: compareLap.tag || `Lap ${compareLap.lapNum}` });
+
+    const targetLap = findSessionLap(targetSessionId, undefined, targetLapNum);
+    if (targetLap && !candidates.some(candidate => candidate.id === targetLap.id)) {
+      candidates.push({ ...targetLap, tag: targetLap.tag || `Lap ${targetLap.lapNum}` });
     }
 
     const pbLap =
@@ -239,7 +255,7 @@ export function useCompareLapsData({
     setSelectedLaps(initialSlice);
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
     initializedScopeRef.current = currentScope;
-  }, [apiData, selectedTrack, selectedCarClass, targetSessionId, targetLapNum]);
+  }, [apiData, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
 
   const availableCarModels = useMemo(() => {
     const set = new Set<string>();

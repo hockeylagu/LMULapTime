@@ -241,19 +241,6 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             <text x={CENTER + ring2Dist * scale + 4} y={CENTER + 3} fill="#38bdf8" fontSize="9" fontFamily="monospace" opacity="0.3">{ring2Dist}m</text>
             <line x1={CENTER - 15} y1={CENTER} x2={CENTER + 15} y2={CENTER} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
             <line x1={CENTER} y1={CENTER - 15} x2={CENTER} y2={CENTER + 15} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
-            {baselineSegments.map((seg, i) => (
-              <path
-                key={`baseline-${i}`}
-                d={seg.pathD}
-                stroke={seg.color}
-                strokeWidth="4"
-                strokeDasharray="8 6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                opacity={0.9 * baselineOpacity}
-              />
-            ))}
             <g opacity={primaryOpacity}>
               {visibleSegments.map((seg, i) => (
                 <path
@@ -262,6 +249,21 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
                 >
                   <title>Frame {seg.idx} • {seg.avgSpeed} km/h</title>
                 </path>
+              ))}
+            </g>
+            <g data-track-line="baseline" pointerEvents="none">
+              {baselineSegments.map((seg, i) => (
+                <path
+                  key={`baseline-${i}`}
+                  d={seg.pathD}
+                  stroke={seg.color}
+                  strokeWidth="5"
+                  strokeDasharray="10 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  opacity={baselineOpacity}
+                />
               ))}
             </g>
             {baselineGhostPos && (

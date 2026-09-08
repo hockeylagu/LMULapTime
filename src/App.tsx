@@ -222,6 +222,9 @@ export default function App() {
             initialCarClass={compareParams?.get('carClass') || (selectedCarClass !== 'All' ? selectedCarClass : undefined)}
             initialSessionId={compareParams?.get('sessionId') || undefined}
             initialLapNum={compareParams?.get('lapNum') ? parseInt(compareParams.get('lapNum')!, 10) : undefined}
+            initialCompareSessionId={compareParams?.get('compareSessionId') || undefined}
+            initialCompareDriver={compareParams?.get('compareDriver') || undefined}
+            initialCompareLapNum={compareParams?.get('compareLapNum') ? parseInt(compareParams.get('compareLapNum')!, 10) : undefined}
           />
         ) : activeTab === 'settings' ? (
           <Settings
