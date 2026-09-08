@@ -33,6 +33,9 @@ interface MockSlice {
     tireWear?: [number, number, number, number];
     brakeTemps?: [number, number, number, number];
   };
+  rpmRaw10?: number;
+  flag?: { flagState: number; sectorMask: number; driverFlag: number };
+  standings?: number[];
 }
 
 function createMockVcrBuffer(): Buffer {
@@ -101,7 +104,9 @@ function createSliceVcrBuffer(options?: {
     sBuf.writeFloatLE(sl.sTime, 0);
     const hasTiming = Boolean(sl.timing);
     const hasWheel = Boolean(sl.wheel);
-    const eventCount = 1 + (hasTiming ? 1 : 0) + (hasWheel ? 1 : 0);
+    const hasFlag = Boolean(sl.flag);
+    const hasStandings = Boolean(sl.standings);
+    const eventCount = 1 + (hasTiming ? 1 : 0) + (hasWheel ? 1 : 0) + (hasFlag ? 1 : 0) + (hasStandings ? 1 : 0);
     sBuf.writeUInt16LE(eventCount, 4);
 
     sliceBufs.push(sBuf);
@@ -167,6 +172,11 @@ function createSliceVcrBuffer(options?: {
     evData.writeFloatLE(sl.z, 49);
     evData.writeFloatLE(0.0, 57); // rotY
 
+    // Engine RPM: 10-bit field at byte 6 bit 5 through byte 7 bit 6
+    if (sl.rpmRaw10 !== undefined) {
+      evData.writeUInt16LE((sl.rpmRaw10 & 0x3ff) << 5, 6);
+    }
+
     sliceBufs.push(evHdr, evPad, evData);
 
     if (sl.timing) {
@@ -177,6 +187,24 @@ function createSliceVcrBuffer(options?: {
       timData.writeFloatLE(sl.timing.splitSec, 0);
       timData[8] = (sl.timing.lapIdx << 2) | (sl.timing.sector & 3);
       sliceBufs.push(timHdr, timPad, timData);
+    }
+
+    if (sl.flag) {
+      // Class 3 Type 10, always 3 bytes: flagState, sectorMask, driverFlag
+      const flagHdr = Buffer.alloc(4);
+      flagHdr.writeUInt32LE(((3 << 29) | (10 << 17) | (3 << 8) | (sl.driverSlot & 0xff)) >>> 0, 0);
+      const flagData = Buffer.from([sl.flag.flagState, sl.flag.sectorMask, sl.flag.driverFlag]);
+      sliceBufs.push(flagHdr, Buffer.from([0]), flagData);
+    }
+
+    if (sl.standings) {
+      // Type 48, always 41 bytes: count byte + 20 reserved bytes + up to 20 slot bytes
+      const stHdr = Buffer.alloc(4);
+      stHdr.writeUInt32LE(((7 << 29) | (48 << 17) | (41 << 8) | (sl.driverSlot & 0xff)) >>> 0, 0);
+      const stData = Buffer.alloc(41);
+      stData[0] = sl.standings.length;
+      sl.standings.forEach((slot, i) => { stData[21 + i] = slot; });
+      sliceBufs.push(stHdr, Buffer.from([0]), stData);
     }
   }
 
@@ -1689,6 +1717,67 @@ describe('replayParser', () => {
         fs.unlinkSync(filePath);
       });
 
+      it('extracts structured fuelAddedLiters from a service-complete pit event (code 37)', () => {
+        const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
+        const headerBuf = Buffer.from(headerText, 'ascii');
+        const irsrBuf = Buffer.from('IRSR', 'ascii');
+        const verBuf = Buffer.alloc(4);
+        verBuf.writeUInt32LE(0x80000008, 0);
+        const streamPrefix = Buffer.alloc(4);
+
+        const sBuf = Buffer.alloc(6);
+        sBuf.writeFloatLE(45.0, 0);
+        sBuf.writeUInt16LE(1, 4);
+
+        // Class 5 Type 2, code 37 (service complete): +1 status byte, +2..5 fuelAddedLiters (Float32LE)
+        const evHdr = Buffer.alloc(4);
+        const pitVal = ((5 << 29) | (2 << 17) | (6 << 8) | 1) >>> 0;
+        evHdr.writeUInt32LE(pitVal, 0);
+        const evData = Buffer.alloc(6);
+        evData[0] = 37;
+        evData.writeFloatLE(62.5, 2);
+
+        const framesBuf = Buffer.concat([streamPrefix, sBuf, evHdr, Buffer.from([0]), evData]);
+
+        function makeStr4(str: string): Buffer {
+          const sBuf2 = Buffer.from(str, 'utf8');
+          const lBuf = Buffer.alloc(4);
+          lBuf.writeUInt32LE(sBuf2.length, 0);
+          return Buffer.concat([lBuf, sBuf2]);
+        }
+
+        const metaParts = [
+          makeStr4(JSON.stringify({ eventTitle: 'Fuel Test' })),
+          makeStr4('T.SCN'),
+          makeStr4('T.AIW'),
+          makeStr4('Track'),
+          makeStr4('1.0'),
+          makeStr4('mod'),
+          makeStr4('path'),
+          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+        ];
+        const trailer = Buffer.alloc(28);
+        metaParts.push(trailer);
+
+        const metaBuf = Buffer.concat(metaParts);
+        const metaOffset = 57 + framesBuf.length;
+        const offsetBuf = Buffer.alloc(4);
+        offsetBuf.writeUInt32LE(metaOffset, 0);
+
+        const fullBuf = Buffer.concat([headerBuf, irsrBuf, verBuf, offsetBuf, framesBuf, metaBuf]);
+        const filePath = path.join(tempDir, 'fuel_added_test.vcr');
+        fs.mkdirSync(tempDir, { recursive: true });
+        fs.writeFileSync(filePath, fullBuf);
+
+        const traj = extractReplayTrajectory(filePath, { driverSlot: 1 });
+        expect(traj.pitEvents).toBeDefined();
+        expect(traj.pitEvents?.length).toBe(1);
+        expect(traj.pitEvents?.[0].code).toBe(37);
+        expect(traj.pitEvents?.[0].fuelAddedLiters).toBeCloseTo(62.5, 1);
+        expect(traj.pitEvents?.[0].details).toBe('Fuel: 62.5L');
+        fs.unlinkSync(filePath);
+      });
+
       const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
       const realP1File = path.join(steamReplays, 'Algarve International Circuit P1 39.Vcr');
       const realQ1File = path.join(steamReplays, 'Algarve International Circuit Q1 10.Vcr');
@@ -2169,6 +2258,73 @@ describe('replayParser', () => {
         expect(traj.points[1].brakeTemps).toEqual([520, 530, 410, 420]);
 
         fs.unlinkSync(wheelVcrPath);
+      });
+
+      it('decodes engine RPM from the 10-bit pose packet field (byte 6 bit 5 through byte 7 bit 6)', () => {
+        fs.mkdirSync(tempDir, { recursive: true });
+        const rpmVcrPath = path.join(tempDir, 'synthetic_rpm.vcr');
+        // raw10 = round(rpm / 10.9228); 5000rpm -> raw 458, 8000rpm -> raw 733
+        const buf = createSliceVcrBuffer({
+          slices: [
+            { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, rpmRaw10: 458 },
+            { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20, rpmRaw10: 733 },
+            // Saturated field (0x3ff) must be treated as unknown, not a real rpm value
+            { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, rpmRaw10: 1023 },
+          ],
+        });
+        fs.writeFileSync(rpmVcrPath, buf);
+
+        const traj = extractReplayTrajectory(rpmVcrPath, { driverSlot: 1, maxPoints: 10 });
+        expect(traj.points.length).toBe(3);
+        expect(traj.points[0].engineRpm).toBeCloseTo(5002, -1);
+        expect(traj.points[1].engineRpm).toBeCloseTo(8006, -1);
+        expect(traj.points[2].engineRpm).toBeUndefined();
+
+        fs.unlinkSync(rpmVcrPath);
+      });
+
+      it('decodes track flag status events (Class 3 Type 10)', () => {
+        fs.mkdirSync(tempDir, { recursive: true });
+        const flagVcrPath = path.join(tempDir, 'synthetic_flags.vcr');
+        const buf = createSliceVcrBuffer({
+          slices: [
+            { sTime: 0.0, driverSlot: 1, x: 10, y: 0, z: 10, flag: { flagState: 1, sectorMask: 33, driverFlag: 0 } },
+            { sTime: 66.0, driverSlot: 1, x: 20, y: 0, z: 20, flag: { flagState: 0, sectorMask: 33, driverFlag: 0 } },
+            { sTime: 1400.0, driverSlot: 1, x: 30, y: 0, z: 30, flag: { flagState: 8, sectorMask: 1, driverFlag: 0 } },
+          ],
+        });
+        fs.writeFileSync(flagVcrPath, buf);
+
+        const traj = extractReplayTrajectory(flagVcrPath, { driverSlot: 1, maxPoints: 10 });
+        expect(traj.flagEvents).toBeDefined();
+        expect(traj.flagEvents?.length).toBe(3);
+        expect(traj.flagEvents?.[0]).toMatchObject({ flagState: 1, flagName: 'Local Yellow', sectorMask: 33 });
+        expect(traj.flagEvents?.[1]).toMatchObject({ flagState: 0, flagName: 'Green' });
+        expect(traj.flagEvents?.[2]).toMatchObject({ flagState: 8, flagName: 'Checkered' });
+
+        fs.unlinkSync(flagVcrPath);
+      });
+
+      it('decodes live standings snapshots (Type 48) into running-order history', () => {
+        fs.mkdirSync(tempDir, { recursive: true });
+        const standingsVcrPath = path.join(tempDir, 'synthetic_standings.vcr');
+        const buf = createSliceVcrBuffer({
+          slices: [
+            { sTime: 4.0, driverSlot: 1, x: 10, y: 0, z: 10, standings: [2, 1, 3] },
+            { sTime: 8.0, driverSlot: 1, x: 20, y: 0, z: 20, standings: [1, 2, 3] },
+          ],
+        });
+        fs.writeFileSync(standingsVcrPath, buf);
+
+        const traj = extractReplayTrajectory(standingsVcrPath, { driverSlot: 1, maxPoints: 10 });
+        expect(traj.standingsHistory).toBeDefined();
+        expect(traj.standingsHistory?.length).toBe(2);
+        expect(traj.standingsHistory?.[0]).toEqual({ timeSec: 4, order: [2, 1, 3] });
+        expect(traj.standingsHistory?.[1]).toEqual({ timeSec: 8, order: [1, 2, 3] });
+        // sessionRunningOrder reflects the most recent snapshot
+        expect(traj.sessionRunningOrder).toEqual([1, 2, 3]);
+
+        fs.unlinkSync(standingsVcrPath);
       });
     });
 });

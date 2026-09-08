@@ -455,6 +455,7 @@ export interface ReplayTrajectoryPoint {
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
+  engineRpm?: number;
 }
 
 export interface ReplayPenaltyEvent {
@@ -475,6 +476,21 @@ export interface ReplayPitEvent {
   isGarage?: boolean;
   durationSec?: number;
   details?: string;
+  fuelAddedLiters?: number;
+}
+
+export interface ReplayFlagEvent {
+  timeSec: number;
+  flagState: number;
+  flagName: string;
+  sectorMask?: number;
+  driverSlot?: number;
+  driverFlag?: number;
+}
+
+export interface ReplayStandingsSnapshot {
+  timeSec: number;
+  order: number[];
 }
 
 export type ReplayTelemetryPoint = ReplayTrajectoryPoint;
@@ -543,6 +559,8 @@ export interface ReplayTrajectoryData {
   penalties?: ReplayPenaltyEvent[];
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];
+  flagEvents?: ReplayFlagEvent[];
+  standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
 }
