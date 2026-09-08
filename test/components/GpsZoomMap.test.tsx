@@ -60,6 +60,24 @@ describe('GpsZoomMap', () => {
     expect(screen.getByText(/RIGHT/i)).toBeInTheDocument();
   });
 
+  it('renders the baseline above the primary line to keep its dash pattern visible', () => {
+    const { container } = render(
+      <GpsZoomMap
+        points={mockPoints}
+        baselinePoints={mockPoints}
+        currentIndex={1}
+        colorBy="speed"
+      />
+    );
+
+    const svgGroup = container.querySelector('svg > g');
+    const primaryGroup = svgGroup?.querySelector('g:not([data-track-line])');
+    const baselineGroup = svgGroup?.querySelector('[data-track-line="baseline"]');
+    expect(primaryGroup).toBeTruthy();
+    expect(baselineGroup).toBeTruthy();
+    expect(primaryGroup?.compareDocumentPosition(baselineGroup!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('allows zooming in and out independently using + and - buttons', () => {
     render(
       <GpsZoomMap

@@ -20,6 +20,7 @@ export interface SessionDetailHeaderProps {
   handleNavigateToSession: (id: string) => void;
   handleExportCsv: () => void;
   refEntry: ReferenceLaptimeEntry | null;
+  sessions?: DetailedSession[];
 }
 
 export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
@@ -34,7 +35,16 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   handleNavigateToSession,
   handleExportCsv,
   refEntry,
+  sessions,
 }) => {
+  const { params: urlParams } = getHashRouteAndParams();
+  const compareSessionId = urlParams.get('compareSessionId');
+  const compareSession = compareSessionId === session.id
+    ? session
+    : sessions?.find(candidate => candidate.id === compareSessionId);
+  const initialBaselineReplayName = compareSession?.matchingReplayFile?.name ?? null;
+  const initialBaselineLapNumber = urlParams.get('compareLapNum') ? parseInt(urlParams.get('compareLapNum')!, 10) : null;
+  const initialBaselineDriverName = urlParams.get('compareDriver');
   const [showReplayModal, setShowReplayModal] = React.useState(() => {
     const { params } = getHashRouteAndParams();
     return Boolean(params.get('replay') || params.get('replayLap') || (session.matchingReplayFile && (params.get('lap') || params.get('lapNum'))));
@@ -74,7 +84,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   };
 
   const handleCloseReplay = () => {
-    updateHashParams({ replay: null, lap: null, lapNum: null, replayLap: null });
+    updateHashParams({ replay: null, lap: null, lapNum: null, replayLap: null, compareSessionId: null, compareDriver: null, compareLapNum: null });
     setShowReplayModal(false);
   };
 
@@ -129,6 +139,10 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 replayName={session.matchingReplayFile.name}
                 initialLapNumber={replayLap}
                 onLapChange={handleLapChange}
+                initialCompareMode={Boolean(initialBaselineReplayName)}
+                initialBaselineReplayName={initialBaselineReplayName}
+                initialBaselineLapNumber={initialBaselineLapNumber}
+                initialBaselineDriverName={initialBaselineDriverName}
               />
             </>
           )}

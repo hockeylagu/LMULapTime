@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplayLapSummary } from '../../../server/types.js';
 import { ComparableLap } from '../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../utils/replayComparison.js';
+import { updateHashParams } from '../../utils/urlParams.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ export interface UseReplayInspectorDataProps {
   initialCompareMode?: boolean;
   initialBaselineReplayName?: string | null;
   initialBaselineLapNumber?: number | null;
+  initialBaselineDriverName?: string | null;
 }
 
 export function useReplayInspectorData({
@@ -21,6 +23,7 @@ export function useReplayInspectorData({
   initialCompareMode,
   initialBaselineReplayName,
   initialBaselineLapNumber,
+  initialBaselineDriverName,
 }: UseReplayInspectorDataProps) {
   const [activeReplayName, setActiveReplayName] = useState<string | null>(replayName);
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
@@ -30,7 +33,7 @@ export function useReplayInspectorData({
   const [isTrajLoading, setIsTrajLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isCompareMode, setIsCompareMode] = useState<boolean>(initialCompareMode ?? false);
-  const [isComparePickerOpen, setIsComparePickerOpen] = useState<boolean>(initialCompareMode ?? false);
+  const [isComparePickerOpen, setIsComparePickerOpen] = useState<boolean>(false);
   const [baselineReplayName, setBaselineReplayName] = useState<string | null>(initialBaselineReplayName ?? null);
   const [baselineLapNumber, setBaselineLapNumber] = useState<number | null>(initialBaselineLapNumber ?? null);
   const [baselineTrajectory, setBaselineTrajectory] = useState<ReplayTrajectoryData | null>(null);
@@ -79,9 +82,10 @@ export function useReplayInspectorData({
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
       setIsCompareMode(initialCompareMode ?? false);
-      setIsComparePickerOpen(initialCompareMode ?? false);
+      setIsComparePickerOpen(false);
       setBaselineReplayName(initialBaselineReplayName ?? (initialCompareMode ? activeReplayName : null));
       setBaselineLapNumber(initialBaselineLapNumber ?? null);
+      setBaselineDriverName(initialBaselineDriverName ?? null);
     }
 
     let isMounted = true;
@@ -174,6 +178,7 @@ export function useReplayInspectorData({
     setPendingLapNumber(null);
     setBaselineTrajectory(null);
     setBaselineMetadata(null);
+    updateHashParams({ compareSessionId: null, compareDriver: null, compareLapNum: null });
   };
 
   // Swap primary lap and baseline lap
@@ -298,6 +303,11 @@ export function useReplayInspectorData({
     setBaselineLapNumber(lap.lapNum ?? 1);
     setBaselineDriverName(lap.driverName || null);
     setIsComparePickerOpen(false);
+    updateHashParams({
+      compareSessionId: lap.sessionId,
+      compareDriver: lap.driverName,
+      compareLapNum: lap.lapNum,
+    });
   };
 
   // Playback animation loop

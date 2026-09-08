@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Gauge, Timer, Users } from 'lucide-react';
+import { Gauge, Timer } from 'lucide-react';
 import { TelemetryStripCharts } from './TelemetryStripCharts.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { ReplayTimelineFooter } from './ReplayTimelineFooter.js';
-import { ReplayDriverRosterTable } from './ReplayDriverRosterTable.js';
 import { ReplayMapContainer } from './ReplayMapContainer.js';
 import { CornerSpeedTable } from './CornerSpeedTable.js';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
@@ -21,6 +20,7 @@ export interface ReplayInspectorModalProps {
   initialCompareMode?: boolean;
   initialBaselineReplayName?: string | null;
   initialBaselineLapNumber?: number | null;
+  initialBaselineDriverName?: string | null;
 }
 
 export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
@@ -32,13 +32,12 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   initialCompareMode,
   initialBaselineReplayName,
   initialBaselineLapNumber,
+  initialBaselineDriverName,
 }) => {
   const {
     metadata,
     trajectory,
     selectedDriverSlot,
-    selectedDriver,
-    playerDriver,
     isLoading,
     isTrajLoading,
     error,
@@ -84,9 +83,10 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     initialCompareMode,
     initialBaselineReplayName,
     initialBaselineLapNumber,
+    initialBaselineDriverName,
   });
 
-  const [activeTab, setActiveTab] = useState<'map' | 'roster' | 'corners'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'corners'>('map');
   const [colorBy, setColorBy] = useState<MapColorMode>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
@@ -171,10 +171,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
         metadata={metadata}
         trajectory={trajectory}
         onSelectLap={handleSelectLap}
-        selectedDriver={selectedDriver}
-        fallbackDriverName={trajectory?.driverName}
-        driverCount={metadata?.drivers?.length || 0}
-        onOpenRoster={() => setActiveTab('roster')}
+        drivers={metadata?.drivers || []}
+        selectedDriverSlot={selectedDriverSlot}
+        onSelectDriver={handleSelectDriver}
         isCompareMode={isCompareMode}
         onToggleCompare={handleToggleCompare}
         onSwapBaseline={handleSwapBaseline}
@@ -269,7 +268,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
               />
             </div>
 
-            {/* RIGHT COLUMN: Track Map & Driver Roster Tab */}
+            {/* RIGHT COLUMN: Track Map & Corner Analysis */}
             <div className="w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] shrink-0 bg-[#0a0e17] flex flex-col min-h-0 overflow-hidden">
               <div className="px-4 py-2.5 bg-lmu-dark border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
                 <div className="flex items-center gap-1.5">
@@ -281,15 +280,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                   >
                     <Gauge className="w-3.5 h-3.5" />
                     GPS Map
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('roster')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      activeTab === 'roster' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'
-                    }`}
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    Driver Roster ({metadata?.drivers?.length || 0})
                   </button>
                   <button
                     onClick={() => setActiveTab('corners')}
@@ -337,16 +327,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     onSelectCornerNumber={handleSelectCorner}
                   />
                 </div>
-              ) : activeTab === 'roster' ? (
-                <ReplayDriverRosterTable
-                  drivers={metadata?.drivers || []}
-                  selectedDriverSlot={selectedDriverSlot}
-                  playerDriver={playerDriver}
-                  onSelectDriver={slot => {
-                    handleSelectDriver(slot);
-                    setActiveTab('map');
-                  }}
-                />
               ) : (
                 <CornerSpeedTable
                   segments={lapSegments}

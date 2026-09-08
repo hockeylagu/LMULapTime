@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
 
 describe('ReplayInspectorModal', () => {
@@ -67,14 +67,10 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/Spa-Francorchamps/i)).toBeInTheDocument();
     });
 
-    // Switch to driver roster tab
-    const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
-    fireEvent.click(rosterTab);
-
-    const rosterTable = screen.getByRole('table');
-    expect(within(rosterTable).getByText('Samuel Lague')).toBeInTheDocument();
-    expect(within(rosterTable).getByText('Ferrari 296 GT3')).toBeInTheDocument();
-    expect(within(rosterTable).getByText('Vista AF Corsa')).toBeInTheDocument();
+    const driverSelect = screen.getByLabelText(/Select Driver/i);
+    expect(driverSelect).toHaveValue('1');
+    expect(screen.getByRole('option', { name: /Samuel Lague.*You/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Rival Racer/i })).toBeInTheDocument();
   });
 
   it('shows the Corners tab for self-analysis even without a baseline lap loaded', async () => {
@@ -134,12 +130,7 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
     });
 
-    // Select driver via Driver Roster tab
-    const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
-    fireEvent.click(rosterTab);
-
-    const rivalCell = screen.getByText('Rival Racer');
-    fireEvent.click(rivalCell);
+    fireEvent.change(screen.getByLabelText(/Select Driver/i), { target: { value: '2' } });
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'));
@@ -161,7 +152,7 @@ describe('ReplayInspectorModal', () => {
     expect(handleClose).toHaveBeenCalled();
   });
 
-  it('displays exactly one Current badge matching the selected driver and allows row selection', async () => {
+  it('selects the current driver in the header dropdown and reloads telemetry', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
@@ -190,54 +181,14 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
     });
 
-    // Go to Driver Roster tab
-    const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
-    fireEvent.click(rosterTab);
-
-    // Verify exactly ONE Current badge is rendered initially (for slot 1 - Samuel Lague)
-    const currentBadges = screen.getAllByText('Current');
-    expect(currentBadges).toHaveLength(1);
-    const rosterTable = screen.getByRole('table');
-    expect(within(rosterTable).getByText('YOU')).toBeInTheDocument();
-
-    // Click on Rival Racer row to select them
-    const rivalCell = screen.getByText('Rival Racer');
-    fireEvent.click(rivalCell);
+    const driverSelect = screen.getByLabelText(/Select Driver/i);
+    expect(driverSelect).toHaveValue('1');
+    fireEvent.change(driverSelect, { target: { value: '2' } });
 
     // Verify it called trajectory fetch with driverSlot=2
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'));
     });
-  });
-
-  it('filters drivers in roster tab via search input', async () => {
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
-      }
-      if (url.includes('/trajectory')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
-      }
-      return Promise.reject(new Error('Unknown URL'));
-    });
-
-    render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
-    });
-
-    const rosterTab = screen.getByRole('button', { name: /Driver Roster/i });
-    fireEvent.click(rosterTab);
-
-    const searchInput = screen.getByPlaceholderText(/Search driver/i);
-    fireEvent.change(searchInput, { target: { value: 'Rival' } });
-
-    const rosterTable = screen.getByRole('table');
-    expect(within(rosterTable).getByText('Rival Racer')).toBeInTheDocument();
-    expect(within(rosterTable).queryByText('Samuel Lague')).not.toBeInTheDocument();
   });
 
   it('toggles compare mode and allows comparing with a baseline lap', async () => {
@@ -395,12 +346,6 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Close comparison lap picker/i }));
-
-    await waitFor(() => {
       expect(screen.getByRole('button', { name: /Swap comparison laps/i })).toBeInTheDocument();
     });
 
@@ -454,7 +399,7 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Remove comparison lap/i })).toBeInTheDocument();
     });
 
     // Change primary lap to Lap 3
@@ -552,6 +497,8 @@ describe('ReplayInspectorModal', () => {
       />
     );
 
+    fireEvent.click(screen.getByTitle('Click to change the comparison lap'));
+
     await waitFor(() => {
       expect(screen.getByText(/Available laps with replay telemetry/i)).toBeInTheDocument();
     });
@@ -601,6 +548,64 @@ describe('ReplayInspectorModal', () => {
     });
 
     expect(capturedCompareUrl).not.toContain('track=BahrainWEC_2023');
+  });
+
+  it('stores and clears the selected comparison session, driver, and lap in the URL', async () => {
+    window.location.hash = '#/compare';
+    const comparisonLap = {
+      id: 'comparison-lap',
+      sessionId: 'comparison-session',
+      sessionName: 'Q1',
+      sessionType: 'Qualifying',
+      dateString: '2026/06/01 12:00',
+      driverName: 'Rival Racer',
+      carType: 'BMW M4 GT3',
+      carClass: 'LMGT3',
+      lapNum: 8,
+      lapTime: 133.2,
+      lapTimeString: '2:13.200',
+      isValid: true,
+      matchingReplayFile: 'Other_Spa_Replay.vcr',
+    };
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('compare/laps')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [comparisonLap] }) });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Compare/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Compare/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Rival Racer')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Rival Racer'));
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      expect(params.get('compareSessionId')).toBe('comparison-session');
+      expect(params.get('compareDriver')).toBe('Rival Racer');
+      expect(params.get('compareLapNum')).toBe('8');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Remove comparison lap/i }));
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    expect(params.has('compareSessionId')).toBe(false);
+    expect(params.has('compareDriver')).toBe(false);
+    expect(params.has('compareLapNum')).toBe(false);
   });
 });
 
