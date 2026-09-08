@@ -1,12 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
+import { computeCumulativeDistances, computeLapComparisons, findIndexAtDistance } from '../../utils/replayComparison.js';
 import {
   getHeatmapColor,
   MapColorMode,
   projectTrajectoryPoints,
   buildContinuousSvgPath,
-  computeBaselinePath,
   computeGhostPosition,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
@@ -35,6 +34,8 @@ export interface GpsTrackMapProps {
   corners?: GpsTrackMapCorner[];
   selectedCornerNumber?: number | null;
   onSelectCornerNumber?: (cornerNumber: number) => void;
+  primaryOpacity?: number;
+  baselineOpacity?: number;
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
@@ -48,6 +49,8 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   corners,
   selectedCornerNumber,
   onSelectCornerNumber,
+  primaryOpacity = 1,
+  baselineOpacity = 1,
 }) => {
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -61,6 +64,10 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   const svgPoints = useMemo(
     () => projectTrajectoryPoints(points, bounds, VIEWBOX_SIZE, PADDING),
     [points, bounds]
+  );
+  const baselineSvgPoints = useMemo(
+    () => projectTrajectoryPoints(baselinePoints || [], bounds, VIEWBOX_SIZE, PADDING),
+    [baselinePoints, bounds]
   );
   const currentPos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
 
@@ -85,10 +92,26 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
   const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
 
-  const baselinePathD = useMemo(
-    () => computeBaselinePath(baselinePoints || [], bounds, VIEWBOX_SIZE, PADDING),
-    [baselinePoints, bounds]
-  );
+  // Per-point time delta vs baseline, only computed when the delta heatmap mode is active.
+  const deltaByIdx = useMemo(() => {
+    if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
+    const comparisons = computeLapComparisons(points, baselinePoints);
+    return comparisons.map(c => c.deltaTimeSec);
+  }, [colorBy, points, baselinePoints]);
+
+  // Rescales each baseline point's own delta (matched by relative track position) so the
+  // baseline line can share the exact same delta heatmap as the primary line.
+  const baselineDeltaByIdx = useMemo(() => {
+    if (colorBy !== 'delta' || !deltaByIdx || !baselinePoints || baselinePoints.length === 0) return null;
+    const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
+    const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
+    const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
+    return baselineDists.map(d => {
+      const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
+      const idx = findIndexAtDistance(primaryDists, targetDist);
+      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
+    });
+  }, [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]);
 
   const baselineGhostPos = useMemo(
     () => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, bounds, VIEWBOX_SIZE, PADDING),
@@ -217,9 +240,25 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
         <path d={pathD} fill="none" stroke="#1e293b" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
         <path d={pathD} fill="none" stroke="#334155" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
 
-        {baselinePathD && (
-          <path d={baselinePathD} fill="none" stroke="#f59e0b" strokeWidth="3.5" strokeDasharray="8 6" strokeOpacity="0.85" strokeLinecap="round" />
-        )}
+        {baselineSvgPoints.map((bp, i) => {
+          if (i === 0) return null;
+          const prev = baselineSvgPoints[i - 1];
+          if (bp.isTeleport || Math.hypot(bp.x - prev.x, bp.z - prev.z) > 20 || Math.hypot(bp.sx - prev.sx, bp.sy - prev.sy) > 30) return null;
+          return (
+            <line
+              key={`baseline-${i}`}
+              x1={prev.sx}
+              y1={prev.sy}
+              x2={bp.sx}
+              y2={bp.sy}
+              stroke={getHeatmapColor(bp, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[bp.idx] : undefined)}
+              strokeWidth="3.5"
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              strokeOpacity={0.9 * baselineOpacity}
+            />
+          );
+        })}
 
         {svgPoints.map((p, i) => {
           if (i === 0) return null;
@@ -232,9 +271,10 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
               y1={prev.sy}
               x2={p.sx}
               y2={p.sy}
-              stroke={getHeatmapColor(p, colorBy)}
+              stroke={getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined)}
               strokeWidth="4"
               strokeLinecap="round"
+              strokeOpacity={primaryOpacity}
               className="hover:stroke-white transition-colors cursor-pointer"
               onClick={() => onSelectIndex?.(p.idx)}
             />
@@ -277,12 +317,12 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
             stroke="#f59e0b"
             strokeWidth="1.5"
             strokeDasharray="4 4"
-            opacity="0.75"
+            opacity={0.75 * baselineOpacity}
           />
         )}
 
         {baselineGhostPos && (
-          <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
+          <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`} opacity={baselineOpacity}>
             <circle r="12" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
             <circle r="6.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" filter="url(#ghostGlow)" />
             <text y="-10" textAnchor="middle" className="fill-amber-300 text-[10px] font-mono font-bold">GHOST</text>
@@ -290,7 +330,7 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
         )}
 
         {currentPos && (
-          <g transform={`translate(${currentPos.sx}, ${currentPos.sy})`}>
+          <g transform={`translate(${currentPos.sx}, ${currentPos.sy})`} opacity={primaryOpacity}>
             <circle r="14" fill="none" stroke="#38bdf8" strokeWidth="2" className="animate-ping opacity-50" />
             <circle r="7" fill="#38bdf8" stroke="#ffffff" strokeWidth="2.5" filter="url(#carGlow)" />
             {!isStationary && (

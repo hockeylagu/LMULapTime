@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../server/types.js';
 import { GpsTrackMap } from './GpsTrackMap.js';
 import { GpsZoomMap } from './GpsZoomMap.js';
@@ -39,6 +40,11 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
+  // Lets the driver fade out either lap's line on the map to make the delta easier to read.
+  const [fadedLine, setFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
+  const primaryOpacity = fadedLine === 'primary' ? 0.12 : 1;
+  const baselineOpacity = fadedLine === 'baseline' ? 0.12 : 1;
+
   const selectedCorner = useMemo(
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
@@ -74,9 +80,34 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             </button>
           ))}
         </div>
-        <span className="text-[10px] text-lmu-muted font-mono hidden sm:inline">
-          {mapViewMode === 'dual' ? 'Overview + Close-Up' : mapViewMode === 'zoom' ? 'Apex Detail' : 'Circuit Map'}
-        </span>
+        {baselinePoints ? (
+          <div className="flex items-center gap-1 bg-lmu-dark p-1 rounded-lg border border-lmu-border/60">
+            <button
+              onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
+              title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                fadedLine === 'primary' ? 'text-lmu-muted' : 'text-sky-400 hover:text-sky-300'
+              }`}
+            >
+              {fadedLine === 'primary' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              Mine
+            </button>
+            <button
+              onClick={() => setFadedLine(f => (f === 'baseline' ? 'none' : 'baseline'))}
+              title={fadedLine === 'baseline' ? 'Show baseline line' : 'Fade baseline line'}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                fadedLine === 'baseline' ? 'text-lmu-muted' : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              {fadedLine === 'baseline' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              Baseline
+            </button>
+          </div>
+        ) : (
+          <span className="text-[10px] text-lmu-muted font-mono hidden sm:inline">
+            {mapViewMode === 'dual' ? 'Overview + Close-Up' : mapViewMode === 'zoom' ? 'Apex Detail' : 'Circuit Map'}
+          </span>
+        )}
       </div>
 
       {/* MAP VIEWS */}
@@ -94,6 +125,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               corners={corners}
               selectedCornerNumber={selectedCornerNumber}
               onSelectCornerNumber={onSelectCornerNumber}
+              primaryOpacity={primaryOpacity}
+              baselineOpacity={baselineOpacity}
             />
           </div>
           <div className="flex-[2] min-h-0 rounded-xl overflow-hidden">
@@ -104,6 +137,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               colorBy={colorBy}
               className="w-full h-full"
               baselinePoints={baselinePoints}
+              primaryOpacity={primaryOpacity}
+              baselineOpacity={baselineOpacity}
             />
           </div>
           {apexChart}
@@ -122,6 +157,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               corners={corners}
               selectedCornerNumber={selectedCornerNumber}
               onSelectCornerNumber={onSelectCornerNumber}
+              primaryOpacity={primaryOpacity}
+              baselineOpacity={baselineOpacity}
             />
           </div>
           {apexChart}
@@ -136,6 +173,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               colorBy={colorBy}
               className="w-full h-full"
               baselinePoints={baselinePoints}
+              primaryOpacity={primaryOpacity}
+              baselineOpacity={baselineOpacity}
             />
           </div>
           {apexChart}

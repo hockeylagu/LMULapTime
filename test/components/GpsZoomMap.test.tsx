@@ -51,7 +51,7 @@ describe('GpsZoomMap', () => {
       <GpsZoomMap
         points={mockPoints}
         currentIndex={3}
-        colorBy="steering"
+        colorBy="pedal"
       />
     );
 

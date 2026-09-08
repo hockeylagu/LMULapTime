@@ -91,6 +91,13 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
 
+  // Delta heatmap requires a baseline lap; fall back to speed if compare mode is turned off.
+  useEffect(() => {
+    if (colorBy === 'delta' && (!isCompareMode || !baselineTrajectory)) {
+      setColorBy('speed');
+    }
+  }, [colorBy, isCompareMode, baselineTrajectory]);
+
   const lapSegments = useMemo(() => {
     if (!trajectory) return [];
     // With no baseline lap loaded, self-compare the lap against itself so corner speeds,
@@ -297,7 +304,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
 
                 {activeTab === 'map' && (
                   <div className="flex items-center gap-1 text-xs">
-                    {(['speed', 'throttle', 'brake', 'steering'] as const).map(mode => (
+                    {(['speed', 'pedal', ...(isCompareMode && baselineTrajectory ? (['delta'] as const) : [])] as const).map(mode => (
                       <button
                         key={mode}
                         onClick={() => setColorBy(mode)}

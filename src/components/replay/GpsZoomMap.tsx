@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Navigation, Plus, Minus, RotateCcw } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../server/types.js';
-import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
+import { computeCumulativeDistances, computeLapComparisons, findIndexAtDistance, interpolatePointAtDistance } from '../../utils/replayComparison.js';
 import { getHeatmapColor, MapColorMode } from './replayMapUtils.js';
 
 export interface GpsZoomMapProps {
@@ -11,6 +11,8 @@ export interface GpsZoomMapProps {
   colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];
+  primaryOpacity?: number;
+  baselineOpacity?: number;
 }
 
 export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
@@ -20,6 +22,8 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   colorBy = 'speed',
   className = '',
   baselinePoints,
+  primaryOpacity = 1,
+  baselineOpacity = 1,
 }) => {
   const VIEWBOX_SIZE = 600;
   const CENTER = VIEWBOX_SIZE / 2;
@@ -70,6 +74,12 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
   const safeIndex = Math.max(0, Math.min(currentIndex, points.length - 1));
   const currentPoint = points[safeIndex];
 
+  // Per-point time delta vs baseline, only computed when the delta heatmap mode is active.
+  const deltaByIdx = useMemo(() => {
+    if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
+    return computeLapComparisons(points, baselinePoints).map(c => c.deltaTimeSec);
+  }, [colorBy, points, baselinePoints]);
+
   const { visibleSegments, carHeadingDeg } = useMemo(() => {
     if (!points || points.length === 0 || !currentPoint) return { visibleSegments: [], carHeadingDeg: 0 };
     const scale = (CENTER - 40) / zoomRadius;
@@ -89,7 +99,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
       const sy2 = CENTER - (p2.z - currentPoint.z) * scale;
       segments.push({
         pathD: `M ${sx1.toFixed(1)} ${sy1.toFixed(1)} L ${sx2.toFixed(1)} ${sy2.toFixed(1)}`,
-        color: getHeatmapColor(p2, colorBy),
+        color: getHeatmapColor(p2, colorBy, deltaByIdx ? deltaByIdx[i + 1] : undefined),
         avgSpeed: Math.round(((p1.speedKmh || 0) + (p2.speedKmh || 0)) / 2),
         idx: i + 1,
       });
@@ -104,14 +114,28 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
       if (Math.hypot(dx, dy) > 0.5) heading = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
     }
     return { visibleSegments: segments, carHeadingDeg: heading };
-  }, [points, currentPoint, safeIndex, zoomRadius, colorBy, CENTER]);
+  }, [points, currentPoint, safeIndex, zoomRadius, colorBy, deltaByIdx, CENTER]);
 
   const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
   const baseDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
 
-  const { baselineVisiblePath, baselineGhostPos } = useMemo(() => {
+  // Rescales each baseline point's own delta (matched by relative track position) so the
+  // baseline line can share the exact same delta heatmap as the primary line.
+  const baselineDeltaByIdx = useMemo(() => {
+    if (colorBy !== 'delta' || !deltaByIdx || !baselinePoints || baselinePoints.length === 0) return null;
+    const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
+    const totalBaselineDist = baseDists[baseDists.length - 1] || 0;
+    const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
+    return baseDists.map(d => {
+      const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
+      const idx = findIndexAtDistance(primaryDists, targetDist);
+      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
+    });
+  }, [colorBy, deltaByIdx, baselinePoints, baseDists, primaryDists]);
+
+  const { baselineSegments, baselineGhostPos } = useMemo(() => {
     if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0 || !currentPoint || baseDists.length === 0 || primaryDists.length === 0) {
-      return { baselineVisiblePath: '', baselineGhostPos: null };
+      return { baselineSegments: [] as Array<{ pathD: string; color: string }>, baselineGhostPos: null };
     }
     const scale = (CENTER - 40) / zoomRadius;
     const maxVisibleDist = zoomRadius * 1.6;
@@ -130,29 +154,27 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     const startB = Math.max(0, low - win);
     const endB = Math.min(baselinePoints.length, low + win);
 
-    let bPath = '';
-    let hasStarted = false;
-    for (let i = startB; i < endB; i++) {
-      const bp = baselinePoints[i];
-      const distToCenter = Math.hypot(bp.x - currentPoint.x, bp.z - currentPoint.z);
-      if (distToCenter <= maxVisibleDist) {
-        const sx = CENTER + (bp.x - currentPoint.x) * scale;
-        const sy = CENTER - (bp.z - currentPoint.z) * scale;
-        if (!hasStarted) {
-          bPath += `M ${sx.toFixed(1)} ${sy.toFixed(1)}`;
-          hasStarted = true;
-        } else {
-          const prev = baselinePoints[i - 1];
-          const stepDist = prev ? Math.hypot(bp.x - prev.x, bp.z - prev.z) : 0;
-          bPath += bp.isTeleport || stepDist > 25 ? ` M ${sx.toFixed(1)} ${sy.toFixed(1)}` : ` L ${sx.toFixed(1)} ${sy.toFixed(1)}`;
-        }
-      } else {
-        hasStarted = false;
-      }
+    const segments: Array<{ pathD: string; color: string }> = [];
+    for (let i = Math.max(1, startB); i < endB; i++) {
+      const bp1 = baselinePoints[i - 1];
+      const bp2 = baselinePoints[i];
+      const dist1 = Math.hypot(bp1.x - currentPoint.x, bp1.z - currentPoint.z);
+      const dist2 = Math.hypot(bp2.x - currentPoint.x, bp2.z - currentPoint.z);
+      if (dist1 > maxVisibleDist && dist2 > maxVisibleDist) continue;
+      const stepDist = Math.hypot(bp2.x - bp1.x, bp2.z - bp1.z);
+      if (bp2.isTeleport || stepDist > 25) continue;
+      const sx1 = CENTER + (bp1.x - currentPoint.x) * scale;
+      const sy1 = CENTER - (bp1.z - currentPoint.z) * scale;
+      const sx2 = CENTER + (bp2.x - currentPoint.x) * scale;
+      const sy2 = CENTER - (bp2.z - currentPoint.z) * scale;
+      segments.push({
+        pathD: `M ${sx1.toFixed(1)} ${sy1.toFixed(1)} L ${sx2.toFixed(1)} ${sy2.toFixed(1)}`,
+        color: getHeatmapColor(bp2, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[i] : undefined),
+      });
     }
 
     return {
-      baselineVisiblePath: bPath,
+      baselineSegments: segments,
       baselineGhostPos: {
         sx: CENTER + (ghostPt.x - currentPoint.x) * scale,
         sy: CENTER - (ghostPt.z - currentPoint.z) * scale,
@@ -160,7 +182,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
         point: ghostPt,
       },
     };
-  }, [points, baselinePoints, currentPoint, safeIndex, zoomRadius, CENTER, primaryDists, baseDists]);
+  }, [points, baselinePoints, currentPoint, safeIndex, zoomRadius, CENTER, primaryDists, baseDists, colorBy, baselineDeltaByIdx]);
 
   if (!points || points.length === 0 || !currentPoint) {
     return (
@@ -219,10 +241,20 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             <text x={CENTER + ring2Dist * scale + 4} y={CENTER + 3} fill="#38bdf8" fontSize="9" fontFamily="monospace" opacity="0.3">{ring2Dist}m</text>
             <line x1={CENTER - 15} y1={CENTER} x2={CENTER + 15} y2={CENTER} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
             <line x1={CENTER} y1={CENTER - 15} x2={CENTER} y2={CENTER + 15} stroke="#ffffff" strokeWidth="0.8" opacity="0.25" />
-            {baselineVisiblePath && (
-              <path d={baselineVisiblePath} stroke="#f59e0b" strokeWidth="4" strokeDasharray="8 6" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
-            )}
-            <g>
+            {baselineSegments.map((seg, i) => (
+              <path
+                key={`baseline-${i}`}
+                d={seg.pathD}
+                stroke={seg.color}
+                strokeWidth="4"
+                strokeDasharray="8 6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                opacity={0.9 * baselineOpacity}
+              />
+            ))}
+            <g opacity={primaryOpacity}>
               {visibleSegments.map((seg, i) => (
                 <path
                   key={`line-${i}`} d={seg.pathD} stroke={seg.color} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" fill="none"
@@ -233,10 +265,10 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
               ))}
             </g>
             {baselineGhostPos && (
-              <line x1={CENTER} y1={CENTER} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.75" />
+              <line x1={CENTER} y1={CENTER} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity={0.75 * baselineOpacity} />
             )}
             {baselineGhostPos && (
-              <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`}>
+              <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`} opacity={baselineOpacity}>
                 <circle r="12" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
                 <circle r="6.5" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" opacity="0.95" />
                 <text y="-10" textAnchor="middle" className="fill-amber-300 text-[10px] font-mono font-bold">GHOST ({baselineGhostPos.distMeters.toFixed(1)}m)</text>

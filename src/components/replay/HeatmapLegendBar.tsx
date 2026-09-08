@@ -35,43 +35,36 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
         </div>
       )}
 
-      {colorBy === 'throttle' && (
+      {colorBy === 'pedal' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Throttle:</span>
-          <span className="flex items-center gap-1 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-[#64748b]" /> 0%
-          </span>
-          <span>→</span>
-          <span className="flex items-center gap-1 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-[#10b981]" /> 100%
-          </span>
-        </div>
-      )}
-
-      {colorBy === 'brake' && (
-        <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Brake:</span>
-          <span className="flex items-center gap-1 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-[#64748b]" /> 0%
-          </span>
-          <span>→</span>
+          <span className="font-bold text-white uppercase">Pedal:</span>
           <span className="flex items-center gap-1 text-rose-400">
-            <span className="w-2 h-2 rounded-full bg-[#ef4444]" /> 100%
+            <span className="w-2 h-2 rounded-full bg-[#ef4444]" /> Brake
+          </span>
+          <span>|</span>
+          <span className="flex items-center gap-1 text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-[#475569]" /> Coast
+          </span>
+          <span>|</span>
+          <span className="flex items-center gap-1 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Throttle
           </span>
         </div>
       )}
 
-      {colorBy === 'steering' && (
+      {colorBy === 'delta' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Steering:</span>
-          <span className="flex items-center gap-1 text-indigo-400">
-            <span className="w-2 h-2 rounded-full bg-[#818cf8]" /> Left
+          <span className="font-bold text-white uppercase">Delta:</span>
+          <span className="flex items-center gap-1 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-[#10b981]" /> Gaining
           </span>
           <span>|</span>
-          <span className="text-slate-400">Center</span>
+          <span className="flex items-center gap-1 text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-[#475569]" /> Even
+          </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-orange-400">
-            <span className="w-2 h-2 rounded-full bg-[#f97316]" /> Right
+          <span className="flex items-center gap-1 text-rose-400">
+            <span className="w-2 h-2 rounded-full bg-[#ef4444]" /> Losing
           </span>
         </div>
       )}
