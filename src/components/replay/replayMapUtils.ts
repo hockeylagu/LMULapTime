@@ -1,46 +1,82 @@
 import { ReplayTelemetryPoint } from '../../../server/types.js';
 import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
 
-export type MapColorMode = 'speed' | 'throttle' | 'brake' | 'steering' | 'default';
+export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
+
+// Continuous thermal gradient stops (0..1): blue -> cyan -> green -> amber -> orange -> purple.
+const SPEED_GRADIENT: Array<[number, [number, number, number]]> = [
+  [0, [2, 132, 199]],     // blue (apex/slow)
+  [0.35, [16, 185, 129]], // emerald (mid)
+  [0.65, [245, 158, 11]], // amber (high)
+  [1, [192, 38, 211]],    // purple/fuchsia (top speed)
+];
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function sampleGradient(stops: Array<[number, [number, number, number]]>, t: number): string {
+  const clamped = Math.min(1, Math.max(0, t));
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, c0] = stops[i];
+    const [t1, c1] = stops[i + 1];
+    if (clamped >= t0 && clamped <= t1) {
+      const localT = t1 > t0 ? (clamped - t0) / (t1 - t0) : 0;
+      const r = Math.round(lerp(c0[0], c1[0], localT));
+      const g = Math.round(lerp(c0[1], c1[1], localT));
+      const b = Math.round(lerp(c0[2], c1[2], localT));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }
+  const last = stops[stops.length - 1][1];
+  return `rgb(${last[0]}, ${last[1]}, ${last[2]})`;
+}
+
+const MAX_SPEED_KMH = 280;
+const COAST_COLOR = '#475569'; // slate-600, neither pedal is applied
+const DELTA_NEUTRAL_COLOR = '#475569';
 
 /**
- * Returns a hexadecimal color string for a telemetry point based on the selected metric.
+ * Returns a color string for a telemetry point based on the selected heatmap metric.
+ * `deltaTimeSec` (positive = losing time vs baseline, negative = gaining time) is only
+ * used when colorBy === 'delta' and must be supplied by the caller (requires a baseline lap).
  */
 export function getHeatmapColor(
   p: ReplayTelemetryPoint,
-  colorBy: MapColorMode = 'speed'
+  colorBy: MapColorMode = 'speed',
+  deltaTimeSec?: number
 ): string {
-  if (colorBy === 'throttle') {
-    const th = p.throttle || 0;
-    if (th > 75) return '#10b981'; // Green
-    if (th > 20) return '#f59e0b'; // Amber
-    return '#64748b';
-  }
-
-  if (colorBy === 'brake') {
-    const brk = p.brake || 0;
-    if (brk > 50) return '#ef4444'; // Red
-    if (brk > 10) return '#f97316'; // Orange
-    return '#64748b';
-  }
-
-  if (colorBy === 'steering') {
-    const st = p.steerYaw || 0;
-    if (st < -25) return '#818cf8'; // Indigo
-    if (st > 25) return '#f97316';  // Orange
-    return '#64748b';
-  }
-
   if (colorBy === 'default') {
     return '#38bdf8';
   }
 
-  // Thermal Speed heatmap: Blue = Apex/Slow -> Green = Exit -> Orange = Fast -> Purple = Top Speed
+  if (colorBy === 'pedal') {
+    const th = p.throttle || 0;
+    const brk = p.brake || 0;
+    // Braking dominates when both are non-trivial (trail-braking overlap).
+    if (brk > 5 && brk >= th) {
+      return sampleGradient([[0, [71, 85, 105]], [1, [239, 68, 68]]], brk / 100);
+    }
+    if (th > 5) {
+      return sampleGradient([[0, [71, 85, 105]], [1, [16, 185, 129]]], th / 100);
+    }
+    return COAST_COLOR;
+  }
+
+  if (colorBy === 'delta') {
+    if (deltaTimeSec === undefined || Number.isNaN(deltaTimeSec) || Math.abs(deltaTimeSec) < 0.02) {
+      return DELTA_NEUTRAL_COLOR;
+    }
+    const maxDelta = 0.6; // seconds at which the gradient saturates
+    const t = Math.min(1, Math.abs(deltaTimeSec) / maxDelta);
+    return deltaTimeSec < 0
+      ? sampleGradient([[0, [71, 85, 105]], [1, [16, 185, 129]]], t) // gaining time -> green
+      : sampleGradient([[0, [71, 85, 105]], [1, [239, 68, 68]]], t); // losing time -> red
+  }
+
+  // Speed: continuous thermal heatmap, Blue (slow) -> Green -> Amber -> Purple (top speed)
   const spd = p.speedKmh || 0;
-  if (spd > 230) return '#c026d3'; // Purple (Top Speed)
-  if (spd > 160) return '#f59e0b'; // Amber/Orange (High Speed)
-  if (spd > 90) return '#10b981';  // Emerald Green (Mid Speed)
-  return '#0284c7';                 // Blue (Apex / Low Speed)
+  return sampleGradient(SPEED_GRADIENT, spd / MAX_SPEED_KMH);
 }
 
 export interface ProjectedPoint extends ReplayTelemetryPoint {
