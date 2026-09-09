@@ -63,7 +63,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
   return (
     <>
       {/* THROTTLE CHANNEL */}
-      <div className="relative flex-1 border-b border-lmu-border/40 min-h-[80px] group bg-[#091512]/50">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#091512]/50">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-emerald-500/20 text-emerald-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Activity className="w-3 h-3" />
@@ -112,7 +112,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
       </div>
 
       {/* BRAKE CHANNEL */}
-      <div className="relative flex-1 border-b border-lmu-border/40 min-h-[80px] group bg-[#190d11]/50">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#190d11]/50">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-rose-500/20 text-rose-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Zap className="w-3 h-3" />

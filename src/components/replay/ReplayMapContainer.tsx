@@ -10,7 +10,7 @@ import { computeCumulativeDistances } from '../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../utils/cornerAnalysis.js';
 
 export interface ReplayMapContainerProps {
-  trajectory: ReplayTrajectoryData;
+  trajectory: ReplayTrajectoryData | null;
   currentIndex: number;
   onSelectIndex: (index: number) => void;
   colorBy: MapColorMode;
@@ -60,8 +60,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
   );
-  const primaryDists = useMemo(() => computeCumulativeDistances(trajectory.points), [trajectory.points]);
+  const primaryDists = useMemo(() => computeCumulativeDistances(trajectory?.points || []), [trajectory]);
   const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
+
+  if (!trajectory) return null;
 
   const apexChart = selectedCorner ? (
     <CornerApexChart

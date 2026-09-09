@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
 import { ConsistencyPanel } from '../../src/components/replay/ConsistencyPanel';
 
 vi.mock('recharts', () => {
-  const React = require('react');
   return {
-    BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Bar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Cell: (props: Record<string, unknown> & { children?: React.ReactNode }) => <button type="button" {...props}>{props.children}</button>,
+    BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    Bar: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    Cell: (props: Record<string, unknown> & { children?: ReactNode }) => <button type="button" {...props}>{props.children}</button>,
     CartesianGrid: () => null,
     XAxis: () => null,
     YAxis: () => null,
     ReferenceLine: () => null,
     Tooltip: () => null,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   };
 });
 
@@ -325,7 +325,7 @@ describe('ReplayInspectorModal', () => {
 
   it('opens a double-clicked consistency chart lap as the baseline comparison', () => {
     const onSelectBaselineLap = vi.fn();
-    const { container } = render(
+    render(
       <ConsistencyPanel
         stats={{
           lapCount: 3,
@@ -340,14 +340,14 @@ describe('ReplayInspectorModal', () => {
         cornerStats={[
           {
             cornerNumber: 1,
+            lapsSampled: 3,
             minDistM: 10,
-            maxDistM: 20,
-            entrySpeedKmh: { consistencyPct: 1, avg: 120, max: 125, min: 110, stdDev: 5, samples: [{ lapNumber: 1, value: 110 }, { lapNumber: 2, value: 120 }, { lapNumber: 3, value: 125 }] },
-            apexSpeedKmh: { consistencyPct: 1, avg: 100, max: 105, min: 95, stdDev: 4, samples: [{ lapNumber: 1, value: 95 }, { lapNumber: 2, value: 100 }, { lapNumber: 3, value: 105 }] },
-            exitSpeedKmh: { consistencyPct: 1, avg: 110, max: 112, min: 108, stdDev: 2, samples: [{ lapNumber: 1, value: 108 }, { lapNumber: 2, value: 110 }, { lapNumber: 3, value: 112 }] },
-            brakingDistM: { consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
-            throttleOnDistM: { consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
-            time: { consistencyPct: 1, avg: 1.5, max: 1.7, min: 1.4, stdDev: 0.12, samples: [{ lapNumber: 1, value: 1.4 }, { lapNumber: 2, value: 1.5 }, { lapNumber: 3, value: 1.7 }] },
+            entrySpeedKmh: { count: 3, consistencyPct: 1, avg: 120, max: 125, min: 110, stdDev: 5, samples: [{ lapNumber: 1, value: 110 }, { lapNumber: 2, value: 120 }, { lapNumber: 3, value: 125 }] },
+            apexSpeedKmh: { count: 3, consistencyPct: 1, avg: 100, max: 105, min: 95, stdDev: 4, samples: [{ lapNumber: 1, value: 95 }, { lapNumber: 2, value: 100 }, { lapNumber: 3, value: 105 }] },
+            exitSpeedKmh: { count: 3, consistencyPct: 1, avg: 110, max: 112, min: 108, stdDev: 2, samples: [{ lapNumber: 1, value: 108 }, { lapNumber: 2, value: 110 }, { lapNumber: 3, value: 112 }] },
+            brakingDistM: { count: 3, consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
+            throttleOnDistM: { count: 3, consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
+            time: { count: 3, consistencyPct: 1, avg: 1.5, max: 1.7, min: 1.4, stdDev: 0.12, samples: [{ lapNumber: 1, value: 1.4 }, { lapNumber: 2, value: 1.5 }, { lapNumber: 3, value: 1.7 }] },
           },
         ]}
         availableLaps={[
