@@ -83,7 +83,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
   ), [deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
 
   return (
-    <div className="relative flex-1 border-b border-lmu-border/40 min-h-[85px] group bg-[#110d1c]/60">
+    <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#110d1c]/60">
       <div className="absolute top-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2">
           <span className="p-1 rounded bg-purple-500/20 text-purple-300 font-black text-[10px] tracking-wider flex items-center gap-1">

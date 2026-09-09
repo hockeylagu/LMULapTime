@@ -25,6 +25,7 @@ describe('ReplayMapContainer', () => {
       minDistM: 10,
       exitDistM: 20,
       lengthM: 20,
+      primaryTimeSec: 1,
       primaryEntrySpeedKmh: 180,
       baselineEntrySpeedKmh: 180,
       entrySpeedDeltaKmh: 0,

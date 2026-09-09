@@ -351,5 +351,41 @@ describe('TelemetryStripCharts', () => {
 
     expect(screen.queryByText(/Zoomed:/i)).not.toBeInTheDocument();
   });
+
+  it('positions sector and corner markers by lap distance, not session time', () => {
+    const points: ReplayTrajectoryPoint[] = [0, 10, 30, 60, 100].map((distance, index) => ({
+      x: distance,
+      y: 0,
+      z: 0,
+      rotY: 0,
+      speedKmh: 120,
+      throttle: 80,
+      brake: 0,
+      steerYaw: 0,
+      timeSec: 3600 + index * 0.1,
+    }));
+
+    const { container } = render(
+      <TelemetryStripCharts
+        points={points}
+        currentIndex={0}
+        onSelectIndex={vi.fn()}
+        sectors={{ s1Frame: 1, s2Frame: 3 }}
+        selectedCornerMarkers={{ cornerNumber: 4, entryFrame: 1, minFrame: 2, exitFrame: 3 }}
+      />
+    );
+
+    const marker = (label: string): HTMLElement => {
+      const text = screen.getByText(label);
+      return text.parentElement as HTMLElement;
+    };
+
+    expect(marker('S1').style.left).toBe('10%');
+    expect(marker('S2').style.left).toBe('60%');
+    expect(marker('T4 IN').style.left).toBe('10%');
+    expect(marker('T4 APEX').style.left).toBe('30%');
+    expect(marker('T4 OUT').style.left).toBe('60%');
+    expect(container.querySelectorAll('.border-dashed').length).toBe(3);
+  });
 });
 

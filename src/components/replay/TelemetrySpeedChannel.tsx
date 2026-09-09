@@ -46,7 +46,7 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
   ), [speedPath, baselineSpeedPath]);
 
   return (
-    <div className="relative flex-1 border-b border-lmu-border/40 min-h-[85px] group bg-[#0b101d]/60">
+    <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#0b101d]/60">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-sky-500/20 text-sky-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Gauge className="w-3 h-3" />

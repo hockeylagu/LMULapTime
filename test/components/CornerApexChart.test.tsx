@@ -13,6 +13,7 @@ describe('CornerApexChart', () => {
     minDistM: 20,
     exitDistM: 40,
     lengthM: 40,
+    primaryTimeSec: 1.2,
     primaryEntrySpeedKmh: 180,
     baselineEntrySpeedKmh: 175,
     entrySpeedDeltaKmh: 5,

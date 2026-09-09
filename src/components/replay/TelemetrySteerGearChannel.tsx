@@ -48,7 +48,7 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
   return (
     <>
       {/* STEERING ANGLE CHANNEL */}
-      <div className="relative flex-1 border-b border-lmu-border/40 min-h-[75px] group bg-[#0e0f1e]/50">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#0e0f1e]/50">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Compass className="w-3 h-3" />
@@ -87,7 +87,7 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
       </div>
 
       {/* GEAR CHANNEL */}
-      <div className="relative flex-1 min-h-[70px] group bg-[#110e1a]/50">
+      <div className="relative flex-1 basis-0 min-h-0 group bg-[#110e1a]/50">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-amber-500/20 text-amber-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Layers className="w-3 h-3" />

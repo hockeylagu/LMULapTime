@@ -307,9 +307,9 @@ export function useReplayInspectorData({
     setBaselineDriverName(lap.driverName || null);
     setIsComparePickerOpen(false);
     updateHashParams({
-      compareSessionId: lap.sessionId,
-      compareDriver: lap.driverName,
-      compareLapNum: lap.lapNum,
+      compareSessionId: lap.sessionId ? String(lap.sessionId) : null,
+      compareDriver: lap.driverName || null,
+      compareLapNum: lap.lapNum === undefined ? null : String(lap.lapNum),
     });
   };
 
@@ -325,7 +325,7 @@ export function useReplayInspectorData({
     updateHashParams({
       compareSessionId: null,
       compareDriver: driverName,
-      compareLapNum: lapNumber,
+      compareLapNum: String(lapNumber),
     });
   };
 
@@ -380,7 +380,7 @@ export function useReplayInspectorData({
   return {
     metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
     isLoading, isTrajLoading, error, isCompareMode, handleToggleCompare,
-    handleSwapBaseline, handleToggleCompare, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineReplayName, setBaselineReplayName,
+    handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineReplayName, setBaselineReplayName,
     baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
     baselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
     isCompareLapsLoading, setCompareLapFilter, handleSelectCompareLap,
