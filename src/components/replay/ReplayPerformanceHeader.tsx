@@ -125,9 +125,6 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
             </span>
           )}
         </div>
-        <div className="hidden md:flex px-2 py-0.5 rounded-lg bg-lmu-dark border border-lmu-border text-lmu-muted items-center gap-1">
-          <span>1,200 pts</span>
-        </div>
       </div>
     </div>
   );

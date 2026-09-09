@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Gauge, Timer } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Gauge, Timer, Activity } from 'lucide-react';
 import { TelemetryStripCharts } from './TelemetryStripCharts.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
-import { ReplayTimelineFooter } from './ReplayTimelineFooter.js';
 import { ReplayMapContainer } from './ReplayMapContainer.js';
 import { CornerSpeedTable } from './CornerSpeedTable.js';
+import { ConsistencyPanel } from './ConsistencyPanel.js';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
+import { useCornerConsistency } from './useCornerConsistency.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
-import { computeLapSegmentComparisons } from '../../utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../utils/cornerAnalysis.js';
+import { computeLapConsistencyStats } from '../../utils/lapConsistency.js';
 
 export interface ReplayInspectorModalProps {
   isOpen: boolean;
@@ -56,7 +58,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setCompareLapFilter,
     handleSelectCompareLap,
     baselineTrajectory,
-    baselineMetadata,
     isBaselineLoading,
     currentIndex,
     setCurrentIndex,
@@ -77,6 +78,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     handleSwapBaseline,
     handleRemoveCompare,
     activeReplayName,
+    handleSelectBaselineLap,
   } = useReplayInspectorData({
     isOpen,
     replayName,
@@ -90,9 +92,21 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState<'map' | 'corners'>('map');
+  const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
+  // Laps toggled off by the driver (outliers - spins, traffic, etc.) via the Consistency tab's
+  // lap selector, excluded from both the sector-level and per-corner consistency stats.
+  const [excludedConsistencyLaps, setExcludedConsistencyLaps] = useState<Set<number>>(new Set());
+  const toggleConsistencyLap = (lapNumber: number) => {
+    setExcludedConsistencyLaps(prev => {
+      const next = new Set(prev);
+      if (next.has(lapNumber)) next.delete(lapNumber);
+      else next.add(lapNumber);
+      return next;
+    });
+  };
 
   // Delta heatmap requires a baseline lap; fall back to speed if compare mode is turned off.
   useEffect(() => {
@@ -111,6 +125,46 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
   const cornerCount = cornerSegments.length;
   const isSelfAnalysis = !isCompareMode || !baselineTrajectory;
+
+  const consistencyStats = useMemo(
+    () => computeLapConsistencyStats((trajectory?.laps || []).filter(l => !excludedConsistencyLaps.has(l.lapNumber))),
+    [trajectory, excludedConsistencyLaps]
+  );
+
+  const { cornerStats: rawCornerConsistencyStats, isLoading: isCornerConsistencyLoading } =
+    useCornerConsistency(activeTab === 'corners' && cornerSubView === 'consistency', activeReplayName, metadata, selectedDriverSlot, trajectory);
+
+  // Recomputed from the already-sampled per-lap values, so excluding an outlier lap doesn't
+  // require re-fetching or re-timing any telemetry.
+  const cornerConsistencyStats = useMemo(
+    () => filterCornerConsistencyStats(rawCornerConsistencyStats, excludedConsistencyLaps),
+    [rawCornerConsistencyStats, excludedConsistencyLaps]
+  );
+
+  // Every lap this replay/driver has (valid or not), offered in the lap selector so the driver
+  // can see and override which laps feed the consistency stats - invalid/outlap laps are
+  // pre-excluded by default (see the initialization effect below) but stay toggleable.
+  // Sourced from trajectory.laps first, same as computeLapConsistencyStats above, so the
+  // selector and the sector-consistency stats always agree on what "valid" means for a lap.
+  const availableConsistencyLaps = useMemo(() => {
+    const laps = (trajectory?.laps || metadata?.laps || []).filter(l => l.lapTimeSec > 0);
+    return laps
+      .map(l => ({ lapNumber: l.lapNumber, lapTimeSec: l.lapTimeSec, isValid: l.isValid !== false && !l.isOutlap }))
+      .sort((a, b) => a.lapNumber - b.lapNumber);
+  }, [metadata, trajectory]);
+
+  // Pre-excludes invalid/outlap laps the first time this replay/driver's lap list becomes
+  // available, without clobbering the driver's own toggles on subsequent renders (e.g. just
+  // switching which lap is currently displayed).
+  const initializedExclusionKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeReplayName || availableConsistencyLaps.length === 0) return;
+    const key = `${activeReplayName}|${selectedDriverSlot ?? 'x'}`;
+    if (initializedExclusionKeyRef.current === key) return;
+    initializedExclusionKeyRef.current = key;
+    const invalidLapNumbers = availableConsistencyLaps.filter(l => !l.isValid).map(l => l.lapNumber);
+    setExcludedConsistencyLaps(new Set(invalidLapNumbers));
+  }, [activeReplayName, selectedDriverSlot, availableConsistencyLaps]);
 
   // Best sector times across this replay's own laps, used to highlight the current lap's
   // best sectors the same way the rest of the site marks S1/S2/S3 personal bests.
@@ -221,21 +275,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
           <>
             {/* LEFT COLUMN: Stacked Telemetry Traces */}
             <div className="flex-1 min-w-0 flex flex-col bg-[#06080d] p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
-              <ReplayPerformanceHeader
-                currentLap={trajectory.currentLap ?? 1}
-                currentLapSummary={currentLapSummary}
-                bestS1Sec={bestSectors.s1}
-                bestS2Sec={bestSectors.s2}
-                bestS3Sec={bestSectors.s3}
-                isCompareMode={isCompareMode}
-                baselineTrajectory={baselineTrajectory}
-                baselineReplayName={baselineReplayName}
-                replayName={replayName}
-                baselineLapNumber={baselineLapNumber}
-                lapDeltas={lapDeltas}
-                formatLapTime={formatLapTime}
-              />
-
               <div className="flex-1 min-h-0 w-full">
                 <TelemetryStripCharts
                   points={trajectory.points}
@@ -243,6 +282,22 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                   onSelectIndex={setCurrentIndex}
                   sectors={trajectory.sectors}
                   className="w-full h-full"
+                  headerContent={
+                    <ReplayPerformanceHeader
+                      currentLap={trajectory.currentLap ?? 1}
+                      currentLapSummary={currentLapSummary}
+                      bestS1Sec={bestSectors.s1}
+                      bestS2Sec={bestSectors.s2}
+                      bestS3Sec={bestSectors.s3}
+                      isCompareMode={isCompareMode}
+                      baselineTrajectory={baselineTrajectory}
+                      baselineReplayName={baselineReplayName}
+                      replayName={replayName}
+                      baselineLapNumber={baselineLapNumber}
+                      lapDeltas={lapDeltas}
+                      formatLapTime={formatLapTime}
+                    />
+                  }
                   baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
                   baselineLabel={
                     isCompareMode && baselineTrajectory
@@ -263,12 +318,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                 />
               </div>
 
-              <ReplayTimelineFooter
-                currentIndex={currentIndex}
-                totalPoints={trajectory.points.length}
-                currentTimeSec={currentPoint && trajectory.points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (trajectory.points[0].timeSec || 0)) : undefined}
-                onChangeIndex={idx => { setCurrentIndex(idx); setIsPlaying(false); }}
-              />
             </div>
 
             {/* RIGHT COLUMN: Track Map & Corner Analysis */}
@@ -311,6 +360,29 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     ))}
                   </div>
                 )}
+
+                {activeTab === 'corners' && (
+                  <div className="flex items-center gap-1 bg-lmu-dark p-1 rounded-lg border border-lmu-border/60">
+                    <button
+                      onClick={() => setCornerSubView('compare')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                        cornerSubView === 'compare' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      }`}
+                    >
+                      <Timer className="w-3 h-3" />
+                      vs Baseline
+                    </button>
+                    <button
+                      onClick={() => setCornerSubView('consistency')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                        cornerSubView === 'consistency' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      }`}
+                    >
+                      <Activity className="w-3 h-3" />
+                      Consistency
+                    </button>
+                  </div>
+                )}
               </div>
 
               {activeTab === 'map' ? (
@@ -330,19 +402,37 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
                     onSelectCornerNumber={handleSelectCorner}
                   />
                 </div>
-              ) : (
+              ) : activeTab === 'corners' && cornerSubView === 'compare' ? (
                 <CornerSpeedTable
                   segments={lapSegments}
                   selfAnalysis={isSelfAnalysis}
-                  primaryLabel={replayName === baselineReplayName ? `Lap ${trajectory.currentLap ?? 1}` : (activeReplayName || 'My Lap')}
+                  primaryLabel={
+                    isSelfAnalysis
+                      ? `Lap ${trajectory.currentLap ?? 1}`
+                      : `Lap ${trajectory.currentLap ?? 1}`
+                  }
                   baselineLabel={
-                    baselineReplayName === replayName
-                      ? `Lap ${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1}`
-                      : `${baselineReplayName} (L${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1})`
+                    `Lap ${baselineTrajectory?.currentLap ?? baselineLapNumber ?? 1}`
                   }
                   onSelectDistance={distM => setCurrentIndex(findIndexAtDistance(primaryDists, distM))}
                   selectedCornerNumber={selectedCornerNumber}
                   onSelectCorner={handleSelectCorner}
+                  className="flex-1 min-h-0"
+                />
+              ) : (
+                <ConsistencyPanel
+                  stats={consistencyStats}
+                  cornerStats={cornerConsistencyStats}
+                  isLoadingCornerStats={isCornerConsistencyLoading}
+                  onSelectCorner={handleSelectCorner}
+                  onSelectBaselineLap={handleSelectBaselineLap}
+                  formatLapTime={formatLapTime}
+                  trackPoints={trajectory.points}
+                  trackBounds={trajectory.bounds}
+                  availableLaps={availableConsistencyLaps}
+                  excludedLaps={excludedConsistencyLaps}
+                  onToggleLapExclusion={toggleConsistencyLap}
+                  currentLapNumber={trajectory.currentLap}
                   className="flex-1 min-h-0"
                 />
               )}

@@ -136,6 +136,22 @@ describe('computeLapSegmentComparisons', () => {
     expect(corners[1]).toMatchObject({ entryDistM: 80, minDistM: 100, exitDistM: 140 });
   });
 
+  it('uses the active lap to define corner boundaries in compare mode, not the baseline noise pattern', () => {
+    const primarySpeeds = [100, 150, 200, 200, 180, 150, 100, 150, 200, 200, 180, 150, 100];
+    const baselineSpeeds = [100, 150, 200, 200, 194, 200, 200, 194, 200, 200, 150, 100];
+    const baselineSteer = [0, -50, -50, -50, 50, -50, -50, 50, -50, -50, -50, -50];
+
+    const toPoints = (speeds: number[], steer: number[] = speeds.map(() => 0)) => speeds.map((speedKmh, i) => ({
+      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: steer[i], timeSec: i * 0.3,
+    }));
+
+    const segments = computeLapSegmentComparisons(toPoints(primarySpeeds), toPoints(baselineSpeeds, baselineSteer), 20);
+    const corners = segments.filter(s => s.type === 'corner');
+
+    expect(corners).toHaveLength(1);
+    expect(corners[0]).toMatchObject({ entryDistM: 30, minDistM: 60, exitDistM: 90 });
+  });
+
   it('splits a corner into linked sub-corners on a genuine steering-direction reversal, even without a full speed recovery', () => {
     const speeds = [100, 150, 200, 200, 194, 200, 200, 194, 200, 200, 150, 100];
     const steerYaw = [0, -50, -50, -50, 50, -50, -50, 50, -50, -50, -50, -50];

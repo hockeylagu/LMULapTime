@@ -313,6 +313,22 @@ export function useReplayInspectorData({
     });
   };
 
+  // Opens a lap from this same replay/driver as the comparison baseline (e.g. from the
+  // consistency chart's per-lap bars), rather than picking a lap from another session.
+  const handleSelectBaselineLap = (lapNumber: number) => {
+    if (!activeReplayName) return;
+    const driverName = selectedDriver?.name || trajectory?.driverName || null;
+    setIsCompareMode(true);
+    setBaselineReplayName(activeReplayName);
+    setBaselineLapNumber(lapNumber);
+    setBaselineDriverName(driverName);
+    updateHashParams({
+      compareSessionId: null,
+      compareDriver: driverName,
+      compareLapNum: lapNumber,
+    });
+  };
+
   // Playback animation loop
   useEffect(() => {
     if (!isPlaying || !trajectory || trajectory.points.length === 0) {
@@ -372,5 +388,6 @@ export function useReplayInspectorData({
     playbackSpeed, setPlaybackSpeed, chartZoomRange, setChartZoomRange,
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
     maxSpeed, currentPoint, currentLapSummary, lapDeltas, activeReplayName,
+    handleSelectBaselineLap,
   };
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flag, ArrowUpRight } from 'lucide-react';
-import { LapSegmentComparison } from '../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../utils/cornerAnalysis.js';
 
 export interface CornerSpeedTableProps {
   segments: LapSegmentComparison[];
@@ -53,8 +53,9 @@ function throttleDeltaClass(delta: number | null): string {
   return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium'; // earlier throttle = faster
 }
 
-// Absolute distance-into-lap for a braking/throttle point in self-analysis mode (no baseline
-// lap to compare against, so there's no delta - just where along the lap it happened).
+// Distance to/from the apex (minimum-speed point) for a braking/throttle point in self-
+// analysis mode (no baseline lap to compare against, so there's no delta) - reading relative
+// to the apex is more meaningful than an absolute lap distance.
 function formatDistPoint(distM: number | null): string {
   return distM === null ? '--' : `${distM}m`;
 }
@@ -79,6 +80,15 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
 
   const totalTimeDelta = segments.reduce((sum, s) => sum + s.timeDeltaSec, 0);
 
+  // Only the genuinely egregious losses deserve the quick-jump shortlist; tiny deltas are
+  // just noise and make the list look like a catch-all for every corner in the lap.
+  const worstCorners: CornerSegmentComparison[] = selfAnalysis
+    ? []
+    : segments
+        .filter((s): s is CornerSegmentComparison => s.type === 'corner' && s.timeDeltaSec >= 0.08)
+        .sort((a, b) => b.timeDeltaSec - a.timeDeltaSec)
+        .slice(0, 3);
+
   return (
     <div className={`flex flex-col min-h-0 ${className}`}>
       <div className="flex items-center justify-between px-3 py-2 shrink-0 text-[11px] font-mono text-lmu-muted border-b border-lmu-border/60">
@@ -89,6 +99,29 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
           </span>
         )}
       </div>
+
+      {worstCorners.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-2 shrink-0 border-b border-lmu-border/60 overflow-x-auto">
+          <span className="text-[10px] uppercase tracking-wider text-lmu-muted shrink-0">Costs the most</span>
+          {worstCorners.map(c => (
+            <button
+              key={c.cornerNumber}
+              onClick={() => {
+                onSelectDistance?.(c.minDistM);
+                onSelectCorner?.(c.cornerNumber);
+              }}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-mono font-bold shrink-0 transition-colors cursor-pointer ${
+                c.cornerNumber === selectedCornerNumber
+                  ? 'bg-lmu-accent/20 border-lmu-accent text-white'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
+              }`}
+            >
+              <Flag className="w-2.5 h-2.5" />
+              T{c.cornerNumber} +{c.timeDeltaSec.toFixed(3)}s
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <table className="w-full text-[11px] font-mono border-collapse">
           <thead className="sticky top-0 bg-lmu-dark z-10">
@@ -136,8 +169,12 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                     </td>
                     {selfAnalysis ? (
                       <>
-                        <td className="px-2 py-1.5 text-right text-white">{formatDistPoint(s.primaryBrakingDistM)}</td>
-                        <td className="px-2 py-1.5 text-right text-white">{formatDistPoint(s.primaryThrottleOnDistM)}</td>
+                        <td className="px-2 py-1.5 text-right text-white">
+                          {formatDistPoint(s.primaryBrakingDistM !== null ? s.minDistM - s.primaryBrakingDistM : null)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-white">
+                          {formatDistPoint(s.primaryThrottleOnDistM !== null ? s.primaryThrottleOnDistM - s.minDistM : null)}
+                        </td>
                       </>
                     ) : (
                       <>
@@ -177,7 +214,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                   </>
                 )}
                 {selfAnalysis ? (
-                  <td className="px-2 py-1.5 text-right font-bold text-white">{s.lengthM}m</td>
+                  <td className="px-2 py-1.5 text-right font-bold text-white">{s.primaryTimeSec.toFixed(3)}s</td>
                 ) : (
                   <td className={`px-2 py-1.5 text-right font-bold ${timeDeltaClass(s.timeDeltaSec)}`}>
                     {formatTimeDelta(s.timeDeltaSec)}
