@@ -28,6 +28,7 @@ describe('CornerSpeedTable', () => {
     primaryThrottleOnDistM: 60,
     baselineThrottleOnDistM: 65,
     throttleOnDeltaM: -5,
+    primaryTimeSec: 0.85,
     timeDeltaSec: -0.2,
   };
 
@@ -43,6 +44,7 @@ describe('CornerSpeedTable', () => {
     primaryExitSpeedKmh: 280,
     baselineExitSpeedKmh: 275,
     exitSpeedDeltaKmh: 5,
+    primaryTimeSec: 0.5,
     timeDeltaSec: 0.1,
   };
 
@@ -123,8 +125,21 @@ describe('CornerSpeedTable', () => {
     expect(screen.queryByText(/vs/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Whole lap:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/-10/)).not.toBeInTheDocument(); // no delta annotations
-    expect(screen.getByText('35m')).toBeInTheDocument(); // absolute braking point
-    expect(screen.getByText('60m')).toBeInTheDocument(); // absolute throttle-on point
-    expect(screen.getByText('40m')).toBeInTheDocument(); // corner segment length
+    expect(screen.getByText('15m')).toBeInTheDocument(); // braking point, meters before apex
+    expect(screen.getByText('10m')).toBeInTheDocument(); // throttle-on point, meters after apex
+    expect(screen.getByText('0.850s')).toBeInTheDocument(); // absolute corner duration in self-analysis
+    expect(screen.getByText('0.500s')).toBeInTheDocument(); // absolute straight duration
+  });
+
+  it('only lists the most egregious losses in the quick-jump corner shortlist', () => {
+    const tinyLoss = { ...cornerSegment, segmentIndex: 0, cornerNumber: 1, timeDeltaSec: 0.03 };
+    const mediumLoss = { ...cornerSegment, segmentIndex: 1, cornerNumber: 2, timeDeltaSec: 0.12 };
+    const hugeLoss = { ...cornerSegment, segmentIndex: 2, cornerNumber: 3, timeDeltaSec: 0.21 };
+
+    render(<CornerSpeedTable segments={[tinyLoss, mediumLoss, hugeLoss, straightSegment]} />);
+
+    expect(screen.queryByText(/T1 \+0.030s/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/T2 \+0.120s/i)).toBeInTheDocument();
+    expect(screen.getByText(/T3 \+0.210s/i)).toBeInTheDocument();
   });
 });

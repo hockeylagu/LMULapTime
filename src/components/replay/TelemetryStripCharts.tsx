@@ -24,6 +24,7 @@ export interface TelemetryStripChartsProps {
     s2Frame: number;
   };
   className?: string;
+  headerContent?: React.ReactNode;
   baselinePoints?: ReplayTrajectoryPoint[];
   baselineLabel?: string;
   baselineLapNumber?: number;
@@ -43,6 +44,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   onSelectIndex,
   sectors,
   className = '',
+  headerContent,
   baselinePoints,
   baselineLabel,
   baselineLapNumber,
@@ -187,6 +189,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   }, [points, baselinePoints]);
 
   const currentComparison = pointComparisons[safeIndex] || null;
+  const currentTimeSec = currentPoint && points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (points[0].timeSec || 0)) : 0;
 
   const paths = useMemo(
     () => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd),
@@ -249,6 +252,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         baselineLabel={baselineLabel || (baselineLapNumber ? `Lap ${baselineLapNumber}` : 'Baseline')}
         telemetryResolution={telemetryResolution} onChangeResolution={onChangeResolution}
         pointsCount={points.length} rawPointsCount={rawPointsCount} rawSampleRateHz={rawSampleRateHz} isFullResolution={isFullResolution}
+        currentTimeSec={currentTimeSec}
+        currentFrame={safeIndex + 1}
+        totalFrames={points.length}
+        headerContent={headerContent}
       />
 
       {/* 1. SPEED */}

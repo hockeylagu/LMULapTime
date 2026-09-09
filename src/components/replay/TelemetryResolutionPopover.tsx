@@ -43,6 +43,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
 
   const effectiveRaw = rawPointsCount ?? pointsCount;
   const downsampleRatio = effectiveRaw > 0 && pointsCount > 0 ? (effectiveRaw / pointsCount).toFixed(1) : '1.0';
+  const activeSampleLabel = `${(pointsCount || effectiveRaw || 1200).toLocaleString()} pts`;
+  const fullRawLabel = `${(effectiveRaw || pointsCount || 1200).toLocaleString()} pts`;
 
   return (
     <div
@@ -81,7 +83,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
         <div className="flex items-center justify-between">
           <span className="text-lmu-muted">Active In Inspector:</span>
           <span className="font-bold text-sky-400">
-            {pointsCount.toLocaleString()} pts {isFullResolution ? '(100% Full Raw)' : `(${downsampleRatio}x downsampled)`}
+            {activeSampleLabel} {isFullResolution ? '(100% Full Raw)' : `(${downsampleRatio}x downsampled)`}
           </span>
         </div>
         {isZoomed && zoomedPointsCount !== undefined && (
@@ -121,7 +123,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Cpu className="w-3 h-3 text-sky-400" />
               Standard
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">1,200 pts</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(1200, pointsCount || 1200).toLocaleString()} pts</span>
             <span className="text-[9px] text-sky-300/80 mt-0.5">Fast 60fps</span>
           </button>
 
@@ -141,7 +143,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Zap className="w-3 h-3 text-emerald-400" />
               High
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">2,400 pts</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(2400, Math.max(pointsCount || 2400, 2400)).toLocaleString()} pts</span>
             <span className="text-[9px] text-emerald-300/80 mt-0.5">2x Precision</span>
           </button>
 
@@ -161,7 +163,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Sparkles className="w-3 h-3 text-purple-400" />
               Full Raw
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{effectiveRaw.toLocaleString()} pts</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{fullRawLabel}</span>
             <span className="text-[9px] text-purple-300/80 mt-0.5">1:1 VCR Data</span>
           </button>
         </div>

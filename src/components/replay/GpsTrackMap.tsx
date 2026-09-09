@@ -16,6 +16,15 @@ export interface GpsTrackMapCorner {
   minDistM: number;
 }
 
+// Distance-into-lap (primary lap's own distance, not baseline-rescaled) where brake/throttle
+// first crosses its onset threshold for a given corner - plotted on the map so a driver can
+// see exactly where on track those inputs happened, not just the corner they belong to.
+export interface GpsTrackMapPedalMarker {
+  cornerNumber: number;
+  distM: number;
+  kind: 'brake' | 'throttle';
+}
+
 export interface GpsTrackMapProps {
   points: ReplayTrajectoryPoint[];
   bounds: {
@@ -36,6 +45,8 @@ export interface GpsTrackMapProps {
   onSelectCornerNumber?: (cornerNumber: number) => void;
   primaryOpacity?: number;
   baselineOpacity?: number;
+  pedalMarkers?: GpsTrackMapPedalMarker[];
+  showPedalMarkers?: boolean;
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
@@ -51,6 +62,8 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
   onSelectCornerNumber,
   primaryOpacity = 1,
   baselineOpacity = 1,
+  pedalMarkers,
+  showPedalMarkers = false,
 }) => {
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -180,6 +193,20 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
       })
       .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number } => m !== null);
   }, [corners, primaryDists, baselineDists, svgPoints]);
+
+  // Brake/throttle onset points are already measured in the PRIMARY lap's own distance
+  // (see findThresholdCrossingDistM in cornerAnalysis.ts), so no baseline-length rescale is
+  // needed here, unlike the corner apex markers above.
+  const pedalMarkerPoints = useMemo(() => {
+    if (!showPedalMarkers || !pedalMarkers || pedalMarkers.length === 0 || svgPoints.length === 0) return [];
+    return pedalMarkers
+      .map(m => {
+        const idx = findIndexAtDistance(primaryDists, m.distM);
+        const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
+        return pt ? { ...m, sx: pt.sx, sy: pt.sy } : null;
+      })
+      .filter((m): m is GpsTrackMapPedalMarker & { sx: number; sy: number } => m !== null);
+  }, [showPedalMarkers, pedalMarkers, primaryDists, svgPoints]);
 
   const carHeadingDeg = useMemo(() => {
     if (!svgPoints || svgPoints.length < 2 || currentIndex === undefined) return 0;
@@ -312,6 +339,20 @@ export const GpsTrackMap: React.FC<GpsTrackMapProps> = ({
             </g>
           );
         })}
+
+        {pedalMarkerPoints.map((m, i) => (
+          <g
+            key={`pedal-${m.kind}-${m.cornerNumber}-${i}`}
+            transform={`translate(${m.sx.toFixed(1)}, ${m.sy.toFixed(1)})`}
+            className="pointer-events-none"
+          >
+            {m.kind === 'brake' ? (
+              <polygon points="0,-5 -4.5,4 4.5,4" fill="#ef4444" stroke="#000" strokeWidth="0.75" opacity="0.9" />
+            ) : (
+              <polygon points="0,-5.5 5.5,0 0,5.5 -5.5,0" fill="#22c55e" stroke="#000" strokeWidth="0.75" opacity="0.9" />
+            )}
+          </g>
+        ))}
 
         {currentPos && baselineGhostPos && (
           <line

@@ -1,6 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
+import { ConsistencyPanel } from '../../src/components/replay/ConsistencyPanel';
+
+vi.mock('recharts', () => {
+  const React = require('react');
+  return {
+    BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Bar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Cell: (props: Record<string, unknown> & { children?: React.ReactNode }) => <button type="button" {...props}>{props.children}</button>,
+    CartesianGrid: () => null,
+    XAxis: () => null,
+    YAxis: () => null,
+    ReferenceLine: () => null,
+    Tooltip: () => null,
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  };
+});
 
 describe('ReplayInspectorModal', () => {
   beforeEach(() => {
@@ -305,6 +321,55 @@ describe('ReplayInspectorModal', () => {
     expect(fastestBadge.className).toContain('bg-lmu-gold/15');
     expect(fastestBadge.className).toContain('text-lmu-gold');
     expect(fastestBadge.className).toContain('border-lmu-gold/40');
+  });
+
+  it('opens a double-clicked consistency chart lap as the baseline comparison', () => {
+    const onSelectBaselineLap = vi.fn();
+    const { container } = render(
+      <ConsistencyPanel
+        stats={{
+          lapCount: 3,
+          stats: [
+            { key: 'lapTimeSec', label: 'Full Lap', count: 3, minSec: 80, maxSec: 82, avgSec: 81, stdDevSec: 0.8, consistencyPct: 1.0 },
+            { key: 's1Sec', label: 'Sector 1', count: 3, minSec: 27, maxSec: 29, avgSec: 28, stdDevSec: 0.7, consistencyPct: 2.5 },
+            { key: 's2Sec', label: 'Sector 2', count: 3, minSec: 25, maxSec: 27, avgSec: 26, stdDevSec: 0.6, consistencyPct: 2.3 },
+            { key: 's3Sec', label: 'Sector 3', count: 3, minSec: 28, maxSec: 30, avgSec: 29, stdDevSec: 0.8, consistencyPct: 2.8 },
+          ],
+          leastConsistent: { key: 's3Sec', label: 'Sector 3', count: 3, minSec: 28, maxSec: 30, avgSec: 29, stdDevSec: 0.8, consistencyPct: 2.8 },
+        }}
+        cornerStats={[
+          {
+            cornerNumber: 1,
+            minDistM: 10,
+            maxDistM: 20,
+            entrySpeedKmh: { consistencyPct: 1, avg: 120, max: 125, min: 110, stdDev: 5, samples: [{ lapNumber: 1, value: 110 }, { lapNumber: 2, value: 120 }, { lapNumber: 3, value: 125 }] },
+            apexSpeedKmh: { consistencyPct: 1, avg: 100, max: 105, min: 95, stdDev: 4, samples: [{ lapNumber: 1, value: 95 }, { lapNumber: 2, value: 100 }, { lapNumber: 3, value: 105 }] },
+            exitSpeedKmh: { consistencyPct: 1, avg: 110, max: 112, min: 108, stdDev: 2, samples: [{ lapNumber: 1, value: 108 }, { lapNumber: 2, value: 110 }, { lapNumber: 3, value: 112 }] },
+            brakingDistM: { consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
+            throttleOnDistM: { consistencyPct: 1, avg: 18, max: 20, min: 16, stdDev: 2, samples: [{ lapNumber: 1, value: 16 }, { lapNumber: 2, value: 18 }, { lapNumber: 3, value: 20 }] },
+            time: { consistencyPct: 1, avg: 1.5, max: 1.7, min: 1.4, stdDev: 0.12, samples: [{ lapNumber: 1, value: 1.4 }, { lapNumber: 2, value: 1.5 }, { lapNumber: 3, value: 1.7 }] },
+          },
+        ]}
+        availableLaps={[
+          { lapNumber: 1, lapTimeSec: 81, isValid: true },
+          { lapNumber: 2, lapTimeSec: 80, isValid: true },
+          { lapNumber: 3, lapTimeSec: 82, isValid: true },
+        ]}
+        excludedLaps={new Set()}
+        onToggleLapExclusion={vi.fn()}
+        formatLapTime={sec => (typeof sec === 'number' ? `${sec.toFixed(3)}s` : '--')}
+        currentLapNumber={1}
+        onSelectBaselineLap={onSelectBaselineLap}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Time'));
+
+    const chartBar = screen.getByRole('button', { name: 'Double-click to compare against lap 1' });
+    expect(chartBar).toBeInTheDocument();
+    fireEvent.doubleClick(chartBar);
+
+    expect(onSelectBaselineLap).toHaveBeenCalledWith(1);
   });
 
   it('allows swapping primary and baseline lap using the Swap button', async () => {
