@@ -16,6 +16,7 @@ export interface ReplayInspectorModalProps {
   onClose: () => void;
   replayName: string | null;
   initialLapNumber?: number;
+  initialDriverName?: string | null;
   onLapChange?: (lapNumber: number) => void;
   initialCompareMode?: boolean;
   initialBaselineReplayName?: string | null;
@@ -28,6 +29,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   onClose,
   replayName,
   initialLapNumber,
+  initialDriverName,
   onLapChange,
   initialCompareMode,
   initialBaselineReplayName,
@@ -79,6 +81,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     isOpen,
     replayName,
     initialLapNumber,
+    initialDriverName,
     onLapChange,
     initialCompareMode,
     initialBaselineReplayName,

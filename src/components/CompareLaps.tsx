@@ -91,8 +91,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   const [telemetryModalOpen, setTelemetryModalOpen] = useState(false);
   const [telemetryTargetReplay, setTelemetryTargetReplay] = useState<string>('');
   const [telemetryTargetLap, setTelemetryTargetLap] = useState<number>(1);
+  const [telemetryTargetDriver, setTelemetryTargetDriver] = useState<string | null>(null);
   const [telemetryBaselineReplay, setTelemetryBaselineReplay] = useState<string | null>(null);
   const [telemetryBaselineLap, setTelemetryBaselineLap] = useState<number | null>(null);
+  const [telemetryBaselineDriver, setTelemetryBaselineDriver] = useState<string | null>(null);
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
 
   const handleCompareTelemetry = async () => {
@@ -146,8 +148,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
     setTelemetryTargetReplay(targetReplay);
     setTelemetryTargetLap(targetLap.lapNum ?? 1);
+    setTelemetryTargetDriver(targetLap.driverName ?? null);
     setTelemetryBaselineReplay(baseReplay);
     setTelemetryBaselineLap(baseLap.lapNum ?? 1);
+    setTelemetryBaselineDriver(baseLap.driverName ?? null);
     setTelemetryModalOpen(true);
   };
 
@@ -157,8 +161,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     setTelemetryModalOpen(false);
     setTelemetryTargetReplay('');
     setTelemetryTargetLap(1);
+    setTelemetryTargetDriver(null);
     setTelemetryBaselineReplay(null);
     setTelemetryBaselineLap(null);
+    setTelemetryBaselineDriver(null);
   };
 
   return (
@@ -262,9 +268,11 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           onClose={handleCloseTelemetry}
           replayName={telemetryTargetReplay}
           initialLapNumber={telemetryTargetLap}
+          initialDriverName={telemetryTargetDriver}
           initialCompareMode={true}
           initialBaselineReplayName={telemetryBaselineReplay}
           initialBaselineLapNumber={telemetryBaselineLap}
+          initialBaselineDriverName={telemetryBaselineDriver}
         />
       )}
     </div>

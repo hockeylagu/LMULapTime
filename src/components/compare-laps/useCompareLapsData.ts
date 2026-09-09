@@ -133,11 +133,7 @@ export function useCompareLapsData({
 
   const setPlayerOnly = (val: boolean) => {
     setPlayerOnlyState(val);
-    if (!val) {
-      setSelectedLaps([]);
-      setBaselineLapId('');
-      initializedScopeRef.current = '';
-    }
+    // Keep whatever laps are currently selected when switching driver scope
     updateHashParams({ playerOnly: val ? null : 'false' });
   };
 

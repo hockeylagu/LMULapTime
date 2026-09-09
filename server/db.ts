@@ -115,9 +115,14 @@ export class SessionDatabase {
     stmt.run(key, value);
   }
 
+  private allSessionsCache: DetailedSession[] | null = null;
+
   public getAllSessions(): DetailedSession[] {
+    if (this.allSessionsCache) return this.allSessionsCache;
     const rows = this.db.prepare('SELECT data_json FROM sessions ORDER BY timestamp ASC').all() as { data_json: string }[];
-    return rows.map(r => JSON.parse(r.data_json) as DetailedSession);
+    const sessions = rows.map(r => JSON.parse(r.data_json) as DetailedSession);
+    this.allSessionsCache = sessions;
+    return sessions;
   }
 
   public getAllSessionSummaries(): SessionMetadata[] {
@@ -224,6 +229,7 @@ export class SessionDatabase {
     if (session.filename) {
       this.sessionMemoryCache.set(session.filename, session);
     }
+    this.allSessionsCache = null;
   }
 
   public syncSessionsFromDir(resultsDir: string, parser: LmuParser): SyncResult {
@@ -326,6 +332,7 @@ export class SessionDatabase {
 
   public clearCache(): void {
     this.sessionMemoryCache.clear();
+    this.allSessionsCache = null;
     this.db.exec("DELETE FROM sessions; DELETE FROM cache_metadata WHERE key NOT LIKE 'reference_%';");
   }
 
