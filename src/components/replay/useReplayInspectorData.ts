@@ -8,6 +8,7 @@ export interface UseReplayInspectorDataProps {
   isOpen: boolean;
   replayName: string | null;
   initialLapNumber?: number;
+  initialDriverName?: string | null;
   onLapChange?: (lapNumber: number) => void;
   initialCompareMode?: boolean;
   initialBaselineReplayName?: string | null;
@@ -19,6 +20,7 @@ export function useReplayInspectorData({
   isOpen,
   replayName,
   initialLapNumber,
+  initialDriverName,
   onLapChange,
   initialCompareMode,
   initialBaselineReplayName,
@@ -93,7 +95,8 @@ export function useReplayInspectorData({
     setError(null);
     const requestedLap = pendingLapNumber ?? initialLapNumber;
     const lapQuery = requestedLap && requestedLap > 0 ? `&lap=${requestedLap}` : '';
-    const driverQuery = pendingDriverName ? `&driverName=${encodeURIComponent(pendingDriverName)}` : '';
+    const requestedDriverName = pendingDriverName ?? initialDriverName;
+    const driverQuery = requestedDriverName ? `&driverName=${encodeURIComponent(requestedDriverName)}` : '';
 
     Promise.all([
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
@@ -107,7 +110,7 @@ export function useReplayInspectorData({
         if (trajData) {
           setTrajectory(trajData);
           if (trajData.currentLap) onLapChange?.(trajData.currentLap);
-          const pendingDriver = pendingDriverName ? metaData?.drivers?.find((d: ReplayDriverEntry) => d.name.toLowerCase() === pendingDriverName.toLowerCase()) : undefined;
+          const pendingDriver = requestedDriverName ? metaData?.drivers?.find((d: ReplayDriverEntry) => d.name.toLowerCase() === requestedDriverName.toLowerCase()) : undefined;
           const defaultSlot = pendingDriver?.slot ?? trajData.driverSlot ??
             metaData?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer)?.slot ??
             metaData?.drivers?.[0]?.slot ?? null;

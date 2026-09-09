@@ -363,7 +363,7 @@ describe('CompareLaps component', () => {
     expect(bestS3Cells[0]).toHaveClass('text-lmu-green');
   });
 
-  it('clears default selections when changing to all drivers', async () => {
+  it('keeps the current selection when changing to all drivers', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     // Initial load selects player's PB lap (2:01.800)
@@ -376,9 +376,10 @@ describe('CompareLaps component', () => {
     const allDriversBtn = screen.getByRole('button', { name: /All Drivers/i });
     fireEvent.click(allDriversBtn);
 
-    // All Drivers starts empty so the user can choose the comparison explicitly.
+    // The previously selected lap remains in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText('No Laps Selected for Comparison')).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
     });
 
     // In the table, AI Driver's lap 3 is now available.
@@ -394,9 +395,9 @@ describe('CompareLaps component', () => {
       fireEvent.click(aiCompareBtn);
     }
 
-    // The chosen all-driver lap is now in the comparison deck.
+    // The chosen all-driver lap is now added to the comparison deck alongside the prior selection.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
 
@@ -406,7 +407,7 @@ describe('CompareLaps component', () => {
 
     // The explicit all-driver selection remains in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
   });
