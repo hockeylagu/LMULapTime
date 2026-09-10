@@ -29,6 +29,7 @@
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "express": "^5.2.1",

@@ -85,7 +85,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     initialBaselineDriverName,
   });
 
-  const [activeTab, setActiveTab] = useState<'map' | 'corners'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('speed');
   const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
