@@ -28,7 +28,7 @@ import {
   compareSessions,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack, getTrackAndLayout } from '../src/utils/paceCategory.js';
+import { matchesTrack, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -959,36 +959,48 @@ export class LmuParser {
     const getMinDiff = (v: ReplayFileEntry) =>
       Math.min(Math.abs(v.mtime - sessionTimestampMs), Math.abs(v.mtime - xmlFileMtimeMs));
 
-    const candidates = this.replaysMap.filter(v => {
-      const minDiff = getMinDiff(v);
-      if (minDiff > 600000) return false;
+    // A replay from a different session type (e.g. R1) must never match a session of another
+    // type (e.g. P1), no matter how close the timestamps are (back-to-back sessions are common).
+    const sessionScoped = this.replaysMap.filter(v => v.sessionCode.toLowerCase() === normSession && getMinDiff(v) <= 600000);
 
-      let trackMatches = matchesTrack(v.trackName, trackVenue, trackCourse);
-      if (!trackMatches) {
-        const qInfo = getTrackAndLayout(v.trackName, '');
-        const sInfo = getTrackAndLayout(trackVenue, trackCourse);
-        if (!qInfo.isKnown && !sInfo.isKnown) {
-          const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const normXmlCourse = (trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const normXmlVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-          trackMatches =
-            (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
-            (!trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)));
-        }
+    // 1. Exact track/layout match takes priority whenever one exists.
+    const exactCandidates = sessionScoped.filter(v => matchesTrack(v.trackName, trackVenue, trackCourse));
+    if (exactCandidates.length > 0) {
+      exactCandidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
+      return exactCandidates[0];
+    }
+
+    // 2. Fall back to generic-vs-specific same-circuit matches only when no exact-layout
+    // replay is available (e.g. a session logged under the bare circuit name with only a
+    // named-layout replay on disk, or vice versa).
+    const fallbackCandidates = sessionScoped.filter(v => {
+      const qInfo = getTrackAndLayout(v.trackName, '');
+      const sInfo = getTrackAndLayout(trackVenue, trackCourse);
+
+      if (qInfo.isKnown && sInfo.isKnown) {
+        if (qInfo.circuit !== sInfo.circuit) return false;
+        const circuitDef = CIRCUIT_DEFINITIONS.find(c => c.circuitId === qInfo.circuit);
+        const defaultLayout = circuitDef?.defaultLayout;
+        return Boolean(defaultLayout && (qInfo.layout === defaultLayout || sInfo.layout === defaultLayout));
       }
 
-      const sessionMatches = v.sessionCode.toLowerCase() === normSession;
-      return trackMatches && (sessionMatches || minDiff < 180000);
+      if (!qInfo.isKnown && !sInfo.isKnown) {
+        const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normXmlCourse = (trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normXmlVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return (
+          (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
+          (!trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)))
+        );
+      }
+
+      return false;
     });
 
-    if (candidates.length === 0) return undefined;
+    if (fallbackCandidates.length === 0) return undefined;
 
-    // Strictly prefer candidates whose sessionCode matches the XML session (e.g. R1 == R1, Q1 == Q1)
-    const matchingSessionCandidates = candidates.filter(v => v.sessionCode.toLowerCase() === normSession);
-    const pool = matchingSessionCandidates.length > 0 ? matchingSessionCandidates : candidates;
-
-    pool.sort((a, b) => getMinDiff(a) - getMinDiff(b));
-    return pool[0];
+    fallbackCandidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
+    return fallbackCandidates[0];
   }
 
   private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {

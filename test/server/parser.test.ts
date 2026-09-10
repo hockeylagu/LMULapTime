@@ -211,6 +211,22 @@ describe('parser server module', () => {
       expect(session?.matchingReplayFile?.name).toBe('Circuit de Spa-Francorchamps P1 78.Vcr');
     });
 
+    it('never matches a replay from a different session type even when timestamps are close', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      // A Race replay recorded moments before a new Practice session should never be picked
+      // for that Practice session just because the timestamps are only seconds apart.
+      vi.spyOn(fs, 'readdirSync').mockReturnValue([
+        'Circuit de Spa-Francorchamps R1 8.Vcr',
+      ] as unknown as ReturnType<typeof fs.readdirSync>);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ size: 1048576, mtime: new Date(1779999950 * 1000) } as unknown as fs.Stats);
+
+      const p = new LmuParser('C:\\Replays');
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(samplePracticeXml);
+
+      const session = p.parseSessionXml('practice.xml');
+      expect(session?.matchingReplayFile).toBeUndefined();
+    });
+
     it('accurately matches Monza Curva Grande and does not match standard Monza GP replay', () => {
       vi.spyOn(fs, 'existsSync').mockReturnValue(true);
       vi.spyOn(fs, 'readdirSync').mockReturnValue([

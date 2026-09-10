@@ -317,7 +317,7 @@ export class SessionDatabase {
       };
     }
 
-    const DB_PARSER_VERSION = '2.8_no_compound_weather';
+    const DB_PARSER_VERSION = '2.9_replay_match_session_scoped';
     const cachedVersion = this.getMetadata('parser_version');
     const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
     if (versionMismatch) {
