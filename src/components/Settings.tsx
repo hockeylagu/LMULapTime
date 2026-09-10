@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { ReferenceBenchmarkDiff } from '../../server/types.js';
+import { ReferenceBenchmarkDiff, ReplayScanStatus } from '../../server/types.js';
 import { CacheSettingsCard } from './settings/CacheSettingsCard';
 import { ReferenceLaptimesCard } from './settings/ReferenceLaptimesCard';
 import { FolderPathsCard } from './settings/FolderPathsCard';
 import { AISettingsCard } from './settings/AISettingsCard';
+import { ReplayCacheCard } from './settings/ReplayCacheCard';
+import { AiReportsHistoryCard } from './settings/AiReportsHistoryCard';
+import { clearSessionDetailCache } from './session-detail/useSessionDetailData.js';
 
 export interface SettingsProps {
   status: {
@@ -26,12 +29,16 @@ export interface SettingsProps {
       sessionsCount: number;
       lastSyncedAt: string | null;
       dbSizeBytes: number;
+      replaysCount?: number;
+      replayTrajectoriesCount?: number;
     };
   } | null;
   onUpdatePaths: (resultsDir?: string, replaysDir?: string) => void;
+  replayScanStatus?: ReplayScanStatus | null;
+  onReplayScanTriggered?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => {
+export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, replayScanStatus, onReplayScanTriggered }) => {
   const [resultsDirInput, setResultsDirInput] = useState<string>(
     status?.resultsDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\LOG\\Results'
   );
@@ -95,6 +102,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => 
         if (data.success) {
           onUpdatePaths(resultsDirInput, replaysDirInput);
           setPathMessage(`Scanned ${data.sessionsCount} sessions successfully! Driver profile: "${data.playerName}"`);
+          onReplayScanTriggered?.();
         } else {
           setPathMessage('Failed to scan directories. Please check paths.');
         }
@@ -145,6 +153,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => 
         setIsClearingCache(false);
         if (data.success) {
           onUpdatePaths();
+          clearSessionDetailCache();
           setCacheMessage('Session SQLite cache cleared successfully! You can rescan anytime.');
         } else {
           setCacheMessage('Failed to clear SQLite cache.');
@@ -178,7 +187,11 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => 
         cacheMessage={cacheMessage}
       />
 
+      <ReplayCacheCard replayScanStatus={replayScanStatus} />
+
       <AISettingsCard />
+
+      <AiReportsHistoryCard />
 
       <ReferenceLaptimesCard
         status={status}

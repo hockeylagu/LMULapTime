@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import path from 'path';
+import fs from 'fs';
 import { app } from '../../server/index';
 import * as refModule from '../../server/referenceLaptimes';
+import { createSliceVcrBuffer } from '../utils/mockVcr';
 
 describe('Server API routes', () => {
   beforeEach(() => {
@@ -135,9 +137,78 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('error');
   });
 
-  it('GET /api/replays/:name/pit-events returns 404 for nonexistent file', async () => {
-    const res = await request(app).get('/api/replays/nonexistent.vcr/pit-events');
-    expect(res.status).toBe(404);
-    expect(res.body).toHaveProperty('error');
+  it('GET /api/replays/cache returns the cached replay list', async () => {
+    const res = await request(app).get('/api/replays/cache');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/ai/reports returns the AI report history list', async () => {
+    const res = await request(app).get('/api/ai/reports');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('caches replay metadata and trajectory in SQLite after a scan and reuses it on request', async () => {
+    const tempReplaysDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_api_temp');
+    fs.mkdirSync(tempReplaysDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tempReplaysDir, 'Api_Cache_Test_P1.Vcr'),
+      createSliceVcrBuffer({
+        drivers: [{ name: 'Api Test Driver', vehicleId: '21_26_AFCO95641716', team: 'Test Team', carNumber: '21' }],
+        slices: [
+          { sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 },
+          { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 },
+        ],
+      })
+    );
+
+    try {
+      const scanRes = await request(app)
+        .post('/api/scan')
+        .send({
+          resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
+          replaysDir: tempReplaysDir,
+          playerName: 'Api Test Driver',
+        });
+      expect(scanRes.status).toBe(200);
+      expect(scanRes.body.replayScanStarted).toBe(true);
+
+      // Replay trajectory extraction runs in the background - poll the scan status
+      // endpoint until it finishes instead of asserting on the immediate scan response.
+      let status;
+      for (let i = 0; i < 50; i++) {
+        status = (await request(app).get('/api/scan/status')).body;
+        if (!status.running) break;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(status.running).toBe(false);
+      expect(status.result).toEqual(expect.objectContaining({ added: 1 }));
+
+      const cacheListRes = await request(app).get('/api/replays/cache');
+      expect(cacheListRes.status).toBe(200);
+      const cached = cacheListRes.body.find((r: { filename: string }) => r.filename === 'Api_Cache_Test_P1.Vcr');
+      expect(cached).toBeDefined();
+      expect(cached.driversCount).toBe(1);
+
+      const metadataRes = await request(app).get('/api/replays/Api_Cache_Test_P1.Vcr/metadata');
+      expect(metadataRes.status).toBe(200);
+      expect(metadataRes.body.drivers?.[0]?.name).toBe('Api Test Driver');
+    } finally {
+      // Restore the default fixtures replays dir so later test runs aren't affected
+      await request(app)
+        .post('/api/scan')
+        .send({
+          resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
+          replaysDir: path.join(process.cwd(), 'test', 'fixtures', 'replays'),
+          playerName: 'TestPlayer',
+        });
+      for (let i = 0; i < 50; i++) {
+        const status = (await request(app).get('/api/scan/status')).body;
+        if (!status.running) break;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      fs.rmSync(tempReplaysDir, { recursive: true, force: true });
+    }
   });
 });

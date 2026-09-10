@@ -17,6 +17,7 @@ export interface TelemetryStripChartsProps {
   onSelectIndex: (index: number) => void;
   sectors?: { s1Frame: number; s2Frame: number };
   className?: string;
+  isLoading?: boolean;
   headerContent?: React.ReactNode;
   baselinePoints?: ReplayTrajectoryPoint[];
   baselineLabel?: string;
@@ -37,6 +38,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   onSelectIndex,
   sectors,
   className = '',
+  isLoading = false,
   headerContent,
   baselinePoints,
   baselineLabel,
@@ -169,6 +171,12 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     cornerExitPct: selectedCornerMarkers && selectedCornerMarkers.exitFrame > viewStart && selectedCornerMarkers.exitFrame < viewEnd ? pctForIndex(selectedCornerMarkers.exitFrame) : null,
   };
 
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 text-lmu-muted text-sm">
+      <div className="w-6 h-6 border-2 border-lmu-accent border-t-transparent rounded-full animate-spin" />
+      Loading telemetry...
+    </div>
+  );
   if (points.length === 0) return <div className="flex items-center justify-center h-full text-lmu-muted text-sm">No telemetry frames recorded for this car.</div>;
 
   return (

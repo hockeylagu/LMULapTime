@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
 import { ConsistencyPanel } from '../../src/components/replay/ConsistencyPanel';
@@ -155,15 +155,25 @@ describe('ReplayInspectorModal', () => {
 
   it('calls onClose when close button clicked', async () => {
     const handleClose = vi.fn();
-    global.fetch = vi.fn().mockImplementation(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) })
-    );
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      }
+      if (url.includes('/trajectory')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     render(
       <ReplayInspectorModal isOpen={true} onClose={handleClose} replayName="Test_Replay.vcr" />
     );
 
-    const closeBtn = screen.getByRole('button', { name: /close/i });
+    await waitFor(() => {
+      expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
+    });
+
+    const closeBtn = screen.getByRole('button', { name: 'Close' });
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalled();
   });
@@ -288,6 +298,12 @@ describe('ReplayInspectorModal', () => {
     fireEvent.click(speedHalf);
     expect(speedHalf.className).toContain('bg-lmu-accent');
     expect(speed1x.className).not.toContain('bg-lmu-accent');
+
+    // Flush any trailing async state updates (e.g. corner consistency data) that
+    // resolve after this test's own assertions so they settle inside act().
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
   });
 
   it('renders fastest lap badge and lap time using the lmu-gold personal-best color set', async () => {

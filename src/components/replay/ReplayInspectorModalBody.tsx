@@ -92,6 +92,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   currentIndex,
   baselineTrajectory,
   selectedDriverSlot,
+  isLoading,
   isTrajLoading,
   isCompareMode,
   handleToggleCompare,
@@ -193,6 +194,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               points={trajectory?.points || []}
               currentIndex={currentIndex}
               onSelectIndex={setCurrentIndex}
+              isLoading={isLoading || isTrajLoading}
               sectors={trajectory?.sectors}
               className="w-full h-full"
               headerContent={

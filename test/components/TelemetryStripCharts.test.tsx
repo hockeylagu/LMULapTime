@@ -103,6 +103,20 @@ describe('TelemetryStripCharts', () => {
     expect(screen.getByText(/No telemetry frames recorded for this car/i)).toBeInTheDocument();
   });
 
+  it('renders a loading indicator instead of the empty message while isLoading is true', () => {
+    render(
+      <TelemetryStripCharts
+        points={[]}
+        currentIndex={0}
+        onSelectIndex={vi.fn()}
+        isLoading
+      />
+    );
+
+    expect(screen.getByText(/Loading telemetry/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No telemetry frames recorded for this car/i)).not.toBeInTheDocument();
+  });
+
   it('renders dedicated TIME DELTA channel and baseline overlays when baselinePoints are supplied', () => {
     const mockBaselinePoints: ReplayTrajectoryPoint[] = [
       { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 140, throttle: 70, brake: 0, steerYaw: -40, timeSec: 0.0 },

@@ -135,8 +135,9 @@ describe('CornerSpeedTable', () => {
     const tinyLoss = { ...cornerSegment, segmentIndex: 0, cornerNumber: 1, timeDeltaSec: 0.03 };
     const mediumLoss = { ...cornerSegment, segmentIndex: 1, cornerNumber: 2, timeDeltaSec: 0.12 };
     const hugeLoss = { ...cornerSegment, segmentIndex: 2, cornerNumber: 3, timeDeltaSec: 0.21 };
+    const trailingStraight = { ...straightSegment, segmentIndex: 3 };
 
-    render(<CornerSpeedTable segments={[tinyLoss, mediumLoss, hugeLoss, straightSegment]} />);
+    render(<CornerSpeedTable segments={[tinyLoss, mediumLoss, hugeLoss, trailingStraight]} />);
 
     expect(screen.queryByText(/T1 \+0.030s/i)).not.toBeInTheDocument();
     expect(screen.getByText(/T2 \+0.120s/i)).toBeInTheDocument();

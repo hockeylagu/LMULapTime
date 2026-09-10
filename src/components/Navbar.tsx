@@ -1,5 +1,6 @@
 import React from 'react';
-import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, ArrowLeftRight } from 'lucide-react';
+import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, ArrowLeftRight, Film } from 'lucide-react';
+import { ReplayScanStatus } from '../../server/types.js';
 
 export type NavTab = 'dashboard' | 'tracks' | 'compare' | 'settings';
 
@@ -11,6 +12,7 @@ interface NavbarProps {
     replaysExist: boolean;
     sessionsCount: number;
   } | null;
+  replayScanStatus?: ReplayScanStatus | null;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
@@ -19,6 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   status,
+  replayScanStatus,
   onRefresh,
   isRefreshing,
 }) => {
@@ -100,6 +103,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <span className={`w-2 h-2 rounded-full ${status?.resultsExist ? 'bg-lmu-green' : 'bg-lmu-accent'} group-hover:scale-110 transition-transform`} />
             <span className="group-hover:text-white transition-colors">{status ? `${status.sessionsCount} Sessions Parsed` : 'Scanning...'}</span>
+          </div>
+
+          <div
+            onClick={() => setActiveTab('settings')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
+            title="View Replay Cache in Settings"
+          >
+            <Film className={`w-3.5 h-3.5 ${replayScanStatus?.running ? 'animate-pulse text-lmu-accent' : 'group-hover:scale-110 transition-transform'}`} />
+            <span className="group-hover:text-white transition-colors">
+              {replayScanStatus?.running
+                ? `Parsing Replays... ${replayScanStatus.processed}/${replayScanStatus.total}`
+                : replayScanStatus?.result
+                  ? `${replayScanStatus.result.total} Replays Parsed`
+                  : 'Replays Pending...'}
+            </span>
           </div>
 
           <button

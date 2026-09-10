@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplayLapSummary } from '../../../server/types.js';
 import { ComparableLap } from '../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../utils/replayComparison.js';
+import { applyTelemetryPostProcessingToTrajectory } from '../../utils/telemetryPostProcessing.js';
 import { updateHashParams } from '../../utils/urlParams.js';
 
 export interface UseReplayInspectorDataProps {
@@ -102,11 +103,12 @@ export function useReplayInspectorData({
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}${driverQuery}`).then(r => (r.ok ? r.json() : null)),
     ])
-      .then(([metaData, trajData]) => {
+      .then(([metaData, rawTrajData]) => {
         if (!isMounted) return;
         if (!metaData) setError(`Could not load metadata for replay ${activeReplayName}`);
         else setMetadata(metaData);
 
+        const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
           setTrajectory(trajData);
           if (trajData.currentLap) onLapChange?.(trajData.currentLap);
@@ -245,7 +247,8 @@ export function useReplayInspectorData({
       const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${validLap}${driverQuery}`)
         .then(r => (r.ok ? r.json() : null))
-        .then((traj: ReplayTrajectoryData | null) => {
+        .then((rawTraj: ReplayTrajectoryData | null) => {
+          const traj = applyTelemetryPostProcessingToTrajectory(rawTraj);
           if (isMounted) {
             setBaselineTrajectory(traj);
             setIsBaselineLoading(false);
@@ -275,7 +278,8 @@ export function useReplayInspectorData({
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
     fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}`)
       .then(r => (r.ok ? r.json() : null))
-      .then((trajData: ReplayTrajectoryData | null) => {
+      .then((rawTrajData: ReplayTrajectoryData | null) => {
+        const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
           setTrajectory(trajData);
           if (trajData.currentLap) onLapChange?.(trajData.currentLap);
