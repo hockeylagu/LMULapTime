@@ -307,7 +307,7 @@ export class SessionDatabase {
     this.allSessionsCache = null;
   }
 
-  public syncSessionsFromDir(resultsDir: string, parser: LmuParser): SyncResult {
+  public syncSessionsFromDir(resultsDir: string, parser: LmuParser, forceReparse = false): SyncResult {
     if (!fs.existsSync(resultsDir)) {
       return {
         added: 0,
@@ -358,8 +358,8 @@ export class SessionDatabase {
         const normalizedPath = path.normalize(filePath).toLowerCase();
         const cached = cacheMap.get(normalizedPath);
 
-        // Check if file is already cached and unmodified
-        if (cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+        // Check if file is already cached and unmodified (unless a reparse is forced, e.g. after a benchmark update)
+        if (!forceReparse && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
           continue;
         }
 
