@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Gauge, Timer } from 'lucide-react';
+import { Activity, BrainCircuit, Gauge, Timer } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/types.js';
 import { ComparableLap } from '../../utils/lapComparison.js';
 import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison } from '../../utils/cornerAnalysis.js';
@@ -11,6 +11,7 @@ import { CornerSpeedTable } from './CornerSpeedTable.js';
 import { ConsistencyPanel } from './ConsistencyPanel.js';
 import { TelemetryStripCharts } from './TelemetryStripCharts.js';
 import { MapColorMode } from './replayMapUtils.js';
+import { AIReportTab } from './AIReportTab.js';
 
 export interface ReplayInspectorModalBodyProps {
   onClose: () => void;
@@ -71,8 +72,8 @@ export interface ReplayInspectorModalBodyProps {
   handleSelectCorner: (cornerNumber: number | null) => void;
   selectedCornerMarkers: { cornerNumber: number; entryFrame: number; minFrame: number; exitFrame: number } | null;
   primaryDists: number[];
-  activeTab: 'map' | 'corners';
-  setActiveTab: (tab: 'map' | 'corners') => void;
+  activeTab: 'map' | 'corners' | 'ai-report';
+  setActiveTab: (tab: 'map' | 'corners' | 'ai-report') => void;
   cornerSubView: 'compare' | 'consistency';
   setCornerSubView: (view: 'compare' | 'consistency') => void;
   colorBy: MapColorMode;
@@ -240,6 +241,9 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               <button onClick={() => setActiveTab('corners')} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${activeTab === 'corners' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'}`}>
                 <Timer className="w-3.5 h-3.5" /> Corners ({cornerCount})
               </button>
+              <button onClick={() => setActiveTab('ai-report')} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${activeTab === 'ai-report' ? 'bg-lmu-accent text-white shadow-md' : 'text-lmu-muted hover:text-white hover:bg-lmu-card'}`}>
+                <BrainCircuit className="w-3.5 h-3.5" /> AI Report
+              </button>
             </div>
 
             {activeTab === 'map' && (
@@ -281,6 +285,16 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
                 onSelectCornerNumber={handleSelectCorner}
               />
             </div>
+          ) : activeTab === 'ai-report' ? (
+            <AIReportTab
+              trajectory={trajectory}
+              baselineTrajectory={baselineTrajectory}
+              baselineLapNumber={baselineLapNumber}
+              segments={lapSegments}
+              currentLapSummary={currentLapSummary}
+              carClass={drivers.find(driver => driver.slot === selectedDriverSlot)?.carClass}
+              carModel={drivers.find(driver => driver.slot === selectedDriverSlot)?.carModel}
+            />
           ) : activeTab === 'corners' && cornerSubView === 'compare' ? (
             <CornerSpeedTable
               segments={lapSegments}

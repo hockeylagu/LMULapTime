@@ -3,17 +3,19 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
-import { DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry } from './types.js';
+import { AiAnalyzeRequest, AiAnalyzeResponse, DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry } from './types.js';
 import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries, extractReplayPitEvents } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/utils/formatters.js';
 import { getSessionDatabase } from './db.js';
+import { AI_MODELS, analyzeLap, clearSessionApiKey, createAiReportRecord, getAiCacheKey, getAiSettings, setSessionApiKey, setSessionModel, toAiError } from './aiReport.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const allowedOrigin = process.env.LMU_UI_ORIGIN || 'http://localhost:5173';
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || origin === allowedOrigin) }));
 app.use(express.json());
 
 // Default LMU Paths
@@ -70,6 +72,68 @@ function parseAndCacheFile(filePath: string): DetailedSession | null {
   }
   return parsed;
 }
+
+app.get('/api/ai/settings', (_req, res) => {
+  res.json(getAiSettings());
+});
+
+app.post('/api/ai/settings', (req, res) => {
+  const { apiKey, model } = req.body as { apiKey?: unknown; model?: unknown };
+  if (model !== undefined && (typeof model !== 'string' || !AI_MODELS.includes(model as typeof AI_MODELS[number]))) {
+    return res.status(400).json({ error: 'Only the configured Gemini POC model is supported.', errorCode: 'invalid_model' });
+  }
+  if (apiKey !== undefined && typeof apiKey !== 'string') {
+    return res.status(400).json({ error: 'The Gemini API key must be a string.', errorCode: 'invalid_request' });
+  }
+  if (apiKey === '') clearSessionApiKey();
+  else if (typeof apiKey === 'string') setSessionApiKey(apiKey);
+  if (typeof model === 'string') setSessionModel(model);
+  return res.json(getAiSettings());
+});
+
+app.post('/api/ai/analyze-lap', async (req, res) => {
+  const requestId = Math.random().toString(36).slice(2, 10);
+  const body = req.body as AiAnalyzeRequest;
+  if (!body || typeof body !== 'object' || !body.evidence) {
+    return res.status(400).json({ error: 'Lap evidence is required.', errorCode: 'invalid_request' });
+  }
+  const serializedSize = Buffer.byteLength(JSON.stringify(body.evidence), 'utf8');
+  if (serializedSize > 64 * 1024) {
+    return res.status(413).json({ error: 'Lap evidence is too large.', errorCode: 'payload_too_large' });
+  }
+  const settings = getAiSettings();
+  if (!settings.configured) {
+    return res.status(400).json({ error: 'Configure a Gemini API key before generating a report.', errorCode: 'not_configured' });
+  }
+  const cacheKey = getAiCacheKey(body.evidence);
+  if (!body.forceRegenerate) {
+    const cached = sessionDb.getAiReport(cacheKey);
+    if (cached) {
+      const response: AiAnalyzeResponse = {
+        report: cached.report,
+        cached: true,
+        modelUsed: cached.model,
+        generatedAt: new Date(cached.generatedAt).toISOString(),
+        tokensUsed: cached.totalTokens == null ? undefined : {
+          prompt: cached.promptTokens ?? 0,
+          completion: cached.completionTokens ?? 0,
+          total: cached.totalTokens,
+        },
+      };
+      return res.json(response);
+    }
+  }
+  try {
+    const result = await analyzeLap(body);
+    sessionDb.saveAiReport(createAiReportRecord(body.evidence, result));
+    return res.json(result);
+  } catch (cause) {
+    const mapped = toAiError(cause);
+    const status = mapped.code === 'invalid_key' ? 401 : mapped.code === 'rate_limited' ? 429 : mapped.code === 'payload_too_large' ? 413 : mapped.code === 'invalid_request' || mapped.code === 'not_configured' || mapped.code === 'invalid_model' ? 400 : mapped.code === 'upstream_unavailable' ? 503 : 502;
+    console.warn(`[AI ${requestId}] ${mapped.code}: ${mapped.message}`);
+    return res.status(status).json({ error: mapped.message, errorCode: mapped.code, requestId });
+  }
+});
 
 // API Routes
 

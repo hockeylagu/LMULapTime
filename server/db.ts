@@ -2,7 +2,7 @@ import Database, { Database as DatabaseType, Statement } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff } from './types.js';
+import { AiReportRecord, DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff } from './types.js';
 import { LmuParser } from './parser.js';
 
 export interface CacheStats {
@@ -94,6 +94,21 @@ export class SessionDatabase {
         key TEXT PRIMARY KEY,
         value TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS ai_reports (
+        cache_key TEXT PRIMARY KEY,
+        replay_name TEXT NOT NULL,
+        lap_number INTEGER NOT NULL,
+        baseline_replay_name TEXT,
+        baseline_lap_number INTEGER,
+        model TEXT NOT NULL,
+        prompt_version INTEGER NOT NULL,
+        report_json TEXT NOT NULL,
+        prompt_tokens INTEGER,
+        completion_tokens INTEGER,
+        total_tokens INTEGER,
+        generated_at INTEGER NOT NULL
+      );
     `);
   }
 
@@ -113,6 +128,66 @@ export class SessionDatabase {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `);
     stmt.run(key, value);
+  }
+
+  public getAiReport(cacheKey: string): AiReportRecord | null {
+    const row = this.db.prepare('SELECT * FROM ai_reports WHERE cache_key = ?').get(cacheKey) as {
+      cache_key: string;
+      replay_name: string;
+      lap_number: number;
+      baseline_replay_name: string | null;
+      baseline_lap_number: number | null;
+      model: string;
+      prompt_version: number;
+      report_json: string;
+      prompt_tokens: number | null;
+      completion_tokens: number | null;
+      total_tokens: number | null;
+      generated_at: number;
+    } | undefined;
+    if (!row) return null;
+    return {
+      cacheKey: row.cache_key,
+      replayName: row.replay_name,
+      lapNumber: row.lap_number,
+      baselineReplayName: row.baseline_replay_name,
+      baselineLapNumber: row.baseline_lap_number,
+      model: row.model,
+      promptVersion: row.prompt_version,
+      report: JSON.parse(row.report_json) as AiReportRecord['report'],
+      promptTokens: row.prompt_tokens,
+      completionTokens: row.completion_tokens,
+      totalTokens: row.total_tokens,
+      generatedAt: row.generated_at,
+    };
+  }
+
+  public saveAiReport(record: AiReportRecord): void {
+    this.db.prepare(`
+      INSERT INTO ai_reports (
+        cache_key, replay_name, lap_number, baseline_replay_name, baseline_lap_number,
+        model, prompt_version, report_json, prompt_tokens, completion_tokens, total_tokens, generated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(cache_key) DO UPDATE SET
+        report_json = excluded.report_json,
+        prompt_tokens = excluded.prompt_tokens,
+        completion_tokens = excluded.completion_tokens,
+        total_tokens = excluded.total_tokens,
+        generated_at = excluded.generated_at
+    `).run(
+      record.cacheKey,
+      record.replayName,
+      record.lapNumber,
+      record.baselineReplayName ?? null,
+      record.baselineLapNumber ?? null,
+      record.model,
+      record.promptVersion,
+      JSON.stringify(record.report),
+      record.promptTokens ?? null,
+      record.completionTokens ?? null,
+      record.totalTokens ?? null,
+      record.generatedAt,
+    );
   }
 
   private allSessionsCache: DetailedSession[] | null = null;

@@ -4,6 +4,7 @@ import { ReferenceBenchmarkDiff } from '../../server/types.js';
 import { CacheSettingsCard } from './settings/CacheSettingsCard';
 import { ReferenceLaptimesCard } from './settings/ReferenceLaptimesCard';
 import { FolderPathsCard } from './settings/FolderPathsCard';
+import { AISettingsCard } from './settings/AISettingsCard';
 
 export interface SettingsProps {
   status: {
@@ -176,6 +177,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths }) => 
         onClearCache={handleClearCache}
         cacheMessage={cacheMessage}
       />
+
+      <AISettingsCard />
 
       <ReferenceLaptimesCard
         status={status}

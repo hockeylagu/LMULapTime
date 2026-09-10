@@ -139,6 +139,135 @@ export interface LapData {
   penaltyCount?: number;
 }
 
+export type AiErrorCode =
+  | 'not_configured'
+  | 'invalid_request'
+  | 'payload_too_large'
+  | 'invalid_key'
+  | 'invalid_model'
+  | 'rate_limited'
+  | 'upstream_timeout'
+  | 'upstream_unavailable'
+  | 'upstream_error'
+  | 'malformed_model_response';
+
+export interface AiEvidenceSegment {
+  segmentIndex: number;
+  type: 'corner' | 'straight';
+  segmentLengthM?: number;
+  primaryTimeSec?: number;
+  baselineTimeSec?: number;
+  cornerNumber?: number;
+  timeDeltaSec?: number;
+  entrySpeedDeltaKmh?: number;
+  primaryEntrySpeedKmh?: number;
+  baselineEntrySpeedKmh?: number;
+  minSpeedDeltaKmh?: number;
+  primaryMinSpeedKmh?: number;
+  baselineMinSpeedKmh?: number;
+  exitSpeedDeltaKmh?: number;
+  primaryExitSpeedKmh?: number;
+  baselineExitSpeedKmh?: number;
+  brakingPointDeltaM?: number | null;
+  primaryBrakingOffsetM?: number | null;
+  baselineBrakingOffsetM?: number | null;
+  throttleOnDeltaM?: number | null;
+  primaryThrottleOnOffsetM?: number | null;
+  baselineThrottleOnOffsetM?: number | null;
+  topSpeedDeltaKmh?: number;
+  primaryTopSpeedKmh?: number;
+  baselineTopSpeedKmh?: number;
+}
+
+export interface AiLapEvidence {
+  lap: {
+    replayName: string;
+    lapNumber: number;
+    driverName?: string;
+    carClass?: string;
+    carModel?: string;
+    lapTimeSec: number;
+    s1Sec?: number;
+    s2Sec?: number;
+    s3Sec?: number;
+    isValid?: boolean;
+    isOutlap?: boolean;
+  };
+  baseline?: {
+    replayName: string;
+    lapNumber: number;
+    driverName?: string;
+    carClass?: string;
+    carModel?: string;
+    lapTimeSec: number;
+    s1Sec?: number;
+    s2Sec?: number;
+    s3Sec?: number;
+  };
+  segments: AiEvidenceSegment[];
+  consistency?: {
+    lapCount: number;
+    leastConsistentLabel?: string;
+    leastConsistentPct?: number;
+    stats: Array<{ label: string; avgSec: number; stdDevSec: number; consistencyPct: number }>;
+  };
+  trackLimits?: { available: boolean; incidents: Array<{ description: string; lapNum?: number; warningPoints?: number }> };
+}
+
+export interface AiReportSection {
+  title: string;
+  action: string;
+  why: string;
+  executionCue: string;
+  verify: string;
+  evidence?: string[];
+  estimatedGainSec?: number;
+}
+
+export interface AiLapReport {
+  overallSummary: string;
+  improvements: AiReportSection[];
+}
+
+export interface AiAnalyzeRequest {
+  forceRegenerate?: boolean;
+  evidence: AiLapEvidence;
+}
+
+export interface AiTokenUsage {
+  prompt: number;
+  completion: number;
+  total: number;
+}
+
+export interface AiAnalyzeResponse {
+  report: AiLapReport;
+  cached: boolean;
+  modelUsed: string;
+  generatedAt: string;
+  tokensUsed?: AiTokenUsage;
+}
+
+export interface AiErrorResponse {
+  error: string;
+  errorCode: AiErrorCode;
+}
+
+export interface AiReportRecord {
+  cacheKey: string;
+  replayName: string;
+  lapNumber: number;
+  baselineReplayName?: string | null;
+  baselineLapNumber?: number | null;
+  model: string;
+  promptVersion: number;
+  report: AiLapReport;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  generatedAt: number;
+}
+
 export interface DriverData {
   name: string;
   carType: string;
