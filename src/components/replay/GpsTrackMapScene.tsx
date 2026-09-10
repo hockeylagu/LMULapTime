@@ -165,9 +165,27 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
         const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
         const idx = findIndexAtDistance(primaryDists, targetDist);
         const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
-        return pt ? { cornerNumber: c.cornerNumber, sx: pt.sx, sy: pt.sy, idx: pt.idx } : null;
+        if (!pt) return null;
+
+        const prev = svgPoints[Math.max(0, pt.idx - 1)] ?? pt;
+        const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 1)] ?? pt;
+        const dx = next.sx - prev.sx;
+        const dy = next.sy - prev.sy;
+        const headingLen = Math.hypot(dx, dy) || 1;
+        const normalX = (dy / headingLen) * 18;
+        const normalY = (-dx / headingLen) * 18;
+
+        const offsetSide = (pt.idx % 2 === 0 ? 1 : -1);
+        return {
+          cornerNumber: c.cornerNumber,
+          sx: pt.sx + normalX * offsetSide,
+          sy: pt.sy + normalY * offsetSide,
+          idx: pt.idx,
+          actualSx: pt.sx,
+          actualSy: pt.sy,
+        };
       })
-      .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number } => m !== null);
+      .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number; actualSx: number; actualSy: number } => m !== null);
   }, [corners, primaryDists, baselineDists, svgPoints]);
 
   const pedalMarkerPoints = useMemo(() => {
@@ -299,6 +317,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
                 onSelectIndex?.(m.idx);
               }}
             >
+              <line x1={0} y1={0} x2={(m.sx - m.actualSx).toFixed(1)} y2={(m.sy - m.actualSy).toFixed(1)} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 3" opacity={0.55} pointerEvents="none" />
               <circle r={isSelected ? 10 : 7} fill={isSelected ? '#f43f5e' : '#0f172a'} stroke={isSelected ? '#ffffff' : '#94a3b8'} strokeWidth={isSelected ? 2 : 1.5} className={isSelected ? 'animate-pulse' : ''} />
               <text y="3.5" textAnchor="middle" className={`font-mono font-bold pointer-events-none ${isSelected ? 'fill-white text-[9px]' : 'fill-slate-300 text-[7.5px]'}`}>
                 T{m.cornerNumber}
