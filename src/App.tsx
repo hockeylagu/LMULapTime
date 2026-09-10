@@ -7,7 +7,7 @@ import { TrackDetail } from './components/TrackDetail';
 import { Settings } from './components/Settings';
 import { CompareLaps } from './components/CompareLaps';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
-import { AppStatus, DetailedSession, SessionProgressionPoint, TrackSummary } from '../server/types.js';
+import { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/types.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -26,6 +26,43 @@ export default function App() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [replayScanStatus, setReplayScanStatus] = useState<ReplayScanStatus | null>(null);
+
+  // Fetches replay scan status once; exposed so Settings can force an immediate refresh
+  // right after triggering a rescan instead of waiting for the next scheduled poll.
+  const refreshReplayScanStatus = useCallback(() => {
+    fetch('/api/scan/status')
+      .then((res) => res.json())
+      .then((data: ReplayScanStatus) => setReplayScanStatus(data))
+      .catch(() => {});
+  }, []);
+
+  // Poll replay scan progress continuously (slower cadence while idle, faster while a scan
+  // is running) so the Navbar badge and Settings page reflect both user-triggered rescans
+  // and the background scan the server kicks off automatically at startup.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = () => {
+      fetch('/api/scan/status')
+        .then((res) => res.json())
+        .then((data: ReplayScanStatus) => {
+          if (cancelled) return;
+          setReplayScanStatus(data);
+          timer = setTimeout(poll, data.running ? 1000 : 5000);
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(poll, 5000);
+        });
+    };
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   // Helper to parse location hash and query parameters for routing and filter state
   const parseUrlState = () => {
@@ -163,6 +200,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={handleTabChange}
         status={status}
+        replayScanStatus={replayScanStatus}
         onRefresh={() => fetchData(true)}
         isRefreshing={isRefreshing}
       />
@@ -230,6 +268,8 @@ export default function App() {
           <Settings
             status={status}
             onUpdatePaths={() => fetchData(true)}
+            replayScanStatus={replayScanStatus}
+            onReplayScanTriggered={refreshReplayScanStatus}
           />
         ) : null}
 

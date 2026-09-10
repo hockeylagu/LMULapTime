@@ -314,7 +314,7 @@ floating-point precision.
 | **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |
 | **Gear** | Implemented (`extractReplayTrajectory`) | Header `eventType - 8`, all cars including AI. |
 | **Engine RPM** | Implemented (`extractReplayTrajectory`) | Bits 53-62 (§2.1), scale 10.9228, saturation guard at raw10 === 1023. |
-| **Pit Events & Strategy** | Implemented (`extractReplayPitEvents`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. |
+| **Pit Events & Strategy** | Implemented (`extractReplayTrajectory`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. Exposed via the trajectory's `pitEvents` field. |
 | **Track Flags & Safety Car** | Implemented (`extractReplayTrajectory`), partially confirmed | Class **3** (not 2) Type 10, always 3 bytes. `flagState` confirmed (§2.6); other 2 bytes decoded but unconfirmed. |
 | **Live Standings** | Implemented (`extractReplayTrajectory`), partially confirmed | Class 7 Type 48. Count + slot array confirmed at the corrected offset (§2.6); 20-byte gap between them still unconfirmed. |
 | **Weather & Track Grip** | **Disproved, removed from parser** | The documented 67-byte float32 block does not match ground-truth ambient/track temp anywhere in the file (§2.6). Needs re-derivation via the correlation methodology, not offset guessing. |

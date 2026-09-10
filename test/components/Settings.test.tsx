@@ -32,8 +32,11 @@ describe('Settings component', () => {
   it('renders directory paths, status indicators, and scans directories on submit', async () => {
     const onUpdatePaths = vi.fn();
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
+    expect(screen.getByText('Cached Replays (.Vcr)')).toBeInTheDocument();
+    expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
 
@@ -51,6 +54,7 @@ describe('Settings component', () => {
   it('handles reference laptimes manual refresh button click', async () => {
     const onUpdatePaths = vi.fn();
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Reference Laptimes Benchmark')).toBeInTheDocument();
 
@@ -72,6 +76,7 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
 
@@ -110,6 +115,7 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={statusWithCache} onUpdatePaths={onUpdatePaths} />);
+    await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
     expect(screen.getByText(/42 Sessions Cached/i)).toBeInTheDocument();
@@ -172,6 +178,7 @@ describe('Settings component', () => {
     };
 
     render(<Settings status={statusWithDiff} onUpdatePaths={onUpdatePaths} />);
+    await screen.findByText(/no replays cached yet/i);
 
     // Renders benchmark section title and badges
     expect(screen.getByText('Benchmark Reference Updates')).toBeInTheDocument();
@@ -216,6 +223,7 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
+    await screen.findByText(/no replays cached yet/i);
 
     const refreshBtn = screen.getByRole('button', { name: /update reference laptimes/i });
     fireEvent.click(refreshBtn);

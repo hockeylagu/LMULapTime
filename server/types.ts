@@ -268,6 +268,33 @@ export interface AiReportRecord {
   generatedAt: number;
 }
 
+export interface AiReportHistoryEntry {
+  cacheKey: string;
+  replayName: string;
+  lapNumber: number;
+  baselineReplayName?: string | null;
+  baselineLapNumber?: number | null;
+  model: string;
+  overallSummary?: string;
+  tokensUsed?: AiTokenUsage;
+  generatedAt: number;
+}
+
+export interface ReplayCacheSummary {
+  filename: string;
+  fileSizeBytes: number;
+  compressedSizeBytes: number;
+  updatedAt: number;
+  // The .Vcr file's on-disk modification time - the closest proxy we have for when the
+  // replay/session actually took place, as opposed to `updatedAt` (when it was cached).
+  replayDateMs: number;
+  trackName?: string;
+  driversCount: number;
+  durationSec?: number;
+  eventTitle?: string;
+  trajectoriesCached: number;
+}
+
 export interface DriverData {
   name: string;
   carType: string;
@@ -439,7 +466,20 @@ export interface AppStatus {
     sessionsCount: number;
     lastSyncedAt: string | null;
     dbSizeBytes: number;
+    replaysCount?: number;
+    replayTrajectoriesCount?: number;
   };
+}
+
+export interface ReplayScanStatus {
+  running: boolean;
+  processed: number;
+  total: number;
+  currentFile: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: { added: number; updated: number; skipped: number; total: number; lastSyncedAt: string; interrupted: boolean } | null;
+  error: string | null;
 }
 
 export interface FuelStrategyData {
@@ -692,6 +732,9 @@ export interface ReplayTrajectoryData {
   standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
+  // Present only when the trajectory was extracted with `allLaps: true` - one fully
+  // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
+  allLapsData?: ReplayTrajectoryData[];
 }
 
 export interface ReplaySummary {

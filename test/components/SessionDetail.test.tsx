@@ -1396,6 +1396,11 @@ describe('SessionDetail component', () => {
     expect(window.location.hash).toContain('replay=1');
     expect(window.location.hash).toContain('lap=1');
 
+    // Let the replay modal's metadata/trajectory fetches settle before closing it
+    await waitFor(() => {
+      expect(screen.getAllByText(/Sim Driver/i).length).toBeGreaterThan(0);
+    });
+
     // Close replay modal
     const closeBtn = screen.getByTitle('Close');
     fireEvent.click(closeBtn);
@@ -1406,6 +1411,10 @@ describe('SessionDetail component', () => {
 
     expect(window.location.hash).toContain('replay=1');
     expect(window.location.hash).toContain('lap=2');
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Sim Driver/i).length).toBeGreaterThan(0);
+    });
   });
 });
 

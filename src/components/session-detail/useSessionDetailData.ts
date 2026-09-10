@@ -11,9 +11,19 @@ export interface UseSessionDetailDataParams {
   initialSessions?: DetailedSession[];
 }
 
-// Module-level in-memory cache for instant sub-millisecond session switching
+// Module-level in-memory cache for instant sub-millisecond session switching. Capped so
+// browsing many sessions in one tab doesn't grow this forever.
 export const clientSessionCache = new Map<string, DetailedSession>();
+const MAX_CACHED_SESSIONS = 50;
 let clientRefCache: ReferenceLaptimesCache | null = null;
+
+function storeCachedSession(sessionId: string, session: DetailedSession): void {
+  if (clientSessionCache.size >= MAX_CACHED_SESSIONS && !clientSessionCache.has(sessionId)) {
+    const oldestKey = clientSessionCache.keys().next().value;
+    if (oldestKey !== undefined) clientSessionCache.delete(oldestKey);
+  }
+  clientSessionCache.set(sessionId, session);
+}
 
 export function clearSessionDetailCache() {
   clientSessionCache.clear();
@@ -89,7 +99,7 @@ export function useSessionDetailData({
       .then((sessionData) => {
         if (!isCurrent) return;
         if (sessionData && !sessionData.error) {
-          clientSessionCache.set(sessionId, sessionData);
+          storeCachedSession(sessionId, sessionData);
           setSession(sessionData);
           if (sessionData.playerDriver) {
             setSelectedDriverName(sessionData.playerDriver.name);

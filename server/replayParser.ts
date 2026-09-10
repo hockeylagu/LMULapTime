@@ -606,22 +606,13 @@ export function extractReplayTrajectory(
   options: {
     driverSlot?: number;
     driverName?: string;
-    sampleRateHz?: number;
     maxPoints?: number;
     playerName?: string;
     lapNumber?: number;
-    sessionLaps?: Array<{
-      lapNum?: number;
-      lapNumber?: number;
-      lapTime?: number | null;
-      lapTimeSec?: number | null;
-      elapsedSeconds?: number | null;
-      s1?: number | null;
-      s2?: number | null;
-      s3?: number | null;
-      isValid?: boolean;
-      isOutLap?: boolean;
-    }>;
+    // When true, finalizes every detected lap for the target driver in this same file
+    // scan and attaches them all as `allLapsData`, so callers (e.g. the eager replay
+    // cache sync) can persist the whole driver's laps from a single binary pass.
+    allLaps?: boolean;
   } = {}
 ): ReplayTrajectoryData {
   const effectivePlayerName = options.playerName || detectPlayerName(filePath);
@@ -1016,61 +1007,10 @@ export function extractReplayTrajectory(
 
     const maxPoints = options.maxPoints !== undefined ? options.maxPoints : 1200;
 
-    // Filter out transmission-actuated upshift ignition cuts and downshift rev-match blips
-    // to preserve true driver pedal intent in telemetry traces.
-    if (rawPts.length > 2) {
-      // 1. Remove downshift auto-blips: during active braking (brake > 8), throttle blips are zeroed out
-      for (let i = 0; i < rawPts.length; i++) {
-        const brk = rawPts[i].rawBrake ?? 0;
-        const thr = rawPts[i].rawThrottle ?? 0;
-        if (brk > 8 && thr > 0) {
-          let preLow = false;
-          for (let k = 1; k <= 6; k++) {
-            if (i - k >= 0 && (rawPts[i - k].rawThrottle ?? 0) <= 15) { preLow = true; break; }
-          }
-          let postLow = false;
-          for (let k = 1; k <= 6; k++) {
-            if (i + k < rawPts.length && (rawPts[i + k].rawThrottle ?? 0) <= 15) { postLow = true; break; }
-          }
-          if (preLow && postLow) {
-            rawPts[i].rawThrottle = 0;
-          }
-        }
-      }
-
-      // 2. Remove upshift cuts: brief dropouts (< 140ms / ~7 frames) when braking is 0 and surrounding throttle was high
-      for (let i = 1; i < rawPts.length - 1; i++) {
-        const curThr = rawPts[i].rawThrottle ?? 0;
-        const curBrk = rawPts[i].rawBrake ?? 0;
-        if (curThr < 70 && curBrk === 0) {
-          let preIdx = -1;
-          for (let k = 1; k <= 4; k++) {
-            if (i - k >= 0 && (rawPts[i - k].rawThrottle ?? 0) >= 70 && (rawPts[i - k].rawBrake ?? 0) === 0) {
-              preIdx = i - k;
-              break;
-            }
-          }
-          if (preIdx !== -1) {
-            let postIdx = -1;
-            for (let k = 1; k <= 7; k++) {
-              if (i + k < rawPts.length && (rawPts[i + k].rawThrottle ?? 0) >= 70 && (rawPts[i + k].rawBrake ?? 0) === 0) {
-                postIdx = i + k;
-                break;
-              }
-            }
-            if (postIdx !== -1 && postIdx - preIdx <= 7) {
-              const preVal = rawPts[preIdx].rawThrottle ?? 0;
-              const postVal = rawPts[postIdx].rawThrottle ?? 0;
-              for (let j = preIdx + 1; j < postIdx; j++) {
-                const ratio = (j - preIdx) / (postIdx - preIdx);
-                rawPts[j].rawThrottle = Math.round(preVal + ratio * (postVal - preVal));
-              }
-              i = postIdx;
-            }
-          }
-        }
-      }
-    }
+    // Note: throttle blip filtering, gear neutral-bridging, and speed smoothing are
+    // intentionally NOT applied here. They are display-only post-processing done on the
+    // frontend (src/utils/telemetryPostProcessing.ts) so the raw decoded values persisted
+    // to the SQLite cache and returned by this function are never modified.
 
     // 3. Detect laps and 3 sectors per lap
     // Compute cumulative distance along the vehicle path, ignoring teleport anomalies
@@ -1315,57 +1255,9 @@ export function extractReplayTrajectory(
       }];
     }
 
-    // Select chosen lap
-    let chosen = detectedLaps.find(l => l.lapNumber === options.lapNumber);
-    if (!chosen) {
-      chosen = detectedLaps.find(l => l.isBest) || detectedLaps[0];
-    }
-
-    // Slice raw points strictly for the chosen lap
-    const lapRawPts = rawPts.slice(chosen.startIdx, chosen.endIdx + 1);
-    const rawPointsCount = lapRawPts.length;
-    const lapDuration = chosen.lapTimeSec || (rawPts.length > 0 ? Math.max(0.001, rawPts[chosen.endIdx].sTime - rawPts[chosen.startIdx].sTime) : 0);
-    const rawSampleRateHz = lapDuration > 0 && rawPointsCount > 1
-      ? Math.round((rawPointsCount - 1) / lapDuration)
-      : 0;
-
-    // Downsample chosen lap to maxPoints (e.g. 1200, 2400; if maxPoints is 0, preserve 100% full raw fidelity)
-    let downsampled = lapRawPts;
-    if (maxPoints > 0 && lapRawPts.length > maxPoints) {
-      const step = lapRawPts.length / maxPoints;
-      downsampled = [];
-      for (let i = 0; i < maxPoints; i++) {
-        downsampled.push(lapRawPts[Math.min(lapRawPts.length - 1, Math.floor(i * step))]);
-      }
-    }
-
-    const lapSpan = Math.max(1, chosen.endIdx - chosen.startIdx);
-    const s1Fraction = (chosen.s1Idx - chosen.startIdx) / lapSpan;
-    const s2Fraction = (chosen.s2Idx - chosen.startIdx) / lapSpan;
-    const targetFrames = downsampled.length;
-    const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
-    const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
-
-    // Calculate speeds between points, capping at realistic maximum to prevent
-    // anomalous position jumps from creating spikes in the smoothed speed trace.
-    const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
-    const rawSpeeds: number[] = [];
-    for (let i = 0; i < downsampled.length; i++) {
-      const cur = downsampled[i];
-      let speed = 0;
-      if (i > 0) {
-        const prev = downsampled[i - 1];
-        const dt = cur.sTime - prev.sTime;
-        const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
-        if (dt > 0.005 && dist < 60) {
-          speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
-        }
-      }
-      const packetSpeed = downsampled[i].speedKmhRaw;
-      rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH
-        ? packetSpeed
-        : speed);
-    }
+    // The following are invariant across every lap of this driver, so compute them once
+    // here rather than inside buildLapResult (which may be called once per detected lap
+    // when options.allLaps is set).
 
     // Build garage and pit intervals for the target vehicle to accurately determine inGarage and inPit states
     const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
@@ -1405,165 +1297,225 @@ export function extractReplayTrajectory(
       return false;
     }
 
-    // Smooth speed over a 3-frame window (kept as its own array so gear detection below
-    // can look across multiple frames without recomputing it inline).
-    const smoothedSpeeds: number[] = [];
-    for (let i = 0; i < downsampled.length; i++) {
-      const prevSpeed = i > 0 ? rawSpeeds[i - 1] : rawSpeeds[i];
-      const curSpeed = rawSpeeds[i];
-      const nextSpeed = i < downsampled.length - 1 ? rawSpeeds[i + 1] : rawSpeeds[i];
-      let s = (prevSpeed + curSpeed + nextSpeed) / 3;
-      if (s < 1.5) s = 0; // remove sensor noise for stationary vehicles
-      smoothedSpeeds.push(s);
-    }
-
-    // Gear is read directly from each point's authoritative gearRaw (evType - 8, see above),
-    // available for every driver. Carry the last known value forward for the rare frame
-    // where evType falls outside the known 7-15 range.
-    const finalGears: number[] = [];
-    let curGear = 1;
-    for (let i = 0; i < downsampled.length; i++) {
-      if (downsampled[i].gearRaw !== undefined) {
-        curGear = downsampled[i].gearRaw!;
-      }
-      finalGears.push(curGear);
-    }
-    // The transmission passes through neutral (gear 0) for a few frames during every real
-    // shift (clutch/dog-ring disengagement). Bridge these short neutral gaps directly to
-    // the new gear so the displayed value jumps straight from the old gear to the new one
-    // instead of visibly dipping to neutral. Long neutral stretches (e.g. parked/coasting)
-    // are left untouched.
-    const NEUTRAL_MAX_FRAMES = 6;
-    for (let i = 0; i < finalGears.length; i++) {
-      if (finalGears[i] !== 0) continue;
-      let j = i;
-      while (j < finalGears.length && finalGears[j] === 0) j++;
-      const beforeGear = i > 0 ? finalGears[i - 1] : undefined;
-      const afterGear = j < finalGears.length ? finalGears[j] : undefined;
-      if (j - i <= NEUTRAL_MAX_FRAMES && beforeGear && afterGear) {
-        for (let k = i; k < j; k++) finalGears[k] = afterGear;
-      }
-      i = j;
-    }
-    // Filter momentary 1-frame shift anomalies
-    for (let i = 1; i < finalGears.length - 1; i++) {
-      if (finalGears[i] !== finalGears[i - 1] && finalGears[i - 1] === finalGears[i + 1]) {
-        finalGears[i] = finalGears[i - 1];
-      }
-    }
-
-    // Smooth speed, calculate acceleration, throttle, and brake
-    const finalPoints: ReplayTrajectoryPoint[] = [];
-    for (let i = 0; i < downsampled.length; i++) {
-      const cur = downsampled[i];
-      const prevSpeed = i > 0 ? rawSpeeds[i - 1] : rawSpeeds[i];
-      const curSpeed = rawSpeeds[i];
-      const nextSpeed = i < downsampled.length - 1 ? rawSpeeds[i + 1] : rawSpeeds[i];
-      let smoothSpeed = (prevSpeed + curSpeed + nextSpeed) / 3;
-
-      // Remove sensor noise for stationary vehicles; negative speeds are guarded
-      if (smoothSpeed < 1.5) smoothSpeed = 0;
-
-      const throttle = cur.rawThrottle ?? 0;
-      const brake = cur.rawBrake ?? 0;
-
-      // True garage state based on simulation events; fallback to stationary in pit
-      const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
-        (garageIntervals.length === 0 && Boolean(cur.inPit) && smoothSpeed < 1);
-      const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
-
-      finalPoints.push({
-        x: Number(cur.x.toFixed(2)),
-        y: Number(cur.y.toFixed(2)),
-        z: Number(cur.z.toFixed(2)),
-        rotX: cur.rotX,
-        rotY: Number(cur.rotY.toFixed(3)),
-        rotZ: cur.rotZ,
-        speedKmh: Math.round(smoothSpeed),
-        throttle,
-        brake,
-        steerYaw: cur.steerYaw ?? 0,
-        gear: finalGears[i],
-        inPit,
-        isOffTrack: cur.isOffTrack,
-        inGarage,
-        isTeleport: false,
-        timeSec: Number(cur.sTime.toFixed(2)),
-        tcActive: cur.tcActive,
-        absActive: cur.absActive,
-        pitLimiter: cur.pitLimiter,
-        detachablePartState: cur.detachablePartState,
-        tireTemps: cur.tireTemps,
-        tireWear: cur.tireWear,
-        brakeTemps: cur.brakeTemps,
-        engineRpm: cur.engineRpm,
-      });
-    }
-
-    // Calculate track bounds
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    for (const p of finalPoints) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.z < minZ) minZ = p.z;
-      if (p.z > maxZ) maxZ = p.z;
-    }
-
-    if (!isFinite(minX)) {
-      minX = 0; maxX = 0; minZ = 0; maxZ = 0;
-    }
-
     const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
     const driverName = matchedDriver?.name || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
 
-    const lapsSummary: ReplayLapSummary[] = detectedLaps.map(l => ({
-      lapNumber: l.lapNumber,
-      lapTimeSec: l.lapTimeSec,
-      lapDistMeters: l.lapDistMeters,
-      s1Sec: l.s1Sec,
-      s2Sec: l.s2Sec,
-      s3Sec: l.s3Sec,
-      isOutlap: l.isOutlap,
-      isBest: l.isBest,
-      isValid: l.isValid ?? !l.isOutlap,
-      startFrame: 0,
-      endFrame: targetFrames,
-    }));
+    // Each lap's own frame count (after downsampling), independent of which lap is
+    // currently being finalized - fixes a prior quirk where every lap's endFrame reflected
+    // whichever lap buildLapResult happened to be processing at the time.
+    const lapsSummary: ReplayLapSummary[] = detectedLaps.map(l => {
+      const rawCount = Math.max(0, l.endIdx - l.startIdx + 1);
+      const frameCount = maxPoints > 0 ? Math.min(rawCount, maxPoints) : rawCount;
+      return {
+        lapNumber: l.lapNumber,
+        lapTimeSec: l.lapTimeSec,
+        lapDistMeters: l.lapDistMeters,
+        s1Sec: l.s1Sec,
+        s2Sec: l.s2Sec,
+        s3Sec: l.s3Sec,
+        isOutlap: l.isOutlap,
+        isBest: l.isBest,
+        isValid: l.isValid ?? !l.isOutlap,
+        startFrame: 0,
+        endFrame: frameCount,
+      };
+    });
 
-    return {
-      replayName: path.basename(filePath),
-      driverSlot: targetSlot,
-      driverName,
-      pointsCount: finalPoints.length,
-      rawPointsCount,
-      rawSampleRateHz,
-      maxPoints: options.maxPoints,
-      isFullResolution: finalPoints.length >= rawPointsCount,
-      currentLap: chosen.lapNumber,
-      laps: lapsSummary,
-      sectors: {
-        s1Frame,
-        s2Frame,
-      },
-      bounds: {
-        minX: Number(minX.toFixed(2)),
-        maxX: Number(maxX.toFixed(2)),
-        minZ: Number(minZ.toFixed(2)),
-        maxZ: Number(maxZ.toFixed(2)),
-        spanX: Number((maxX - minX).toFixed(2)),
-        spanZ: Number((maxZ - minZ).toFixed(2)),
-      },
-      points: finalPoints,
-      penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
-      pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
-      flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
-      standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
-      sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
-      wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.tireTemps !== undefined)),
-    };
+    // Builds a full trajectory result for one detected lap, reusing the raw points/events
+    // already collected in this single file scan (no re-parsing of the .Vcr binary).
+    function buildLapResult(chosenLap: DetectedLapInternal): ReplayTrajectoryData {
+      // Slice raw points strictly for the chosen lap
+      const lapRawPts = rawPts.slice(chosenLap.startIdx, chosenLap.endIdx + 1);
+      const rawPointsCount = lapRawPts.length;
+      const lapDuration = chosenLap.lapTimeSec || (rawPts.length > 0 ? Math.max(0.001, rawPts[chosenLap.endIdx].sTime - rawPts[chosenLap.startIdx].sTime) : 0);
+      const rawSampleRateHz = lapDuration > 0 && rawPointsCount > 1
+        ? Math.round((rawPointsCount - 1) / lapDuration)
+        : 0;
+
+      // Downsample chosen lap to maxPoints (e.g. 1200, 2400; if maxPoints is 0, preserve 100% full raw fidelity)
+      let downsampled = lapRawPts;
+      if (maxPoints > 0 && lapRawPts.length > maxPoints) {
+        const step = lapRawPts.length / maxPoints;
+        downsampled = [];
+        for (let i = 0; i < maxPoints; i++) {
+          downsampled.push(lapRawPts[Math.min(lapRawPts.length - 1, Math.floor(i * step))]);
+        }
+      }
+
+      const lapSpan = Math.max(1, chosenLap.endIdx - chosenLap.startIdx);
+      const s1Fraction = (chosenLap.s1Idx - chosenLap.startIdx) / lapSpan;
+      const s2Fraction = (chosenLap.s2Idx - chosenLap.startIdx) / lapSpan;
+      const targetFrames = downsampled.length;
+      const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
+      const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
+
+      // Compute an instantaneous per-point speed (packet-reported speed when available,
+      // otherwise derived from the position delta), capped at a physically plausible
+      // maximum so a corrupted/teleported position delta can't produce a nonsense value.
+      // This is a data-integrity clamp, not smoothing - no averaging across frames happens
+      // here (that's the frontend's job, see src/utils/telemetryPostProcessing.ts).
+      const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
+      const rawSpeeds: number[] = [];
+      for (let i = 0; i < downsampled.length; i++) {
+        const cur = downsampled[i];
+        let speed = 0;
+        if (i > 0) {
+          const prev = downsampled[i - 1];
+          const dt = cur.sTime - prev.sTime;
+          const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
+          if (dt > 0.005 && dist < 60) {
+            speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
+          }
+        }
+        const packetSpeed = downsampled[i].speedKmhRaw;
+        rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH
+          ? packetSpeed
+          : speed);
+      }
+
+      const finalPoints: ReplayTrajectoryPoint[] = [];
+      for (let i = 0; i < downsampled.length; i++) {
+        const cur = downsampled[i];
+        const rawSpeed = rawSpeeds[i];
+
+        const throttle = cur.rawThrottle ?? 0;
+        const brake = cur.rawBrake ?? 0;
+
+        // True garage state based on simulation events; fallback to stationary in pit
+        const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
+          (garageIntervals.length === 0 && Boolean(cur.inPit) && rawSpeed < 1);
+        const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
+
+        finalPoints.push({
+          x: Number(cur.x.toFixed(2)),
+          y: Number(cur.y.toFixed(2)),
+          z: Number(cur.z.toFixed(2)),
+          rotX: cur.rotX,
+          rotY: Number(cur.rotY.toFixed(3)),
+          rotZ: cur.rotZ,
+          speedKmh: Math.round(rawSpeed),
+          throttle,
+          brake,
+          steerYaw: cur.steerYaw ?? 0,
+          gear: cur.gearRaw,
+          inPit,
+          isOffTrack: cur.isOffTrack,
+          inGarage,
+          isTeleport: false,
+          timeSec: Number(cur.sTime.toFixed(2)),
+          tcActive: cur.tcActive,
+          absActive: cur.absActive,
+          pitLimiter: cur.pitLimiter,
+          detachablePartState: cur.detachablePartState,
+          tireTemps: cur.tireTemps,
+          tireWear: cur.tireWear,
+          brakeTemps: cur.brakeTemps,
+          engineRpm: cur.engineRpm,
+        });
+      }
+
+      // Calculate track bounds
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const p of finalPoints) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
+      }
+
+      if (!isFinite(minX)) {
+        minX = 0; maxX = 0; minZ = 0; maxZ = 0;
+      }
+
+      return {
+        replayName: path.basename(filePath),
+        driverSlot: targetSlot,
+        driverName,
+        pointsCount: finalPoints.length,
+        rawPointsCount,
+        rawSampleRateHz,
+        maxPoints: options.maxPoints,
+        isFullResolution: finalPoints.length >= rawPointsCount,
+        currentLap: chosenLap.lapNumber,
+        laps: lapsSummary,
+        sectors: {
+          s1Frame,
+          s2Frame,
+        },
+        bounds: {
+          minX: Number(minX.toFixed(2)),
+          maxX: Number(maxX.toFixed(2)),
+          minZ: Number(minZ.toFixed(2)),
+          maxZ: Number(maxZ.toFixed(2)),
+          spanX: Number((maxX - minX).toFixed(2)),
+          spanZ: Number((maxZ - minZ).toFixed(2)),
+        },
+        points: finalPoints,
+        penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
+        pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
+        flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
+        standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
+        sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
+        wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.tireTemps !== undefined)),
+      };
+    }
+
+    // Select chosen lap
+    let chosen = detectedLaps.find(l => l.lapNumber === options.lapNumber);
+    if (!chosen) {
+      chosen = detectedLaps.find(l => l.isBest) || detectedLaps[0];
+    }
+
+    // When requested, finalize every detected lap in this same single file scan (no extra
+    // .Vcr reads) so the caller can persist full per-lap trajectories for this driver in one pass.
+    const allLapsData = options.allLaps ? detectedLaps.map(l => buildLapResult(l)) : undefined;
+    // `chosen` is always a member of `detectedLaps`, and `allLapsData` (when present) was built
+    // by mapping over that same array, so the matching entry is always found.
+    const result = allLapsData
+      ? allLapsData.find(r => r.currentLap === chosen!.lapNumber)!
+      : buildLapResult(chosen);
+
+    if (allLapsData) {
+      result.allLapsData = allLapsData;
+    }
+
+    return result;
   } finally {
     fs.closeSync(fd);
   }
+}
+
+/**
+ * Downsamples an already-extracted full-resolution trajectory to at most `maxPoints`
+ * points, without touching the source .Vcr file. Used to serve cached (DB-backed)
+ * full-resolution trajectories at whatever resolution the caller requested.
+ */
+export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints: number | undefined): ReplayTrajectoryData {
+  if (!maxPoints || maxPoints <= 0 || full.points.length <= maxPoints) {
+    return full;
+  }
+
+  const points = full.points;
+  const step = points.length / maxPoints;
+  const sampled: ReplayTrajectoryPoint[] = [];
+  for (let i = 0; i < maxPoints; i++) {
+    sampled.push(points[Math.min(points.length - 1, Math.floor(i * step))]);
+  }
+
+  const s1Frac = full.sectors ? full.sectors.s1Frame / points.length : 0;
+  const s2Frac = full.sectors ? full.sectors.s2Frame / points.length : 0;
+
+  return {
+    ...full,
+    points: sampled,
+    pointsCount: sampled.length,
+    maxPoints,
+    isFullResolution: false,
+    sectors: {
+      s1Frame: Math.min(sampled.length - 1, Math.round(s1Frac * sampled.length)),
+      s2Frame: Math.min(sampled.length - 1, Math.round(s2Frac * sampled.length)),
+    },
+  };
 }
 
 /**
@@ -1585,27 +1537,4 @@ export function extractReplayLapSummaries(
     maxPoints: 10,
   });
   return traj.laps || [];
-}
-
-/**
- * Extracts pit stop and garage events for a replay session.
- */
-export function extractReplayPitEvents(
-  filePath: string,
-  options: {
-    driverSlot?: number;
-    driverName?: string;
-    playerName?: string;
-  } = {}
-): ReplayPitEvent[] {
-  const traj = extractReplayTrajectory(filePath, {
-    driverSlot: options.driverSlot,
-    driverName: options.driverName,
-    playerName: options.playerName,
-    maxPoints: 10,
-  });
-  if (options.driverSlot !== undefined) {
-    return (traj.pitEvents || []).filter(e => e.driverSlot === options.driverSlot);
-  }
-  return traj.pitEvents || [];
 }

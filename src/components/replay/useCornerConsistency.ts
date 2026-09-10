@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../server/types.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../utils/cornerAnalysis.js';
+import { applyTelemetryPostProcessing } from '../../utils/telemetryPostProcessing.js';
 
 // Kept small since these laps are only used for corner-window timing, not full detail rendering.
 const CONSISTENCY_MAX_POINTS = 400;
@@ -95,7 +96,7 @@ export function useCornerConsistency(
       otherLaps.map(l =>
         fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${CONSISTENCY_MAX_POINTS}&lap=${l.lapNumber}${slotParam}`)
           .then(r => (r.ok ? r.json() : null))
-          .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: data?.points || [] }))
+          .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: applyTelemetryPostProcessing(data?.points || []) }))
           .catch((): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: [] }))
       )
     ).then(results => {

@@ -3,8 +3,8 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { LmuParser, computeProgression, computeTrackSummaries, extractComparableLaps } from './parser.js';
-import { AiAnalyzeRequest, AiAnalyzeResponse, DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry } from './types.js';
-import { parseReplayMetadata, extractReplayTrajectory, extractReplayLapSummaries, extractReplayPitEvents } from './replayParser.js';
+import { AiAnalyzeRequest, AiAnalyzeResponse, DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry, ReplayTrajectoryData, ReplayScanStatus } from './types.js';
+import { parseReplayMetadata, extractReplayTrajectory, downsampleReplayTrajectory } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/utils/formatters.js';
@@ -32,6 +32,64 @@ let currentReplaysDir = DEFAULT_REPLAYS_DIR;
 let parser = new LmuParser(currentReplaysDir);
 const sessionDb = getSessionDatabase();
 
+let replayScanStatus: ReplayScanStatus = {
+  running: false,
+  processed: 0,
+  total: 0,
+  currentFile: null,
+  startedAt: null,
+  finishedAt: null,
+  result: null,
+  error: null,
+};
+
+// Runs the (potentially very slow) replay directory sync off the request/startup path,
+// tracking per-file progress in `replayScanStatus` so the UI can poll and render it.
+// Drives the iterator one step per `setImmediate` tick (rather than calling the blocking
+// syncReplaysFromDir) so the event loop gets to service other HTTP requests between every
+// file - and every per-driver extraction within a file - instead of the server going
+// unresponsive for the whole scan.
+// Ignores overlapping calls instead of queueing them, since a rescan mid-scan would just
+// re-walk files the running scan hasn't reached yet.
+function runReplaySyncInBackground(replaysDir: string, playerName?: string): void {
+  if (replayScanStatus.running) return;
+  replayScanStatus = {
+    running: true,
+    processed: 0,
+    total: 0,
+    currentFile: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    result: null,
+    error: null,
+  };
+
+  const iterator = sessionDb.syncReplaysIterator(replaysDir, { playerName });
+
+  const step = () => {
+    try {
+      const { value, done } = iterator.next();
+      if (done) {
+        replayScanStatus.result = value;
+        console.log(`[SQLite Cache] Cached ${value.total} replays (${value.added} new, ${value.updated} updated, ${value.skipped} skipped) from ${replaysDir}`);
+        replayScanStatus.running = false;
+        replayScanStatus.finishedAt = new Date().toISOString();
+        return;
+      }
+      replayScanStatus.processed = value.processed;
+      replayScanStatus.total = value.total;
+      replayScanStatus.currentFile = value.currentFile || null;
+      setImmediate(step);
+    } catch (err) {
+      replayScanStatus.error = err instanceof Error ? err.message : String(err);
+      console.warn('[SQLite Cache] Replay sync warning:', err);
+      replayScanStatus.running = false;
+      replayScanStatus.finishedAt = new Date().toISOString();
+    }
+  };
+  setImmediate(step);
+}
+
 // Initial sync of LMU XML sessions into SQLite cache on server startup
 try {
   const syncRes = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
@@ -39,6 +97,13 @@ try {
 } catch (err) {
   console.warn('[SQLite Cache] Initial sync warning:', err);
 }
+
+// Eagerly parse and cache .Vcr replay files too - LMU periodically deletes old replays,
+// so waiting for a UI request to parse them risks losing that data permanently.
+// This can take a long time (large replay libraries, many drivers per file), so it's
+// deferred until after the server starts listening instead of blocking startup and
+// leaving the port closed (which would surface as ECONNREFUSED to the frontend).
+runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
 
 // Ensure reference laptimes are loaded or cached on server startup
 (async () => {
@@ -56,6 +121,7 @@ try {
 function loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
   if (forceRefresh) {
     sessionDb.syncSessionsFromDir(currentResultsDir, parser, forceReparse);
+    runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
   }
   return sessionDb.getAllSessions();
 }
@@ -71,6 +137,47 @@ function parseAndCacheFile(filePath: string): DetailedSession | null {
     }
   }
   return parsed;
+}
+
+// Reads replay metadata (drivers, event info, session type, laps) from the SQLite
+// cache when the on-disk file hasn't changed; otherwise parses the .Vcr binary once
+// and persists the (brotli-compressed) result so subsequent requests skip the parse.
+function getCachedReplayMetadata(filePath: string, replayName: string, playerName?: string): ReplayMetadata {
+  const stat = fs.statSync(filePath);
+  const mtime = Math.floor(stat.mtimeMs);
+  const cached = sessionDb.getReplayMetadataCache(replayName, mtime, stat.size);
+  if (cached) return cached;
+  const metadata = parseReplayMetadata(filePath, { playerName });
+  sessionDb.upsertReplayMetadataCache(replayName, filePath, mtime, stat.size, metadata);
+  return metadata;
+}
+
+// Reads a full-resolution (maxPoints=0) trajectory - including laps and pit/flag
+// events for the resolved driver - from the SQLite cache, falling back to a single
+// binary parse when missing/stale. Callers downsample in-memory as needed, which is
+// far cheaper than re-parsing the replay frame stream from disk.
+function getCachedFullTrajectory(
+  filePath: string,
+  replayName: string,
+  opts: { driverSlot?: number; driverName?: string; lapNumber?: number; playerName?: string }
+): ReplayTrajectoryData {
+  const stat = fs.statSync(filePath);
+  const mtime = Math.floor(stat.mtimeMs);
+  const driverSlotKey = typeof opts.driverSlot === 'number' ? opts.driverSlot : -1;
+  const lapKey = typeof opts.lapNumber === 'number' ? opts.lapNumber : -1;
+
+  const cached = sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size);
+  if (cached) return cached;
+
+  const trajectory = extractReplayTrajectory(filePath, {
+    driverSlot: opts.driverSlot,
+    driverName: opts.driverName,
+    maxPoints: 0,
+    playerName: opts.playerName,
+    lapNumber: opts.lapNumber,
+  });
+  sessionDb.upsertReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, trajectory);
+  return trajectory;
 }
 
 app.get('/api/ai/settings', (_req, res) => {
@@ -135,6 +242,17 @@ app.post('/api/ai/analyze-lap', async (req, res) => {
   }
 });
 
+app.get('/api/ai/reports', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    res.json(sessionDb.getAiReportsList(limit));
+  } catch (err: unknown) {
+    console.error('Failed to list AI report history:', err);
+    const message = err instanceof Error ? err.message : 'Failed to list AI report history';
+    res.status(500).json({ error: message });
+  }
+});
+
 // API Routes
 
 app.get('/api/status', (_req, res) => {
@@ -163,6 +281,8 @@ app.get('/api/status', (_req, res) => {
       sessionsCount: cacheStats.sessionsCount,
       lastSyncedAt: cacheStats.lastSyncedAt,
       dbSizeBytes: cacheStats.dbSizeBytes,
+      replaysCount: cacheStats.replaysCount,
+      replayTrajectoriesCount: cacheStats.replayTrajectoriesCount,
     },
   });
 });
@@ -309,6 +429,10 @@ app.post('/api/scan', (req, res) => {
   }
 
   const syncResult = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
+  // Replay trajectory extraction can take a long time for large libraries, so it runs
+  // in the background - the frontend polls GET /api/scan/status for progress instead
+  // of this request blocking until every .Vcr file has been scanned.
+  runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
   const sessions = sessionDb.getAllSessions();
 
   res.json({
@@ -318,8 +442,13 @@ app.post('/api/scan', (req, res) => {
     playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
     sync: syncResult,
+    replayScanStarted: true,
     sqliteCache: sessionDb.getCacheStats(),
   });
+});
+
+app.get('/api/scan/status', (_req, res) => {
+  res.json(replayScanStatus);
 });
 
 app.get('/api/track/:trackName', (req, res) => {
@@ -399,6 +528,16 @@ app.get('/api/compare/laps', (req, res) => {
 });
 
 // Replays API routes
+app.get('/api/replays/cache', (_req, res) => {
+  try {
+    res.json(sessionDb.getReplayCacheList());
+  } catch (err: unknown) {
+    console.error('Failed to list cached replays:', err);
+    const message = err instanceof Error ? err.message : 'Failed to list cached replays';
+    res.status(500).json({ error: message });
+  }
+});
+
 app.get('/api/replays', (_req, res) => {
   try {
     if (!fs.existsSync(currentReplaysDir)) {
@@ -417,7 +556,7 @@ app.get('/api/replays', (_req, res) => {
         const stat = fs.statSync(filePath);
         let meta: ReplayMetadata | null = null;
         try {
-          meta = parseReplayMetadata(filePath);
+          meta = getCachedReplayMetadata(filePath, f);
         } catch {
           // Ignore invalid or active recording files
         }
@@ -480,7 +619,7 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       return res.status(404).json({ error: `Replay file "${replayName}" not found` });
     }
 
-    const metadata = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
+    const metadata = getCachedReplayMetadata(filePath, replayName, parser.configuredPlayerName);
 
     try {
       const sessions = loadSessions();
@@ -532,9 +671,9 @@ app.get('/api/replays/:name/metadata', (req, res) => {
 
     if (!metadata.laps || metadata.laps.length === 0) {
       try {
-        const vcrLaps = extractReplayLapSummaries(filePath, { playerName: parser.configuredPlayerName });
-        if (vcrLaps && vcrLaps.length > 0) {
-          metadata.laps = vcrLaps;
+        const vcrTrajectory = getCachedFullTrajectory(filePath, replayName, { playerName: parser.configuredPlayerName });
+        if (vcrTrajectory.laps && vcrTrajectory.laps.length > 0) {
+          metadata.laps = vcrTrajectory.laps;
         }
       } catch {
         // Ignore fallback errors
@@ -578,7 +717,7 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
 
         if (!matchedDriver && typeof driverSlot === 'number') {
           try {
-            const meta = parseReplayMetadata(filePath, { playerName: parser.configuredPlayerName });
+            const meta = getCachedReplayMetadata(filePath, replayName, parser.configuredPlayerName);
             const replayDriver = meta.drivers.find(d => d.slot === driverSlot);
             if (replayDriver) {
               matchedDriver = matchedSession.drivers.find((d: DriverData) =>
@@ -599,13 +738,13 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       // Ignore session loading errors
     }
 
-    const trajectory = extractReplayTrajectory(filePath, {
+    const fullTrajectory = getCachedFullTrajectory(filePath, replayName, {
       driverSlot,
       driverName,
-      maxPoints,
-      playerName: parser.configuredPlayerName,
       lapNumber,
+      playerName: parser.configuredPlayerName,
     });
+    const trajectory = downsampleReplayTrajectory(fullTrajectory, maxPoints);
 
     // Validate replay against matched session log (decoupled validation layer)
     try {
@@ -651,36 +790,6 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
   } catch (err: unknown) {
     console.error(`Failed to extract replay trajectory for ${req.params.name}:`, err);
     const message = err instanceof Error ? err.message : 'Failed to extract replay trajectory';
-    res.status(500).json({ error: message });
-  }
-});
-
-app.get('/api/replays/:name/pit-events', (req, res) => {
-  try {
-    const replayName = req.params.name;
-    const filePath = path.join(currentReplaysDir, replayName);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: `Replay file "${replayName}" not found` });
-    }
-
-    const driverSlot = req.query.driverSlot ? Number(req.query.driverSlot) : undefined;
-    const driverName = req.query.driverName as string | undefined;
-
-    const pitEvents = extractReplayPitEvents(filePath, {
-      driverSlot,
-      driverName,
-      playerName: parser.configuredPlayerName,
-    });
-
-    res.json({
-      replayName,
-      count: pitEvents.length,
-      pitEvents,
-    });
-  } catch (err: unknown) {
-    console.error(`Failed to extract pit events for ${req.params.name}:`, err);
-    const message = err instanceof Error ? err.message : 'Failed to extract pit events';
     res.status(500).json({ error: message });
   }
 });
