@@ -53,9 +53,9 @@ try {
   }
 })();
 
-function loadSessions(forceRefresh = false): DetailedSession[] {
+function loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
   if (forceRefresh) {
-    sessionDb.syncSessionsFromDir(currentResultsDir, parser);
+    sessionDb.syncSessionsFromDir(currentResultsDir, parser, forceReparse);
   }
   return sessionDb.getAllSessions();
 }
@@ -353,8 +353,8 @@ app.get('/api/reference-laptimes', (_req, res) => {
 app.post('/api/reference-laptimes/refresh', async (_req, res) => {
   try {
     const updatedCache = await fetchAndCacheReferenceLaptimes();
-    // Force reload sessions so lap pace categories update with latest reference benchmark
-    const sessions = loadSessions(true);
+    // Force reparse of all cached sessions so lap pace categories update with the latest reference benchmark
+    const sessions = loadSessions(true, true);
     res.json({
       success: true,
       lastUpdated: updatedCache.lastUpdated,
