@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMap } from '../../src/components/replay/GpsTrackMap';
+import { projectTrajectoryPoints } from '../../src/components/replay/replayMapUtils';
+import { computeCumulativeDistances } from '../../src/utils/replayComparison';
 import { ReplayTrajectoryPoint } from '../../server/types';
 
 describe('GpsTrackMap', () => {
@@ -120,6 +122,41 @@ describe('GpsTrackMap', () => {
 
     expect(screen.getByText('T1')).toBeInTheDocument();
     expect(screen.getByText('T2')).toBeInTheDocument();
+  });
+
+  it('offsets corner markers away from the racing line to avoid clustering', () => {
+    const cornerPoints: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, rotY: 0, speedKmh: 60, throttle: 40, brake: 0, timeSec: 0.0 },
+      { x: 5, y: 0, z: 1, rotY: 0, speedKmh: 70, throttle: 50, brake: 0, timeSec: 0.1 },
+      { x: 10, y: 0, z: 3, rotY: 0, speedKmh: 80, throttle: 60, brake: 0, timeSec: 0.2 },
+      { x: 15, y: 0, z: 7, rotY: 0, speedKmh: 90, throttle: 70, brake: 0, timeSec: 0.3 },
+      { x: 20, y: 0, z: 12, rotY: 0, speedKmh: 100, throttle: 80, brake: 0, timeSec: 0.4 },
+      { x: 25, y: 0, z: 18, rotY: 0, speedKmh: 90, throttle: 70, brake: 0, timeSec: 0.5 },
+    ];
+    const bounds = { minX: 0, maxX: 25, minZ: 0, maxZ: 18, spanX: 25, spanZ: 18 };
+    const projected = projectTrajectoryPoints(cornerPoints, bounds, 800, 60);
+    const cornerDist = computeCumulativeDistances(cornerPoints)[3];
+
+    render(
+      <GpsTrackMap
+        points={cornerPoints}
+        bounds={bounds}
+        currentIndex={0}
+        corners={[{ cornerNumber: 1, minDistM: cornerDist }]}
+      />
+    );
+
+    const label = screen.getByText('T1');
+    const markerGroup = label.closest('g');
+    expect(markerGroup).not.toBeNull();
+    const transform = markerGroup!.getAttribute('transform') ?? '';
+    const match = transform.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
+    expect(match).not.toBeNull();
+
+    const markerX = Number(match![1]);
+    const markerY = Number(match![2]);
+    const trackPoint = projected[3];
+    expect(Math.hypot(markerX - trackPoint.sx, markerY - trackPoint.sy)).toBeGreaterThan(12);
   });
 
   it('highlights the selected corner marker and clicking it selects the corner and jumps the scrubber', () => {
