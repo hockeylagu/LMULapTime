@@ -84,8 +84,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   toggleConsistencyLap,
 }) => {
   return (
-    <div className="w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] shrink-0 bg-[#0a0e17] flex flex-col min-h-0 overflow-hidden">
-      <div className="px-4 py-2.5 bg-lmu-dark border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
+    <div className="w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] shrink-0 bg-lmu-bg flex flex-col min-h-0 overflow-hidden">
+      <div className="px-4 py-2.5 bg-lmu-card border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setActiveTab('map')}
@@ -131,7 +131,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
         )}
 
         {activeTab === 'corners' && (
-          <div className="flex items-center gap-1 bg-lmu-dark p-1 rounded-lg border border-lmu-border/60">
+          <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
             <button
               onClick={() => setCornerSubView('compare')}
               className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${

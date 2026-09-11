@@ -80,7 +80,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   return (
     <>
       <div className="flex items-center justify-between px-0.5 shrink-0 text-xs">
-        <div className="flex items-center gap-1 bg-lmu-dark p-1 rounded-lg border border-lmu-border/60">
+        <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
           {(['dual', 'zoom', 'overview'] as const).map(mode => (
             <button
               key={mode}
@@ -101,7 +101,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
                 showPedalMarkers
                   ? 'bg-lmu-accent/15 border-lmu-accent text-white'
-                  : 'bg-lmu-dark border-lmu-border/60 text-lmu-muted hover:text-white'
+                  : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white'
               }`}
             >
               <Disc className="w-3 h-3" />
@@ -109,7 +109,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             </button>
           )}
           {baselinePoints ? (
-            <div className="flex items-center gap-1 bg-lmu-dark p-1 rounded-lg border border-lmu-border/60">
+            <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
               <button
                 onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
                 title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}

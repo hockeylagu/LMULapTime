@@ -46,7 +46,7 @@ export const AiReportsHistoryCard: React.FC = () => {
         Every generated Gemini lap report is cached in SQLite so it can be re-displayed instantly without spending tokens again.
       </p>
 
-      {error && <p className="text-xs font-semibold text-red-400">{error}</p>}
+      {error && <p className="text-xs font-semibold text-lmu-accent">{error}</p>}
 
       {reports && reports.length === 0 && !isLoading && (
         <p className="text-xs text-lmu-muted italic">No AI reports generated yet.</p>

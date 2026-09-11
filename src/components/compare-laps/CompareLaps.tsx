@@ -24,7 +24,7 @@ export interface CompareLapsProps {
   onSelectSession?: (sessionId: string) => void;
 }
 
-const LAP_COLORS = ['#ECC94B', '#3182CE', '#38A169', '#E53E3E', '#9F7AEA'];
+const LAP_COLORS = ['#FFB703', '#219EBC', '#2A9D8F', '#E63946', '#8B5CF6'];
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
   sessions = [],

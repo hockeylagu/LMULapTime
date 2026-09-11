@@ -109,7 +109,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
         </div>
       )}
 
-      {error && <p className="text-xs font-semibold text-red-400">{error}</p>}
+      {error && <p className="text-xs font-semibold text-lmu-accent">{error}</p>}
 
       {replays && replays.length === 0 && !isLoading && (
         <p className="text-xs text-lmu-muted italic">No replays cached yet. Rescan from the folder paths section below.</p>

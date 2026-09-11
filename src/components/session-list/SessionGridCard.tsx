@@ -100,7 +100,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
                 {p.positionGain !== null && p.positionGain !== undefined && (
                   <span
                     className={`font-bold text-xs ${
-                      p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-slate-400'
+                      p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-lmu-muted'
                     }`}
                   >
                     ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})

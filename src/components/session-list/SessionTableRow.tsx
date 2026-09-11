@@ -64,7 +64,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               {p.positionGain !== null && p.positionGain !== undefined && (
                 <span
                   className={`ml-1 font-bold ${
-                    p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-slate-400'
+                    p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-lmu-muted'
                   }`}
                 >
                   ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})

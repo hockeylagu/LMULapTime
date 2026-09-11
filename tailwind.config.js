@@ -17,7 +17,8 @@ export default {
           cyan: '#8ECAE6',
           green: '#2A9D8F',
           text: '#F8F9FA',
-          muted: '#8D99AE'
+          muted: '#8D99AE',
+          dark: '#080A0F'
         }
       }
     },
