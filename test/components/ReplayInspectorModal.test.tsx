@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ReplayInspectorModal } from '../../src/components/replay/ReplayInspectorModal';
-import { ConsistencyPanel } from '../../src/components/replay/ConsistencyPanel';
+import { ReplayInspectorModal, ConsistencyPanel } from '../../src/components/replay/index.js';
 
 vi.mock('recharts', () => {
   return {
@@ -373,7 +372,7 @@ describe('ReplayInspectorModal', () => {
         ]}
         excludedLaps={new Set()}
         onToggleLapExclusion={vi.fn()}
-        formatLapTime={sec => (typeof sec === 'number' ? `${sec.toFixed(3)}s` : '--')}
+        formatLapTime={(sec?: number | null) => (typeof sec === 'number' ? `${sec.toFixed(3)}s` : '--')}
         currentLapNumber={1}
         onSelectBaselineLap={onSelectBaselineLap}
       />

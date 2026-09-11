@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { SessionDetail } from '../../src/components/SessionDetail';
+import { SessionDetail } from '../../src/components/session-detail/index.js';
 import { DriverData } from '../../server/types';
 
 describe('SessionDetail component', () => {

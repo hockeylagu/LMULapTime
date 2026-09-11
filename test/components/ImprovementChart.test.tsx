@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ImprovementChart } from '../../src/components/ImprovementChart';
+import { ImprovementChart } from '../../src/components/track-detail/improvement-chart/index.js';
 
 describe('ImprovementChart component', () => {
   const mockProgressionData = [

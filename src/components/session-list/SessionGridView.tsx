@@ -1,5 +1,5 @@
 import React from 'react';
-import { SessionListItem } from '../SessionList';
+import { SessionListItem } from './SessionList.js';
 import { SessionGridCard } from './SessionGridCard';
 import { PaceCategory } from '../../../server/types';
 

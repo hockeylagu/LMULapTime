@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTelemetryChartPaths } from '../../src/components/replay/telemetryChartPaths.js';
+import { computeTelemetryChartPaths, DeltaGradientStop } from '../../src/components/replay/index.js';
 import { ReplayTrajectoryPoint } from '../../server/types.js';
 import { PointComparison } from '../../src/utils/replayComparison.js';
 
@@ -59,9 +59,9 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Active stops should be emerald green with high opacity (> 0.4)
-    const activeStops = result.deltaGradientStops.filter(s => s.opacity > 0.4);
+    const activeStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity > 0.4);
     expect(activeStops.length).toBeGreaterThan(0);
-    activeStops.forEach(s => {
+    activeStops.forEach((s: DeltaGradientStop) => {
       expect(s.color).toBe('#10b981');
       expect(s.opacity).toBeGreaterThanOrEqual(0.4);
     });
@@ -82,9 +82,9 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
-    const activeStops = result.deltaGradientStops.filter(s => s.opacity > 0.4);
+    const activeStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity > 0.4);
     expect(activeStops.length).toBeGreaterThan(0);
-    activeStops.forEach(s => {
+    activeStops.forEach((s: DeltaGradientStop) => {
       expect(s.color).toBe('#ef4444');
       expect(s.opacity).toBeGreaterThanOrEqual(0.4);
     });
@@ -106,7 +106,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // All stops in the flat zone should be faded to 0 opacity
-    result.deltaGradientStops.forEach(s => {
+    result.deltaGradientStops.forEach((s: DeltaGradientStop) => {
       expect(s.opacity).toBe(0);
     });
     // Fallback trapezoids should also be omitted in flat zone to avoid barcode stripes
@@ -131,13 +131,13 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Verify there are both green stops (during gain) and red stops (during loss)
-    const hasGreen = result.deltaGradientStops.some(s => s.color === '#10b981' && s.opacity > 0.1);
-    const hasRed = result.deltaGradientStops.some(s => s.color === '#ef4444' && s.opacity > 0.1);
+    const hasGreen = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#10b981' && s.opacity > 0.1);
+    const hasRed = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#ef4444' && s.opacity > 0.1);
     expect(hasGreen).toBe(true);
     expect(hasRed).toBe(true);
 
     // Verify transition region has zero opacity stops to prevent color bleed
-    const zeroStops = result.deltaGradientStops.filter(s => s.opacity === 0);
+    const zeroStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity === 0);
     expect(zeroStops.length).toBeGreaterThan(0);
   });
 

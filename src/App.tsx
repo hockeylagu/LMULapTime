@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Navbar, NavTab } from './components/Navbar';
-import { Dashboard } from './components/Dashboard';
-import { TrackSummaries } from './components/TrackSummaries';
-import { SessionDetail } from './components/SessionDetail';
-import { TrackDetail } from './components/TrackDetail';
-import { Settings } from './components/Settings';
-import { CompareLaps } from './components/CompareLaps';
+import {
+  Navbar,
+  NavTab,
+  Dashboard,
+  TrackSummaries,
+  SessionDetail,
+  TrackDetail,
+  Settings,
+  CompareLaps,
+} from './components/index.js';
 import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
 import { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/types.js';
 

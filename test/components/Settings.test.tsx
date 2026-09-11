@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Settings } from '../../src/components/Settings';
+import { Settings } from '../../src/components/settings/index.js';
 
 describe('Settings component', () => {
   const mockStatus = {

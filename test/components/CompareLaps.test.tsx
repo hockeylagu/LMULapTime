@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CompareLaps } from '../../src/components/CompareLaps';
+import { CompareLaps } from '../../src/components/compare-laps/index.js';
 
 describe('CompareLaps component', () => {
   const mockSessions = [

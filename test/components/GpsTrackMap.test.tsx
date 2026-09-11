@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { GpsTrackMap } from '../../src/components/replay/GpsTrackMap';
-import { projectTrajectoryPoints } from '../../src/components/replay/replayMapUtils';
+import { GpsTrackMap, projectTrajectoryPoints } from '../../src/components/replay/index.js';
 import { computeCumulativeDistances } from '../../src/utils/replayComparison';
 import { ReplayTrajectoryPoint } from '../../server/types';
 

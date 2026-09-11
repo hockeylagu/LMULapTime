@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ReplayTimelineFooter } from '../../src/components/replay/ReplayTimelineFooter';
+import { ReplayTimelineFooter } from '../../src/components/replay/index.js';
 
 describe('ReplayTimelineFooter', () => {
   it('renders the current frame count out of the total', () => {
