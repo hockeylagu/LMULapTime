@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessions } from '../../utils/formatters.js';
-import { matchesCarClass, matchesTrack } from '../../utils/paceCategory.js';
+import { matchesSessionCarClass, matchesTrack } from '../../utils/paceCategory.js';
 import { DetailedSession } from '../../../server/types.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
@@ -46,11 +46,7 @@ export function useDashboardMetrics({
       const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
       const isTrackMatch = matchesTrack(selectedTrack, s.trackVenue, s.trackCourse);
       const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
-      const isMatchingCarClass = matchesCarClass(
-        s.playerDriver?.carClass || '',
-        s.playerDriver?.carType || '',
-        selectedCarClass
-      );
+      const isMatchingCarClass = matchesSessionCarClass(s, selectedCarClass);
       const matchesSearch =
         searchQuery === '' ||
         displayTrack.toLowerCase().includes(searchQuery.toLowerCase()) ||

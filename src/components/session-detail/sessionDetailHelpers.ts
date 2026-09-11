@@ -109,10 +109,8 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
   }
 
   // 2. Same track match, closest in time
-  const sameTrackSessions = targetSessions.filter(
-    (s) =>
-      matchesTrack(current.trackVenue, s.trackVenue, s.trackCourse) ||
-      s.trackVenue?.toLowerCase() === current.trackVenue?.toLowerCase()
+  const sameTrackSessions = targetSessions.filter((s) =>
+    matchesTrack(current.trackVenue, s.trackVenue, s.trackCourse)
   );
 
   const candidatePool = sameTrackSessions.length > 0 ? sameTrackSessions : targetSessions;

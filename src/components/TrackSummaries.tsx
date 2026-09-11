@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp } from '../utils/formatters.js';
-import { matchesCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
+import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp, minValidTime } from '../utils/formatters.js';
+import { matchesSessionCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../utils/paceCategory.js';
 import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache } from '../../server/types.js';
 import { TrackSummariesHeader, TracksSortOption } from './track-summaries/TrackSummariesHeader';
 import { TrackSummaryCard, TrackSummaryItem } from './track-summaries/TrackSummaryCard';
@@ -74,8 +74,6 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       return Object.values(tracksMap).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
     }
 
-    const minTime = (current: number | null, next: number | null | undefined): number | null =>
-      next !== null && next !== undefined && next > 0 && (current === null || next < current) ? next : current;
 
     // Group filtered sessions by display track name in a single pass
     const sessionsByVenue = new Map<string, SessionSummary[]>();
@@ -85,7 +83,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
       if (!venue) return;
       allVenues.add(venue);
-      if (matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedCarClass)) {
+      if (matchesSessionCarClass(s, selectedCarClass)) {
         const group = sessionsByVenue.get(venue) || [];
         group.push(s);
         sessionsByVenue.set(venue, group);
@@ -122,9 +120,9 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
             bestLapCar = p.carType;
             bestLapClass = p.carClass || '';
           }
-          bestS1 = minTime(bestS1, p.bestS1);
-          bestS2 = minTime(bestS2, p.bestS2);
-          bestS3 = minTime(bestS3, p.bestS3);
+          bestS1 = minValidTime(bestS1, p.bestS1);
+          bestS2 = minValidTime(bestS2, p.bestS2);
+          bestS3 = minValidTime(bestS3, p.bestS3);
         }
       });
 

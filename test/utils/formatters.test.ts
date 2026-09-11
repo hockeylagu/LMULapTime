@@ -8,6 +8,8 @@ import {
   matchesSessionType,
   parseDateStringToTimestamp,
   computeTheoreticalBest,
+  computeTheoreticalGap,
+  minValidTime,
   getSessionTypeWeight,
   compareSessions,
 } from '../../src/utils/formatters';
@@ -188,6 +190,43 @@ describe('formatters utility', () => {
 
     it('sums valid sector times correctly', () => {
       expect(computeTheoreticalBest(25.100, 32.200, 41.300)).toBeCloseTo(98.6);
+    });
+  });
+
+  describe('computeTheoreticalGap', () => {
+    it('returns null if either bestLapTime or theoreticalBest is missing or <= 0', () => {
+      expect(computeTheoreticalGap(null, 120)).toBeNull();
+      expect(computeTheoreticalGap(120, null)).toBeNull();
+      expect(computeTheoreticalGap(undefined, 120)).toBeNull();
+      expect(computeTheoreticalGap(0, 120)).toBeNull();
+      expect(computeTheoreticalGap(120, 0)).toBeNull();
+      expect(computeTheoreticalGap(-5, 120)).toBeNull();
+    });
+
+    it('calculates the positive gap between actual best and theoretical best', () => {
+      expect(computeTheoreticalGap(122.500, 121.200)).toBe(1.3);
+      expect(computeTheoreticalGap(95.123, 95.000)).toBe(0.123);
+    });
+
+    it('clamps negative differences to 0 to prevent floating-point noise artifacts', () => {
+      expect(computeTheoreticalGap(120.000, 120.000)).toBe(0);
+      expect(computeTheoreticalGap(120.000, 120.0000001)).toBe(0);
+    });
+  });
+
+  describe('minValidTime', () => {
+    it('returns smaller valid number', () => {
+      expect(minValidTime(null, 30.5)).toBe(30.5);
+      expect(minValidTime(35.0, 30.5)).toBe(30.5);
+      expect(minValidTime(25.0, 30.5)).toBe(25.0);
+    });
+
+    it('ignores null, undefined, or non-positive values', () => {
+      expect(minValidTime(30.0, null)).toBe(30.0);
+      expect(minValidTime(30.0, undefined)).toBe(30.0);
+      expect(minValidTime(30.0, 0)).toBe(30.0);
+      expect(minValidTime(30.0, -5)).toBe(30.0);
+      expect(minValidTime(null, null)).toBeNull();
     });
   });
 

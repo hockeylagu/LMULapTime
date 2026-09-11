@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Trophy, Gauge } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../server/types.js';
+import { computeTopNLapAverage, computeConsistencyRating } from '../../utils/lapComparison.js';
+import { computeTheoreticalGap } from '../../utils/formatters.js';
 import { DriverRaceStandingsRow } from './DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';
 
@@ -56,45 +58,23 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
     return fallbackWithoutPit.length > 0 ? fallbackWithoutPit : completedLaps;
   }, [validFlyingLaps, completedLaps, hasMultipleLaps]);
 
-  const avgLapTime = useMemo(() => {
-    return cleanLapsForAvg.length > 0
-      ? cleanLapsForAvg.reduce((sum, l) => sum + (l.lapTime || 0), 0) / cleanLapsForAvg.length
-      : null;
-  }, [cleanLapsForAvg]);
+  const consistency = useMemo(() => {
+    return computeConsistencyRating(selectedDriver.laps || []);
+  }, [selectedDriver.laps]);
+
+  const avgLapTime = consistency.avgLapTime;
+  const lapStdDev = consistency.stdDev;
+  const consistencyScore = consistency.consistencyScore;
 
   const deltaToBest = useMemo(() => {
     return avgLapTime !== null && selectedDriver.bestLapTime
-      ? avgLapTime - selectedDriver.bestLapTime
+      ? parseFloat((avgLapTime - selectedDriver.bestLapTime).toFixed(3))
       : null;
   }, [avgLapTime, selectedDriver.bestLapTime]);
 
-  const lapStdDev = useMemo(() => {
-    return avgLapTime !== null && cleanLapsForAvg.length > 1
-      ? Math.sqrt(
-          cleanLapsForAvg.reduce((sum, l) => sum + Math.pow((l.lapTime || 0) - avgLapTime, 2), 0) /
-            cleanLapsForAvg.length
-        )
-      : null;
-  }, [avgLapTime, cleanLapsForAvg]);
-
-  const consistencyScore = useMemo(() => {
-    return avgLapTime !== null && lapStdDev !== null && avgLapTime > 0
-      ? Math.max(0, Math.min(100, (1 - lapStdDev / avgLapTime) * 100))
-      : null;
-  }, [avgLapTime, lapStdDev]);
-
-  const sortedCleanLaps = useMemo(() => {
-    return [...cleanLapsForAvg]
-      .filter((l) => l.lapTime !== null && l.lapTime > 0)
-      .sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
-  }, [cleanLapsForAvg]);
-
   const top3Avg = useMemo(() => {
-    const top3Slice = sortedCleanLaps.slice(0, 3);
-    return top3Slice.length > 0
-      ? parseFloat((top3Slice.reduce((sum, l) => sum + (l.lapTime || 0), 0) / top3Slice.length).toFixed(3))
-      : null;
-  }, [sortedCleanLaps]);
+    return computeTopNLapAverage(selectedDriver.laps || [], 3);
+  }, [selectedDriver.laps]);
 
   const top3DeltaToBest = useMemo(() => {
     return top3Avg !== null && selectedDriver.bestLapTime
@@ -103,9 +83,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
   }, [top3Avg, selectedDriver.bestLapTime]);
 
   const theoGap = useMemo(() => {
-    return selectedDriver.bestLapTime && selectedDriver.theoreticalBest
-      ? parseFloat((selectedDriver.bestLapTime - selectedDriver.theoreticalBest).toFixed(3))
-      : null;
+    return computeTheoreticalGap(selectedDriver.bestLapTime, selectedDriver.theoreticalBest);
   }, [selectedDriver.bestLapTime, selectedDriver.theoreticalBest]);
 
   const s1Laps = useMemo(() => {

@@ -119,6 +119,16 @@ describe('lapComparison utility', () => {
       expect(theo.lapTimeString).toBe('--:--.---');
     });
 
+    it('returns null lapTime if any sector is <= 0', () => {
+      const theoZero = createTheoreticalBestLap(0, 44.2, 45.1);
+      expect(theoZero.lapTime).toBeNull();
+      expect(theoZero.lapTimeString).toBe('--:--.---');
+
+      const theoNegative = createTheoreticalBestLap(-5, 44.2, 45.1);
+      expect(theoNegative.lapTime).toBeNull();
+      expect(theoNegative.lapTimeString).toBe('--:--.---');
+    });
+
     it('creates a theoretical lap with paceCategory and pacePercentage attached', () => {
       const theo = createTheoreticalBestLap(
         29.5,

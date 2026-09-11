@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { formatTime, getDisplayTrackName, matchesSessionType, compareSessions } from '../utils/formatters';
-import { matchesCarClass } from '../utils/paceCategory';
+import { formatTime, matchesSessionType, compareSessions } from '../utils/formatters';
+import { matchesCarClass, matchesTrack } from '../utils/paceCategory';
 import { PaceCategory } from '../../server/types.js';
 import { ImprovementHeader } from './improvement-chart/ImprovementHeader';
 import { ImprovementStatsBanner } from './improvement-chart/ImprovementStatsBanner';
@@ -83,15 +83,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
   const rawTrackData = progression.filter((p) => {
-    const display = (p.displayTrack || getDisplayTrackName(p.trackVenue, p.trackCourse) || p.trackVenue).toLowerCase().trim();
-    const pVenue = (p.trackVenue || '').toLowerCase().trim();
-    const activeNorm = activeTrack.toLowerCase().trim();
-    const isTrackMatch =
-      activeTrack === 'All' ||
-      display === activeNorm ||
-      pVenue === activeNorm ||
-      (activeNorm.length > 3 && pVenue.includes(activeNorm)) ||
-      (pVenue.length > 3 && activeNorm.includes(pVenue));
+    const isTrackMatch = matchesTrack(activeTrack, p.trackVenue, p.trackCourse);
 
     const matchesClass = matchesCarClass(p.carClass, p.carType, selectedCarClass);
     const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;

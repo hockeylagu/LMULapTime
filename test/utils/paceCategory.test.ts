@@ -6,6 +6,7 @@ import {
   normalizeCarClass,
   normalizeCarClassGroup,
   matchesCarClass,
+  matchesSessionCarClass,
   normalizeTrackName,
   matchesTrack,
   getPaceCategoryFromPercentage,
@@ -124,6 +125,42 @@ describe('paceCategory utility', () => {
 
     it('matches custom fallback classes', () => {
       expect(matchesCarClass('Formula', 'Spec', 'formula')).toBe(true);
+    });
+  });
+
+  describe('matchesSessionCarClass', () => {
+    it('returns true when targetClass is All or empty', () => {
+      expect(matchesSessionCarClass({}, 'All')).toBe(true);
+      expect(matchesSessionCarClass({}, '')).toBe(true);
+    });
+
+    it('matches session via playerDriver carClass or carType', () => {
+      const session = {
+        playerDriver: { carClass: 'Hypercar', carType: 'Ferrari 499P' },
+      };
+      expect(matchesSessionCarClass(session, 'LMH')).toBe(true);
+      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(false);
+    });
+
+    it('matches session via drivers array when playerDriver does not match or is absent', () => {
+      const session = {
+        playerDriver: null,
+        drivers: [
+          { carClass: 'LMGT3', carType: 'Aston Martin Vantage' },
+          { carClass: 'LMH', carType: 'Porsche 963' },
+        ],
+      };
+      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(true);
+      expect(matchesSessionCarClass(session, 'LMH')).toBe(true);
+      expect(matchesSessionCarClass(session, 'LMP2')).toBe(false);
+    });
+
+    it('returns false when neither playerDriver nor any drivers match', () => {
+      const session = {
+        playerDriver: { carClass: 'LMP2', carType: 'Oreca 07' },
+        drivers: [{ carClass: 'LMP2', carType: 'Oreca 07' }],
+      };
+      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(false);
     });
   });
 

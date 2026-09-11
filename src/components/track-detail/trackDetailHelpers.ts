@@ -1,6 +1,6 @@
 import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/types';
 import { getPaceCategoryFromPercentage } from '../../utils/paceCategory';
-import { parseDateStringToTimestamp } from '../../utils/formatters';
+import { parseDateStringToTimestamp, computeTheoreticalGap } from '../../utils/formatters';
 import { SessionProgressionPoint } from '../ImprovementChart';
 
 export interface SessionMeta {
@@ -58,7 +58,7 @@ export function buildTrackProgression(
         const consistencyScore = matchingPoint?.consistencyScore ?? null;
         const theoreticalGap =
           matchingPoint?.theoreticalGap ??
-          (p?.bestLapTime && p?.theoreticalBest ? parseFloat((p.bestLapTime - p.theoreticalBest).toFixed(3)) : null);
+          computeTheoreticalGap(p?.bestLapTime, p?.theoreticalBest);
 
         return {
           sessionId: s.id,

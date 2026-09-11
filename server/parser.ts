@@ -16,17 +16,20 @@ import {
   TrackSummary,
   ComparableLap,
 } from './types.js';
-import { parseReplayMetadata } from './replayParser.js';
+import { parseReplayMetadata, detectPlayerName } from './replayParser.js';
 import {
   formatTime,
   formatElapsedSeconds,
   parseTimeStringToSeconds,
   getDisplayTrackName,
   computeTheoreticalBest,
+  computeTheoreticalGap,
   parseDateStringToTimestamp,
   getSessionTypeWeight,
   compareSessions,
+  minValidTime,
 } from '../src/utils/formatters.js';
+import { computeTopNLapAverage, computeConsistencyRating } from '../src/utils/lapComparison.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
 import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
 
@@ -180,8 +183,7 @@ export interface ReplayFileEntry {
   durationSec?: number;
 }
 
-const updateMinTime = (current: number | null, next: number | null): number | null =>
-  next !== null && next > 0 && (current === null || next < current) ? next : current;
+const updateMinTime = minValidTime;
 
 const computeAverageLapTime = (laps: LapData[]): number | null => {
   const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
@@ -238,44 +240,10 @@ export class LmuParser {
   }
 
   public detectPlayerName(baseDir?: string) {
-    try {
-      const candidateUserDataDirs: string[] = [];
-
-      if (baseDir) {
-        const uIdx = baseDir.indexOf('UserData');
-        if (uIdx !== -1) {
-          candidateUserDataDirs.push(baseDir.substring(0, uIdx + 8));
-        }
-      }
-
-      candidateUserDataDirs.push(
-        'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData',
-        path.join(process.cwd(), 'UserData')
-      );
-
-      for (const udDir of candidateUserDataDirs) {
-        if (!fs.existsSync(udDir)) continue;
-
-        const settingsPaths = [
-          path.join(udDir, 'player', 'settings.json'),
-          path.join(udDir, 'player', 'Settings.JSON'),
-        ];
-
-        for (const sp of settingsPaths) {
-          if (fs.existsSync(sp)) {
-            const raw = fs.readFileSync(sp, 'utf8');
-            const parsed = JSON.parse(raw);
-            const pName = parsed?.DRIVER?.['Player Name'] || parsed?.DRIVER?.PlayerName;
-            if (pName && typeof pName === 'string' && pName.trim()) {
-              this.configuredPlayerName = pName.trim();
-              console.log(`[LmuParser] Dynamically detected LMU player profile name: "${this.configuredPlayerName}"`);
-              return;
-            }
-          }
-        }
-      }
-    } catch {
-      // Ignore fallback
+    const detected = detectPlayerName(baseDir);
+    if (detected) {
+      this.configuredPlayerName = detected;
+      console.log(`[LmuParser] Dynamically detected LMU player profile name: "${this.configuredPlayerName}"`);
     }
   }
 
@@ -1233,39 +1201,14 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
     const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
 
     // Top 3 Clean Lap Average (filters out lap 1, pit stops, and out-laps after valid pit stops)
-    const hasMultipleLaps = cleanLaps.length > 1;
-    const validFlyingLaps = cleanLaps.filter((l, idx, arr) => {
-      const prevLap = idx > 0 ? arr[idx - 1] : null;
-      const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-      const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-      return (!hasMultipleLaps || l.lapNum > 1) && !l.isPitStop && !isOut;
-    });
-    const lapsForTop3 = validFlyingLaps.length > 0 ? validFlyingLaps : cleanLaps.filter(l => !l.isPitStop && !l.isOutLap);
-    const sortedLaps = [...lapsForTop3].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
-    const top3Slice = sortedLaps.slice(0, 3);
-    const top3AvgLapTime = top3Slice.length > 0
-      ? parseFloat((top3Slice.reduce((sum, l) => sum + (l.lapTime || 0), 0) / top3Slice.length).toFixed(3))
-      : null;
+    const top3AvgLapTime = computeTopNLapAverage(driver?.laps || [], 3);
 
     // Theoretical Gap (Execution gap: Actual Best - Theoretical Best)
-    const theoreticalGap = (driver?.bestLapTime && driver?.theoreticalBest)
-      ? parseFloat((driver.bestLapTime - driver.theoreticalBest).toFixed(3))
-      : null;
+    const theoreticalGap = computeTheoreticalGap(driver?.bestLapTime, driver?.theoreticalBest);
 
     // Consistency score (%) based on standard deviation of clean flying laps
-    const lapsForConsistency = validFlyingLaps.length >= 2 ? validFlyingLaps : (cleanLaps.length >= 2 ? cleanLaps : validFlyingLaps);
-    const consistAvg = lapsForConsistency.length > 0
-      ? lapsForConsistency.reduce((sum, l) => sum + (l.lapTime || 0), 0) / lapsForConsistency.length
-      : null;
-    const stdDev = (consistAvg !== null && lapsForConsistency.length > 1)
-      ? Math.sqrt(
-          lapsForConsistency.reduce((sum, l) => sum + Math.pow((l.lapTime || 0) - consistAvg, 2), 0) /
-            lapsForConsistency.length
-        )
-      : null;
-    const consistencyScore = (consistAvg !== null && stdDev !== null && consistAvg > 0)
-      ? parseFloat(Math.max(0, Math.min(100, (1 - stdDev / consistAvg) * 100)).toFixed(1))
-      : null;
+    const consistencyRating = computeConsistencyRating(driver?.laps || []);
+    const consistencyScore = consistencyRating.consistencyScore;
 
     return {
       sessionId: s.id,

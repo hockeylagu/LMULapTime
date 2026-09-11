@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/types.js';
-import { matchesTrack, matchesCarClass, getTrackAndLayout } from './paceCategory.js';
+import { matchesTrack, matchesCarClass } from './paceCategory.js';
 
 // Neutral (0) / reverse (-1) are clamped to 1 for chart/comparison display.
 function resolveGearValue(p: ReplayTrajectoryPoint): number {
@@ -263,24 +263,12 @@ export function filterCompatibleReplays(
     return [];
   }
 
-  const normTarget = currentTrackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-
   return allReplays.filter(r => {
     if (excludeReplayName && r.name === excludeReplayName) return false;
     if (!r.trackName) return false;
 
     // Track matching rule
-    let isTrackMatch = matchesTrack(r.trackName, currentTrackName, '');
-    if (!isTrackMatch) {
-      const qInfo = getTrackAndLayout(r.trackName, '');
-      const sInfo = getTrackAndLayout(currentTrackName, '');
-      if (!qInfo.isKnown && !sInfo.isKnown) {
-        const normTrack = r.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        isTrackMatch = normTrack.includes(normTarget) || normTarget.includes(normTrack);
-      }
-    }
-
-    if (!isTrackMatch) return false;
+    if (!matchesTrack(r.trackName, currentTrackName, '')) return false;
 
     // Vehicle class rule (if vehicle class specified)
     if (currentCarClass && currentCarClass !== 'All') {
