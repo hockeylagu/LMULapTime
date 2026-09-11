@@ -1,6 +1,6 @@
 import React from 'react';
 import { DetailedSession, DriverData, LapData } from '../../../server/types.js';
-import { formatTime, getDisplayTrackName } from '../../utils/formatters.js';
+import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../utils/formatters.js';
 import { computeLapToLapDelta } from '../../utils/lapComparison.js';
 import { updateHashParams } from '../../utils/urlParams.js';
 import { PaceBadge } from '../common';
@@ -85,8 +85,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const lapToLap = computeLapToLapDelta(prevLap?.lapTime, displayLapTime);
 
   const theoGapLap =
-    displayLapTime && theoBest && l.isValid && !isSessionBest && !l.isPitStop && !isOutLap
-      ? parseFloat((displayLapTime - theoBest).toFixed(3))
+    l.isValid && !isSessionBest && !l.isPitStop && !isOutLap
+      ? computeTheoreticalGap(displayLapTime, theoBest)
       : null;
 
   const isS1Best = l.s1 !== null && bestS1 !== null && Math.abs(l.s1 - bestS1) < 0.0005;

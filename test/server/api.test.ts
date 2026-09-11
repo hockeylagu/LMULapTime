@@ -60,6 +60,10 @@ describe('Server API routes', () => {
     const allProg = await request(app).get('/api/progression?track=All&carClass=All');
     expect(allProg.status).toBe(200);
     expect(Array.isArray(allProg.body)).toBe(true);
+
+    const raceProg = await request(app).get('/api/progression?sessionType=Race');
+    expect(raceProg.status).toBe(200);
+    expect(Array.isArray(raceProg.body)).toBe(true);
   });
 
   it('GET /api/tracks returns track summaries', async () => {

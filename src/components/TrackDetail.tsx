@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { formatTime, matchesSessionType, compareSessions } from '../utils/formatters.js';
-import { matchesCarClass } from '../utils/paceCategory.js';
+import { formatTime, matchesSessionType, compareSessions, isSessionEmpty } from '../utils/formatters.js';
+import { matchesCarClass, matchesSessionCarClass } from '../utils/paceCategory.js';
 import { getHashRouteAndParams, updateHashParams } from '../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './ImprovementChart.js';
@@ -119,19 +119,19 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const availableCarModels = Array.from(
     new Set(
       data.sessions
-        .filter((s) => selectedClass === 'All' || matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass))
+        .filter((s) => matchesSessionCarClass(s, selectedClass))
         .map((s) => s.playerDriver?.carType)
         .filter(Boolean)
     )
   ).sort() as string[];
 
   const classTrackSessions = data.sessions.filter((s) => {
-    const matchesClass = selectedClass === 'All' || matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', selectedClass);
+    const matchesClass = matchesSessionCarClass(s, selectedClass);
     const matchesModel = selectedCarModel === 'All' || s.playerDriver?.carType === selectedCarModel;
     return matchesClass && matchesModel;
   });
 
-  const emptyCount = classTrackSessions.filter((s) => !s.playerDriver?.bestLapTime || s.playerDriver.bestLapTime <= 0).length;
+  const emptyCount = classTrackSessions.filter((s) => isSessionEmpty(s)).length;
 
   const filteredSessions = classTrackSessions.filter((s) => {
     const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
@@ -140,7 +140,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       s.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.playerDriver?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesEmpty = !hideEmpty || (s.playerDriver?.bestLapTime && s.playerDriver.bestLapTime > 0);
+    const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
     return matchesType && matchesSearch && matchesEmpty;
   });
 

@@ -165,6 +165,36 @@ export function matchesCarClass(carClass: string = '', carType: string = '', tar
   }
 }
 
+/**
+ * Checks if a session matches a target car class by evaluating either playerDriver
+ * or any participating driver in the session.
+ */
+export function matchesSessionCarClass(
+  session: {
+    playerDriver?: { carClass?: string | null; carType?: string | null } | null;
+    drivers?: Array<{ carClass?: string | null; carType?: string | null }> | null;
+  },
+  targetClass: string = 'All'
+): boolean {
+  if (!targetClass || targetClass === 'All') return true;
+
+  if (
+    session.playerDriver &&
+    matchesCarClass(session.playerDriver.carClass || '', session.playerDriver.carType || '', targetClass)
+  ) {
+    return true;
+  }
+
+  if (session.drivers && session.drivers.length > 0) {
+    return session.drivers.some(d =>
+      matchesCarClass(d.carClass || '', d.carType || '', targetClass)
+    );
+  }
+
+  return false;
+}
+
+
 import { getDisplayTrackName } from './formatters.js';
 
 export interface TrackLayoutDef {

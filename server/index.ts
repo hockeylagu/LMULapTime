@@ -6,7 +6,7 @@ import { LmuParser, computeProgression, computeTrackSummaries, extractComparable
 import { AiAnalyzeRequest, AiAnalyzeResponse, DetailedSession, ReplaySummary, DriverData, LapData, ReplayMetadata, ReplayDriverEntry, ReplayTrajectoryData, ReplayScanStatus } from './types.js';
 import { parseReplayMetadata, extractReplayTrajectory, downsampleReplayTrajectory } from './replayParser.js';
 import { loadReferenceLaptimesFromCache, fetchAndCacheReferenceLaptimes, normalizeTrackName } from './referenceLaptimes.js';
-import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesCarClass } from '../src/utils/paceCategory.js';
+import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/utils/formatters.js';
 import { getSessionDatabase } from './db.js';
 import { AI_MODELS, analyzeLap, clearSessionApiKey, createAiReportRecord, getAiCacheKey, getAiSettings, setSessionApiKey, setSessionModel, toAiError } from './aiReport.js';
@@ -311,10 +311,7 @@ app.get('/api/sessions', (req, res) => {
   }
 
   if (carClass && carClass !== 'All') {
-    sessions = sessions.filter(s =>
-      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', carClass) ||
-      s.drivers.some(d => matchesCarClass(d.carClass || '', d.carType || '', carClass))
-    );
+    sessions = sessions.filter(s => matchesSessionCarClass(s, carClass));
   }
 
   if (driver && driver !== 'All') {
@@ -369,6 +366,7 @@ app.get('/api/progression', (req, res) => {
   const driverName = req.query.driver as string | undefined;
   const track = req.query.track as string | undefined;
   const carClass = req.query.carClass as string | undefined;
+  const sessionType = req.query.sessionType as string | undefined;
   const hideEmpty = req.query.hideEmpty === 'true' || req.query.filterEmpty === 'true';
   let sessions = loadSessions();
 
@@ -380,11 +378,12 @@ app.get('/api/progression', (req, res) => {
     sessions = sessions.filter(s => matchesTrack(track, s.trackVenue, s.trackCourse));
   }
 
+  if (sessionType && sessionType !== 'All') {
+    sessions = sessions.filter(s => matchesSessionType(s.sessionType, s.sessionName, sessionType));
+  }
+
   if (carClass && carClass !== 'All') {
-    sessions = sessions.filter(s =>
-      matchesCarClass(s.playerDriver?.carClass || '', s.playerDriver?.carType || '', carClass) ||
-      s.drivers.some(d => matchesCarClass(d.carClass || '', d.carType || '', carClass))
-    );
+    sessions = sessions.filter(s => matchesSessionCarClass(s, carClass));
   }
 
   const progression = computeProgression(sessions, driverName);

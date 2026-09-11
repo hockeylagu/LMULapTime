@@ -1,5 +1,5 @@
 import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../../server/types.js';
-import { formatTime } from './formatters.js';
+import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 
 export type { ComparableLap };
@@ -106,7 +106,7 @@ export function createTheoreticalBestLap(
   paceCategory?: PaceCategory | null,
   pacePercentage?: number | null
 ): ComparableLap {
-  const lapTime = s1 !== null && s2 !== null && s3 !== null ? parseFloat((s1 + s2 + s3).toFixed(3)) : null;
+  const lapTime = computeTheoreticalBest(s1, s2, s3);
   return {
     id: `theoretical_${carClass}_${Date.now()}`,
     driverName,
@@ -308,14 +308,16 @@ export function computeConsistencyRating(
     return (l.isValid ?? true) && !l.isPitStop && !isOut && (!hasMultiple || (l.lapNum ?? 2) > 1);
   });
 
-  const candidates = validFlying.length > 0
+  const fallback = completed.filter((l, idx, arr) => {
+    const prevLap = idx > 0 ? arr[idx - 1] : null;
+    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
+    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
+    return (l.isValid ?? true) && !l.isPitStop && !isOut;
+  });
+
+  const candidates = validFlying.length >= 2
     ? validFlying
-    : completed.filter((l, idx, arr) => {
-        const prevLap = idx > 0 ? arr[idx - 1] : null;
-        const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-        const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-        return (l.isValid ?? true) && !l.isPitStop && !isOut;
-      });
+    : (fallback.length >= 2 ? fallback : (validFlying.length > 0 ? validFlying : fallback));
 
   if (candidates.length === 0) return { consistencyScore: null, avgLapTime: null, stdDev: null };
 

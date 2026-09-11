@@ -137,6 +137,29 @@ export function computeTheoreticalBest(s1: number | null, s2: number | null, s3:
   return null;
 }
 
+export function computeTheoreticalGap(
+  bestLapTime?: number | null,
+  theoreticalBest?: number | null
+): number | null {
+  if (
+    bestLapTime !== null &&
+    bestLapTime !== undefined &&
+    theoreticalBest !== null &&
+    theoreticalBest !== undefined &&
+    bestLapTime > 0 &&
+    theoreticalBest > 0
+  ) {
+    const gap = bestLapTime - theoreticalBest;
+    return parseFloat(Math.max(0, gap).toFixed(3));
+  }
+  return null;
+}
+
+export function minValidTime(current: number | null, next: number | null | undefined): number | null {
+  return next !== null && next !== undefined && next > 0 && (current === null || next < current) ? next : current;
+}
+
+
 /**
  * Returns chronological weight for session types and names.
  * Practice (100-199) < Qualifying (200-299) < Warmup (250) < Race (300-399).
