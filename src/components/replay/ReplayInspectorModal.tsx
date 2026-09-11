@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { useCornerConsistency } from './useCornerConsistency.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { computeCumulativeDistances, findIndexAtDistance } from '../../utils/replayComparison.js';
 import { computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../utils/cornerAnalysis.js';
 import { computeLapConsistencyStats } from '../../utils/lapConsistency.js';
+import { formatTime } from '../../utils/formatters.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 
 export interface ReplayInspectorModalProps {
@@ -185,12 +186,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     setSelectedCornerNumber(prev => (cornerNumber !== null && prev === cornerNumber ? null : cornerNumber));
   };
 
-  const formatLapTime = (sec?: number | null): string => {
-    if (!sec || isNaN(sec) || sec <= 0) return '--:--.---';
-    const mins = Math.floor(sec / 60);
-    const rem = (sec % 60).toFixed(3);
-    return `${mins}:${parseFloat(rem) < 10 ? `0${rem}` : rem}`;
-  };
+  const formatLapTime = (sec?: number | null): string => formatTime(sec);
 
   if (!isOpen) return null;
 

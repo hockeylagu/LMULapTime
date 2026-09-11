@@ -301,5 +301,14 @@ describe('replayComparison utility', () => {
       expect(mapVehicleIdToClass('G61', 'Ginetta G61-LT-P325 Evo')).toBe('LMP3');
       expect(mapVehicleIdToClass('D09', 'Duqueine D09 P3')).toBe('LMP3');
     });
+
+    it('correctly classifies vehicles using vehicleId alone when carModel is missing', () => {
+      expect(mapVehicleIdToClass('23_26_THOR59931582')).toBe('LMGT3');
+      expect(mapVehicleIdToClass('50_26_499P_123456')).toBe('LMH');
+      expect(mapVehicleIdToClass('10_VECTOR_C18BEE4')).toBe('LMP2');
+      expect(mapVehicleIdToClass('777_DSTATI5BFA7EF3')).toBe('GTE');
+      expect(mapVehicleIdToClass('G61')).toBe('LMP3');
+    });
   });
 });
+

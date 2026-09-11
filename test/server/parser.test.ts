@@ -1162,6 +1162,58 @@ describe('parser server module', () => {
       expect(result.allTimeBestLap).toBeNull();
       expect(result.overallTrackBestLap).toBeNull();
     });
+
+    it('correctly filters LMP3 and differentiates LMP2 ELMS vs WEC', () => {
+      const multiClassSessions = [
+        {
+          id: 'session_multiclass',
+          sessionName: 'P1',
+          sessionType: 'Practice',
+          trackVenue: 'Spa',
+          drivers: [
+            {
+              name: 'LMP3 Driver',
+              carClass: 'LMP3',
+              carType: 'Ligier JS P320',
+              laps: [{ lapNum: 1, lapTime: 130.0, lapTimeString: '2:10.000', isValid: true }],
+            },
+            {
+              name: 'ELMS Driver',
+              carClass: 'LMP2',
+              carType: 'Oreca 07 ELMS',
+              laps: [{ lapNum: 1, lapTime: 125.0, lapTimeString: '2:05.000', isValid: true }],
+            },
+            {
+              name: 'WEC Driver',
+              carClass: 'LMP2',
+              carType: 'Oreca 07 WEC',
+              laps: [{ lapNum: 1, lapTime: 124.0, lapTimeString: '2:04.000', isValid: true }],
+            },
+          ],
+        },
+      ] as unknown as DetailedSession[];
+
+      const lmp3Result = extractComparableLaps(multiClassSessions, {
+        trackName: 'Spa',
+        carClass: 'LMP3',
+      });
+      expect(lmp3Result.laps.length).toBe(1);
+      expect(lmp3Result.laps[0].driverName).toBe('LMP3 Driver');
+
+      const elmsResult = extractComparableLaps(multiClassSessions, {
+        trackName: 'Spa',
+        carClass: 'LMP2elms',
+      });
+      expect(elmsResult.laps.length).toBe(1);
+      expect(elmsResult.laps[0].driverName).toBe('ELMS Driver');
+
+      const wecResult = extractComparableLaps(multiClassSessions, {
+        trackName: 'Spa',
+        carClass: 'LMP2wec',
+      });
+      expect(wecResult.laps.length).toBe(1);
+      expect(wecResult.laps[0].driverName).toBe('WEC Driver');
+    });
   });
 
   describe('Stream Incidents, Track Limits, Damage, and Penalties', () => {
