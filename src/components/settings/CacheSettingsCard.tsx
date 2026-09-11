@@ -87,7 +87,7 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
             type="button"
             onClick={onClearCache}
             disabled={isClearingCache}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-lmu-accent/10 text-lmu-accent border border-lmu-accent/20 font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/20 transition-all disabled:opacity-50 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             {isClearingCache ? 'Clearing...' : 'Clear Cache'}

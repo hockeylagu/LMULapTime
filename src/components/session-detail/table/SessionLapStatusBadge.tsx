@@ -75,7 +75,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       )}
       {hasLapPenalties && (
         <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600/30 text-red-200 border border-red-500/50 cursor-help"
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40 cursor-help"
           title={l.penalties?.map((p) => `🛑 ${p.description}`).join('\n')}
         >
           🛑 {l.penalties?.[0]?.penalty || 'Pen'}

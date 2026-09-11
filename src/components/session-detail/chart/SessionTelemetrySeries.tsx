@@ -58,9 +58,9 @@ export const SessionTelemetrySeries: React.FC<SessionTelemetrySeriesProps> = ({
           type="monotone"
           dataKey="lapTime"
           name="Lap Time"
-          stroke="#E53E3E"
+          stroke="#E63946"
           strokeWidth={3}
-          dot={{ r: 4, fill: '#E53E3E', strokeWidth: 2, stroke: '#FFFFFF' }}
+          dot={{ r: 4, fill: '#E63946', strokeWidth: 2, stroke: '#FFFFFF' }}
           activeDot={{ r: 7 }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['lapTime'])}
@@ -85,19 +85,19 @@ export const SessionTelemetrySeries: React.FC<SessionTelemetrySeriesProps> = ({
   if (activeChartMetric === 'sectors') {
     return (
       <>
-        <Line type="monotone" dataKey="s1" name="Sector 1" stroke="#ECC94B" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s1'])} />
-        <Line type="monotone" dataKey="s2" name="Sector 2" stroke="#3182CE" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s2'])} />
-        <Line type="monotone" dataKey="s3" name="Sector 3" stroke="#38A169" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s3'])} />
-        {avgS1 !== null && <Line type="monotone" dataKey="avgS1" name="Avg S1" stroke="#ECC94B" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS1'])} />}
-        {avgS2 !== null && <Line type="monotone" dataKey="avgS2" name="Avg S2" stroke="#3182CE" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS2'])} />}
-        {avgS3 !== null && <Line type="monotone" dataKey="avgS3" name="Avg S3" stroke="#38A169" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS3'])} />}
+        <Line type="monotone" dataKey="s1" name="Sector 1" stroke="#FFB703" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s1'])} />
+        <Line type="monotone" dataKey="s2" name="Sector 2" stroke="#219EBC" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s2'])} />
+        <Line type="monotone" dataKey="s3" name="Sector 3" stroke="#2A9D8F" strokeWidth={2} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['s3'])} />
+        {avgS1 !== null && <Line type="monotone" dataKey="avgS1" name="Avg S1" stroke="#FFB703" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS1'])} />}
+        {avgS2 !== null && <Line type="monotone" dataKey="avgS2" name="Avg S2" stroke="#219EBC" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS2'])} />}
+        {avgS3 !== null && <Line type="monotone" dataKey="avgS3" name="Avg S3" stroke="#2A9D8F" strokeWidth={1.5} strokeDasharray="3 3" dot={false} connectNulls={true} hide={Boolean(hiddenSeries['avgS3'])} />}
       </>
     );
   }
 
   if (activeChartMetric === 'topSpeed') {
     return (
-      <Line type="monotone" dataKey="topSpeed" name="Top Speed (km/h)" stroke="#E53E3E" strokeWidth={2.5} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['topSpeed'])} />
+      <Line type="monotone" dataKey="topSpeed" name="Top Speed (km/h)" stroke="#E63946" strokeWidth={2.5} dot={{ r: 3 }} connectNulls={true} hide={Boolean(hiddenSeries['topSpeed'])} />
     );
   }
 

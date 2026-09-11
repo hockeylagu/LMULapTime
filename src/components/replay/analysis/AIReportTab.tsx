@@ -116,13 +116,13 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-      <div className="rounded-xl border border-lmu-border bg-lmu-dark/70 p-4 space-y-3">
+      <div className="rounded-xl border border-lmu-border bg-lmu-card/80 p-4 space-y-3">
         <div className="flex items-center gap-2">
           <BrainCircuit className="w-5 h-5 text-lmu-accent" />
           <h3 className="text-sm font-bold text-white">AI Lap Report</h3>
         </div>
         <p className="text-xs leading-relaxed text-lmu-muted">Lap analytics and driver names used in this comparison will be sent to Google Gemini.</p>
-        {configured === false && <p className="text-xs text-amber-300">Configure a Gemini API key in Settings before generating a report.</p>}
+        {configured === false && <p className="text-xs text-lmu-gold">Configure a Gemini API key in Settings before generating a report.</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void generate(false)} disabled={configured !== true || isLoading} className="inline-flex items-center gap-1.5 rounded-lg bg-lmu-accent px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
             <Sparkles className="h-3.5 w-3.5" /> {isLoading ? 'Generating...' : 'Generate AI Report'}
@@ -133,7 +133,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
         </div>
       </div>
 
-      {errorCode && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{errorMessages[errorCode]}{errorMessage && <span className="mt-1 block text-xs text-red-200/70">{errorMessage}</span>}</div>}
+      {errorCode && <div role="alert" className="rounded-xl border border-lmu-accent/30 bg-lmu-accent/10 p-4 text-sm text-white">{errorMessages[errorCode]}{errorMessage && <span className="mt-1 block text-xs text-lmu-muted">{errorMessage}</span>}</div>}
 
       {report && <div className="space-y-3">
         <section className="rounded-xl border border-lmu-border bg-lmu-card/60 p-4">

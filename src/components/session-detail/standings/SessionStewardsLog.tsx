@@ -69,7 +69,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         et: pen.elapsedSeconds,
         description: pen.description,
         badge: `🛑 ${pen.penalty}`,
-        badgeClass: 'bg-red-600/30 text-red-200 border-red-500/50',
+        badgeClass: 'bg-lmu-accent/20 text-lmu-accent border-lmu-accent/40',
         lapNum: l.lapNum,
       });
     });
@@ -121,7 +121,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
               );
             })()}
             {hasPenalties && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-600/25 text-red-200 border border-red-500/40">
+              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40">
                 🛑 {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}
               </span>
             )}

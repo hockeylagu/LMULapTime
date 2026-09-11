@@ -124,7 +124,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
       )}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <table className="w-full text-[11px] font-mono border-collapse">
-          <thead className="sticky top-0 bg-lmu-dark z-10">
+          <thead className="sticky top-0 bg-lmu-card border-b border-lmu-border z-10">
             <tr className="text-lmu-muted uppercase tracking-wider text-[10px]">
               <th className="px-2 py-1.5 text-left">Segment</th>
               <th className="px-2 py-1.5 text-right">Entry</th>
