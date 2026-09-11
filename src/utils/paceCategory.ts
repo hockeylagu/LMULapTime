@@ -88,17 +88,33 @@ export function formatPacePercentage(percentage?: number | null): string {
   return `${percentage.toFixed(1)}%`;
 }
 
-export function normalizeCarClassGroup(carClass?: string, carType?: string): string {
+// Car Class Normalization Helper
+export function normalizeCarClass(carClass?: string, carType: string = ''): string {
   const combined = `${carClass || ''} ${carType || ''}`.toLowerCase();
 
-  if (combined.includes('hyper') || combined.includes('lmh') || combined.includes('lmdh')) return 'LMH';
-  if (combined.includes('gt3') || combined.includes('lmgt3')) return 'LMGT3';
-  if (combined.includes('lmp3')) return 'LMP3';
-  if (combined.includes('lmp2')) return 'LMP2';
+  if (/hyper|lmh|lmdh/.test(combined)) return 'LMH';
+  if (/gt3|lmgt3/.test(combined)) return 'LMGT3';
   if (combined.includes('gte')) return 'GTE';
+  if (combined.includes('lmp3')) return 'LMP3';
+  if (combined.includes('lmp2')) {
+    return /elms|lmp2_elms/.test(combined) ? 'LMP2elms' : 'LMP2wec';
+  }
 
+  return carClass || '';
+}
+
+export function normalizeCarClassGroup(carClass?: string, carType?: string): string {
+  const norm = normalizeCarClass(carClass, carType);
+  if (norm === 'LMH' || norm === 'LMGT3' || norm === 'GTE' || norm === 'LMP3') {
+    return norm;
+  }
+  if (norm === 'LMP2elms' || norm === 'LMP2wec') {
+    return 'LMP2';
+  }
   return (carClass || carType || 'General').toUpperCase();
 }
+
+
 
 export interface CarClassOption {
   id: string;

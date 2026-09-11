@@ -1,5 +1,5 @@
 import { DetailedSession } from '../../../server/types.js';
-import { parseDateStringToTimestamp } from '../../utils/formatters.js';
+import { parseDateStringToTimestamp, matchesSessionType } from '../../utils/formatters.js';
 import { matchesTrack } from '../../utils/paceCategory.js';
 
 export const OPPONENT_COLORS = [
@@ -57,11 +57,9 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
 ): { type: 'qualifying' | 'race'; target: T } | null {
   if (!current || !sessions || sessions.length === 0) return null;
 
-  const currentType = (current.sessionType || '').toLowerCase();
-  const currentName = (current.sessionName || '').toLowerCase();
-  const isRace = currentType === 'race' || currentName.startsWith('r');
-  const isQuali = currentType.includes('qual') || currentName.startsWith('q');
-  const isPractice = currentType.includes('practice') || currentName.startsWith('p');
+  const isRace = matchesSessionType(current.sessionType, current.sessionName, 'Race');
+  const isQuali = matchesSessionType(current.sessionType, current.sessionName, 'Qualifying');
+  const isPractice = matchesSessionType(current.sessionType, current.sessionName, 'Practice');
 
   // Race -> Quali; Quali -> Race; Practice -> Race or Quali
   const targetType: 'qualifying' | 'race' | null = isRace ? 'qualifying' : (isQuali || isPractice) ? 'race' : null;
@@ -70,13 +68,11 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
   const targetSessions = sessions.filter((s) => {
     const sId = s.id || s.sessionId;
     if (sId === current.id) return false;
-    const t = (s.sessionType || '').toLowerCase();
-    const n = (s.sessionName || '').toLowerCase();
     if (targetType === 'qualifying') {
-      return t.includes('qual') || n.startsWith('q');
+      return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
     }
     if (targetType === 'race') {
-      return t === 'race' || n.startsWith('r');
+      return matchesSessionType(s.sessionType, s.sessionName, 'Race');
     }
     return false;
   });
@@ -86,9 +82,7 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
       const qualiSessions = sessions.filter((s) => {
         const sId = s.id || s.sessionId;
         if (sId === current.id) return false;
-        const t = (s.sessionType || '').toLowerCase();
-        const n = (s.sessionName || '').toLowerCase();
-        return t.includes('qual') || n.startsWith('q');
+        return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
       });
       if (qualiSessions.length > 0) {
         const target = findClosestSession(current, qualiSessions);

@@ -3,6 +3,7 @@ import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types';
 import {
   getPaceCategoryStyle,
   formatPacePercentage,
+  normalizeCarClass,
   normalizeCarClassGroup,
   matchesCarClass,
   normalizeTrackName,
@@ -72,6 +73,18 @@ describe('paceCategory utility', () => {
     it('falls back to uppercase general or car name', () => {
       expect(normalizeCarClassGroup('CustomClass', '')).toBe('CUSTOMCLASS');
       expect(normalizeCarClassGroup('', '')).toBe('GENERAL');
+    });
+  });
+
+  describe('normalizeCarClass', () => {
+    it('distinguishes LMP2elms and LMP2wec and returns canonical class', () => {
+      expect(normalizeCarClass('Hypercar', '')).toBe('LMH');
+      expect(normalizeCarClass('GT3', 'Porsche 911 GT3 R')).toBe('LMGT3');
+      expect(normalizeCarClass('LMP2', 'ELMS')).toBe('LMP2elms');
+      expect(normalizeCarClass('LMP2', 'WEC')).toBe('LMP2wec');
+      expect(normalizeCarClass('LMP3', 'Ligier JS P320')).toBe('LMP3');
+      expect(normalizeCarClass('GTE', 'Ferrari 488 GTE')).toBe('GTE');
+      expect(normalizeCarClass('UnknownClass')).toBe('UnknownClass');
     });
   });
 

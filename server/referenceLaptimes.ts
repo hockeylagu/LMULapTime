@@ -4,10 +4,11 @@ import {
   normalizeTrackName,
   getPaceCategoryFromPercentage,
   findReferenceEntry,
+  normalizeCarClass,
 } from '../src/utils/paceCategory.js';
 import { getSessionDatabase } from './db.js';
 
-export { normalizeTrackName };
+export { normalizeTrackName, normalizeCarClass };
 
 const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
@@ -222,20 +223,7 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
   return cache;
 }
 
-// Car Class Normalization Helper
-export function normalizeCarClass(carClass: string, carType: string = ''): string {
-  const combined = `${carClass} ${carType}`.toLowerCase();
 
-  if (/hyper|lmh|lmdh/.test(combined)) return 'LMH';
-  if (/gt3|lmgt3/.test(combined)) return 'LMGT3';
-  if (combined.includes('gte')) return 'GTE';
-  if (combined.includes('lmp3')) return 'LMP3';
-  if (combined.includes('lmp2')) {
-    return /elms|lmp2_elms/.test(combined) ? 'LMP2elms' : 'LMP2wec';
-  }
-
-  return carClass;
-}
 
 // Find reference entry
 function getReferenceEntry(

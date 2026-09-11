@@ -28,7 +28,7 @@ import {
   compareSessions,
 } from '../src/utils/formatters.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
+import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 
@@ -1401,20 +1401,8 @@ export function extractComparableLaps(
 
     // Check all drivers in matching sessions to determine overall track record without driver restriction
     (s.drivers || []).forEach(d => {
-      if (targetClass && targetClass !== 'All') {
-        const dClass = d.carClass || '';
-        const dType = d.carType || '';
-        const normTarget = targetClass.toUpperCase();
-        const normD = `${dClass} ${dType}`.toUpperCase();
-        
-        const isLMH = (normTarget.includes('HYPER') || normTarget.includes('LMH')) && (normD.includes('HYPER') || normD.includes('LMH') || normD.includes('LMDH'));
-        const isGT3 = (normTarget.includes('GT3') || normTarget.includes('LMGT3')) && (normD.includes('GT3') || normD.includes('LMGT3'));
-        const isLMP2 = normTarget.includes('LMP2') && normD.includes('LMP2');
-        const isGTE = normTarget.includes('GTE') && normD.includes('GTE');
-        
-        if (!isLMH && !isGT3 && !isLMP2 && !isGTE && !normD.includes(normTarget)) {
-          return;
-        }
+      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
+        return;
       }
 
       if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
@@ -1529,20 +1517,8 @@ export function extractComparableLaps(
         return;
       }
 
-      if (targetClass && targetClass !== 'All') {
-        const dClass = d.carClass || '';
-        const dType = d.carType || '';
-        const normTarget = targetClass.toUpperCase();
-        const normD = `${dClass} ${dType}`.toUpperCase();
-        
-        const isLMH = (normTarget.includes('HYPER') || normTarget.includes('LMH')) && (normD.includes('HYPER') || normD.includes('LMH') || normD.includes('LMDH'));
-        const isGT3 = (normTarget.includes('GT3') || normTarget.includes('LMGT3')) && (normD.includes('GT3') || normD.includes('LMGT3'));
-        const isLMP2 = normTarget.includes('LMP2') && normD.includes('LMP2');
-        const isGTE = normTarget.includes('GTE') && normD.includes('GTE');
-        
-        if (!isLMH && !isGT3 && !isLMP2 && !isGTE && !normD.includes(normTarget)) {
-          return;
-        }
+      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
+        return;
       }
 
       if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
