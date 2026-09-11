@@ -1,7 +1,6 @@
 import React from 'react';
 
 export const SESSION_TYPE_OPTIONS = ['All', 'Practice', 'Qualifying', 'Race'] as const;
-export type SessionTypeOption = typeof SESSION_TYPE_OPTIONS[number];
 
 export interface SessionTypePillsProps {
   selectedType: string;

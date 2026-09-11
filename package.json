@@ -23,7 +23,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:parser": "tsx server/test_parser.ts",
     "telemetry:probe": "dotnet run -c Release --project tools/telemetry-recorder -- probe",
     "telemetry:record": "dotnet run -c Release --project tools/telemetry-recorder -- record",
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts"
@@ -53,7 +52,6 @@
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^4.1.11",
-    "autoprefixer": "^10.5.4",
     "concurrently": "^10.0.5",
     "jsdom": "^30.0.1",
     "postcss": "^8.5.26",

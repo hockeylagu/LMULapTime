@@ -9,7 +9,7 @@ import { getSessionDatabase } from './db.js';
 
 export { normalizeTrackName };
 
-export const PUBLISHED_SPREADSHEET_CSV_URL =
+const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
 
 let cachedData: ReferenceLaptimesCache | null = null;
@@ -238,7 +238,7 @@ export function normalizeCarClass(carClass: string, carType: string = ''): strin
 }
 
 // Find reference entry
-export function getReferenceEntry(
+function getReferenceEntry(
   venue: string,
   course: string,
   carClass: string,

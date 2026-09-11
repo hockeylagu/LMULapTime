@@ -1,5 +1,5 @@
 import { ReplayTelemetryPoint } from '../../../server/types.js';
-import { computeCumulativeDistances, interpolatePointAtDistance } from '../../utils/replayComparison.js';
+import { interpolatePointAtDistance } from '../../utils/replayComparison.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -127,29 +127,6 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
   return d;
 }
 
-export function computeBaselinePath(
-  baselinePoints: ReplayTelemetryPoint[],
-  bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
-  viewBoxSize: number,
-  padding: number
-): string {
-  if (!baselinePoints || baselinePoints.length === 0) return '';
-  const { minX, minZ, spanX, spanZ } = bounds;
-  const maxSpan = Math.max(spanX, spanZ, 1);
-  const scale = (viewBoxSize - 2 * padding) / maxSpan;
-  const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
-  const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
-
-  const bSvgPts = baselinePoints.map(p => ({
-    sx: offsetX + (p.x - minX) * scale,
-    sy: viewBoxSize - (offsetZ + (p.z - minZ) * scale),
-    x: p.x,
-    z: p.z,
-    isTeleport: p.isTeleport,
-  }));
-  return buildContinuousSvgPath(bSvgPts);
-}
-
 export function computeGhostPosition(
   primaryDists: number[],
   baseDists: number[],
@@ -186,32 +163,4 @@ export function computeGhostPosition(
     sy: viewBoxSize - (offsetZ + (ghostPt.z - minZ) * scale),
     point: ghostPt,
   };
-}
-
-export function computeGhostProjection(
-  points: ReplayTelemetryPoint[],
-  baselinePoints: ReplayTelemetryPoint[],
-  bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
-  currentIndex: number,
-  viewBoxSize: number,
-  padding: number
-) {
-  if (!baselinePoints || baselinePoints.length === 0 || !points || points.length === 0) {
-    return { baselinePathD: '', baselineGhostPos: null };
-  }
-
-  const baselinePathD = computeBaselinePath(baselinePoints, bounds, viewBoxSize, padding);
-  const primaryDists = computeCumulativeDistances(points);
-  const baseDists = computeCumulativeDistances(baselinePoints);
-  const baselineGhostPos = computeGhostPosition(
-    primaryDists,
-    baseDists,
-    baselinePoints,
-    currentIndex,
-    bounds,
-    viewBoxSize,
-    padding
-  );
-
-  return { baselinePathD, baselineGhostPos };
 }

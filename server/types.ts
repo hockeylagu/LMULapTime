@@ -248,11 +248,6 @@ export interface AiAnalyzeResponse {
   tokensUsed?: AiTokenUsage;
 }
 
-export interface AiErrorResponse {
-  error: string;
-  errorCode: AiErrorCode;
-}
-
 export interface AiReportRecord {
   cacheKey: string;
   replayName: string;

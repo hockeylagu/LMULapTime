@@ -13,7 +13,7 @@ export interface UseSessionDetailDataParams {
 
 // Module-level in-memory cache for instant sub-millisecond session switching. Capped so
 // browsing many sessions in one tab doesn't grow this forever.
-export const clientSessionCache = new Map<string, DetailedSession>();
+const clientSessionCache = new Map<string, DetailedSession>();
 const MAX_CACHED_SESSIONS = 50;
 let clientRefCache: ReferenceLaptimesCache | null = null;
 

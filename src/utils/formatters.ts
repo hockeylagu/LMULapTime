@@ -172,7 +172,7 @@ export function getSessionTypeWeight(sessionType?: string, sessionName?: string)
   return 0;
 }
 
-export interface SessionComparable {
+interface SessionComparable {
   timeString?: string;
   dateString?: string;
   timestamp?: number;
