@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TelemetryStripToolbar } from '../../src/components/replay/TelemetryStripToolbar';
+import { TelemetryStripToolbar } from '../../src/components/replay/index.js';
 
 describe('TelemetryStripToolbar', () => {
   it('renders mode buttons and triggers mode changes', () => {

@@ -1,7 +1,7 @@
-import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/types';
-import { getPaceCategoryFromPercentage } from '../../utils/paceCategory';
-import { parseDateStringToTimestamp, computeTheoreticalGap } from '../../utils/formatters';
-import { SessionProgressionPoint } from '../ImprovementChart';
+import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/types.js';
+import { getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
+import { parseDateStringToTimestamp, computeTheoreticalGap } from '../../utils/formatters.js';
+import { SessionProgressionPoint } from './improvement-chart/index.js';
 
 export interface SessionMeta {
   id: string;

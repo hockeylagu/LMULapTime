@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Navbar } from '../../src/components/Navbar';
+import { Navbar } from '../../src/components/navbar/index.js';
 
 describe('Navbar component', () => {
   it('renders brand title and active tab correctly', () => {

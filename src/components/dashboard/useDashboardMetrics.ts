@@ -4,7 +4,7 @@ import { matchesSessionCarClass, matchesTrack } from '../../utils/paceCategory.j
 import { DetailedSession } from '../../../server/types.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
-import { SessionSummary } from '../Dashboard.js';
+import { SessionSummary } from './Dashboard.js';
 
 export type DashboardSessionItem = SessionSummary | DetailedSession;
 

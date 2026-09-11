@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
-import { SessionList, SessionListItem } from '../SessionList';
+import { SessionList, SessionListItem } from '../session-list/SessionList.js';
 import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
 import { PaceCategory } from '../../../server/types';
 

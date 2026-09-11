@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { Dashboard } from '../../src/components/Dashboard';
+import { Dashboard } from '../../src/components/dashboard/index.js';
 
 describe('Dashboard component', () => {
   const mockSessions = [

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { TrackDetail } from '../../src/components/TrackDetail';
+import { TrackDetail } from '../../src/components/track-detail/index.js';
 
 describe('TrackDetail component', () => {
   const mockTrackDataWithMultipleClasses = {
