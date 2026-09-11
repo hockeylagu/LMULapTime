@@ -356,7 +356,7 @@ export interface ConsistencyMetricStat {
   samples: LapMetricSample[];
 }
 
-export function computeMetricStat(samples: LapMetricSample[]): ConsistencyMetricStat | null {
+function computeMetricStat(samples: LapMetricSample[]): ConsistencyMetricStat | null {
   if (samples.length < 2) return null;
   const values = samples.map(s => s.value);
   const avg = values.reduce((a, b) => a + b, 0) / values.length;

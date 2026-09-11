@@ -922,37 +922,8 @@ export class LmuParser {
     sessionCode: string,
     sessionTimestampMs: number,
     xmlFileMtimeMs: number
-  ): ReplayFileEntry | undefined;
-  private findMatchingReplay(
-    trackVenue: string,
-    sessionCode: string,
-    sessionTimestampMs: number,
-    xmlFileMtimeMs: number
-  ): ReplayFileEntry | undefined;
-  private findMatchingReplay(
-    trackVenue: string,
-    arg2: string,
-    arg3: string | number,
-    arg4?: number,
-    arg5?: number
   ): ReplayFileEntry | undefined {
     if (this.replaysMap.length === 0) return undefined;
-
-    let trackCourse = trackVenue;
-    let sessionCode = '';
-    let sessionTimestampMs = 0;
-    let xmlFileMtimeMs = 0;
-
-    if (typeof arg3 === 'string') {
-      trackCourse = arg2 || trackVenue;
-      sessionCode = arg3;
-      sessionTimestampMs = typeof arg4 === 'number' ? arg4 : 0;
-      xmlFileMtimeMs = typeof arg5 === 'number' ? arg5 : 0;
-    } else {
-      sessionCode = arg2;
-      sessionTimestampMs = typeof arg3 === 'number' ? arg3 : 0;
-      xmlFileMtimeMs = typeof arg4 === 'number' ? arg4 : 0;
-    }
 
     const normSession = (sessionCode || '').toLowerCase();
 

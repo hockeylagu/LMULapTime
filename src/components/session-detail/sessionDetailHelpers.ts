@@ -32,7 +32,7 @@ export interface CandidateRelatedSession {
   filename?: string;
 }
 
-export function findClosestSession<T extends CandidateRelatedSession>(current: DetailedSession, candidates: T[]): T | null {
+function findClosestSession<T extends CandidateRelatedSession>(current: DetailedSession, candidates: T[]): T | null {
   if (candidates.length <= 1) return candidates[0] || null;
 
   const currentTime = current.timestamp || parseDateStringToTimestamp(current.timeString);

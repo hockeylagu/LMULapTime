@@ -20,14 +20,6 @@ export interface InterpolatedPoint {
   absActive?: boolean;
 }
 
-export interface LapDeltaSummary {
-  lapTimeDeltaSec: number;
-  s1DeltaSec?: number;
-  s2DeltaSec?: number;
-  s3DeltaSec?: number;
-  isFaster: boolean;
-}
-
 export interface PointComparison {
   primary: ReplayTrajectoryPoint;
   baseline: InterpolatedPoint;
