@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatTime, matchesSessionType, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
-import { matchesCarClass, matchesSessionCarClass } from '../../utils/paceCategory.js';
+import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
 import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
@@ -16,6 +16,7 @@ export interface TrackDetailProps {
   trackName: string;
   onBack: () => void;
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
   progression?: SessionProgressionPoint[];
@@ -25,6 +26,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   trackName,
   onBack,
   onSelectSession,
+  onOpenReplay,
   selectedCarClass,
   setSelectedCarClass,
   progression = [],
@@ -143,38 +145,30 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     return matchesType && matchesSearch && matchesEmpty;
   });
 
-  let bestTime: number | null = null;
-  let bestTimeStr = '--:--.---';
-  let bestCar = '';
-  let bestCarClass = '';
+  const findBenchmarkForClass = (carClass?: string, carType?: string): ReferenceLaptimeEntry | null => {
+    if (!carClass && !carType) return null;
+    const sessionClass = normalizeCarClass(carClass, carType);
+    return data.benchmarks.find(
+      (benchmark) =>
+        matchesCarClass(benchmark.carClass, benchmark.carClass, sessionClass) ||
+        matchesCarClass(sessionClass, sessionClass, benchmark.carClass)
+    ) || null;
+  };
 
-  for (const s of filteredSessions) {
-    const p = s.playerDriver;
-    if (p?.bestLapTime && (bestTime === null || p.bestLapTime < bestTime)) {
-      bestTime = p.bestLapTime;
-      bestTimeStr = p.bestLapTimeString;
-      bestCar = p.carType;
-      bestCarClass = p.carClass || '';
-    }
-  }
+  const latestSession = [...classTrackSessions].sort((a, b) => compareSessions(a, b, 'desc'))[0];
+  const currentBenchmark = selectedClass && selectedClass !== 'All'
+    ? data.benchmarks.find((benchmark) => matchesCarClass(benchmark.carClass, benchmark.carClass, selectedClass)) || null
+    : findBenchmarkForClass(latestSession?.playerDriver?.carClass, latestSession?.playerDriver?.carType);
 
-  const rawBestStats = { bestTime, bestTimeStr, bestCar, bestCarClass };
-
-  let currentBenchmark: ReferenceLaptimeEntry | null = null;
-  if (data.benchmarks && data.benchmarks.length > 0) {
-    if (selectedClass && selectedClass !== 'All') {
-      currentBenchmark = data.benchmarks.find((b) => matchesCarClass(b.carClass, b.carClass, selectedClass)) || null;
-    } else if (rawBestStats.bestCarClass || rawBestStats.bestCar) {
-      currentBenchmark =
-        data.benchmarks.find(
-          (b) =>
-            matchesCarClass(b.carClass, b.carClass, rawBestStats.bestCarClass || rawBestStats.bestCar) ||
-            matchesCarClass(rawBestStats.bestCarClass || rawBestStats.bestCar, rawBestStats.bestCar, b.carClass)
-        ) || data.benchmarks[0];
-    } else {
-      currentBenchmark = data.benchmarks[0];
-    }
-  }
+  const bestLapSession = classTrackSessions.reduce<SessionMeta | null>((best, session) => {
+    const lapTime = session.playerDriver?.bestLapTime;
+    if (!lapTime || (best?.playerDriver?.bestLapTime && best.playerDriver.bestLapTime <= lapTime)) return best;
+    return session;
+  }, null);
+  const bestLapBenchmark = findBenchmarkForClass(
+    bestLapSession?.playerDriver?.carClass,
+    bestLapSession?.playerDriver?.carType
+  );
 
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
@@ -192,8 +186,14 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       if (lapA !== lapB) return lapA - lapB;
       return compareSessions(a, b, 'desc');
     }
-    const paceA = getPaceCategoryForLap(a.playerDriver?.bestLapTime || null, currentBenchmark);
-    const paceB = getPaceCategoryForLap(b.playerDriver?.bestLapTime || null, currentBenchmark);
+    const paceA = getPaceCategoryForLap(
+      a.playerDriver?.bestLapTime || null,
+      findBenchmarkForClass(a.playerDriver?.carClass, a.playerDriver?.carType)
+    );
+    const paceB = getPaceCategoryForLap(
+      b.playerDriver?.bestLapTime || null,
+      findBenchmarkForClass(b.playerDriver?.carClass, b.playerDriver?.carType)
+    );
     const pctA = paceA?.percentage ?? 999;
     const pctB = paceB?.percentage ?? 999;
     if (pctA !== pctB) {
@@ -204,13 +204,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression);
 
-  const bestLapSec = classTrackSessions.reduce<number | null>((min, s) => {
-    const t = s.playerDriver?.bestLapTime;
-    if (!t || t <= 0) return min;
-    return min === null || t < min ? t : min;
-  }, null);
+  const bestLapSec = bestLapSession?.playerDriver?.bestLapTime || null;
 
-  const paceInfo = getPaceCategoryForLap(bestLapSec, currentBenchmark);
+  const paceInfo = getPaceCategoryForLap(bestLapSec, bestLapBenchmark);
   const currentClassDriverStats = {
     bestTimeStr: bestLapSec ? formatTime(bestLapSec) : '--:--.---',
     bestPaceCat: paceInfo?.category || null,
@@ -260,13 +256,19 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         hideEmpty={hideEmpty}
         setHideEmpty={setHideEmpty}
         onSelectSession={onSelectSession}
+        onOpenReplay={onOpenReplay}
         filterType={filterType}
         setFilterType={setFilterType}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         sortBy={sortBy}
         setSortBy={setSortBy}
-        getPaceBadge={(s) => getPaceCategoryForLap(s.playerDriver?.bestLapTime || null, currentBenchmark)}
+        getPaceBadge={(s) =>
+          getPaceCategoryForLap(
+            s.playerDriver?.bestLapTime || null,
+            findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType)
+          )
+        }
         onResetFilters={
           filterType !== 'All' || searchQuery !== '' || (hideEmpty && emptyCount > 0)
             ? () => {

@@ -38,6 +38,7 @@ export interface SessionListItem {
 export interface SessionListProps {
   sessions: SessionListItem[];
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
   getPaceBadge?: (session: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
   emptyMessage?: string;
@@ -53,6 +54,7 @@ export interface SessionListProps {
 export const SessionList: React.FC<SessionListProps> = ({
   sessions,
   onSelectSession,
+  onOpenReplay,
   showTrackColumn = true,
   getPaceBadge,
   emptyMessage = 'No sessions found matching filters.',
@@ -125,6 +127,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         <SessionGridView
           sessions={sessions}
           onSelectSession={onSelectSession}
+          onOpenReplay={onOpenReplay}
           showTrackColumn={showTrackColumn}
           resolvePaceBadge={resolvePaceBadge}
         />
@@ -132,6 +135,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         <SessionTableView
           sessions={sessions}
           onSelectSession={onSelectSession}
+          onOpenReplay={onOpenReplay}
           showTrackColumn={showTrackColumn}
           resolvePaceBadge={resolvePaceBadge}
         />

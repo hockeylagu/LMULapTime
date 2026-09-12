@@ -8,6 +8,7 @@ import { PaceCategory } from '../../../server/types';
 export interface SessionGridCardProps {
   session: SessionListItem;
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
   paceBadge?: { category: PaceCategory; percentage?: number | null } | null;
 }
@@ -15,6 +16,7 @@ export interface SessionGridCardProps {
 export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   session: s,
   onSelectSession,
+  onOpenReplay,
   showTrackColumn = true,
   paceBadge: pace,
 }) => {
@@ -61,7 +63,11 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
           </p>
         </div>
 
-        <ReplayIndicator replay={s.matchingReplayFile} hideIfEmpty={true} />
+        <ReplayIndicator
+          replay={s.matchingReplayFile}
+          hideIfEmpty={true}
+          onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
+        />
       </div>
 
       {/* Driver / Car / Lap / Timing Info */}

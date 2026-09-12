@@ -130,7 +130,6 @@ describe('TelemetryStripCharts', () => {
         currentIndex={1}
         onSelectIndex={vi.fn()}
         baselinePoints={mockBaselinePoints}
-        baselineLapNumber={2}
       />
     );
 

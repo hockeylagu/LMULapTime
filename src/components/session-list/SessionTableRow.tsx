@@ -8,6 +8,7 @@ import { PaceCategory } from '../../../server/types';
 export interface SessionTableRowProps {
   session: SessionListItem;
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
   paceBadge?: { category: PaceCategory; percentage?: number | null } | null;
 }
@@ -15,6 +16,7 @@ export interface SessionTableRowProps {
 export const SessionTableRow: React.FC<SessionTableRowProps> = ({
   session: s,
   onSelectSession,
+  onOpenReplay,
   showTrackColumn = true,
   paceBadge: pace,
 }) => {
@@ -133,7 +135,10 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
 
       {/* Replay */}
       <td className="px-3.5 py-3 text-center">
-        <ReplayIndicator replay={s.matchingReplayFile} />
+        <ReplayIndicator
+          replay={s.matchingReplayFile}
+          onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
+        />
       </td>
 
       {/* Action */}

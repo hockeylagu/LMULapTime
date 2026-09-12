@@ -25,7 +25,6 @@ export interface TelemetryStripChartsProps {
   isLoading?: boolean;
   headerContent?: React.ReactNode;
   baselinePoints?: ReplayTrajectoryPoint[];
-  baselineLapNumber?: number;
   zoomRange?: { start: number; end: number } | null;
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
   telemetryResolution?: number;
@@ -49,7 +48,6 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   isLoading = false,
   headerContent,
   baselinePoints,
-  baselineLapNumber,
   zoomRange,
   onZoomRangeChange,
   telemetryResolution,

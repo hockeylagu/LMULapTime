@@ -98,6 +98,23 @@ describe('SessionList component', () => {
     }
   });
 
+  it('opens replay telemetry without selecting the session card', () => {
+    const onSelectSession = vi.fn();
+    const onOpenReplay = vi.fn();
+    render(
+      <SessionList
+        sessions={mockSessions}
+        onSelectSession={onSelectSession}
+        onOpenReplay={onOpenReplay}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Open replay telemetry/i }));
+
+    expect(onOpenReplay).toHaveBeenCalledWith('sess-1');
+    expect(onSelectSession).not.toHaveBeenCalled();
+  });
+
   it('toggles to Table mode, renders all columns, and handles row clicks', () => {
     const onSelectSession = vi.fn();
     render(

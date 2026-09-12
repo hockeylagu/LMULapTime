@@ -163,6 +163,27 @@ describe('TrackDetail component', () => {
     }
   });
 
+  it('opens replay telemetry from the track sessions list', async () => {
+    const onOpenReplay = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        onOpenReplay={onOpenReplay}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Open replay telemetry/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Open replay telemetry/i }));
+    expect(onOpenReplay).toHaveBeenCalledWith('sess-hypercar-1');
+  });
+
   it('strictly isolates benchmark targets by vehicle class (LMH vs LMGT3)', async () => {
     const setSelectedCarClass = vi.fn();
 
@@ -200,6 +221,101 @@ describe('TrackDetail component', () => {
       expect(screen.getByText('2:15.000')).toBeInTheDocument();
       // LMH Alien target of 2:00.000 must NOT be displayed in LMGT3 mode
       expect(screen.queryByText('2:00.000')).not.toBeInTheDocument();
+    });
+  });
+
+  it('uses the latest session car class when no class filter is selected', async () => {
+    const mixedClassData = {
+      ...mockTrackDataWithMultipleClasses,
+      sessions: [
+        ...mockTrackDataWithMultipleClasses.sessions,
+        { ...mockTrackDataWithMultipleClasses.sessions[1], id: 'sess-gt3-2' },
+      ],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mixedClassData),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        progression={[
+          {
+            sessionId: 'sess-hypercar-1', timestamp: 1, dateString: '2026/05/28', sessionType: 'Practice',
+            sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'LMH',
+            driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
+            cleanLapsCount: 5, totalLapsCount: 5, avgLapTime: 122,
+          },
+          {
+            sessionId: 'sess-gt3-1', timestamp: 2, dateString: '2026/05/29', sessionType: 'Qualifying',
+            sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'LMGT3',
+            driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
+            cleanLapsCount: 4, totalLapsCount: 4, avgLapTime: 138,
+          },
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('2:15.000')).toBeInTheDocument();
+      expect(screen.queryByText('2:00.000')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps LMP2 ELMS and WEC benchmark pace isolated', async () => {
+    const lmp2Benchmark = {
+      ...mockTrackDataWithMultipleClasses.benchmarks[0],
+      key: 'spa_lmp2_elms',
+      carClass: 'LMP2elms',
+      targets: {
+        ...mockTrackDataWithMultipleClasses.benchmarks[0].targets,
+        alienSec: 90,
+      },
+    };
+    const wecBenchmark = {
+      ...lmp2Benchmark,
+      key: 'spa_lmp2_wec',
+      carClass: 'LMP2wec',
+      targets: {
+        ...lmp2Benchmark.targets,
+        alienSec: 120,
+      },
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockTrackDataNoBenchmarks,
+        sessions: [{
+          ...mockTrackDataNoBenchmarks.sessions[0],
+          playerDriver: {
+            ...mockTrackDataNoBenchmarks.sessions[0].playerDriver,
+            carType: 'Oreca 07',
+            carClass: 'LMP2elms',
+            bestLapTime: 100,
+            bestLapTimeString: '1:40.000',
+          },
+        }],
+        benchmarks: [lmp2Benchmark, wecBenchmark],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Benchmark Pace: Offline (111.1%)')).toBeInTheDocument();
     });
   });
 

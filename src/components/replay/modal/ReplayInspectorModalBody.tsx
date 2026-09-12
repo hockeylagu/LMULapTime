@@ -208,7 +208,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
                 />
               }
               baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
-              baselineLapNumber={baselineTrajectory?.currentLap ?? baselineLapNumber ?? undefined}
               zoomRange={chartZoomRange}
               onZoomRangeChange={setChartZoomRange}
               telemetryResolution={telemetryResolution}
