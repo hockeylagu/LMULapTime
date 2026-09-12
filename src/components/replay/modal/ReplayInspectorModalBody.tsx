@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/types.js';
 import { ComparableLap } from '../../../utils/lapComparison.js';
-import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
@@ -146,6 +146,11 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   setMapViewMode,
   drivers,
 }) => {
+  const initialStraight = useMemo(() => {
+    const first = lapSegments.find(s => s.type === 'straight' && s.entryDistM <= 50);
+    return first && first.lengthM >= 30 ? (first as StraightSegmentComparison) : null;
+  }, [lapSegments]);
+
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex flex-col bg-[#07090e] text-white w-screen h-screen overflow-hidden select-none overscroll-none animate-fadeIn">
       <ReplayInspectorHeader
@@ -226,6 +231,10 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               rawSampleRateHz={trajectory?.rawSampleRateHz}
               isFullResolution={trajectory?.isFullResolution}
               selectedCornerMarkers={selectedCornerMarkers}
+              cornerSegments={cornerSegments}
+              initialStraight={initialStraight}
+              selectedCornerNumber={selectedCornerNumber}
+              onSelectCorner={handleSelectCorner}
             />
           </div>
         </div>

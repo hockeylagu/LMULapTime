@@ -81,8 +81,8 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
     return computeLapComparisons(points, baselinePoints).map(c => c.deltaTimeSec);
   }, [colorBy, points, baselinePoints]);
 
-  const { visibleSegments, carHeadingDeg } = useMemo(() => {
-    if (!points || points.length === 0 || !currentPoint) return { visibleSegments: [], carHeadingDeg: 0 };
+  const visibleSegments = useMemo(() => {
+    if (!points || points.length === 0 || !currentPoint) return [];
     const scale = (CENTER - 40) / zoomRadius;
     const windowSize = Math.max(50, Math.min(160, Math.round(zoomRadius * 1.2)));
     const minFrame = Math.max(0, safeIndex - windowSize);
@@ -106,15 +106,7 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
       });
     }
 
-    let heading = 0;
-    const prevIdx = Math.max(0, safeIndex - 2);
-    const nextIdx = Math.min(points.length - 1, safeIndex + 2);
-    if (nextIdx > prevIdx) {
-      const dx = (points[nextIdx].x - points[prevIdx].x) * scale;
-      const dy = -(points[nextIdx].z - points[prevIdx].z) * scale;
-      if (Math.hypot(dx, dy) > 0.5) heading = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-    }
-    return { visibleSegments: segments, carHeadingDeg: heading };
+    return segments;
   }, [points, currentPoint, safeIndex, zoomRadius, colorBy, deltaByIdx, CENTER]);
 
   const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
@@ -273,21 +265,9 @@ export const GpsZoomMap: React.FC<GpsZoomMapProps> = ({
             <g transform={`translate(${CENTER}, ${CENTER})`}>
               <circle r="14" fill="#38bdf8" opacity="0.15" className="animate-ping" />
               <circle r="7" fill="#38bdf8" stroke="#ffffff" strokeWidth="2" className="shadow-[0_0_10px_#38bdf8]" />
-              <g transform={`rotate(${carHeadingDeg})`}>
-                <polygon points="0,-16 5,-6 -5,-6" fill="#facc15" stroke="#000000" strokeWidth="0.8" />
-              </g>
             </g>
           </g>
         </svg>
-      </div>
-
-      <div className="absolute bottom-2 left-2.5 right-2.5 z-20 flex items-center justify-between pointer-events-none text-[10px] font-mono">
-        <div className="flex items-center gap-2 bg-[#0a0e17]/90 px-2 py-0.5 rounded border border-white/10 text-white font-bold backdrop-blur-sm">
-          <span>{currentPoint.speedKmh ?? 0} km/h</span>
-        </div>
-        <span className="bg-[#0a0e17]/90 px-2 py-0.5 rounded border border-white/10 text-indigo-400 font-bold backdrop-blur-sm">
-          {Math.abs(currentPoint.steerYaw ?? 0)}° {(currentPoint.steerYaw ?? 0) < -5 ? 'LEFT' : (currentPoint.steerYaw ?? 0) > 5 ? 'RIGHT' : 'CTR'}
-        </span>
       </div>
     </div>
   );

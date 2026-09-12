@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ReplayMapContainer } from '../../src/components/replay/index.js';
 import { ReplayTrajectoryData } from '../../server/types';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis';
@@ -90,5 +90,21 @@ describe('ReplayMapContainer', () => {
       <ReplayMapContainer {...baseProps} mapViewMode="zoom" corners={corners} selectedCornerNumber={1} />
     );
     expect(screen.getByText(/Turn 1 Apex Chart/i)).toBeInTheDocument();
+  });
+
+  it('renders the floating pedal points button inside the map container when corners exist', () => {
+    render(<ReplayMapContainer {...baseProps} corners={corners} />);
+    const pedalBtn = screen.getByRole('button', { name: /Pedal Points/i });
+    expect(pedalBtn).toBeInTheDocument();
+    expect(pedalBtn.className).toContain('absolute');
+    expect(pedalBtn.className).toContain('top-2.5');
+  });
+
+  it('toggles pedal points state when clicked', () => {
+    render(<ReplayMapContainer {...baseProps} corners={corners} />);
+    const pedalBtn = screen.getByRole('button', { name: /Pedal Points/i });
+    expect(pedalBtn).toHaveAttribute('title', 'Show brake/throttle points');
+    fireEvent.click(pedalBtn);
+    expect(pedalBtn).toHaveAttribute('title', 'Hide brake/throttle points');
   });
 });

@@ -5,5 +5,6 @@ export * from './TelemetrySpeedChannel.js';
 export * from './TelemetryPedalsChannel.js';
 export * from './TelemetrySteerGearChannel.js';
 export * from './TelemetryDeltaChannel.js';
+export * from './TelemetryCornerStrip.js';
 export * from './TelemetryResolutionPopover.js';
 export * from './telemetryChartPaths.js';

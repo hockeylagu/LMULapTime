@@ -30,21 +30,26 @@ describe('GpsTrackMap', () => {
     );
 
     expect(screen.getByText(/START/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/SPEED/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/150/i)).toBeInTheDocument();
+    expect(screen.getByText(/Speed:/i)).toBeInTheDocument();
   });
 
-  it('displays telemetry badge with current point metrics', () => {
+  it('keeps the heatmap legend on the circuit map and does not render speed, throttle, or brake overlays', () => {
     render(
       <GpsTrackMap
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={1}
+        colorBy="speed"
       />
     );
 
-    expect(screen.getByText(/180/i)).toBeInTheDocument();
-    expect(screen.getByText(/100%/i)).toBeInTheDocument();
+    // Legend is present
+    expect(screen.getByText(/Speed:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Apex/i)).toBeInTheDocument();
+
+    // No floating speed/throttle/brake telemetry overlay
+    expect(screen.queryByText(/THR:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/BRK:/i)).not.toBeInTheDocument();
   });
 
   it('handles empty points gracefully', () => {
@@ -220,5 +225,97 @@ describe('GpsTrackMap', () => {
 
     fireEvent.click(screen.getByText('T1'));
     expect(onSelectIndex).toHaveBeenCalledWith(1);
+  });
+
+  it('renders perpendicular pedal marker lines and outside badges when showPedalMarkers is true', () => {
+    const { container } = render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        pedalMarkers={[
+          { cornerNumber: 1, distM: 0, kind: 'brake' },
+          { cornerNumber: 1, distM: 10, kind: 'throttle' },
+        ]}
+        showPedalMarkers={true}
+      />
+    );
+
+    const brakeGroup = container.querySelector('[data-testid="pedal-marker-brake-1"]');
+    const throttleGroup = container.querySelector('[data-testid="pedal-marker-throttle-1"]');
+    expect(brakeGroup).toBeInTheDocument();
+    expect(throttleGroup).toBeInTheDocument();
+
+    // Contains the perpendicular marker lines extending across and outside the racing line
+    const lines = brakeGroup?.querySelectorAll('line');
+    expect(lines && lines.length >= 2).toBe(true);
+
+    // Verify outer badge text 'B' and 'T'
+    expect(screen.getByText('B')).toBeInTheDocument();
+    expect(screen.getByText('T')).toBeInTheDocument();
+  });
+
+  it('does not render pedal markers when showPedalMarkers is false', () => {
+    const { container } = render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        pedalMarkers={[
+          { cornerNumber: 1, distM: 0, kind: 'brake' },
+          { cornerNumber: 1, distM: 10, kind: 'throttle' },
+        ]}
+        showPedalMarkers={false}
+      />
+    );
+
+    expect(container.querySelector('[data-testid="pedal-marker-brake-1"]')).not.toBeInTheDocument();
+    expect(screen.queryByText('B')).not.toBeInTheDocument();
+  });
+
+  it('centers the corner marker text inside the indicator circle', () => {
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        corners={[{ cornerNumber: 1, minDistM: 0 }]}
+      />
+    );
+
+    const textEl = screen.getByText('T1');
+    expect(textEl).toHaveAttribute('text-anchor', 'middle');
+    expect(textEl).toHaveAttribute('dominant-baseline', 'central');
+    expect(textEl).toHaveAttribute('x', '0');
+    expect(textEl).toHaveAttribute('y', '0');
+  });
+
+  it('disperses close chicane corner markers so they do not overlap each other', () => {
+    // Two chicane corners closely placed at 0m and 8m
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        corners={[
+          { cornerNumber: 1, minDistM: 0 },
+          { cornerNumber: 2, minDistM: 8 },
+        ]}
+      />
+    );
+
+    const t1Group = screen.getByText('T1').closest('g');
+    const t2Group = screen.getByText('T2').closest('g');
+    expect(t1Group).not.toBeNull();
+    expect(t2Group).not.toBeNull();
+
+    const m1 = t1Group!.getAttribute('transform')!.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
+    const m2 = t2Group!.getAttribute('transform')!.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
+    expect(m1).not.toBeNull();
+    expect(m2).not.toBeNull();
+
+    const dist = Math.hypot(Number(m1![1]) - Number(m2![1]), Number(m1![2]) - Number(m2![2]));
+    // Distance between centers must be at least 22px so circles (radius 7.5px) never overlap
+    expect(dist).toBeGreaterThanOrEqual(21.9);
   });
 });

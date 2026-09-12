@@ -124,4 +124,36 @@ describe('CornerApexChart', () => {
     expect(paths.length).toBe(1);
     expect(paths[0].getAttribute('stroke')).toBe('#38bdf8');
   });
+
+  it('renders telemetry metrics in solo mode', () => {
+    render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        isCompareMode={false}
+      />
+    );
+
+    expect(screen.getByText('1.200s')).toBeInTheDocument();
+    expect(screen.getByText('15m')).toBeInTheDocument(); // Brake point relative to apex (20m - 5m)
+    expect(screen.getByText('10m')).toBeInTheDocument(); // Throttle point relative to apex (30m - 20m)
+    expect(screen.getByText('40m')).toBeInTheDocument(); // Corner length
+  });
+
+  it('renders telemetry deltas in compare mode', () => {
+    render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        isCompareMode={true}
+      />
+    );
+
+    expect(screen.getByText('Brake Δ')).toBeInTheDocument();
+    expect(screen.getByText('Thr Δ')).toBeInTheDocument();
+    expect(screen.getByText('Δ Time')).toBeInTheDocument();
+    expect(screen.getByText('-0.100s')).toBeInTheDocument();
+  });
 });
