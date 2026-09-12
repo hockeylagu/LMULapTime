@@ -447,4 +447,34 @@ describe('TrackDetail component', () => {
     fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
     expect(sortSelect).toHaveValue('pos-asc');
   });
+
+  it('renders interactive chart legend in TrackDetail and allows toggling series visibility', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const bestLapLegend = await waitFor(() =>
+      screen.getByTitle('Click to toggle Best Lap Time visibility')
+    );
+    expect(bestLapLegend).toBeInTheDocument();
+    expect(bestLapLegend.className).not.toContain('line-through');
+
+    fireEvent.click(bestLapLegend);
+    expect(bestLapLegend.className).toContain('line-through');
+
+    fireEvent.click(bestLapLegend);
+    expect(bestLapLegend.className).not.toContain('line-through');
+  });
 });
+
+

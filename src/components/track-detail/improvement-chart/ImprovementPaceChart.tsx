@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
   Legend,
+  type LegendPayload,
 } from 'recharts';
 import { formatTime } from '../../../utils/formatters.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';
+import { ImprovementPaceSeries } from './ImprovementPaceSeries.js';
 
 export interface ImprovementChartPoint {
   chartKey: string;
@@ -72,6 +73,18 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
   activeRange,
   onSelectSession,
 }) => {
+  const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+
+  const handleLegendClick = (e: LegendPayload) => {
+    if (!e || !e.dataKey) return;
+    const key = typeof e.dataKey === 'function' ? '' : String(e.dataKey);
+    if (!key) return;
+    setHiddenSeries((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
   if (chartData.length === 0) {
     return (
       <div className="py-16 text-center text-lmu-muted">
@@ -124,135 +137,29 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
           />
           <Tooltip content={<ImprovementPaceTooltip onSelectSession={onSelectSession} />} />
-          <Legend wrapperStyle={{ paddingTop: '15px' }} />
-
-          {metric === 'bestLap' && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="bestLap"
-                name="Best Lap Time"
-                stroke="#E63946"
-                strokeWidth={3}
-                dot={{ r: 5, fill: '#E63946', cursor: onSelectSession ? 'pointer' : 'default' }}
-                activeDot={{ r: 8, cursor: onSelectSession ? 'pointer' : 'default' }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="top3Avg"
-                name="Top 3 Lap Avg (True Pace)"
-                stroke="#06B6D4"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#06B6D4', cursor: onSelectSession ? 'pointer' : 'default' }}
-                activeDot={{ r: 7 }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="movingAvg"
-                name="3-Session Moving Avg"
-                stroke="#F59E0B"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                dot={{ r: 3.5, fill: '#F59E0B' }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="avgLap"
-                name="Session Avg Lap"
-                stroke="#8ECAE6"
-                strokeWidth={1.5}
-                strokeDasharray="3 3"
-                dot={{ r: 3, fill: '#8ECAE6' }}
-                connectNulls={true}
-              />
-            </>
-          )}
-
-          {metric === 'theoretical' && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="bestLap"
-                name="Actual Best Lap"
-                stroke="#E63946"
-                strokeWidth={3}
-                dot={{ r: 5, cursor: onSelectSession ? 'pointer' : 'default' }}
-                activeDot={{ r: 8, cursor: onSelectSession ? 'pointer' : 'default' }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="movingAvg"
-                name="3-Session Moving Avg"
-                stroke="#F59E0B"
-                strokeWidth={2.5}
-                strokeDasharray="6 4"
-                dot={{ r: 3.5, fill: '#F59E0B' }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="theoretical"
-                name="Theoretical Best (S1+S2+S3)"
-                stroke="#2A9D8F"
-                strokeWidth={3}
-                strokeDasharray="3 3"
-                dot={{ r: 5, fill: '#2A9D8F' }}
-                connectNulls={true}
-              />
-            </>
-          )}
-
-          {metric === 'consistency' && (
-            <Line
-              type="monotone"
-              dataKey="consistencyScore"
-              name="Pace Consistency Rating (%)"
-              stroke="#10B981"
-              strokeWidth={3}
-              dot={{ r: 5, fill: '#10B981', cursor: onSelectSession ? 'pointer' : 'default' }}
-              activeDot={{ r: 8 }}
-              connectNulls={true}
-            />
-          )}
-
-          {metric === 'sectors' && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="s1"
-                name="Sector 1"
-                stroke="#FFB703"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#FFB703' }}
-                activeDot={{ r: 7 }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="s2"
-                name="Sector 2"
-                stroke="#219EBC"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#219EBC' }}
-                activeDot={{ r: 7 }}
-                connectNulls={true}
-              />
-              <Line
-                type="monotone"
-                dataKey="s3"
-                name="Sector 3"
-                stroke="#2A9D8F"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#2A9D8F' }}
-                activeDot={{ r: 7 }}
-                connectNulls={true}
-              />
-            </>
-          )}
+          <Legend
+            onClick={handleLegendClick}
+            wrapperStyle={{ paddingTop: '15px', fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
+            formatter={(value, entry: LegendPayload) => {
+              const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey || '');
+              const isHidden = Boolean(hiddenSeries[key]);
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
+                    isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+                  }`}
+                  title={`Click to toggle ${value} visibility`}
+                >
+                  {value}
+                </span>
+              );
+            }}
+          />
+          <ImprovementPaceSeries
+            metric={metric}
+            onSelectSession={onSelectSession}
+            hiddenSeries={hiddenSeries}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -3,4 +3,5 @@ export * from './ImprovementHeader.js';
 export * from './ImprovementStatsBanner.js';
 export * from './ImprovementChartControls.js';
 export * from './ImprovementPaceChart.js';
+export * from './ImprovementPaceSeries.js';
 export * from './ImprovementPaceTooltip.js';
