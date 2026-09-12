@@ -130,17 +130,12 @@ describe('TelemetryStripCharts', () => {
         currentIndex={1}
         onSelectIndex={vi.fn()}
         baselinePoints={mockBaselinePoints}
-        baselineLabel="Lap 2 (Best)"
         baselineLapNumber={2}
       />
     );
 
     // TIME DELTA channel header should be rendered
     expect(screen.getByText(/TIME DELTA \(Δt\)/i)).toBeInTheDocument();
-
-    // Comparison legend should display Primary and Baseline label
-    expect(screen.getByText('Primary')).toBeInTheDocument();
-    expect(screen.getByText('Lap 2 (Best)')).toBeInTheDocument();
 
     // Delta gain/loss legend must be rendered to explain gradient colors
     expect(screen.getByText(/Gaining Time/i)).toBeInTheDocument();
@@ -179,7 +174,6 @@ describe('TelemetryStripCharts', () => {
         currentIndex={0}
         onSelectIndex={vi.fn()}
         baselinePoints={offsetBaseline}
-        baselineLabel="Lap 5"
       />
     );
 

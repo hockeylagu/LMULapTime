@@ -1,7 +1,5 @@
 export * from './GpsTrackMap.js';
 export * from './GpsTrackMapScene.js';
-export * from './GpsZoomMap.js';
-export * from './GpsZoomControls.js';
 export * from './GpsSceneHudOverlay.js';
 export * from './GpsSceneMarkers.js';
 export * from './HeatmapLegendBar.js';
@@ -10,3 +8,6 @@ export * from './MiniCornerMap.js';
 export * from './ReplayMapContainer.js';
 export * from './replayMapUtils.js';
 export * from './useGpsMapPanZoom.js';
+export * from './GpsCircuitMinimap.js';
+export * from './GpsTrackSegments.js';
+export * from './GpsStartFinishLine.js';

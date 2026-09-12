@@ -10,9 +10,6 @@ export interface ReplayPerformanceHeaderProps {
   bestS3Sec?: number | null;
   isCompareMode: boolean;
   baselineTrajectory: ReplayTrajectoryData | null;
-  baselineReplayName: string | null;
-  replayName: string | null;
-  baselineLapNumber: number | null;
   lapDeltas: {
     lapDelta: number | null;
     s1Delta: number | null;
@@ -30,9 +27,6 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
   bestS3Sec,
   isCompareMode,
   baselineTrajectory,
-  baselineReplayName,
-  replayName,
-  baselineLapNumber,
   lapDeltas,
   formatLapTime,
 }) => {
@@ -69,9 +63,6 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
         {/* Overall Lap Delta Pill against Baseline */}
         {isCompareMode && baselineTrajectory && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#131024] border border-amber-500/40 text-[11px] font-mono shadow-sm">
-            <span className="text-amber-400 font-bold text-[10px]">
-              vs {baselineReplayName === replayName ? `L${baselineTrajectory.currentLap ?? baselineLapNumber}` : `${baselineReplayName?.slice(0, 14)}… L${baselineTrajectory.currentLap ?? baselineLapNumber}`}:
-            </span>
             {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
               <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})

@@ -14,7 +14,7 @@ export const SessionReferenceAndSafety: React.FC<SessionReferenceAndSafetyProps>
   if (!refEntry) return null;
 
   return (
-    <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="font-bold text-lmu-gold flex items-center gap-1.5 mr-1">
         <Zap className="w-4 h-4 text-lmu-gold" />
         {refEntry.carClass} Reference Targets:

@@ -50,8 +50,6 @@ describe('ReplayMapContainer', () => {
     currentIndex: 0,
     onSelectIndex: vi.fn(),
     colorBy: 'speed' as const,
-    mapViewMode: 'dual' as const,
-    onChangeMapViewMode: vi.fn(),
     isCompareMode: false,
   };
 
@@ -80,24 +78,18 @@ describe('ReplayMapContainer', () => {
     expect(onSelectCornerNumber).toHaveBeenCalledWith(null);
   });
 
-  it('renders the apex chart in overview and zoom-only view modes too', () => {
-    const { rerender } = render(
-      <ReplayMapContainer {...baseProps} mapViewMode="overview" corners={corners} selectedCornerNumber={1} />
+  it('renders the apex chart when a corner is selected in the single pane layout', () => {
+    render(
+      <ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={1} />
     );
     expect(screen.getByText(/Turn 1 Apex Chart/i)).toBeInTheDocument();
-
-    rerender(
-      <ReplayMapContainer {...baseProps} mapViewMode="zoom" corners={corners} selectedCornerNumber={1} />
-    );
-    expect(screen.getByText(/Turn 1 Apex Chart/i)).toBeInTheDocument();
+    expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
   });
 
-  it('renders the floating pedal points button inside the map container when corners exist', () => {
+  it('renders the pedal points button on top near the heatmap selector when corners exist', () => {
     render(<ReplayMapContainer {...baseProps} corners={corners} />);
     const pedalBtn = screen.getByRole('button', { name: /Pedal Points/i });
     expect(pedalBtn).toBeInTheDocument();
-    expect(pedalBtn.className).toContain('absolute');
-    expect(pedalBtn.className).toContain('top-2.5');
   });
 
   it('toggles pedal points state when clicked', () => {
@@ -106,5 +98,13 @@ describe('ReplayMapContainer', () => {
     expect(pedalBtn).toHaveAttribute('title', 'Show brake/throttle points');
     fireEvent.click(pedalBtn);
     expect(pedalBtn).toHaveAttribute('title', 'Hide brake/throttle points');
+  });
+
+  it('renders Pedal as the first color mode button before Speed', () => {
+    const onChangeColorBy = vi.fn();
+    render(<ReplayMapContainer {...baseProps} onChangeColorBy={onChangeColorBy} />);
+    const buttons = screen.getAllByRole('button');
+    const colorModeButtons = buttons.filter(b => b.textContent === 'Pedal' || b.textContent === 'Speed');
+    expect(colorModeButtons.map(b => b.textContent)).toEqual(['Pedal', 'Speed']);
   });
 });

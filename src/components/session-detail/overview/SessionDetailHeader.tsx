@@ -1,9 +1,9 @@
 import React from 'react';
-import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/types.js';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
 import { getHashRouteAndParams, updateHashParams } from '../../../utils/urlParams.js';
-import { SessionRulesCard } from '../standings/SessionRulesCard.js';
+import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { ReplayInspectorModal } from '../../replay/index.js';
@@ -92,6 +92,24 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     setReplayLap(newLap);
     updateHashParams({ lap: String(newLap) });
   };
+
+  const [showRulesModal, setShowRulesModal] = React.useState(false);
+  const settings = session.settings;
+  const hasSettings = Boolean(
+    settings && (
+      settings.modeSetting || settings.serverName ||
+      settings.damageMultiplier !== undefined || settings.fuelMultiplier !== undefined ||
+      settings.tireMultiplier !== undefined || settings.tireWarmers !== undefined ||
+      settings.fixedSetups !== undefined || (settings.durationMinutes && settings.durationMinutes > 0) ||
+      (settings.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640)
+    )
+  );
+  const modeLabel = settings?.modeSetting || (settings?.serverName ? 'Multiplayer' : 'Race Weekend');
+  const durationLabel = settings?.durationMinutes && settings.durationMinutes > 0
+    ? `${settings.durationMinutes} min`
+    : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640
+    ? `${settings.raceLaps} Laps`
+    : undefined;
 
   return (
     <>
@@ -197,11 +215,9 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
             <div className="flex items-center gap-2">
               <span
                 className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                  session.sessionType === 'Race'
-                    ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
-                    : session.sessionType === 'Qualifying'
-                    ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                    : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                  session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                  : session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
+                  : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
                 }`}
               >
                 {session.sessionName} ({session.sessionType})
@@ -209,10 +225,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               <span className="text-xs text-lmu-muted">{session.timeString}</span>
             </div>
             <h2
-              onClick={() => {
-                const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-                window.location.hash = `#track/${encodeURIComponent(trackName)}`;
-              }}
+              onClick={() => { window.location.hash = `#track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`; }}
               className="text-2xl font-extrabold text-white mt-1 cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
               title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
             >
@@ -242,9 +255,40 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
           </div>
         </div>
 
-        <SessionRulesCard settings={session.settings} />
-        <SessionReferenceAndSafety refEntry={refEntry} selectedDriver={selectedDriver} />
+        {/* Lap Reference & Rules Row */}
+        {(refEntry || hasSettings) && (
+          <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <SessionReferenceAndSafety refEntry={refEntry} selectedDriver={selectedDriver} />
+            {hasSettings && (
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all shadow-sm cursor-pointer group shrink-0 ml-auto md:ml-0"
+                title="View Rules & Server Configuration"
+              >
+                <Sliders className="w-3.5 h-3.5 text-lmu-accent group-hover:rotate-12 transition-transform shrink-0" />
+                <span className="text-slate-300">Rules & Config:</span>
+                {modeLabel && (
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold text-[11px] border border-slate-700/60">
+                    {modeLabel}
+                  </span>
+                )}
+                {durationLabel && (
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-semibold text-[11px] border border-slate-700/60">
+                    {durationLabel}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      <SessionRulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        settings={session.settings}
+      />
     </>
   );
 };

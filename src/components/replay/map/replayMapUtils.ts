@@ -43,7 +43,7 @@ const DELTA_NEUTRAL_COLOR = '#475569';
  */
 export function getHeatmapColor(
   p: ReplayTelemetryPoint,
-  colorBy: MapColorMode = 'speed',
+  colorBy: MapColorMode = 'pedal',
   deltaTimeSec?: number
 ): string {
   if (colorBy === 'default') {
@@ -174,16 +174,43 @@ export interface DispersedCornerMarker {
   actualSy: number;
 }
 
+// Pedal-marker badge geometry, shared with GpsSceneMarkers so corner-flag placement
+// stays in sync with where pedal badges are actually rendered.
+export const PEDAL_MARKER_LINE_HALF_LEN = 17;
+export const PEDAL_MARKER_TAG_BASE_OFFSET = 9;
+export const PEDAL_MARKER_TAG_STAGGER_OFFSET = 26;
+
+function distanceToPolyline(
+  px: number,
+  py: number,
+  points: ProjectedPoint[],
+  step = 3
+): number {
+  if (!points || points.length === 0) return Infinity;
+  let minDistSq = Infinity;
+  for (let i = 0; i < points.length; i += step) {
+    const pt = points[i];
+    const dx = px - pt.sx;
+    const dy = py - pt.sy;
+    const dSq = dx * dx + dy * dy;
+    if (dSq < minDistSq) {
+      minDistSq = dSq;
+    }
+  }
+  return Math.sqrt(minDistSq);
+}
+
 /**
- * Calculates corner flag positions on the 2D map with alternating side allocation
- * and iterative collision repulsion so consecutive corners (e.g. tight chicanes)
- * never overlap and maintain adequate separation from each other and the racing line.
+ * Calculates corner flag positions on the 2D map with trajectory clearance checking
+ * so flags are never placed on top of either the primary racing line or the baseline racing line.
  */
 export function computeDispersedCornerMarkers(
   corners: Array<{ cornerNumber: number; minDistM: number }> | undefined,
   primaryDists: number[],
   baselineDists: number[],
-  svgPoints: ProjectedPoint[]
+  svgPoints: ProjectedPoint[],
+  baselineSvgPoints?: ProjectedPoint[],
+  pedalMarkers?: Array<{ sx: number; sy: number; nx?: number; ny?: number; isStaggered?: boolean }>
 ): DispersedCornerMarker[] {
   if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
   const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
@@ -191,6 +218,8 @@ export function computeDispersedCornerMarkers(
   const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
 
   const markers: DispersedCornerMarker[] = [];
+  const candidateDistances = [38, 46, 54, 62, 70];
+
   for (let i = 0; i < corners.length; i++) {
     const c = corners[i];
     const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
@@ -198,20 +227,78 @@ export function computeDispersedCornerMarkers(
     const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
     if (!pt) continue;
 
-    const prev = svgPoints[Math.max(0, pt.idx - 1)] ?? pt;
-    const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 1)] ?? pt;
+    const prev = svgPoints[Math.max(0, pt.idx - 3)] ?? pt;
+    const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 3)] ?? pt;
     const dx = next.sx - prev.sx;
     const dy = next.sy - prev.sy;
     const headingLen = Math.hypot(dx, dy) || 1;
-    const normalX = (dy / headingLen) * 18;
-    const normalY = (-dx / headingLen) * 18;
+    const nx = -dy / headingLen;
+    const ny = dx / headingLen;
 
-    // Alternate sides strictly by sequence index (i % 2) so consecutive corners (chicanes) separate to opposite sides
-    const offsetSide = i % 2 === 0 ? 1 : -1;
+    // Cross product to find the outside of the turn
+    const cross = (pt.sx - prev.sx) * (next.sy - pt.sy) - (pt.sy - prev.sy) * (next.sx - pt.sx);
+    const outsideSign = cross >= 0 ? -1 : 1;
+    const sides = [outsideSign, -outsideSign];
+
+    let bestCand = {
+      sx: pt.sx + nx * outsideSign * 42,
+      sy: pt.sy + ny * outsideSign * 42,
+      score: -Infinity,
+    };
+
+    for (const side of sides) {
+      for (const dist of candidateDistances) {
+        const candX = pt.sx + nx * side * dist;
+        const candY = pt.sy + ny * side * dist;
+
+        const distPrim = distanceToPolyline(candX, candY, svgPoints, 3);
+        const distBase = baselineSvgPoints && baselineSvgPoints.length > 0
+          ? distanceToPolyline(candX, candY, baselineSvgPoints, 3)
+          : Infinity;
+        const clearance = Math.min(distPrim, distBase);
+
+        const distToExisting = markers.length === 0
+          ? 100
+          : markers.reduce((minD, m) => Math.min(minD, Math.hypot(candX - m.sx, candY - m.sy)), Infinity);
+
+        // Clearance to nearby pedal marker badges
+        const distToPedal = pedalMarkers && pedalMarkers.length > 0
+          ? pedalMarkers.reduce((minD, pm) => {
+              const pmNx = pm.nx ?? 0;
+              const pmNy = pm.ny ?? 1;
+              const tagDist = PEDAL_MARKER_LINE_HALF_LEN + (pm.isStaggered ? PEDAL_MARKER_TAG_STAGGER_OFFSET : PEDAL_MARKER_TAG_BASE_OFFSET);
+              const tagX = pm.sx + pmNx * tagDist;
+              const tagY = pm.sy + pmNy * tagDist;
+              return Math.min(minD, Math.hypot(candX - tagX, candY - tagY));
+            }, Infinity)
+          : Infinity;
+
+        let score = 0;
+        if (clearance < 26) {
+          score = -1000 + clearance * 10;
+        } else if (distToPedal < 30) {
+          // Massive penalty if candidate overlaps with a pedal marker badge
+          score = -1500 + distToPedal * 10;
+        } else {
+          score = Math.min(clearance, 60) * 4;
+          if (side === outsideSign) score += 30; // prefer outside runoff area
+          score += Math.min(distToExisting, 40);
+          if (distToPedal < 42) {
+            score -= (42 - distToPedal) * 10;
+          }
+          score -= dist * 0.25; // slight preference for reasonable distance
+        }
+
+        if (score > bestCand.score) {
+          bestCand = { sx: candX, sy: candY, score };
+        }
+      }
+    }
+
     markers.push({
       cornerNumber: c.cornerNumber,
-      sx: pt.sx + normalX * offsetSide,
-      sy: pt.sy + normalY * offsetSide,
+      sx: bestCand.sx,
+      sy: bestCand.sy,
       idx: pt.idx,
       actualSx: pt.sx,
       actualSy: pt.sy,
@@ -219,7 +306,7 @@ export function computeDispersedCornerMarkers(
   }
 
   // Multi-pass collision repulsion relaxation to ensure no two markers ever overlap
-  const MIN_SEPARATION = 22;
+  const MIN_SEPARATION = 32;
   for (let pass = 0; pass < 6; pass++) {
     let hadCollision = false;
     for (let i = 0; i < markers.length; i++) {
@@ -248,9 +335,9 @@ export function computeDispersedCornerMarkers(
       const dX = m.sx - m.actualSx;
       const dY = m.sy - m.actualSy;
       const tetherDist = Math.hypot(dX, dY);
-      if (tetherDist < 16) {
-        const scale = tetherDist > 0.001 ? 18 / tetherDist : 1;
-        m.sx = m.actualSx + (tetherDist > 0.001 ? dX * scale : 18);
+      if (tetherDist < 30) {
+        const scale = tetherDist > 0.001 ? 38 / tetherDist : 1;
+        m.sx = m.actualSx + (tetherDist > 0.001 ? dX * scale : 38);
         m.sy = m.actualSy + (tetherDist > 0.001 ? dY * scale : 0);
       }
     }

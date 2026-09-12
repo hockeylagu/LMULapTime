@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Eye, EyeOff, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/types.js';
 import { GpsTrackMap } from './GpsTrackMap.js';
-import { GpsZoomMap } from './GpsZoomMap.js';
 import { ReplayTelemetryHud } from '../modal/ReplayTelemetryHud.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
@@ -15,8 +14,6 @@ export interface ReplayMapContainerProps {
   onSelectIndex: (index: number) => void;
   colorBy: MapColorMode;
   onChangeColorBy?: (mode: MapColorMode) => void;
-  mapViewMode: 'dual' | 'overview' | 'zoom';
-  onChangeMapViewMode: (mode: 'dual' | 'overview' | 'zoom') => void;
   isCompareMode: boolean;
   baselineTrajectory?: ReplayTrajectoryData | null;
   currentPoint?: ReplayTelemetryPoint | null;
@@ -31,8 +28,6 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   onSelectIndex,
   colorBy,
   onChangeColorBy,
-  mapViewMode,
-  onChangeMapViewMode,
   isCompareMode,
   baselineTrajectory,
   currentPoint,
@@ -50,13 +45,25 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   const pedalMarkers = useMemo(() => {
     if (!corners || corners.length === 0) return [];
-    const markers: Array<{ cornerNumber: number; distM: number; kind: 'brake' | 'throttle' }> = [];
+    const markers: Array<{ cornerNumber: number; distM: number; kind: 'brake' | 'throttle'; isBaseline?: boolean }> = [];
     corners.forEach(c => {
-      if (c.primaryBrakingDistM !== null) markers.push({ cornerNumber: c.cornerNumber, distM: c.primaryBrakingDistM, kind: 'brake' });
-      if (c.primaryThrottleOnDistM !== null) markers.push({ cornerNumber: c.cornerNumber, distM: c.primaryThrottleOnDistM, kind: 'throttle' });
+      if (c.primaryBrakingDistM !== null) {
+        markers.push({ cornerNumber: c.cornerNumber, distM: c.primaryBrakingDistM, kind: 'brake', isBaseline: false });
+      }
+      if (c.primaryThrottleOnDistM !== null) {
+        markers.push({ cornerNumber: c.cornerNumber, distM: c.primaryThrottleOnDistM, kind: 'throttle', isBaseline: false });
+      }
+      if (isCompareMode && baselinePoints && baselinePoints.length > 0) {
+        if (c.baselineBrakingDistM !== null) {
+          markers.push({ cornerNumber: c.cornerNumber, distM: c.baselineBrakingDistM, kind: 'brake', isBaseline: true });
+        }
+        if (c.baselineThrottleOnDistM !== null) {
+          markers.push({ cornerNumber: c.cornerNumber, distM: c.baselineThrottleOnDistM, kind: 'throttle', isBaseline: true });
+        }
+      }
     });
     return markers;
-  }, [corners]);
+  }, [corners, isCompareMode, baselinePoints]);
 
   const selectedCorner = useMemo(
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
@@ -80,43 +87,13 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     />
   ) : null;
 
-  const pedalButton = corners && corners.length > 0 ? (
-    <button
-      type="button"
-      onClick={() => setShowPedalMarkers(v => !v)}
-      title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
-      className={`absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer backdrop-blur-md shadow-lg ${
-        showPedalMarkers
-          ? 'bg-sky-500/20 border-sky-400 text-sky-200 shadow-sky-500/10'
-          : 'bg-[#0a0e17]/85 border-white/10 text-lmu-muted hover:text-white hover:border-white/20'
-      }`}
-    >
-      <Disc className="w-3.5 h-3.5 text-rose-400" />
-      <span>Pedal Points</span>
-    </button>
-  ) : null;
-
   return (
     <>
       <div className="flex items-center justify-between px-0.5 shrink-0 text-xs">
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
-            {(['dual', 'zoom', 'overview'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => onChangeMapViewMode(mode)}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                  mapViewMode === mode ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
-                }`}
-              >
-                {mode === 'dual' ? 'Dual View' : mode === 'zoom' ? 'Close-Up Line' : 'Full Circuit'}
-              </button>
-            ))}
-          </div>
-
           {onChangeColorBy && (
             <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
-              {(['speed', 'pedal', ...(isCompareMode && baselinePoints ? (['delta'] as const) : [])] as const).map(mode => (
+              {(['pedal', 'speed', ...(isCompareMode && baselinePoints ? (['delta'] as const) : [])] as const).map(mode => (
                 <button
                   key={mode}
                   onClick={() => onChangeColorBy(mode)}
@@ -125,10 +102,25 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                     colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white shadow-sm font-bold' : 'text-lmu-muted hover:text-white'
                   }`}
                 >
-                  {mode === 'speed' ? 'Speed' : mode === 'pedal' ? 'Pedal' : 'Delta'}
+                  {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
                 </button>
               ))}
             </div>
+          )}
+          {corners && corners.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowPedalMarkers(v => !v)}
+              title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+                showPedalMarkers
+                  ? 'bg-rose-500/20 border-rose-500/60 text-rose-300 shadow-sm'
+                  : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
+              }`}
+            >
+              <Disc className="w-3 h-3 text-rose-400" />
+              <span>Pedal Points</span>
+            </button>
           )}
         </div>
         <div className="flex items-center gap-1.5">
@@ -137,108 +129,60 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               <button
                 onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
                 title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                  fadedLine === 'primary' ? 'text-lmu-muted' : 'text-sky-400 hover:text-sky-300'
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  fadedLine === 'primary'
+                    ? 'text-lmu-muted bg-slate-800/40 opacity-60'
+                    : 'text-sky-300 bg-sky-950/40 border border-sky-500/40 hover:text-white hover:bg-sky-900/50'
                 }`}
               >
+                <span className="w-2.5 h-1 rounded-sm bg-sky-400 shrink-0" />
                 {fadedLine === 'primary' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Mine
               </button>
               <button
                 onClick={() => setFadedLine(f => (f === 'baseline' ? 'none' : 'baseline'))}
                 title={fadedLine === 'baseline' ? 'Show baseline line' : 'Fade baseline line'}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                  fadedLine === 'baseline' ? 'text-lmu-muted' : 'text-amber-400 hover:text-amber-300'
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  fadedLine === 'baseline'
+                    ? 'text-lmu-muted bg-slate-800/40 opacity-60'
+                    : 'text-amber-300 bg-amber-950/40 border border-amber-500/40 hover:text-white hover:bg-amber-900/50'
                 }`}
               >
+                <span className="w-2.5 h-0 border-b-2 border-dashed border-amber-400 shrink-0" />
                 {fadedLine === 'baseline' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Baseline
               </button>
             </div>
           ) : (
             <span className="text-[10px] text-lmu-muted font-mono hidden sm:inline">
-              {mapViewMode === 'dual' ? 'Overview + Close-Up' : mapViewMode === 'zoom' ? 'Apex Detail' : 'Circuit Map'}
+              Circuit Map & Racing Line
             </span>
           )}
         </div>
       </div>
 
-      {/* MAP VIEWS */}
-      {mapViewMode === 'dual' ? (
-        <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
-          <div className="flex-[1] min-h-0 rounded-xl bg-[#060910] border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
-            <GpsTrackMap
-              points={trajectory.points}
-              bounds={trajectory.bounds}
-              currentIndex={currentIndex}
-              onSelectIndex={onSelectIndex}
-              colorBy={colorBy}
-              className="w-full h-full"
-              baselinePoints={baselinePoints}
-              corners={corners}
-              selectedCornerNumber={selectedCornerNumber}
-              onSelectCornerNumber={onSelectCornerNumber}
-              primaryOpacity={primaryOpacity}
-              baselineOpacity={baselineOpacity}
-              pedalMarkers={pedalMarkers}
-              showPedalMarkers={showPedalMarkers}
-            />
-            {pedalButton}
-          </div>
-          <div className="flex-[2] min-h-0 rounded-xl overflow-hidden">
-            <GpsZoomMap
-              points={trajectory.points}
-              currentIndex={currentIndex}
-              onSelectIndex={onSelectIndex}
-              colorBy={colorBy}
-              className="w-full h-full"
-              baselinePoints={baselinePoints}
-              primaryOpacity={primaryOpacity}
-              baselineOpacity={baselineOpacity}
-            />
-          </div>
-          {apexChart}
+      {/* SINGLE UNIFIED MAP PANE */}
+      <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
+        <div className="flex-1 min-h-0 rounded-xl bg-[#060910] border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
+          <GpsTrackMap
+            points={trajectory.points}
+            bounds={trajectory.bounds}
+            currentIndex={currentIndex}
+            onSelectIndex={onSelectIndex}
+            colorBy={colorBy}
+            className="w-full h-full"
+            baselinePoints={baselinePoints}
+            corners={corners}
+            selectedCornerNumber={selectedCornerNumber}
+            onSelectCornerNumber={onSelectCornerNumber}
+            primaryOpacity={primaryOpacity}
+            baselineOpacity={baselineOpacity}
+            pedalMarkers={pedalMarkers}
+            showPedalMarkers={showPedalMarkers}
+          />
         </div>
-      ) : mapViewMode === 'overview' ? (
-        <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
-          <div className="flex-1 min-h-0 rounded-xl bg-[#060910] border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
-            <GpsTrackMap
-              points={trajectory.points}
-              bounds={trajectory.bounds}
-              currentIndex={currentIndex}
-              onSelectIndex={onSelectIndex}
-              colorBy={colorBy}
-              className="w-full h-full"
-              baselinePoints={baselinePoints}
-              corners={corners}
-              selectedCornerNumber={selectedCornerNumber}
-              onSelectCornerNumber={onSelectCornerNumber}
-              primaryOpacity={primaryOpacity}
-              baselineOpacity={baselineOpacity}
-              pedalMarkers={pedalMarkers}
-              showPedalMarkers={showPedalMarkers}
-            />
-            {pedalButton}
-          </div>
-          {apexChart}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
-          <div className="flex-1 min-h-0 rounded-xl overflow-hidden">
-            <GpsZoomMap
-              points={trajectory.points}
-              currentIndex={currentIndex}
-              onSelectIndex={onSelectIndex}
-              colorBy={colorBy}
-              className="w-full h-full"
-              baselinePoints={baselinePoints}
-              primaryOpacity={primaryOpacity}
-              baselineOpacity={baselineOpacity}
-            />
-          </div>
-          {apexChart}
-        </div>
-      )}
+        {apexChart}
+      </div>
 
       <ReplayTelemetryHud currentPoint={currentPoint} />
     </>

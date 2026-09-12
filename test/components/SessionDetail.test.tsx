@@ -407,18 +407,27 @@ describe('SessionDetail component', () => {
     expect(screen.getByText(/Tire Wear & Degradation Telemetry/i)).toBeInTheDocument();
   });
 
-  it('renders session rules and server configuration badges', async () => {
+  it('renders session rules and server configuration button with modal dialog', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Rules & Config:/i)).toBeInTheDocument();
     });
 
+    // Check button highlights (mode and duration) on the button row
     expect(screen.getByText(/Race Weekend/i)).toBeInTheDocument();
+    expect(screen.getByText(/60 min/i)).toBeInTheDocument();
+
+    // Click button to open modal dialog with full configuration
+    const toggleBtn = screen.getByRole('button', { name: /Rules & Config/i });
+    fireEvent.click(toggleBtn);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getAllByText(/Race Weekend/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/50%/i)).toBeInTheDocument();
     expect(screen.getByText(/Warm Tires/i)).toBeInTheDocument();
     expect(screen.getByText(/Open Setup/i)).toBeInTheDocument();
-    expect(screen.getByText(/60 min/i)).toBeInTheDocument();
   });
 
   it('switches to Fuel & Energy chart metric and displays stint strategy banner on top of chart', async () => {

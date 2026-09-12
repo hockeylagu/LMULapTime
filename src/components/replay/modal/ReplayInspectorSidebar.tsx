@@ -27,8 +27,6 @@ export interface ReplayInspectorSidebarProps {
   trajectory: ReplayTrajectoryData | null;
   currentIndex: number;
   setCurrentIndex: (index: number) => void;
-  mapViewMode: 'dual' | 'overview' | 'zoom';
-  setMapViewMode: (mode: 'dual' | 'overview' | 'zoom') => void;
   currentPoint?: ReplayTrajectoryPoint;
   cornerSegments: CornerSegmentComparison[];
   selectedCornerNumber: number | null;
@@ -62,8 +60,6 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   trajectory,
   currentIndex,
   setCurrentIndex,
-  mapViewMode,
-  setMapViewMode,
   currentPoint,
   cornerSegments,
   selectedCornerNumber,
@@ -145,8 +141,6 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
             onSelectIndex={setCurrentIndex}
             colorBy={colorBy}
             onChangeColorBy={setColorBy}
-            mapViewMode={mapViewMode}
-            onChangeMapViewMode={setMapViewMode}
             isCompareMode={isCompareMode}
             baselineTrajectory={baselineTrajectory}
             currentPoint={currentPoint}
