@@ -25,7 +25,6 @@ export interface TelemetryStripChartsProps {
   isLoading?: boolean;
   headerContent?: React.ReactNode;
   baselinePoints?: ReplayTrajectoryPoint[];
-  baselineLabel?: string;
   baselineLapNumber?: number;
   zoomRange?: { start: number; end: number } | null;
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
@@ -50,7 +49,6 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   isLoading = false,
   headerContent,
   baselinePoints,
-  baselineLabel,
   baselineLapNumber,
   zoomRange,
   onZoomRangeChange,
@@ -245,7 +243,6 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         isZoomed={isZoomed}
         onResetZoom={handleResetZoom}
         hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
-        baselineLabel={baselineLabel || (baselineLapNumber ? `Lap ${baselineLapNumber}` : 'Baseline')}
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}
         rawPointsCount={rawPointsCount}

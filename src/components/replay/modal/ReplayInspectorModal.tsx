@@ -88,8 +88,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
-  const [colorBy, setColorBy] = useState<MapColorMode>('speed');
-  const [mapViewMode, setMapViewMode] = useState<'dual' | 'overview' | 'zoom'>('dual');
+  const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
   const [excludedConsistencyLaps, setExcludedConsistencyLaps] = useState<Set<number>>(new Set());
 
@@ -256,8 +255,6 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
       setCornerSubView={setCornerSubView}
       colorBy={colorBy}
       setColorBy={setColorBy}
-      mapViewMode={mapViewMode}
-      setMapViewMode={setMapViewMode}
       drivers={metadata?.drivers || []}
     />
   );

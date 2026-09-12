@@ -74,8 +74,6 @@ export interface ReplayInspectorModalBodyProps {
   setCornerSubView: (view: 'compare' | 'consistency') => void;
   colorBy: MapColorMode;
   setColorBy: (mode: MapColorMode) => void;
-  mapViewMode: 'dual' | 'overview' | 'zoom';
-  setMapViewMode: (mode: 'dual' | 'overview' | 'zoom') => void;
   drivers: ReplayDriverEntry[];
 }
 
@@ -142,8 +140,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   setCornerSubView,
   colorBy,
   setColorBy,
-  mapViewMode,
-  setMapViewMode,
   drivers,
 }) => {
   const initialStraight = useMemo(() => {
@@ -207,21 +203,11 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
                   bestS3Sec={bestSectors.s3}
                   isCompareMode={isCompareMode}
                   baselineTrajectory={baselineTrajectory ?? null}
-                  baselineReplayName={baselineReplayName}
-                  replayName={replayName}
-                  baselineLapNumber={baselineLapNumber}
                   lapDeltas={lapDeltas}
                   formatLapTime={formatLapTime}
                 />
               }
               baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
-              baselineLabel={
-                isCompareMode && baselineTrajectory
-                  ? baselineReplayName === replayName
-                    ? `Lap ${baselineTrajectory.currentLap ?? baselineLapNumber ?? 1}`
-                    : `${baselineReplayName} (L${baselineTrajectory.currentLap ?? baselineLapNumber ?? 1})`
-                  : undefined
-              }
               baselineLapNumber={baselineTrajectory?.currentLap ?? baselineLapNumber ?? undefined}
               zoomRange={chartZoomRange}
               onZoomRangeChange={setChartZoomRange}
@@ -252,8 +238,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           trajectory={trajectory}
           currentIndex={currentIndex}
           setCurrentIndex={setCurrentIndex}
-          mapViewMode={mapViewMode}
-          setMapViewMode={setMapViewMode}
           currentPoint={currentPoint}
           cornerSegments={cornerSegments}
           selectedCornerNumber={selectedCornerNumber}

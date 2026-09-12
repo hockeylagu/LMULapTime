@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { GpsTrackMapScene } from './GpsTrackMapScene.js';
@@ -12,6 +12,7 @@ export interface GpsTrackMapPedalMarker {
   cornerNumber: number;
   distM: number;
   kind: 'brake' | 'throttle';
+  isBaseline?: boolean;
 }
 
 export interface GpsTrackMapProps {
@@ -29,6 +30,7 @@ export interface GpsTrackMapProps {
   baselineOpacity?: number;
   pedalMarkers?: GpsTrackMapPedalMarker[];
   showPedalMarkers?: boolean;
+  showMinimap?: boolean;
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = props => <GpsTrackMapScene {...props} />;

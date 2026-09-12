@@ -13,7 +13,6 @@ describe('TelemetryStripToolbar', () => {
         viewStart={0}
         viewEnd={100}
         onResetZoom={vi.fn()}
-        hasBaseline={false}
       />
     );
 
@@ -32,7 +31,6 @@ describe('TelemetryStripToolbar', () => {
         viewStart={0}
         viewEnd={100}
         onResetZoom={vi.fn()}
-        hasBaseline={false}
         telemetryResolution={2400}
         onChangeResolution={handleChangeResolution}
         pointsCount={2400}
@@ -59,7 +57,6 @@ describe('TelemetryStripToolbar', () => {
         viewStart={0}
         viewEnd={100}
         onResetZoom={vi.fn()}
-        hasBaseline={false}
         telemetryResolution={0}
         onChangeResolution={vi.fn()}
         pointsCount={7200}

@@ -35,7 +35,6 @@ export interface TelemetryStripViewProps {
   isZoomed: boolean;
   onResetZoom: () => void;
   hasBaseline: boolean;
-  baselineLabel?: string;
   telemetryResolution?: number;
   onChangeResolution?: (res: number) => void;
   rawPointsCount?: number;
@@ -79,7 +78,6 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   isZoomed,
   onResetZoom,
   hasBaseline,
-  baselineLabel,
   telemetryResolution,
   onChangeResolution,
   rawPointsCount,
@@ -103,8 +101,6 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         viewEnd={viewEnd}
         spanTimeSec={points[viewStart]?.timeSec !== undefined && points[viewEnd]?.timeSec !== undefined ? (points[viewEnd].timeSec || 0) - (points[viewStart].timeSec || 0) : undefined}
         onResetZoom={onResetZoom}
-        hasBaseline={hasBaseline}
-        baselineLabel={baselineLabel}
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}
         pointsCount={points.length}

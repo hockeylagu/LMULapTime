@@ -10,8 +10,6 @@ export interface TelemetryStripToolbarProps {
   viewEnd: number;
   spanTimeSec?: number;
   onResetZoom: () => void;
-  hasBaseline: boolean;
-  baselineLabel?: string;
   telemetryResolution?: number;
   onChangeResolution?: (res: number) => void;
   pointsCount?: number;
@@ -32,8 +30,6 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   viewEnd,
   spanTimeSec,
   onResetZoom,
-  hasBaseline,
-  baselineLabel,
   telemetryResolution,
   onChangeResolution,
   pointsCount,
@@ -184,23 +180,6 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             Frame {currentFrame ?? 1} / {totalFrames ?? 1}
           </span>
         </div>
-
-        {/* Comparison Legend Indicator */}
-        {hasBaseline && (
-          <div className="flex items-center gap-2 text-[10px] font-mono select-none pl-2 border-l border-white/10">
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-[#38bdf8] rounded" />
-              <span className="text-sky-400 font-bold">Primary</span>
-            </div>
-            <span className="text-white/20">vs</span>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-0.5 bg-[#f59e0b] rounded border-b border-dashed border-[#f59e0b]" />
-              <span className="text-amber-400 font-bold truncate max-w-[140px]">
-                {baselineLabel || 'Baseline'}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
