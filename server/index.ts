@@ -152,6 +152,26 @@ function getCachedReplayMetadata(filePath: string, replayName: string, playerNam
   return metadata;
 }
 
+function resolveDriverSlotFromMetadata(
+  filePath: string,
+  replayName: string,
+  driverName?: string,
+  playerName?: string
+): number | undefined {
+  if (!driverName) return undefined;
+  try {
+    const meta = getCachedReplayMetadata(filePath, replayName, playerName);
+    const target = driverName.toLowerCase();
+    const match = meta.drivers.find(d => {
+      const name = d.name.toLowerCase();
+      return name === target || name.includes(target) || target.includes(name);
+    });
+    return typeof match?.slot === 'number' ? match.slot : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Reads a full-resolution (maxPoints=0) trajectory - including laps and pit/flag
 // events for the resolved driver - from the SQLite cache, falling back to a single
 // binary parse when missing/stale. Callers downsample in-memory as needed, which is
@@ -163,20 +183,26 @@ function getCachedFullTrajectory(
 ): ReplayTrajectoryData {
   const stat = fs.statSync(filePath);
   const mtime = Math.floor(stat.mtimeMs);
-  const driverSlotKey = typeof opts.driverSlot === 'number' ? opts.driverSlot : -1;
+
+  const resolvedSlot = typeof opts.driverSlot === 'number'
+    ? opts.driverSlot
+    : resolveDriverSlotFromMetadata(filePath, replayName, opts.driverName, opts.playerName);
+
+  const driverSlotKey = typeof resolvedSlot === 'number' ? resolvedSlot : -1;
   const lapKey = typeof opts.lapNumber === 'number' ? opts.lapNumber : -1;
 
   const cached = sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size);
   if (cached) return cached;
 
   const trajectory = extractReplayTrajectory(filePath, {
-    driverSlot: opts.driverSlot,
+    driverSlot: resolvedSlot,
     driverName: opts.driverName,
     maxPoints: 0,
     playerName: opts.playerName,
     lapNumber: opts.lapNumber,
   });
-  sessionDb.upsertReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, trajectory);
+  const finalSlotKey = typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : driverSlotKey;
+  sessionDb.upsertReplayTrajectoryCache(replayName, finalSlotKey, lapKey, mtime, stat.size, trajectory);
   return trajectory;
 }
 
@@ -696,13 +722,17 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       return res.status(404).json({ error: `Replay file "${replayName}" not found` });
     }
 
-    const driverSlot = req.query.driverSlot ? parseInt(req.query.driverSlot as string, 10) : undefined;
+    let driverSlot = req.query.driverSlot ? parseInt(req.query.driverSlot as string, 10) : undefined;
     const driverName = (req.query.driverName as string | undefined) || (!req.query.driverSlot ? parser.configuredPlayerName : undefined);
     const maxPointsParam = req.query.maxPoints as string | undefined;
     const maxPoints = maxPointsParam !== undefined
       ? (maxPointsParam === '0' || maxPointsParam.toLowerCase() === 'raw' ? 0 : parseInt(maxPointsParam, 10))
       : 1200;
     const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
+
+    if (driverSlot === undefined && driverName) {
+      driverSlot = resolveDriverSlotFromMetadata(filePath, replayName, driverName, parser.configuredPlayerName);
+    }
 
     let matchedSession: DetailedSession | undefined = undefined;
     let matchedDriver: DriverData | undefined = undefined;
