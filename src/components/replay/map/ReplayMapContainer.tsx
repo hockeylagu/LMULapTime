@@ -14,6 +14,7 @@ export interface ReplayMapContainerProps {
   currentIndex: number;
   onSelectIndex: (index: number) => void;
   colorBy: MapColorMode;
+  onChangeColorBy?: (mode: MapColorMode) => void;
   mapViewMode: 'dual' | 'overview' | 'zoom';
   onChangeMapViewMode: (mode: 'dual' | 'overview' | 'zoom') => void;
   isCompareMode: boolean;
@@ -29,6 +30,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   currentIndex,
   onSelectIndex,
   colorBy,
+  onChangeColorBy,
   mapViewMode,
   onChangeMapViewMode,
   isCompareMode,
@@ -72,42 +74,64 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
       primaryDists={primaryDists}
       baselinePoints={baselinePoints}
       baselineDists={baselineDists}
+      isCompareMode={Boolean(isCompareMode && baselinePoints && baselinePoints.length > 0)}
       onClose={() => onSelectCornerNumber?.(null)}
-      className="h-24 shrink-0"
+      className="shrink-0"
     />
+  ) : null;
+
+  const pedalButton = corners && corners.length > 0 ? (
+    <button
+      type="button"
+      onClick={() => setShowPedalMarkers(v => !v)}
+      title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
+      className={`absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer backdrop-blur-md shadow-lg ${
+        showPedalMarkers
+          ? 'bg-sky-500/20 border-sky-400 text-sky-200 shadow-sky-500/10'
+          : 'bg-[#0a0e17]/85 border-white/10 text-lmu-muted hover:text-white hover:border-white/20'
+      }`}
+    >
+      <Disc className="w-3.5 h-3.5 text-rose-400" />
+      <span>Pedal Points</span>
+    </button>
   ) : null;
 
   return (
     <>
       <div className="flex items-center justify-between px-0.5 shrink-0 text-xs">
-        <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
-          {(['dual', 'zoom', 'overview'] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => onChangeMapViewMode(mode)}
-              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                mapViewMode === mode ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
-              }`}
-            >
-              {mode === 'dual' ? 'Dual View' : mode === 'zoom' ? 'Close-Up Line' : 'Full Circuit'}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
+            {(['dual', 'zoom', 'overview'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => onChangeMapViewMode(mode)}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                  mapViewMode === mode ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                }`}
+              >
+                {mode === 'dual' ? 'Dual View' : mode === 'zoom' ? 'Close-Up Line' : 'Full Circuit'}
+              </button>
+            ))}
+          </div>
+
+          {onChangeColorBy && (
+            <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
+              {(['speed', 'pedal', ...(isCompareMode && baselinePoints ? (['delta'] as const) : [])] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => onChangeColorBy(mode)}
+                  title={`Color by ${mode}`}
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
+                    colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white shadow-sm font-bold' : 'text-lmu-muted hover:text-white'
+                  }`}
+                >
+                  {mode === 'speed' ? 'Speed' : mode === 'pedal' ? 'Pedal' : 'Delta'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
-          {corners && corners.length > 0 && (
-            <button
-              onClick={() => setShowPedalMarkers(v => !v)}
-              title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
-                showPedalMarkers
-                  ? 'bg-lmu-accent/15 border-lmu-accent text-white'
-                  : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white'
-              }`}
-            >
-              <Disc className="w-3 h-3" />
-              Pedal Points
-            </button>
-          )}
           {baselinePoints ? (
             <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
               <button
@@ -159,6 +183,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               pedalMarkers={pedalMarkers}
               showPedalMarkers={showPedalMarkers}
             />
+            {pedalButton}
           </div>
           <div className="flex-[2] min-h-0 rounded-xl overflow-hidden">
             <GpsZoomMap
@@ -193,6 +218,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               pedalMarkers={pedalMarkers}
               showPedalMarkers={showPedalMarkers}
             />
+            {pedalButton}
           </div>
           {apexChart}
         </div>

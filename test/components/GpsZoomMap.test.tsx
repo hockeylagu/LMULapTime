@@ -46,7 +46,7 @@ describe('GpsZoomMap', () => {
     expect(screen.getByText(/Apex Detail \(150m\)/i)).toBeInTheDocument();
   });
 
-  it('displays live corner speed and steering telemetry', () => {
+  it('does not render bottom speed and steering telemetry overlay in apex detail view', () => {
     render(
       <GpsZoomMap
         points={mockPoints}
@@ -55,9 +55,8 @@ describe('GpsZoomMap', () => {
       />
     );
 
-    expect(screen.getByText(/120 km\/h/i)).toBeInTheDocument();
-    expect(screen.getByText(/35°/i)).toBeInTheDocument();
-    expect(screen.getByText(/RIGHT/i)).toBeInTheDocument();
+    expect(screen.queryByText(/120 km\/h/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/CTR/i)).not.toBeInTheDocument();
   });
 
   it('renders the baseline above the primary line to keep its dash pattern visible', () => {

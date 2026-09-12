@@ -112,45 +112,30 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
             <BrainCircuit className="w-3.5 h-3.5" /> AI Report
           </button>
         </div>
+      </div>
 
-        {activeTab === 'map' && (
-          <div className="flex items-center gap-1 text-xs">
-            {(['speed', 'pedal', ...(isCompareMode && baselineTrajectory ? (['delta'] as const) : [])] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setColorBy(mode)}
-                title={`Heatmap: ${mode}`}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                  colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
-                }`}
-              >
-                {mode.slice(0, 3)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'corners' && (
-          <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
+      {activeTab === 'corners' && (
+        <div className="px-3 py-1.5 bg-lmu-card/50 border-b border-lmu-border/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1 bg-lmu-bg p-0.5 rounded-lg border border-lmu-border/60 w-full">
             <button
               onClick={() => setCornerSubView('compare')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 cornerSubView === 'compare' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
               }`}
             >
-              <Timer className="w-3 h-3" /> vs Baseline
+              <Timer className="w-3.5 h-3.5" /> vs Baseline
             </button>
             <button
               onClick={() => setCornerSubView('consistency')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 cornerSubView === 'consistency' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
               }`}
             >
-              <Activity className="w-3 h-3" /> Consistency
+              <Activity className="w-3.5 h-3.5" /> Consistency
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {activeTab === 'map' ? (
         <div className="flex-1 flex flex-col min-h-0 h-full p-3 gap-2.5 overflow-hidden">
@@ -159,6 +144,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
             currentIndex={currentIndex}
             onSelectIndex={setCurrentIndex}
             colorBy={colorBy}
+            onChangeColorBy={setColorBy}
             mapViewMode={mapViewMode}
             onChangeMapViewMode={setMapViewMode}
             isCompareMode={isCompareMode}

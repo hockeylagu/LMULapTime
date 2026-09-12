@@ -7,6 +7,7 @@ import {
   projectTrajectoryPoints,
   buildContinuousSvgPath,
   computeGhostPosition,
+  computeDispersedCornerMarkers,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -138,38 +139,10 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
 
   const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, bounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, bounds]);
 
-  const cornerMarkers = useMemo(() => {
-    if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
-    const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-    const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-    const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
-    return corners
-      .map(c => {
-        const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
-        const idx = findIndexAtDistance(primaryDists, targetDist);
-        const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
-        if (!pt) return null;
-
-        const prev = svgPoints[Math.max(0, pt.idx - 1)] ?? pt;
-        const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 1)] ?? pt;
-        const dx = next.sx - prev.sx;
-        const dy = next.sy - prev.sy;
-        const headingLen = Math.hypot(dx, dy) || 1;
-        const normalX = (dy / headingLen) * 18;
-        const normalY = (-dx / headingLen) * 18;
-
-        const offsetSide = (pt.idx % 2 === 0 ? 1 : -1);
-        return {
-          cornerNumber: c.cornerNumber,
-          sx: pt.sx + normalX * offsetSide,
-          sy: pt.sy + normalY * offsetSide,
-          idx: pt.idx,
-          actualSx: pt.sx,
-          actualSy: pt.sy,
-        };
-      })
-      .filter((m): m is { cornerNumber: number; sx: number; sy: number; idx: number; actualSx: number; actualSy: number } => m !== null);
-  }, [corners, primaryDists, baselineDists, svgPoints]);
+  const cornerMarkers = useMemo(
+    () => computeDispersedCornerMarkers(corners, primaryDists, baselineDists, svgPoints),
+    [corners, primaryDists, baselineDists, svgPoints]
+  );
 
   const pedalMarkerPoints = useMemo(() => {
     if (!showPedalMarkers || !pedalMarkers || pedalMarkers.length === 0 || svgPoints.length === 0) return [];
@@ -177,9 +150,15 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       .map(m => {
         const idx = findIndexAtDistance(primaryDists, m.distM);
         const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
-        return pt ? { ...m, sx: pt.sx, sy: pt.sy } : null;
+        if (!pt) return null;
+        const prev = svgPoints[Math.max(0, pt.idx - 2)] ?? pt;
+        const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 2)] ?? pt;
+        const dx = next.sx - prev.sx;
+        const dy = next.sy - prev.sy;
+        const headingLen = Math.hypot(dx, dy) || 1;
+        return { ...m, sx: pt.sx, sy: pt.sy, nx: -dy / headingLen, ny: dx / headingLen };
       })
-      .filter((m): m is GpsTrackMapPedalMarker & { sx: number; sy: number } => m !== null);
+      .filter((m): m is GpsTrackMapPedalMarker & { sx: number; sy: number; nx: number; ny: number } => m !== null);
   }, [showPedalMarkers, pedalMarkers, primaryDists, svgPoints]);
 
   const carHeadingDeg = useMemo(() => {
@@ -257,7 +236,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
             opacity={0.75 * baselineOpacity}
           />
         )}
-
         {baselineGhostPos && (
           <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)})`} opacity={baselineOpacity}>
             <circle r="12" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
@@ -283,7 +261,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       <GpsSceneHudOverlay
         hasGhost={Boolean(baselineGhostPos)}
         isStationary={isStationary}
-        currentPos={currentPos}
       />
 
       <HeatmapLegendBar colorBy={colorBy} />

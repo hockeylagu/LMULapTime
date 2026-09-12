@@ -1,5 +1,5 @@
 import { ReplayTelemetryPoint } from '../../../../server/types.js';
-import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
+import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -163,4 +163,100 @@ export function computeGhostPosition(
     sy: viewBoxSize - (offsetZ + (ghostPt.z - minZ) * scale),
     point: ghostPt,
   };
+}
+
+export interface DispersedCornerMarker {
+  cornerNumber: number;
+  sx: number;
+  sy: number;
+  idx: number;
+  actualSx: number;
+  actualSy: number;
+}
+
+/**
+ * Calculates corner flag positions on the 2D map with alternating side allocation
+ * and iterative collision repulsion so consecutive corners (e.g. tight chicanes)
+ * never overlap and maintain adequate separation from each other and the racing line.
+ */
+export function computeDispersedCornerMarkers(
+  corners: Array<{ cornerNumber: number; minDistM: number }> | undefined,
+  primaryDists: number[],
+  baselineDists: number[],
+  svgPoints: ProjectedPoint[]
+): DispersedCornerMarker[] {
+  if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
+  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
+  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
+  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
+
+  const markers: DispersedCornerMarker[] = [];
+  for (let i = 0; i < corners.length; i++) {
+    const c = corners[i];
+    const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
+    const idx = findIndexAtDistance(primaryDists, targetDist);
+    const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
+    if (!pt) continue;
+
+    const prev = svgPoints[Math.max(0, pt.idx - 1)] ?? pt;
+    const next = svgPoints[Math.min(svgPoints.length - 1, pt.idx + 1)] ?? pt;
+    const dx = next.sx - prev.sx;
+    const dy = next.sy - prev.sy;
+    const headingLen = Math.hypot(dx, dy) || 1;
+    const normalX = (dy / headingLen) * 18;
+    const normalY = (-dx / headingLen) * 18;
+
+    // Alternate sides strictly by sequence index (i % 2) so consecutive corners (chicanes) separate to opposite sides
+    const offsetSide = i % 2 === 0 ? 1 : -1;
+    markers.push({
+      cornerNumber: c.cornerNumber,
+      sx: pt.sx + normalX * offsetSide,
+      sy: pt.sy + normalY * offsetSide,
+      idx: pt.idx,
+      actualSx: pt.sx,
+      actualSy: pt.sy,
+    });
+  }
+
+  // Multi-pass collision repulsion relaxation to ensure no two markers ever overlap
+  const MIN_SEPARATION = 22;
+  for (let pass = 0; pass < 6; pass++) {
+    let hadCollision = false;
+    for (let i = 0; i < markers.length; i++) {
+      for (let j = i + 1; j < markers.length; j++) {
+        const m1 = markers[i];
+        const m2 = markers[j];
+        const dX = m2.sx - m1.sx;
+        const dY = m2.sy - m1.sy;
+        const dist = Math.hypot(dX, dY);
+        if (dist < MIN_SEPARATION) {
+          hadCollision = true;
+          const overlap = MIN_SEPARATION - dist;
+          const pushX = dist > 0.001 ? dX / dist : (i % 2 === 0 ? 1 : -1);
+          const pushY = dist > 0.001 ? dY / dist : 0;
+          const half = overlap / 2;
+          m1.sx -= pushX * half;
+          m1.sy -= pushY * half;
+          m2.sx += pushX * half;
+          m2.sy += pushY * half;
+        }
+      }
+    }
+
+    // Anchor tether constraint: prevent markers from collapsing onto the track line
+    for (const m of markers) {
+      const dX = m.sx - m.actualSx;
+      const dY = m.sy - m.actualSy;
+      const tetherDist = Math.hypot(dX, dY);
+      if (tetherDist < 16) {
+        const scale = tetherDist > 0.001 ? 18 / tetherDist : 1;
+        m.sx = m.actualSx + (tetherDist > 0.001 ? dX * scale : 18);
+        m.sy = m.actualSy + (tetherDist > 0.001 ? dY * scale : 0);
+      }
+    }
+
+    if (!hadCollision) break;
+  }
+
+  return markers;
 }

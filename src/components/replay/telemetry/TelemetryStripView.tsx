@@ -1,12 +1,14 @@
 import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetrySpeedChannel } from './TelemetrySpeedChannel.js';
 import { TelemetryDeltaChannel } from './TelemetryDeltaChannel.js';
 import { TelemetryPedalsChannel } from './TelemetryPedalsChannel.js';
 import { TelemetrySteerGearChannel } from './TelemetrySteerGearChannel.js';
+import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];
@@ -20,6 +22,13 @@ export interface TelemetryStripViewProps {
   pointComparisons: PointComparison[];
   paths: TelemetryChartPathsResult;
   sectors?: { s1Frame: number; s2Frame: number };
+  cornerSegments?: CornerSegmentComparison[];
+  initialStraight?: StraightSegmentComparison | null;
+  selectedCornerNumber?: number | null;
+  onSelectCorner?: (cornerNumber: number | null) => void;
+  onJumpToDistance?: (distM: number) => void;
+  cumDists?: number[];
+  currentDistM?: number;
   selectedCornerMarkers?: { cornerNumber: number; entryFrame: number; minFrame: number; exitFrame: number } | null;
   interactionMode: 'scrub' | 'zoom';
   setInteractionMode: (mode: 'scrub' | 'zoom') => void;
@@ -56,6 +65,14 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   currentComparison,
   pointComparisons,
   paths,
+  sectors,
+  cornerSegments,
+  initialStraight,
+  selectedCornerNumber,
+  onSelectCorner,
+  onJumpToDistance,
+  cumDists,
+  currentDistM,
   selectedCornerMarkers,
   interactionMode,
   setInteractionMode,
@@ -147,6 +164,20 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
           isCursorInView={isCursorInView}
           cursorPct={cursorPct}
         />
+
+        {((cornerSegments && cornerSegments.length > 0) || Boolean(initialStraight)) && (
+          <TelemetryCornerStrip
+            corners={cornerSegments || []}
+            initialStraight={initialStraight}
+            selectedCornerNumber={selectedCornerNumber}
+            onSelectCorner={onSelectCorner}
+            onJumpToDistance={onJumpToDistance}
+            isCompareMode={hasBaseline}
+            currentDistM={currentDistM}
+            sectors={sectors}
+            cumDists={cumDists}
+          />
+        )}
 
         {s1Pct !== null && (
           <div style={{ left: `${s1Pct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-gold/50 pointer-events-none z-10">

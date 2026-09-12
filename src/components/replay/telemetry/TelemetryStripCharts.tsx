@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
 import { computeLapComparisons, computeCumulativeDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
 
@@ -16,6 +17,10 @@ export interface TelemetryStripChartsProps {
   currentIndex: number;
   onSelectIndex: (index: number) => void;
   sectors?: { s1Frame: number; s2Frame: number };
+  cornerSegments?: CornerSegmentComparison[];
+  initialStraight?: StraightSegmentComparison | null;
+  selectedCornerNumber?: number | null;
+  onSelectCorner?: (cornerNumber: number | null) => void;
   className?: string;
   isLoading?: boolean;
   headerContent?: React.ReactNode;
@@ -37,6 +42,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   currentIndex,
   onSelectIndex,
   sectors,
+  cornerSegments,
+  initialStraight,
+  selectedCornerNumber,
+  onSelectCorner,
   className = '',
   isLoading = false,
   headerContent,
@@ -160,6 +169,15 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const pctForIndex = (i: number): number => Math.max(0, Math.min(100, ((cumDists[i] ?? distStart) - distStart) / distSpan * 100));
   const cursorPct = pctForIndex(safeIndex);
 
+  const onJumpToDistance = useCallback(
+    (distM: number) => {
+      if (cumDists.length === 0) return;
+      const targetFrame = findIndexAtDistance(cumDists, distM);
+      onSelectIndex(targetFrame);
+    },
+    [cumDists, onSelectIndex]
+  );
+
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
 
@@ -214,6 +232,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         pointComparisons={pointComparisons}
         paths={paths}
         sectors={sectors}
+        cornerSegments={cornerSegments}
+        initialStraight={initialStraight}
+        selectedCornerNumber={selectedCornerNumber}
+        onSelectCorner={onSelectCorner}
+        onJumpToDistance={onJumpToDistance}
+        cumDists={cumDists}
+        currentDistM={cumDists[safeIndex]}
         selectedCornerMarkers={selectedCornerMarkers}
         interactionMode={interactionMode}
         setInteractionMode={setInteractionMode}
