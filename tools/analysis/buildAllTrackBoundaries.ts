@@ -1,11 +1,20 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import zlib from 'zlib';
 
 export interface Point2D {
   x: number;
   y: number;
+}
+
+export interface TimingGateGeometry {
+  name: string;
+  center: [number, number];
+  left: [number, number];
+  right: [number, number];
+  stationM: number;
 }
 
 export interface TrackBoundaryGeometry {
@@ -35,6 +44,12 @@ export interface TrackBoundaryGeometry {
   rightBoundary: Array<[number, number]>;
   centerline: Array<[number, number]>;
   nominalWidthM: number;
+  startFinish?: [number, number];
+  timingGates?: {
+    startFinish: TimingGateGeometry;
+    sector1?: TimingGateGeometry;
+    sector2?: TimingGateGeometry;
+  };
   createdAt: string;
   updatedAt?: string;
 }
@@ -527,6 +542,178 @@ function loadReplayLap(db: any, filename: string, lapKey: number): Array<{ x: nu
   return data.points.map((p: any) => ({ x: p.x, z: p.z }));
 }
 
+function extractTrackGateSamples(db: any, layoutKey: string, replayPattern: string): {
+  sfSamples: Point2D[];
+  s1Samples: Point2D[];
+  s2Samples: Point2D[];
+} {
+  const cleanKey = layoutKey.replace(/_(gp|full|short|wec|classic|chicane|outer|paddock|school|curvagrande|road_course)$/i, '');
+  const patternPrefix = replayPattern.split(' ')[0] || cleanKey;
+
+  const rows = db.prepare(`
+    SELECT trajectory_br FROM replay_trajectories 
+    WHERE (filename = ? OR filename LIKE ? OR filename LIKE ?) 
+      AND lap_key >= 1 AND driver_slot = -1 
+    LIMIT 40
+  `).all(replayPattern, `%${cleanKey}%`, `%${patternPrefix}%`);
+
+  const sfSamples: Point2D[] = [];
+  const s1Samples: Point2D[] = [];
+  const s2Samples: Point2D[] = [];
+
+  for (const r of rows as any[]) {
+    try {
+      const d = JSON.parse(zlib.brotliDecompressSync(r.trajectory_br).toString('utf8'));
+      if (!d.points || d.points.length < 10) continue;
+
+      const p0 = d.points[0];
+      sfSamples.push({ x: p0.x, y: p0.z });
+
+      const plast = d.points[d.points.length - 1];
+      if (Math.hypot(plast.x - p0.x, plast.z - p0.z) < 40) {
+        sfSamples.push({ x: plast.x, y: plast.z });
+      }
+
+      if (d.sectors) {
+        if (d.sectors.s1Frame && d.points[d.sectors.s1Frame]) {
+          const p = d.points[d.sectors.s1Frame];
+          s1Samples.push({ x: p.x, y: p.z });
+        }
+        if (d.sectors.s2Frame && d.points[d.sectors.s2Frame]) {
+          const p = d.points[d.sectors.s2Frame];
+          s2Samples.push({ x: p.x, y: p.z });
+        }
+      }
+    } catch {}
+  }
+
+  return { sfSamples, s1Samples, s2Samples };
+}
+
+function fitGateLine(
+  samples: Point2D[],
+  fallbackPoint: Point2D,
+  trackTangent: Point2D
+): { point: Point2D; dir: Point2D } {
+  if (samples.length < 2) {
+    return { point: fallbackPoint, dir: { x: -trackTangent.y, y: trackTangent.x } };
+  }
+
+  const meanX = samples.reduce((a, b) => a + b.x, 0) / samples.length;
+  const meanY = samples.reduce((a, b) => a + b.y, 0) / samples.length;
+
+  let sxx = 0, sxy = 0, syy = 0;
+  for (const p of samples) {
+    const dx = p.x - meanX;
+    const dy = p.y - meanY;
+    sxx += dx * dx;
+    sxy += dx * dy;
+    syy += dy * dy;
+  }
+
+  const variance = (sxx + syy) / samples.length;
+  if (variance < 0.25) {
+    return { point: { x: meanX, y: meanY }, dir: { x: -trackTangent.y, y: trackTangent.x } };
+  }
+
+  const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  let dirX = Math.cos(theta);
+  let dirY = Math.sin(theta);
+
+  // Orient line direction so cross product with trackTangent is positive (pointing towards left)
+  const cross = trackTangent.x * dirY - trackTangent.y * dirX;
+  if (cross < 0) {
+    dirX = -dirX;
+    dirY = -dirY;
+  }
+
+  return { point: { x: meanX, y: meanY }, dir: { x: dirX, y: dirY } };
+}
+
+function intersectLineWithPolyline(
+  linePoint: Point2D,
+  lineDir: Point2D,
+  polyline: Point2D[],
+  maxDistanceM: number = 35
+): { point: Point2D; index: number } | null {
+  const nx = -lineDir.y;
+  const ny = lineDir.x;
+  const m = polyline.length;
+  let bestInter: { point: Point2D; index: number; dist: number } | null = null;
+
+  for (let i = 0; i < m; i++) {
+    const p1 = polyline[i];
+    const p2 = polyline[(i + 1) % m];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const denom = dx * nx + dy * ny;
+    if (Math.abs(denom) < 1e-6) continue;
+
+    const s = ((linePoint.x - p1.x) * nx + (linePoint.y - p1.y) * ny) / denom;
+    if (s >= 0 && s <= 1) {
+      const ix = p1.x + s * dx;
+      const iy = p1.y + s * dy;
+      const dist = Math.hypot(ix - linePoint.x, iy - linePoint.y);
+      // Reject intersections on distant parallel tracks
+      if (dist > maxDistanceM) continue;
+
+      if (!bestInter || dist < bestInter.dist) {
+        bestInter = {
+          point: { x: Number(ix.toFixed(2)), y: Number(iy.toFixed(2)) },
+          index: i + s,
+          dist,
+        };
+      }
+    }
+  }
+
+  return bestInter ? { point: bestInter.point, index: bestInter.index } : null;
+}
+
+function findClosestOnPolyline(target: Point2D, polyline: Point2D[]): { point: Point2D; index: number } {
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < polyline.length; i++) {
+    const d = Math.hypot(polyline[i].x - target.x, polyline[i].y - target.y);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  return { point: polyline[bestIdx], index: bestIdx };
+}
+
+function rollPolyline(polyline: Point2D[], shift: number, exactPoint0?: Point2D): Point2D[] {
+  const m = polyline.length;
+  const k = ((Math.round(shift) % m) + m) % m;
+  const rolled: Point2D[] = [];
+  for (let i = 0; i < m; i++) {
+    rolled.push(polyline[(i + k) % m]);
+  }
+  if (exactPoint0) {
+    rolled[0] = { x: Number(exactPoint0.x.toFixed(2)), y: Number(exactPoint0.y.toFixed(2)) };
+  }
+  return rolled;
+}
+
+function computeStationAlongPolyline(polyline: Point2D[], targetIndex: number): number {
+  const m = polyline.length;
+  let dist = 0;
+  const fullIdx = Math.floor(targetIndex);
+  const frac = targetIndex - fullIdx;
+  for (let i = 0; i < fullIdx && i < m; i++) {
+    const p1 = polyline[i];
+    const p2 = polyline[(i + 1) % m];
+    dist += Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  }
+  if (frac > 0 && fullIdx < m) {
+    const p1 = polyline[fullIdx];
+    const p2 = polyline[(fullIdx + 1) % m];
+    dist += frac * Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  }
+  return dist;
+}
+
 async function ensureSourceFile(cfg: TrackConfig): Promise<string> {
   const cacheDir = path.resolve('tools/analysis/cache');
   if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
@@ -1004,15 +1191,82 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     console.log(`Telemetry Corridor: direct 1:1 LMU native space with ${cfg.nominalWidthM}m width profile`);
   }
 
-  // Calculate circuit length
+  // Multi-replay Timing Gate Fitting and Polyline Alignment
+  const gateSamples = extractTrackGateSamples(db, cfg.layoutKey, cfg.replayPattern);
+
+  // Fallback anchor for S/F is replayLap[0] or first point of centerline
+  const sfFallback: Point2D = replayLap[0] ? { x: replayLap[0].x, y: replayLap[0].z } : finalCenter[0];
+  const sfTangent: Point2D = {
+    x: finalCenter[1].x - finalCenter[0].x,
+    y: finalCenter[1].y - finalCenter[0].y,
+  };
+  const sfGate = fitGateLine(gateSamples.sfSamples, sfFallback, sfTangent);
+
+  const sfCenterInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalCenter, 35) || findClosestOnPolyline(sfGate.point, finalCenter);
+  const sfLeftInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalLeft, 35) || findClosestOnPolyline(sfCenterInter.point, finalLeft);
+  const sfRightInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalRight, 35) || findClosestOnPolyline(sfCenterInter.point, finalRight);
+
+  // Roll closed polylines so that index 0 is strictly at the Start/Finish gate
+  const rolledCenter = rollPolyline(finalCenter, sfCenterInter.index, sfCenterInter.point);
+  const rolledLeft = rollPolyline(finalLeft, sfCenterInter.index, sfLeftInter.point);
+  const rolledRight = rollPolyline(finalRight, sfCenterInter.index, sfRightInter.point);
+
+  // On the rolled centerline (where index 0 is s=0.0m), detect Sector 1 and Sector 2 timing gates
+  let sector1Gate: TimingGateGeometry | undefined = undefined;
+  if (gateSamples.s1Samples.length > 0) {
+    const s1Fallback = gateSamples.s1Samples[0];
+    const s1GateLine = fitGateLine(gateSamples.s1Samples, s1Fallback, { x: 1, y: 0 });
+    const s1Center = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledCenter, 35) || findClosestOnPolyline(s1GateLine.point, rolledCenter);
+    const s1Left = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s1Center.point, rolledLeft);
+    const s1Right = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s1Center.point, rolledRight);
+    const s1StationM = computeStationAlongPolyline(rolledCenter, s1Center.index);
+    sector1Gate = {
+      name: 'Sector 1',
+      center: [s1Center.point.x, s1Center.point.y],
+      left: [s1Left.point.x, s1Left.point.y],
+      right: [s1Right.point.x, s1Right.point.y],
+      stationM: Number(s1StationM.toFixed(1)),
+    };
+  }
+
+  let sector2Gate: TimingGateGeometry | undefined = undefined;
+  if (gateSamples.s2Samples.length > 0) {
+    const s2Fallback = gateSamples.s2Samples[0];
+    const s2GateLine = fitGateLine(gateSamples.s2Samples, s2Fallback, { x: 1, y: 0 });
+    const s2Center = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledCenter, 35) || findClosestOnPolyline(s2GateLine.point, rolledCenter);
+    const s2Left = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s2Center.point, rolledLeft);
+    const s2Right = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s2Center.point, rolledRight);
+    const s2StationM = computeStationAlongPolyline(rolledCenter, s2Center.index);
+    sector2Gate = {
+      name: 'Sector 2',
+      center: [s2Center.point.x, s2Center.point.y],
+      left: [s2Left.point.x, s2Left.point.y],
+      right: [s2Right.point.x, s2Right.point.y],
+      stationM: Number(s2StationM.toFixed(1)),
+    };
+  }
+
+  const timingGates = {
+    startFinish: {
+      name: 'Start / Finish',
+      center: [sfCenterInter.point.x, sfCenterInter.point.y] as [number, number],
+      left: [sfLeftInter.point.x, sfLeftInter.point.y] as [number, number],
+      right: [sfRightInter.point.x, sfRightInter.point.y] as [number, number],
+      stationM: 0,
+    },
+    sector1: sector1Gate,
+    sector2: sector2Gate,
+  };
+
+  // Calculate circuit length along rolled centerline
   let lengthM = 0;
-  for (let i = 1; i < finalCenter.length; i++) {
-    lengthM += Math.hypot(finalCenter[i].x - finalCenter[i - 1].x, finalCenter[i].y - finalCenter[i - 1].y);
+  for (let i = 1; i < rolledCenter.length; i++) {
+    lengthM += Math.hypot(rolledCenter[i].x - rolledCenter[i - 1].x, rolledCenter[i].y - rolledCenter[i - 1].y);
   }
 
   // Calculate bounding box
-  const allX = [...finalLeft.map(p => p.x), ...finalRight.map(p => p.x)];
-  const allZ = [...finalLeft.map(p => p.y), ...finalRight.map(p => p.y)];
+  const allX = [...rolledLeft.map(p => p.x), ...rolledRight.map(p => p.x)];
+  const allZ = [...rolledLeft.map(p => p.y), ...rolledRight.map(p => p.y)];
   const minX = Number(Math.min(...allX).toFixed(2));
   const maxX = Number(Math.max(...allX).toFixed(2));
   const minZ = Number(Math.min(...allZ).toFixed(2));
@@ -1039,18 +1293,36 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
       spanX: Number((maxX - minX).toFixed(2)),
       spanZ: Number((maxZ - minZ).toFixed(2)),
     },
-    leftBoundary: finalLeft.map(p => [p.x, p.y]),
-    rightBoundary: finalRight.map(p => [p.x, p.y]),
-    centerline: finalCenter.map(p => [p.x, p.y]),
+    leftBoundary: rolledLeft.map(p => [p.x, p.y]),
+    rightBoundary: rolledRight.map(p => [p.x, p.y]),
+    centerline: rolledCenter.map(p => [p.x, p.y]),
     nominalWidthM: cfg.nominalWidthM,
+    startFinish: [sfCenterInter.point.x, sfCenterInter.point.y],
+    timingGates,
     createdAt: new Date().toISOString(),
   };
 
-  console.log(`Completed: ${geometry.lengthM}m length, ${geometry.centerline.length} points, bounds [${minX}, ${maxX}] x [${minZ}, ${maxZ}]`);
+  console.log(`Completed [${geometry.layoutKey}]: ${geometry.lengthM}m length, S/F=[${geometry.startFinish[0]}, ${geometry.startFinish[1]}], S1=${sector1Gate?.stationM}m, S2=${sector2Gate?.stationM}m`);
   return geometry;
 }
 
 function hasGeometryChanged(existing: TrackBoundaryGeometry, current: TrackBoundaryGeometry): boolean {
+  if (!existing.timingGates || !existing.startFinish) {
+    return true;
+  }
+  if (
+    existing.startFinish[0] !== current.startFinish?.[0] ||
+    existing.startFinish[1] !== current.startFinish?.[1]
+  ) {
+    return true;
+  }
+  if (
+    existing.timingGates?.startFinish?.stationM !== current.timingGates?.startFinish?.stationM ||
+    existing.timingGates?.sector1?.stationM !== current.timingGates?.sector1?.stationM ||
+    existing.timingGates?.sector2?.stationM !== current.timingGates?.sector2?.stationM
+  ) {
+    return true;
+  }
   if (
     existing.layoutKey !== current.layoutKey ||
     existing.circuitId !== current.circuitId ||
@@ -1119,6 +1391,8 @@ async function main() {
     source: string;
     bounds: any;
     pointsCount: number;
+    startFinish?: [number, number];
+    timingGates?: any;
   }> = [];
 
   let updatedCount = 0;
@@ -1168,6 +1442,8 @@ async function main() {
         source: geom.source,
         bounds: geom.bounds,
         pointsCount: geom.centerline.length,
+        startFinish: geom.startFinish,
+        timingGates: geom.timingGates,
       });
     } catch (err: any) {
       console.error(`❌ Failed processing ${cfg.layoutKey}:`, err.message);
@@ -1198,7 +1474,15 @@ async function main() {
   console.log(` - Public Web:  ${publicDir}`);
 }
 
-main().catch(e => {
-  console.error('Fatal error running pipeline:', e);
-  process.exit(1);
-});
+const isDirectExecution = process.argv[1] && (
+  process.argv[1].endsWith('buildAllTrackBoundaries.ts') ||
+  process.argv[1].endsWith('buildAllTrackBoundaries.js') ||
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+);
+
+if (isDirectExecution) {
+  main().catch(e => {
+    console.error('Fatal error running pipeline:', e);
+    process.exit(1);
+  });
+}

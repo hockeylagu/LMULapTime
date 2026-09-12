@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
 
+export interface TimingGateGeometry {
+  name: string;
+  center: [number, number];
+  left: [number, number];
+  right: [number, number];
+  stationM: number;
+}
+
 export interface TrackBoundaryGeometry {
   layoutKey: string;
   circuitId: string;
@@ -19,6 +27,12 @@ export interface TrackBoundaryGeometry {
   rightBoundary: Array<[number, number]>;
   centerline: Array<[number, number]>;
   nominalWidthM?: number;
+  startFinish?: [number, number];
+  timingGates?: {
+    startFinish: TimingGateGeometry;
+    sector1?: TimingGateGeometry;
+    sector2?: TimingGateGeometry;
+  };
 }
 
 /**
