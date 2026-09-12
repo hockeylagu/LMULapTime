@@ -10,6 +10,7 @@ import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass
 import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/utils/formatters.js';
 import { getSessionDatabase } from './db.js';
 import { AI_MODELS, analyzeLap, clearSessionApiKey, createAiReportRecord, getAiCacheKey, getAiSettings, setSessionApiKey, setSessionModel, toAiError } from './aiReport.js';
+import { enrichTrajectoryWithTrackGeometry } from './serverTrackSync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -813,6 +814,17 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       }
     } catch {
       // Ignore validation lookup errors
+    }
+
+    try {
+      enrichTrajectoryWithTrackGeometry(
+        trajectory,
+        matchedSession?.trackVenue,
+        matchedSession?.trackCourse,
+        replayName
+      );
+    } catch (enrichErr) {
+      console.warn(`[serverTrackSync] Failed to enrich trajectory for ${replayName}:`, enrichErr);
     }
 
     res.json(trajectory);

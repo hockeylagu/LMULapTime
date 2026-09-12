@@ -1,8 +1,8 @@
 import { ReplayTrajectoryPoint } from '../../server/types.js';
 import {
   InterpolatedPoint,
-  computeCumulativeDistances,
   interpolatePointAtDistance,
+  getTrajectoryDistances,
 } from './replayComparison.js';
 
 interface BaseSegmentComparison {
@@ -219,19 +219,20 @@ export function computeLapSegmentComparisons(
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
-  const primaryDists = computeCumulativeDistances(primaryPoints);
-  const baselineDists = computeCumulativeDistances(baselinePoints);
+  const primaryDists = getTrajectoryDistances(primaryPoints);
+  const baselineDists = getTrajectoryDistances(baselinePoints);
   const primaryMinSteerAmplitude = computeMaxAbsSteer(primaryPoints) * STEER_REVERSAL_FRACTION;
   const turningPoints = findSpeedTurningPoints(primaryPoints, primaryDists, minProminenceKmh, primaryMinSteerAmplitude);
   const totalDistM = primaryDists[primaryDists.length - 1] || 0;
+  const startDistM = primaryDists[0] || 0;
 
   // A dangling min/max at either end of the lap - e.g. the last corner leads straight onto
   // the line with no further speed dip before the data ends - has no closing boundary of the
   // opposite type, so the corner-building loop below (which requires a max on both sides of
   // every min) would otherwise silently drop it instead of treating it as a real corner.
   // Close it off using the lap's own start/end point as an implicit boundary.
-  if (turningPoints.length > 0 && turningPoints[0].type === 'min' && turningPoints[0].distM >= MIN_STRAIGHT_LENGTH_M) {
-    turningPoints.unshift({ index: 0, distM: 0, type: 'max' });
+  if (turningPoints.length > 0 && turningPoints[0].type === 'min' && turningPoints[0].distM - startDistM >= MIN_STRAIGHT_LENGTH_M) {
+    turningPoints.unshift({ index: 0, distM: startDistM, type: 'max' });
   }
   if (
     turningPoints.length > 0 &&
@@ -316,7 +317,7 @@ export function computeLapSegmentComparisons(
 
   const segments: LapSegmentComparison[] = [];
   let cornerNumber = 0;
-  let prevBoundaryDist = 0;
+  let prevBoundaryDist = startDistM;
 
   for (let i = 1; i < turningPoints.length - 1; i++) {
     const min = turningPoints[i];
@@ -463,7 +464,7 @@ export function computeCornerConsistencyStats(
 
   for (const lap of laps) {
     if (!lap.points?.length) continue;
-    const lapDists = computeCumulativeDistances(lap.points);
+    const lapDists = getTrajectoryDistances(lap.points);
 
     for (const corner of canonicalCorners) {
       // Same entry->exit window computeLapSegmentComparisons uses for the "vs Baseline" corner

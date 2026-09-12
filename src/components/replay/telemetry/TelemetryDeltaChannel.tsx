@@ -103,6 +103,18 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
               }`}>
                 {currentComparison.deltaTimeSec <= 0 ? 'Ahead' : 'Behind'}
               </span>
+              {typeof currentComparison.primaryLateralOffsetM === 'number' && (
+                <span className="text-[10px] text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60 ml-1">
+                  <span className="text-slate-400">Line: </span>
+                  {currentComparison.primaryLateralOffsetM >= 0 ? '+' : ''}
+                  {currentComparison.primaryLateralOffsetM.toFixed(1)}m
+                  {typeof currentComparison.deltaLateralOffsetM === 'number' && (
+                    <span className="text-sky-300 ml-1">
+                      (Δ {currentComparison.deltaLateralOffsetM >= 0 ? '+' : ''}{currentComparison.deltaLateralOffsetM.toFixed(1)}m)
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           ) : null}
         </div>

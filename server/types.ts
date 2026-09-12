@@ -595,6 +595,20 @@ export interface ReplayMetadata {
   carModel?: string;
 }
 
+export interface TimingGateGeometry {
+  name: string;
+  center: [number, number];
+  left: [number, number];
+  right: [number, number];
+  stationM: number;
+}
+
+export interface TrackTimingGates {
+  startFinish: TimingGateGeometry;
+  sector1?: TimingGateGeometry;
+  sector2?: TimingGateGeometry;
+}
+
 export interface ReplayTrajectoryPoint {
   x: number;
   y: number;
@@ -620,6 +634,9 @@ export interface ReplayTrajectoryPoint {
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   engineRpm?: number;
+  distM?: number;
+  stationM?: number;
+  lateralOffsetM?: number;
 }
 
 export interface ReplayPenaltyEvent {
@@ -727,6 +744,10 @@ export interface ReplayTrajectoryData {
   standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
+  layoutKey?: string;
+  trackLengthM?: number;
+  lapDistMeters?: number;
+  timingGates?: TrackTimingGates;
   // Present only when the trajectory was extracted with `allLaps: true` - one fully
   // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
   allLapsData?: ReplayTrajectoryData[];

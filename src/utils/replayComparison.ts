@@ -28,6 +28,10 @@ export interface PointComparison {
   deltaThrottle: number;
   deltaBrake: number;
   deltaSteer: number;
+  stationM?: number;
+  primaryLateralOffsetM?: number;
+  baselineLateralOffsetM?: number;
+  deltaLateralOffsetM?: number;
 }
 
 /**
@@ -64,6 +68,19 @@ export function computeCumulativeDistances(points: ReplayTrajectoryPoint[]): num
   }
 
   return dists;
+}
+
+/**
+ * Returns the canonical lap distance index (meters) along the trajectory.
+ * Prioritizes the server-provided distM as the single source of truth,
+ * falling back to computeCumulativeDistances if distM is not yet populated.
+ */
+export function getTrajectoryDistances(points: ReplayTrajectoryPoint[]): number[] {
+  if (!points || points.length === 0) return [];
+  if (points[0]?.distM !== undefined) {
+    return points.map(p => p.distM ?? 0);
+  }
+  return computeCumulativeDistances(points);
 }
 
 /**
@@ -186,11 +203,35 @@ export function interpolatePointAtDistance(
 }
 
 /**
+ * Interpolates a scalar value (e.g. lateral offset) at a given distance along a trajectory.
+ */
+export function interpolateScalarAtDistance(values: number[], cumDists: number[], targetDist: number): number {
+  if (values.length === 0) return 0;
+  if (values.length === 1 || targetDist <= cumDists[0]) return values[0];
+  const maxDist = cumDists[cumDists.length - 1];
+  if (targetDist >= maxDist) return values[values.length - 1];
+
+  let low = 0;
+  let high = cumDists.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (cumDists[mid] < targetDist) low = mid + 1;
+    else high = mid - 1;
+  }
+  const idx0 = Math.max(0, low - 1);
+  const idx1 = Math.min(values.length - 1, low);
+  if (idx0 === idx1) return values[idx0];
+  const span = cumDists[idx1] - cumDists[idx0];
+  const t = span > 0 ? (targetDist - cumDists[idx0]) / span : 0;
+  return Number((values[idx0] + t * (values[idx1] - values[idx0])).toFixed(2));
+}
+
+/**
  * Computes comparative telemetry points for the primary lap against a baseline lap,
- * matched by absolute cumulative distance (meters) along the track rather than by
- * lap-fraction, so both laps are compared on the exact same physical track position —
- * this keeps the comparison correct even when the two laps have different total lengths
- * (e.g. off-track excursions, pit stops, or corner-cutting).
+ * matched either by canonical track layout station (s) or by absolute cumulative distance
+ * along the track rather than by lap-fraction, so both laps are compared on the exact same
+ * physical track position — this keeps the comparison correct even when the two laps have
+ * different total lengths (e.g. off-track excursions, pit stops, or corner-cutting).
  */
 export function computeLapComparisons(
   primaryPoints: ReplayTrajectoryPoint[],
@@ -200,8 +241,8 @@ export function computeLapComparisons(
     return [];
   }
 
-  const primaryDists = computeCumulativeDistances(primaryPoints);
-  const baselineDists = computeCumulativeDistances(baselinePoints);
+  const primaryDists = getTrajectoryDistances(primaryPoints);
+  const baselineDists = getTrajectoryDistances(baselinePoints);
   const totalBaselineDist = Math.max(1, baselineDists[baselineDists.length - 1]);
 
   const n = primaryPoints.length;
@@ -211,6 +252,9 @@ export function computeLapComparisons(
   const baselineStartT = baselinePoints[0].timeSec || 0;
   const baselineTotalLapTime = Math.max(0, (baselinePoints[baselinePoints.length - 1].timeSec || 0) - baselineStartT);
   const finishLineDelta = primaryTotalLapTime - baselineTotalLapTime;
+
+  const hasLateralOffsets = primaryPoints[0]?.lateralOffsetM !== undefined && baselinePoints[0]?.lateralOffsetM !== undefined;
+  const baselineOffsets = hasLateralOffsets ? baselinePoints.map(p => p.lateralOffsetM ?? 0) : null;
 
   return primaryPoints.map((p, i) => {
     // Match on the same absolute distance traveled, clamped to the baseline's own track length
@@ -238,6 +282,20 @@ export function computeLapComparisons(
     const deltaBrake = (p.brake || 0) - basePoint.brake;
     const deltaSteer = (p.steerYaw || 0) - basePoint.steerYaw;
 
+    let primaryLateralOffsetM: number | undefined = undefined;
+    let baselineLateralOffsetM: number | undefined = undefined;
+    let deltaLateralOffsetM: number | undefined = undefined;
+
+    if (hasLateralOffsets && baselineOffsets) {
+      primaryLateralOffsetM = p.lateralOffsetM;
+      baselineLateralOffsetM = interpolateScalarAtDistance(
+        baselineOffsets,
+        baselineDists,
+        targetBaselineDist
+      );
+      deltaLateralOffsetM = Number(((primaryLateralOffsetM ?? 0) - baselineLateralOffsetM).toFixed(2));
+    }
+
     return {
       primary: p,
       baseline: basePoint,
@@ -246,6 +304,10 @@ export function computeLapComparisons(
       deltaThrottle,
       deltaBrake,
       deltaSteer,
+      stationM: p.stationM ?? primaryDists[i],
+      primaryLateralOffsetM,
+      baselineLateralOffsetM,
+      deltaLateralOffsetM,
     };
   });
 }

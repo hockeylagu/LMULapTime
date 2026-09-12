@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { PointComparison, computeCumulativeDistances } from '../../../utils/replayComparison.js';
+import { PointComparison, getTrajectoryDistances } from '../../../utils/replayComparison.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
 // forward gears 1-7.
@@ -38,7 +38,8 @@ export function computeTelemetryChartPaths(
   points: ReplayTrajectoryPoint[],
   pointComparisons: PointComparison[],
   viewStart: number,
-  viewEnd: number
+  viewEnd: number,
+  distances?: number[]
 ): TelemetryChartPathsResult {
   if (points.length === 0) {
     return {
@@ -69,9 +70,9 @@ export function computeTelemetryChartPaths(
     ...(pointComparisons.map(c => c.baseline.speedKmh) || [])
   );
 
-  // X axis is plotted by cumulative lap distance (meters) rather than by frame index or
-  // elapsed time, so that comparisons against a baseline lap align on the same track position.
-  const cumDists = computeCumulativeDistances(points);
+  const cumDists = distances && distances.length === points.length
+    ? distances
+    : getTrajectoryDistances(points);
   const distStart = cumDists[viewStart] ?? 0;
   const distEnd = cumDists[viewEnd] ?? distStart;
   const distSpan = Math.max(1e-6, distEnd - distStart);
