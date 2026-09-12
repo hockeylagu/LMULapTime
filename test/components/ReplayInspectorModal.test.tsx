@@ -687,5 +687,86 @@ describe('ReplayInspectorModal', () => {
     expect(params.has('compareDriver')).toBe(false);
     expect(params.has('compareLapNum')).toBe(false);
   });
+
+  it('selects the exact chosen lap number when comparing against another driver whose lap count differs from player', async () => {
+    const rivalLap12 = {
+      id: 'rival-lap-12',
+      sessionId: 'session-1',
+      sessionName: 'R1',
+      sessionType: 'Race',
+      dateString: '2026/08/08 20:16:41',
+      driverName: 'Pithivier Patate',
+      carType: 'Ferrari 296 LMGT3 Evo',
+      carClass: 'LMGT3',
+      lapNum: 12,
+      lapTime: 72.484,
+      lapTimeString: '1:12.484',
+      isValid: true,
+      matchingReplayFile: 'Test_Replay.vcr',
+    };
+
+    const requestedUrls: string[] = [];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      requestedUrls.push(url);
+      if (url.includes('/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockMeta,
+            // Player only has laps 1 to 11 with lap 11 as best
+            laps: [
+              { lapNumber: 1, lapTimeSec: 74.5, isBest: false },
+              { lapNumber: 11, lapTimeSec: 73.209, isBest: true },
+            ],
+          }),
+        });
+      }
+      if (url.includes('compare/laps')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [rivalLap12] }) });
+      }
+      if (url.includes('/trajectory')) {
+        const lapMatch = url.match(/lap=(\d+)/);
+        const lap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockTraj,
+            currentLap: lap,
+            driverName: url.includes('Pithivier') ? 'Pithivier Patate' : 'Test Driver',
+            laps: [
+              { lapNumber: lap, lapTimeSec: lap === 12 ? 72.484 : 73.209, isBest: true },
+            ],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unknown URL: ${url}`));
+    });
+
+    render(
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Compare/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Compare/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Pithivier Patate')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Pithivier Patate'));
+
+    await waitFor(() => {
+      expect(requestedUrls.some(u => u.includes('lap=12') && u.includes('Pithivier'))).toBe(true);
+    });
+
+    // Check that the baseline compare pill displays L12 and 1:12.484 instead of Lap 11
+    await waitFor(() => {
+      expect(screen.getByTitle('Click to change the comparison lap')).toHaveTextContent(/L12/);
+      expect(screen.getByTitle('Click to change the comparison lap')).toHaveTextContent(/1:12.484/);
+    });
+  });
 });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ReplayLapSummary } from '../../../../server/types.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/types.js';
 import { ComparableLap } from '../../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../../utils/replayComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
@@ -231,34 +231,29 @@ export function useReplayInspectorData({
     setIsBaselineLoading(true);
     const targetReplay = baselineReplayName;
     const targetLap = baselineLapNumber ?? 1;
+    const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
 
     const fetchMeta = targetReplay === activeReplayName && metadata
       ? Promise.resolve(metadata)
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
-    fetchMeta.then((meta: ReplayMetadata | null) => {
-      if (!isMounted) return;
-      if (targetReplay !== activeReplayName) setBaselineMetadata(meta);
-      let validLap = targetLap;
-      if (meta?.laps && meta.laps.length > 0 && !meta.laps.some((l: ReplayLapSummary) => l.lapNumber === validLap)) {
-        validLap = meta.laps.find((l: ReplayLapSummary) => l.isBest)?.lapNumber || meta.laps[0].lapNumber;
-        setBaselineLapNumber(validLap);
-      }
-      const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${validLap}${driverQuery}`)
-        .then(r => (r.ok ? r.json() : null))
-        .then((rawTraj: ReplayTrajectoryData | null) => {
-          const traj = applyTelemetryPostProcessingToTrajectory(rawTraj);
-          if (isMounted) {
-            setBaselineTrajectory(traj);
-            setIsBaselineLoading(false);
-            if (traj?.laps && traj.laps.length > 0 && !traj.laps.some(l => l.lapNumber === validLap)) {
-              setBaselineLapNumber(traj.currentLap || traj.laps.find(l => l.isBest)?.lapNumber || traj.laps[0].lapNumber);
-            }
-          }
-        })
-        .catch(() => { if (isMounted) setIsBaselineLoading(false); });
-    }).catch(() => { if (isMounted) setIsBaselineLoading(false); });
+    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${targetLap}${driverQuery}`)
+      .then(r => (r.ok ? r.json() : null));
+
+    Promise.all([fetchMeta, fetchTraj])
+      .then(([meta, rawTraj]: [ReplayMetadata | null, ReplayTrajectoryData | null]) => {
+        if (!isMounted) return;
+        if (targetReplay !== activeReplayName && meta) setBaselineMetadata(meta);
+        const traj = applyTelemetryPostProcessingToTrajectory(rawTraj);
+        setBaselineTrajectory(traj);
+        setIsBaselineLoading(false);
+        if (traj?.currentLap && typeof traj.currentLap === 'number' && traj.currentLap !== targetLap) {
+          setBaselineLapNumber(traj.currentLap);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsBaselineLoading(false);
+      });
 
     return () => { isMounted = false; };
   }, [isCompareMode, baselineReplayName, baselineLapNumber, baselineDriverName, activeReplayName, metadata, telemetryResolution]);
