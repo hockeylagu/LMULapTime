@@ -45,6 +45,9 @@ export interface ReplayInspectorSidebarProps {
   availableConsistencyLaps: { lapNumber: number; lapTimeSec: number; isValid: boolean }[];
   excludedConsistencyLaps: Set<number>;
   toggleConsistencyLap: (lapNumber: number) => void;
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey?: string;
 }
 
 export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
@@ -78,6 +81,9 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   availableConsistencyLaps,
   excludedConsistencyLaps,
   toggleConsistencyLap,
+  trackVenue,
+  trackCourse,
+  layoutKey,
 }) => {
   return (
     <div className="w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px] shrink-0 bg-lmu-bg flex flex-col min-h-0 overflow-hidden">
@@ -147,6 +153,9 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
             corners={cornerSegments}
             selectedCornerNumber={selectedCornerNumber}
             onSelectCornerNumber={handleSelectCorner}
+            trackVenue={trackVenue}
+            trackCourse={trackCourse}
+            layoutKey={layoutKey}
           />
         </div>
       ) : activeTab === 'ai-report' ? (

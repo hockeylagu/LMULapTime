@@ -20,6 +20,9 @@ export interface ReplayMapContainerProps {
   corners?: CornerSegmentComparison[];
   selectedCornerNumber?: number | null;
   onSelectCornerNumber?: (cornerNumber: number | null) => void;
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey?: string;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -34,6 +37,9 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   corners,
   selectedCornerNumber,
   onSelectCornerNumber,
+  trackVenue,
+  trackCourse,
+  layoutKey,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
@@ -179,6 +185,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             baselineOpacity={baselineOpacity}
             pedalMarkers={pedalMarkers}
             showPedalMarkers={showPedalMarkers}
+            trackVenue={trackVenue}
+            trackCourse={trackCourse}
+            layoutKey={layoutKey}
+            replayName={trajectory.replayName}
           />
         </div>
         {apexChart}

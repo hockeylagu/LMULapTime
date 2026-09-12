@@ -1,12 +1,17 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { computeCumulativeDistances, computeLapComparisons, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { computeCumulativeDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
 import {
   MapColorMode,
   projectTrajectoryPoints,
+  projectBoundaryPoints,
+  buildClosedSvgPath,
   buildContinuousSvgPath,
   computeGhostPosition,
   computeDispersedCornerMarkers,
+  computePedalMarkerPoints,
+  computeEffectiveBounds,
+  computeBaselineDeltaByIdx,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -16,6 +21,8 @@ import { useGpsMapPanZoom } from './useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from './GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
+import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
+import { useTrackBoundaryGeometry, TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 
 import type { GpsTrackMapCorner, GpsTrackMapPedalMarker } from './GpsTrackMap.js';
 
@@ -35,6 +42,11 @@ export interface GpsTrackMapSceneProps {
   pedalMarkers?: GpsTrackMapPedalMarker[];
   showPedalMarkers?: boolean;
   showMinimap?: boolean;
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey?: string;
+  replayName?: string;
+  trackGeometry?: TrackBoundaryGeometry | null;
 }
 
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
@@ -53,13 +65,48 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   pedalMarkers,
   showPedalMarkers = false,
   showMinimap = true,
+  trackVenue,
+  trackCourse,
+  layoutKey,
+  replayName,
+  trackGeometry,
 }) => {
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
 
-  const svgPoints = useMemo(() => projectTrajectoryPoints(points, bounds, VIEWBOX_SIZE, PADDING), [points, bounds]);
-  const baselineSvgPoints = useMemo(() => projectTrajectoryPoints(baselinePoints || [], bounds, VIEWBOX_SIZE, PADDING), [baselinePoints, bounds]);
+  const { trackGeometry: fetchedGeometry } = useTrackBoundaryGeometry({
+    layoutKey,
+    trackVenue,
+    trackCourse,
+    replayName,
+  });
+  const effectiveGeometry = trackGeometry ?? fetchedGeometry;
+
+  const effectiveBounds = useMemo(
+    () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, baselinePoints),
+    [bounds, effectiveGeometry, baselinePoints]
+  );
+
+  const svgPoints = useMemo(() => projectTrajectoryPoints(points, effectiveBounds, VIEWBOX_SIZE, PADDING), [points, effectiveBounds]);
+  const baselineSvgPoints = useMemo(() => projectTrajectoryPoints(baselinePoints || [], effectiveBounds, VIEWBOX_SIZE, PADDING), [baselinePoints, effectiveBounds]);
   const currentPos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
+
+  const leftSvgPoints = useMemo(
+    () => (effectiveGeometry?.leftBoundary ? projectBoundaryPoints(effectiveGeometry.leftBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
+    [effectiveGeometry, effectiveBounds]
+  );
+  const rightSvgPoints = useMemo(
+    () => (effectiveGeometry?.rightBoundary ? projectBoundaryPoints(effectiveGeometry.rightBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
+    [effectiveGeometry, effectiveBounds]
+  );
+  const centerlineSvgPoints = useMemo(
+    () => (effectiveGeometry?.centerline ? projectBoundaryPoints(effectiveGeometry.centerline, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
+    [effectiveGeometry, effectiveBounds]
+  );
+  const layoutPathD = useMemo(
+    () => (centerlineSvgPoints.length > 0 ? buildClosedSvgPath(centerlineSvgPoints) : undefined),
+    [centerlineSvgPoints]
+  );
 
   const {
     zoomLevel,
@@ -77,7 +124,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   } = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
 
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
-  const isStationary = useMemo(() => ((bounds?.spanX ?? 0) < 25 && (bounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [bounds, points]);
+  const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
   const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
   const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
@@ -87,54 +134,22 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     return computeLapComparisons(points, baselinePoints).map(c => c.deltaTimeSec);
   }, [colorBy, points, baselinePoints]);
 
-  const baselineDeltaByIdx = useMemo(() => {
-    if (colorBy !== 'delta' || !deltaByIdx || !baselinePoints || baselinePoints.length === 0) return null;
-    const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-    const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-    const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
-    return baselineDists.map(d => {
-      const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
-      const idx = findIndexAtDistance(primaryDists, targetDist);
-      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
-    });
-  }, [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]);
+  const baselineDeltaByIdx = useMemo(
+    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, baselinePoints, primaryDists, baselineDists) : null),
+    [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]
+  );
 
   const markerScale = useMemo(() => {
     return Number((1 / zoomLevel).toFixed(4));
   }, [zoomLevel]);
 
-  const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, bounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, bounds]);
+  const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, effectiveBounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, effectiveBounds]);
 
-  const pedalMarkerPoints = useMemo(() => {
-    if (!showPedalMarkers || !pedalMarkers || pedalMarkers.length === 0 || svgPoints.length === 0) return [];
-    const mapped = pedalMarkers
-      .map(m => {
-        const useBaseline = Boolean(m.isBaseline && baselinePoints && baselinePoints.length > 0 && baselineSvgPoints.length > 0);
-        const dists = useBaseline ? baselineDists : primaryDists;
-        const pts = useBaseline ? baselineSvgPoints : svgPoints;
-        const idx = findIndexAtDistance(dists, m.distM);
-        const pt = pts[Math.min(idx, pts.length - 1)];
-        if (!pt) return null;
-        const prev = pts[Math.max(0, pt.idx - 2)] ?? pt;
-        const next = pts[Math.min(pts.length - 1, pt.idx + 2)] ?? pt;
-        const dx = next.sx - prev.sx;
-        const dy = next.sy - prev.sy;
-        const headingLen = Math.hypot(dx, dy) || 1;
-        return { ...m, sx: pt.sx, sy: pt.sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
-      })
-      .filter((m): m is GpsTrackMapPedalMarker & { sx: number; sy: number; nx: number; ny: number; isStaggered: boolean } => m !== null);
 
-    // Stagger baseline markers if they are within 22px of the primary marker of the same corner and kind
-    for (const bMarker of mapped) {
-      if (!bMarker.isBaseline) continue;
-      const primMarker = mapped.find(p => !p.isBaseline && p.cornerNumber === bMarker.cornerNumber && p.kind === bMarker.kind);
-      if (primMarker && Math.hypot(bMarker.sx - primMarker.sx, bMarker.sy - primMarker.sy) < 22) {
-        bMarker.isStaggered = true;
-      }
-    }
-
-    return mapped;
-  }, [showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, baselinePoints]);
+  const pedalMarkerPoints = useMemo(
+    () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, baselinePoints),
+    [showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, baselinePoints]
+  );
 
   const cornerMarkers = useMemo(
     () => computeDispersedCornerMarkers(corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints),
@@ -183,6 +198,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       {showMinimap && (
         <GpsCircuitMinimap
           pathD={pathD}
+          layoutPathD={layoutPathD}
           currentPos={currentPos}
           baselineGhostPos={baselineGhostPos}
           currentViewBox={currentViewBox}
@@ -199,8 +215,18 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
           </filter>
         </defs>
 
-        <path d={pathD} fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        <path d={pathD} fill="none" stroke="#334155" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
+          <GpsTrackRoadRibbon
+            leftSvgPoints={leftSvgPoints}
+            rightSvgPoints={rightSvgPoints}
+            centerlineSvgPoints={centerlineSvgPoints}
+          />
+        ) : (
+          <>
+            <path d={pathD} fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            <path d={pathD} fill="none" stroke="#334155" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
 
         <GpsTrackSegments
           svgPoints={svgPoints}
