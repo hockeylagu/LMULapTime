@@ -5,13 +5,25 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/Tests-414%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-533%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 A modern, high-performance telemetry analyzer and race intelligence hub for **Le Mans Ultimate** (LMU). Automatically scans and parses your session XML logs and native binary VCR replay recordings, correlates multi-stint telemetry data, evaluates lap-by-lap pace against community "Alien" benchmarks, visualizes full 2D trajectory racing lines with synchronized telemetry, and provides deep head-to-head lap comparisons.
 
 ---
 
 ## ✨ Features
+
+### 🤖 AI Race Engineer & Deterministic Coaching Engine
+- **Deterministic Technique Deficit Ranking**:
+  - Automatically identifies and ranks your top driving technique deficits across corners using pure deterministic evidence:
+    $$\text{Priority} = \text{Estimated Time Loss} \times \text{Repeatability} \times \text{Confidence}$$
+  - Evaluates **Braking Points** (early/late braking initiation), **Trail Braking Shape** (pressure decay rate and release area), **Throttle Application** (distance from apex to initial pick-up and ramp rate to 100%), **Apex Minimum Speed**, and **Line Deviation**.
+  - **Evidence-Linked Drilldown**: Click directly on any coaching finding to immediately open the exact corner, compare baseline vs. target laps, and inspect synchronized telemetry waveforms.
+- **Natural Language Coaching Reports (Google Gemini)**:
+  - Powered by `@google/genai` to synthesize telemetry metrics into actionable engineer debriefs, technique critiques, and garage feedback.
+  - Generates comprehensive post-stint summaries, tire management guidance, and session improvement tips.
+- **Historical Coaching & Progression Archive**:
+  - Automatically persists historical coaching reports in SQLite cache, allowing you to review your technique progression across multiple sessions.
 
 ### 🛰️ VCR Replay & Trajectory Telemetry Studio
 - **Native Binary VCR Decoder (`gMb1.002f`)**: Directly extracts high-frequency time-slice positions, multi-driver telemetry, and official Class 6 Type 6 timing loops without relying on third-party companion tools.
@@ -40,13 +52,16 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
   - Strictly prevents cross-layout leakage between parent GP facilities and shorter variants.
 - **Format Specification**: Comprehensive reverse-engineered binary specification documented in [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md).
 
-### 📊 Comprehensive Session Telemetry
+### 📊 Comprehensive Session Telemetry & Stewards Log
 - **Multi-Metric Telemetry Charts**: Switch between **Lap Pace**, **Sector Times (S1 / S2 / S3)**, **Top Speed**, **Tire Wear degradation** (FL, FR, RL, RR, Avg), and **Fuel & Virtual Energy** stint consumption.
 - **Flying Lap & Out-Lap Intelligence**:
   - Automatically identifies **Start Laps** (standing/rolling starts or garage exits).
   - Flags **Pit Stop in-laps** and **Out-laps** (pit exit laps), excluding them from flying average pace and pace consistency ratings.
   - Plots estimated/inferred lap times for incomplete laps so no telemetry data is lost.
 - **Multiclass Race Classification**: Tracks both **Class Position** (Hypercar, LMP2, LMGT3, GTE) and **Overall Position**, with position deltas ($\Delta$), gaps to class leader, and finish statuses (Finished, DNF, DNS, DQ).
+- **Session Stewards Log & Incident Timeline**:
+  - Extracts penalties, contact collisions, cut-track warnings, and mechanical damage events from XML results.
+  - Displays elapsed lap time, driver involved, and penalty severity in a dedicated stewards ledger.
 - **Session Rules & Server Badges**: Visualizes server configuration (Damage, Tire Warmers, Fixed Setups, ParcFermé, Multipliers) directly from session logs.
 - **Results XML Specification**: Comprehensive technical specification of the simulation results log format and available data structures documented in [`docs/XML_FORMAT.md`](docs/XML_FORMAT.md).
 
@@ -61,9 +76,11 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
 - **Theoretical Execution Gap**: Visualizes the delta between your actual fastest lap and your optimal theoretical sectors ($S1 + S2 + S3$).
 - **Multi-Class & Car Model Filters**: Filter analytics across Hypercar (LMH/LMDh), LMP2, LMGT3, and specific vehicle models (e.g. Porsche 911 GT3 R, Ferrari 499P, BMW M4 GT3).
 
-### ⚡ Blazing-Fast SQLite Caching (WAL Mode)
+### ⚡ Blazing-Fast SQLite Caching & Background Replay Scanner
 - **Zero-Lag Incremental Sync**: Incremental file modification checking (`mtime` & file size). Only newly created or modified XML files are reparsed.
-- **Instantaneous Lookups**: Indexed queries for tracks, timestamps, and driver sessions.
+- **Asynchronous Background Scanner**: Automatically indexes and downsamples binary replays in a low-priority background thread with real-time UI status tracking in the navigation bar.
+- **Replay Cache Management**: In-app cache inspection card displaying total parsed replays, trajectory size, memory footprint, and rescan controls.
+- **Instantaneous Lookups**: Indexed queries for tracks, timestamps, and driver sessions using Write-Ahead Logging (WAL).
 
 ### 🌐 Live Community Benchmark Sync & Update Changelog
 - **Google Sheets Benchmark Sync**: Synchronizes the latest community reference lap times directly into SQLite.
@@ -83,12 +100,16 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
   - [Recharts](https://recharts.org/) - Interactive telemetry and delta charts
   - [Lucide Icons](https://lucide.dev/) - Clean iconography
 - **Backend**:
-  - [Node.js](https://nodejs.org/) & [Express](https://expressjs.com/)
+  - [Node.js](https://nodejs.org/) & [Express 5](https://expressjs.com/)
   - [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) with Write-Ahead Logging (WAL)
   - [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser) - High-throughput XML parsing
   - Custom Binary `.Vcr` Parser with 4-wheel telemetry & pitstop state machine
+  - [Google Gen AI SDK](https://github.com/googleapis/genai-js) (`@google/genai`) - AI race engineer post-stint coaching
+- **Native Tools & Diagnostics**:
+  - **C# .NET 8 Telemetry Recorder** (`tools/telemetry-recorder/`) - Real-time memory-mapped telemetry probes
+  - **TSX Offline Analysis** (`tools/analysis/`) - Replay binary verification and correlation utilities
 - **Testing**:
-  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - 414+ automated unit and integration tests
+  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - 533+ automated unit and integration tests
 
 ---
 
@@ -97,6 +118,7 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (version 18.0 or newer)
 - [Le Mans Ultimate](https://lemansultimate.com/) installed on your computer
+- *(Optional)* Google Gemini API key for AI Race Engineer coaching reports
 
 ### Installation
 
@@ -111,13 +133,19 @@ A modern, high-performance telemetry analyzer and race intelligence hub for **Le
    npm install
    ```
 
-3. **Start the application**:
+3. **Configure Environment (Optional)**:
+   Create a `.env` file in the project root if you want to enable Gemini AI coaching reports:
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+4. **Start the application**:
    ```bash
    npm run dev
    ```
    *Windows users can also simply double-click `launch.bat`.*
 
-4. **Open your browser**:
+5. **Open your browser**:
    - Frontend: [http://localhost:5173](http://localhost:5173)
    - Backend API: [http://localhost:3001](http://localhost:3001)
 
@@ -133,7 +161,12 @@ You can change these paths at any time via the in-app **Settings** tab:
 1. Navigate to **Settings** in the top navigation bar.
 2. Enter your custom results directory and replays directory.
 3. Optionally enter your **In-Game Driver Profile Name** to automatically prioritize your driver telemetry.
-4. Click **Rescan & Load Telemetry**.
+4. Inspect or clear SQLite cache statistics in the **Replay Cache** card.
+5. Click **Rescan & Load Telemetry**.
+
+For a controlled workflow that turns lap comparison, corner phases, tyre trends, and coaching
+evidence into LMU garage decisions, see the
+[`LMU Setup Development with Telemetry and Coaching` guide](docs/LMU_SETUP_AND_TELEMETRY_GUIDE.md).
 
 ---
 
@@ -145,9 +178,12 @@ You can change these paths at any time via the in-app **Settings** tab:
 | `npm run dev:server` | Runs the backend server using `tsx watch`. |
 | `npm run dev:client` | Runs the Vite client development server. |
 | `npm run build` | Runs TypeScript typechecks and compiles the production client bundle. |
-| `npm test` | Runs all 414+ automated test suites with Vitest. |
+| `npm test` | Runs all 533+ automated test suites with Vitest. |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Generates detailed test coverage reports. |
+| `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
+| `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
+| `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
 
 ---
 
