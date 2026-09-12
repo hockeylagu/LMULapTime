@@ -221,17 +221,17 @@
     "layoutId": "road_course",
     "trackVenue": "Daytona International Speedway",
     "trackCourse": "Daytona International Speedway Road Course",
-    "lengthM": 5680.1,
-    "source": "track-atlas",
+    "lengthM": 5721.5,
+    "source": "OpenStreetMap",
     "bounds": {
-      "minX": -321.05,
-      "maxX": 887.71,
-      "minZ": -1040.25,
-      "maxZ": 394.01,
-      "spanX": 1208.76,
-      "spanZ": 1434.26
+      "minX": -325.79,
+      "maxX": 892.3,
+      "minZ": -1040.28,
+      "maxZ": 390.82,
+      "spanX": 1218.09,
+      "spanZ": 1431.1
     },
-    "pointsCount": 2294
+    "pointsCount": 2307
   },
   {
     "layoutKey": "fuji_chicane",
@@ -275,17 +275,17 @@
     "layoutId": "wec",
     "trackVenue": "Algarve International Circuit",
     "trackCourse": "Algarve International Circuit",
-    "lengthM": 4695.3,
-    "source": "telemetry-corridor",
+    "lengthM": 4666.8,
+    "source": "OpenStreetMap",
     "bounds": {
-      "minX": -275.59,
-      "maxX": 418.23,
-      "minZ": -627.69,
-      "maxZ": 553.63,
-      "spanX": 693.82,
-      "spanZ": 1181.32
+      "minX": -285.8,
+      "maxX": 419.11,
+      "minZ": -622.69,
+      "maxZ": 550.55,
+      "spanX": 704.91,
+      "spanZ": 1173.24
     },
-    "pointsCount": 1882
+    "pointsCount": 1861
   },
   {
     "layoutKey": "sebring_full",
@@ -365,16 +365,16 @@
     "layoutId": "1a_v2_short",
     "trackVenue": "Paul Ricard Circuit",
     "trackCourse": "Paul Ricard - 1A-V2-Short",
-    "lengthM": 5145.4,
-    "source": "telemetry-corridor",
+    "lengthM": 5192.8,
+    "source": "OpenStreetMap",
     "bounds": {
-      "minX": -1159.52,
-      "maxX": 975.03,
-      "minZ": -265.79,
-      "maxZ": 733.37,
-      "spanX": 2134.55,
-      "spanZ": 999.16
+      "minX": -1151.07,
+      "maxX": 968.01,
+      "minZ": -260.96,
+      "maxZ": 732.95,
+      "spanX": 2119.08,
+      "spanZ": 993.91
     },
-    "pointsCount": 2061
+    "pointsCount": 2084
   }
 ]

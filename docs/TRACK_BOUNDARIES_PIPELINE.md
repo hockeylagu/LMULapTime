@@ -52,9 +52,17 @@ Tracks are acquired through a 3-tier hierarchy:
 - **Format**: High-frequency metric survey points `# x_m, y_m, w_tr_right_m, w_tr_left_m`.
 - **Processing**: Standard Procrustes similarity alignment ($s, \theta, t_x, t_z$) matching LMU replay telemetry. LMU modeling scale matches TUM to within $0.05\%$.
 
-### Tier 2: Curvature-Adaptive Centerlines (Track-Atlas / OSM GPS)
-- **Source**: [tobi/track-atlas](https://github.com/tobi/track-atlas) & OpenStreetMap
-- **Included Tracks (6)**: Circuit de la Sarthe (24h Le Mans), Autodromo Enzo e Dino Ferrari (Imola), Daytona Road Course, Fuji Speedway (GP), WeatherTech Raceway Laguna Seca, Sebring International Raceway (Full WEC).
+### Tier 2: Curvature-Adaptive Centerlines (Track-Atlas / OpenStreetMap GPS)
+- **Source**: [tobi/track-atlas](https://github.com/tobi/track-atlas) & [OpenStreetMap](https://www.openstreetmap.org)
+- **Included Tracks (8)**:
+  - Circuit de la Sarthe (24h Le Mans) [track-atlas]
+  - Autodromo Enzo e Dino Ferrari (Imola) [track-atlas]
+  - Daytona Road Course (OSM Relation 5254136 with Le Mans Chicane)
+  - Algarve International Circuit / Portimão (OSM Relation 7509968)
+  - Paul Ricard 1A-V2 (OSM Relation 17590236)
+  - Fuji Speedway GP [track-atlas]
+  - WeatherTech Raceway Laguna Seca [track-atlas]
+  - Sebring International Raceway Full WEC [track-atlas]
 - **Format**: WGS-84 GPS coordinates `[lon, lat]`.
 - **Processing**:
   1. Transverse Mercator projection to metric coordinates $(x, y)$.
@@ -65,15 +73,13 @@ Tracks are acquired through a 3-tier hierarchy:
 
 ### Tier 3: Layout Variants & Custom Connectors (LMU Native Telemetry Corridors)
 - **Source**: High-frequency replay streams stored in `server/lmu_cache.db`.
-- **Included Layouts (8)**:
+- **Included Layouts (6)**:
   - `monza_curvagrande`: Autodromo Nazionale Monza bypassing Prima Variante.
   - `fuji_classic`: Fuji Speedway straight bypassing Dunlop chicane.
   - `bahrain_outer`: Bahrain Outer Circuit.
   - `bahrain_paddock`: Bahrain Paddock Circuit.
-  - `portimao_wec`: Algarve International Circuit (WEC 2023 layout with T1-T2 hairpin connector).
   - `sebring_school`: Sebring School Circuit.
   - `qatar_short`: Lusail Short Circuit.
-  - `paul_ricard_1a_v2_short`: Paul Ricard 1A-V2-Short layout.
 - **Processing**:
   Clean flying laps extracted from the replay cache provide ground truth physics coordinates in native 1:1 metric space ($s = 1.0, \theta = 0.0^\circ$). Unit normals are derived to project standard FIA corridor widths, perfectly matching connected parent tracks.
 
@@ -95,15 +101,15 @@ Tracks are acquired through a 3-tier hierarchy:
 | `bahrain_outer` | `bahrain` | `outer` | Bahrain International Circuit | Bahrain Outer Circuit | 3,487.9 m | telemetry-corridor |
 | `bahrain_paddock` | `bahrain` | `paddock` | Bahrain International Circuit | Bahrain Paddock Circuit | 3,836.8 m | telemetry-corridor |
 | `imola_gp` | `imola` | `gp` | Autodromo Enzo e Dino Ferrari | Autodromo Enzo e Dino Ferrari | 4,901.4 m | track-atlas |
-| `daytona_road_course` | `daytona` | `road_course` | Daytona International Speedway | Daytona International Speedway Road Course | 5,680.1 m | track-atlas |
+| `daytona_road_course` | `daytona` | `road_course` | Daytona International Speedway | Daytona International Speedway Road Course | 5,721.5 m | OpenStreetMap |
 | `fuji_chicane` | `fuji` | `chicane` | Fuji Speedway | Fuji Speedway | 4,535.4 m | track-atlas |
 | `fuji_classic` | `fuji` | `classic` | Fuji Speedway | Fuji Speedway Classic | 4,471.5 m | telemetry-corridor |
-| `portimao_wec` | `portimao` | `wec` | Algarve International Circuit | Algarve International Circuit | 4,695.3 m | telemetry-corridor |
+| `portimao_wec` | `portimao` | `wec` | Algarve International Circuit | Algarve International Circuit | 4,666.8 m | OpenStreetMap |
 | `sebring_full` | `sebring` | `full` | Sebring International Raceway | Sebring International Raceway | 5,858.4 m | track-atlas |
 | `sebring_school` | `sebring` | `school` | Sebring International Raceway | Sebring School Circuit | 3,079.8 m | telemetry-corridor |
 | `laguna_seca` | `laguna_seca`| `full` | WeatherTech Raceway Laguna Seca | WeatherTech Raceway Laguna Seca | 3,599.9 m | track-atlas |
 | `qatar_short` | `qatar` | `short` | Lusail International Circuit | Lusail Short Circuit | 3,660.7 m | telemetry-corridor |
-| `paul_ricard_1a_v2_short` | `paul_ricard`| `1a_v2_short`| Paul Ricard Circuit | Paul Ricard - 1A-V2-Short | 5,145.4 m | telemetry-corridor |
+| `paul_ricard_1a_v2_short` | `paul_ricard`| `1a_v2_short`| Paul Ricard Circuit | Paul Ricard - 1A-V2-Short | 5,192.8 m | OpenStreetMap |
 
 ---
 

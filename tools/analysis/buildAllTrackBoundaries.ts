@@ -44,8 +44,9 @@ export interface TrackConfig {
   layoutId: string;
   trackVenue: string;
   trackCourse: string;
-  sourceType: 'TUM' | 'atlas' | 'telemetry';
+  sourceType: 'TUM' | 'atlas' | 'telemetry' | 'osm';
   sourceFile?: string;
+  osmRelationId?: number;
   replayPattern: string;
   preferredLap?: number;
   nominalWidthM: number;
@@ -213,10 +214,11 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'road_course',
     trackVenue: 'Daytona International Speedway',
     trackCourse: 'Daytona International Speedway Road Course',
-    sourceType: 'atlas',
-    sourceFile: 'daytona_gp.geojson',
-    replayPattern: 'Daytona International Speedway Road Course P1 16.Vcr',
-    preferredLap: 2,
+    sourceType: 'osm',
+    sourceFile: 'daytona_road_course.geojson',
+    osmRelationId: 5254136,
+    replayPattern: 'Daytona International Speedway Road Course R1 7.Vcr',
+    preferredLap: -1,
     nominalWidthM: 13.0,
   },
   // 14. Fuji Speedway (GP)
@@ -251,7 +253,9 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'wec',
     trackVenue: 'Algarve International Circuit',
     trackCourse: 'Algarve International Circuit',
-    sourceType: 'telemetry',
+    sourceType: 'osm',
+    sourceFile: 'portimao_wec.geojson',
+    osmRelationId: 7509968,
     replayPattern: 'Algarve International Circuit P1 47.Vcr',
     preferredLap: 2,
     nominalWidthM: 14.0,
@@ -313,7 +317,9 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: '1a_v2_short',
     trackVenue: 'Paul Ricard Circuit',
     trackCourse: 'Paul Ricard - 1A-V2-Short',
-    sourceType: 'telemetry',
+    sourceType: 'osm',
+    sourceFile: 'paul_ricard_1a_v2_short.geojson',
+    osmRelationId: 17590236,
     replayPattern: 'Paul Ricard - 1A-V2-Short P1 2.Vcr',
     preferredLap: 2,
     nominalWidthM: 12.0,
@@ -493,9 +499,12 @@ function findSimilarityTransform(source: Point2D[], target: Point2D[]): {
 }
 
 function loadReplayLap(db: any, filename: string, lapKey: number): Array<{ x: number; z: number }> {
-  let row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? AND lap_key = ?').get(filename, lapKey);
+  let row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ?').get(filename, `%${filename}%`, lapKey);
+  if (!row && lapKey !== -1) {
+    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1').get(filename, `%${filename}%`);
+  }
   if (!row) {
-    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? LIMIT 1').get(filename);
+    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) ORDER BY points_count DESC LIMIT 1').get(filename, `%${filename}%`);
   }
   if (!row) {
     throw new Error(`Replay trajectory not found for ${filename}`);
@@ -525,6 +534,56 @@ async function ensureSourceFile(cfg: TrackConfig): Promise<string> {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to download Track-Atlas file: ${res.statusText}`);
     fs.writeFileSync(localPath, await res.text(), 'utf8');
+  } else if (cfg.sourceType === 'osm') {
+    console.log(`Fetching OpenStreetMap relation ${cfg.osmRelationId}...`);
+    const res = await fetch(`https://api.openstreetmap.org/api/0.6/relation/${cfg.osmRelationId}/full.json`, {
+      headers: { 'User-Agent': 'LMULapTime-Analyzer/1.0' },
+    });
+    if (!res.ok) throw new Error(`Failed to fetch OSM relation ${cfg.osmRelationId}: ${res.statusText}`);
+    const data = await res.json();
+    const nodesMap = new Map<number, [number, number]>();
+    for (const e of (data as any).elements) {
+      if (e.type === 'node') nodesMap.set(e.id, [e.lon, e.lat]);
+    }
+    const rel = (data as any).elements.find((e: any) => e.type === 'relation');
+    let wayOrder: number[] = [];
+    if (cfg.osmRelationId === 5254136) {
+      // Daytona: custom order ensures Le Mans chicane is traversed
+      wayOrder = [
+        352067004, 352070311, 198466856, 352070316, 352696267,
+        352104911, 352104914, 1315971773, 352070313, 352104912,
+        352070310, 352070308
+      ];
+    } else if (rel) {
+      wayOrder = rel.members.filter((m: any) => m.type === 'way').map((m: any) => m.ref);
+    }
+    const waysMap = new Map<number, any>();
+    for (const e of (data as any).elements) {
+      if (e.type === 'way') waysMap.set(e.id, e);
+    }
+    const coords: Array<[number, number]> = [];
+    for (const wid of wayOrder) {
+      const w = waysMap.get(wid);
+      if (w) {
+        for (let i = 0; i < w.nodes.length - 1; i++) {
+          const pt = nodesMap.get(w.nodes[i]);
+          if (pt) coords.push(pt);
+        }
+      }
+    }
+    if (coords.length > 0) coords.push(coords[0]);
+    const geojson = {
+      type: 'FeatureCollection',
+      name: `${cfg.trackCourse} (OpenStreetMap)`,
+      features: [
+        {
+          type: 'Feature',
+          properties: { name: cfg.trackCourse, source: `OpenStreetMap relation ${cfg.osmRelationId}` },
+          geometry: { type: 'LineString', coordinates: coords },
+        },
+      ],
+    };
+    fs.writeFileSync(localPath, JSON.stringify(geojson, null, 2), 'utf8');
   }
   return localPath;
 }
@@ -633,7 +692,7 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
 
     console.log(`TUM Alignment: scale=${transformInfo.scale}, rot=${transformInfo.rotationDeg}°, rmse=${transformInfo.rmse}m`);
 
-  } else if (cfg.sourceType === 'atlas') {
+  } else if (cfg.sourceType === 'atlas' || cfg.sourceType === 'osm') {
     const atlasPath = await ensureSourceFile(cfg);
     const geojson = JSON.parse(fs.readFileSync(atlasPath, 'utf8'));
     const feature0 = geojson.features.find((f: any) => f.geometry.type === 'LineString') || geojson.features[0];
@@ -751,7 +810,7 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     trackVenue: cfg.trackVenue,
     trackCourse: cfg.trackCourse,
     lengthM: Number(lengthM.toFixed(1)),
-    source: cfg.sourceType === 'TUM' ? 'TUM-survey' : cfg.sourceType === 'atlas' ? 'track-atlas' : 'telemetry-corridor',
+    source: cfg.sourceType === 'TUM' ? 'TUM-survey' : cfg.sourceType === 'osm' ? 'OpenStreetMap' : cfg.sourceType === 'atlas' ? 'track-atlas' : 'telemetry-corridor',
     transform: transformInfo,
     bounds: {
       minX,
