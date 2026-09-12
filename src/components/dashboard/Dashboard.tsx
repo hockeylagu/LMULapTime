@@ -57,6 +57,7 @@ export interface SessionSummary {
 export interface DashboardProps {
   sessions: SessionSummary[];
   onSelectSession: (id: string) => void;
+  onOpenReplay?: (id: string) => void;
   selectedTrack: string;
   setSelectedTrack: (track: string) => void;
   selectedCarClass: string;
@@ -70,6 +71,7 @@ export interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   sessions,
   onSelectSession,
+  onOpenReplay,
   selectedTrack,
   setSelectedTrack,
   selectedCarClass,
@@ -183,6 +185,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <SessionList
             sessions={sortedSessions}
             onSelectSession={onSelectSession}
+            onOpenReplay={onOpenReplay}
             showTrackColumn={true}
             headerTitle={
               <>

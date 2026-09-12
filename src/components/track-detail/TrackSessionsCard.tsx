@@ -12,6 +12,7 @@ export interface TrackSessionsCardProps {
   hideEmpty: boolean;
   setHideEmpty: (val: boolean) => void;
   onSelectSession: (id: string) => void;
+  onOpenReplay?: (id: string) => void;
   filterType: string;
   setFilterType: (val: string) => void;
   searchQuery: string;
@@ -30,6 +31,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   hideEmpty,
   setHideEmpty,
   onSelectSession,
+  onOpenReplay,
   filterType,
   setFilterType,
   searchQuery,
@@ -44,6 +46,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
       <SessionList
         sessions={sortedSessions}
         onSelectSession={onSelectSession}
+        onOpenReplay={onOpenReplay}
         showTrackColumn={false}
         headerTitle={
           <>

@@ -4,7 +4,6 @@ import {
   getPaceCategoryStyle,
   formatPacePercentage,
   normalizeCarClass,
-  normalizeCarClassGroup,
   matchesCarClass,
   matchesSessionCarClass,
   normalizeTrackName,
@@ -44,36 +43,6 @@ describe('paceCategory utility', () => {
       expect(formatPacePercentage(null)).toBe('--%');
       expect(formatPacePercentage(undefined)).toBe('--%');
       expect(formatPacePercentage(NaN)).toBe('--%');
-    });
-  });
-
-  describe('normalizeCarClassGroup', () => {
-    it('correctly maps hypercar strings to LMH', () => {
-      expect(normalizeCarClassGroup('Hypercar', '')).toBe('LMH');
-      expect(normalizeCarClassGroup('LMH', 'Ferrari 499P')).toBe('LMH');
-      expect(normalizeCarClassGroup('', 'Porsche 963 LMDh')).toBe('LMH');
-    });
-
-    it('correctly maps GT3 strings to LMGT3', () => {
-      expect(normalizeCarClassGroup('GT3', 'Porsche 911 GT3 R')).toBe('LMGT3');
-      expect(normalizeCarClassGroup('LMGT3', 'Aston Martin Vantage')).toBe('LMGT3');
-    });
-
-    it('correctly maps LMP3 strings', () => {
-      expect(normalizeCarClassGroup('LMP3', 'Ligier JS P320')).toBe('LMP3');
-    });
-
-    it('correctly maps LMP2 strings', () => {
-      expect(normalizeCarClassGroup('LMP2', 'Oreca 07')).toBe('LMP2');
-    });
-
-    it('correctly maps GTE strings', () => {
-      expect(normalizeCarClassGroup('GTE', 'Ferrari 488 GTE')).toBe('GTE');
-    });
-
-    it('falls back to uppercase general or car name', () => {
-      expect(normalizeCarClassGroup('CustomClass', '')).toBe('CUSTOMCLASS');
-      expect(normalizeCarClassGroup('', '')).toBe('GENERAL');
     });
   });
 

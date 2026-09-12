@@ -173,6 +173,10 @@ export default function App() {
     window.location.hash = `session/${encodeURIComponent(id)}`;
   };
 
+  const handleOpenReplay = (id: string) => {
+    window.location.hash = `session/${encodeURIComponent(id)}?replay=1`;
+  };
+
   const handleBackToSessions = () => {
     if (window.location.hash.startsWith('#session/')) {
       if (window.history.length > 1) {
@@ -230,6 +234,7 @@ export default function App() {
             trackName={selectedRouteTrackName}
             onBack={() => { window.location.hash = 'tracks'; }}
             onSelectSession={handleSelectSession}
+            onOpenReplay={handleOpenReplay}
             selectedCarClass={selectedCarClass}
             setSelectedCarClass={setSelectedCarClass}
             progression={progression}
@@ -238,6 +243,7 @@ export default function App() {
           <Dashboard
             sessions={sessions}
             onSelectSession={handleSelectSession}
+            onOpenReplay={handleOpenReplay}
             selectedTrack={selectedTrack}
             setSelectedTrack={setSelectedTrack}
             selectedCarClass={selectedCarClass}

@@ -6,6 +6,7 @@ import { PaceCategory } from '../../../server/types';
 export interface SessionTableViewProps {
   sessions: SessionListItem[];
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
   resolvePaceBadge: (session: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
 }
@@ -13,6 +14,7 @@ export interface SessionTableViewProps {
 export const SessionTableView: React.FC<SessionTableViewProps> = ({
   sessions,
   onSelectSession,
+  onOpenReplay,
   showTrackColumn = true,
   resolvePaceBadge,
 }) => {
@@ -38,6 +40,7 @@ export const SessionTableView: React.FC<SessionTableViewProps> = ({
               key={s.id}
               session={s}
               onSelectSession={onSelectSession}
+              onOpenReplay={onOpenReplay}
               showTrackColumn={showTrackColumn}
               paceBadge={resolvePaceBadge(s)}
             />

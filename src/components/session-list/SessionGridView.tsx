@@ -6,6 +6,7 @@ import { PaceCategory } from '../../../server/types';
 export interface SessionGridViewProps {
   sessions: SessionListItem[];
   onSelectSession: (sessionId: string) => void;
+  onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
   resolvePaceBadge: (session: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
 }
@@ -13,6 +14,7 @@ export interface SessionGridViewProps {
 export const SessionGridView: React.FC<SessionGridViewProps> = ({
   sessions,
   onSelectSession,
+  onOpenReplay,
   showTrackColumn = true,
   resolvePaceBadge,
 }) => {
@@ -23,6 +25,7 @@ export const SessionGridView: React.FC<SessionGridViewProps> = ({
           key={s.id}
           session={s}
           onSelectSession={onSelectSession}
+          onOpenReplay={onOpenReplay}
           showTrackColumn={showTrackColumn}
           paceBadge={resolvePaceBadge(s)}
         />

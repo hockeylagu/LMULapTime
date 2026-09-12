@@ -103,19 +103,6 @@ export function normalizeCarClass(carClass?: string, carType: string = ''): stri
   return carClass || '';
 }
 
-export function normalizeCarClassGroup(carClass?: string, carType?: string): string {
-  const norm = normalizeCarClass(carClass, carType);
-  if (norm === 'LMH' || norm === 'LMGT3' || norm === 'GTE' || norm === 'LMP3') {
-    return norm;
-  }
-  if (norm === 'LMP2elms' || norm === 'LMP2wec') {
-    return 'LMP2';
-  }
-  return (carClass || carType || 'General').toUpperCase();
-}
-
-
-
 export interface CarClassOption {
   id: string;
   label: string;
