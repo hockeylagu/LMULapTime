@@ -11,6 +11,7 @@ This document provides architectural standards, domain rules, coding conventions
 ### Key Capabilities:
 - **XML Session Log Parsing**: Extracts timing, lap splits (S1/S2/S3), sector speeds, tire degradation, fuel consumption, driver classifications, and penalties from LMU's `UserData/LOG/Results/*.xml`.
 - **Binary Replay (`.Vcr`) Parsing**: Custom reverse-engineered parser for native `gMb1.002f` binary replay files, extracting high-frequency 2D racing lines, yaw, throttle/brake inputs, steering, gear, and 4-wheel corner telemetry (tire carcass/inner temps, rotor temps, dynamic wear).
+- **Physical Track Boundaries & Limit Corridors**: Automated extraction, synthesis, and 1-step Procrustes alignment of physical road boundaries (`leftBoundary`, `rightBoundary`, `centerline`) in LMU world space across all 21 driven layouts using TUM survey data, Track-Atlas/OSM GPS, and native telemetry corridors.
 - **Track Layout Matching**: Disambiguates circuit variations (e.g. Monza GP vs. Curva Grande, Bahrain GP vs. Outer vs. Paddock, Paul Ricard Full vs. Short, Sebring Full vs. School).
 - **Community Benchmark Tracking**: Synchronizes alien reference targets from Google Sheets with automated diff calculation (new, updated, deprecated targets).
 - **Deterministic Coaching Engine**: Ranks driving technique deficits (braking points, trail braking release, throttle application, apex speeds) using deterministic evidence (`priority = estimatedTimeLoss * repeatability * confidence`).
@@ -37,7 +38,7 @@ This document provides architectural standards, domain rules, coding conventions
 
 ### Tooling & Native Utilities
 - **C# .NET 8 Telemetry Recorder**: `tools/telemetry-recorder/` (probes and records live memory-mapped telemetry).
-- **TSX Scripts**: `tools/analysis/` for offline correlation and reverse engineering.
+- **TSX Scripts & Boundary Pipeline**: `tools/analysis/` (`buildAllTrackBoundaries.ts`, offline correlation and reverse engineering).
 
 ---
 
@@ -45,19 +46,23 @@ This document provides architectural standards, domain rules, coding conventions
 
 ```
 LMULapTime/
-├── docs/                   # Reverse-engineered formats, specs & coaching plans
-│   ├── XML_FORMAT.md       # LMU XML Results log schema specification
-│   ├── VCR_FORMAT.md       # Binary VCR header and stream packet layout
-│   └── VCR_ANALYSIS.md     # Technical deep-dive on binary decoding
-├── server/                 # Express backend & ingestion pipeline
-│   ├── index.ts            # API routes and server entry
-│   ├── db.ts               # Better-SQLite3 database abstraction & caching
-│   ├── parser.ts           # XML session log parser & profile auto-detector
-│   ├── replayParser.ts     # Binary .Vcr parser (trajectories, 4-corner telemetry)
-│   ├── referenceLaptimes.ts# Google Sheets CSV benchmark scraper & diff engine
-│   ├── aiReport.ts         # Gemini AI race engineer analysis
-│   └── types.ts            # Shared TypeScript interfaces & types
-├── src/                    # React frontend
+├── docs/                           # Reverse-engineered formats, specs & coaching plans
+│   ├── XML_FORMAT.md               # LMU XML Results log schema specification
+│   ├── VCR_FORMAT.md               # Binary VCR header and stream packet layout
+│   ├── VCR_ANALYSIS.md             # Technical deep-dive on binary decoding
+│   └── TRACK_BOUNDARIES_PIPELINE.md# Track boundary synthesis and addition guide
+├── server/                         # Express backend & ingestion pipeline
+│   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index
+│   ├── index.ts                    # API routes and server entry
+│   ├── db.ts                       # Better-SQLite3 database abstraction & caching
+│   ├── parser.ts                   # XML session log parser & profile auto-detector
+│   ├── replayParser.ts             # Binary .Vcr parser (trajectories, 4-corner telemetry)
+│   ├── referenceLaptimes.ts        # Google Sheets CSV benchmark scraper & diff engine
+│   ├── aiReport.ts                 # Gemini AI race engineer analysis
+│   └── types.ts                    # Shared TypeScript interfaces & types
+├── public/                         # Public client-side assets
+│   └── tracks/                     # Mirrored track boundary JSON files for GPS map
+├── src/                            # React frontend
 │   ├── App.tsx             # Root app component, tabs & global state
 │   ├── components/         # Modular UI features
 │   │   ├── common/         # Badges, modals, loading spinners, metric cards
@@ -120,6 +125,12 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Ensure streaming/downsampling functions (`downsampleReplayTrajectory`) preserve apex minimum speeds, maximum straight speeds, and braking initiation points while preventing frontend memory exhaustion.
 - Cache processed trajectories and metadata in SQLite (`server/db.ts`) with appropriate hash/timestamp invalidation.
 
+### E. Physical Track Boundaries & Metric Integrity
+- All track boundaries (`leftBoundary`, `rightBoundary`, `centerline`) stored in `server/data/tracks/` and `public/tracks/` **must be strictly expressed in LMU local Cartesian coordinates** (`x, z` in meters).
+- Alignment scale factors ($s$) relative to real LMU replay telemetry must adhere to $0.99 < s < 1.01$ (exact 1:1 metric modeling).
+- Never cross-pollinate track geometries across distinct layout variants of the same facility.
+- When a new track or layout is driven, follow the procedure in `docs/TRACK_BOUNDARIES_PIPELINE.md` using `tools/analysis/buildAllTrackBoundaries.ts`.
+
 ---
 
 ## 5. Coding & Architecture Conventions
@@ -151,7 +162,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with over 530 tests. Any change must preserve this coverage.
+The repository maintains an extensive automated test suite with over 579 tests. Any change must preserve this coverage.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`
@@ -169,9 +180,9 @@ The repository maintains an extensive automated test suite with over 530 tests. 
 
 ## 7. Recommended Development Workflow
 
-1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/parser.ts`), replay decoding (`server/replayParser.ts`), database cache (`server/db.ts`), or UI views (`src/components/`).
+1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/parser.ts`), replay decoding (`server/replayParser.ts`), database cache (`server/db.ts`), track boundaries (`tools/analysis/buildAllTrackBoundaries.ts`), or UI views (`src/components/`).
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
-   - Run `npm test` to verify no regressions across the 530+ unit/integration tests.
+   - Run `npm test` to verify no regressions across the 579+ unit/integration tests.
    - Run `npm run build` to verify clean TypeScript compilation and bundle generation.
 4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants.

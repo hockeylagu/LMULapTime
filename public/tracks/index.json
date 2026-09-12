@@ -1,0 +1,380 @@
+[
+  {
+    "layoutKey": "monza_gp",
+    "circuitId": "monza",
+    "layoutId": "gp",
+    "trackVenue": "Autodromo Nazionale Monza",
+    "trackCourse": "Autodromo Nazionale Monza",
+    "lengthM": 5787.7,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -317.79,
+      "maxX": 950.54,
+      "minZ": -945.5,
+      "maxZ": 1234.45,
+      "spanX": 1268.33,
+      "spanZ": 2179.95
+    },
+    "pointsCount": 1159
+  },
+  {
+    "layoutKey": "monza_curvagrande",
+    "circuitId": "monza",
+    "layoutId": "curvagrande",
+    "trackVenue": "Autodromo Nazionale Monza",
+    "trackCourse": "Monza Curva Grande Circuit",
+    "lengthM": 5730.6,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -318.68,
+      "maxX": 947.33,
+      "minZ": -955.03,
+      "maxZ": 1234.57,
+      "spanX": 1266.01,
+      "spanZ": 2189.6
+    },
+    "pointsCount": 2293
+  },
+  {
+    "layoutKey": "spa_gp",
+    "circuitId": "spa",
+    "layoutId": "gp",
+    "trackVenue": "Circuit de Spa-Francorchamps",
+    "trackCourse": "Circuit de Spa-Francorchamps",
+    "lengthM": 6968.9,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -571.31,
+      "maxX": 704.62,
+      "minZ": -1058.99,
+      "maxZ": 990.45,
+      "spanX": 1275.93,
+      "spanZ": 2049.44
+    },
+    "pointsCount": 1401
+  },
+  {
+    "layoutKey": "sarthe_full",
+    "circuitId": "sarthe",
+    "layoutId": "full",
+    "trackVenue": "Circuit de la Sarthe",
+    "trackCourse": "Circuit de la Sarthe",
+    "lengthM": 13621.2,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -186.65,
+      "maxX": 2381.18,
+      "minZ": -3102.17,
+      "maxZ": 2367.76,
+      "spanX": 2567.83,
+      "spanZ": 5469.93
+    },
+    "pointsCount": 5450
+  },
+  {
+    "layoutKey": "cota_gp",
+    "circuitId": "cota",
+    "layoutId": "gp",
+    "trackVenue": "Circuit of the Americas",
+    "trackCourse": "Circuit of the Americas",
+    "lengthM": 5509.2,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -778.87,
+      "maxX": 1069.27,
+      "minZ": -653.61,
+      "maxZ": 430.72,
+      "spanX": 1848.14,
+      "spanZ": 1084.33
+    },
+    "pointsCount": 1102
+  },
+  {
+    "layoutKey": "barcelona_gp",
+    "circuitId": "barcelona",
+    "layoutId": "gp",
+    "trackVenue": "Circuit de Barcelona",
+    "trackCourse": "Circuit de Barcelona",
+    "lengthM": 4648.3,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -659.19,
+      "maxX": 327.26,
+      "minZ": -498,
+      "maxZ": 669.58,
+      "spanX": 986.45,
+      "spanZ": 1167.58
+    },
+    "pointsCount": 931
+  },
+  {
+    "layoutKey": "interlagos_gp",
+    "circuitId": "interlagos",
+    "layoutId": "gp",
+    "trackVenue": "Autódromo José Carlos Pace",
+    "trackCourse": "Autódromo José Carlos Pace",
+    "lengthM": 4281.7,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -169.82,
+      "maxX": 509.33,
+      "minZ": -458.6,
+      "maxZ": 596.06,
+      "spanX": 679.15,
+      "spanZ": 1054.66
+    },
+    "pointsCount": 862
+  },
+  {
+    "layoutKey": "silverstone_wec",
+    "circuitId": "silverstone",
+    "layoutId": "gp",
+    "trackVenue": "Silverstone Circuit",
+    "trackCourse": "Silverstone Grand Prix Circuit - WEC",
+    "lengthM": 5869.8,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -494.42,
+      "maxX": 555.74,
+      "minZ": -857.65,
+      "maxZ": 860.19,
+      "spanX": 1050.16,
+      "spanZ": 1717.84
+    },
+    "pointsCount": 1178
+  },
+  {
+    "layoutKey": "bahrain_wec",
+    "circuitId": "bahrain",
+    "layoutId": "wec",
+    "trackVenue": "Bahrain International Circuit",
+    "trackCourse": "Bahrain International Circuit",
+    "lengthM": 5390.6,
+    "source": "TUM-survey",
+    "bounds": {
+      "minX": -240.59,
+      "maxX": 588.65,
+      "minZ": -741.4,
+      "maxZ": 475.35,
+      "spanX": 829.24,
+      "spanZ": 1216.75
+    },
+    "pointsCount": 1082
+  },
+  {
+    "layoutKey": "bahrain_outer",
+    "circuitId": "bahrain",
+    "layoutId": "outer",
+    "trackVenue": "Bahrain International Circuit",
+    "trackCourse": "Bahrain Outer Circuit",
+    "lengthM": 3487.9,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -242.38,
+      "maxX": 618.09,
+      "minZ": -732.24,
+      "maxZ": 468.1,
+      "spanX": 860.47,
+      "spanZ": 1200.34
+    },
+    "pointsCount": 1397
+  },
+  {
+    "layoutKey": "bahrain_paddock",
+    "circuitId": "bahrain",
+    "layoutId": "paddock",
+    "trackVenue": "Bahrain International Circuit",
+    "trackCourse": "Bahrain Paddock Circuit",
+    "lengthM": 3836.8,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -241.79,
+      "maxX": 495.21,
+      "minZ": -734.98,
+      "maxZ": 465.34,
+      "spanX": 737,
+      "spanZ": 1200.32
+    },
+    "pointsCount": 1537
+  },
+  {
+    "layoutKey": "imola_gp",
+    "circuitId": "imola",
+    "layoutId": "gp",
+    "trackVenue": "Autodromo Enzo e Dino Ferrari",
+    "trackCourse": "Autodromo Enzo e Dino Ferrari",
+    "lengthM": 4901.4,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -1146.5,
+      "maxX": 677.91,
+      "minZ": -877.64,
+      "maxZ": 148.96,
+      "spanX": 1824.41,
+      "spanZ": 1026.6
+    },
+    "pointsCount": 1964
+  },
+  {
+    "layoutKey": "daytona_road_course",
+    "circuitId": "daytona",
+    "layoutId": "road_course",
+    "trackVenue": "Daytona International Speedway",
+    "trackCourse": "Daytona International Speedway Road Course",
+    "lengthM": 5680.1,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -321.05,
+      "maxX": 887.71,
+      "minZ": -1040.25,
+      "maxZ": 394.01,
+      "spanX": 1208.76,
+      "spanZ": 1434.26
+    },
+    "pointsCount": 2294
+  },
+  {
+    "layoutKey": "fuji_chicane",
+    "circuitId": "fuji",
+    "layoutId": "chicane",
+    "trackVenue": "Fuji Speedway",
+    "trackCourse": "Fuji Speedway",
+    "lengthM": 4535.4,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -662.5,
+      "maxX": 624.85,
+      "minZ": -816.51,
+      "maxZ": 469.92,
+      "spanX": 1287.35,
+      "spanZ": 1286.43
+    },
+    "pointsCount": 1823
+  },
+  {
+    "layoutKey": "fuji_classic",
+    "circuitId": "fuji",
+    "layoutId": "classic",
+    "trackVenue": "Fuji Speedway",
+    "trackCourse": "Fuji Speedway Classic",
+    "lengthM": 4471.5,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -658.04,
+      "maxX": 630.45,
+      "minZ": -813.99,
+      "maxZ": 461.59,
+      "spanX": 1288.49,
+      "spanZ": 1275.58
+    },
+    "pointsCount": 1791
+  },
+  {
+    "layoutKey": "portimao_wec",
+    "circuitId": "portimao",
+    "layoutId": "wec",
+    "trackVenue": "Algarve International Circuit",
+    "trackCourse": "Algarve International Circuit",
+    "lengthM": 4695.3,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -275.59,
+      "maxX": 418.23,
+      "minZ": -627.69,
+      "maxZ": 553.63,
+      "spanX": 693.82,
+      "spanZ": 1181.32
+    },
+    "pointsCount": 1882
+  },
+  {
+    "layoutKey": "sebring_full",
+    "circuitId": "sebring",
+    "layoutId": "full",
+    "trackVenue": "Sebring International Raceway",
+    "trackCourse": "Sebring International Raceway",
+    "lengthM": 5858.4,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -563.38,
+      "maxX": 651.37,
+      "minZ": -220.71,
+      "maxZ": 789.62,
+      "spanX": 1214.75,
+      "spanZ": 1010.33
+    },
+    "pointsCount": 2348
+  },
+  {
+    "layoutKey": "sebring_school",
+    "circuitId": "sebring",
+    "layoutId": "school",
+    "trackVenue": "Sebring International Raceway",
+    "trackCourse": "Sebring School Circuit",
+    "lengthM": 3079.8,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -497.83,
+      "maxX": 652.5,
+      "minZ": -220.01,
+      "maxZ": 359.65,
+      "spanX": 1150.33,
+      "spanZ": 579.66
+    },
+    "pointsCount": 1233
+  },
+  {
+    "layoutKey": "laguna_seca",
+    "circuitId": "laguna_seca",
+    "layoutId": "full",
+    "trackVenue": "WeatherTech Raceway Laguna Seca",
+    "trackCourse": "WeatherTech Raceway Laguna Seca",
+    "lengthM": 3599.9,
+    "source": "track-atlas",
+    "bounds": {
+      "minX": -408.65,
+      "maxX": 388.18,
+      "minZ": -503.37,
+      "maxZ": 487.43,
+      "spanX": 796.83,
+      "spanZ": 990.8
+    },
+    "pointsCount": 1441
+  },
+  {
+    "layoutKey": "qatar_short",
+    "circuitId": "qatar",
+    "layoutId": "short",
+    "trackVenue": "Lusail International Circuit",
+    "trackCourse": "Lusail Short Circuit",
+    "lengthM": 3660.7,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -350.61,
+      "maxX": 907.67,
+      "minZ": -338.64,
+      "maxZ": 728.96,
+      "spanX": 1258.28,
+      "spanZ": 1067.6
+    },
+    "pointsCount": 1465
+  },
+  {
+    "layoutKey": "paul_ricard_1a_v2_short",
+    "circuitId": "paul_ricard",
+    "layoutId": "1a_v2_short",
+    "trackVenue": "Paul Ricard Circuit",
+    "trackCourse": "Paul Ricard - 1A-V2-Short",
+    "lengthM": 5145.4,
+    "source": "telemetry-corridor",
+    "bounds": {
+      "minX": -1159.52,
+      "maxX": 975.03,
+      "minZ": -265.79,
+      "maxZ": 733.37,
+      "spanX": 2134.55,
+      "spanZ": 999.16
+    },
+    "pointsCount": 2061
+  }
+]
