@@ -50,3 +50,10 @@ server/lmu_cache.db*
 *.db-wal
 *.db-shm
 coverage/
+
+# Temporary test fixtures
+test/fixtures/*_temp/
+test/fixtures/replays_temp/
+test/fixtures/replays_db_temp/
+test/fixtures/replays_api_temp/
+
