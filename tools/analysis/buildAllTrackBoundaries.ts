@@ -15,7 +15,7 @@ export interface TrackBoundaryGeometry {
   trackVenue: string;
   trackCourse: string;
   lengthM: number;
-  source: 'TUM-survey' | 'track-atlas' | 'OSM-FIA-profile' | 'telemetry-corridor';
+  source: string;
   transform?: {
     scale: number;
     rotationDeg: number;
@@ -36,6 +36,7 @@ export interface TrackBoundaryGeometry {
   centerline: Array<[number, number]>;
   nominalWidthM: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface TrackConfig {
@@ -44,9 +45,10 @@ export interface TrackConfig {
   layoutId: string;
   trackVenue: string;
   trackCourse: string;
-  sourceType: 'TUM' | 'atlas' | 'telemetry' | 'osm';
+  sourceType: 'TUM' | 'atlas' | 'telemetry' | 'osm' | 'hybrid';
   sourceFile?: string;
   osmRelationId?: number;
+  parentLayoutKey?: string;
   replayPattern: string;
   preferredLap?: number;
   nominalWidthM: number;
@@ -74,9 +76,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'curvagrande',
     trackVenue: 'Autodromo Nazionale Monza',
     trackCourse: 'Monza Curva Grande Circuit',
-    sourceType: 'telemetry',
-    replayPattern: 'Monza Curva Grande Circuit P1 15.Vcr',
-    preferredLap: 3,
+    sourceType: 'hybrid',
+    parentLayoutKey: 'monza_gp',
+    replayPattern: 'Monza Curva Grande Circuit Q1 5.Vcr',
+    preferredLap: 2,
     nominalWidthM: 12.0,
   },
   // 3. Spa-Francorchamps
@@ -177,7 +180,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'outer',
     trackVenue: 'Bahrain International Circuit',
     trackCourse: 'Bahrain Outer Circuit',
-    sourceType: 'telemetry',
+    sourceType: 'hybrid',
+    parentLayoutKey: 'bahrain_wec',
     replayPattern: 'Bahrain Outer Circuit P1 20.Vcr',
     preferredLap: 2,
     nominalWidthM: 14.0,
@@ -189,7 +193,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'paddock',
     trackVenue: 'Bahrain International Circuit',
     trackCourse: 'Bahrain Paddock Circuit',
-    sourceType: 'telemetry',
+    sourceType: 'hybrid',
+    parentLayoutKey: 'bahrain_wec',
     replayPattern: 'Bahrain Paddock Circuit P1 18.Vcr',
     preferredLap: 2,
     nominalWidthM: 13.0,
@@ -241,7 +246,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'classic',
     trackVenue: 'Fuji Speedway',
     trackCourse: 'Fuji Speedway Classic',
-    sourceType: 'telemetry',
+    sourceType: 'hybrid',
+    parentLayoutKey: 'fuji_chicane',
     replayPattern: 'Fuji Speedway Classic P1 10.Vcr',
     preferredLap: 2,
     nominalWidthM: 15.0,
@@ -280,7 +286,8 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'school',
     trackVenue: 'Sebring International Raceway',
     trackCourse: 'Sebring School Circuit',
-    sourceType: 'telemetry',
+    sourceType: 'hybrid',
+    parentLayoutKey: 'sebring_full',
     replayPattern: 'Sebring School Circuit P1 1.Vcr',
     preferredLap: 3,
     nominalWidthM: 12.0,
@@ -384,8 +391,9 @@ function resamplePolyline(pts: Point2D[], numSamples: number): Point2D[] {
 function resampleStep(pts: Point2D[], stepM: number = 2.5): Point2D[] {
   const clean: Point2D[] = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
-    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-    if (d > 0.3) clean.push(pts[i]);
+    const last = clean[clean.length - 1];
+    const d = Math.hypot(pts[i].x - last.x, pts[i].y - last.y);
+    if (d >= 0.3) clean.push(pts[i]);
   }
   const n = clean.length;
   const cumDists = [0];
@@ -425,14 +433,14 @@ function smoothPolyline(pts: Point2D[], windowSize: number = 5): Point2D[] {
   return smoothed;
 }
 
-function computeCorridorBoundaries(centerline: Point2D[], halfWidthM: number): { left: Point2D[]; right: Point2D[] } {
+function computeCorridorBoundaries(centerline: Point2D[], halfWidthM: number, isClosed: boolean = true): { left: Point2D[]; right: Point2D[] } {
   const m = centerline.length;
   const left: Point2D[] = [];
   const right: Point2D[] = [];
 
   for (let i = 0; i < m; i++) {
-    const prev = centerline[(i - 1 + m) % m];
-    const next = centerline[(i + 1) % m];
+    const prev = isClosed ? centerline[(i - 1 + m) % m] : centerline[Math.max(0, i - 1)];
+    const next = isClosed ? centerline[(i + 1) % m] : centerline[Math.min(m - 1, i + 1)];
     const dx = next.x - prev.x;
     const dy = next.y - prev.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -499,9 +507,15 @@ function findSimilarityTransform(source: Point2D[], target: Point2D[]): {
 }
 
 function loadReplayLap(db: any, filename: string, lapKey: number): Array<{ x: number; z: number }> {
-  let row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ?').get(filename, `%${filename}%`, lapKey);
+  let row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ? AND driver_slot = -1').get(filename, `%${filename}%`, lapKey);
+  if (!row) {
+    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ? ORDER BY points_count DESC').get(filename, `%${filename}%`, lapKey);
+  }
   if (!row && lapKey !== -1) {
-    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1').get(filename, `%${filename}%`);
+    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1 AND driver_slot = -1').get(filename, `%${filename}%`);
+  }
+  if (!row && lapKey !== -1) {
+    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1 ORDER BY points_count DESC').get(filename, `%${filename}%`);
   }
   if (!row) {
     row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) ORDER BY points_count DESC LIMIT 1').get(filename, `%${filename}%`);
@@ -586,6 +600,184 @@ async function ensureSourceFile(cfg: TrackConfig): Promise<string> {
     fs.writeFileSync(localPath, JSON.stringify(geojson, null, 2), 'utf8');
   }
   return localPath;
+}
+
+export function synthesizeHybridTrack(
+  parentGeom: any,
+  telem2D: Point2D[],
+  nominalWidthM: number,
+  divThresholdM: number = 12.0
+): { centerline: Point2D[]; left: Point2D[]; right: Point2D[]; sharedPct: number } {
+  const P_center: Point2D[] = parentGeom.centerline.map(([x, y]: [number, number]) => ({ x, y }));
+  const P_left: Point2D[] = parentGeom.leftBoundary.map(([x, y]: [number, number]) => ({ x, y }));
+  const P_right: Point2D[] = parentGeom.rightBoundary.map(([x, y]: [number, number]) => ({ x, y }));
+  const N_parent = P_center.length;
+
+  const T = smoothPolyline(resampleStep(telem2D, 2.5), 5);
+  const N_telem = T.length;
+
+  // Closest parent search
+  const closestParent: Array<{ i: number; minD: number; k: number }> = [];
+  for (let i = 0; i < N_telem; i++) {
+    let minD = Infinity, bestK = 0;
+    for (let k = 0; k < N_parent; k++) {
+      const d = Math.hypot(T[i].x - P_center[k].x, T[i].y - P_center[k].y);
+      if (d < minD) { minD = d; bestK = k; }
+    }
+    closestParent.push({ i, minD, k: bestK });
+  }
+
+  // Find contiguous runs of divergence
+  const runs: Array<{ start: number; end: number; len: number; maxD: number }> = [];
+  let curRun: { start: number; end: number; len: number; maxD: number } | null = null;
+  for (let i = 0; i < N_telem; i++) {
+    if (closestParent[i].minD >= divThresholdM) {
+      if (!curRun) curRun = { start: i, end: i, len: 1, maxD: closestParent[i].minD };
+      else {
+        curRun.end = i;
+        curRun.len++;
+        if (closestParent[i].minD > curRun.maxD) curRun.maxD = closestParent[i].minD;
+      }
+    } else {
+      if (curRun) {
+        runs.push(curRun);
+        curRun = null;
+      }
+    }
+  }
+  if (curRun) runs.push(curRun);
+
+  // Filter major divergent runs (peak deviation >= 18m and length >= 10 points)
+  let majorRuns = runs.filter(r => r.maxD >= 18.0 && r.len >= 10);
+  if (majorRuns.length === 0) {
+    const modRuns = runs.filter(r => r.maxD >= 12.0 && r.len >= 15);
+    if (modRuns.length > 0) majorRuns.push(...modRuns);
+  }
+
+  if (majorRuns.length === 0) {
+    console.log('No significant divergence detected, using parent track directly');
+    return {
+      centerline: P_center,
+      left: P_left,
+      right: P_right,
+      sharedPct: 100,
+    };
+  }
+
+  // Sort runs in telemetry progression order
+  majorRuns.sort((a, b) => a.start - b.start);
+
+  interface SplicedRun {
+    divStartT: number;
+    divEndT: number;
+    kExit: number;
+    kEntry: number;
+  }
+
+  const splicedRuns: SplicedRun[] = [];
+  for (const r of majorRuns) {
+    const divStartT = Math.max(0, r.start - 3);
+    const divEndT = Math.min(N_telem - 1, r.end + 3);
+    const kExit = closestParent[divStartT].k;
+    const kEntry = closestParent[divEndT].k;
+    splicedRuns.push({ divStartT, divEndT, kExit, kEntry });
+  }
+
+  // Helper to slice circular parent
+  function sliceParentRange(P: Point2D[], kFrom: number, kTo: number): Point2D[] {
+    const res: Point2D[] = [];
+    let curr = kFrom;
+    while (curr !== kTo) {
+      res.push(P[curr]);
+      curr = (curr + 1) % P.length;
+    }
+    res.push(P[kTo]);
+    return res;
+  }
+
+  const finalCenter: Point2D[] = [];
+  const finalLeft: Point2D[] = [];
+  const finalRight: Point2D[] = [];
+  let totalParentPoints = 0;
+
+  const M = splicedRuns.length;
+  for (let m = 0; m < M; m++) {
+    const prevRun = splicedRuns[(m - 1 + M) % M];
+    const curRun = splicedRuns[m];
+
+    // Parent segment from previous entry up to current exit
+    const parentKFrom = m === 0 ? splicedRuns[M - 1].kEntry : prevRun.kEntry;
+    const parentKTo = curRun.kExit;
+
+    const parentSegCenter = sliceParentRange(P_center, parentKFrom, parentKTo);
+    const parentSegLeft = sliceParentRange(P_left, parentKFrom, parentKTo);
+    const parentSegRight = sliceParentRange(P_right, parentKFrom, parentKTo);
+    totalParentPoints += parentSegCenter.length;
+
+    // Divergent connector (using open boundary computation)
+    const divCenter = T.slice(curRun.divStartT, curRun.divEndT + 1);
+    const divCorridor = computeCorridorBoundaries(divCenter, nominalWidthM / 2, false);
+
+    // Transition Blending (C1 Hermite / cosine weighting over B points)
+    const B = Math.min(6, Math.floor(divCenter.length / 3));
+    if (B > 0 && parentSegCenter.length > B) {
+      // Blend at exit junction (from parent to connector)
+      for (let b = 0; b < B; b++) {
+        const u = 0.5 * (1 - Math.cos((Math.PI * b) / B));
+        const targetL = divCorridor.left[b];
+        const targetR = divCorridor.right[b];
+        const sourceL = parentSegLeft[parentSegLeft.length - B + b];
+        const sourceR = parentSegRight[parentSegRight.length - B + b];
+        if (targetL && sourceL) {
+          divCorridor.left[b] = {
+            x: Number((sourceL.x * (1 - u) + targetL.x * u).toFixed(2)),
+            y: Number((sourceL.y * (1 - u) + targetL.y * u).toFixed(2)),
+          };
+        }
+        if (targetR && sourceR) {
+          divCorridor.right[b] = {
+            x: Number((sourceR.x * (1 - u) + targetR.x * u).toFixed(2)),
+            y: Number((sourceR.y * (1 - u) + targetR.y * u).toFixed(2)),
+          };
+        }
+      }
+
+      // Blend at entry junction (from connector back to next parent entry)
+      const nextParentL = P_left[curRun.kEntry];
+      const nextParentR = P_right[curRun.kEntry];
+      for (let b = 0; b < B; b++) {
+        const u = 0.5 * (1 - Math.cos((Math.PI * b) / B));
+        const idx = divCenter.length - B + b;
+        const sourceL = divCorridor.left[idx];
+        const sourceR = divCorridor.right[idx];
+        if (sourceL && nextParentL) {
+          divCorridor.left[idx] = {
+            x: Number((sourceL.x * (1 - u) + nextParentL.x * u).toFixed(2)),
+            y: Number((sourceL.y * (1 - u) + nextParentL.y * u).toFixed(2)),
+          };
+        }
+        if (sourceR && nextParentR) {
+          divCorridor.right[idx] = {
+            x: Number((sourceR.x * (1 - u) + nextParentR.x * u).toFixed(2)),
+            y: Number((sourceR.y * (1 - u) + nextParentR.y * u).toFixed(2)),
+          };
+        }
+      }
+    }
+
+    finalCenter.push(...parentSegCenter, ...divCenter);
+    finalLeft.push(...parentSegLeft, ...divCorridor.left);
+    finalRight.push(...parentSegRight, ...divCorridor.right);
+  }
+
+  const sharedPct = Number(((totalParentPoints / finalCenter.length) * 100).toFixed(1));
+
+  return {
+    centerline: finalCenter,
+    left: finalLeft,
+    right: finalRight,
+    sharedPct,
+  };
 }
 
 export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoundaryGeometry> {
@@ -768,6 +960,29 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
 
     console.log(`Atlas Alignment: scale=${transformInfo.scale}, rot=${transformInfo.rotationDeg}°, rmse=${transformInfo.rmse}m`);
 
+  } else if (cfg.sourceType === 'hybrid') {
+    // Strategy: Hybrid synthesis anchored to parent circuit survey
+    const parentFile = path.resolve('server/data/tracks', `${cfg.parentLayoutKey}.json`);
+    if (!fs.existsSync(parentFile)) {
+      throw new Error(`Parent track geometry not found for hybrid layout: ${parentFile}`);
+    }
+    const parentGeom = JSON.parse(fs.readFileSync(parentFile, 'utf8'));
+
+    const hybrid = synthesizeHybridTrack(parentGeom, lmu2D, cfg.nominalWidthM, 12.0);
+    finalCenter = hybrid.centerline.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
+    finalLeft = hybrid.left.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
+    finalRight = hybrid.right.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
+
+    transformInfo = {
+      scale: 1.0,
+      rotationDeg: 0.0,
+      tx: 0.0,
+      tz: 0.0,
+      rmse: 0.0,
+    };
+
+    console.log(`Hybrid Synthesis: ${hybrid.sharedPct}% anchored to parent survey [${cfg.parentLayoutKey}] (${parentGeom.source})`);
+
   } else {
     // Strategy: Telemetry Corridor directly in LMU coordinates
     // We resample and smooth the clean flying lap trajectory, then project the nominal FIA half-width
@@ -810,7 +1025,11 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     trackVenue: cfg.trackVenue,
     trackCourse: cfg.trackCourse,
     lengthM: Number(lengthM.toFixed(1)),
-    source: cfg.sourceType === 'TUM' ? 'TUM-survey' : cfg.sourceType === 'osm' ? 'OpenStreetMap' : cfg.sourceType === 'atlas' ? 'track-atlas' : 'telemetry-corridor',
+    source: cfg.sourceType === 'TUM' ? 'TUM-survey'
+      : cfg.sourceType === 'osm' ? 'OpenStreetMap'
+      : cfg.sourceType === 'atlas' ? 'track-atlas'
+      : cfg.sourceType === 'hybrid' ? `hybrid (${cfg.parentLayoutKey})`
+      : 'telemetry-corridor',
     transform: transformInfo,
     bounds: {
       minX,
@@ -829,6 +1048,55 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
 
   console.log(`Completed: ${geometry.lengthM}m length, ${geometry.centerline.length} points, bounds [${minX}, ${maxX}] x [${minZ}, ${maxZ}]`);
   return geometry;
+}
+
+function hasGeometryChanged(existing: TrackBoundaryGeometry, current: TrackBoundaryGeometry): boolean {
+  if (
+    existing.layoutKey !== current.layoutKey ||
+    existing.circuitId !== current.circuitId ||
+    existing.layoutId !== current.layoutId ||
+    existing.trackVenue !== current.trackVenue ||
+    existing.trackCourse !== current.trackCourse ||
+    existing.lengthM !== current.lengthM ||
+    existing.source !== current.source ||
+    existing.nominalWidthM !== current.nominalWidthM
+  ) {
+    return true;
+  }
+  if (
+    (existing.transform?.scale ?? 0) !== (current.transform?.scale ?? 0) ||
+    (existing.transform?.rotationDeg ?? 0) !== (current.transform?.rotationDeg ?? 0) ||
+    (existing.transform?.tx ?? 0) !== (current.transform?.tx ?? 0) ||
+    (existing.transform?.tz ?? 0) !== (current.transform?.tz ?? 0) ||
+    (existing.transform?.rmse ?? 0) !== (current.transform?.rmse ?? 0)
+  ) {
+    return true;
+  }
+  if (
+    existing.bounds.minX !== current.bounds.minX ||
+    existing.bounds.maxX !== current.bounds.maxX ||
+    existing.bounds.minZ !== current.bounds.minZ ||
+    existing.bounds.maxZ !== current.bounds.maxZ ||
+    existing.bounds.spanX !== current.bounds.spanX ||
+    existing.bounds.spanZ !== current.bounds.spanZ
+  ) {
+    return true;
+  }
+  if (
+    existing.centerline.length !== current.centerline.length ||
+    existing.leftBoundary.length !== current.leftBoundary.length ||
+    existing.rightBoundary.length !== current.rightBoundary.length
+  ) {
+    return true;
+  }
+  if (
+    JSON.stringify(existing.centerline) !== JSON.stringify(current.centerline) ||
+    JSON.stringify(existing.leftBoundary) !== JSON.stringify(current.leftBoundary) ||
+    JSON.stringify(existing.rightBoundary) !== JSON.stringify(current.rightBoundary)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 async function main() {
@@ -853,14 +1121,42 @@ async function main() {
     pointsCount: number;
   }> = [];
 
+  let updatedCount = 0;
+  let unchangedCount = 0;
+
   for (const cfg of TRACK_CONFIGS) {
     try {
       const geom = await processTrack(cfg, db);
-      const jsonStr = JSON.stringify(geom, null, 2);
+      const serverFile = path.join(serverDir, `${cfg.layoutKey}.json`);
+      const publicFile = path.join(publicDir, `${cfg.layoutKey}.json`);
 
-      // Save to both server/data/tracks and public/tracks
-      fs.writeFileSync(path.join(serverDir, `${cfg.layoutKey}.json`), jsonStr, 'utf8');
-      fs.writeFileSync(path.join(publicDir, `${cfg.layoutKey}.json`), jsonStr, 'utf8');
+      let existing: TrackBoundaryGeometry | null = null;
+      if (fs.existsSync(serverFile)) {
+        try {
+          existing = JSON.parse(fs.readFileSync(serverFile, 'utf8'));
+        } catch {}
+      }
+
+      const changed = !existing || hasGeometryChanged(existing, geom);
+      if (!changed && existing) {
+        // Geometry has not changed; retain existing createdAt and updatedAt without writing a new version
+        geom.createdAt = existing.createdAt;
+        if (existing.updatedAt) {
+          geom.updatedAt = existing.updatedAt;
+        }
+        unchangedCount++;
+        console.log(`⏩ [${cfg.layoutKey}] No geometry changes; retaining existing version (${existing.updatedAt || existing.createdAt}).`);
+      } else {
+        const now = new Date().toISOString();
+        geom.createdAt = existing?.createdAt || now;
+        geom.updatedAt = now;
+
+        const jsonStr = JSON.stringify(geom, null, 2);
+        fs.writeFileSync(serverFile, jsonStr, 'utf8');
+        fs.writeFileSync(publicFile, jsonStr, 'utf8');
+        updatedCount++;
+        console.log(`💾 [${cfg.layoutKey}] Geometry updated; wrote new version (updatedAt: ${geom.updatedAt}).`);
+      }
 
       indexManifest.push({
         layoutKey: geom.layoutKey,
@@ -878,12 +1174,25 @@ async function main() {
     }
   }
 
-  // Save index.json
-  const indexStr = JSON.stringify(indexManifest, null, 2);
-  fs.writeFileSync(path.join(serverDir, 'index.json'), indexStr, 'utf8');
-  fs.writeFileSync(path.join(publicDir, 'index.json'), indexStr, 'utf8');
+  // Save index.json only if changed
+  const serverIndexFile = path.join(serverDir, 'index.json');
+  const publicIndexFile = path.join(publicDir, 'index.json');
+  let existingIndexStr = '';
+  if (fs.existsSync(serverIndexFile)) {
+    try {
+      existingIndexStr = fs.readFileSync(serverIndexFile, 'utf8');
+    } catch {}
+  }
+  const newIndexStr = JSON.stringify(indexManifest, null, 2);
+  if (existingIndexStr !== newIndexStr) {
+    fs.writeFileSync(serverIndexFile, newIndexStr, 'utf8');
+    fs.writeFileSync(publicIndexFile, newIndexStr, 'utf8');
+    console.log('💾 index.json: Saved updated catalog manifest.');
+  } else {
+    console.log('⏩ index.json: No changes detected; skipping rewrite.');
+  }
 
-  console.log(`\n🎉 Successfully processed and saved ${indexManifest.length} / ${TRACK_CONFIGS.length} track boundary geometries!`);
+  console.log(`\n🎉 Track Boundary Pipeline complete: ${updatedCount} updated, ${unchangedCount} unchanged.`);
   console.log(`Output locations:`);
   console.log(` - Server Data: ${serverDir}`);
   console.log(` - Public Web:  ${publicDir}`);
