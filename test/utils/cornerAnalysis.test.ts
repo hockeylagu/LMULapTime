@@ -171,4 +171,22 @@ describe('computeLapSegmentComparisons', () => {
     expect(corners[0]).toMatchObject({ entryDistM: 30, minDistM: 40, exitDistM: 60 });
     expect(corners[1]).toMatchObject({ entryDistM: 60, minDistM: 70, exitDistM: 90 });
   });
+
+  it('measures distance monotonically from lap start even when stationM metadata is present', () => {
+    const baseline = buildLap(100, 0.3);
+    const primary = buildLap(90, 0.3);
+    // Even if backend centerline projection assigns non-zero stationM (e.g. Monza S/F is at station 1600m)
+    primary.forEach((p, i) => { p.stationM = 1600 + i * 10; });
+    baseline.forEach((p, i) => { p.stationM = 1600 + i * 10; });
+
+    const segments = computeLapSegmentComparisons(primary, baseline, 6);
+
+    expect(segments[0].entryDistM).toBe(0);
+    expect(segments[0].exitDistM).toBe(30);
+    const corner = segments[1];
+    if (corner.type !== 'corner') throw new Error('expected corner segment');
+    expect(corner.entryDistM).toBe(30);
+    expect(corner.minDistM).toBe(70);
+    expect(corner.exitDistM).toBe(110);
+  });
 });

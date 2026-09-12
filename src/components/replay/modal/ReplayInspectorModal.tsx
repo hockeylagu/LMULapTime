@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
-import { computeCumulativeDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../../utils/cornerAnalysis.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../utils/formatters.js';
@@ -110,7 +110,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
   const lapSegments = useMemo(() => {
     if (!trajectory) return [];
     const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
-    return computeLapSegmentComparisons(trajectory.points, baseline);
+    return computeLapSegmentComparisons(trajectory.points, baseline, 6);
   }, [isCompareMode, trajectory, baselineTrajectory]);
 
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
@@ -160,7 +160,10 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     return { s1, s2, s3 };
   }, [trajectory]);
 
-  const primaryDists = useMemo(() => computeCumulativeDistances(trajectory?.points || []), [trajectory]);
+  const primaryDists = useMemo(
+    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points) : []),
+    [trajectory]
+  );
 
   useEffect(() => {
     setSelectedCornerNumber(null);

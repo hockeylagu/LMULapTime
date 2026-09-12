@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { computeCumulativeDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { projectTrajectoryPoints, buildContinuousSvgPath } from './replayMapUtils.js';
 
 export interface MiniCornerMapProps {
@@ -19,7 +19,7 @@ const PADDING = 12;
  */
 export const MiniCornerMap: React.FC<MiniCornerMapProps> = ({ points, bounds, highlightDistM, className = '' }) => {
   const svgPoints = useMemo(() => projectTrajectoryPoints(points, bounds, VIEWBOX_SIZE, PADDING), [points, bounds]);
-  const dists = useMemo(() => computeCumulativeDistances(points), [points]);
+  const dists = useMemo(() => getTrajectoryDistances(points), [points]);
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const markerIdx = useMemo(() => findIndexAtDistance(dists, highlightDistM), [dists, highlightDistM]);
   const marker = svgPoints[Math.min(markerIdx, svgPoints.length - 1)];

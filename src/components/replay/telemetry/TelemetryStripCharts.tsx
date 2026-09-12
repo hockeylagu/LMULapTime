@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { computeLapComparisons, computeCumulativeDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { computeLapComparisons, getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
@@ -36,26 +36,10 @@ export interface TelemetryStripChartsProps {
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
-  points,
-  currentIndex,
-  onSelectIndex,
-  sectors,
-  cornerSegments,
-  initialStraight,
-  selectedCornerNumber,
-  onSelectCorner,
-  className = '',
-  isLoading = false,
-  headerContent,
-  baselinePoints,
-  zoomRange,
-  onZoomRangeChange,
-  telemetryResolution,
-  onChangeResolution,
-  rawPointsCount,
-  rawSampleRateHz,
-  isFullResolution,
-  selectedCornerMarkers,
+  points, currentIndex, onSelectIndex, sectors, cornerSegments, initialStraight,
+  selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
+  baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
+  rawPointsCount, rawSampleRateHz, isFullResolution, selectedCornerMarkers,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -85,7 +69,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const isZoomed = !!(activeZoomRange && totalPoints > 0 && activeZoomRange.end > activeZoomRange.start);
   const viewStart = isZoomed ? Math.max(0, Math.min(activeZoomRange.start, totalPoints - 2)) : 0;
   const viewEnd = isZoomed ? Math.min(totalPoints - 1, Math.max(activeZoomRange.end, viewStart + 1)) : Math.max(0, totalPoints - 1);
-  const cumDists = useMemo(() => computeCumulativeDistances(points), [points]);
+  const cumDists = useMemo(() => getTrajectoryDistances(points), [points]);
   const distStart = cumDists[viewStart] ?? 0;
   const distEnd = cumDists[viewEnd] ?? distStart;
   const distSpan = Math.max(1e-6, distEnd - distStart);
@@ -157,10 +141,15 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
   };
 
-  const pointComparisons = useMemo(() => (baselinePoints && baselinePoints.length > 0 && points.length > 0 ? computeLapComparisons(points, baselinePoints) : []), [points, baselinePoints]);
+  const pointComparisons = useMemo(
+    () => (baselinePoints && baselinePoints.length > 0 && points.length > 0
+      ? computeLapComparisons(points, baselinePoints)
+      : []),
+    [points, baselinePoints]
+  );
   const currentComparison = pointComparisons[safeIndex] || null;
   const currentTimeSec = currentPoint && points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (points[0].timeSec || 0)) : 0;
-  const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd), [points, pointComparisons, viewStart, viewEnd]);
+  const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists), [points, pointComparisons, viewStart, viewEnd, cumDists]);
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
   const pctForIndex = (i: number): number => Math.max(0, Math.min(100, ((cumDists[i] ?? distStart) - distStart) / distSpan * 100));
   const cursorPct = pctForIndex(safeIndex);
@@ -210,9 +199,15 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
         <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[8px] sm:text-[9px] font-mono font-bold tracking-wider overflow-hidden">
-          {((sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0) > 0) && <div style={{ width: `${Math.max(0, pctForIndex(sectors.s1Frame))}%` }} className="h-full border-r border-lmu-gold/40 bg-lmu-gold/15 text-lmu-gold flex items-center justify-center truncate px-1">SECTOR 1</div>}
-          {sectors.s2Frame > sectors.s1Frame && <div style={{ width: `${Math.max(0, pctForIndex(sectors.s2Frame) - (sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0))}%` }} className="h-full border-r border-lmu-blue/40 bg-lmu-blue/15 text-lmu-blue flex items-center justify-center truncate px-1">SECTOR 2</div>}
-          {100 > (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0) && <div style={{ width: `${Math.max(0, 100 - (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0))}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>}
+          {((sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0) > 0) && (
+            <div style={{ width: `${Math.max(0, pctForIndex(sectors.s1Frame))}%` }} className="h-full border-r border-lmu-gold/40 bg-lmu-gold/15 text-lmu-gold flex items-center justify-center truncate px-1">SECTOR 1</div>
+          )}
+          {sectors.s2Frame > sectors.s1Frame && (
+            <div style={{ width: `${Math.max(0, pctForIndex(sectors.s2Frame) - (sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0))}%` }} className="h-full border-r border-lmu-blue/40 bg-lmu-blue/15 text-lmu-blue flex items-center justify-center truncate px-1">SECTOR 2</div>
+          )}
+          {100 > (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0) && (
+            <div style={{ width: `${Math.max(0, 100 - (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0))}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>
+          )}
         </div>
       )}
 

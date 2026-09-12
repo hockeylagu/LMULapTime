@@ -394,5 +394,30 @@ describe('TelemetryStripCharts', () => {
     expect(marker('T4 OUT').style.left).toBe('60%');
     expect(container.querySelectorAll('.border-dashed').length).toBe(3);
   });
+
+  it('displays lateral line offset when comparison data has lateralOffsetM', () => {
+    const primaryPoints: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, speedKmh: 150, timeSec: 0, stationM: 0, lateralOffsetM: 1.2 },
+      { x: 50, y: 0, z: 0, speedKmh: 160, timeSec: 1, stationM: 50, lateralOffsetM: 1.5 },
+    ];
+    const baselinePoints: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, speedKmh: 148, timeSec: 0, stationM: 0, lateralOffsetM: 0.2 },
+      { x: 50, y: 0, z: 0, speedKmh: 158, timeSec: 1.05, stationM: 50, lateralOffsetM: 0.4 },
+    ];
+
+    render(
+      <TelemetryStripCharts
+        points={primaryPoints}
+        baselinePoints={baselinePoints}
+        currentIndex={0}
+        onSelectIndex={vi.fn()}
+      />
+    );
+
+    // Lateral line offset badge should display "+1.2m" and delta "(Δ +1.0m)"
+    expect(screen.getByText(/Line:/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+1.2m/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(Δ \+1.0m\)/i)).toBeInTheDocument();
+  });
 });
 

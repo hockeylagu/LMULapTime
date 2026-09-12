@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { computeCumulativeDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
 import {
   MapColorMode,
   projectTrajectoryPoints,
@@ -126,8 +126,11 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
-  const primaryDists = useMemo(() => computeCumulativeDistances(points), [points]);
-  const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
+  const primaryDists = useMemo(() => getTrajectoryDistances(points), [points]);
+  const baselineDists = useMemo(
+    () => (baselinePoints ? getTrajectoryDistances(baselinePoints) : []),
+    [baselinePoints]
+  );
 
   const deltaByIdx = useMemo(() => {
     if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
@@ -138,11 +141,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, baselinePoints, primaryDists, baselineDists) : null),
     [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]
   );
-
-  const markerScale = useMemo(() => {
-    return Number((1 / zoomLevel).toFixed(4));
-  }, [zoomLevel]);
-
+  const markerScale = Number((1 / zoomLevel).toFixed(4));
   const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, effectiveBounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, effectiveBounds]);
 
 

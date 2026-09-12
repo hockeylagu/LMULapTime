@@ -5,7 +5,7 @@ import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../modal/ReplayTelemetryHud.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
-import { computeCumulativeDistances } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 
 export interface ReplayMapContainerProps {
@@ -75,8 +75,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
   );
-  const primaryDists = useMemo(() => computeCumulativeDistances(trajectory?.points || []), [trajectory]);
-  const baselineDists = useMemo(() => computeCumulativeDistances(baselinePoints || []), [baselinePoints]);
+  const primaryDists = useMemo(() => (trajectory?.points ? getTrajectoryDistances(trajectory.points) : []), [trajectory]);
+  const baselineDists = useMemo(() => (baselinePoints ? getTrajectoryDistances(baselinePoints) : []), [baselinePoints]);
 
   if (!trajectory) return null;
 
