@@ -640,5 +640,155 @@ describe('GpsTrackMap', () => {
     // Badges must maintain adequate separation and never overlap (>= 22px apart)
     expect(distance).toBeGreaterThanOrEqual(22);
   });
+
+  it('renders track boundary road ribbon when trackGeometry is provided', () => {
+    const mockGeometry = {
+      layoutKey: 'monza_gp',
+      circuitId: 'monza',
+      layoutId: 'gp',
+      trackVenue: 'Autodromo Nazionale Monza',
+      trackCourse: 'Autodromo Nazionale Monza',
+      lengthM: 5787,
+      bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+      leftBoundary: [
+        [90, 190],
+        [140, 210],
+        [190, 230],
+      ] as Array<[number, number]>,
+      rightBoundary: [
+        [110, 210],
+        [160, 230],
+        [210, 250],
+      ] as Array<[number, number]>,
+      centerline: [
+        [100, 200],
+        [150, 220],
+        [200, 240],
+      ] as Array<[number, number]>,
+    };
+
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        trackGeometry={mockGeometry}
+      />
+    );
+
+    const roadRibbon = screen.getByTestId('gps-track-road-ribbon');
+    expect(roadRibbon).toBeInTheDocument();
+
+    const paths = roadRibbon.querySelectorAll('path');
+    expect(paths.length).toBeGreaterThanOrEqual(3); // Asphalt surface + 2 boundary limits
+    expect(paths[0].getAttribute('fill')).toBe('#0c121e');
+  });
+
+  it('renders circuit minimap using track layout geometry when available', () => {
+    const mockGeometry = {
+      layoutKey: 'monza_gp',
+      circuitId: 'monza',
+      layoutId: 'gp',
+      trackVenue: 'Autodromo Nazionale Monza',
+      trackCourse: 'Autodromo Nazionale Monza',
+      lengthM: 5787,
+      bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+      leftBoundary: [
+        [90, 190],
+        [140, 210],
+      ] as Array<[number, number]>,
+      rightBoundary: [
+        [110, 210],
+        [160, 230],
+      ] as Array<[number, number]>,
+      centerline: [
+        [100, 200],
+        [150, 220],
+        [200, 240],
+      ] as Array<[number, number]>,
+    };
+
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        trackGeometry={mockGeometry}
+      />
+    );
+
+    const minimap = screen.getByTestId('gps-circuit-minimap');
+    expect(minimap).toBeInTheDocument();
+    const minimapSvg = minimap.querySelector('svg');
+    expect(minimapSvg).toBeInTheDocument();
+  });
+
+  it('correctly aligns both primary and baseline racing lines with identical projection within the road ribbon', () => {
+    const primaryPoints: ReplayTrajectoryPoint[] = [
+      { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
+      { x: 102, y: 10, z: 202, rotY: 0.1, speedKmh: 160, throttle: 80, brake: 0, timeSec: 0.1 },
+      { x: 104, y: 10, z: 204, rotY: 0.2, speedKmh: 170, throttle: 80, brake: 0, timeSec: 0.2 },
+    ];
+
+    const baselinePoints: ReplayTrajectoryPoint[] = [
+      { x: 101, y: 10, z: 201, rotY: 0, speedKmh: 155, throttle: 85, brake: 0, timeSec: 0.0 },
+      { x: 103, y: 10, z: 203, rotY: 0.1, speedKmh: 165, throttle: 85, brake: 0, timeSec: 0.1 },
+      { x: 105, y: 10, z: 205, rotY: 0.2, speedKmh: 175, throttle: 85, brake: 0, timeSec: 0.2 },
+    ];
+
+    const mockGeometry = {
+      layoutKey: 'monza_gp',
+      circuitId: 'monza',
+      layoutId: 'gp',
+      trackVenue: 'Autodromo Nazionale Monza',
+      trackCourse: 'Autodromo Nazionale Monza',
+      lengthM: 5787,
+      bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+      leftBoundary: [
+        [90, 190],
+        [140, 210],
+        [190, 230],
+      ] as Array<[number, number]>,
+      rightBoundary: [
+        [110, 210],
+        [160, 230],
+        [210, 250],
+      ] as Array<[number, number]>,
+      centerline: [
+        [100, 200],
+        [150, 220],
+        [200, 240],
+      ] as Array<[number, number]>,
+    };
+
+    const { container } = render(
+      <GpsTrackMap
+        points={primaryPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        baselinePoints={baselinePoints}
+        trackGeometry={mockGeometry}
+      />
+    );
+
+    const primaryLines = container.querySelectorAll('[data-track-line="primary"]');
+    const baselineLines = container.querySelectorAll('[data-track-line="baseline"]');
+    expect(primaryLines.length).toBeGreaterThan(0);
+    expect(baselineLines.length).toBeGreaterThan(0);
+
+    expect(screen.getByTestId('gps-track-road-ribbon')).toBeInTheDocument();
+
+    const primLine = primaryLines[0];
+    const baseLine = baselineLines[0];
+
+    const pX1 = parseFloat(primLine.getAttribute('x1') || '0');
+    const bX1 = parseFloat(baseLine.getAttribute('x1') || '0');
+
+    const svgDiff = Math.abs(bX1 - pX1);
+    expect(svgDiff).toBeGreaterThan(0);
+    expect(svgDiff).toBeLessThan(30);
+  });
 });
+
+
 

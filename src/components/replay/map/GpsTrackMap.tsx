@@ -2,6 +2,7 @@ import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { GpsTrackMapScene } from './GpsTrackMapScene.js';
+import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 
 export interface GpsTrackMapCorner {
   cornerNumber: number;
@@ -31,6 +32,12 @@ export interface GpsTrackMapProps {
   pedalMarkers?: GpsTrackMapPedalMarker[];
   showPedalMarkers?: boolean;
   showMinimap?: boolean;
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey?: string;
+  replayName?: string;
+  trackGeometry?: TrackBoundaryGeometry | null;
 }
 
 export const GpsTrackMap: React.FC<GpsTrackMapProps> = props => <GpsTrackMapScene {...props} />;
+

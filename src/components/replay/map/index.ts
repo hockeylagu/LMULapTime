@@ -11,3 +11,5 @@ export * from './useGpsMapPanZoom.js';
 export * from './GpsCircuitMinimap.js';
 export * from './GpsTrackSegments.js';
 export * from './GpsStartFinishLine.js';
+export * from './GpsTrackRoadRibbon.js';
+export * from './useTrackBoundaryGeometry.js';

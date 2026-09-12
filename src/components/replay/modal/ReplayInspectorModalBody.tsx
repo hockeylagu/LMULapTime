@@ -255,6 +255,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           availableConsistencyLaps={availableConsistencyLaps}
           excludedConsistencyLaps={excludedConsistencyLaps}
           toggleConsistencyLap={toggleConsistencyLap}
+          trackVenue={metadata?.trackVenue}
+          trackCourse={metadata?.trackCourse}
         />
       </div>
     </div>

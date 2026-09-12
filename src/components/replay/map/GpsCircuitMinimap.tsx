@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 
 export interface GpsCircuitMinimapProps {
   pathD: string;
+  layoutPathD?: string;
   currentPos?: { sx: number; sy: number };
   baselineGhostPos?: { sx: number; sy: number } | null;
   currentViewBox?: string;
@@ -10,11 +11,14 @@ export interface GpsCircuitMinimapProps {
 
 export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
   pathD,
+  layoutPathD,
   currentPos,
   baselineGhostPos,
   currentViewBox,
   className = '',
 }) => {
+  const activePathD = layoutPathD || pathD;
+
   const viewportBox = useMemo(() => {
     if (!currentViewBox) return null;
     const parts = currentViewBox.split(' ').map(Number);
@@ -24,7 +28,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
     return { vx, vy, vw, vh };
   }, [currentViewBox]);
 
-  if (!pathD) return null;
+  if (!activePathD) return null;
 
   return (
     <div

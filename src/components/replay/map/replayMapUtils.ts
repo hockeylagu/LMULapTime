@@ -127,6 +127,52 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
   return d;
 }
 
+export function projectBoundaryPoints(
+  points: Array<[number, number]>,
+  bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
+  viewBoxSize: number,
+  padding: number
+): Array<{ sx: number; sy: number }> {
+  if (!points || points.length === 0) return [];
+  const { minX, minZ, spanX, spanZ } = bounds;
+  const maxSpan = Math.max(spanX, spanZ, 1);
+  const scale = (viewBoxSize - 2 * padding) / maxSpan;
+  const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
+  const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
+
+  return points.map(([x, z]) => ({
+    sx: offsetX + (x - minX) * scale,
+    sy: viewBoxSize - (offsetZ + (z - minZ) * scale),
+  }));
+}
+
+export function buildRoadRibbonSvgPath(
+  leftSvg: Array<{ sx: number; sy: number }>,
+  rightSvg: Array<{ sx: number; sy: number }>
+): string {
+  if (leftSvg.length === 0 || rightSvg.length === 0) return '';
+  let d = `M ${leftSvg[0].sx.toFixed(1)} ${leftSvg[0].sy.toFixed(1)}`;
+  for (let i = 1; i < leftSvg.length; i++) {
+    d += ` L ${leftSvg[i].sx.toFixed(1)} ${leftSvg[i].sy.toFixed(1)}`;
+  }
+  for (let i = rightSvg.length - 1; i >= 0; i--) {
+    d += ` L ${rightSvg[i].sx.toFixed(1)} ${rightSvg[i].sy.toFixed(1)}`;
+  }
+  d += ' Z';
+  return d;
+}
+
+export function buildClosedSvgPath(pts: Array<{ sx: number; sy: number }>): string {
+  if (pts.length === 0) return '';
+  let d = `M ${pts[0].sx.toFixed(1)} ${pts[0].sy.toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    d += ` L ${pts[i].sx.toFixed(1)} ${pts[i].sy.toFixed(1)}`;
+  }
+  d += ' Z';
+  return d;
+}
+
+
 export function computeGhostPosition(
   primaryDists: number[],
   baseDists: number[],
@@ -172,6 +218,56 @@ export interface DispersedCornerMarker {
   idx: number;
   actualSx: number;
   actualSy: number;
+}
+
+export interface MappedPedalMarker {
+  cornerNumber: number;
+  distM: number;
+  kind: 'brake' | 'throttle';
+  isBaseline?: boolean;
+  sx: number;
+  sy: number;
+  nx: number;
+  ny: number;
+  isStaggered: boolean;
+}
+
+export function computePedalMarkerPoints(
+  showPedalMarkers: boolean,
+  pedalMarkers: Array<{ cornerNumber: number; distM: number; kind: 'brake' | 'throttle'; isBaseline?: boolean }> | undefined,
+  primaryDists: number[],
+  baselineDists: number[],
+  svgPoints: ProjectedPoint[],
+  baselineSvgPoints: ProjectedPoint[],
+  baselinePoints?: ReplayTelemetryPoint[]
+): MappedPedalMarker[] {
+  if (!showPedalMarkers || !pedalMarkers || pedalMarkers.length === 0 || svgPoints.length === 0) return [];
+  const mapped: MappedPedalMarker[] = pedalMarkers
+    .map(m => {
+      const useBaseline = Boolean(m.isBaseline && baselinePoints && baselinePoints.length > 0 && baselineSvgPoints.length > 0);
+      const dists = useBaseline ? baselineDists : primaryDists;
+      const pts = useBaseline ? baselineSvgPoints : svgPoints;
+      const idx = findIndexAtDistance(dists, m.distM);
+      const pt = pts[Math.min(idx, pts.length - 1)];
+      if (!pt) return null;
+      const prev = pts[Math.max(0, pt.idx - 2)] ?? pt;
+      const next = pts[Math.min(pts.length - 1, pt.idx + 2)] ?? pt;
+      const dx = next.sx - prev.sx;
+      const dy = next.sy - prev.sy;
+      const headingLen = Math.hypot(dx, dy) || 1;
+      return { ...m, sx: pt.sx, sy: pt.sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
+    })
+    .filter((m): m is MappedPedalMarker => m !== null);
+
+  for (const bMarker of mapped) {
+    if (!bMarker.isBaseline) continue;
+    const primMarker = mapped.find(p => !p.isBaseline && p.cornerNumber === bMarker.cornerNumber && p.kind === bMarker.kind);
+    if (primMarker && Math.hypot(bMarker.sx - primMarker.sx, bMarker.sy - primMarker.sy) < 22) {
+      bMarker.isStaggered = true;
+    }
+  }
+
+  return mapped;
 }
 
 // Pedal-marker badge geometry, shared with GpsSceneMarkers so corner-flag placement
@@ -347,3 +443,61 @@ export function computeDispersedCornerMarkers(
 
   return markers;
 }
+
+export function computeEffectiveBounds(
+  bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX?: number; spanZ?: number },
+  trackBounds?: { minX: number; maxX: number; minZ: number; maxZ: number; spanX?: number; spanZ?: number } | null,
+  baselinePoints?: Array<{ x: number; z: number }>
+) {
+  let minX = bounds.minX;
+  let maxX = bounds.maxX;
+  let minZ = bounds.minZ;
+  let maxZ = bounds.maxZ;
+
+  if (trackBounds) {
+    minX = Math.min(minX, trackBounds.minX);
+    maxX = Math.max(maxX, trackBounds.maxX);
+    minZ = Math.min(minZ, trackBounds.minZ);
+    maxZ = Math.max(maxZ, trackBounds.maxZ);
+  }
+
+  if (baselinePoints && baselinePoints.length > 0) {
+    for (let i = 0; i < baselinePoints.length; i++) {
+      const p = baselinePoints[i];
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.z < minZ) minZ = p.z;
+      if (p.z > maxZ) maxZ = p.z;
+    }
+  }
+
+  return {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    spanX: Math.max(maxX - minX, 1),
+    spanZ: Math.max(maxZ - minZ, 1),
+  };
+}
+
+
+export function computeBaselineDeltaByIdx(
+  deltaByIdx: number[] | null,
+  baselinePoints?: ReplayTelemetryPoint[],
+  primaryDists?: number[],
+  baselineDists?: number[]
+): number[] | null {
+  if (!deltaByIdx || !baselinePoints || baselinePoints.length === 0 || !primaryDists || !baselineDists) {
+    return null;
+  }
+  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
+  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
+  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
+  return baselineDists.map(d => {
+    const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
+    const idx = findIndexAtDistance(primaryDists, targetDist);
+    return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
+  });
+}
+
