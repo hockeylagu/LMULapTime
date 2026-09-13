@@ -16,9 +16,10 @@ export interface UseDashboardMetricsParams {
   searchQuery: string;
   hideEmpty: boolean;
   sortBy: DashboardSortOption;
-  showMoreTracks: boolean;
-  showMoreCars: boolean;
-  showMoreBenchmarks: boolean;
+  showMoreTracks?: boolean;
+  showMoreCars?: boolean;
+  showMoreBenchmarks?: boolean;
+  isExpanded?: boolean;
 }
 
 export function useDashboardMetrics({
@@ -29,9 +30,10 @@ export function useDashboardMetrics({
   searchQuery,
   hideEmpty,
   sortBy,
-  showMoreTracks,
-  showMoreCars,
-  showMoreBenchmarks,
+  showMoreTracks = false,
+  showMoreCars = false,
+  showMoreBenchmarks = false,
+  isExpanded,
 }: UseDashboardMetricsParams) {
   const tracks = useMemo(() => {
     return Array.from(new Set(sessions.map((s) => getDisplayTrackName(s.trackVenue, s.trackCourse))))
@@ -80,13 +82,36 @@ export function useDashboardMetrics({
 
   const metrics = useMemo(() => {
     let totalLaps = 0;
+    let cleanLaps = 0;
     let totalDistanceKm = 0;
     let totalDrivingSeconds = 0;
+    let maxTopSpeed = 0;
+    let maxTopSpeedTrack = '';
+    let practiceSessionsCount = 0;
+    let qualifyingSessionsCount = 0;
+    let raceSessionsCount = 0;
+    let raceWinsCount = 0;
+    let racePodiumsCount = 0;
+    let totalPitStops = 0;
     const trackLapsMap: Record<string, number> = {};
     const carLapsMap: Record<string, number> = {};
     const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
 
     for (const s of sessions) {
+      if (matchesSessionType(s.sessionType, s.sessionName, 'Race')) {
+        raceSessionsCount++;
+        if (s.playerDriver?.position === 1) {
+          raceWinsCount++;
+        }
+        if (s.playerDriver?.position && s.playerDriver.position <= 3 && s.playerDriver.position > 0) {
+          racePodiumsCount++;
+        }
+      } else if (matchesSessionType(s.sessionType, s.sessionName, 'Qualifying')) {
+        qualifyingSessionsCount++;
+      } else {
+        practiceSessionsCount++;
+      }
+
       const p = s.playerDriver;
       if (!p) continue;
 
@@ -99,18 +124,29 @@ export function useDashboardMetrics({
 
       const trackMeters = s.trackLengthMeters || 5000;
       totalDistanceKm += (trackMeters / 1000) * completedLapsCount;
+      const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
 
       if (p.laps && p.laps.length > 0) {
         for (const lap of p.laps) {
           if (lap.lapTime && lap.lapTime > 0) {
             totalDrivingSeconds += lap.lapTime;
+            if (lap.isValid !== false && !lap.isPitStop) {
+              cleanLaps++;
+            }
+          }
+          if (lap.isPitStop) {
+            totalPitStops++;
+          }
+          if (lap.topSpeed && lap.topSpeed > maxTopSpeed) {
+            maxTopSpeed = lap.topSpeed;
+            maxTopSpeedTrack = displayTrack;
           }
         }
       } else if (p.avgLapTime && completedLapsCount > 0) {
         totalDrivingSeconds += p.avgLapTime * completedLapsCount;
+        cleanLaps += completedLapsCount;
       }
 
-      const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
       if (displayTrack && completedLapsCount > 0) {
         trackLapsMap[displayTrack] = (trackLapsMap[displayTrack] || 0) + completedLapsCount;
       }
@@ -134,6 +170,9 @@ export function useDashboardMetrics({
       }
     }
 
+    const cleanLapsPercentage = totalLaps > 0 ? Math.round((cleanLaps / totalLaps) * 1000) / 10 : 0;
+    const averageSpeedKmh = totalDrivingSeconds > 0 ? Math.round(totalDistanceKm / (totalDrivingSeconds / 3600)) : 0;
+
     const rankedTracks = Object.entries(trackLapsMap)
       .map(([track, laps]) => ({ track, laps }))
       .sort((a, b) => b.laps - a.laps);
@@ -146,27 +185,42 @@ export function useDashboardMetrics({
 
     return {
       totalLaps,
+      cleanLaps,
+      cleanLapsPercentage,
       totalDistanceKm,
       totalDrivingSeconds,
+      maxTopSpeed,
+      maxTopSpeedTrack,
+      averageSpeedKmh,
+      practiceSessionsCount,
+      qualifyingSessionsCount,
+      raceSessionsCount,
+      raceWinsCount,
+      racePodiumsCount,
+      totalPitStops,
       rankedTracks,
       rankedCars,
       bestTrackRefLaps,
     };
   }, [sessions]);
 
+  const expandTracks = isExpanded !== undefined ? isExpanded : showMoreTracks;
+  const expandCars = isExpanded !== undefined ? isExpanded : showMoreCars;
+  const expandBenchmarks = isExpanded !== undefined ? isExpanded : showMoreBenchmarks;
+
   const visibleTracks = useMemo(
-    () => (showMoreTracks ? metrics.rankedTracks : metrics.rankedTracks.slice(0, 3)),
-    [showMoreTracks, metrics.rankedTracks]
+    () => (expandTracks ? metrics.rankedTracks : metrics.rankedTracks.slice(0, 3)),
+    [expandTracks, metrics.rankedTracks]
   );
 
   const visibleCars = useMemo(
-    () => (showMoreCars ? metrics.rankedCars : metrics.rankedCars.slice(0, 3)),
-    [showMoreCars, metrics.rankedCars]
+    () => (expandCars ? metrics.rankedCars : metrics.rankedCars.slice(0, 3)),
+    [expandCars, metrics.rankedCars]
   );
 
   const visibleRefLaps = useMemo(
-    () => (showMoreBenchmarks ? metrics.bestTrackRefLaps : metrics.bestTrackRefLaps.slice(0, 3)),
-    [showMoreBenchmarks, metrics.bestTrackRefLaps]
+    () => (expandBenchmarks ? metrics.bestTrackRefLaps : metrics.bestTrackRefLaps.slice(0, 3)),
+    [expandBenchmarks, metrics.bestTrackRefLaps]
   );
 
   return {

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Zap } from 'lucide-react';
 import { ReferenceLaptimeEntry } from '../../../server/types';
 import { formatTime } from '../../utils/formatters';
 
@@ -16,15 +15,11 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
 }) => {
   if (!benchmark) return null;
 
-  const { targets, carClass } = benchmark;
+  const { targets } = benchmark;
 
   if (variant === 'pills') {
     return (
       <div className={`pt-3 border-t border-lmu-border/50 flex flex-wrap items-center gap-2 text-xs ${className}`}>
-        <span className="font-bold text-lmu-gold flex items-center gap-1.5 mr-1">
-          <Zap className="w-4 h-4 text-lmu-gold" />
-          {carClass} Reference Targets:
-        </span>
         <span className="px-2.5 py-1 rounded bg-purple-950/60 text-purple-300 border border-purple-500/40 text-xs font-mono">
           👾 Alien: <strong className="text-white ml-0.5">{formatTime(targets.alienSec)}</strong>
         </span>

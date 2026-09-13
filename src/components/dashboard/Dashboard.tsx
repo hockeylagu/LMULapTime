@@ -81,9 +81,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   searchQuery,
   setSearchQuery,
 }) => {
-  const [showMoreTracks, setShowMoreTracks] = useState<boolean>(false);
-  const [showMoreCars, setShowMoreCars] = useState<boolean>(false);
-  const [showMoreBenchmarks, setShowMoreBenchmarks] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+
+  const toggleExpanded = (val?: boolean | ((prev: boolean) => boolean)) => {
+    if (typeof val === 'boolean') {
+      setIsExpanded(val);
+    } else if (typeof val === 'function') {
+      setIsExpanded(val);
+    } else {
+      setIsExpanded((prev) => !prev);
+    }
+  };
 
   const { params: initialParams } = getHashRouteAndParams();
   const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.get('hideEmpty') !== 'false');
@@ -109,8 +117,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     visibleCars,
     visibleRefLaps,
     totalLaps,
+    cleanLaps,
+    cleanLapsPercentage,
     totalDistanceKm,
     totalDrivingSeconds,
+    maxTopSpeed,
+    maxTopSpeedTrack,
+    averageSpeedKmh,
+    practiceSessionsCount,
+    qualifyingSessionsCount,
+    raceSessionsCount,
+    raceWinsCount,
+    racePodiumsCount,
+    totalPitStops,
     rankedTracks,
     rankedCars,
     bestTrackRefLaps,
@@ -122,9 +141,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     searchQuery,
     hideEmpty,
     sortBy,
-    showMoreTracks,
-    showMoreCars,
-    showMoreBenchmarks,
+    isExpanded,
   });
 
   return (
@@ -135,29 +152,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <CircuitsSummaryCard
             rankedTracks={rankedTracks}
             visibleTracks={visibleTracks}
-            showMoreTracks={showMoreTracks}
-            setShowMoreTracks={setShowMoreTracks}
+            showMoreTracks={isExpanded}
+            setShowMoreTracks={toggleExpanded}
           />
           <CarsSummaryCard
             rankedCars={rankedCars}
             visibleCars={visibleCars}
-            showMoreCars={showMoreCars}
-            setShowMoreCars={setShowMoreCars}
+            showMoreCars={isExpanded}
+            setShowMoreCars={toggleExpanded}
             onSelectCar={(car) => setSearchQuery(car)}
           />
           <BenchmarkLapsSummaryCard
             rankedRefLaps={bestTrackRefLaps}
             visibleRefLaps={visibleRefLaps}
-            showMoreBenchmarks={showMoreBenchmarks}
-            setShowMoreBenchmarks={setShowMoreBenchmarks}
+            showMoreBenchmarks={isExpanded}
+            setShowMoreBenchmarks={toggleExpanded}
             onSelectSession={onSelectSession}
           />
           <DrivingOverviewCard
             sessionsCount={sessions.length}
             totalLaps={totalLaps}
+            cleanLaps={cleanLaps}
+            cleanLapsPercentage={cleanLapsPercentage}
             totalDistanceKm={totalDistanceKm}
             totalDrivingSeconds={totalDrivingSeconds}
-            uniqueCircuitsCount={rankedTracks.length}
+            maxTopSpeed={maxTopSpeed}
+            maxTopSpeedTrack={maxTopSpeedTrack}
+            averageSpeedKmh={averageSpeedKmh}
+            practiceSessionsCount={practiceSessionsCount}
+            qualifyingSessionsCount={qualifyingSessionsCount}
+            raceSessionsCount={raceSessionsCount}
+            raceWinsCount={raceWinsCount}
+            racePodiumsCount={racePodiumsCount}
+            totalPitStops={totalPitStops}
+            showMore={isExpanded}
+            setShowMore={toggleExpanded}
           />
         </div>
       )}

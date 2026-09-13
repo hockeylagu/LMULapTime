@@ -14,7 +14,7 @@ interface CachedResult {
 // Module-level so the result survives tab toggles and modal re-opens for the same replay/lap,
 // avoiding an expensive re-fetch-and-recompute every time the Consistency sub-view is revisited.
 const consistencyCache = new Map<string, CachedResult>();
-const MAX_CACHE_ENTRIES = 30;
+const MAX_CACHE_ENTRIES = 10;
 
 function cacheKeyFor(replayName: string, driverSlot: number | null, referenceLap: number | undefined): string {
   return `${replayName}|${driverSlot ?? 'x'}|${referenceLap ?? 0}`;

@@ -22,16 +22,6 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
           <MapPin className="w-4 h-4 text-lmu-gold" />
           <span>Circuits {rankedTracks.length > 3 && `(${visibleTracks.length}/${rankedTracks.length})`}</span>
         </p>
-        {rankedTracks.length > 3 && (
-          <button
-            type="button"
-            onClick={() => setShowMoreTracks(!showMoreTracks)}
-            className="text-[10px] text-lmu-accent hover:text-white font-semibold transition-colors flex items-center gap-0.5"
-          >
-            <span>{showMoreTracks ? 'Show Less' : `+${rankedTracks.length - 3} More`}</span>
-            <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreTracks ? 'rotate-180' : ''}`} />
-          </button>
-        )}
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreTracks ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>

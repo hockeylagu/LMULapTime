@@ -5,7 +5,6 @@ import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.j
 import { ReferenceLaptimeEntry } from '../../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
-import { TrackBenchmarkSection } from './TrackBenchmarkSection.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
@@ -81,17 +80,25 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   }, [selectedClass]);
 
   useEffect(() => {
+    let isCurrent = true;
+    const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/track/${encodeURIComponent(trackName)}`)
+    fetch(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((resData) => {
+        if (!isCurrent) return;
         setData(resData);
         setLoading(false);
       })
       .catch((err) => {
+        if (!isCurrent || err?.name === 'AbortError') return;
         console.error('Failed to fetch track details:', err);
         setLoading(false);
       });
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
   }, [trackName]);
 
   if (loading) {
@@ -217,6 +224,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     <div className="space-y-6">
       <TrackDetailHeader
         trackName={trackName}
+        trackCourse={data.sessions[0]?.trackCourse}
         sessionsCount={filteredSessions.length}
         onBack={onBack}
         selectedClass={selectedClass}
@@ -224,9 +232,11 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         selectedCarModel={selectedCarModel}
         setSelectedCarModel={setSelectedCarModel}
         availableCarModels={availableCarModels}
+        currentBenchmark={currentBenchmark}
+        bestLapTimeString={bestLapSession?.playerDriver?.bestLapTimeString}
+        bestLapCar={bestLapSession?.playerDriver?.carType}
+        xmlTrackLengthMeters={data.sessions[0]?.trackLengthMeters}
       />
-
-      <TrackBenchmarkSection currentBenchmark={currentBenchmark} />
 
       <ImprovementChart
         progression={trackProgression}

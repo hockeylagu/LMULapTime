@@ -137,7 +137,11 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ### TypeScript & Modules
 - The repository is configured with `"type": "module"`. When writing relative imports in files processed under Node/ESM (such as `server/` or when importing local TS modules in certain test files), include `.js` extension where necessary (e.g., `import ... from './types.js'`).
-- Avoid `any`. Use strict domain models from `server/types.ts` or declare targeted interfaces.
+- **Zero-`any` Policy**: The use of `any` is strictly forbidden anywhere in the repository (`src/`, `server/`, `test/`). Always use explicit domain models from `server/types.ts`, targeted TypeScript interfaces, union types, or `unknown` with runtime type narrowing / type guards.
+- **Zero Warnings Standard**: Both production builds (`npm run build`) and test suites (`npm test`) must run with **zero warnings and zero errors**:
+  - No chunk-size or rollup warnings (keep manual chunking configured in `vite.config.ts`).
+  - No unhandled React test warnings (e.g., `act(...)` or uncaught async state updates; ensure components fetching geometry or data support optional injected props for deterministic testing or are cleanly awaited via `waitFor`).
+  - No unused variables or parameters (`noUnusedLocals` and `noUnusedParameters` strictly enforced in `tsconfig.json`).
 
 ### Database Patterns (`server/db.ts`)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
@@ -162,7 +166,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with over 579 tests. Any change must preserve this coverage.
+The repository maintains an extensive automated test suite with over 628 tests across 53 test files. Any change must preserve this coverage and run with zero warnings.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`

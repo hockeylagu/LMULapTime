@@ -15,7 +15,7 @@ export interface ImprovementChartControlsProps {
 }
 
 export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> = ({
-  activeTrack,
+  activeTrack: _activeTrack,
   displayedSessionsCount,
   totalSessionsCount,
   activeRange,
@@ -28,7 +28,7 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
       <div>
         <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-lmu-accent" />
-          <span>Progression Timeline — {activeTrack}</span>
+          <span>Progression Timeline</span>
         </h3>
         <span className="text-xs text-lmu-muted">
           Displaying {displayedSessionsCount} of {totalSessionsCount} recorded sessions

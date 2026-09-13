@@ -1,5 +1,4 @@
 import React from 'react';
-import { Zap } from 'lucide-react';
 import { ReferenceLaptimeEntry, DriverData } from '../../../../server/types.js';
 import { formatTime } from '../../../utils/formatters.js';
 
@@ -15,10 +14,6 @@ export const SessionReferenceAndSafety: React.FC<SessionReferenceAndSafetyProps>
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-bold text-lmu-gold flex items-center gap-1.5 mr-1">
-        <Zap className="w-4 h-4 text-lmu-gold" />
-        {refEntry.carClass} Reference Targets:
-      </span>
       <span className="px-2.5 py-1 rounded bg-purple-950/60 text-purple-300 border border-purple-500/40 text-xs font-mono">
         👾 Alien: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.alienSec)}</strong>
       </span>

@@ -38,9 +38,19 @@ export interface TrackBoundaryGeometry {
 import { resolveTrackLayoutKey } from '../../../utils/trackLayout.js';
 export { resolveTrackLayoutKey };
 
-// In-memory module cache to avoid redundant network requests across tab/lap switches
+// In-memory module cache to avoid redundant network requests across tab/lap switches.
+// Capped with LRU eviction to keep memory low across 21 track geometries.
+const MAX_GEOMETRY_CACHE = 3;
 const geometryCache = new Map<string, TrackBoundaryGeometry>();
 const inFlightRequests = new Map<string, Promise<TrackBoundaryGeometry | null>>();
+
+function setGeometryCache(key: string, data: TrackBoundaryGeometry): void {
+  if (geometryCache.size >= MAX_GEOMETRY_CACHE && !geometryCache.has(key)) {
+    const oldestKey = geometryCache.keys().next().value;
+    if (oldestKey !== undefined) geometryCache.delete(oldestKey);
+  }
+  geometryCache.set(key, data);
+}
 
 export interface UseTrackBoundaryGeometryOptions {
   layoutKey?: string | null;
@@ -72,7 +82,11 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
     }
 
     if (geometryCache.has(resolvedKey)) {
-      setTrackGeometry(geometryCache.get(resolvedKey)!);
+      const existing = geometryCache.get(resolvedKey)!;
+      // Refresh LRU order
+      geometryCache.delete(resolvedKey);
+      geometryCache.set(resolvedKey, existing);
+      setTrackGeometry(existing);
       setIsLoading(false);
       return;
     }
@@ -90,7 +104,7 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
           return res.json();
         })
         .then((data: TrackBoundaryGeometry) => {
-          geometryCache.set(resolvedKey, data);
+          setGeometryCache(resolvedKey, data);
           inFlightRequests.delete(resolvedKey);
           return data;
         })

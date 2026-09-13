@@ -30,8 +30,7 @@ export const SessionTableView: React.FC<SessionTableViewProps> = ({
             <th className="px-3.5 py-3 text-center">Laps</th>
             <th className="px-3.5 py-3 text-right">Best Lap</th>
             <th className="px-3.5 py-3 text-center">Benchmark Pace</th>
-            <th className="px-3.5 py-3 text-center">Replay</th>
-            <th className="px-3.5 py-3 text-right">Action</th>
+            <th className="px-3.5 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-lmu-border/50">

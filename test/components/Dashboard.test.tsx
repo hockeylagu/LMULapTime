@@ -240,13 +240,15 @@ describe('Dashboard component', () => {
       />
     );
 
-    // Expand Show More buttons
-    const moreButtons = screen.getAllByText(/\+1 More/i);
-    moreButtons.forEach(btn => fireEvent.click(btn));
+    // Expand using bottom button
+    const moreButtons = screen.getAllByRole('button', { name: /Show All/i });
+    expect(moreButtons.length).toBeGreaterThan(0);
+    fireEvent.click(moreButtons[0]);
 
     // Collapse again
-    const lessButtons = screen.getAllByText(/Show Less/i);
-    lessButtons.forEach(btn => fireEvent.click(btn));
+    const lessButtons = screen.getAllByRole('button', { name: /Show Top 3 Only/i });
+    expect(lessButtons.length).toBeGreaterThan(0);
+    fireEvent.click(lessButtons[0]);
   });
 
   it('toggles Hide Empty Results filter', () => {
@@ -293,8 +295,8 @@ describe('Dashboard component', () => {
     // Distance Driven and Driving Time
     expect(screen.getByText('Distance Driven')).toBeInTheDocument();
     expect(screen.getByText('Driving Time')).toBeInTheDocument();
-    // Footer tracks count
-    expect(screen.getByText(/Across 4 Unique Circuits/i)).toBeInTheDocument();
+    // Footer tracks count removed as requested
+    expect(screen.queryByText(/Across 4 Unique Circuits/i)).not.toBeInTheDocument();
   });
 
   it('calculates Driving Overview lap count and km driven using completed laps (valid or not, excluding incomplete)', () => {
@@ -539,5 +541,113 @@ describe('Dashboard component', () => {
     expect(screen.getByText('12 laps')).toBeInTheDocument();
     // And total laps across both layouts in overview and cars card
     expect(screen.getAllByText('20 laps').length).toBe(2);
+  });
+
+  it('synchronizes card expansion across all cards and reveals extended driving overview statistics', () => {
+    const sessionsWithExtStats = [
+      ...mockSessions,
+      {
+        id: 'sess-fuji-1',
+        filename: '2026_05_31_R2.xml',
+        trackVenue: 'Fuji',
+        timeString: '2026/05/31 19:00',
+        sessionType: 'Race' as const,
+        sessionName: 'R2',
+        driversCount: 1,
+        playerDriver: {
+          name: 'Player',
+          carType: 'BMW M4 LMGT3',
+          carClass: 'LMGT3',
+          bestLapTime: 100.0,
+          bestLapTimeString: '1:40.000',
+          bestS1: 25.0,
+          bestS2: 35.0,
+          bestS3: 40.0,
+          theoreticalBest: 100.0,
+          theoreticalBestString: '1:40.000',
+          bestLapPaceCategory: 'Alien' as const,
+          bestLapPacePercentage: 100.2,
+          position: 1,
+          lapsCount: 10,
+          laps: [
+            {
+              lapNum: 1,
+              position: 1,
+              lapTime: 100.0,
+              lapTimeString: '1:40.000',
+              s1: 25.0,
+              s2: 35.0,
+              s3: 40.0,
+              topSpeed: 312.5,
+              fCompound: 'Medium',
+              rCompound: 'Medium',
+              isPitStop: false,
+              isValid: true,
+            },
+            {
+              lapNum: 2,
+              position: 1,
+              lapTime: 110.0,
+              lapTimeString: '1:50.000',
+              s1: 28.0,
+              s2: 38.0,
+              s3: 44.0,
+              topSpeed: 305.0,
+              fCompound: 'Medium',
+              rCompound: 'Medium',
+              isPitStop: true,
+              isValid: true,
+            },
+          ],
+        },
+      },
+    ];
+
+    render(
+      <Dashboard
+        sessions={sessionsWithExtStats}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Initially, extended driving stats should not be visible (collapsed)
+    expect(screen.queryByText('Clean Flying Laps')).not.toBeInTheDocument();
+    expect(screen.queryByText('Top Speed Recorded')).not.toBeInTheDocument();
+
+    // Find any "+ More" or "Show All" button on any card (e.g. on Driving Overview or Circuits or Cars)
+    const expandButton = screen.getByRole('button', { name: /Show All Driving Stats/i });
+    expect(expandButton).toBeInTheDocument();
+
+    // Click to expand ONE of the cards
+    fireEvent.click(expandButton);
+
+    // ALL cards should now be in expanded state!
+    // 1. Driving overview displays all extra stats
+    expect(screen.getByText('Clean Flying Laps')).toBeInTheDocument();
+    expect(screen.getByText('Top Speed Recorded')).toBeInTheDocument();
+    expect(screen.getByText('312.5 km/h')).toBeInTheDocument();
+    expect(screen.getByText('Average Speed')).toBeInTheDocument();
+    expect(screen.getByText('Race Podiums & Wins')).toBeInTheDocument();
+    expect(screen.getByText('Session Breakdown')).toBeInTheDocument();
+    expect(screen.getByText('Pit Stops Serviced')).toBeInTheDocument();
+
+    // 2. The collapse buttons are visible on cards (e.g. "Show Top 3 Only")
+    const collapseButtons = screen.getAllByRole('button', { name: /Show Top 3 Only/i });
+    expect(collapseButtons.length).toBeGreaterThanOrEqual(1);
+
+    // Click collapse on any card
+    fireEvent.click(collapseButtons[0]);
+
+    // All cards collapse back together
+    expect(screen.queryByText('Clean Flying Laps')).not.toBeInTheDocument();
+    expect(screen.queryByText('Top Speed Recorded')).not.toBeInTheDocument();
   });
 });
