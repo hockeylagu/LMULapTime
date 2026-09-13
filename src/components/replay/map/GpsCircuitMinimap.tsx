@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 
 export interface GpsCircuitMinimapProps {
-  pathD: string;
   layoutPathD?: string;
+  trackBoundaryPathD?: string;
   currentPos?: { sx: number; sy: number };
   baselineGhostPos?: { sx: number; sy: number } | null;
   currentViewBox?: string;
@@ -10,14 +10,14 @@ export interface GpsCircuitMinimapProps {
 }
 
 export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
-  pathD,
   layoutPathD,
+  trackBoundaryPathD,
   currentPos,
   baselineGhostPos,
   currentViewBox,
   className = '',
 }) => {
-  const activePathD = layoutPathD || pathD;
+  const activePathD = trackBoundaryPathD || layoutPathD;
 
   const viewportBox = useMemo(() => {
     if (!currentViewBox) return null;
@@ -37,7 +37,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
     >
       <svg viewBox="0 0 800 800" className="w-full h-full drop-shadow-sm">
         <path
-          d={pathD}
+          d={activePathD}
           stroke="#1e293b"
           strokeWidth="16"
           strokeLinecap="round"
@@ -45,7 +45,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
           fill="none"
         />
         <path
-          d={pathD}
+          d={activePathD}
           stroke="#475569"
           strokeWidth="8"
           strokeLinecap="round"

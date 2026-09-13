@@ -45,12 +45,36 @@ describe('ReplayMapContainer', () => {
     },
   ];
 
+  const mockTrackGeometry = {
+    layoutKey: 'monza_gp',
+    circuitId: 'monza',
+    layoutId: 'gp',
+    trackVenue: 'Autodromo Nazionale Monza',
+    trackCourse: 'Autodromo Nazionale Monza',
+    lengthM: 5787,
+    bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+    leftBoundary: [
+      [90, 190],
+      [140, 210],
+    ] as Array<[number, number]>,
+    rightBoundary: [
+      [110, 210],
+      [160, 230],
+    ] as Array<[number, number]>,
+    centerline: [
+      [100, 200],
+      [150, 220],
+      [200, 240],
+    ] as Array<[number, number]>,
+  };
+
   const baseProps = {
     trajectory,
     currentIndex: 0,
     onSelectIndex: vi.fn(),
     colorBy: 'speed' as const,
     isCompareMode: false,
+    trackGeometry: mockTrackGeometry,
   };
 
   it('does not render an apex chart when no corner is selected', () => {

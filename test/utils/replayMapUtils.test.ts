@@ -4,6 +4,7 @@ import {
   buildContinuousSvgPath,
   computeDispersedCornerMarkers,
   getHeatmapColor,
+  computeTrackBoundaryPathD,
 } from '../../src/components/replay/map/replayMapUtils.js';
 import type { ReplayTelemetryPoint } from '../../server/types.js';
 
@@ -94,5 +95,33 @@ describe('replayMapUtils', () => {
 
     const losingColor = getHeatmapColor({ x: 0, y: 0, z: 0, brake: 0, throttle: 100, speedKmh: 200 }, 'delta', 0.6);
     expect(losingColor).toBe('rgb(239, 68, 68)');
+  });
+
+  describe('computeTrackBoundaryPathD', () => {
+    it('uses centerlineSvgPoints when available', () => {
+      const centerline = [{ sx: 10, sy: 20 }, { sx: 30, sy: 40 }];
+      const left = [{ sx: 8, sy: 18 }];
+      const right = [{ sx: 12, sy: 22 }];
+      const result = computeTrackBoundaryPathD(centerline, left, right);
+      expect(result).toBe('M 10.0 20.0 L 30.0 40.0 Z');
+    });
+
+    it('derives boundary path from midpoints of left and right boundaries when centerline is absent', () => {
+      const left = [{ sx: 10, sy: 10 }, { sx: 20, sy: 20 }];
+      const right = [{ sx: 30, sy: 10 }, { sx: 40, sy: 20 }];
+      const result = computeTrackBoundaryPathD([], left, right);
+      expect(result).toBe('M 20.0 10.0 L 30.0 20.0 Z');
+    });
+
+    it('falls back to left boundary if right is absent', () => {
+      const left = [{ sx: 15, sy: 25 }];
+      const result = computeTrackBoundaryPathD([], left, []);
+      expect(result).toBe('M 15.0 25.0 Z');
+    });
+
+    it('returns undefined if all boundary point arrays are empty', () => {
+      const result = computeTrackBoundaryPathD([], [], []);
+      expect(result).toBeUndefined();
+    });
   });
 });

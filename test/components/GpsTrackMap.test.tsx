@@ -20,6 +20,29 @@ describe('GpsTrackMap', () => {
     spanZ: 40,
   };
 
+  const mockGeometry = {
+    layoutKey: 'monza_gp',
+    circuitId: 'monza',
+    layoutId: 'gp',
+    trackVenue: 'Autodromo Nazionale Monza',
+    trackCourse: 'Autodromo Nazionale Monza',
+    lengthM: 5787,
+    bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+    leftBoundary: [
+      [90, 190],
+      [140, 210],
+    ] as Array<[number, number]>,
+    rightBoundary: [
+      [110, 210],
+      [160, 230],
+    ] as Array<[number, number]>,
+    centerline: [
+      [100, 200],
+      [150, 220],
+      [200, 240],
+    ] as Array<[number, number]>,
+  };
+
   it('renders SVG track map and perpendicular start/finish line with start label beside the line', () => {
     const { container } = render(
       <GpsTrackMap
@@ -458,6 +481,7 @@ describe('GpsTrackMap', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        trackGeometry={mockGeometry}
       />
     );
 
@@ -472,6 +496,7 @@ describe('GpsTrackMap', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        trackGeometry={mockGeometry}
         showMinimap={false}
       />
     );
@@ -685,29 +710,6 @@ describe('GpsTrackMap', () => {
   });
 
   it('renders circuit minimap using track layout geometry when available', () => {
-    const mockGeometry = {
-      layoutKey: 'monza_gp',
-      circuitId: 'monza',
-      layoutId: 'gp',
-      trackVenue: 'Autodromo Nazionale Monza',
-      trackCourse: 'Autodromo Nazionale Monza',
-      lengthM: 5787,
-      bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
-      leftBoundary: [
-        [90, 190],
-        [140, 210],
-      ] as Array<[number, number]>,
-      rightBoundary: [
-        [110, 210],
-        [160, 230],
-      ] as Array<[number, number]>,
-      centerline: [
-        [100, 200],
-        [150, 220],
-        [200, 240],
-      ] as Array<[number, number]>,
-    };
-
     render(
       <GpsTrackMap
         points={mockPoints}
@@ -721,6 +723,49 @@ describe('GpsTrackMap', () => {
     expect(minimap).toBeInTheDocument();
     const minimapSvg = minimap.querySelector('svg');
     expect(minimapSvg).toBeInTheDocument();
+
+    const paths = minimap.querySelectorAll('path');
+    expect(paths.length).toBeGreaterThanOrEqual(2);
+    // Track boundary geometry path is closed with 'Z'
+    expect(paths[0].getAttribute('d')).toContain('Z');
+    // Ensure it is not using the unclosed racing line
+    expect(paths[0].getAttribute('d')?.trim().endsWith('Z')).toBe(true);
+  });
+
+  it('renders circuit minimap using derived track boundary when centerline is omitted', () => {
+    const mockGeometryWithoutCenterline = {
+      layoutKey: 'custom_layout',
+      circuitId: 'custom',
+      layoutId: 'full',
+      trackVenue: 'Custom Venue',
+      trackCourse: 'Custom Course',
+      lengthM: 3000,
+      bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
+      leftBoundary: [
+        [90, 190],
+        [140, 210],
+      ] as Array<[number, number]>,
+      rightBoundary: [
+        [110, 210],
+        [160, 230],
+      ] as Array<[number, number]>,
+      centerline: [] as Array<[number, number]>,
+    };
+
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        trackGeometry={mockGeometryWithoutCenterline}
+      />
+    );
+
+    const minimap = screen.getByTestId('gps-circuit-minimap');
+    expect(minimap).toBeInTheDocument();
+    const paths = minimap.querySelectorAll('path');
+    expect(paths.length).toBeGreaterThanOrEqual(2);
+    expect(paths[0].getAttribute('d')?.trim().endsWith('Z')).toBe(true);
   });
 
   it('correctly aligns both primary and baseline racing lines with identical projection within the road ribbon', () => {
