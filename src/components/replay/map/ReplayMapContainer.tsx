@@ -7,6 +7,7 @@ import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { getTrajectoryDistances } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData | null;
@@ -23,6 +24,7 @@ export interface ReplayMapContainerProps {
   trackVenue?: string;
   trackCourse?: string;
   layoutKey?: string;
+  trackGeometry?: TrackBoundaryGeometry | null;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -40,6 +42,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   trackVenue,
   trackCourse,
   layoutKey,
+  trackGeometry,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
@@ -189,6 +192,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             trackCourse={trackCourse}
             layoutKey={layoutKey}
             replayName={trajectory.replayName}
+            trackGeometry={trackGeometry}
           />
         </div>
         {apexChart}

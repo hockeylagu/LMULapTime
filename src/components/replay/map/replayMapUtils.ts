@@ -172,6 +172,30 @@ export function buildClosedSvgPath(pts: Array<{ sx: number; sy: number }>): stri
   return d;
 }
 
+export function computeTrackBoundaryPathD(
+  centerlineSvgPoints: Array<{ sx: number; sy: number }>,
+  leftSvgPoints: Array<{ sx: number; sy: number }>,
+  rightSvgPoints: Array<{ sx: number; sy: number }>
+): string | undefined {
+  if (centerlineSvgPoints.length > 0) {
+    return buildClosedSvgPath(centerlineSvgPoints);
+  }
+  if (leftSvgPoints.length > 0 && rightSvgPoints.length > 0 && leftSvgPoints.length === rightSvgPoints.length) {
+    const midpoints = leftSvgPoints.map((pt, i) => ({
+      sx: (pt.sx + rightSvgPoints[i].sx) / 2,
+      sy: (pt.sy + rightSvgPoints[i].sy) / 2,
+    }));
+    return buildClosedSvgPath(midpoints);
+  }
+  if (leftSvgPoints.length > 0) {
+    return buildClosedSvgPath(leftSvgPoints);
+  }
+  if (rightSvgPoints.length > 0) {
+    return buildClosedSvgPath(rightSvgPoints);
+  }
+  return undefined;
+}
+
 
 export function computeGhostPosition(
   primaryDists: number[],

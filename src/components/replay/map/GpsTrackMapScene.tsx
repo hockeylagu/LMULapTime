@@ -5,7 +5,7 @@ import {
   MapColorMode,
   projectTrajectoryPoints,
   projectBoundaryPoints,
-  buildClosedSvgPath,
+  computeTrackBoundaryPathD,
   buildContinuousSvgPath,
   computeGhostPosition,
   computeDispersedCornerMarkers,
@@ -103,9 +103,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     () => (effectiveGeometry?.centerline ? projectBoundaryPoints(effectiveGeometry.centerline, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
     [effectiveGeometry, effectiveBounds]
   );
-  const layoutPathD = useMemo(
-    () => (centerlineSvgPoints.length > 0 ? buildClosedSvgPath(centerlineSvgPoints) : undefined),
-    [centerlineSvgPoints]
+  const trackBoundaryPathD = useMemo(
+    () => computeTrackBoundaryPathD(centerlineSvgPoints, leftSvgPoints, rightSvgPoints),
+    [centerlineSvgPoints, leftSvgPoints, rightSvgPoints]
   );
 
   const {
@@ -196,8 +196,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
 
       {showMinimap && (
         <GpsCircuitMinimap
-          pathD={pathD}
-          layoutPathD={layoutPathD}
+          trackBoundaryPathD={trackBoundaryPathD}
+          layoutPathD={trackBoundaryPathD}
           currentPos={currentPos}
           baselineGhostPos={baselineGhostPos}
           currentViewBox={currentViewBox}
