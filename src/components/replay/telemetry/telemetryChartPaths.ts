@@ -42,6 +42,24 @@ export interface TelemetryChartPathsResult {
   lateralOffsetPath: string;
   baselineLateralOffsetPath: string;
   hasLateralOffset: boolean;
+
+  // Computed vehicle dynamics channels
+  accelLatPath: string;
+  baselineAccelLatPath: string;
+  accelLonPath: string;
+  baselineAccelLonPath: string;
+  accelTotalPath: string;
+  accelTotalArea: string;
+  baselineAccelTotalPath: string;
+  slipAnglePath: string;
+  baselineSlipAnglePath: string;
+  understeerPath: string;
+  baselineUndersteerPath: string;
+  tireSlipPath: string;
+  tireSlipArea: string;
+  baselineTireSlipPath: string;
+  yawRatePath: string;
+  baselineYawRatePath: string;
 }
 
 export function computeTelemetryChartPaths(
@@ -78,6 +96,22 @@ export function computeTelemetryChartPaths(
       lateralOffsetPath: '',
       baselineLateralOffsetPath: '',
       hasLateralOffset: false,
+      accelLatPath: '',
+      baselineAccelLatPath: '',
+      accelLonPath: '',
+      baselineAccelLonPath: '',
+      accelTotalPath: '',
+      accelTotalArea: '',
+      baselineAccelTotalPath: '',
+      slipAnglePath: '',
+      baselineSlipAnglePath: '',
+      understeerPath: '',
+      baselineUndersteerPath: '',
+      tireSlipPath: '',
+      tireSlipArea: '',
+      baselineTireSlipPath: '',
+      yawRatePath: '',
+      baselineYawRatePath: '',
     };
   }
 
@@ -121,6 +155,21 @@ export function computeTelemetryChartPaths(
 
   let lat = '';
   let bLat = '';
+
+  let accLat = '';
+  let bAccLat = '';
+  let accLon = '';
+  let bAccLon = '';
+  let accTot = '';
+  let bAccTot = '';
+  let slipAng = '';
+  let bSlipAng = '';
+  let uSteer = '';
+  let bUSteer = '';
+  let tireSlp = '';
+  let bTireSlp = '';
+  let yawRt = '';
+  let bYawRt = '';
 
   let maxDelta = 1.0;
   const rates = new Map<number, number>();
@@ -208,6 +257,55 @@ export function computeTelemetryChartPaths(
       lat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
     }
 
+    // Lateral Acceleration: -3.0G to +3.0G -> 92 to 8 in SVG Y (center 0 at 50)
+    if (p.accelLatG !== undefined) {
+      const latClamped = Math.max(-3.0, Math.min(3.0, p.accelLatG));
+      const latY = 50 - (latClamped / 3.0) * 42;
+      accLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
+    }
+
+    // Longitudinal Acceleration: -3.0G to +3.0G -> 92 to 8 in SVG Y (center 0 at 50)
+    if (p.accelLonG !== undefined) {
+      const lonClamped = Math.max(-3.0, Math.min(3.0, p.accelLonG));
+      const lonY = 50 - (lonClamped / 3.0) * 42;
+      accLon += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${lonY.toFixed(1)} `;
+    }
+
+    // Combined Acceleration: 0.0G to 4.0G -> 95 to 10 in SVG Y
+    if (p.accelTotalG !== undefined) {
+      const totClamped = Math.max(0, Math.min(4.0, p.accelTotalG));
+      const totY = 95 - (totClamped / 4.0) * 85;
+      accTot += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${totY.toFixed(1)} `;
+    }
+
+    // Slip Angle: -12 to +12 deg -> 92 to 8 in SVG Y (center 0 at 50)
+    if (p.slipAngleDeg !== undefined) {
+      const saClamped = Math.max(-12, Math.min(12, p.slipAngleDeg));
+      const saY = 50 - (saClamped / 12) * 42;
+      slipAng += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${saY.toFixed(1)} `;
+    }
+
+    // Understeer / Oversteer Dynamic Balance: -8 to +8 deg -> 92 to 8 in SVG Y (center 0 at 50)
+    if (p.understeerDeg !== undefined) {
+      const uClamped = Math.max(-8, Math.min(8, p.understeerDeg));
+      const uY = 50 - (uClamped / 8) * 42;
+      uSteer += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${uY.toFixed(1)} `;
+    }
+
+    // Tire Slip Saturation: 0% to 100% -> 95 to 10 in SVG Y
+    if (p.tireSlipPct !== undefined) {
+      const slpClamped = Math.max(0, Math.min(100, p.tireSlipPct));
+      const slpY = 95 - (slpClamped / 100) * 85;
+      tireSlp += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${slpY.toFixed(1)} `;
+    }
+
+    // Yaw Rate: -90 to +90 deg/s -> 92 to 8 in SVG Y (center 0 at 50)
+    if (p.yawRateDeg !== undefined) {
+      const yrClamped = Math.max(-90, Math.min(90, p.yawRateDeg));
+      const yrY = 50 - (yrClamped / 90) * 42;
+      yawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
+    }
+
     // Baseline comparisons
     if (pointComparisons[i]) {
       const comp = pointComparisons[i];
@@ -248,6 +346,48 @@ export function computeTelemetryChartPaths(
         const latClamped = Math.min(10, Math.max(-10, bp.lateralOffsetM));
         const latY = 50 - (latClamped / 10) * 40;
         bLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
+      }
+
+      if (bp.accelLatG !== undefined) {
+        const latClamped = Math.max(-3.0, Math.min(3.0, bp.accelLatG));
+        const latY = 50 - (latClamped / 3.0) * 42;
+        bAccLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
+      }
+
+      if (bp.accelLonG !== undefined) {
+        const lonClamped = Math.max(-3.0, Math.min(3.0, bp.accelLonG));
+        const lonY = 50 - (lonClamped / 3.0) * 42;
+        bAccLon += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${lonY.toFixed(1)} `;
+      }
+
+      if (bp.accelTotalG !== undefined) {
+        const totClamped = Math.max(0, Math.min(4.0, bp.accelTotalG));
+        const totY = 95 - (totClamped / 4.0) * 85;
+        bAccTot += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${totY.toFixed(1)} `;
+      }
+
+      if (bp.slipAngleDeg !== undefined) {
+        const saClamped = Math.max(-12, Math.min(12, bp.slipAngleDeg));
+        const saY = 50 - (saClamped / 12) * 42;
+        bSlipAng += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${saY.toFixed(1)} `;
+      }
+
+      if (bp.understeerDeg !== undefined) {
+        const uClamped = Math.max(-8, Math.min(8, bp.understeerDeg));
+        const uY = 50 - (uClamped / 8) * 42;
+        bUSteer += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${uY.toFixed(1)} `;
+      }
+
+      if (bp.tireSlipPct !== undefined) {
+        const slpClamped = Math.max(0, Math.min(100, bp.tireSlipPct));
+        const slpY = 95 - (slpClamped / 100) * 85;
+        bTireSlp += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${slpY.toFixed(1)} `;
+      }
+
+      if (bp.yawRateDeg !== undefined) {
+        const yrClamped = Math.max(-90, Math.min(90, bp.yawRateDeg));
+        const yrY = 50 - (yrClamped / 90) * 42;
+        bYawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
       }
 
       // Delta time: negative is faster (above zero line, Y < 50), positive is slower (below, Y > 50)
@@ -356,5 +496,21 @@ export function computeTelemetryChartPaths(
     lateralOffsetPath: lat,
     baselineLateralOffsetPath: bLat,
     hasLateralOffset,
+    accelLatPath: accLat,
+    baselineAccelLatPath: bAccLat,
+    accelLonPath: accLon,
+    baselineAccelLonPath: bAccLon,
+    accelTotalPath: accTot,
+    accelTotalArea: accTot ? `${accTot} L 1000 95 L 0 95 Z` : '',
+    baselineAccelTotalPath: bAccTot,
+    slipAnglePath: slipAng,
+    baselineSlipAnglePath: bSlipAng,
+    understeerPath: uSteer,
+    baselineUndersteerPath: bUSteer,
+    tireSlipPath: tireSlp,
+    tireSlipArea: tireSlp ? `${tireSlp} L 1000 95 L 0 95 Z` : '',
+    baselineTireSlipPath: bTireSlp,
+    yawRatePath: yawRt,
+    baselineYawRatePath: bYawRt,
   };
 }

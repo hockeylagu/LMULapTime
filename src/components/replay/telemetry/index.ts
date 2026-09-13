@@ -17,4 +17,10 @@ export * from './TelemetryPresetSelector.js';
 export * from './TelemetryPresetModal.js';
 export * from './telemetryPresets.js';
 export * from './telemetryChartPaths.js';
-
+export * from './TelemetryAccelLatChannel.js';
+export * from './TelemetryAccelLonChannel.js';
+export * from './TelemetryAccelTotalChannel.js';
+export * from './TelemetrySlipAngleChannel.js';
+export * from './TelemetryUndersteerChannel.js';
+export * from './TelemetryTireSlipChannel.js';
+export * from './TelemetryYawRateChannel.js';

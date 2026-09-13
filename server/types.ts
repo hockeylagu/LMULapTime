@@ -637,6 +637,14 @@ export interface ReplayTrajectoryPoint {
   distM?: number;
   stationM?: number;
   lateralOffsetM?: number;
+  accelLonG?: number;
+  accelLatG?: number;
+  accelTotalG?: number;
+  yawRateDeg?: number;
+  slipAngleDeg?: number;
+  understeerDeg?: number;
+  tireSlipPct?: number;
+  wheelLockActive?: boolean;
 }
 
 export interface ReplayPenaltyEvent {

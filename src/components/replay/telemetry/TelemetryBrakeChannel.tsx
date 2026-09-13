@@ -71,6 +71,11 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
             ABS ACTIVE
           </span>
         )}
+        {currentPoint?.wheelLockActive && !currentPoint?.absActive && (
+          <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white font-black text-[8px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
+            LOCKUP
+          </span>
+        )}
         {currentComparison && (
           <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
             Base: {currentComparison.baseline.brake.toFixed(0)}%
