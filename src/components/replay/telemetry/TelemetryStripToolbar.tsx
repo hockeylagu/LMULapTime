@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Play, ZoomIn, Activity } from 'lucide-react';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
+import { TelemetryPreset } from './telemetryPresets.js';
+import { TelemetryPresetSelector } from './TelemetryPresetSelector.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -20,6 +22,10 @@ export interface TelemetryStripToolbarProps {
   currentFrame?: number;
   totalFrames?: number;
   headerContent?: React.ReactNode;
+  presets?: TelemetryPreset[];
+  activePresetId?: string;
+  onSelectPreset?: (presetId: string) => void;
+  onOpenManageModal?: () => void;
 }
 
 export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React.memo(({
@@ -40,6 +46,10 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   currentFrame,
   totalFrames,
   headerContent,
+  presets,
+  activePresetId,
+  onSelectPreset,
+  onOpenManageModal,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
 
@@ -86,6 +96,15 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {presets && presets.length > 0 && activePresetId && onSelectPreset && onOpenManageModal && (
+          <TelemetryPresetSelector
+            presets={presets}
+            activePresetId={activePresetId}
+            onSelectPreset={onSelectPreset}
+            onOpenManageModal={onOpenManageModal}
+          />
+        )}
+
         {/* Mode Switch Pills */}
         <div className="flex items-center p-0.5 rounded-lg bg-black/40 border border-white/10 text-[10px] font-mono">
           <button

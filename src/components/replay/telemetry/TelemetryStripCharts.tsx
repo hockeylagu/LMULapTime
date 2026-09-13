@@ -4,6 +4,15 @@ import { computeLapComparisons, getTrajectoryDistances, findIndexAtDistance } fr
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
+import {
+  TelemetryPreset,
+  loadTelemetryPresets,
+  saveTelemetryPresets,
+  loadActivePresetId,
+  saveActivePresetId,
+  resetTelemetryPresetsToDefault,
+} from './telemetryPresets.js';
+import { TelemetryPresetModal } from './TelemetryPresetModal.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -49,6 +58,28 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
   const [dragSelection, setDragSelection] = useState<{ startX: number; currentX: number; startPct: number; currentPct: number } | null>(null);
+
+  const [presets, setPresets] = useState<TelemetryPreset[]>(() => loadTelemetryPresets());
+  const [activePresetId, setActivePresetId] = useState<string>(() => loadActivePresetId(presets));
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+
+  const handleSelectPreset = useCallback((id: string) => {
+    setActivePresetId(id);
+    saveActivePresetId(id);
+  }, []);
+
+  const handleSavePresets = useCallback((updated: TelemetryPreset[]) => {
+    setPresets(updated);
+    saveTelemetryPresets(updated);
+  }, []);
+
+  const handleResetDefaults = useCallback(() => {
+    const defs = resetTelemetryPresetsToDefault();
+    setPresets(defs);
+    setActivePresetId(defs[0].id);
+  }, []);
+
+  const activePreset = presets.find(p => p.id === activePresetId) || presets[0];
 
   const activeZoomRange = zoomRange !== undefined ? zoomRange : internalZoomRange;
   const updateZoomRange = useCallback((range: { start: number; end: number } | null) => {
@@ -246,6 +277,21 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         headerContent={headerContent}
         dragSelection={dragSelection}
         markerPcts={metrics}
+        activeChannels={activePreset?.channels}
+        presets={presets}
+        activePresetId={activePresetId}
+        onSelectPreset={handleSelectPreset}
+        onOpenManageModal={() => setIsPresetModalOpen(true)}
+      />
+
+      <TelemetryPresetModal
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+        presets={presets}
+        activePresetId={activePresetId}
+        onSavePresets={handleSavePresets}
+        onSelectActivePreset={handleSelectPreset}
+        onResetDefaults={handleResetDefaults}
       />
     </div>
   );
