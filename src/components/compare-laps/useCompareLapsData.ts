@@ -144,13 +144,14 @@ export function useCompareLapsData({
 
   useEffect(() => {
     if (!selectedTrack) return;
+    const controller = new AbortController();
     setLoading(true);
     const query = new URLSearchParams({
       track: selectedTrack,
       carClass: selectedCarClass,
       playerOnly: String(playerOnly),
     });
-    fetch(`/api/compare/laps?${query.toString()}`)
+    fetch(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
         setApiData(data);
@@ -158,9 +159,14 @@ export function useCompareLapsData({
         setLoading(false);
       })
       .catch((err) => {
+        if (err?.name === 'AbortError') return;
         console.error('Failed to fetch compare laps:', err);
         setLoading(false);
       });
+
+    return () => {
+      controller.abort();
+    };
   }, [selectedTrack, selectedCarClass, playerOnly]);
 
   const targetSessionId = initialSessionId || params.get('sessionId') || undefined;

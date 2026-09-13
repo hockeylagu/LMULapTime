@@ -24,9 +24,9 @@ export interface TrackSessionsCardProps {
 }
 
 export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
-  trackName,
+  trackName: _trackName,
   sortedSessions,
-  totalSessionsCount,
+  totalSessionsCount: _totalSessionsCount,
   emptyCount,
   hideEmpty,
   setHideEmpty,
@@ -51,10 +51,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
         headerTitle={
           <>
             <FileText className="w-5 h-5 text-lmu-accent" />
-            <span>
-              Sessions Recorded on {trackName} ({sortedSessions.length}
-              {hideEmpty && emptyCount > 0 ? ` / ${totalSessionsCount}` : ''})
-            </span>
+            <span>Sessions Recorded</span>
           </>
         }
         headerSubtitle={

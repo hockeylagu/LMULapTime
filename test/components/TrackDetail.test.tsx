@@ -151,7 +151,8 @@ describe('TrackDetail component', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
-      expect(screen.getByText('Appropriate Reference Lap Times')).toBeInTheDocument();
+      expect(screen.queryByText('Appropriate Reference Lap Times')).not.toBeInTheDocument();
+      expect(screen.getByText('2:00.000')).toBeInTheDocument();
       expect(screen.getAllByText('Ferrari 499P').length).toBeGreaterThan(0);
     });
 
@@ -474,6 +475,33 @@ describe('TrackDetail component', () => {
 
     fireEvent.click(bestLapLegend);
     expect(bestLapLegend.className).not.toContain('line-through');
+  });
+
+  it('opens circuit info modal when clicking on the info icon', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const infoBtn = screen.getByTitle('View circuit info for Spa');
+    fireEvent.click(infoBtn);
+
+    expect(screen.getByRole('dialog', { name: /Circuit Information/i })).toBeInTheDocument();
+    expect(screen.getByText('19 Turns')).toBeInTheDocument();
+    expect(screen.getByText(/Belgium/i)).toBeInTheDocument();
+
+    const closeBtn = screen.getByTitle('Close');
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog', { name: /Circuit Information/i })).not.toBeInTheDocument();
   });
 });
 

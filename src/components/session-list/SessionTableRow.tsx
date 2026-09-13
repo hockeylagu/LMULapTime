@@ -133,20 +133,29 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
         )}
       </td>
 
-      {/* Replay */}
-      <td className="px-3.5 py-3 text-center">
-        <ReplayIndicator
-          replay={s.matchingReplayFile}
-          onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
-        />
-      </td>
-
-      {/* Action */}
-      <td className="px-3.5 py-3 text-right">
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-lmu-accent group-hover:text-white transition-colors">
-          <span>Analyze</span>
-          <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
-        </span>
+      {/* Actions (Replay + Analyze) */}
+      <td className="px-3.5 py-3 text-right whitespace-nowrap">
+        <div className="inline-flex items-center justify-end gap-2.5">
+          {s.matchingReplayFile && (
+            <ReplayIndicator
+              replay={s.matchingReplayFile}
+              hideIfEmpty
+              onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
+            />
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectSession(s.id);
+            }}
+            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center group/btn"
+            title={`Analyze ${displayTrack || 'Session'} Details`}
+            aria-label={`Analyze ${displayTrack || 'Session'}`}
+          >
+            <ChevronRight className="w-4 h-4 transform group-hover/btn:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
       </td>
     </tr>
   );

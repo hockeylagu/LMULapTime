@@ -14,7 +14,7 @@ export interface UseSessionDetailDataParams {
 // Module-level in-memory cache for instant sub-millisecond session switching. Capped so
 // browsing many sessions in one tab doesn't grow this forever.
 const clientSessionCache = new Map<string, DetailedSession>();
-const MAX_CACHED_SESSIONS = 50;
+const MAX_CACHED_SESSIONS = 5;
 let clientRefCache: ReferenceLaptimesCache | null = null;
 
 function storeCachedSession(sessionId: string, session: DetailedSession): void {
@@ -80,6 +80,8 @@ export function useSessionDetailData({
 
   useEffect(() => {
     let isCurrent = true;
+    const abortController = new AbortController();
+    const { signal } = abortController;
     const memCached = clientSessionCache.get(sessionId);
     if (memCached) {
       setSession(memCached);
@@ -94,7 +96,7 @@ export function useSessionDetailData({
     }
 
     // 1. Fetch Session Telemetry Data (primary critical path)
-    fetch(`/api/session/${sessionId}`)
+    fetch(`/api/session/${sessionId}`, { signal })
       .then((res) => res.json())
       .then((sessionData) => {
         if (!isCurrent) return;
@@ -110,14 +112,14 @@ export function useSessionDetailData({
         setLoading(false);
       })
       .catch((err) => {
-        if (!isCurrent) return;
+        if (!isCurrent || err?.name === 'AbortError') return;
         console.error('Failed to load session detail data:', err);
         setLoading(false);
       });
 
     // 2. Fetch Reference Targets (if not yet cached in memory)
     if (!clientRefCache) {
-      fetch('/api/reference-laptimes')
+      fetch('/api/reference-laptimes', { signal })
         .then((res) => res.json())
         .then((refData) => {
           if (!isCurrent) return;
@@ -129,7 +131,7 @@ export function useSessionDetailData({
 
     // 3. Fetch Progression in background (if not supplied via props)
     if (!initialProgression || initialProgression.length === 0) {
-      fetch('/api/progression')
+      fetch('/api/progression', { signal })
         .then((res) => res.json())
         .then((progData) => {
           if (!isCurrent) return;
@@ -140,14 +142,26 @@ export function useSessionDetailData({
         .catch(() => null);
     }
 
-    // 4. Fetch All Sessions summary in background (if not supplied via props)
+    // 4. Fetch session candidates in background (if not supplied via props)
+    // Strip heavy driver arrays, lap logs, and setups to minimize heap memory retention
     if (!initialSessions || initialSessions.length === 0) {
-      fetch('/api/sessions')
+      fetch('/api/sessions', { signal })
         .then((res) => res.json())
         .then((allSessionsData) => {
           if (!isCurrent) return;
           if (Array.isArray(allSessionsData)) {
-            setAllSessions(allSessionsData);
+            const stripped = allSessionsData.map((s) => ({
+              id: s.id,
+              sessionId: s.sessionId || s.id,
+              sessionType: s.sessionType,
+              sessionName: s.sessionName,
+              trackVenue: s.trackVenue,
+              trackCourse: s.trackCourse,
+              timeString: s.timeString,
+              dateString: s.dateString,
+              timestamp: s.timestamp,
+            }));
+            setAllSessions(stripped as unknown as DetailedSession[]);
           }
         })
         .catch(() => null);
@@ -155,6 +169,7 @@ export function useSessionDetailData({
 
     return () => {
       isCurrent = false;
+      abortController.abort();
     };
   }, [sessionId, initialProgression, initialSessions]);
 

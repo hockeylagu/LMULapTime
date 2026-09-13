@@ -137,7 +137,7 @@ describe('SessionList component', () => {
     expect(within(table).getByText('Laps')).toBeInTheDocument();
     expect(within(table).getByText('Best Lap')).toBeInTheDocument();
     expect(within(table).getByText('Benchmark Pace')).toBeInTheDocument();
-    expect(within(table).getByText('Replay')).toBeInTheDocument();
+    expect(within(table).getByText('Actions')).toBeInTheDocument();
 
     const row = within(table).getByText('Circuit de la Sarthe').closest('tr');
     expect(row).not.toBeNull();

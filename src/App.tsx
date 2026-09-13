@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Navbar,
   NavTab,
@@ -14,58 +14,64 @@ import { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, 
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-  const [status, setStatus] = useState<AppStatus | null>(null);
-  const [sessions, setSessions] = useState<DetailedSession[]>([]);
-  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
-  const [tracksMap, setTracksMap] = useState<Record<string, TrackSummary>>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedRouteTrackName, setSelectedRouteTrackName] = useState<string | null>(null);
 
-  // Filter states
+  // Global Filter States
   const [selectedTrack, setSelectedTrackState] = useState<string>('All');
   const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
   const [filterType, setFilterTypeState] = useState<string>('All');
   const [searchQuery, setSearchQueryState] = useState<string>('');
 
+  // Data States
+  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [sessions, setSessions] = useState<DetailedSession[]>([]);
+  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
+  const [tracksMap, setTracksMap] = useState<Record<string, TrackSummary>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [replayScanStatus, setReplayScanStatus] = useState<ReplayScanStatus | null>(null);
 
-  // Fetches replay scan status once; exposed so Settings can force an immediate refresh
-  // right after triggering a rescan instead of waiting for the next scheduled poll.
-  const refreshReplayScanStatus = useCallback(() => {
-    fetch('/api/scan/status')
-      .then((res) => res.json())
-      .then((data: ReplayScanStatus) => setReplayScanStatus(data))
-      .catch(() => {});
-  }, []);
+  // Poll replay scan progress only while a scan is actively running.
+  // Once the scan finishes (running === false), polling stops completely,
+  // making 0 requests when idle.
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scanAbortRef = useRef<AbortController | null>(null);
 
-  // Poll replay scan progress continuously (slower cadence while idle, faster while a scan
-  // is running) so the Navbar badge and Settings page reflect both user-triggered rescans
-  // and the background scan the server kicks off automatically at startup.
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+  const startScanPolling = useCallback(() => {
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    if (scanAbortRef.current) scanAbortRef.current.abort();
 
     const poll = () => {
-      fetch('/api/scan/status')
+      scanAbortRef.current = new AbortController();
+      fetch('/api/scan/status', { signal: scanAbortRef.current.signal })
         .then((res) => res.json())
         .then((data: ReplayScanStatus) => {
-          if (cancelled) return;
           setReplayScanStatus(data);
-          timer = setTimeout(poll, data.running ? 1000 : 5000);
+          // Only continue polling if a scan is actively in progress
+          if (data.running) {
+            pollTimerRef.current = setTimeout(poll, 1000);
+          }
         })
-        .catch(() => {
-          if (!cancelled) timer = setTimeout(poll, 5000);
+        .catch((err) => {
+          if (err?.name === 'AbortError') return;
         });
     };
     poll();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
   }, []);
+
+  const refreshReplayScanStatus = useCallback(() => {
+    startScanPolling();
+  }, [startScanPolling]);
+
+  useEffect(() => {
+    // Check scan status once on startup; if a background scan is running, poll until complete
+    startScanPolling();
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      if (scanAbortRef.current) scanAbortRef.current.abort();
+    };
+  }, [startScanPolling]);
 
   // Helper to parse location hash and query parameters for routing and filter state
   const parseUrlState = () => {
@@ -281,14 +287,12 @@ export default function App() {
             onReplayScanTriggered={refreshReplayScanStatus}
           />
         ) : null}
-
       </main>
 
       {/* Footer */}
       <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted glass-panel">
         <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
       </footer>
-
     </div>
   );
 }

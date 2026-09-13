@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
 export interface DrivingOverviewCardProps {
@@ -7,7 +7,20 @@ export interface DrivingOverviewCardProps {
   totalLaps: number;
   totalDistanceKm: number;
   totalDrivingSeconds: number;
-  uniqueCircuitsCount: number;
+  uniqueCircuitsCount?: number;
+  cleanLaps?: number;
+  cleanLapsPercentage?: number;
+  maxTopSpeed?: number;
+  maxTopSpeedTrack?: string;
+  averageSpeedKmh?: number;
+  practiceSessionsCount?: number;
+  qualifyingSessionsCount?: number;
+  raceSessionsCount?: number;
+  raceWinsCount?: number;
+  racePodiumsCount?: number;
+  totalPitStops?: number;
+  showMore?: boolean;
+  setShowMore?: (val: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
@@ -15,7 +28,19 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
   totalLaps,
   totalDistanceKm,
   totalDrivingSeconds,
-  uniqueCircuitsCount,
+  cleanLaps,
+  cleanLapsPercentage,
+  maxTopSpeed,
+  maxTopSpeedTrack,
+  averageSpeedKmh,
+  practiceSessionsCount,
+  qualifyingSessionsCount,
+  raceSessionsCount,
+  raceWinsCount,
+  racePodiumsCount,
+  totalPitStops,
+  showMore = false,
+  setShowMore,
 }) => {
   const formatTotalDrivingTime = (totalSec: number): string => {
     if (!totalSec || totalSec <= 0) return '0h 00m';
@@ -32,14 +57,17 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
         <p className="text-xs font-bold text-lmu-green uppercase tracking-wider flex items-center gap-1.5">
           <Calendar className="w-4 h-4 text-lmu-green" />
-          <span>Driving Overview</span>
+          <span>Driving Overview {showMore && '(9 Stats)'}</span>
         </p>
-        <span className="text-[10px] text-lmu-green font-mono font-bold">
-          {sessionsCount.toLocaleString()} Sessions
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-lmu-green font-mono font-bold">
+            {sessionsCount.toLocaleString()} Sessions
+          </span>
+        </div>
       </div>
 
-      <div className="space-y-1.5 flex-1">
+      <div className={`space-y-1.5 flex-1 ${showMore ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
+        {/* #1 Total Laps */}
         <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
           <div className="flex items-center gap-1.5 truncate">
             <RankBadge rank={1} firstPlaceColor="text-lmu-green" />
@@ -52,6 +80,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
           </span>
         </div>
 
+        {/* #2 Distance Driven */}
         <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
           <div className="flex items-center gap-1.5 truncate">
             <RankBadge rank={2} />
@@ -64,6 +93,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
           </span>
         </div>
 
+        {/* #3 Driving Time */}
         <div className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group">
           <div className="flex items-center gap-1.5 truncate">
             <RankBadge rank={3} />
@@ -75,11 +105,119 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             {formatTotalDrivingTime(totalDrivingSeconds)}
           </span>
         </div>
+
+        {/* Additional metrics shown in expanded mode */}
+        {showMore && (
+          <>
+            {/* #4 Clean Flying Laps */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title={`${(cleanLaps ?? 0).toLocaleString()} valid laps out of ${totalLaps.toLocaleString()} total laps`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={4} />
+                <span className="text-white font-medium truncate group-hover:text-emerald-400 transition-colors">
+                  Clean Flying Laps
+                </span>
+              </div>
+              <span className="text-emerald-400 font-mono text-[11px] shrink-0 font-semibold">
+                {(cleanLaps ?? 0).toLocaleString()} ({cleanLapsPercentage ?? 0}%)
+              </span>
+            </div>
+
+            {/* #5 Top Speed */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title={maxTopSpeedTrack ? `Set at ${maxTopSpeedTrack}` : undefined}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={5} />
+                <span className="text-white font-medium truncate group-hover:text-sky-400 transition-colors">
+                  Top Speed Recorded
+                </span>
+              </div>
+              <span className="text-sky-400 font-mono text-[11px] shrink-0 font-semibold">
+                {maxTopSpeed && maxTopSpeed > 0 ? `${maxTopSpeed.toFixed(1)} km/h` : 'N/A'}
+              </span>
+            </div>
+
+            {/* #6 Average Speed */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title="Average speed across all logged laps"
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={6} />
+                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                  Average Speed
+                </span>
+              </div>
+              <span className="text-slate-300 font-mono text-[11px] shrink-0">
+                {averageSpeedKmh && averageSpeedKmh > 0 ? `${averageSpeedKmh} km/h` : 'N/A'}
+              </span>
+            </div>
+
+            {/* #7 Race Podiums & Wins */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title={`${raceWinsCount ?? 0} Wins, ${racePodiumsCount ?? 0} Podiums across ${raceSessionsCount ?? 0} Races`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={7} />
+                <span className="text-white font-medium truncate group-hover:text-lmu-gold transition-colors">
+                  Race Podiums & Wins
+                </span>
+              </div>
+              <span className="text-lmu-gold font-mono text-[11px] shrink-0 font-semibold">
+                {raceWinsCount ?? 0}W • {racePodiumsCount ?? 0}P
+              </span>
+            </div>
+
+            {/* #8 Session Types */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title={`${practiceSessionsCount ?? 0} Practice, ${qualifyingSessionsCount ?? 0} Qualifying, ${raceSessionsCount ?? 0} Race`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={8} />
+                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                  Session Breakdown
+                </span>
+              </div>
+              <span className="text-slate-300 font-mono text-[11px] shrink-0">
+                {practiceSessionsCount ?? 0}P • {qualifyingSessionsCount ?? 0}Q • {raceSessionsCount ?? 0}R
+              </span>
+            </div>
+
+            {/* #9 Pit Stops */}
+            <div
+              className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
+              title="Total in-laps and pit stops serviced"
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <RankBadge rank={9} />
+                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                  Pit Stops Serviced
+                </span>
+              </div>
+              <span className="text-slate-300 font-mono text-[11px] shrink-0">
+                {(totalPitStops ?? 0).toLocaleString()} stops
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="w-full text-center text-[10px] text-lmu-muted font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1">
-        <span>Across {uniqueCircuitsCount} Unique Circuits</span>
-      </div>
+      {setShowMore && (
+        <button
+          type="button"
+          onClick={() => setShowMore(!showMore)}
+          className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-green font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+        >
+          <span>{showMore ? 'Show Top 3 Only' : 'Show All Driving Stats'}</span>
+          <ChevronDown className={`w-3 h-3 transform transition-transform ${showMore ? 'rotate-180' : ''}`} />
+        </button>
+      )}
     </div>
   );
 };

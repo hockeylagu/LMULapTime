@@ -3,6 +3,7 @@ import { Trophy } from 'lucide-react';
 import { formatTime } from '../../utils/formatters.js';
 import { PaceBadge, SectorSplitsRow } from '../common';
 import { PaceCategory } from '../../../server/types.js';
+import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
 export interface TrackSummaryItem {
   trackVenue: string;
@@ -37,16 +38,22 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
       className="glass-panel glass-panel-hover p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between"
     >
       <div className="space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1 mr-2">
-            <h3 className="text-lg font-bold text-white tracking-wide truncate" title={t.trackVenue}>
-              {t.trackVenue}
-            </h3>
-            <p className="text-xs text-lmu-muted mt-0.5 truncate">
-              {t.sessionsCount} Sessions • {t.totalLaps} Total Laps
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 flex items-center gap-3">
+            <TrackCircuitLayout
+              trackName={t.trackVenue}
+              size="card"
+            />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg font-bold text-white tracking-wide truncate" title={t.trackVenue}>
+                {t.trackVenue}
+              </h3>
+              <p className="text-xs text-lmu-muted mt-0.5 truncate">
+                {t.sessionsCount} Sessions • {t.totalLaps} Total Laps
+              </p>
+            </div>
           </div>
-          <span className="p-2 rounded-xl bg-lmu-gold/10 text-lmu-gold border border-lmu-gold/20">
+          <span className="p-2 rounded-xl bg-lmu-gold/10 text-lmu-gold border border-lmu-gold/20 shrink-0">
             <Trophy className="w-5 h-5" />
           </span>
         </div>

@@ -24,16 +24,6 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
           <Award className="w-4 h-4 text-lmu-cyan" />
           <span>Cars {rankedCars.length > 3 && `(${visibleCars.length}/${rankedCars.length})`}</span>
         </p>
-        {rankedCars.length > 3 && (
-          <button
-            type="button"
-            onClick={() => setShowMoreCars(!showMoreCars)}
-            className="text-[10px] text-lmu-cyan hover:text-white font-semibold transition-colors flex items-center gap-0.5"
-          >
-            <span>{showMoreCars ? 'Show Less' : `+${rankedCars.length - 3} More`}</span>
-            <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreCars ? 'rotate-180' : ''}`} />
-          </button>
-        )}
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreCars ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>

@@ -7,6 +7,7 @@ import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { ReplayInspectorModal } from '../../replay/index.js';
+import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
@@ -61,11 +62,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
       const { params } = getHashRouteAndParams();
       const hasReplay = Boolean(params.get('replay') || params.get('replayLap') || (session.matchingReplayFile && (params.get('lap') || params.get('lapNum'))));
       const l = params.get('lap') || params.get('lapNum') || params.get('replayLap');
-      const lapNum = l ? parseInt(l, 10) : undefined;
       setShowReplayModal(hasReplay);
-      if (lapNum) {
-        setReplayLap(lapNum);
-      }
+      if (l) setReplayLap(parseInt(l, 10));
     };
 
     window.addEventListener('hashchange', syncFromUrl);
@@ -107,9 +105,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   const modeLabel = settings?.modeSetting || (settings?.serverName ? 'Multiplayer' : 'Race Weekend');
   const durationLabel = settings?.durationMinutes && settings.durationMinutes > 0
     ? `${settings.durationMinutes} min`
-    : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640
-    ? `${settings.raceLaps} Laps`
-    : undefined;
+    : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640 ? `${settings.raceLaps} Laps` : undefined;
 
   return (
     <>
@@ -211,30 +207,35 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
       {/* Session Title Card */}
       <div className="glass-panel p-6 rounded-2xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                  session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
-                  : session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                  : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
-                }`}
-              >
-                {session.sessionName} ({session.sessionType})
-              </span>
-              <span className="text-xs text-lmu-muted">{session.timeString}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-4">
+              <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="session" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
+                      session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                      : session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
+                      : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                    }`}
+                  >
+                    {session.sessionName} ({session.sessionType})
+                  </span>
+                  <span className="text-xs text-lmu-muted">{session.timeString}</span>
+                </div>
+                <h2
+                  onClick={() => { window.location.hash = `#track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`; }}
+                  className="text-2xl font-extrabold text-white cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
+                  title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
+                >
+                  <span className="truncate">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</span>
+                  <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-lmu-gold group-hover:translate-x-0.5 transition-all shrink-0" />
+                </h2>
+                <p className="text-xs text-lmu-muted mt-0.5 truncate">
+                  {session.trackCourse} • {session.trackEvent || 'Session'}
+                </p>
+              </div>
             </div>
-            <h2
-              onClick={() => { window.location.hash = `#track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`; }}
-              className="text-2xl font-extrabold text-white mt-1 cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
-              title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
-            >
-              <span className="truncate">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</span>
-              <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-lmu-gold group-hover:translate-x-0.5 transition-all shrink-0" />
-            </h2>
-            <p className="text-xs text-lmu-muted mt-0.5">
-              {session.trackCourse} • {session.trackEvent || 'Session'}
-            </p>
           </div>
 
           {/* Driver Selector */}
