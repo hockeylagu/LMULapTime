@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
 import {
   X,
-  Plus,
   Copy,
   Trash2,
-  RotateCcw,
-  ArrowUp,
-  ArrowDown,
   Check,
   Edit2,
   SlidersHorizontal,
@@ -16,6 +12,8 @@ import {
   TelemetryChannelId,
   AVAILABLE_TELEMETRY_CHANNELS,
 } from './telemetryPresets.js';
+import { TelemetryPresetChannelRow } from './TelemetryPresetChannelRow.js';
+import { TelemetryPresetSidebar } from './TelemetryPresetSidebar.js';
 
 export interface TelemetryPresetModalProps {
   isOpen: boolean;
@@ -164,60 +162,17 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden font-mono text-xs">
           {/* Preset Sidebar */}
-          <div className="w-full md:w-56 bg-[#060910] border-b md:border-b-0 md:border-r border-lmu-border/60 flex flex-col shrink-0">
-            <div className="p-2.5 flex items-center justify-between border-b border-white/5 shrink-0">
-              <span className="text-[10px] uppercase font-bold text-lmu-muted">Presets</span>
-              <button
-                type="button"
-                onClick={handleCreateNew}
-                className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
-                title="Create a new custom telemetry preset"
-              >
-                <Plus className="w-3 h-3" /> New
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
-              {presets.map(p => {
-                const isSelected = p.id === currentPreset?.id;
-                const isActive = p.id === activePresetId;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(p.id);
-                      setIsRenaming(false);
-                    }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-sky-500/20 border border-sky-400/40 text-white font-bold'
-                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
-                      <span className="truncate">{p.name}</span>
-                    </div>
-                    <span className="text-[9px] text-lmu-muted shrink-0">
-                      {p.channels.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="p-2 border-t border-white/5 shrink-0">
-              <button
-                type="button"
-                onClick={onResetDefaults}
-                className="w-full py-1 px-2 rounded text-[10px] text-lmu-muted hover:text-amber-300 hover:bg-amber-500/10 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                title="Reset all presets to factory defaults"
-              >
-                <RotateCcw className="w-3 h-3" /> Reset to Defaults
-              </button>
-            </div>
-          </div>
+          <TelemetryPresetSidebar
+            presets={presets}
+            selectedId={currentPreset?.id ?? selectedId}
+            activePresetId={activePresetId}
+            onSelectId={(id) => {
+              setSelectedId(id);
+              setIsRenaming(false);
+            }}
+            onCreateNew={handleCreateNew}
+            onResetDefaults={onResetDefaults}
+          />
 
           {/* Preset Editor Main Panel */}
           {currentPreset && (
@@ -300,57 +255,15 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
                   const isLast = activeIdx === currentPreset.channels.length - 1;
 
                   return (
-                    <div
+                    <TelemetryPresetChannelRow
                       key={channel.id}
-                      className={`p-2 rounded-xl border flex items-center justify-between gap-2 transition-all ${
-                        isActive
-                          ? 'bg-[#0d1524] border-sky-500/40'
-                          : 'bg-black/20 border-white/5 opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={isActive}
-                          onChange={() => handleToggleChannel(channel.id)}
-                          className="w-3.5 h-3.5 rounded bg-black border-slate-700 text-sky-500 focus:ring-0 cursor-pointer"
-                        />
-                        <span className={`px-1.5 py-0.2 rounded font-black text-[9px] tracking-wider ${channel.badgeColor}`}>
-                          {channel.shortName}
-                        </span>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[11px] font-bold text-white truncate">
-                            {channel.name}
-                          </span>
-                          <span className="text-[9px] text-lmu-muted truncate">
-                            {channel.description} ({channel.unit})
-                          </span>
-                        </div>
-                      </label>
-
-                      {isActive && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={isFirst}
-                            onClick={() => handleMoveChannel(channel.id, 'up')}
-                            className="p-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-20 text-slate-300 cursor-pointer disabled:cursor-not-allowed"
-                            title="Move channel up"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isLast}
-                            onClick={() => handleMoveChannel(channel.id, 'down')}
-                            className="p-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-20 text-slate-300 cursor-pointer disabled:cursor-not-allowed"
-                            title="Move channel down"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                      channel={channel}
+                      isActive={isActive}
+                      isFirst={isFirst}
+                      isLast={isLast}
+                      onToggle={handleToggleChannel}
+                      onMove={handleMoveChannel}
+                    />
                   );
                 })}
               </div>

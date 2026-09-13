@@ -23,6 +23,14 @@ export interface InterpolatedPoint {
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   lateralOffsetM?: number;
+  accelLonG?: number;
+  accelLatG?: number;
+  accelTotalG?: number;
+  yawRateDeg?: number;
+  slipAngleDeg?: number;
+  understeerDeg?: number;
+  tireSlipPct?: number;
+  wheelLockActive?: boolean;
 }
 
 export interface PointComparison {
@@ -151,6 +159,14 @@ export function interpolatePointAtDistance(
       tireWear: p.tireWear ? [...p.tireWear] : undefined,
       brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
       lateralOffsetM: p.lateralOffsetM,
+      accelLonG: p.accelLonG,
+      accelLatG: p.accelLatG,
+      accelTotalG: p.accelTotalG,
+      yawRateDeg: p.yawRateDeg,
+      slipAngleDeg: p.slipAngleDeg,
+      understeerDeg: p.understeerDeg,
+      tireSlipPct: p.tireSlipPct,
+      wheelLockActive: p.wheelLockActive,
     };
   }
 
@@ -189,6 +205,14 @@ export function interpolatePointAtDistance(
       tireWear: p.tireWear ? [...p.tireWear] : undefined,
       brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
       lateralOffsetM: p.lateralOffsetM,
+      accelLonG: p.accelLonG,
+      accelLatG: p.accelLatG,
+      accelTotalG: p.accelTotalG,
+      yawRateDeg: p.yawRateDeg,
+      slipAngleDeg: p.slipAngleDeg,
+      understeerDeg: p.understeerDeg,
+      tireSlipPct: p.tireSlipPct,
+      wheelLockActive: p.wheelLockActive,
     };
   }
 
@@ -237,6 +261,36 @@ export function interpolatePointAtDistance(
     ? Number((p0.lateralOffsetM + t * (p1.lateralOffsetM - p0.lateralOffsetM)).toFixed(2))
     : (p0.lateralOffsetM ?? p1.lateralOffsetM);
 
+  const accelLonG = p0.accelLonG !== undefined && p1.accelLonG !== undefined
+    ? Number((p0.accelLonG + t * (p1.accelLonG - p0.accelLonG)).toFixed(2))
+    : (p0.accelLonG ?? p1.accelLonG);
+
+  const accelLatG = p0.accelLatG !== undefined && p1.accelLatG !== undefined
+    ? Number((p0.accelLatG + t * (p1.accelLatG - p0.accelLatG)).toFixed(2))
+    : (p0.accelLatG ?? p1.accelLatG);
+
+  const accelTotalG = p0.accelTotalG !== undefined && p1.accelTotalG !== undefined
+    ? Number((p0.accelTotalG + t * (p1.accelTotalG - p0.accelTotalG)).toFixed(2))
+    : (p0.accelTotalG ?? p1.accelTotalG);
+
+  const yawRateDeg = p0.yawRateDeg !== undefined && p1.yawRateDeg !== undefined
+    ? Number((p0.yawRateDeg + t * (p1.yawRateDeg - p0.yawRateDeg)).toFixed(1))
+    : (p0.yawRateDeg ?? p1.yawRateDeg);
+
+  const slipAngleDeg = p0.slipAngleDeg !== undefined && p1.slipAngleDeg !== undefined
+    ? Number((p0.slipAngleDeg + t * (p1.slipAngleDeg - p0.slipAngleDeg)).toFixed(2))
+    : (p0.slipAngleDeg ?? p1.slipAngleDeg);
+
+  const understeerDeg = p0.understeerDeg !== undefined && p1.understeerDeg !== undefined
+    ? Number((p0.understeerDeg + t * (p1.understeerDeg - p0.understeerDeg)).toFixed(2))
+    : (p0.understeerDeg ?? p1.understeerDeg);
+
+  const tireSlipPct = p0.tireSlipPct !== undefined && p1.tireSlipPct !== undefined
+    ? Math.round(p0.tireSlipPct + t * (p1.tireSlipPct - p0.tireSlipPct))
+    : (p0.tireSlipPct ?? p1.tireSlipPct);
+
+  const wheelLockActive = Boolean(p0.wheelLockActive || p1.wheelLockActive);
+
   return {
     timeSec: relativeTime,
     speedKmh: Math.round(spd),
@@ -254,6 +308,14 @@ export function interpolatePointAtDistance(
     tireWear,
     brakeTemps,
     lateralOffsetM,
+    accelLonG,
+    accelLatG,
+    accelTotalG,
+    yawRateDeg,
+    slipAngleDeg,
+    understeerDeg,
+    tireSlipPct,
+    wheelLockActive,
   };
 }
 

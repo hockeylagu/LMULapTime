@@ -4,14 +4,7 @@ import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
-import { TelemetrySpeedChannel } from './TelemetrySpeedChannel.js';
-import { TelemetryDeltaChannel } from './TelemetryDeltaChannel.js';
-import { TelemetryThrottleChannel } from './TelemetryThrottleChannel.js';
-import { TelemetryBrakeChannel } from './TelemetryBrakeChannel.js';
-import { TelemetryGearChannel } from './TelemetryGearChannel.js';
-import { TelemetrySteerChannel } from './TelemetrySteerChannel.js';
-import { TelemetryRpmChannel } from './TelemetryRpmChannel.js';
-import { TelemetryLateralOffsetChannel } from './TelemetryLateralOffsetChannel.js';
+import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './telemetryPresets.js';
 
@@ -102,115 +95,18 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
       />
 
       <div className="relative flex-1 min-h-0 h-full overflow-y-auto bg-[#0a0e17] flex flex-col">
-        {activeChannels.map(channelId => {
-          switch (channelId) {
-            case 'speed':
-              return (
-                <TelemetrySpeedChannel
-                  key="speed"
-                  speedPath={paths.speedPath}
-                  baselineSpeedPath={paths.baselineSpeedPath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'delta':
-              return pointComparisons.length > 0 ? (
-                <TelemetryDeltaChannel
-                  key="delta"
-                  deltaTimePath={paths.deltaTimePath}
-                  deltaTimeArea={paths.deltaTimeArea}
-                  deltaGainArea={paths.deltaGainArea}
-                  deltaLossArea={paths.deltaLossArea}
-                  deltaGradientStops={paths.deltaGradientStops}
-                  maxDeltaSec={paths.maxDeltaSec}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              ) : null;
-            case 'throttle':
-              return (
-                <TelemetryThrottleChannel
-                  key="throttle"
-                  throttlePath={paths.throttlePath}
-                  throttleArea={paths.throttleArea}
-                  baselineThrottlePath={paths.baselineThrottlePath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'brake':
-              return (
-                <TelemetryBrakeChannel
-                  key="brake"
-                  brakePath={paths.brakePath}
-                  brakeArea={paths.brakeArea}
-                  baselineBrakePath={paths.baselineBrakePath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'gear':
-              return (
-                <TelemetryGearChannel
-                  key="gear"
-                  gearPath={paths.gearPath}
-                  baselineGearPath={paths.baselineGearPath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'steer':
-              return (
-                <TelemetrySteerChannel
-                  key="steer"
-                  steerPath={paths.steerPath}
-                  baselineSteerPath={paths.baselineSteerPath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'rpm':
-              return (
-                <TelemetryRpmChannel
-                  key="rpm"
-                  rpmPath={paths.rpmPath}
-                  rpmArea={paths.rpmArea}
-                  baselineRpmPath={paths.baselineRpmPath}
-                  maxRpm={paths.maxRpm}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'lateral-offset':
-              return (
-                <TelemetryLateralOffsetChannel
-                  key="lateral-offset"
-                  lateralOffsetPath={paths.lateralOffsetPath}
-                  baselineLateralOffsetPath={paths.baselineLateralOffsetPath}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            default:
-              return null;
-          }
-        })}
+        {activeChannels.map(channelId => (
+          <TelemetryChannelRenderer
+            key={channelId}
+            channelId={channelId}
+            currentPoint={currentPoint}
+            currentComparison={currentComparison}
+            pointComparisons={pointComparisons}
+            paths={paths}
+            isCursorInView={isCursorInView}
+            cursorPct={cursorPct}
+          />
+        ))}
 
         {((cornerSegments && cornerSegments.length > 0) || Boolean(initialStraight)) && (
           <TelemetryCornerStrip

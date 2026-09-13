@@ -1,4 +1,5 @@
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/types.js';
+import { computeVehicleDynamics } from './computedTelemetry.js';
 
 const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
 const NEUTRAL_MAX_FRAMES = 6;
@@ -88,12 +89,15 @@ export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[]): R
     }
   }
 
-  return points.map((p, i) => ({
+  const denoisedPoints: ReplayTrajectoryPoint[] = points.map((p, i) => ({
     ...p,
     throttle: throttles[i],
     speedKmh: speeds[i],
     gear: gears[i],
   }));
+
+  // 5. Compute vehicle dynamics: longitudinal & lateral G, combined G, slip angle, understeer/oversteer, and tire slip
+  return computeVehicleDynamics(denoisedPoints);
 }
 
 /**

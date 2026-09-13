@@ -6,14 +6,22 @@ export type TelemetryChannelId =
   | 'gear'
   | 'steer'
   | 'rpm'
-  | 'lateral-offset';
+  | 'lateral-offset'
+  | 'accel-lat'
+  | 'accel-lon'
+  | 'accel-total'
+  | 'slip-angle'
+  | 'under-over-steer'
+  | 'tire-slip'
+  | 'yaw-rate';
 
 export interface TelemetryChannelInfo {
   id: TelemetryChannelId;
   name: string;
   shortName: string;
   unit: string;
-  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics';
+  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics' | 'forces';
+  isComputed: boolean;
   description: string;
   badgeColor: string;
   lineColor: string;
@@ -33,6 +41,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'SPEED',
     unit: 'km/h',
     category: 'speed',
+    isComputed: false,
     description: 'Vehicle GPS speed with baseline comparison trace',
     badgeColor: 'text-sky-400 bg-sky-500/20',
     lineColor: '#38bdf8',
@@ -43,6 +52,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'DELTA',
     unit: 's',
     category: 'delta',
+    isComputed: false,
     description: 'Running time gain / loss relative to reference baseline lap',
     badgeColor: 'text-amber-400 bg-amber-500/20',
     lineColor: '#f59e0b',
@@ -53,6 +63,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'THROTTLE',
     unit: '%',
     category: 'inputs',
+    isComputed: false,
     description: 'Driver throttle pedal position and traction control events',
     badgeColor: 'text-emerald-400 bg-emerald-500/20',
     lineColor: '#10b981',
@@ -63,7 +74,8 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'BRAKE',
     unit: '%',
     category: 'inputs',
-    description: 'Driver brake pedal pressure and ABS activation state',
+    isComputed: false,
+    description: 'Driver brake pedal pressure, ABS activation, and wheel lockup',
     badgeColor: 'text-rose-400 bg-rose-500/20',
     lineColor: '#ef4444',
   },
@@ -73,6 +85,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'GEAR',
     unit: 'N/1-7',
     category: 'engine',
+    isComputed: false,
     description: 'Selected forward gear step trace and shift points',
     badgeColor: 'text-amber-400 bg-amber-500/20',
     lineColor: '#f59e0b',
@@ -83,6 +96,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'STEER',
     unit: '°',
     category: 'inputs',
+    isComputed: false,
     description: 'Steering wheel angle with center zero reference line',
     badgeColor: 'text-indigo-400 bg-indigo-500/20',
     lineColor: '#818cf8',
@@ -93,6 +107,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'RPM',
     unit: 'rpm',
     category: 'engine',
+    isComputed: false,
     description: 'Internal combustion engine revs decoded from binary replay stream',
     badgeColor: 'text-purple-300 bg-purple-500/20',
     lineColor: '#c084fc',
@@ -103,9 +118,87 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     shortName: 'LAT OFFSET',
     unit: 'm',
     category: 'dynamics',
+    isComputed: false,
     description: 'Lateral displacement from reference racing line / track centerline',
     badgeColor: 'text-teal-400 bg-teal-500/20',
     lineColor: '#2dd4bf',
+  },
+  {
+    id: 'accel-lat',
+    name: 'Lateral Acceleration (G)',
+    shortName: 'LAT G',
+    unit: 'G',
+    category: 'forces',
+    isComputed: true,
+    description: 'Computed cornering centripetal load with center zero line (+Right / -Left)',
+    badgeColor: 'text-sky-400 bg-sky-500/20',
+    lineColor: '#38bdf8',
+  },
+  {
+    id: 'accel-lon',
+    name: 'Longitudinal Acceleration (G)',
+    shortName: 'LON G',
+    unit: 'G',
+    category: 'forces',
+    isComputed: true,
+    description: 'Computed acceleration and braking deceleration rate (-Braking / +Power)',
+    badgeColor: 'text-amber-400 bg-amber-500/20',
+    lineColor: '#f59e0b',
+  },
+  {
+    id: 'accel-total',
+    name: 'Combined Acceleration (G)',
+    shortName: 'TOTAL G',
+    unit: 'G',
+    category: 'forces',
+    isComputed: true,
+    description: 'Resultant friction circle acceleration vector magnitude (grip utilization)',
+    badgeColor: 'text-rose-400 bg-rose-500/20',
+    lineColor: '#f43f5e',
+  },
+  {
+    id: 'slip-angle',
+    name: 'Body Slip Angle (Beta)',
+    shortName: 'SLIP ANG',
+    unit: '°',
+    category: 'dynamics',
+    isComputed: true,
+    description: 'Computed vehicle attitude angle relative to path velocity vector',
+    badgeColor: 'text-violet-400 bg-violet-500/20',
+    lineColor: '#a78bfa',
+  },
+  {
+    id: 'under-over-steer',
+    name: 'Handling Dynamic Balance',
+    shortName: 'BALANCE',
+    unit: '°',
+    category: 'dynamics',
+    isComputed: true,
+    description: 'Dynamic steering angle deviation: +Understeer (push) / -Oversteer (loose)',
+    badgeColor: 'text-amber-300 bg-amber-500/20',
+    lineColor: '#fbbf24',
+  },
+  {
+    id: 'tire-slip',
+    name: 'Tire Slip & Lockup Index',
+    shortName: 'TIRE SLIP',
+    unit: '%',
+    category: 'dynamics',
+    isComputed: true,
+    description: 'Synthesized traction saturation and non-ABS / ABS wheel lockup detection',
+    badgeColor: 'text-red-400 bg-red-500/20',
+    lineColor: '#ef4444',
+  },
+  {
+    id: 'yaw-rate',
+    name: 'Yaw Angular Rate',
+    shortName: 'YAW RATE',
+    unit: '°/s',
+    category: 'dynamics',
+    isComputed: true,
+    description: 'Computed vehicle rotation rate showing corner entry agility and rotation',
+    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    lineColor: '#22d3ee',
   },
 ];
 
@@ -123,10 +216,28 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'rpm', 'steer'],
   },
   {
+    id: 'g-forces',
+    name: 'G-Forces & Dynamics',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'accel-lat', 'accel-lon', 'accel-total', 'steer'],
+  },
+  {
+    id: 'handling',
+    name: 'Handling & Balance',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'steer', 'under-over-steer', 'slip-angle', 'accel-lat'],
+  },
+  {
+    id: 'tire-slip-limits',
+    name: 'Tire Slip & Limits',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'tire-slip', 'accel-total', 'throttle', 'brake'],
+  },
+  {
     id: 'dynamics',
     name: 'Vehicle Dynamics & Line',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'steer', 'lateral-offset', 'throttle', 'brake'],
+    channels: ['speed', 'delta', 'steer', 'lateral-offset', 'accel-lat', 'throttle', 'brake'],
   },
   {
     id: 'all-channels',
@@ -141,22 +252,44 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'steer',
       'rpm',
       'lateral-offset',
+      'accel-lat',
+      'accel-lon',
+      'accel-total',
+      'slip-angle',
+      'under-over-steer',
+      'tire-slip',
+      'yaw-rate',
     ],
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v4';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v4';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v5';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v5';
+const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v4';
+const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v4';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem(PRESETS_STORAGE_KEY) : null;
+    let raw = typeof window !== 'undefined' ? localStorage.getItem(PRESETS_STORAGE_KEY) : null;
+    let isMigrating = false;
+
+    if (!raw && typeof window !== 'undefined') {
+      raw = localStorage.getItem(LEGACY_PRESETS_STORAGE_KEY);
+      if (raw) isMigrating = true;
+    }
+
     if (!raw) return DEFAULT_TELEMETRY_PRESETS;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_TELEMETRY_PRESETS;
+
+    // When migrating, include newly added default presets while preserving custom presets
+    const customPresets = isMigrating
+      ? parsed.filter((p: Record<string, unknown>) => !p.isBuiltIn)
+      : [];
     
     // Ensure all presets have valid channels and non-empty name (and filter legacy driver-inputs)
-    const validated: TelemetryPreset[] = (parsed as Record<string, unknown>[])
+    const baseList = isMigrating ? [...DEFAULT_TELEMETRY_PRESETS, ...customPresets] : parsed;
+    const validated: TelemetryPreset[] = (baseList as Record<string, unknown>[])
       .filter((p) => p.id !== 'driver-inputs')
       .map((p, idx) => {
       const defaultChannels: TelemetryChannelId[] = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'];
@@ -175,7 +308,11 @@ export function loadTelemetryPresets(): TelemetryPreset[] {
       };
     });
 
-    return validated.length > 0 ? validated : DEFAULT_TELEMETRY_PRESETS;
+    const result = validated.length > 0 ? validated : DEFAULT_TELEMETRY_PRESETS;
+    if (isMigrating) {
+      saveTelemetryPresets(result);
+    }
+    return result;
   } catch {
     return DEFAULT_TELEMETRY_PRESETS;
   }
@@ -194,7 +331,10 @@ export function saveTelemetryPresets(presets: TelemetryPreset[]): void {
 export function loadActivePresetId(availablePresets: TelemetryPreset[]): string {
   try {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ACTIVE_PRESET_STORAGE_KEY);
+      let saved = localStorage.getItem(ACTIVE_PRESET_STORAGE_KEY);
+      if (!saved) {
+        saved = localStorage.getItem(LEGACY_ACTIVE_PRESET_STORAGE_KEY);
+      }
       if (saved && availablePresets.some(p => p.id === saved)) {
         return saved;
       }
