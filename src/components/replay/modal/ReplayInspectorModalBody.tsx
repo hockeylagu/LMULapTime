@@ -220,6 +220,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               initialStraight={initialStraight}
               selectedCornerNumber={selectedCornerNumber}
               onSelectCorner={handleSelectCorner}
+              source={trajectory?.source}
+              duckdbFilename={trajectory?.duckdbFilename}
             />
           </div>
         </div>

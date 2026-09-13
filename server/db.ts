@@ -3,7 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
-import { AiReportRecord, DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReplayMetadata, ReplayTrajectoryData, ReplayCacheSummary, AiReportHistoryEntry, AiLapReport } from './types.js';
+import { AiReportRecord, DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReplayMetadata, ReplayTrajectoryData, ReplayCacheSummary, AiReportHistoryEntry, AiLapReport, DuckDbLapTelemetry } from './types.js';
+import { DuckDbFileInfo } from './telemetryMatcher.js';
 import { LmuParser } from './parser.js';
 import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
 
@@ -168,6 +169,30 @@ export class SessionDatabase {
         trajectory_br BLOB NOT NULL,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (filename, driver_slot, lap_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS telemetry_metadata (
+        filename TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL,
+        file_mtime INTEGER NOT NULL,
+        file_size INTEGER NOT NULL,
+        track_name TEXT NOT NULL,
+        session_type TEXT NOT NULL,
+        session_timestamp TEXT NOT NULL,
+        laps_count INTEGER NOT NULL,
+        metadata_json TEXT NOT NULL,
+        matched_session_id TEXT,
+        matched_replay_filename TEXT,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS telemetry_lap_cache (
+        filename TEXT NOT NULL,
+        lap_number INTEGER NOT NULL,
+        points_count INTEGER NOT NULL,
+        telemetry_br BLOB NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (filename, lap_number)
       );
     `);
   }
@@ -374,6 +399,73 @@ export class SessionDatabase {
 
   public clearReplayCache(): void {
     this.db.exec('DELETE FROM replay_metadata; DELETE FROM replay_trajectories;');
+  }
+
+  public upsertTelemetryMetadata(info: DuckDbFileInfo, matchedSessionId?: string, matchedReplayFilename?: string): void {
+    this.db.prepare(`
+      INSERT INTO telemetry_metadata (
+        filename, file_path, file_mtime, file_size, track_name, session_type,
+        session_timestamp, laps_count, metadata_json, matched_session_id,
+        matched_replay_filename, updated_at
+      ) VALUES (
+        @filename, @filePath, @fileMtime, @fileSize, @trackName, @sessionType,
+        @sessionTimestamp, @lapsCount, @metadataJson, @matchedSessionId,
+        @matchedReplayFilename, @updatedAt
+      )
+      ON CONFLICT(filename) DO UPDATE SET
+        file_path = excluded.file_path,
+        file_mtime = excluded.file_mtime,
+        file_size = excluded.file_size,
+        track_name = excluded.track_name,
+        session_type = excluded.session_type,
+        session_timestamp = excluded.session_timestamp,
+        laps_count = excluded.laps_count,
+        metadata_json = excluded.metadata_json,
+        matched_session_id = COALESCE(excluded.matched_session_id, telemetry_metadata.matched_session_id),
+        matched_replay_filename = COALESCE(excluded.matched_replay_filename, telemetry_metadata.matched_replay_filename),
+        updated_at = excluded.updated_at
+    `).run({
+      filename: info.filename,
+      filePath: info.filePath,
+      fileMtime: info.fileMtimeMs,
+      fileSize: info.fileSizeBytes,
+      trackName: info.trackName,
+      sessionType: info.sessionType,
+      sessionTimestamp: info.timestampStr,
+      lapsCount: info.lapsCount || 0,
+      metadataJson: JSON.stringify(info),
+      matchedSessionId: matchedSessionId || null,
+      matchedReplayFilename: matchedReplayFilename || null,
+      updatedAt: Date.now(),
+    });
+  }
+
+  public getTelemetryFiles(): DuckDbFileInfo[] {
+    const rows = this.db.prepare('SELECT metadata_json FROM telemetry_metadata').all() as { metadata_json: string }[];
+    return rows.map((r) => JSON.parse(r.metadata_json) as DuckDbFileInfo);
+  }
+
+  public getTelemetryLapCache(filename: string, lapNumber: number): DuckDbLapTelemetry | null {
+    const row = this.db.prepare(
+      'SELECT telemetry_br FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
+    ).get(filename, lapNumber) as { telemetry_br: Buffer } | undefined;
+    if (!row) return null;
+    return decompressJson<DuckDbLapTelemetry>(row.telemetry_br);
+  }
+
+  public upsertTelemetryLapCache(filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {
+    this.db.prepare(`
+      INSERT INTO telemetry_lap_cache (filename, lap_number, points_count, telemetry_br, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(filename, lap_number) DO UPDATE SET
+        points_count = excluded.points_count,
+        telemetry_br = excluded.telemetry_br,
+        updated_at = excluded.updated_at
+    `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), Date.now());
+  }
+
+  public clearTelemetryCache(): void {
+    this.db.exec('DELETE FROM telemetry_metadata; DELETE FROM telemetry_lap_cache;');
   }
 
   public getReplaysCount(): number {

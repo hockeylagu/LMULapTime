@@ -156,4 +156,102 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.deltaTimeArea).toContain('50 Z');
     expect(result.deltaTimeArea).toMatch(/^M \d+\.\d+ \d+\.\d+ L .* L \d+\.\d+ 50 L \d+\.\d+ 50 Z$/);
   });
+
+  it('computes 4-corner paths and dynamic boundaries for suspension, wheel speeds, tire pressures, wear, temps, and brakes', () => {
+    const ptA: ReplayTrajectoryPoint = {
+      x: 0, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.0,
+      suspPos: [20, 22, 30, 32],
+      wheelSpeeds: [180, 181, 185, 186],
+      tirePressures: [180, 181, 190, 191],
+      tireWear: [99.5, 99.2, 98.8, 98.5],
+      tireTemps: [82, 84, 90, 92],
+      brakeTemps: [420, 410, 360, 350],
+    };
+
+    const ptB: ReplayTrajectoryPoint = {
+      x: 50, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, steerYaw: 0, timeSec: 11.0,
+      suspPos: [25, 27, 35, 37],
+      wheelSpeeds: [200, 202, 205, 207],
+      tirePressures: [182, 183, 192, 193],
+      tireWear: [99.0, 98.7, 98.2, 98.0],
+      tireTemps: [86, 88, 94, 96],
+      brakeTemps: [500, 490, 410, 400],
+    };
+
+    const compA: PointComparison = {
+      primary: ptA,
+      deltaTimeSec: 0,
+      deltaSpeedKmh: 0,
+      deltaThrottle: 0,
+      deltaBrake: 0,
+      deltaSteer: 0,
+      baseline: {
+        timeSec: 10.0, speedKmh: 180, throttle: 100, brake: 0, gear: 4, steerYaw: 0, x: 0, y: 0, z: 0,
+        suspPos: [19, 21, 29, 31],
+        wheelSpeeds: [179, 180, 184, 185],
+        tirePressures: [179, 180, 189, 190],
+        tireWear: [99.8, 99.6, 99.1, 99.0],
+        tireTemps: [80, 82, 88, 90],
+        brakeTemps: [400, 390, 340, 330],
+      },
+    };
+
+    const compB: PointComparison = {
+      primary: ptB,
+      deltaTimeSec: 0,
+      deltaSpeedKmh: 0,
+      deltaThrottle: 0,
+      deltaBrake: 0,
+      deltaSteer: 0,
+      baseline: {
+        timeSec: 11.0, speedKmh: 200, throttle: 100, brake: 0, gear: 4, steerYaw: 0, x: 50, y: 0, z: 0,
+        suspPos: [24, 26, 34, 36],
+        wheelSpeeds: [199, 201, 204, 206],
+        tirePressures: [181, 182, 191, 192],
+        tireWear: [99.2, 99.0, 98.6, 98.4],
+        tireTemps: [84, 86, 92, 94],
+        brakeTemps: [480, 470, 390, 380],
+      },
+    };
+
+    const result = computeTelemetryChartPaths([ptA, ptB], [compA, compB], 0, 1);
+
+    // Verify all corner paths exist for both primary and baseline
+    (['fl', 'fr', 'rl', 'rr'] as const).forEach((corner) => {
+      expect(result.suspPosPaths[corner]).toContain('M ');
+      expect(result.baselineSuspPosPaths[corner]).toContain('M ');
+
+      expect(result.wheelSpeedsPaths[corner]).toContain('M ');
+      expect(result.baselineWheelSpeedsPaths[corner]).toContain('M ');
+
+      expect(result.tirePressuresPaths[corner]).toContain('M ');
+      expect(result.baselineTirePressuresPaths[corner]).toContain('M ');
+
+      expect(result.tireWearPaths[corner]).toContain('M ');
+      expect(result.baselineTireWearPaths[corner]).toContain('M ');
+
+      expect(result.tireTempsPaths[corner]).toContain('M ');
+      expect(result.baselineTireTempsPaths[corner]).toContain('M ');
+
+      expect(result.brakeTempsPaths[corner]).toContain('M ');
+      expect(result.baselineBrakeTempsPaths[corner]).toContain('M ');
+    });
+
+    // Verify dynamic bounds
+    expect(result.minSuspPos).toBeLessThanOrEqual(20);
+    expect(result.maxSuspPos).toBeGreaterThanOrEqual(37);
+
+    expect(result.maxWheelSpeed).toBeGreaterThanOrEqual(207);
+
+    expect(result.minTirePressure).toBeLessThanOrEqual(180);
+    expect(result.maxTirePressure).toBeGreaterThanOrEqual(193);
+
+    expect(result.minTireWear).toBeLessThanOrEqual(98.0);
+    expect(result.maxTireWear).toBe(100);
+
+    expect(result.minTireTemp).toBeLessThanOrEqual(82);
+    expect(result.maxTireTemp).toBeGreaterThanOrEqual(96);
+
+    expect(result.maxBrakeTemp).toBeGreaterThanOrEqual(500);
+  });
 });

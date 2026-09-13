@@ -49,6 +49,40 @@ describe('replayComparison utility', () => {
       expect(pt.timeSec).toBeCloseTo(0.5);
     });
 
+    it('interpolates 4-corner wheel dynamics smoothly between distance nodes', () => {
+      const pointsWithWheels: ReplayTrajectoryPoint[] = [
+        {
+          x: 0, y: 0, z: 0, speedKmh: 100, throttle: 50, brake: 0, steerYaw: 0, timeSec: 0,
+          suspPos: [20, 20, 30, 30],
+          wheelSpeeds: [100, 100, 100, 100],
+          tirePressures: [180, 180, 190, 190],
+          tireWear: [100, 100, 100, 100],
+          tireTemps: [80, 80, 90, 90],
+          brakeTemps: [400, 400, 300, 300],
+        },
+        {
+          x: 10, y: 0, z: 0, speedKmh: 120, throttle: 80, brake: 0, steerYaw: 0, timeSec: 1,
+          suspPos: [30, 30, 40, 40],
+          wheelSpeeds: [120, 120, 120, 120],
+          tirePressures: [182, 182, 192, 192],
+          tireWear: [98, 98, 96, 96],
+          tireTemps: [90, 90, 100, 100],
+          brakeTemps: [500, 500, 400, 400],
+        },
+      ];
+      const cumDists = [0, 10];
+
+      // Interpolate at 5m (exactly 50% between node 0 and 1)
+      const pt = interpolatePointAtDistance(pointsWithWheels, cumDists, 5);
+
+      expect(pt.suspPos).toEqual([25, 25, 35, 35]);
+      expect(pt.wheelSpeeds).toEqual([110, 110, 110, 110]);
+      expect(pt.tirePressures).toEqual([181, 181, 191, 191]);
+      expect(pt.tireWear).toEqual([99, 99, 98, 98]);
+      expect(pt.tireTemps).toEqual([85, 85, 95, 95]);
+      expect(pt.brakeTemps).toEqual([450, 450, 350, 350]);
+    });
+
     it('clamps gracefully if distance is out of bounds', () => {
       const cumDists = [0, 10, 30];
       const before = interpolatePointAtDistance(mockPoints, cumDists, -5);

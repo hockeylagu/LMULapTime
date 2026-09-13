@@ -412,6 +412,9 @@ interface RawPoint {
   speedKmhRaw?: number;
   detachablePartState?: number;
   engineRpm?: number;
+  wheelSpeeds?: [number, number, number, number];
+  brakeTemps?: [number, number, number, number];
+  suspPos?: [number, number, number, number];
 }
 
 function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
@@ -520,6 +523,11 @@ export function extractReplayTrajectory(
     const replayPitEvents: ReplayPitEvent[] = [];
     const replayFlagEvents: ReplayFlagEvent[] = [];
     const standingsHistory: ReplayStandingsSnapshot[] = [];
+    const driverWheelTelemetry = new Map<number, {
+      wheelSpeeds?: [number, number, number, number];
+      brakeTemps?: [number, number, number, number];
+      suspPos?: [number, number, number, number];
+    }>();
 
     // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
     const CHUNK_SIZE = 16 * 1024 * 1024;
@@ -632,6 +640,8 @@ export function extractReplayTrajectory(
               // observed here also use Class 0, but the class is left ungated for revisions.
               const gearRaw = evType >= 7 && evType <= 15 ? evType - 8 : undefined;
 
+              const latestWheel = driverWheelTelemetry.get(drv);
+
               const pt: RawPoint = {
                 sTime,
                 x,
@@ -652,6 +662,9 @@ export function extractReplayTrajectory(
                 speedKmhRaw,
                 detachablePartState,
                 engineRpm,
+                wheelSpeeds: latestWheel?.wheelSpeeds ? [...latestWheel.wheelSpeeds] : undefined,
+                brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
+                suspPos: latestWheel?.suspPos ? [...latestWheel.suspPos] : undefined,
               };
 
               if (targetSlot !== undefined) {
@@ -790,6 +803,36 @@ export function extractReplayTrajectory(
                 });
               }
             }
+          } else if (evType === 24 && sz === 40 && eventSp + 5 + 40 <= activeLen) {
+            // Type 24 (sz === 40): 4-Corner Wheel Dynamics (100 Hz, local player car)
+            // 4 corners x 10 bytes: [FL: 0..9, FR: 10..19, RL: 20..29, RR: 30..39]
+            const pStart = eventSp + 5;
+            const flSusp = buf[pStart];
+            const frSusp = buf[pStart + 10];
+            const rlSusp = buf[pStart + 20];
+            const rrSusp = buf[pStart + 30];
+
+            let wheelState = driverWheelTelemetry.get(drv);
+            if (!wheelState) {
+              wheelState = {};
+              driverWheelTelemetry.set(drv, wheelState);
+            }
+            wheelState.suspPos = [flSusp, frSusp, rlSusp, rrSusp];
+          } else if (evType === 15 && (sz === 24 || sz === 37) && eventSp + 5 + 24 <= activeLen) {
+            // Type 15: Brake Rotor Temperature (byte 23 tracks disc core temperature)
+            const rawBrakeTemp = buf[eventSp + 5 + 23];
+            const brakeTempC = Math.round(Math.max(20, (rawBrakeTemp - 51) * 5.86 + 29));
+            let wheelState = driverWheelTelemetry.get(drv);
+            if (!wheelState) {
+              wheelState = {};
+              driverWheelTelemetry.set(drv, wheelState);
+            }
+            wheelState.brakeTemps = [
+              brakeTempC,
+              brakeTempC,
+              Math.round(brakeTempC * 0.88),
+              Math.round(brakeTempC * 0.88),
+            ];
           }
           eventSp += 4 + 1 + sz;
         }
@@ -1212,6 +1255,9 @@ export function extractReplayTrajectory(
           pitLimiter: cur.pitLimiter,
           detachablePartState: cur.detachablePartState,
           engineRpm: cur.engineRpm,
+          wheelSpeeds: cur.wheelSpeeds,
+          brakeTemps: cur.brakeTemps,
+          suspPos: cur.suspPos,
         });
       }
 
@@ -1257,7 +1303,7 @@ export function extractReplayTrajectory(
         flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
         standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
         sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
-        wheelTelemetryAvailable: false,
+        wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined || p.suspPos !== undefined || p.tireTemps !== undefined)),
       };
     }
 

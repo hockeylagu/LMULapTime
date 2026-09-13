@@ -8,6 +8,8 @@ export interface FolderPathsCardProps {
   setResultsDirInput: (val: string) => void;
   replaysDirInput: string;
   setReplaysDirInput: (val: string) => void;
+  telemetryDirInput: string;
+  setTelemetryDirInput: (val: string) => void;
   playerNameInput: string;
   setPlayerNameInput: (val: string) => void;
   isScanning: boolean;
@@ -21,6 +23,8 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   setResultsDirInput,
   replaysDirInput,
   setReplaysDirInput,
+  telemetryDirInput,
+  setTelemetryDirInput,
   playerNameInput,
   setPlayerNameInput,
   isScanning,
@@ -35,12 +39,12 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
           LMU UserData Directory Paths
         </h3>
         <p className="text-xs text-lmu-muted mt-0.5">
-          Configure local paths where Le Mans Ultimate writes result XML files and replay VCR files
+          Configure local paths where Le Mans Ultimate writes XML results, VCR replays, and DuckDB telemetry files
         </p>
       </div>
 
       {/* Current status indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-lmu-muted uppercase">Results Log Directory</span>
@@ -83,6 +87,28 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
             </span>
           </div>
           <p className="text-xs text-white font-mono truncate">{status?.replaysDir}</p>
+        </div>
+
+        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-lmu-muted uppercase">Telemetry (.duckdb)</span>
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-bold ${
+                status?.telemetryExist ? 'text-lmu-green' : 'text-lmu-accent'
+              }`}
+            >
+              {status?.telemetryExist ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" /> Detected
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-4 h-4" /> Not Found
+                </>
+              )}
+            </span>
+          </div>
+          <p className="text-xs text-white font-mono truncate">{status?.telemetryDir || 'Not Configured'}</p>
         </div>
       </div>
 
@@ -135,6 +161,25 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
               type="text"
               value={replaysDirInput}
               onChange={(e) => setReplaysDirInput(e.target.value)}
+              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-lmu-accent"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-lmu-muted uppercase mb-1.5 flex items-center justify-between">
+            <span>UserData Telemetry (.duckdb) Folder Path</span>
+            <span className="text-lmu-accent text-[11px] font-normal normal-case">
+              (Primary telemetry source for main driver)
+            </span>
+          </label>
+          <div className="relative">
+            <HardDrive className="w-4 h-4 text-lmu-muted absolute left-3.5 top-3" />
+            <input
+              type="text"
+              value={telemetryDirInput}
+              onChange={(e) => setTelemetryDirInput(e.target.value)}
+              placeholder="C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry"
               className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-lmu-accent"
             />
           </div>

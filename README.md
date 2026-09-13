@@ -5,9 +5,10 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/Tests-647%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
+[![Tests](https://img.shields.io/badge/Tests-693%20Passing-brightgreen.svg)](https://vitest.dev/)
 
-A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Automatically scans session XML logs and reverse-engineers native binary `.Vcr` replays to deliver professional-grade driver coaching, synchronized multi-metric waveforms, physical track limit corridors, and alien benchmark tracking.
+A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Ingests high-fidelity native **100 Hz DuckDB telemetry** (`UserData/Telemetry/*.duckdb`), scans session XML logs, and reverse-engineers binary `.Vcr` replays to deliver professional-grade driver coaching, synchronized multi-metric waveforms, 4-wheel dynamics, physical track limit corridors, and alien benchmark tracking.
 
 ---
 
@@ -15,14 +16,15 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
 
 | Feature Hub | Core Capabilities |
 | :--- | :--- |
+| **⚡ 100 Hz DuckDB Telemetry** | Primary ingestion of native LMU `.duckdb` logs with microsecond timing, continuous 100 Hz sampling, and fused 2D GPS trajectories. |
 | **🤖 AI Race Engineer & Coaching** | Deterministic technique deficit ranking ($P = \text{Loss} \times \text{Repeatability} \times \text{Confidence}$) + Google Gemini debriefs. |
-| **🛰️ 2D Replay & Trajectory Studio** | Native binary `gMb1.002f` parser, customizable & renamable telemetry channel presets, interactive playback scrubber, 4-wheel corner telemetry. |
+| **🛰️ Replay Studio & 4-Wheel Dynamics** | Native binary `gMb1.002f` parser, 11 uncombined telemetry channels, 4-corner wheel dynamics (suspension, wheel speeds, tire wear/pressures/temps, brakes), interactive scrubber. |
 | **🏁 Physical Track Boundaries** | Pre-aligned road limits & asphalt corridors across **all 21 driven layouts** in exact 1:1 LMU simulation coordinates ($x, z$). |
 | **🔬 Deep Lap Comparison Studio** | Head-to-head delta analysis, micro-sector time divergence ($\pm$s), theoretical optimal lap, and synchronized telemetry overlays. |
 | **📊 Session Telemetry & Stewards Log** | Class classifications, incident ledger (penalties, collisions, cut warnings), flying lap filtering, and stint tire/fuel consumption. |
 | **📈 Historical Pace & Progression** | Top 3 Clean Lap Average (True Pace), lap consistency rating (%), execution gap tracking, and multi-class car model filters. |
 | **🌐 Community Benchmarks & Diff Sync** | Live Google Sheets alien benchmark sync with automated changelog highlighting new, updated, and deprecated targets. |
-| **⚡ Blazing-Fast SQLite WAL Cache** | Incremental sync, non-blocking background replay scanner, and sub-millisecond query performance. |
+| **⚡ Blazing-Fast SQLite WAL Cache** | Incremental sync, non-blocking background replay scanner, Brotli lap compression, and sub-millisecond query performance. |
 
 ---
 
@@ -42,27 +44,39 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
 
 ---
 
-### 🛰️ 2. Binary VCR Replay & Trajectory Telemetry Studio
+### 🛰️ 2. Dual-Engine Telemetry Studio (100 Hz DuckDB & Binary VCR)
+- **Primary 100 Hz DuckDB Ingestion**:
+  - Automatically queries native LMU `.duckdb` logs (`UserData/Telemetry/`) containing over 58 channels at 100 Hz with microsecond timestamp precision.
+  - Slices continuous session logs into clean flying laps with sector boundary tags.
+  - **Trajectory Fusion**: Fuses 100 Hz DuckDB vehicle dynamics with VCR 2D spatial coordinates and racing line data.
+  - **UI Provenance Indicator**: Shows `⚡ 100Hz DuckDB` badge with source filename, automatically falling back to `🎬 VCR` if DuckDB is absent.
 - **Native Binary VCR Decoder (`gMb1.002f`)**: Directly extracts high-frequency time-slice positions, multi-driver telemetry, and official Class 6 Type 6 timing loops without relying on third-party companion tools.
 - **Customizable & Renamable Telemetry Channel Presets**:
-  - **Quick Preset Selector**: Switch telemetry layouts instantly via the toolbar dropdown (e.g. *Standard*, *Powertrain & Inputs*, *Vehicle Dynamics & Line*, or *All Channels*).
+  - **Quick Preset Selector**: Switch telemetry layouts instantly via the toolbar dropdown (e.g. *Standard*, *Powertrain & Inputs*, *Vehicle Dynamics & Line*, *Suspension & Wheels*, *Tires & Wear*, *Brakes & Thermals*, or *All Channels*).
   - **Interactive Preset Manager**: Rename any preset, toggle channels on/off, reorder channels with up/down controls, create new presets, duplicate, or delete custom presets.
   - **Persistent Customization**: All presets and active layout choices are stored in browser `localStorage` with a 1-click **Reset to Defaults** option.
-- **Full Spectrum of Uncombined Telemetry Channels**:
+- **Full Spectrum of 11 Uncombined Telemetry Channels**:
   - **Vehicle Speed**: Speed trace (0 to max km/h) with baseline comparison and delta overlay.
   - **Delta Time**: Real-time lap delta curve with emerald green (gaining) and rose red (losing) time divergence areas.
   - **Throttle Input**: Dedicated throttle pedal position (0–100%) with live Traction Control (`TC`) cut alerts.
   - **Brake Input**: Dedicated brake pedal pressure (0–100%) with active Anti-Lock Braking (`ABS`) indicators.
   - **Transmission Gear**: Forward gear step trace (1–7, N, R) highlighting precise shift points in amber/yellow.
   - **Steering Angle**: Independent steering yaw curve (-180° to +180°) with center zero reference line and L/R degrees.
-  - **Engine RPM**: Real internal combustion engine revs decoded from binary replay stream with baseline comparison in electric violet.
+  - **Engine RPM**: Real internal combustion engine revs decoded from DuckDB or binary replay stream with baseline comparison in electric violet.
   - **Lateral Track Offset**: Lateral racing line displacement in meters relative to reference track corridor / centerline.
+  - **Suspension Travel / Deflection**: 4-wheel damper/suspension deflection in millimeters (FL, FR, RL, RR) with min/max grid.
+  - **Individual Wheel Speeds**: 4-wheel rotational velocity in km/h to isolate corner wheel slip, locking, and curb hop.
+  - **Tire Pressures & Temperatures**: 4-wheel dynamic tire pressures in kPa and carcass/inner temps in °C.
+  - **Tire Wear & Brake Temperatures**: Stint tire degradation (0–100%) and 4-corner brake rotor thermals in °C.
 - **Interactive 2D Trajectory Map**:
   - Renders the complete circuit layout with customizable colored racing lines (**Speed gradient**, **Throttle/Brake application**, and **Lateral Yaw**).
   - Synchronized interactive playback scrubber with live apex position tracking, corner metrics, and start/finish loops.
 - **Pit Stop & Garage Lifecycle Intelligence**:
   - Event-driven tracking of pit lane entrance, pit box stop durations, refueling/tire servicing intervals, pit lane exit, and garage motion states (`inPit`, `inGarage`).
-- **Format Specification**: Comprehensive reverse-engineered binary specification documented in [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md).
+- **Telemetry & Reverse-Engineering Specifications**:
+  - [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): Detailed catalog of LMU DuckDB tables, channels, and session event tags.
+  - [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md): Comprehensive reverse-engineered binary replay specification.
+  - [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): Technical deep-dive and empirical accuracy comparison (VCR vs DuckDB vs Shared Memory Capture).
 
 ---
 
@@ -138,6 +152,7 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - [Lucide Icons](https://lucide.dev/) - Clean iconography
 - **Backend**:
   - [Node.js](https://nodejs.org/) & [Express 5](https://expressjs.com/)
+  - [DuckDB Node.js](https://duckdb.org/) - High-speed queries on 100 Hz columnar `.duckdb` telemetry files
   - [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) with Write-Ahead Logging (WAL)
   - [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser) - High-throughput XML parsing
   - Custom Binary `.Vcr` Parser with 4-wheel telemetry & pitstop state machine
@@ -146,7 +161,7 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - **C# .NET 8 Telemetry Recorder** (`tools/telemetry-recorder/`) - Real-time memory-mapped telemetry probes
   - **TSX Offline Analysis & Geometry Pipeline** (`tools/analysis/`) - Replay binary verification, boundary generation (`buildAllTrackBoundaries.ts`), and correlation utilities
 - **Testing**:
-  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **647+ automated unit and integration tests** (57 test suites)
+  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **693+ automated unit and integration tests** (62 test suites)
 
 ---
 
@@ -193,13 +208,15 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
 By default, the application detects standard Steam installation paths:
 - **Results XML Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\LOG\Results`
 - **Replays Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Replays`
+- **Telemetry DuckDB Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry`
 
 You can change these paths at any time via the in-app **Settings** tab:
 1. Navigate to **Settings** in the top navigation bar.
-2. Enter your custom results directory and replays directory.
-3. Optionally enter your **In-Game Driver Profile Name** to automatically prioritize your driver telemetry.
-4. Inspect or clear SQLite cache statistics in the **Replay Cache** card.
-5. Click **Rescan & Load Telemetry**.
+2. Enter your custom results directory, replays directory, and telemetry directory.
+3. Live status badges will verify if each path exists on disk.
+4. Optionally enter your **In-Game Driver Profile Name** to automatically prioritize your driver telemetry.
+5. Inspect or clear SQLite cache statistics in the **Replay Cache** card.
+6. Click **Rescan & Load Telemetry**.
 
 For a controlled workflow that turns lap comparison, corner phases, tyre trends, and coaching evidence into LMU garage decisions, see the [`LMU Setup Development with Telemetry and Coaching` guide](docs/LMU_SETUP_AND_TELEMETRY_GUIDE.md).
 

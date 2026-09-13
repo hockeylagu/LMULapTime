@@ -15,6 +15,8 @@ export interface SettingsProps {
     resultsExist: boolean;
     replaysDir: string;
     replaysExist: boolean;
+    telemetryDir?: string;
+    telemetryExist?: boolean;
     playerName?: string;
     sessionsCount: number;
     tracksCount: number;
@@ -33,7 +35,7 @@ export interface SettingsProps {
       replayTrajectoriesCount?: number;
     };
   } | null;
-  onUpdatePaths: (resultsDir?: string, replaysDir?: string) => void;
+  onUpdatePaths: (resultsDir?: string, replaysDir?: string, telemetryDir?: string) => void;
   replayScanStatus?: ReplayScanStatus | null;
   onReplayScanTriggered?: () => void;
 }
@@ -44,6 +46,9 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   );
   const [replaysDirInput, setReplaysDirInput] = useState<string>(
     status?.replaysDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays'
+  );
+  const [telemetryDirInput, setTelemetryDirInput] = useState<string>(
+    status?.telemetryDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Telemetry'
   );
   const [playerNameInput, setPlayerNameInput] = useState<string>(
     status?.playerName || ''
@@ -71,6 +76,12 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   }, [status?.replaysDir]);
 
   useEffect(() => {
+    if (status?.telemetryDir && (!telemetryDirInput || telemetryDirInput.includes('Le Mans Ultimate\\UserData\\Telemetry'))) {
+      setTelemetryDirInput(status.telemetryDir);
+    }
+  }, [status?.telemetryDir]);
+
+  useEffect(() => {
     if (status?.playerName && !playerNameInput) {
       setPlayerNameInput(status.playerName);
     }
@@ -93,6 +104,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       body: JSON.stringify({
         resultsDir: resultsDirInput,
         replaysDir: replaysDirInput,
+        telemetryDir: telemetryDirInput,
         playerName: playerNameInput,
       }),
     })
@@ -100,7 +112,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       .then((data) => {
         setIsScanning(false);
         if (data.success) {
-          onUpdatePaths(resultsDirInput, replaysDirInput);
+          onUpdatePaths(resultsDirInput, replaysDirInput, telemetryDirInput);
           setPathMessage(`Scanned ${data.sessionsCount} sessions successfully! Driver profile: "${data.playerName}"`);
           onReplayScanTriggered?.();
         } else {
@@ -207,6 +219,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         setResultsDirInput={setResultsDirInput}
         replaysDirInput={replaysDirInput}
         setReplaysDirInput={setReplaysDirInput}
+        telemetryDirInput={telemetryDirInput}
+        setTelemetryDirInput={setTelemetryDirInput}
         playerNameInput={playerNameInput}
         setPlayerNameInput={setPlayerNameInput}
         isScanning={isScanning}

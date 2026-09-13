@@ -41,6 +41,10 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
           <span className="px-1.5 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5 shrink-0">
             <Sparkles className="w-2.5 h-2.5" /> COMPUTED
           </span>
+        ) : channel.category === 'wheels' ? (
+          <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold text-[8px] tracking-wider shrink-0">
+            WHEEL / TIRE
+          </span>
         ) : (
           <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-bold text-[8px] tracking-wider shrink-0">
             DIRECT

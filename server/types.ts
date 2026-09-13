@@ -447,6 +447,8 @@ export interface AppStatus {
   resultsExist: boolean;
   replaysDir: string;
   replaysExist: boolean;
+  telemetryDir?: string;
+  telemetryExist?: boolean;
   playerName?: string;
   sessionsCount: number;
   tracksCount: number;
@@ -632,6 +634,9 @@ export interface ReplayTrajectoryPoint {
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
+  tirePressures?: [number, number, number, number];
+  suspPos?: [number, number, number, number];
+  wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   engineRpm?: number;
   distM?: number;
@@ -756,9 +761,44 @@ export interface ReplayTrajectoryData {
   trackLengthM?: number;
   lapDistMeters?: number;
   timingGates?: TrackTimingGates;
+  source?: 'vcr' | 'duckdb';
+  duckdbFilename?: string;
   // Present only when the trajectory was extracted with `allLaps: true` - one fully
   // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
   allLapsData?: ReplayTrajectoryData[];
+}
+
+export interface DuckDbChannelEntry {
+  channelName: string;
+  frequency: number;
+  unit: string;
+}
+
+export interface DuckDbEventEntry {
+  eventName: string;
+  unit: string;
+}
+
+export interface DuckDbLapSummary {
+  lapNumber: number;
+  startTs: number;
+  endTs: number;
+  lapTimeSec: number;
+  s1Sec?: number;
+  s2Sec?: number;
+  s3Sec?: number;
+}
+
+export interface DuckDbLapTelemetry {
+  lapNumber: number;
+  lapTimeSec: number;
+  pointsCount: number;
+  sampleRateHz: number;
+  points: ReplayTrajectoryPoint[];
+  sectors?: {
+    s1PointIndex?: number;
+    s2PointIndex?: number;
+  };
 }
 
 export interface ReplaySummary {
