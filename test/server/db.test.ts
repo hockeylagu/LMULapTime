@@ -474,3 +474,62 @@ describe('SessionDatabase AI report history', () => {
     expect(limited[1].cacheKey).toBe('key-2');
   });
 });
+
+describe('DuckDB telemetry caching in SessionDatabase', () => {
+  let db: SessionDatabase;
+
+  beforeEach(() => {
+    db = new SessionDatabase(':memory:');
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('persists and retrieves DuckDB metadata and lap telemetry cache', () => {
+    const fileInfo = {
+      filename: 'Bahrain_Test_P.duckdb',
+      filePath: 'C:\\Telemetry\\Bahrain_Test_P.duckdb',
+      fileMtimeMs: 1773000000000,
+      fileSizeBytes: 2048,
+      trackName: 'Bahrain International Circuit',
+      sessionType: 'P',
+      timestampStr: '2026-09-13T20:33:32Z',
+      timestampEpochMs: 1773000000000,
+      lapsCount: 5,
+    };
+
+    db.upsertTelemetryMetadata(fileInfo, 'session-123', 'Bahrain_P1.Vcr');
+
+    const files = db.getTelemetryFiles();
+    expect(files).toHaveLength(1);
+    expect(files[0].filename).toBe('Bahrain_Test_P.duckdb');
+    expect(files[0].trackName).toBe('Bahrain International Circuit');
+
+    const mockLapData = {
+      lapNumber: 2,
+      lapTimeSec: 91.45,
+      pointsCount: 2,
+      sampleRateHz: 100,
+      points: [
+        { x: 0, y: 0, z: 0, speedKmh: 120, throttle: 100, brake: 0, gear: 4 },
+        { x: 0, y: 0, z: 0, speedKmh: 125, throttle: 100, brake: 0, gear: 4 },
+      ],
+    };
+
+    db.upsertTelemetryLapCache(fileInfo.filename, 2, mockLapData);
+
+    const cached = db.getTelemetryLapCache(fileInfo.filename, 2);
+    expect(cached).not.toBeNull();
+    expect(cached!.lapNumber).toBe(2);
+    expect(cached!.lapTimeSec).toBe(91.45);
+    expect(cached!.points).toHaveLength(2);
+    expect(cached!.points[0].speedKmh).toBe(120);
+
+    // Verify clearTelemetryCache clears data
+    db.clearTelemetryCache();
+    expect(db.getTelemetryFiles()).toHaveLength(0);
+    expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
+  });
+});
+

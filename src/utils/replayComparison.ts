@@ -22,6 +22,9 @@ export interface InterpolatedPoint {
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
+  suspPos?: [number, number, number, number];
+  wheelSpeeds?: [number, number, number, number];
+  tirePressures?: [number, number, number, number];
   lateralOffsetM?: number;
   accelLonG?: number;
   accelLatG?: number;
@@ -204,6 +207,9 @@ export function interpolatePointAtDistance(
       tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
       tireWear: p.tireWear ? [...p.tireWear] : undefined,
       brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
+      suspPos: p.suspPos ? [...p.suspPos] : undefined,
+      wheelSpeeds: p.wheelSpeeds ? [...p.wheelSpeeds] : undefined,
+      tirePressures: p.tirePressures ? [...p.tirePressures] : undefined,
       lateralOffsetM: p.lateralOffsetM,
       accelLonG: p.accelLonG,
       accelLatG: p.accelLatG,
@@ -257,6 +263,33 @@ export function interpolatePointAtDistance(
       ] as [number, number, number, number])
     : (p0.brakeTemps ?? p1.brakeTemps);
 
+  const suspPos = p0.suspPos && p1.suspPos
+    ? ([
+        Number((p0.suspPos[0] + t * (p1.suspPos[0] - p0.suspPos[0])).toFixed(1)),
+        Number((p0.suspPos[1] + t * (p1.suspPos[1] - p0.suspPos[1])).toFixed(1)),
+        Number((p0.suspPos[2] + t * (p1.suspPos[2] - p0.suspPos[2])).toFixed(1)),
+        Number((p0.suspPos[3] + t * (p1.suspPos[3] - p0.suspPos[3])).toFixed(1)),
+      ] as [number, number, number, number])
+    : (p0.suspPos ?? p1.suspPos);
+
+  const wheelSpeeds = p0.wheelSpeeds && p1.wheelSpeeds
+    ? ([
+        Number((p0.wheelSpeeds[0] + t * (p1.wheelSpeeds[0] - p0.wheelSpeeds[0])).toFixed(1)),
+        Number((p0.wheelSpeeds[1] + t * (p1.wheelSpeeds[1] - p0.wheelSpeeds[1])).toFixed(1)),
+        Number((p0.wheelSpeeds[2] + t * (p1.wheelSpeeds[2] - p0.wheelSpeeds[2])).toFixed(1)),
+        Number((p0.wheelSpeeds[3] + t * (p1.wheelSpeeds[3] - p0.wheelSpeeds[3])).toFixed(1)),
+      ] as [number, number, number, number])
+    : (p0.wheelSpeeds ?? p1.wheelSpeeds);
+
+  const tirePressures = p0.tirePressures && p1.tirePressures
+    ? ([
+        Number((p0.tirePressures[0] + t * (p1.tirePressures[0] - p0.tirePressures[0])).toFixed(1)),
+        Number((p0.tirePressures[1] + t * (p1.tirePressures[1] - p0.tirePressures[1])).toFixed(1)),
+        Number((p0.tirePressures[2] + t * (p1.tirePressures[2] - p0.tirePressures[2])).toFixed(1)),
+        Number((p0.tirePressures[3] + t * (p1.tirePressures[3] - p0.tirePressures[3])).toFixed(1)),
+      ] as [number, number, number, number])
+    : (p0.tirePressures ?? p1.tirePressures);
+
   const lateralOffsetM = p0.lateralOffsetM !== undefined && p1.lateralOffsetM !== undefined
     ? Number((p0.lateralOffsetM + t * (p1.lateralOffsetM - p0.lateralOffsetM)).toFixed(2))
     : (p0.lateralOffsetM ?? p1.lateralOffsetM);
@@ -307,6 +340,9 @@ export function interpolatePointAtDistance(
     tireTemps,
     tireWear,
     brakeTemps,
+    suspPos,
+    wheelSpeeds,
+    tirePressures,
     lateralOffsetM,
     accelLonG,
     accelLatG,

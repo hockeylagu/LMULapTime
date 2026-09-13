@@ -89,10 +89,12 @@ describe('parser server module', () => {
 
   describe('LmuParser XML parsing', () => {
     it('returns null for non-existent or invalid XML', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
         throw new Error('File not found');
       });
       expect(parser.parseSessionXml('nonexistent.xml')).toBeNull();
+      consoleSpy.mockRestore();
     });
 
     it('returns null if XML is not an rFactor/LMU session XML', () => {

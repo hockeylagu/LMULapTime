@@ -54,6 +54,8 @@ export interface TelemetryStripViewProps {
   activePresetId?: string;
   onSelectPreset?: (presetId: string) => void;
   onOpenManageModal?: () => void;
+  source?: 'vcr' | 'duckdb';
+  duckdbFilename?: string;
 }
 
 export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
@@ -64,7 +66,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
   isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
-  presets, activePresetId, onSelectPreset, onOpenManageModal,
+  presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
 
@@ -92,6 +94,8 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         activePresetId={activePresetId}
         onSelectPreset={onSelectPreset}
         onOpenManageModal={onOpenManageModal}
+        source={source}
+        duckdbFilename={duckdbFilename}
       />
 
       <div className="relative flex-1 min-h-0 h-full overflow-y-auto bg-[#0a0e17] flex flex-col">

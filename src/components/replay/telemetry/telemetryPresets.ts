@@ -6,6 +6,12 @@ export type TelemetryChannelId =
   | 'gear'
   | 'steer'
   | 'rpm'
+  | 'brake-temps'
+  | 'susp-pos'
+  | 'wheel-speeds'
+  | 'tire-pressures'
+  | 'tire-wear'
+  | 'tire-temps'
   | 'lateral-offset'
   | 'accel-lat'
   | 'accel-lon'
@@ -20,7 +26,7 @@ export interface TelemetryChannelInfo {
   name: string;
   shortName: string;
   unit: string;
-  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics' | 'forces';
+  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics' | 'forces' | 'wheels';
   isComputed: boolean;
   description: string;
   badgeColor: string;
@@ -111,6 +117,72 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     description: 'Internal combustion engine revs decoded from binary replay stream',
     badgeColor: 'text-purple-300 bg-purple-500/20',
     lineColor: '#c084fc',
+  },
+  {
+    id: 'brake-temps',
+    name: 'Brake Rotor Temps (4-Corner)',
+    shortName: 'BRAKE TEMP',
+    unit: '°C',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Carbon / steel brake disc temperatures across all 4 corners',
+    badgeColor: 'text-orange-400 bg-orange-500/20',
+    lineColor: '#fb923c',
+  },
+  {
+    id: 'susp-pos',
+    name: 'Suspension Travel (4-Corner)',
+    shortName: 'SUSP TRAVEL',
+    unit: 'mm',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Suspension spring / damper displacement across all 4 corners',
+    badgeColor: 'text-emerald-400 bg-emerald-500/20',
+    lineColor: '#10b981',
+  },
+  {
+    id: 'wheel-speeds',
+    name: 'Wheel Speeds (4-Corner)',
+    shortName: 'WHEEL SPD',
+    unit: 'km/h',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Individual 4-wheel rotation linear velocity (FL, FR, RL, RR)',
+    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    lineColor: '#06b6d4',
+  },
+  {
+    id: 'tire-pressures',
+    name: 'Tire Pressures (4-Corner)',
+    shortName: 'PRESSURES',
+    unit: 'kPa',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Dynamic tire air inflation pressures across all 4 wheels',
+    badgeColor: 'text-sky-400 bg-sky-500/20',
+    lineColor: '#38bdf8',
+  },
+  {
+    id: 'tire-wear',
+    name: 'Tire Wear (4-Corner)',
+    shortName: 'TIRE WEAR',
+    unit: '%',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Corner tire tread condition and remaining life (100% = new)',
+    badgeColor: 'text-amber-400 bg-amber-500/20',
+    lineColor: '#f59e0b',
+  },
+  {
+    id: 'tire-temps',
+    name: 'Tire Temps (4-Corner)',
+    shortName: 'TIRE TEMP',
+    unit: '°C',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Tire carcass and inner rubber bulk temperatures across all 4 wheels',
+    badgeColor: 'text-rose-400 bg-rose-500/20',
+    lineColor: '#f43f5e',
   },
   {
     id: 'lateral-offset',
@@ -216,6 +288,24 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'rpm', 'steer'],
   },
   {
+    id: 'wheels-suspension',
+    name: 'Suspension & Wheels',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'susp-pos', 'wheel-speeds', 'tire-pressures', 'brake-temps'],
+  },
+  {
+    id: 'tires-wear',
+    name: 'Tires & Wear',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'tire-wear', 'tire-pressures', 'tire-temps', 'brake-temps'],
+  },
+  {
+    id: 'thermals',
+    name: 'Brakes & Thermals',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'brake-temps', 'tire-temps', 'tire-pressures', 'throttle', 'brake'],
+  },
+  {
     id: 'g-forces',
     name: 'G-Forces & Dynamics',
     isBuiltIn: true,
@@ -251,6 +341,12 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'gear',
       'steer',
       'rpm',
+      'brake-temps',
+      'susp-pos',
+      'wheel-speeds',
+      'tire-pressures',
+      'tire-wear',
+      'tire-temps',
       'lateral-offset',
       'accel-lat',
       'accel-lon',
@@ -263,10 +359,10 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v5';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v5';
-const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v4';
-const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v4';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v7';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v7';
+const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v6';
+const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v6';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {

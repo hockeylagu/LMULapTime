@@ -46,22 +46,32 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(channelIds).toContain('under-over-steer');
     expect(channelIds).toContain('tire-slip');
     expect(channelIds).toContain('yaw-rate');
-    expect(channelIds).not.toContain('tire-temps');
-    expect(channelIds).not.toContain('tire-wear');
-    expect(channelIds).not.toContain('brake-temps');
+    expect(channelIds).toContain('brake-temps');
+    expect(channelIds).toContain('susp-pos');
+    expect(channelIds).toContain('wheel-speeds');
+    expect(channelIds).toContain('tire-pressures');
+    expect(channelIds).toContain('tire-wear');
+    expect(channelIds).toContain('tire-temps');
 
     // Check isComputed flags
     const latG = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'accel-lat');
     const speed = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'speed');
+    const brakeTemps = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'brake-temps');
+    const suspPos = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'susp-pos');
     expect(latG?.isComputed).toBe(true);
     expect(speed?.isComputed).toBe(false);
+    expect(brakeTemps?.isComputed).toBe(false);
+    expect(suspPos?.isComputed).toBe(false);
   });
 
-  it('includes new built-in presets for G-forces, handling balance, and tire slip', () => {
+  it('includes built-in presets for G-forces, handling balance, tire slip, suspension and wear', () => {
     const presetIds = DEFAULT_TELEMETRY_PRESETS.map(p => p.id);
     expect(presetIds).toContain('g-forces');
     expect(presetIds).toContain('handling');
     expect(presetIds).toContain('tire-slip-limits');
+    expect(presetIds).toContain('thermals');
+    expect(presetIds).toContain('wheels-suspension');
+    expect(presetIds).toContain('tires-wear');
   });
 
   it('loads default presets when localStorage is empty', () => {

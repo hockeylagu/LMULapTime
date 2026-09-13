@@ -15,6 +15,9 @@ describe('Server API routes', () => {
     const res = await request(app).get('/api/status');
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('resultsDir');
+    expect(res.body).toHaveProperty('replaysDir');
+    expect(res.body).toHaveProperty('telemetryDir');
+    expect(res.body).toHaveProperty('telemetryExist');
     expect(res.body).toHaveProperty('sessionsCount');
     expect(res.body).toHaveProperty('referenceLaptimes');
     expect(res.body).toHaveProperty('sqliteCache');
@@ -149,6 +152,12 @@ describe('Server API routes', () => {
 
   it('GET /api/ai/reports returns the AI report history list', async () => {
     const res = await request(app).get('/api/ai/reports');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('GET /api/telemetry returns list of scanned DuckDB telemetry files', async () => {
+    const res = await request(app).get('/api/telemetry');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });

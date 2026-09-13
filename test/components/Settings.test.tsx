@@ -8,6 +8,8 @@ describe('Settings component', () => {
     resultsExist: true,
     replaysDir: 'C:\\LMU\\Replays',
     replaysExist: true,
+    telemetryDir: 'C:\\LMU\\Telemetry',
+    telemetryExist: true,
     playerName: 'Player1',
     sessionsCount: 15,
     tracksCount: 5,
@@ -39,6 +41,7 @@ describe('Settings component', () => {
     expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('C:\\LMU\\Telemetry')).toBeInTheDocument();
 
     const playerNameInput = screen.getByDisplayValue('Player1');
     fireEvent.change(playerNameInput, { target: { value: 'NewDriver' } });

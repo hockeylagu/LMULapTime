@@ -11,6 +11,9 @@ import { matchesSessionType, isSessionEmpty, getDisplayTrackName } from '../src/
 import { getSessionDatabase } from './db.js';
 import { AI_MODELS, analyzeLap, clearSessionApiKey, createAiReportRecord, getAiCacheKey, getAiSettings, setSessionApiKey, setSessionModel, toAiError } from './aiReport.js';
 import { enrichTrajectoryWithTrackGeometry } from './serverTrackSync.js';
+import { DuckDbReader } from './duckdbReader.js';
+import { scanDuckDbDirectory, matchDuckDbToReplay, matchDuckDbToSession } from './telemetryMatcher.js';
+import { fuseDuckDbWithVcrTrajectory } from './telemetryFusion.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,9 +29,13 @@ const DEFAULT_RESULTS_DIR = process.env.NODE_ENV === 'test'
 const DEFAULT_REPLAYS_DIR = process.env.NODE_ENV === 'test'
   ? path.join(process.cwd(), 'test', 'fixtures', 'replays')
   : 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
+const DEFAULT_TELEMETRY_DIR = process.env.NODE_ENV === 'test'
+  ? path.join(process.cwd(), 'test', 'fixtures', 'telemetry')
+  : 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Telemetry';
 
 let currentResultsDir = DEFAULT_RESULTS_DIR;
 let currentReplaysDir = DEFAULT_REPLAYS_DIR;
+let currentTelemetryDir = DEFAULT_TELEMETRY_DIR;
 
 let parser = new LmuParser(currentReplaysDir);
 const sessionDb = getSessionDatabase();
@@ -285,6 +292,7 @@ app.get('/api/ai/reports', (req, res) => {
 app.get('/api/status', (_req, res) => {
   const resultsExist = fs.existsSync(currentResultsDir);
   const replaysExist = fs.existsSync(currentReplaysDir);
+  const telemetryExist = fs.existsSync(currentTelemetryDir);
   const sessions = loadSessions();
   const refCache = loadReferenceLaptimesFromCache();
   const cacheStats = sessionDb.getCacheStats();
@@ -294,6 +302,8 @@ app.get('/api/status', (_req, res) => {
     resultsExist,
     replaysDir: currentReplaysDir,
     replaysExist,
+    telemetryDir: currentTelemetryDir,
+    telemetryExist,
     playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
     tracksCount: Object.keys(computeTrackSummaries(sessions)).length,
@@ -440,13 +450,17 @@ app.post('/api/cache/clear', (_req, res) => {
 });
 
 app.post('/api/scan', (req, res) => {
-  const { resultsDir, replaysDir, playerName } = req.body;
+  const { resultsDir, replaysDir, telemetryDir, playerName } = req.body;
 
   if (resultsDir && fs.existsSync(resultsDir)) {
     currentResultsDir = resultsDir;
   }
   if (replaysDir && fs.existsSync(replaysDir)) {
     currentReplaysDir = replaysDir;
+  }
+  if (telemetryDir) {
+    currentTelemetryDir = telemetryDir;
+    sessionDb.setMetadata('telemetry_dir', currentTelemetryDir);
   }
 
   parser = new LmuParser(currentReplaysDir, currentResultsDir);
@@ -465,6 +479,8 @@ app.post('/api/scan', (req, res) => {
     success: true,
     resultsDir: currentResultsDir,
     replaysDir: currentReplaysDir,
+    telemetryDir: currentTelemetryDir,
+    telemetryExist: fs.existsSync(currentTelemetryDir),
     playerName: parser.configuredPlayerName,
     sessionsCount: sessions.length,
     sync: syncResult,
@@ -636,6 +652,16 @@ app.get('/api/replays', (_req, res) => {
   }
 });
 
+app.get('/api/telemetry', (_req, res) => {
+  try {
+    const files = scanDuckDbDirectory(currentTelemetryDir);
+    res.json(files);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to scan telemetry directory';
+    res.status(500).json({ error: message });
+  }
+});
+
 app.get('/api/replays/:name/metadata', (req, res) => {
   try {
     const replayName = req.params.name;
@@ -714,7 +740,7 @@ app.get('/api/replays/:name/metadata', (req, res) => {
   }
 });
 
-app.get('/api/replays/:name/trajectory', (req, res) => {
+app.get('/api/replays/:name/trajectory', async (req, res) => {
   try {
     const replayName = req.params.name;
     const filePath = path.join(currentReplaysDir, replayName);
@@ -774,7 +800,49 @@ app.get('/api/replays/:name/trajectory', (req, res) => {
       lapNumber,
       playerName: parser.configuredPlayerName,
     });
-    const trajectory = downsampleReplayTrajectory(fullTrajectory, maxPoints);
+    let trajectory = downsampleReplayTrajectory(fullTrajectory, maxPoints);
+    trajectory.source = 'vcr';
+
+    // If querying the main driver and a matched DuckDB telemetry file exists, fuse native 100 Hz channels
+    try {
+      const isPlayer = (!driverSlot && !driverName) ||
+        (driverName && driverName.toLowerCase().includes(parser.configuredPlayerName.toLowerCase())) ||
+        (typeof driverSlot === 'number' && getCachedReplayMetadata(filePath, replayName, parser.configuredPlayerName)?.drivers?.find(d => d.slot === driverSlot)?.isPlayer);
+
+      if (isPlayer) {
+        const duckFiles = scanDuckDbDirectory(currentTelemetryDir);
+        const meta = getCachedReplayMetadata(filePath, replayName, parser.configuredPlayerName);
+        const stat = fs.statSync(filePath);
+        const matchedDuck = matchDuckDbToReplay(duckFiles, meta, stat.mtime.getTime()) ||
+          (matchedSession ? matchDuckDbToSession(duckFiles, matchedSession) : null);
+
+        if (matchedDuck) {
+          sessionDb.upsertTelemetryMetadata(matchedDuck, matchedSession?.id, replayName);
+          const chosenLapNum = trajectory.currentLap || lapNumber || 1;
+          let duckLap = sessionDb.getTelemetryLapCache(matchedDuck.filename, chosenLapNum);
+          if (!duckLap) {
+            try {
+              const duckReader = new DuckDbReader(matchedDuck.filePath);
+              await duckReader.open();
+              duckLap = await duckReader.getLapTelemetry(chosenLapNum);
+              await duckReader.close();
+              if (duckLap) {
+                sessionDb.upsertTelemetryLapCache(matchedDuck.filename, chosenLapNum, duckLap);
+              }
+            } catch (err) {
+              console.warn(`[DuckDB] Failed to extract lap ${chosenLapNum} from ${matchedDuck.filename}:`, err);
+            }
+          }
+
+          if (duckLap) {
+            const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
+            trajectory = downsampleReplayTrajectory(fused, maxPoints);
+          }
+        }
+      }
+    } catch (duckErr) {
+      console.warn(`[DuckDB] Error fusing DuckDB telemetry for ${replayName}:`, duckErr);
+    }
 
     // Validate replay against matched session log (decoupled validation layer)
     try {

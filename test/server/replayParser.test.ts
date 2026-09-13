@@ -1914,15 +1914,24 @@ describe('replayParser', () => {
         }
       });
 
-      it('does not emit unverified wheel telemetry (wheelTelemetryAvailable: false)', () => {
+      it('emits authentic wheel telemetry (brakeTemps) when present and omits unverified tire wear', () => {
         if (!fs.existsSync(lagunaPractice)) return;
 
         const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 200 });
-        expect(traj.wheelTelemetryAvailable).toBe(false);
+        expect(traj.wheelTelemetryAvailable).toBe(true);
         expect(traj.points.length).toBeGreaterThan(10);
 
-        const pointsWithWheel = traj.points.filter(p => p.tireTemps !== undefined || p.tireWear !== undefined || p.brakeTemps !== undefined);
-        expect(pointsWithWheel.length).toBe(0);
+        // Does NOT emit unverified/refuted tire wear or carcass temps
+        const pointsWithWear = traj.points.filter(p => p.tireTemps !== undefined || p.tireWear !== undefined);
+        expect(pointsWithWear.length).toBe(0);
+
+        // Does emit authentic brake rotor temperatures and suspension deflection
+        const pointsWithBrakes = traj.points.filter(p => p.brakeTemps !== undefined);
+        expect(pointsWithBrakes.length).toBeGreaterThan(0);
+        const sampleBrake = pointsWithBrakes[0].brakeTemps!;
+        expect(sampleBrake.length).toBe(4);
+        expect(sampleBrake[0]).toBeGreaterThanOrEqual(20);
+        expect(sampleBrake[0]).toBeLessThanOrEqual(1000);
       });
 
       it('decodes engine RPM from the 10-bit pose packet field (byte 6 bit 5 through byte 7 bit 6)', () => {

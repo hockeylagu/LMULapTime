@@ -26,6 +26,8 @@ export interface TelemetryStripToolbarProps {
   activePresetId?: string;
   onSelectPreset?: (presetId: string) => void;
   onOpenManageModal?: () => void;
+  source?: 'vcr' | 'duckdb';
+  duckdbFilename?: string;
 }
 
 export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React.memo(({
@@ -50,6 +52,8 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   activePresetId,
   onSelectPreset,
   onOpenManageModal,
+  source,
+  duckdbFilename,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
 
@@ -66,6 +70,24 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
         {headerContent && (
           <div className="min-w-0 flex items-center shrink-0">
             {headerContent}
+          </div>
+        )}
+
+        {/* Source Provenance Badge */}
+        {source === 'duckdb' ? (
+          <div
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold shrink-0"
+            title={`Native 100 Hz DuckDB telemetry (${duckdbFilename || 'file'})`}
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>⚡ 100Hz DuckDB</span>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-lmu-muted font-mono text-[10px] shrink-0"
+            title="VCR replay trajectory stream"
+          >
+            <span>🎬 VCR</span>
           </div>
         )}
 

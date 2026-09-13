@@ -4,14 +4,7 @@ import { computeLapComparisons, getTrajectoryDistances, findIndexAtDistance } fr
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
-import {
-  TelemetryPreset,
-  loadTelemetryPresets,
-  saveTelemetryPresets,
-  loadActivePresetId,
-  saveActivePresetId,
-  resetTelemetryPresetsToDefault,
-} from './telemetryPresets.js';
+import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './telemetryPresets.js';
 import { TelemetryPresetModal } from './TelemetryPresetModal.js';
 
 export interface SelectedCornerMarkers {
@@ -42,13 +35,15 @@ export interface TelemetryStripChartsProps {
   rawSampleRateHz?: number;
   isFullResolution?: boolean;
   selectedCornerMarkers?: SelectedCornerMarkers | null;
+  source?: 'vcr' | 'duckdb';
+  duckdbFilename?: string;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   points, currentIndex, onSelectIndex, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
-  rawPointsCount, rawSampleRateHz, isFullResolution, selectedCornerMarkers,
+  rawPointsCount, rawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -282,6 +277,8 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         activePresetId={activePresetId}
         onSelectPreset={handleSelectPreset}
         onOpenManageModal={() => setIsPresetModalOpen(true)}
+        source={source}
+        duckdbFilename={duckdbFilename}
       />
 
       <TelemetryPresetModal
