@@ -6,9 +6,17 @@ import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetrySpeedChannel } from './TelemetrySpeedChannel.js';
 import { TelemetryDeltaChannel } from './TelemetryDeltaChannel.js';
-import { TelemetryPedalsChannel } from './TelemetryPedalsChannel.js';
-import { TelemetrySteerGearChannel } from './TelemetrySteerGearChannel.js';
+import { TelemetryThrottleChannel } from './TelemetryThrottleChannel.js';
+import { TelemetryBrakeChannel } from './TelemetryBrakeChannel.js';
+import { TelemetryGearChannel } from './TelemetryGearChannel.js';
+import { TelemetrySteerChannel } from './TelemetrySteerChannel.js';
+import { TelemetryRpmChannel } from './TelemetryRpmChannel.js';
+import { TelemetryTireTempsChannel } from './TelemetryTireTempsChannel.js';
+import { TelemetryTireWearChannel } from './TelemetryTireWearChannel.js';
+import { TelemetryBrakeTempsChannel } from './TelemetryBrakeTempsChannel.js';
+import { TelemetryLateralOffsetChannel } from './TelemetryLateralOffsetChannel.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
+import { TelemetryChannelId, TelemetryPreset } from './telemetryPresets.js';
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];
@@ -51,6 +59,11 @@ export interface TelemetryStripViewProps {
     cornerMinPct: number | null;
     cornerExitPct: number | null;
   };
+  activeChannels?: TelemetryChannelId[];
+  presets?: TelemetryPreset[];
+  activePresetId?: string;
+  onSelectPreset?: (presetId: string) => void;
+  onOpenManageModal?: () => void;
 }
 
 export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
@@ -88,6 +101,11 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   headerContent,
   dragSelection,
   markerPcts,
+  activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
+  presets,
+  activePresetId,
+  onSelectPreset,
+  onOpenManageModal,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
 
@@ -111,55 +129,163 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         currentFrame={safeIndex + 1}
         totalFrames={totalFrames}
         headerContent={headerContent}
+        presets={presets}
+        activePresetId={activePresetId}
+        onSelectPreset={onSelectPreset}
+        onOpenManageModal={onOpenManageModal}
       />
 
-      <div className="relative flex-1 min-h-0 h-full overflow-hidden bg-[#0a0e17] flex flex-col">
-        <TelemetrySpeedChannel
-          speedPath={paths.speedPath}
-          baselineSpeedPath={paths.baselineSpeedPath}
-          currentPoint={currentPoint}
-          currentComparison={currentComparison}
-          isCursorInView={isCursorInView}
-          cursorPct={cursorPct}
-        />
-
-        {pointComparisons.length > 0 && (
-          <TelemetryDeltaChannel
-            deltaTimePath={paths.deltaTimePath}
-            deltaTimeArea={paths.deltaTimeArea}
-            deltaGainArea={paths.deltaGainArea}
-            deltaLossArea={paths.deltaLossArea}
-            deltaGradientStops={paths.deltaGradientStops}
-            maxDeltaSec={paths.maxDeltaSec}
-            currentComparison={currentComparison}
-            isCursorInView={isCursorInView}
-            cursorPct={cursorPct}
-          />
-        )}
-
-        <TelemetryPedalsChannel
-          throttlePath={paths.throttlePath}
-          throttleArea={paths.throttleArea}
-          baselineThrottlePath={paths.baselineThrottlePath}
-          brakePath={paths.brakePath}
-          brakeArea={paths.brakeArea}
-          baselineBrakePath={paths.baselineBrakePath}
-          currentPoint={currentPoint}
-          currentComparison={currentComparison}
-          isCursorInView={isCursorInView}
-          cursorPct={cursorPct}
-        />
-
-        <TelemetrySteerGearChannel
-          steerPath={paths.steerPath}
-          baselineSteerPath={paths.baselineSteerPath}
-          gearPath={paths.gearPath}
-          baselineGearPath={paths.baselineGearPath}
-          currentPoint={currentPoint}
-          currentComparison={currentComparison}
-          isCursorInView={isCursorInView}
-          cursorPct={cursorPct}
-        />
+      <div className="relative flex-1 min-h-0 h-full overflow-y-auto bg-[#0a0e17] flex flex-col">
+        {activeChannels.map(channelId => {
+          switch (channelId) {
+            case 'speed':
+              return (
+                <TelemetrySpeedChannel
+                  key="speed"
+                  speedPath={paths.speedPath}
+                  baselineSpeedPath={paths.baselineSpeedPath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'delta':
+              return pointComparisons.length > 0 ? (
+                <TelemetryDeltaChannel
+                  key="delta"
+                  deltaTimePath={paths.deltaTimePath}
+                  deltaTimeArea={paths.deltaTimeArea}
+                  deltaGainArea={paths.deltaGainArea}
+                  deltaLossArea={paths.deltaLossArea}
+                  deltaGradientStops={paths.deltaGradientStops}
+                  maxDeltaSec={paths.maxDeltaSec}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              ) : null;
+            case 'throttle':
+              return (
+                <TelemetryThrottleChannel
+                  key="throttle"
+                  throttlePath={paths.throttlePath}
+                  throttleArea={paths.throttleArea}
+                  baselineThrottlePath={paths.baselineThrottlePath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'brake':
+              return (
+                <TelemetryBrakeChannel
+                  key="brake"
+                  brakePath={paths.brakePath}
+                  brakeArea={paths.brakeArea}
+                  baselineBrakePath={paths.baselineBrakePath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'gear':
+              return (
+                <TelemetryGearChannel
+                  key="gear"
+                  gearPath={paths.gearPath}
+                  baselineGearPath={paths.baselineGearPath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'steer':
+              return (
+                <TelemetrySteerChannel
+                  key="steer"
+                  steerPath={paths.steerPath}
+                  baselineSteerPath={paths.baselineSteerPath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'rpm':
+              return (
+                <TelemetryRpmChannel
+                  key="rpm"
+                  rpmPath={paths.rpmPath}
+                  rpmArea={paths.rpmArea}
+                  baselineRpmPath={paths.baselineRpmPath}
+                  maxRpm={paths.maxRpm}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'tire-temps':
+              return (
+                <TelemetryTireTempsChannel
+                  key="tire-temps"
+                  tireTempsPaths={paths.tireTempsPaths}
+                  baselineTireTempsPaths={paths.baselineTireTempsPaths}
+                  minTireTemp={paths.minTireTemp}
+                  maxTireTemp={paths.maxTireTemp}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'tire-wear':
+              return (
+                <TelemetryTireWearChannel
+                  key="tire-wear"
+                  tireWearPaths={paths.tireWearPaths}
+                  baselineTireWearPaths={paths.baselineTireWearPaths}
+                  minTireWearPct={paths.minTireWearPct}
+                  maxTireWearPct={paths.maxTireWearPct}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'brake-temps':
+              return (
+                <TelemetryBrakeTempsChannel
+                  key="brake-temps"
+                  brakeTempsPaths={paths.brakeTempsPaths}
+                  baselineBrakeTempsPaths={paths.baselineBrakeTempsPaths}
+                  maxBrakeTemp={paths.maxBrakeTemp}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            case 'lateral-offset':
+              return (
+                <TelemetryLateralOffsetChannel
+                  key="lateral-offset"
+                  lateralOffsetPath={paths.lateralOffsetPath}
+                  baselineLateralOffsetPath={paths.baselineLateralOffsetPath}
+                  currentPoint={currentPoint}
+                  currentComparison={currentComparison}
+                  isCursorInView={isCursorInView}
+                  cursorPct={cursorPct}
+                />
+              );
+            default:
+              return null;
+          }
+        })}
 
         {((cornerSegments && cornerSegments.length > 0) || Boolean(initialStraight)) && (
           <TelemetryCornerStrip

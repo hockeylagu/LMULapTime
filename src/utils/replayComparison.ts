@@ -18,6 +18,11 @@ export interface InterpolatedPoint {
   z: number;
   tcActive?: boolean;
   absActive?: boolean;
+  engineRpm?: number;
+  tireTemps?: [number, number, number, number];
+  tireWear?: [number, number, number, number];
+  brakeTemps?: [number, number, number, number];
+  lateralOffsetM?: number;
 }
 
 export interface PointComparison {
@@ -141,6 +146,11 @@ export function interpolatePointAtDistance(
       z: p.z,
       tcActive: p.tcActive,
       absActive: p.absActive,
+      engineRpm: p.engineRpm,
+      tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
+      tireWear: p.tireWear ? [...p.tireWear] : undefined,
+      brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
+      lateralOffsetM: p.lateralOffsetM,
     };
   }
 
@@ -174,6 +184,11 @@ export function interpolatePointAtDistance(
       z: p.z,
       tcActive: p.tcActive,
       absActive: p.absActive,
+      engineRpm: p.engineRpm,
+      tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
+      tireWear: p.tireWear ? [...p.tireWear] : undefined,
+      brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
+      lateralOffsetM: p.lateralOffsetM,
     };
   }
 
@@ -187,6 +202,41 @@ export function interpolatePointAtDistance(
   const curLapTime1 = (p1.timeSec || 0) - startTime0;
   const relativeTime = curLapTime0 + t * (curLapTime1 - curLapTime0);
 
+  const engineRpm = p0.engineRpm !== undefined && p1.engineRpm !== undefined
+    ? Math.round(p0.engineRpm + t * (p1.engineRpm - p0.engineRpm))
+    : (p0.engineRpm ?? p1.engineRpm);
+
+  const tireTemps = p0.tireTemps && p1.tireTemps
+    ? ([
+        Math.round(p0.tireTemps[0] + t * (p1.tireTemps[0] - p0.tireTemps[0])),
+        Math.round(p0.tireTemps[1] + t * (p1.tireTemps[1] - p0.tireTemps[1])),
+        Math.round(p0.tireTemps[2] + t * (p1.tireTemps[2] - p0.tireTemps[2])),
+        Math.round(p0.tireTemps[3] + t * (p1.tireTemps[3] - p0.tireTemps[3])),
+      ] as [number, number, number, number])
+    : (p0.tireTemps ?? p1.tireTemps);
+
+  const tireWear = p0.tireWear && p1.tireWear
+    ? ([
+        Math.round(p0.tireWear[0] + t * (p1.tireWear[0] - p0.tireWear[0])),
+        Math.round(p0.tireWear[1] + t * (p1.tireWear[1] - p0.tireWear[1])),
+        Math.round(p0.tireWear[2] + t * (p1.tireWear[2] - p0.tireWear[2])),
+        Math.round(p0.tireWear[3] + t * (p1.tireWear[3] - p0.tireWear[3])),
+      ] as [number, number, number, number])
+    : (p0.tireWear ?? p1.tireWear);
+
+  const brakeTemps = p0.brakeTemps && p1.brakeTemps
+    ? ([
+        Math.round(p0.brakeTemps[0] + t * (p1.brakeTemps[0] - p0.brakeTemps[0])),
+        Math.round(p0.brakeTemps[1] + t * (p1.brakeTemps[1] - p0.brakeTemps[1])),
+        Math.round(p0.brakeTemps[2] + t * (p1.brakeTemps[2] - p0.brakeTemps[2])),
+        Math.round(p0.brakeTemps[3] + t * (p1.brakeTemps[3] - p0.brakeTemps[3])),
+      ] as [number, number, number, number])
+    : (p0.brakeTemps ?? p1.brakeTemps);
+
+  const lateralOffsetM = p0.lateralOffsetM !== undefined && p1.lateralOffsetM !== undefined
+    ? Number((p0.lateralOffsetM + t * (p1.lateralOffsetM - p0.lateralOffsetM)).toFixed(2))
+    : (p0.lateralOffsetM ?? p1.lateralOffsetM);
+
   return {
     timeSec: relativeTime,
     speedKmh: Math.round(spd),
@@ -199,6 +249,11 @@ export function interpolatePointAtDistance(
     z: p0.z + t * (p1.z - p0.z),
     tcActive: p0.tcActive || p1.tcActive,
     absActive: p0.absActive || p1.absActive,
+    engineRpm,
+    tireTemps,
+    tireWear,
+    brakeTemps,
+    lateralOffsetM,
   };
 }
 
