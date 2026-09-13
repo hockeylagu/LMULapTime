@@ -24,11 +24,11 @@ describe('TelemetryPresetSelector', () => {
     fireEvent.click(dropdownBtn);
 
     expect(screen.getByTestId('telemetry-preset-menu')).toBeInTheDocument();
-    expect(screen.getByText('Tires & Thermals')).toBeInTheDocument();
+    expect(screen.getByText('Powertrain & Inputs')).toBeInTheDocument();
 
-    // Select Tires & Thermals
-    fireEvent.click(screen.getByTestId('telemetry-preset-option-thermals'));
-    expect(handleSelect).toHaveBeenCalledWith('thermals');
+    // Select Powertrain & Inputs
+    fireEvent.click(screen.getByTestId('telemetry-preset-option-powertrain'));
+    expect(handleSelect).toHaveBeenCalledWith('powertrain');
   });
 
   it('triggers onOpenManageModal when manage button clicked', () => {

@@ -5,7 +5,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/Tests-644%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-647%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Automatically scans session XML logs and reverse-engineers native binary `.Vcr` replays to deliver professional-grade driver coaching, synchronized multi-metric waveforms, physical track limit corridors, and alien benchmark tracking.
 
@@ -45,7 +45,7 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
 ### 🛰️ 2. Binary VCR Replay & Trajectory Telemetry Studio
 - **Native Binary VCR Decoder (`gMb1.002f`)**: Directly extracts high-frequency time-slice positions, multi-driver telemetry, and official Class 6 Type 6 timing loops without relying on third-party companion tools.
 - **Customizable & Renamable Telemetry Channel Presets**:
-  - **Quick Preset Selector**: Switch telemetry layouts instantly via the toolbar dropdown (e.g. *Standard*, *Powertrain & Inputs*, *Tires & Thermals*, *Driver Inputs & Controls*, *Vehicle Dynamics & Line*, or *All Channels*).
+  - **Quick Preset Selector**: Switch telemetry layouts instantly via the toolbar dropdown (e.g. *Standard*, *Powertrain & Inputs*, *Vehicle Dynamics & Line*, or *All Channels*).
   - **Interactive Preset Manager**: Rename any preset, toggle channels on/off, reorder channels with up/down controls, create new presets, duplicate, or delete custom presets.
   - **Persistent Customization**: All presets and active layout choices are stored in browser `localStorage` with a 1-click **Reset to Defaults** option.
 - **Full Spectrum of Uncombined Telemetry Channels**:
@@ -53,12 +53,9 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - **Delta Time**: Real-time lap delta curve with emerald green (gaining) and rose red (losing) time divergence areas.
   - **Throttle Input**: Dedicated throttle pedal position (0–100%) with live Traction Control (`TC`) cut alerts.
   - **Brake Input**: Dedicated brake pedal pressure (0–100%) with active Anti-Lock Braking (`ABS`) indicators.
-  - **Transmission Gear**: Forward gear step trace (1–7, N, R) highlighting precise shift points.
+  - **Transmission Gear**: Forward gear step trace (1–7, N, R) highlighting precise shift points in amber/yellow.
   - **Steering Angle**: Independent steering yaw curve (-180° to +180°) with center zero reference line and L/R degrees.
-  - **Engine RPM**: Real internal combustion engine revs decoded from binary replay stream with baseline comparison.
-  - **4-Corner Tire Temperatures**: 4-wheel independent carcass and surface temperatures in °C (FL: Cyan, FR: Blue, RL: Amber, RR: Rose).
-  - **Dynamic Tire Wear & Degradation**: 4-wheel real-time tread wear degradation percentages.
-  - **4-Corner Brake Rotor Temperatures**: Carbon / steel disc rotor heating in °C, capturing thermal spikes in hard braking zones.
+  - **Engine RPM**: Real internal combustion engine revs decoded from binary replay stream with baseline comparison in electric violet.
   - **Lateral Track Offset**: Lateral racing line displacement in meters relative to reference track corridor / centerline.
 - **Interactive 2D Trajectory Map**:
   - Renders the complete circuit layout with customizable colored racing lines (**Speed gradient**, **Throttle/Brake application**, and **Lateral Yaw**).
@@ -149,7 +146,7 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - **C# .NET 8 Telemetry Recorder** (`tools/telemetry-recorder/`) - Real-time memory-mapped telemetry probes
   - **TSX Offline Analysis & Geometry Pipeline** (`tools/analysis/`) - Replay binary verification, boundary generation (`buildAllTrackBoundaries.ts`), and correlation utilities
 - **Testing**:
-  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **644+ automated unit and integration tests** (57 test suites)
+  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **647+ automated unit and integration tests** (57 test suites)
 
 ---
 
@@ -216,7 +213,7 @@ For a controlled workflow that turns lap comparison, corner phases, tyre trends,
 | `npm run dev:server` | Runs the backend server using `tsx watch`. |
 | `npm run dev:client` | Runs the Vite client development server. |
 | `npm run build` | Runs TypeScript typechecks and compiles the production client bundle. |
-| `npm test` | Runs all 644+ automated test suites with Vitest. |
+| `npm test` | Runs all 647+ automated test suites with Vitest. |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Generates detailed test coverage reports. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |

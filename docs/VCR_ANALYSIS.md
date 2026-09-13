@@ -251,6 +251,31 @@ corresponding VCR_FORMAT.md sections have been fixed to match.
   align with the Class 3 Type 10 flag-state events already confirmed above, so it's logged here as
   an open lead rather than guessed at.
 
+### 2.7 Refutation & Debunking of 4-Wheel Tire Wear, Tire Temps, and Brake Rotor Temps
+
+In earlier revisions of `VCR_FORMAT.md`, Class 0/1 Type 15 (`eventSize === 24` or `37`) was hypothesized to carry live 4-corner wheel telemetry: bytes 2, 6, 10, 14 as tire temperatures (°C), bytes 19..22 as dynamic tire wear degradation, and bytes 24..31 as brake rotor temperatures.
+
+Empirical verification against paired shared-memory ground truth (`test/fixtures/telemetry/` captured by the C# recorder from `$rFactor2SMMP_Telemetry$`) completely refutes these claims across multiple replays and sessions (Algarve P1 and Monza Q1/R1):
+
+| Candidate Channel | Hypothesized Offset in Type 15 | Ground-Truth Telemetry (`tel`) | Observed VCR Value & Behavior | Verdict |
+|---|---|---|---|---|
+| **FL/FR/RL/RR Dynamic Tire Wear** | Bytes 19..22 (`UInt8` / 255) | 1.000 down to 0.950 (monotonic smooth degradation across laps) | Erratic high-frequency byte oscillations (e.g. 118, 205, 37, 87) jumping between 14% and 80% within fractions of a second; correlation $r \approx 0.02$ | **Refuted.** Bytes 19..22 are internal bitfields / cycle counters, not tire wear counters. |
+| **FL/FR/RL/RR Brake Rotor Temps** | Bytes 24..31 (`UInt16LE`, `sz === 37`) | 30°C to 750°C under threshold braking | In 99.9% of Type 15 packets (`sz === 24`), the packet ends at byte 24 and contains zero brake bytes. In the rare `sz === 37` packets (3 in the entire session), decoding UInt16LE yielded 32,512°C and 41,305°C | **Refuted.** Bytes 24..31 in `sz === 37` are internal system flags, not rotor temperatures. |
+| **FL/FR/RL/RR Tire Temperatures** | Bytes 2, 6, 10, 14 (`UInt16LE`) | 70°C to 95°C with distinct inner/center/outer gradient | Low uncalibrated values (e.g. 52, 64) that fluctuate without matching tire thermal physics or corner lateral load | **Refuted.** Uncorrelated with physical carcass or surface temperatures. |
+
+**Conclusion:** In the analyzed sessions, native `.Vcr` binary replay files do **not** store dynamic tire wear degradation or brake rotor temperatures. All speculative wheel telemetry decoding has been removed from the parser and UI to preserve strict telemetry integrity.
+
+#### Open Investigation: Session-Level Protocol Omission Hypothesis (Multiplayer vs. Local / Practice)
+
+A critical open question remains regarding **session mode filtering**:
+- The ground-truth captures analyzed to date (Monza Q1/R1 and Algarve P1) were recorded during **online multiplayer sessions / dedicated server events**.
+- In the rFactor 2 / LMU netcode architecture, dedicated servers deliberately truncate or omit bandwidth-heavy per-wheel physics packets (such as 4-corner rubber wear counters, inner/middle/outer tire temperature matrices, and brake disc core thermals) to conserve client bandwidth across large 30–60 car grids and prevent live telemetry snooping.
+- In contrast, **offline local sessions** (such as Single-Player Practice, Test Day, or Local Race Weekend) write replay slices directly from the local physics engine without passing through the network serialization layer. We already know packet sizes differ by session mode (e.g. Type 6 timing loops are 18 bytes in offline single-player practice vs. 21 bytes in online multiplayer).
+- **Further Investigation Needed:**
+  1. Capture paired `.jsonl` shared-memory telemetry alongside `.Vcr` replays in **offline Single-Player Practice / Test Day** with high tire wear multipliers (e.g. 5x).
+  2. Capture paired telemetry in an **offline Single-Player Race Weekend** with AI opponents.
+  3. Scan the resulting frame stream for local-only event types or alternate packet sizes to determine definitively whether tire wear and brake thermals are present in local sessions but omitted in multiplayer, or whether `.Vcr` files universally exclude them across all game modes.
+
 ---
 
 ## 3. Track geometry from scoring (proof of concept)
@@ -309,7 +334,7 @@ floating-point precision.
 | **Driver Roster** | Implemented (`parseReplayMetadata`) | Deterministic binary `numDrivers` + structured records with `entryTime`/`exitTime`. |
 | **Session Identification** | Implemented (`parseReplayMetadata`) | Session byte parsing, `modUid`, `trackPath`. |
 | **Lap & Sector Timing** | Implemented (`extractReplayLapSummaries`) | Class 6 Type 6 events; matches in-game HUD. |
-| **Tire Dynamics & Wear** | Implemented (`extractReplayTrajectory`) | Class 0 Type 15 tire temps, wear counters, brake rotor temps. |
+| **Tire Dynamics & Wear** | **Unverified; removed from parser** | Speculative Type 15 offsets refuted in analyzed multiplayer sessions (§2.7). Open investigation remains for potential inclusion in offline practice / local race weekend sessions. |
 | **Penalties & Incidents** | Implemented | Class 2 Type 5 penalty strings, lap indices, timestamps. |
 | **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |
 | **Gear** | Implemented (`extractReplayTrajectory`) | Header `eventType - 8`, all cars including AI. |
@@ -330,6 +355,8 @@ affect any per-class feature.
 Specification-ready material not yet surfaced in the app.
 
 ### 6.1 4-wheel thermal, pressure & degradation dynamics (Class 0 Type 15)
+> **Investigation Note:** The offsets below represent the earlier speculative hypothesis. Empirical analysis on multiplayer replays demonstrated that these fields are not present in online sessions (§2.7). Investigation is ongoing to determine whether offline/local practice sessions retain these fields.
+
 - **12-point tire tread temperatures (°C)**: inner / centre / outer zones across all 4 corners,
   enabling thermal camber optimisation and overheating analysis.
 - **Dynamic hot inflation pressures** (kPa / PSI) for all 4 tires.
@@ -372,3 +399,8 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
 3. **Confirm the ride-height lead** at `i16 @18` with a purpose-built capture — e.g. heavy
    braking and kerb strikes to force large suspension travel (§2.3).
 4. **Extend the track model** to more circuits: 2 edge laps each, per §3.
+5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** Record a dedicated
+   offline single-player session (e.g. Local Practice / Test Day or Local Race Weekend with
+   accelerated 5x tire wear and hard trail-braking) with simultaneous shared-memory `.jsonl`
+   logging to verify if offline local replays record granular wheel/thermal fields that dedicated
+   servers omit (§2.7).

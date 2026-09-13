@@ -11,9 +11,6 @@ import { TelemetryBrakeChannel } from './TelemetryBrakeChannel.js';
 import { TelemetryGearChannel } from './TelemetryGearChannel.js';
 import { TelemetrySteerChannel } from './TelemetrySteerChannel.js';
 import { TelemetryRpmChannel } from './TelemetryRpmChannel.js';
-import { TelemetryTireTempsChannel } from './TelemetryTireTempsChannel.js';
-import { TelemetryTireWearChannel } from './TelemetryTireWearChannel.js';
-import { TelemetryBrakeTempsChannel } from './TelemetryBrakeTempsChannel.js';
 import { TelemetryLateralOffsetChannel } from './TelemetryLateralOffsetChannel.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './telemetryPresets.js';
@@ -67,45 +64,14 @@ export interface TelemetryStripViewProps {
 }
 
 export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
-  points,
-  currentPoint,
-  safeIndex,
-  viewStart,
-  viewEnd,
-  isCursorInView,
-  cursorPct,
-  currentComparison,
-  pointComparisons,
-  paths,
-  sectors,
-  cornerSegments,
-  initialStraight,
-  selectedCornerNumber,
-  onSelectCorner,
-  onJumpToDistance,
-  cumDists,
-  currentDistM,
-  selectedCornerMarkers,
-  interactionMode,
-  setInteractionMode,
-  isZoomed,
-  onResetZoom,
-  hasBaseline,
-  telemetryResolution,
-  onChangeResolution,
-  rawPointsCount,
-  rawSampleRateHz,
-  isFullResolution,
-  currentTimeSec,
-  totalFrames,
-  headerContent,
-  dragSelection,
-  markerPcts,
+  points, currentPoint, safeIndex, viewStart, viewEnd, isCursorInView, cursorPct,
+  currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
+  selectedCornerNumber, onSelectCorner, onJumpToDistance, cumDists, currentDistM,
+  selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
+  hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
+  isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
-  presets,
-  activePresetId,
-  onSelectPreset,
-  onOpenManageModal,
+  presets, activePresetId, onSelectPreset, onOpenManageModal,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
 
@@ -223,47 +189,6 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
                   rpmArea={paths.rpmArea}
                   baselineRpmPath={paths.baselineRpmPath}
                   maxRpm={paths.maxRpm}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'tire-temps':
-              return (
-                <TelemetryTireTempsChannel
-                  key="tire-temps"
-                  tireTempsPaths={paths.tireTempsPaths}
-                  baselineTireTempsPaths={paths.baselineTireTempsPaths}
-                  minTireTemp={paths.minTireTemp}
-                  maxTireTemp={paths.maxTireTemp}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'tire-wear':
-              return (
-                <TelemetryTireWearChannel
-                  key="tire-wear"
-                  tireWearPaths={paths.tireWearPaths}
-                  baselineTireWearPaths={paths.baselineTireWearPaths}
-                  minTireWearPct={paths.minTireWearPct}
-                  maxTireWearPct={paths.maxTireWearPct}
-                  currentPoint={currentPoint}
-                  currentComparison={currentComparison}
-                  isCursorInView={isCursorInView}
-                  cursorPct={cursorPct}
-                />
-              );
-            case 'brake-temps':
-              return (
-                <TelemetryBrakeTempsChannel
-                  key="brake-temps"
-                  brakeTempsPaths={paths.brakeTempsPaths}
-                  baselineBrakeTempsPaths={paths.baselineBrakeTempsPaths}
-                  maxBrakeTemp={paths.maxBrakeTemp}
                   currentPoint={currentPoint}
                   currentComparison={currentComparison}
                   isCursorInView={isCursorInView}

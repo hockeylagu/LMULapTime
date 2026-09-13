@@ -20,7 +20,7 @@ describe('TelemetryPresetModal', () => {
     expect(screen.getByText(/Telemetry Channel Presets/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Standard Telemetry/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Engine RPM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Tire Temperatures/i)).toBeInTheDocument();
+    expect(screen.getByText(/Lateral Track Offset/i)).toBeInTheDocument();
   });
 
   it('allows renaming a preset', () => {

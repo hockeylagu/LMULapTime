@@ -1914,81 +1914,15 @@ describe('replayParser', () => {
         }
       });
 
-      it('extracts live 4-wheel telemetry (tire temperatures, dynamic wear) on real replays (Laguna Seca P1 5)', () => {
+      it('does not emit unverified wheel telemetry (wheelTelemetryAvailable: false)', () => {
         if (!fs.existsSync(lagunaPractice)) return;
 
         const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 200 });
-        expect(traj.wheelTelemetryAvailable).toBe(true);
+        expect(traj.wheelTelemetryAvailable).toBe(false);
         expect(traj.points.length).toBeGreaterThan(10);
 
-        const pointsWithWheel = traj.points.filter(p => p.tireTemps !== undefined);
-        expect(pointsWithWheel.length).toBeGreaterThan(0);
-
-        const sample = pointsWithWheel[0];
-        expect(sample.tireTemps).toBeDefined();
-        expect(sample.tireTemps?.length).toBe(4);
-        // All four corners [FL, FR, RL, RR] have non-zero plausible temperatures (°C)
-        expect(sample.tireTemps![0]).toBeGreaterThan(30);
-        expect(sample.tireTemps![0]).toBeLessThan(350);
-        expect(sample.tireTemps![1]).toBeGreaterThan(30);
-        expect(sample.tireTemps![1]).toBeLessThan(350);
-        expect(sample.tireTemps![2]).toBeGreaterThan(30);
-        expect(sample.tireTemps![2]).toBeLessThan(350);
-        expect(sample.tireTemps![3]).toBeGreaterThan(30);
-        expect(sample.tireTemps![3]).toBeLessThan(350);
-
-        if (sample.tireWear) {
-          expect(sample.tireWear.length).toBe(4);
-        }
-      });
-
-      it('parses synthetic Class 0 Type 15 packet (sz === 24 and sz === 37) and synchronizes with vehicle trajectory points', () => {
-        fs.mkdirSync(tempDir, { recursive: true });
-        const wheelVcrPath = path.join(tempDir, 'synthetic_wheel.vcr');
-        const buf = createSliceVcrBuffer({
-          slices: [
-            {
-              sTime: 1.0,
-              driverSlot: 1,
-              x: 10,
-              y: 0,
-              z: 10,
-              wheel: {
-                tireTemps: [92, 95, 88, 89],
-                tireWear: [240, 241, 238, 239],
-              },
-            },
-            {
-              sTime: 1.1,
-              driverSlot: 1,
-              x: 20,
-              y: 0,
-              z: 20,
-              wheel: {
-                tireTemps: [105, 108, 97, 99],
-                tireWear: [238, 239, 236, 237],
-                brakeTemps: [520, 530, 410, 420],
-              },
-            },
-          ],
-        });
-        fs.writeFileSync(wheelVcrPath, buf);
-
-        const traj = extractReplayTrajectory(wheelVcrPath, { driverSlot: 1, maxPoints: 10 });
-        expect(traj.wheelTelemetryAvailable).toBe(true);
-        expect(traj.points.length).toBe(2);
-
-        // Point 0 (sz 24)
-        expect(traj.points[0].tireTemps).toEqual([92, 95, 88, 89]);
-        expect(traj.points[0].tireWear).toEqual([240, 241, 238, 239]);
-        expect(traj.points[0].brakeTemps).toBeUndefined();
-
-        // Point 1 (sz 37 with brake rotor temps)
-        expect(traj.points[1].tireTemps).toEqual([105, 108, 97, 99]);
-        expect(traj.points[1].tireWear).toEqual([238, 239, 236, 237]);
-        expect(traj.points[1].brakeTemps).toEqual([520, 530, 410, 420]);
-
-        fs.unlinkSync(wheelVcrPath);
+        const pointsWithWheel = traj.points.filter(p => p.tireTemps !== undefined || p.tireWear !== undefined || p.brakeTemps !== undefined);
+        expect(pointsWithWheel.length).toBe(0);
       });
 
       it('decodes engine RPM from the 10-bit pose packet field (byte 6 bit 5 through byte 7 bit 6)', () => {
