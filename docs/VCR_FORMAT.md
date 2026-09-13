@@ -158,30 +158,14 @@ The field saturates at 1023, i.e. ~11,170 rpm, and would wrap silently above tha
 | `57` | 4 bytes | Float32LE | **`rotY`**: Yaw / heading angle (radians) |
 | `61` | 4 bytes | Float32LE | **`rotZ`**: Roll angle (radians) |
 
-#### Type 15 (`eventSize === 24` or `37`): Per-Wheel Live Telemetry
-Emitted periodically or alongside motion packets (at up to ~50 Hz per car) to report real-time per-wheel tire physics, dynamic wear, and brake thermal load across all four corners `[Front-Left, Front-Right, Rear-Left, Rear-Right]`:
+#### Type 15 (`eventSize === 24` or `37`): Wheel & Suspension Dynamics Packet
+Emitted periodically alongside vehicle motion packets (at up to ~50 Hz per car). Contains internal wheel rotation, suspension deflection, and chassis dynamics state.
 
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `0..1` | 2 bytes | UInt16LE | **FL Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
-| `2..3` | 2 bytes | UInt16LE | **FL Tire Temperature**: Front-Left tire carcass/surface temperature in degrees Celsius (°C). |
-| `4..5` | 2 bytes | UInt16LE | **FR Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
-| `6..7` | 2 bytes | UInt16LE | **FR Tire Temperature**: Front-Right tire carcass/surface temperature in degrees Celsius (°C). |
-| `8..9` | 2 bytes | UInt16LE | **RL Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
-| `10..11` | 2 bytes | UInt16LE | **RL Tire Temperature**: Rear-Left tire carcass/surface temperature in degrees Celsius (°C). |
-| `12..13` | 2 bytes | UInt16LE | **RR Wheel Dynamics**: Rotational / vertical tire load and slip flag. |
-| `14..15` | 2 bytes | UInt16LE | **RR Tire Temperature**: Rear-Right tire carcass/surface temperature in degrees Celsius (°C). |
-| `16..18` | 3 bytes | Binary | Reserved wheel rotation & camber state. |
-| `19` | 1 byte | UInt8 | **FL Dynamic Tire Wear**: Front-Left remaining rubber counter (monotonic wear degradation). |
-| `20` | 1 byte | UInt8 | **FR Dynamic Tire Wear**: Front-Right remaining rubber counter. |
-| `21` | 1 byte | UInt8 | **RL Dynamic Tire Wear**: Rear-Left remaining rubber counter. |
-| `22` | 1 byte | UInt8 | **RR Dynamic Tire Wear**: Rear-Right remaining rubber counter. |
-| `23` | 1 byte | UInt8 | Wheel telemetry packet status & sync flags. |
-| `24..25` (sz === 37) | 2 bytes | UInt16LE | **FL Brake Rotor Temperature**: Front-Left brake disc temperature in °C (reaches 500°C–800°C under threshold braking). |
-| `26..27` (sz === 37) | 2 bytes | UInt16LE | **FR Brake Rotor Temperature**: Front-Right brake disc temperature in °C. |
-| `28..29` (sz === 37) | 2 bytes | UInt16LE | **RL Brake Rotor Temperature**: Rear-Left brake disc temperature in °C. |
-| `30..31` (sz === 37) | 2 bytes | UInt16LE | **RR Brake Rotor Temperature**: Rear-Right brake disc temperature in °C. |
-| `32..36` (sz === 37) | 5 bytes | Binary | Brake caliper pressure & thermal dissipation flags. |
+| `0..15` | 16 bytes | Binary | 4-corner wheel rotation, camber, and vertical suspension dynamics state. |
+| `16..23` | 8 bytes | Binary | Chassis motion sync and internal dynamics bitfields. |
+| `24..36` (`sz === 37`) | 13 bytes | Binary | Extended dynamics / chassis state (rare variant, present on select vehicles). |
 
 #### Type 7: Garage Event
 - Float32LE: Timestamp of entering/exiting garage bay.

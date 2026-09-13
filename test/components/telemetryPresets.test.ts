@@ -29,7 +29,7 @@ describe('telemetryPresets - Management and Storage', () => {
     });
   });
 
-  it('provides comprehensive list of uncombined telemetry channels', () => {
+  it('provides comprehensive list of uncombined authentic telemetry channels', () => {
     const channelIds = AVAILABLE_TELEMETRY_CHANNELS.map(c => c.id);
     expect(channelIds).toContain('speed');
     expect(channelIds).toContain('delta');
@@ -38,10 +38,10 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(channelIds).toContain('gear');
     expect(channelIds).toContain('steer');
     expect(channelIds).toContain('rpm');
-    expect(channelIds).toContain('tire-temps');
-    expect(channelIds).toContain('tire-wear');
-    expect(channelIds).toContain('brake-temps');
     expect(channelIds).toContain('lateral-offset');
+    expect(channelIds).not.toContain('tire-temps');
+    expect(channelIds).not.toContain('tire-wear');
+    expect(channelIds).not.toContain('brake-temps');
   });
 
   it('loads default presets when localStorage is empty', () => {
@@ -57,22 +57,22 @@ describe('telemetryPresets - Management and Storage', () => {
       {
         id: 'my-custom',
         name: 'My Alien Telemetry',
-        channels: ['speed', 'rpm', 'tire-temps'],
+        channels: ['speed', 'rpm', 'lateral-offset'],
       },
     ];
     saveTelemetryPresets(custom);
     const loaded = loadTelemetryPresets();
     expect(loaded.length).toBe(1);
     expect(loaded[0].name).toBe('My Alien Telemetry');
-    expect(loaded[0].channels).toEqual(['speed', 'rpm', 'tire-temps']);
+    expect(loaded[0].channels).toEqual(['speed', 'rpm', 'lateral-offset']);
   });
 
   it('persists and reloads the active preset ID', () => {
     const presets = loadTelemetryPresets();
     expect(loadActivePresetId(presets)).toBe('default');
 
-    saveActivePresetId('thermals');
-    expect(loadActivePresetId(presets)).toBe('thermals');
+    saveActivePresetId('powertrain');
+    expect(loadActivePresetId(presets)).toBe('powertrain');
   });
 
   it('resets presets to factory defaults', () => {
@@ -81,6 +81,6 @@ describe('telemetryPresets - Management and Storage', () => {
     ]);
     const defs = resetTelemetryPresetsToDefault();
     expect(defs.length).toBe(DEFAULT_TELEMETRY_PRESETS.length);
-    expect(defs.find(p => p.id === 'thermals')?.channels).toContain('tire-temps');
+    expect(defs.find(p => p.id === 'powertrain')?.channels).toContain('rpm');
   });
 });

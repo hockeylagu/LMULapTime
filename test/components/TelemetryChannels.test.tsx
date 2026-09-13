@@ -2,9 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
   TelemetryRpmChannel,
-  TelemetryTireTempsChannel,
-  TelemetryTireWearChannel,
-  TelemetryBrakeTempsChannel,
   TelemetryLateralOffsetChannel,
   TelemetryGearChannel,
   TelemetryThrottleChannel,
@@ -13,7 +10,7 @@ import {
 } from '../../src/components/replay/telemetry/index.js';
 import { ReplayTrajectoryPoint } from '../../server/types.js';
 
-describe('Extended Telemetry Channels', () => {
+describe('Authentic VCR Telemetry Channels', () => {
   const mockPoint: ReplayTrajectoryPoint = {
     x: 0,
     y: 0,
@@ -24,9 +21,6 @@ describe('Extended Telemetry Channels', () => {
     gear: 4,
     steerYaw: 12.5,
     engineRpm: 7850,
-    tireTemps: [92, 95, 88, 89],
-    tireWear: [240, 241, 238, 239],
-    brakeTemps: [520, 530, 410, 420],
     lateralOffsetM: 1.85,
   };
 
@@ -105,58 +99,6 @@ describe('Extended Telemetry Channels', () => {
     const paths = container.querySelectorAll('path');
     const hasPurpleStroke = Array.from(paths).some((p) => p.getAttribute('stroke') === '#c084fc');
     expect(hasPurpleStroke).toBe(true);
-  });
-
-  it('renders TelemetryTireTempsChannel with 4-corner temperatures', () => {
-    render(
-      <TelemetryTireTempsChannel
-        tireTempsPaths={{ fl: 'M 0 50', fr: 'M 0 50', rl: 'M 0 50', rr: 'M 0 50' }}
-        minTireTemp={40}
-        maxTireTemp={130}
-        currentPoint={mockPoint}
-        isCursorInView={true}
-        cursorPct={50}
-      />
-    );
-
-    expect(screen.getByText(/TIRE TEMPS/i)).toBeInTheDocument();
-    expect(screen.getByText(/FL: 92°C/i)).toBeInTheDocument();
-    expect(screen.getByText(/FR: 95°C/i)).toBeInTheDocument();
-    expect(screen.getByText(/RL: 88°C/i)).toBeInTheDocument();
-    expect(screen.getByText(/RR: 89°C/i)).toBeInTheDocument();
-  });
-
-  it('renders TelemetryTireWearChannel with remaining wear percentage', () => {
-    render(
-      <TelemetryTireWearChannel
-        tireWearPaths={{ fl: 'M 0 50', fr: 'M 0 50', rl: 'M 0 50', rr: 'M 0 50' }}
-        minTireWearPct={0}
-        maxTireWearPct={100}
-        currentPoint={mockPoint}
-        isCursorInView={true}
-        cursorPct={50}
-      />
-    );
-
-    expect(screen.getByText(/TIRE WEAR/i)).toBeInTheDocument();
-    // 240 / 255 * 100 = 94.1%
-    expect(screen.getByText(/FL: 94.1%/i)).toBeInTheDocument();
-  });
-
-  it('renders TelemetryBrakeTempsChannel with rotor temperatures', () => {
-    render(
-      <TelemetryBrakeTempsChannel
-        brakeTempsPaths={{ fl: 'M 0 50', fr: 'M 0 50', rl: 'M 0 50', rr: 'M 0 50' }}
-        maxBrakeTemp={750}
-        currentPoint={mockPoint}
-        isCursorInView={true}
-        cursorPct={50}
-      />
-    );
-
-    expect(screen.getByText(/BRAKE ROTOR TEMPS/i)).toBeInTheDocument();
-    expect(screen.getByText(/FL: 520°C/i)).toBeInTheDocument();
-    expect(screen.getByText(/FR: 530°C/i)).toBeInTheDocument();
   });
 
   it('renders TelemetryLateralOffsetChannel with displacement in meters', () => {

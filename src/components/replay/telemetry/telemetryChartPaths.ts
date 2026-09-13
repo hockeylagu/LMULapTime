@@ -13,13 +13,6 @@ export interface DeltaGradientStop {
   opacity: number;
 }
 
-export interface CornerPaths {
-  fl: string;
-  fr: string;
-  rl: string;
-  rr: string;
-}
-
 export interface TelemetryChartPathsResult {
   speedPath: string;
   throttlePath: string;
@@ -40,28 +33,11 @@ export interface TelemetryChartPathsResult {
   deltaGradientStops: DeltaGradientStop[];
   maxDeltaSec: number;
 
-  // Extended telemetry channels
+  // Extended authentic telemetry channels
   rpmPath: string;
   rpmArea: string;
   baselineRpmPath: string;
   maxRpm: number;
-
-  tireTempsPaths: CornerPaths;
-  baselineTireTempsPaths: CornerPaths;
-  hasTireTemps: boolean;
-  minTireTemp: number;
-  maxTireTemp: number;
-
-  tireWearPaths: CornerPaths;
-  baselineTireWearPaths: CornerPaths;
-  hasTireWear: boolean;
-  minTireWearPct: number;
-  maxTireWearPct: number;
-
-  brakeTempsPaths: CornerPaths;
-  baselineBrakeTempsPaths: CornerPaths;
-  hasBrakeTemps: boolean;
-  maxBrakeTemp: number;
 
   lateralOffsetPath: string;
   baselineLateralOffsetPath: string;
@@ -99,20 +75,6 @@ export function computeTelemetryChartPaths(
       rpmArea: '',
       baselineRpmPath: '',
       maxRpm: 9000,
-      tireTempsPaths: { fl: '', fr: '', rl: '', rr: '' },
-      baselineTireTempsPaths: { fl: '', fr: '', rl: '', rr: '' },
-      hasTireTemps: false,
-      minTireTemp: 40,
-      maxTireTemp: 140,
-      tireWearPaths: { fl: '', fr: '', rl: '', rr: '' },
-      baselineTireWearPaths: { fl: '', fr: '', rl: '', rr: '' },
-      hasTireWear: false,
-      minTireWearPct: 0,
-      maxTireWearPct: 100,
-      brakeTempsPaths: { fl: '', fr: '', rl: '', rr: '' },
-      baselineBrakeTempsPaths: { fl: '', fr: '', rl: '', rr: '' },
-      hasBrakeTemps: false,
-      maxBrakeTemp: 750,
       lateralOffsetPath: '',
       baselineLateralOffsetPath: '',
       hasLateralOffset: false,
@@ -132,23 +94,7 @@ export function computeTelemetryChartPaths(
   );
   const maxRpm = Math.ceil(rawMaxRpm / 1000) * 1000;
 
-  const hasTireTemps = points.some(p => p.tireTemps !== undefined);
-  const hasTireWear = points.some(p => p.tireWear !== undefined);
-  const hasBrakeTemps = points.some(p => p.brakeTemps !== undefined);
   const hasLateralOffset = points.some(p => p.lateralOffsetM !== undefined);
-
-  const minTireTemp = 40;
-  const maxTireTemp = 130;
-
-  const minTireWearPct = 0;
-  const maxTireWearPct = 100;
-
-  const rawMaxBrake = Math.max(
-    600,
-    ...points.flatMap(p => p.brakeTemps || []),
-    ...pointComparisons.flatMap(c => c.baseline.brakeTemps || [])
-  );
-  const maxBrakeTemp = Math.ceil(rawMaxBrake / 50) * 50;
 
   const cumDists = distances && distances.length === points.length
     ? distances
@@ -172,15 +118,6 @@ export function computeTelemetryChartPaths(
 
   let rpm = '';
   let bRpm = '';
-
-  const tt = { fl: '', fr: '', rl: '', rr: '' };
-  const bTt = { fl: '', fr: '', rl: '', rr: '' };
-
-  const tw = { fl: '', fr: '', rl: '', rr: '' };
-  const bTw = { fl: '', fr: '', rl: '', rr: '' };
-
-  const bt = { fl: '', fr: '', rl: '', rr: '' };
-  const bBt = { fl: '', fr: '', rl: '', rr: '' };
 
   let lat = '';
   let bLat = '';
@@ -264,45 +201,6 @@ export function computeTelemetryChartPaths(
       rpm += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${ry.toFixed(1)} `;
     }
 
-    // Tire temps: 4-corner in SVG Y
-    if (p.tireTemps) {
-      const [flT, frT, rlT, rrT] = p.tireTemps;
-      const flY = 95 - Math.min(1, Math.max(0, (flT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-      const frY = 95 - Math.min(1, Math.max(0, (frT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-      const rlY = 95 - Math.min(1, Math.max(0, (rlT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-      const rrY = 95 - Math.min(1, Math.max(0, (rrT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-      tt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-      tt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-      tt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-      tt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
-    }
-
-    // Tire wear: 4-corner in SVG Y (0-255 -> 0-100% remaining)
-    if (p.tireWear) {
-      const [flW, frW, rlW, rrW] = p.tireWear;
-      const flY = 95 - Math.min(1, Math.max(0, flW / 255)) * 85;
-      const frY = 95 - Math.min(1, Math.max(0, frW / 255)) * 85;
-      const rlY = 95 - Math.min(1, Math.max(0, rlW / 255)) * 85;
-      const rrY = 95 - Math.min(1, Math.max(0, rrW / 255)) * 85;
-      tw.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-      tw.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-      tw.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-      tw.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
-    }
-
-    // Brake temps: 4-corner in SVG Y
-    if (p.brakeTemps) {
-      const [flB, frB, rlB, rrB] = p.brakeTemps;
-      const flY = 95 - Math.min(1, Math.max(0, flB / maxBrakeTemp)) * 85;
-      const frY = 95 - Math.min(1, Math.max(0, frB / maxBrakeTemp)) * 85;
-      const rlY = 95 - Math.min(1, Math.max(0, rlB / maxBrakeTemp)) * 85;
-      const rrY = 95 - Math.min(1, Math.max(0, rrB / maxBrakeTemp)) * 85;
-      bt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-      bt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-      bt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-      bt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
-    }
-
     // Lateral offset: -10m to +10m -> 90 to 10 in SVG Y (center 0 at 50)
     if (p.lateralOffsetM !== undefined) {
       const latClamped = Math.min(10, Math.max(-10, p.lateralOffsetM));
@@ -344,42 +242,6 @@ export function computeTelemetryChartPaths(
         const brpmNorm = Math.min(1, Math.max(0, bp.engineRpm / maxRpm));
         const bry = 95 - brpmNorm * 85;
         bRpm += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
-      }
-
-      if (bp.tireTemps) {
-        const [flT, frT, rlT, rrT] = bp.tireTemps;
-        const flY = 95 - Math.min(1, Math.max(0, (flT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-        const frY = 95 - Math.min(1, Math.max(0, (frT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-        const rlY = 95 - Math.min(1, Math.max(0, (rlT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-        const rrY = 95 - Math.min(1, Math.max(0, (rrT - minTireTemp) / (maxTireTemp - minTireTemp))) * 85;
-        bTt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-        bTt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-        bTt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-        bTt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
-      }
-
-      if (bp.tireWear) {
-        const [flW, frW, rlW, rrW] = bp.tireWear;
-        const flY = 95 - Math.min(1, Math.max(0, flW / 255)) * 85;
-        const frY = 95 - Math.min(1, Math.max(0, frW / 255)) * 85;
-        const rlY = 95 - Math.min(1, Math.max(0, rlW / 255)) * 85;
-        const rrY = 95 - Math.min(1, Math.max(0, rrW / 255)) * 85;
-        bTw.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-        bTw.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-        bTw.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-        bTw.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
-      }
-
-      if (bp.brakeTemps) {
-        const [flB, frB, rlB, rrB] = bp.brakeTemps;
-        const flY = 95 - Math.min(1, Math.max(0, flB / maxBrakeTemp)) * 85;
-        const frY = 95 - Math.min(1, Math.max(0, frB / maxBrakeTemp)) * 85;
-        const rlY = 95 - Math.min(1, Math.max(0, rlB / maxBrakeTemp)) * 85;
-        const rrY = 95 - Math.min(1, Math.max(0, rrB / maxBrakeTemp)) * 85;
-        bBt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-        bBt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-        bBt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-        bBt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
       }
 
       if (bp.lateralOffsetM !== undefined) {
@@ -491,20 +353,6 @@ export function computeTelemetryChartPaths(
     rpmArea: rpm ? `${rpm} L 1000 95 L 0 95 Z` : '',
     baselineRpmPath: bRpm,
     maxRpm,
-    tireTempsPaths: tt,
-    baselineTireTempsPaths: bTt,
-    hasTireTemps,
-    minTireTemp,
-    maxTireTemp,
-    tireWearPaths: tw,
-    baselineTireWearPaths: bTw,
-    hasTireWear,
-    minTireWearPct,
-    maxTireWearPct,
-    brakeTempsPaths: bt,
-    baselineBrakeTempsPaths: bBt,
-    hasBrakeTemps,
-    maxBrakeTemp,
     lateralOffsetPath: lat,
     baselineLateralOffsetPath: bLat,
     hasLateralOffset,

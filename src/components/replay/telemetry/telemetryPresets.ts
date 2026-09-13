@@ -6,9 +6,6 @@ export type TelemetryChannelId =
   | 'gear'
   | 'steer'
   | 'rpm'
-  | 'tire-temps'
-  | 'tire-wear'
-  | 'brake-temps'
   | 'lateral-offset';
 
 export interface TelemetryChannelInfo {
@@ -16,7 +13,7 @@ export interface TelemetryChannelInfo {
   name: string;
   shortName: string;
   unit: string;
-  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'wheels' | 'dynamics';
+  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics';
   description: string;
   badgeColor: string;
   lineColor: string;
@@ -101,36 +98,6 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     lineColor: '#c084fc',
   },
   {
-    id: 'tire-temps',
-    name: 'Tire Temperatures (4-Corner)',
-    shortName: 'TIRE TEMP',
-    unit: '°C',
-    category: 'wheels',
-    description: '4-wheel tire carcass and surface temperatures (FL, FR, RL, RR)',
-    badgeColor: 'text-cyan-400 bg-cyan-500/20',
-    lineColor: '#06b6d4',
-  },
-  {
-    id: 'tire-wear',
-    name: 'Tire Wear & Degradation',
-    shortName: 'TIRE DEG',
-    unit: '%',
-    category: 'wheels',
-    description: 'Dynamic tire wear degradation percentage across all 4 wheels',
-    badgeColor: 'text-emerald-300 bg-emerald-500/20',
-    lineColor: '#34d399',
-  },
-  {
-    id: 'brake-temps',
-    name: 'Brake Rotor Temps (4-Corner)',
-    shortName: 'BRAKE TEMP',
-    unit: '°C',
-    category: 'wheels',
-    description: 'Carbon / steel brake disc temperatures across all 4 corners',
-    badgeColor: 'text-orange-400 bg-orange-500/20',
-    lineColor: '#fb923c',
-  },
-  {
     id: 'lateral-offset',
     name: 'Lateral Track Offset',
     shortName: 'LAT OFFSET',
@@ -156,12 +123,6 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'rpm', 'steer'],
   },
   {
-    id: 'thermals',
-    name: 'Tires & Thermals',
-    isBuiltIn: true,
-    channels: ['speed', 'delta', 'tire-temps', 'brake-temps', 'tire-wear'],
-  },
-  {
     id: 'dynamics',
     name: 'Vehicle Dynamics & Line',
     isBuiltIn: true,
@@ -179,16 +140,13 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'gear',
       'steer',
       'rpm',
-      'tire-temps',
-      'tire-wear',
-      'brake-temps',
       'lateral-offset',
     ],
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v3';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v3';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v4';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v4';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {
