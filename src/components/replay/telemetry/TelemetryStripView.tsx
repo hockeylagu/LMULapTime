@@ -56,6 +56,8 @@ export interface TelemetryStripViewProps {
   onOpenManageModal?: () => void;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
+  hasDuckDb?: boolean;
+  onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
 export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
@@ -67,6 +69,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
+  hasDuckDb, onSelectSource,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
 
@@ -96,6 +99,8 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         onOpenManageModal={onOpenManageModal}
         source={source}
         duckdbFilename={duckdbFilename}
+        hasDuckDb={hasDuckDb}
+        onSelectSource={onSelectSource}
       />
 
       <div className="relative flex-1 min-h-0 h-full overflow-y-auto bg-[#0a0e17] flex flex-col">

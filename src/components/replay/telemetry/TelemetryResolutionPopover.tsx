@@ -12,6 +12,10 @@ export interface TelemetryResolutionPopoverProps {
   isFullResolution?: boolean;
   isZoomed?: boolean;
   zoomedPointsCount?: number;
+  source?: 'vcr' | 'duckdb';
+  duckdbFilename?: string;
+  hasDuckDb?: boolean;
+  onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
 export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProps> = ({
@@ -25,6 +29,10 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   isFullResolution,
   isZoomed,
   zoomedPointsCount,
+  source,
+  duckdbFilename,
+  hasDuckDb,
+  onSelectSource,
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +57,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   return (
     <div
       ref={popoverRef}
-      className="absolute top-9 left-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-[#0c101d] border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-fadeIn backdrop-blur-md"
+      className="absolute top-9 right-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-[#0c101d] border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-fadeIn backdrop-blur-md"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between border-b border-lmu-border/60 pb-2">
@@ -59,7 +67,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
           </div>
           <div>
             <h4 className="font-bold text-white text-xs">Telemetry Resolution & Fidelity</h4>
-            <p className="text-[10px] text-lmu-muted">Replay VCR Sample Rate & Precision</p>
+            <p className="text-[10px] text-lmu-muted">Sample Rate & Precision</p>
           </div>
         </div>
         <button
@@ -75,7 +83,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
       {/* Replay Fidelity Stats Card */}
       <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 space-y-1.5 font-mono text-[11px]">
         <div className="flex items-center justify-between">
-          <span className="text-lmu-muted">Replay Max Fidelity:</span>
+          <span className="text-lmu-muted">Source Max Fidelity:</span>
           <span className="font-bold text-amber-300">
             {effectiveRaw.toLocaleString()} raw pts {rawSampleRateHz ? `@ ${rawSampleRateHz} Hz` : ''}
           </span>
@@ -123,7 +131,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Cpu className="w-3 h-3 text-sky-400" />
               Standard
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(1200, pointsCount || 1200).toLocaleString()} pts</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(1200, effectiveRaw).toLocaleString()} pts</span>
             <span className="text-[9px] text-sky-300/80 mt-0.5">Fast 60fps</span>
           </button>
 
@@ -143,7 +151,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Zap className="w-3 h-3 text-emerald-400" />
               High
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(2400, Math.max(pointsCount || 2400, 2400)).toLocaleString()} pts</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(2400, effectiveRaw).toLocaleString()} pts</span>
             <span className="text-[9px] text-emerald-300/80 mt-0.5">2x Precision</span>
           </button>
 
@@ -164,10 +172,53 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               Full Raw
             </div>
             <span className="text-[9px] text-lmu-muted mt-1 font-mono">{fullRawLabel}</span>
-            <span className="text-[9px] text-purple-300/80 mt-0.5">1:1 VCR Data</span>
+            <span className="text-[9px] text-purple-300/80 mt-0.5">1:1 Raw Telemetry</span>
           </button>
         </div>
       </div>
+
+      {/* Telemetry Data Source Selector */}
+      {(hasDuckDb || duckdbFilename) && onSelectSource && (
+        <div className="space-y-1.5 pt-2 border-t border-lmu-border/60">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted">Telemetry Data Source</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onSelectSource('duckdb')}
+              className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                source === 'duckdb'
+                  ? 'bg-amber-500/20 border-amber-500/60 text-white shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                  : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 font-bold text-[11px] text-amber-300">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${source === 'duckdb' ? 'bg-amber-400 animate-pulse' : 'bg-amber-400/40'}`} />
+                ⚡ 100Hz DuckDB
+              </div>
+              <span className="text-[9px] text-lmu-muted mt-1 truncate max-w-full" title={duckdbFilename || 'Native DuckDB file'}>
+                {duckdbFilename ? (duckdbFilename.length > 22 ? duckdbFilename.slice(0, 20) + '...' : duckdbFilename) : 'Physical sensor log'}
+              </span>
+              <span className="text-[9px] text-amber-300/80 mt-0.5">Physical 100Hz log</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectSource('vcr')}
+              className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                source === 'vcr'
+                  ? 'bg-sky-500/20 border-sky-500/60 text-white shadow-[0_0_10px_rgba(56,189,248,0.25)]'
+                  : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 font-bold text-[11px] text-sky-300">
+                🎬 Native VCR
+              </div>
+              <span className="text-[9px] text-lmu-muted mt-1">Replay binary file</span>
+              <span className="text-[9px] text-sky-300/80 mt-0.5">Simulation stream</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

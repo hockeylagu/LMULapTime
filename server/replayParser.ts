@@ -1339,7 +1339,12 @@ export function extractReplayTrajectory(
  */
 export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints: number | undefined): ReplayTrajectoryData {
   if (!maxPoints || maxPoints <= 0 || full.points.length <= maxPoints) {
-    return full;
+    return {
+      ...full,
+      isFullResolution: true,
+      pointsCount: full.points.length,
+      rawPointsCount: full.rawPointsCount || full.points.length,
+    };
   }
 
   const points = full.points;
@@ -1356,6 +1361,7 @@ export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints
     ...full,
     points: sampled,
     pointsCount: sampled.length,
+    rawPointsCount: full.rawPointsCount || full.points.length,
     maxPoints,
     isFullResolution: false,
     sectors: {

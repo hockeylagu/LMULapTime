@@ -28,6 +28,8 @@ export interface TelemetryStripToolbarProps {
   onOpenManageModal?: () => void;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
+  hasDuckDb?: boolean;
+  onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
 export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React.memo(({
@@ -54,6 +56,8 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   onOpenManageModal,
   source,
   duckdbFilename,
+  hasDuckDb,
+  onSelectSource,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
 
@@ -65,29 +69,11 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   };
 
   return (
-    <div className="px-3 py-1.5 flex items-center justify-between gap-2 bg-[#080c14] border-b border-lmu-border/40 shrink-0 select-none z-[60]">
+    <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-[#080c14] border-b border-lmu-border/40 shrink-0 select-none z-[60]">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         {headerContent && (
           <div className="min-w-0 flex items-center shrink-0">
             {headerContent}
-          </div>
-        )}
-
-        {/* Source Provenance Badge */}
-        {source === 'duckdb' ? (
-          <div
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 font-mono text-[10px] font-bold shrink-0"
-            title={`Native 100 Hz DuckDB telemetry (${duckdbFilename || 'file'})`}
-          >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span>⚡ 100Hz DuckDB</span>
-          </div>
-        ) : (
-          <div
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-lmu-muted font-mono text-[10px] shrink-0"
-            title="VCR replay trajectory stream"
-          >
-            <span>🎬 VCR</span>
           </div>
         )}
 
@@ -193,8 +179,8 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                   ? 'text-emerald-400'
                   : 'text-purple-400'
               }`} />
-              <span>
-                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 0 ? 'Full Raw' : `${telemetryResolution || pointsCount || 0} pts`}
+              <span className="whitespace-nowrap">
+                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 0 ? 'Full Raw' : `${(pointsCount || telemetryResolution || 0).toLocaleString()} pts`}
               </span>
             </button>
 
@@ -210,6 +196,10 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 isFullResolution={isFullResolution}
                 isZoomed={isZoomed}
                 zoomedPointsCount={isZoomed ? viewEnd - viewStart + 1 : undefined}
+                source={source}
+                duckdbFilename={duckdbFilename}
+                hasDuckDb={hasDuckDb}
+                onSelectSource={onSelectSource}
               />
             )}
           </div>

@@ -75,6 +75,9 @@ export interface ReplayInspectorModalBodyProps {
   colorBy: MapColorMode;
   setColorBy: (mode: MapColorMode) => void;
   drivers: ReplayDriverEntry[];
+  hasDuckDbTelemetry?: boolean;
+  selectedSource?: 'duckdb' | 'vcr';
+  onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
 export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> = ({
@@ -141,6 +144,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   colorBy,
   setColorBy,
   drivers,
+  hasDuckDbTelemetry,
+  onSelectSource,
 }) => {
   const initialStraight = useMemo(() => {
     const first = lapSegments.find(s => s.type === 'straight' && s.entryDistM <= 50);
@@ -222,6 +227,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               onSelectCorner={handleSelectCorner}
               source={trajectory?.source}
               duckdbFilename={trajectory?.duckdbFilename}
+              hasDuckDb={hasDuckDbTelemetry}
+              onSelectSource={onSelectSource}
             />
           </div>
         </div>

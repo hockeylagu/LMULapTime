@@ -16,9 +16,13 @@ export interface SessionListItem {
   sessionName?: string;
   weatherInfo?: string;
   driversCount?: number;
+  hasDuckDbTelemetry?: boolean;
+  duckdbFilename?: string;
   matchingReplayFile?: {
     name: string;
     path: string;
+    hasDuckDbTelemetry?: boolean;
+    duckdbFilename?: string;
   };
   playerDriver?: {
     name?: string;

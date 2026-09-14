@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders } from 'lucide-react';
+import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/types.js';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
 import { getHashRouteAndParams, updateHashParams } from '../../../utils/urlParams.js';
@@ -107,6 +107,9 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     ? `${settings.durationMinutes} min`
     : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640 ? `${settings.raceLaps} Laps` : undefined;
 
+  const hasDuckDb = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
+  const duckFilename = session.duckdbFilename || session.matchingReplayFile?.duckdbFilename;
+
   return (
     <>
       {/* Top Action Bar */}
@@ -124,13 +127,25 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
             <>
               <button
                 onClick={() => handleOpenReplay()}
-                title={`Matching Replay: ${session.matchingReplayFile.name}\nClick to inspect trajectory and telemetry`}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition-all shadow-sm"
+                title={`Matching Replay: ${session.matchingReplayFile.name}${
+                  hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
+                }\nClick to inspect trajectory and telemetry`}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
+                  hasDuckDb
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                }`}
               >
-                <Video className="w-4 h-4 text-emerald-400" />
+                {hasDuckDb ? (
+                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                ) : (
+                  <Video className="w-4 h-4 text-emerald-400" />
+                )}
                 <span>
                   {session.matchingReplayFile.eventTitle
                     ? `${session.matchingReplayFile.eventTitle}${session.matchingReplayFile.splitNo ? ` (Split ${session.matchingReplayFile.splitNo})` : ''}`
+                    : hasDuckDb
+                    ? '⚡ Inspect Telemetry (100Hz DuckDB)'
                     : 'Inspect Replay (.VCR)'}
                 </span>
               </button>
