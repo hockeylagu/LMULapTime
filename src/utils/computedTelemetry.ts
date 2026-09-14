@@ -104,8 +104,8 @@ export function computeYawRate(points: ReplayTrajectoryPoint[]): number[] {
 }
 
 /**
- * Computes lateral centripetal acceleration (G) = (v * yawRate) / g.
- * Signed convention: +G right turn, -G left turn, 0G straight.
+ * Computes lateral inertial acceleration (G) from yaw rate.
+ * Canonical convention: +G right, -G left, 0G straight.
  */
 export function computeLateralG(points: ReplayTrajectoryPoint[], yawRatesDeg: number[]): number[] {
   const n = points.length;
@@ -117,7 +117,7 @@ export function computeLateralG(points: ReplayTrajectoryPoint[], yawRatesDeg: nu
     const yawRateRad = (yawRatesDeg[i] * Math.PI) / 180;
     // a_lat = v * omega
     const aLat = vMs * yawRateRad;
-    latG[i] = aLat / G_CONST;
+    latG[i] = -aLat / G_CONST;
   }
 
   const smoothed = movingAverage(latG, 2);
@@ -366,9 +366,9 @@ export function computeVehicleDynamics(points: ReplayTrajectoryPoint[]): ReplayT
 
     return {
       ...p,
-      accelLonG: gLon,
-      accelLatG: gLat,
-      accelTotalG: gTotal,
+      accelLonG: p.accelLonG ?? gLon,
+      accelLatG: p.accelLatG ?? gLat,
+      accelTotalG: p.accelTotalG ?? gTotal,
       yawRateDeg: yawRates[i],
       slipAngleDeg: slipAngles[i],
       understeerDeg: underOversteer[i],

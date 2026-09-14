@@ -92,7 +92,7 @@ describe('computedTelemetry physics engine', () => {
       expect(latG[1]).toBe(0);
     });
 
-    it('computes positive yaw rate and lateral G in right turn', () => {
+    it('computes canonical lateral G sign for a positive yaw turn', () => {
       // Speed 144 km/h (40 m/s), rotating right by 0.05 rad (~2.86 deg) per 0.1s -> yawRate = 28.6 deg/s (0.5 rad/s)
       // aLat = v * omega = 40 * 0.5 = 20 m/s^2 (~ 2.04G)
       const points = [
@@ -105,8 +105,8 @@ describe('computedTelemetry physics engine', () => {
       const latG = computeLateralG(points, yawRates);
 
       expect(yawRates[1]).toBeGreaterThan(20);
-      expect(latG[1]).toBeGreaterThan(1.5);
-      expect(latG[1]).toBeLessThan(2.5);
+      expect(latG[1]).toBeLessThan(-1.5);
+      expect(latG[1]).toBeGreaterThan(-2.5);
     });
 
     it('falls back to trajectory path tangent when rotY is missing', () => {

@@ -35,6 +35,7 @@ export interface TelemetryChannelRendererProps {
   paths: TelemetryChartPathsResult;
   isCursorInView: boolean;
   cursorPct: number;
+  source?: 'vcr' | 'duckdb';
 }
 
 export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> = React.memo(({
@@ -45,8 +46,9 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
   paths,
   isCursorInView,
   cursorPct,
+  source,
 }) => {
-  const cursorProps = { currentPoint, currentComparison, isCursorInView, cursorPct };
+  const cursorProps = { currentPoint, currentComparison, isCursorInView, cursorPct, source };
 
   switch (channelId) {
     case 'speed':

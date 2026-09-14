@@ -11,6 +11,7 @@ export interface TelemetryAccelTotalChannelProps {
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;
+  source?: 'vcr' | 'duckdb';
 }
 
 export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProps> = React.memo(({
@@ -21,6 +22,7 @@ export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProp
   currentComparison,
   isCursorInView,
   cursorPct,
+  source,
 }) => {
   const chartSvg = useMemo(() => (
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
@@ -71,9 +73,9 @@ export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProp
           <Activity className="w-3 h-3" />
           COMBINED G
         </span>
-        <span className="px-1 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
-        </span>
+        </span>}
         {hasTotalG ? (
           <span className="text-xs font-mono font-bold text-rose-300">
             {totalG !== undefined ? `${totalG.toFixed(2)} G Resultant` : '0.00 G'}

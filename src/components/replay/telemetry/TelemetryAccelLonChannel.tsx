@@ -10,6 +10,7 @@ export interface TelemetryAccelLonChannelProps {
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;
+  source?: 'vcr' | 'duckdb';
 }
 
 export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> = React.memo(({
@@ -19,6 +20,7 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
   currentComparison,
   isCursorInView,
   cursorPct,
+  source,
 }) => {
   const chartSvg = useMemo(() => (
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
@@ -67,9 +69,9 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
           <Gauge className="w-3 h-3" />
           LONGITUDINAL G
         </span>
-        <span className="px-1 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
-        </span>
+        </span>}
         {hasLonG ? (
           <span className={`text-xs font-mono font-bold ${lonG && lonG < -0.1 ? 'text-rose-400' : lonG && lonG > 0.1 ? 'text-emerald-400' : 'text-amber-300'}`}>
             {formatG(lonG)}

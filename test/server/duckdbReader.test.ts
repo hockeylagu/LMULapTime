@@ -2,9 +2,17 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import duckdb from 'duckdb';
 import path from 'path';
 import fs from 'fs';
-import { DuckDbReader } from '../../server/duckdbReader.js';
+import { DuckDbReader, normalizeDuckDbGForces } from '../../server/duckdbReader.js';
 
 describe('DuckDbReader', () => {
+  it('normalizes exported G-force labels to canonical lateral and longitudinal axes', () => {
+    expect(normalizeDuckDbGForces(1.25, -0.75)).toEqual({
+      accelLatG: -0.75,
+      accelLonG: -1.25,
+      accelTotalG: 1.46,
+    });
+  });
+
   const testDbDir = path.join(process.cwd(), 'test', 'fixtures', 'telemetry');
   const testDbPath = path.join(testDbDir, 'Bahrain_Test_P_2026-09-13T20_33_32Z.duckdb');
 
@@ -34,6 +42,8 @@ describe('DuckDbReader', () => {
           ('Brake Pos', 100, '%'),
           ('Steering Input', 100, 'deg'),
           ('Engine RPM', 100, 'rpm'),
+          ('G Force Lat', 10, 'G'),
+          ('G Force Long', 10, 'G'),
           ('RideHeights', 100, 'm'),
           ('TyresPressure', 100, 'kPa'),
           ('TyresWear', 100, '%'),
@@ -55,6 +65,8 @@ describe('DuckDbReader', () => {
         CREATE TABLE "Brake Pos" (value FLOAT);
         CREATE TABLE "Steering Input" (value FLOAT);
         CREATE TABLE "Engine RPM" (value FLOAT);
+        CREATE TABLE "G Force Lat" (value FLOAT);
+        CREATE TABLE "G Force Long" (value FLOAT);
         CREATE TABLE "RideHeights" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "TyresPressure" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "TyresWear" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
@@ -81,6 +93,8 @@ describe('DuckDbReader', () => {
         INSERT INTO "Brake Pos" SELECT (CASE WHEN i >= 600 AND i < 800 THEN 0.8 ELSE 0.0 END)::FLOAT FROM range(1200) t(i);
         INSERT INTO "Steering Input" SELECT (15.0 * cos(i / 40.0))::FLOAT FROM range(1200) t(i);
         INSERT INTO "Engine RPM" SELECT (6000.0 + 1500.0 * sin(i / 30.0))::FLOAT FROM range(1200) t(i);
+        INSERT INTO "G Force Lat" SELECT 1.25::FLOAT FROM range(120) t(i);
+        INSERT INTO "G Force Long" SELECT -0.75::FLOAT FROM range(120) t(i);
         INSERT INTO "RideHeights" SELECT 0.025::FLOAT, 0.026::FLOAT, 0.030::FLOAT, 0.031::FLOAT FROM range(1200) t(i);
         INSERT INTO "TyresPressure" SELECT 180.0::FLOAT, 181.0::FLOAT, 185.0::FLOAT, 186.0::FLOAT FROM range(1200) t(i);
         INSERT INTO "TyresWear" SELECT 98.5::FLOAT, 98.2::FLOAT, 97.5::FLOAT, 97.3::FLOAT FROM range(1200) t(i);
@@ -111,7 +125,7 @@ describe('DuckDbReader', () => {
     expect(metadata.car).toBe('Ferrari 499P');
 
     const channels = await reader.getChannelsList();
-    expect(channels.length).toBe(12);
+    expect(channels.length).toBe(14);
     expect(channels.find(c => c.channelName === 'Ground Speed')?.frequency).toBe(100);
     expect(channels.find(c => c.channelName === 'TyresWear')?.frequency).toBe(100);
 
@@ -139,6 +153,9 @@ describe('DuckDbReader', () => {
     const p0 = lapTelemetry!.points[0];
     expect(p0.speedKmh).toBeGreaterThan(0);
     expect(p0.engineRpm).toBeGreaterThan(0);
+    expect(p0.accelLatG).toBeCloseTo(-0.75, 2);
+    expect(p0.accelLonG).toBeCloseTo(-1.25, 2);
+    expect(p0.accelTotalG).toBeCloseTo(1.46, 2);
     expect(p0.tirePressures).toBeDefined();
     expect(p0.rideHeight).toEqual([25, 26, 30, 31]);
     expect(p0.wheelSpeeds?.[0]).toBeCloseTo(245.47, 1);

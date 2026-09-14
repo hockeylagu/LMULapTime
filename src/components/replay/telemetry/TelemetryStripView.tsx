@@ -126,6 +126,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
             paths={paths}
             isCursorInView={isCursorInView}
             cursorPct={cursorPct}
+            source={source}
           />
         ))}
 

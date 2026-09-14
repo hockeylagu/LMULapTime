@@ -12,7 +12,7 @@ import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js'
 // invalidate previously-cached replay metadata/trajectory rows, without requiring
 // the underlying replay file's mtime/size to change.
 const REPLAY_CACHE_VERSION = 'v3';
-const DUCKDB_TELEMETRY_CACHE_VERSION = 'v3';
+const DUCKDB_TELEMETRY_CACHE_VERSION = 'v8';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
