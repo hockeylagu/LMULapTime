@@ -469,6 +469,7 @@ export interface AppStatus {
     dbSizeBytes: number;
     replaysCount?: number;
     replayTrajectoriesCount?: number;
+    telemetryFilesCount?: number;
   };
 }
 

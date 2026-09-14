@@ -43,7 +43,7 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
       </p>
 
       {/* Cache Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
           <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Sessions</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
@@ -62,6 +62,13 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
           <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Replays</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.replaysCount ?? 0}
+          </span>
+        </div>
+
+        <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Telemetry Files</span>
+          <span className="text-base font-bold text-white font-mono mt-0.5 block">
+            {status?.sqliteCache?.telemetryFilesCount ?? 0}
           </span>
         </div>
 

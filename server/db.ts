@@ -35,6 +35,7 @@ export interface CacheStats {
   dbSizeBytes: number;
   replaysCount: number;
   replayTrajectoriesCount: number;
+  telemetryFilesCount: number;
 }
 
 export interface SyncResult {
@@ -1065,6 +1066,7 @@ export class SessionDatabase {
     const lastSyncedAt = this.getMetadata('last_synced_at');
     const replaysCount = (this.db.prepare('SELECT COUNT(*) as count FROM replay_metadata').get() as { count: number }).count;
     const replayTrajectoriesCount = (this.db.prepare('SELECT COUNT(*) as count FROM replay_trajectories').get() as { count: number }).count;
+    const telemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM telemetry_metadata').get() as { count: number }).count;
 
     let dbSizeBytes = 0;
     if (this.dbPath !== ':memory:' && fs.existsSync(this.dbPath)) {
@@ -1083,6 +1085,7 @@ export class SessionDatabase {
       dbSizeBytes,
       replaysCount,
       replayTrajectoriesCount,
+      telemetryFilesCount,
     };
   }
 

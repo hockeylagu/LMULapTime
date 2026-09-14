@@ -101,6 +101,7 @@ describe('Settings component', () => {
         sessionsCount: 42,
         lastSyncedAt: '2026-06-01T10:30:00Z',
         dbSizeBytes: 524288,
+        telemetryFilesCount: 7,
       },
     };
 
@@ -123,6 +124,8 @@ describe('Settings component', () => {
     expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
     expect(screen.getByText(/42 Sessions Cached/i)).toBeInTheDocument();
     expect(screen.getByText('512.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('Cached Telemetry Files')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
 
     const clearBtn = screen.getByRole('button', { name: /clear cache/i });
     fireEvent.click(clearBtn);
