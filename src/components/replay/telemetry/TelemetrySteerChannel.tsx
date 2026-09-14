@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Compass } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/types.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { getSteerPercent } from '../../../utils/formatters.js';
 
 export interface TelemetrySteerChannelProps {
   steerPath: string;
@@ -49,9 +50,9 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
     </svg>
   ), [steerPath, baselineSteerPath]);
 
-  const steerAngle = currentPoint?.steerYaw ?? 0;
-  const baseSteerAngle = currentComparison?.baseline.steerYaw ?? 0;
-  const steerDir = steerAngle < -3 ? 'LEFT' : steerAngle > 3 ? 'RIGHT' : 'CENTER';
+  const steerPercent = getSteerPercent(currentPoint?.steerYaw);
+  const baseSteerPercent = getSteerPercent(currentComparison?.baseline.steerYaw);
+  const steerDir = steerPercent < -1 ? 'LEFT' : steerPercent > 1 ? 'RIGHT' : 'CENTER';
 
   return (
     <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-[#0e0c1a]/50">
@@ -61,19 +62,19 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           STEERING
         </span>
         <span className="text-xs font-mono font-bold text-indigo-300">
-          {Math.abs(steerAngle).toFixed(1)}° {steerDir}
+          {Math.abs(steerPercent).toFixed(1)}% {steerDir}
         </span>
         {currentComparison && (
           <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
-            Base: {Math.abs(baseSteerAngle).toFixed(1)}°
+            Base: {Math.abs(baseSteerPercent).toFixed(1)}%
           </span>
         )}
       </div>
 
       <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+270° R</div>
-        <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0° Center</div>
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-270° L</div>
+        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+100% R</div>
+        <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0% Center</div>
+        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-100% L</div>
       </div>
 
       {chartSvg}
@@ -86,11 +87,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-indigo-400/80 font-mono font-bold text-[11px] text-indigo-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-            {steerAngle > 0 ? `+${steerAngle.toFixed(0)}°` : `${steerAngle.toFixed(0)}°`}
+            {steerPercent > 0 ? `+${steerPercent.toFixed(0)}%` : `${steerPercent.toFixed(0)}%`}
           </span>
           {currentComparison && (
             <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-              B: {baseSteerAngle.toFixed(0)}°
+              B: {baseSteerPercent.toFixed(0)}%
             </span>
           )}
         </div>

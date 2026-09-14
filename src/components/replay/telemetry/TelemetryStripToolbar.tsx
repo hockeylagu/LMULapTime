@@ -17,6 +17,10 @@ export interface TelemetryStripToolbarProps {
   pointsCount?: number;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
+  duckdbRawPointsCount?: number;
+  duckdbRawSampleRateHz?: number;
   isFullResolution?: boolean;
   currentTimeSec?: number;
   currentFrame?: number;
@@ -29,6 +33,7 @@ export interface TelemetryStripToolbarProps {
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
   hasDuckDb?: boolean;
+  duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
@@ -45,6 +50,10 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   pointsCount,
   rawPointsCount,
   rawSampleRateHz,
+  vcrRawPointsCount,
+  vcrRawSampleRateHz,
+  duckdbRawPointsCount,
+  duckdbRawSampleRateHz,
   isFullResolution,
   currentTimeSec,
   currentFrame,
@@ -57,6 +66,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   source,
   duckdbFilename,
   hasDuckDb,
+  duckdbUnavailableReason,
   onSelectSource,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
@@ -193,12 +203,17 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 pointsCount={pointsCount ?? 0}
                 rawPointsCount={rawPointsCount}
                 rawSampleRateHz={rawSampleRateHz}
+                vcrRawPointsCount={vcrRawPointsCount}
+                vcrRawSampleRateHz={vcrRawSampleRateHz}
+                duckdbRawPointsCount={duckdbRawPointsCount}
+                duckdbRawSampleRateHz={duckdbRawSampleRateHz}
                 isFullResolution={isFullResolution}
                 isZoomed={isZoomed}
                 zoomedPointsCount={isZoomed ? viewEnd - viewStart + 1 : undefined}
                 source={source}
                 duckdbFilename={duckdbFilename}
                 hasDuckDb={hasDuckDb}
+                duckdbUnavailableReason={duckdbUnavailableReason}
                 onSelectSource={onSelectSource}
               />
             )}

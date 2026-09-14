@@ -38,7 +38,7 @@ describe('TelemetryStripCharts', () => {
     // Speed 150 km/h
     expect(screen.getAllByText(/150/i).length).toBeGreaterThanOrEqual(1);
     // Steering 45 deg Left
-    expect(screen.getAllByText(/45°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/16\.7%/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/LEFT/i).length).toBeGreaterThanOrEqual(1);
   });
 

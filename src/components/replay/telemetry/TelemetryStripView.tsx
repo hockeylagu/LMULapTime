@@ -37,6 +37,10 @@ export interface TelemetryStripViewProps {
   onChangeResolution?: (res: number) => void;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
+  duckdbRawPointsCount?: number;
+  duckdbRawSampleRateHz?: number;
   isFullResolution?: boolean;
   currentTimeSec?: number;
   totalFrames?: number;
@@ -57,6 +61,7 @@ export interface TelemetryStripViewProps {
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
   hasDuckDb?: boolean;
+  duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
@@ -67,9 +72,10 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
   hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
   isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
+  vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
-  hasDuckDb, onSelectSource,
+  hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
 
@@ -88,6 +94,10 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         pointsCount={points.length}
         rawPointsCount={rawPointsCount}
         rawSampleRateHz={rawSampleRateHz}
+        vcrRawPointsCount={vcrRawPointsCount}
+        vcrRawSampleRateHz={vcrRawSampleRateHz}
+        duckdbRawPointsCount={duckdbRawPointsCount}
+        duckdbRawSampleRateHz={duckdbRawSampleRateHz}
         isFullResolution={isFullResolution}
         currentTimeSec={currentTimeSec}
         currentFrame={safeIndex + 1}
@@ -100,6 +110,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         source={source}
         duckdbFilename={duckdbFilename}
         hasDuckDb={hasDuckDb}
+        duckdbUnavailableReason={duckdbUnavailableReason}
         onSelectSource={onSelectSource}
       />
 

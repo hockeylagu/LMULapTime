@@ -76,6 +76,7 @@ export interface ReplayInspectorModalBodyProps {
   setColorBy: (mode: MapColorMode) => void;
   drivers: ReplayDriverEntry[];
   hasDuckDbTelemetry?: boolean;
+  duckdbUnavailableReason?: string;
   selectedSource?: 'duckdb' | 'vcr';
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
@@ -145,6 +146,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   setColorBy,
   drivers,
   hasDuckDbTelemetry,
+  duckdbUnavailableReason,
   onSelectSource,
 }) => {
   const initialStraight = useMemo(() => {
@@ -219,6 +221,10 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               onChangeResolution={handleChangeResolution}
               rawPointsCount={trajectory?.rawPointsCount}
               rawSampleRateHz={trajectory?.rawSampleRateHz}
+              vcrRawPointsCount={trajectory?.vcrRawPointsCount}
+              vcrRawSampleRateHz={trajectory?.vcrRawSampleRateHz}
+              duckdbRawPointsCount={trajectory?.duckdbRawPointsCount}
+              duckdbRawSampleRateHz={trajectory?.duckdbRawSampleRateHz}
               isFullResolution={trajectory?.isFullResolution}
               selectedCornerMarkers={selectedCornerMarkers}
               cornerSegments={cornerSegments}
@@ -228,6 +234,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               source={trajectory?.source}
               duckdbFilename={trajectory?.duckdbFilename}
               hasDuckDb={hasDuckDbTelemetry}
+              duckdbUnavailableReason={duckdbUnavailableReason}
               onSelectSource={onSelectSource}
             />
           </div>

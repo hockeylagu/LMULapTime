@@ -332,6 +332,15 @@ export class SessionDatabase {
     return decompressJson<ReplayMetadata>(row.metadata_br);
   }
 
+  /** Returns the latest parser-versioned metadata even when LMU has deleted the source .Vcr. */
+  public getStoredReplayMetadata(filename: string): ReplayMetadata | null {
+    const row = this.db.prepare(
+      'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
+    ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
+    if (!row || row.parser_version !== REPLAY_CACHE_VERSION) return null;
+    return decompressJson<ReplayMetadata>(row.metadata_br);
+  }
+
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
     this.db.prepare(`
       INSERT INTO replay_metadata (filename, file_path, file_mtime, file_size, parser_version, metadata_br, updated_at)
@@ -361,6 +370,15 @@ export class SessionDatabase {
     if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION) {
       return null;
     }
+    return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+  }
+
+  /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
+  public getStoredReplayTrajectory(filename: string, driverSlot: number, lapKey: number): ReplayTrajectoryData | null {
+    const row = this.db.prepare(
+      'SELECT parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    ).get(filename, driverSlot, lapKey) as { parser_version: string; trajectory_br: Buffer } | undefined;
+    if (!row || row.parser_version !== REPLAY_CACHE_VERSION) return null;
     return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
   }
 

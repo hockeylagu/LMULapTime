@@ -9,12 +9,17 @@ export interface TelemetryResolutionPopoverProps {
   pointsCount: number;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
+  duckdbRawPointsCount?: number;
+  duckdbRawSampleRateHz?: number;
   isFullResolution?: boolean;
   isZoomed?: boolean;
   zoomedPointsCount?: number;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
   hasDuckDb?: boolean;
+  duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
@@ -26,12 +31,17 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   pointsCount,
   rawPointsCount,
   rawSampleRateHz,
+  vcrRawPointsCount,
+  vcrRawSampleRateHz,
+  duckdbRawPointsCount,
+  duckdbRawSampleRateHz,
   isFullResolution,
   isZoomed,
   zoomedPointsCount,
   source,
   duckdbFilename,
   hasDuckDb,
+  duckdbUnavailableReason,
   onSelectSource,
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -53,6 +63,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   const downsampleRatio = effectiveRaw > 0 && pointsCount > 0 ? (effectiveRaw / pointsCount).toFixed(1) : '1.0';
   const activeSampleLabel = `${(pointsCount || effectiveRaw || 1200).toLocaleString()} pts`;
   const fullRawLabel = `${(effectiveRaw || pointsCount || 1200).toLocaleString()} pts`;
+  const vcrResolutionLabel = `${(vcrRawPointsCount ?? effectiveRaw).toLocaleString()} pts${vcrRawSampleRateHz ? ` @ ${vcrRawSampleRateHz} Hz` : ''}`;
+  const duckdbResolutionLabel = `${(duckdbRawPointsCount ?? effectiveRaw).toLocaleString()} pts${duckdbRawSampleRateHz ? ` @ ${duckdbRawSampleRateHz} Hz` : ''}`;
 
   return (
     <div
@@ -184,9 +196,14 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => onSelectSource('duckdb')}
+              onClick={() => {
+                if (!duckdbUnavailableReason) onSelectSource('duckdb');
+              }}
+              disabled={Boolean(duckdbUnavailableReason)}
               className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                source === 'duckdb'
+                duckdbUnavailableReason
+                  ? 'border-lmu-border/50 bg-black/20 text-lmu-muted opacity-60 cursor-not-allowed'
+                  : source === 'duckdb'
                   ? 'bg-amber-500/20 border-amber-500/60 text-white shadow-[0_0_10px_rgba(245,158,11,0.25)]'
                   : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
               }`}
@@ -195,10 +212,12 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${source === 'duckdb' ? 'bg-amber-400 animate-pulse' : 'bg-amber-400/40'}`} />
                 ⚡ 100Hz DuckDB
               </div>
-              <span className="text-[9px] text-lmu-muted mt-1 truncate max-w-full" title={duckdbFilename || 'Native DuckDB file'}>
-                {duckdbFilename ? (duckdbFilename.length > 22 ? duckdbFilename.slice(0, 20) + '...' : duckdbFilename) : 'Physical sensor log'}
+              <span className="text-[9px] text-lmu-muted mt-1 font-mono">
+                {duckdbResolutionLabel}
               </span>
-              <span className="text-[9px] text-amber-300/80 mt-0.5">Physical 100Hz log</span>
+              {duckdbUnavailableReason && (
+                <span className="text-[9px] text-amber-300/90 mt-1 leading-tight">{duckdbUnavailableReason}</span>
+              )}
             </button>
 
             <button
@@ -213,8 +232,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <div className="flex items-center gap-1.5 font-bold text-[11px] text-sky-300">
                 🎬 Native VCR
               </div>
-              <span className="text-[9px] text-lmu-muted mt-1">Replay binary file</span>
-              <span className="text-[9px] text-sky-300/80 mt-0.5">Simulation stream</span>
+              <span className="text-[9px] text-lmu-muted mt-1 font-mono">{vcrResolutionLabel}</span>
             </button>
           </div>
         </div>

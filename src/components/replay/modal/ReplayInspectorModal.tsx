@@ -77,6 +77,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     selectedSource,
     handleSelectSource,
     hasDuckDbTelemetry,
+    duckdbUnavailableReason,
   } = useReplayInspectorData({
     isOpen,
     replayName,
@@ -263,6 +264,7 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
       setColorBy={setColorBy}
       drivers={metadata?.drivers || []}
       hasDuckDbTelemetry={hasDuckDbTelemetry}
+      duckdbUnavailableReason={duckdbUnavailableReason}
       selectedSource={selectedSource}
       onSelectSource={handleSelectSource}
     />

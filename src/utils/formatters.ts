@@ -15,6 +15,12 @@ export function getSteerAngleDeg(steerYaw: number | undefined | null, maxLockDeg
   return parseFloat((steerYaw * maxLockDeg).toFixed(1));
 }
 
+/** Converts a post-processed steering wheel angle to signed steering input percent. */
+export function getSteerPercent(steerAngleDeg: number | undefined | null, maxLockDeg = 270): number {
+  if (steerAngleDeg === undefined || steerAngleDeg === null) return 0;
+  return parseFloat(((steerAngleDeg / maxLockDeg) * 100).toFixed(1));
+}
+
 export function formatElapsedSeconds(seconds: number | string | null | undefined): string {
   if (seconds === null || seconds === undefined || seconds === '') return '--:--';
   const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
