@@ -65,6 +65,8 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
 
         <ReplayIndicator
           replay={s.matchingReplayFile}
+          hasDuckDbTelemetry={s.hasDuckDbTelemetry}
+          duckdbFilename={s.duckdbFilename}
           hideIfEmpty={true}
           onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
         />

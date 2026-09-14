@@ -21,7 +21,12 @@ export function fuseDuckDbWithVcrTrajectory(
     };
   }
 
-  const vcrMaxTime = vcrPoints[vcrPoints.length - 1].timeSec || duckLap.lapTimeSec;
+  const vcrBaseTime =
+    vcrPoints[0]?.timeSec !== undefined && vcrPoints[0].timeSec > (duckLap.lapTimeSec + 5)
+      ? vcrPoints[0].timeSec
+      : 0;
+  const vcrMaxTime =
+    ((vcrPoints[vcrPoints.length - 1].timeSec ?? duckLap.lapTimeSec) - vcrBaseTime) || duckLap.lapTimeSec;
   const duckPoints = duckLap.points;
   const fusedPoints: ReplayTrajectoryPoint[] = [];
 
@@ -32,14 +37,17 @@ export function fuseDuckDbWithVcrTrajectory(
     const t = dp.timeSec ?? 0;
 
     // Advance vcrIdx so that vcrPoints[vcrIdx].timeSec <= t <= vcrPoints[vcrIdx + 1].timeSec
-    while (vcrIdx < vcrPoints.length - 2 && (vcrPoints[vcrIdx + 1].timeSec ?? 0) < t) {
+    while (
+      vcrIdx < vcrPoints.length - 2 &&
+      ((vcrPoints[vcrIdx + 1].timeSec ?? 0) - vcrBaseTime) < t
+    ) {
       vcrIdx++;
     }
 
     const p0 = vcrPoints[vcrIdx];
     const p1 = vcrPoints[vcrIdx + 1] || p0;
-    const t0 = p0.timeSec ?? 0;
-    const t1 = p1.timeSec ?? vcrMaxTime;
+    const t0 = (p0.timeSec ?? 0) - vcrBaseTime;
+    const t1 = (p1.timeSec ?? (vcrMaxTime + vcrBaseTime)) - vcrBaseTime;
 
     const span = t1 - t0;
     const alpha = span > 0.0001 ? Math.max(0, Math.min(1, (t - t0) / span)) : 0;
@@ -80,7 +88,9 @@ export function fuseDuckDbWithVcrTrajectory(
     duckdbFilename,
     points: fusedPoints,
     pointsCount: fusedPoints.length,
+    rawPointsCount: fusedPoints.length,
     rawSampleRateHz: duckLap.sampleRateHz,
+    isFullResolution: true,
     wheelTelemetryAvailable: Boolean(vcrTrajectory.wheelTelemetryAvailable || hasWheelData),
   };
 }

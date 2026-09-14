@@ -37,6 +37,8 @@ export interface TelemetryStripChartsProps {
   selectedCornerMarkers?: SelectedCornerMarkers | null;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
+  hasDuckDb?: boolean;
+  onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
@@ -44,6 +46,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
   rawPointsCount, rawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
+  hasDuckDb, onSelectSource,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -271,14 +274,11 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         totalFrames={points.length}
         headerContent={headerContent}
         dragSelection={dragSelection}
-        markerPcts={metrics}
-        activeChannels={activePreset?.channels}
-        presets={presets}
-        activePresetId={activePresetId}
-        onSelectPreset={handleSelectPreset}
+        markerPcts={metrics} activeChannels={activePreset?.channels}
+        presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}
         onOpenManageModal={() => setIsPresetModalOpen(true)}
-        source={source}
-        duckdbFilename={duckdbFilename}
+        source={source} duckdbFilename={duckdbFilename}
+        hasDuckDb={hasDuckDb} onSelectSource={onSelectSource}
       />
 
       <TelemetryPresetModal

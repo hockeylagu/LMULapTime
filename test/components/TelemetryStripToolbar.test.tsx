@@ -39,7 +39,7 @@ describe('TelemetryStripToolbar', () => {
       />
     );
 
-    const resBtn = screen.getByRole('button', { name: /60Hz • 2400 pts/i });
+    const resBtn = screen.getByRole('button', { name: /60Hz • 2[,.]?400 pts/i });
     expect(resBtn).toBeInTheDocument();
 
     // Click to open resolution popover
@@ -67,5 +67,43 @@ describe('TelemetryStripToolbar', () => {
     );
 
     expect(screen.getByRole('button', { name: /60Hz • Full Raw/i })).toBeInTheDocument();
+  });
+
+  it('renders interactive data source switcher inside resolution popover and triggers onSelectSource', () => {
+    const handleSelectSource = vi.fn();
+    render(
+      <TelemetryStripToolbar
+        interactionMode="scrub"
+        onChangeInteractionMode={vi.fn()}
+        isZoomed={false}
+        viewStart={0}
+        viewEnd={100}
+        onResetZoom={vi.fn()}
+        source="duckdb"
+        duckdbFilename="Bahrain_Test.duckdb"
+        hasDuckDb={true}
+        onSelectSource={handleSelectSource}
+        onChangeResolution={vi.fn()}
+        telemetryResolution={2400}
+        pointsCount={2400}
+        rawSampleRateHz={100}
+      />
+    );
+
+    // Open resolution popover
+    const resBtn = screen.getByRole('button', { name: /100Hz • 2[,.]?400 pts/i });
+    fireEvent.click(resBtn);
+
+    const vcrBtn = screen.getByRole('button', { name: /🎬 Native VCR/i });
+    expect(vcrBtn).toBeInTheDocument();
+
+    const duckBtn = screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i });
+    expect(duckBtn).toBeInTheDocument();
+
+    fireEvent.click(vcrBtn);
+    expect(handleSelectSource).toHaveBeenCalledWith('vcr');
+
+    fireEvent.click(duckBtn);
+    expect(handleSelectSource).toHaveBeenCalledWith('duckdb');
   });
 });

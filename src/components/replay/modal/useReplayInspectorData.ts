@@ -53,6 +53,7 @@ export function useReplayInspectorData({
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [chartZoomRange, setChartZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [telemetryResolution, setTelemetryResolution] = useState<number>(2400);
+  const [selectedSource, setSelectedSource] = useState<'duckdb' | 'vcr'>('duckdb');
 
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
@@ -101,7 +102,7 @@ export function useReplayInspectorData({
 
     Promise.all([
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}${driverQuery}`).then(r => (r.ok ? r.json() : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, rawTrajData]) => {
         if (!isMounted) return;
@@ -237,7 +238,7 @@ export function useReplayInspectorData({
       ? Promise.resolve(metadata)
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
-    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${targetLap}${driverQuery}`)
+    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
       .then(r => (r.ok ? r.json() : null));
 
     Promise.all([fetchMeta, fetchTraj])
@@ -256,7 +257,7 @@ export function useReplayInspectorData({
       });
 
     return () => { isMounted = false; };
-  }, [isCompareMode, baselineReplayName, baselineLapNumber, baselineDriverName, activeReplayName, metadata, telemetryResolution]);
+  }, [isCompareMode, baselineReplayName, baselineLapNumber, baselineDriverName, activeReplayName, metadata, telemetryResolution, selectedSource]);
 
   // Handle external lap changes
   useEffect(() => {
@@ -265,13 +266,19 @@ export function useReplayInspectorData({
     }
   }, [isOpen, initialLapNumber]);
 
-  const fetchTrajectory = (lapNum?: number, slot?: number | null, res: number = telemetryResolution) => {
+  const fetchTrajectory = (
+    lapNum?: number,
+    slot?: number | null,
+    res: number = telemetryResolution,
+    src: 'duckdb' | 'vcr' = selectedSource
+  ) => {
     if (!activeReplayName) return;
     setIsTrajLoading(true);
     const targetLap = lapNum ?? trajectory?.currentLap ?? initialLapNumber ?? 1;
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
-    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}`)
+    const sourceParam = `&source=${src}`;
+    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}${sourceParam}`)
       .then(r => (r.ok ? r.json() : null))
       .then((rawTrajData: ReplayTrajectoryData | null) => {
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
@@ -282,6 +289,11 @@ export function useReplayInspectorData({
         setIsTrajLoading(false);
       })
       .catch(() => setIsTrajLoading(false));
+  };
+
+  const handleSelectSource = (newSource: 'duckdb' | 'vcr') => {
+    setSelectedSource(newSource);
+    fetchTrajectory(trajectory?.currentLap, selectedDriverSlot, telemetryResolution, newSource);
   };
 
   const handleSelectDriver = (slot: number) => {
@@ -388,5 +400,8 @@ export function useReplayInspectorData({
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
     maxSpeed, currentPoint, currentLapSummary, lapDeltas, activeReplayName,
     handleSelectBaselineLap,
+    selectedSource,
+    handleSelectSource,
+    hasDuckDbTelemetry: Boolean(metadata?.hasDuckDbTelemetry || trajectory?.duckdbFilename || trajectory?.source === 'duckdb'),
   };
 }

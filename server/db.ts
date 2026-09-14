@@ -445,6 +445,28 @@ export class SessionDatabase {
     return rows.map((r) => JSON.parse(r.metadata_json) as DuckDbFileInfo);
   }
 
+  public getTelemetryMetadata(): Array<{
+    filename: string;
+    filePath: string;
+    matchedSessionId: string | null;
+    matchedReplayFilename: string | null;
+  }> {
+    const rows = this.db.prepare(
+      'SELECT filename, file_path, matched_session_id, matched_replay_filename FROM telemetry_metadata'
+    ).all() as Array<{
+      filename: string;
+      file_path: string;
+      matched_session_id: string | null;
+      matched_replay_filename: string | null;
+    }>;
+    return rows.map((r) => ({
+      filename: r.filename,
+      filePath: r.file_path,
+      matchedSessionId: r.matched_session_id,
+      matchedReplayFilename: r.matched_replay_filename,
+    }));
+  }
+
   public getTelemetryLapCache(filename: string, lapNumber: number): DuckDbLapTelemetry | null {
     const row = this.db.prepare(
       'SELECT telemetry_br FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'

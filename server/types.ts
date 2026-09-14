@@ -393,7 +393,11 @@ export interface SessionMetadata {
     splitNo?: number;
     eventType?: string;
     durationSec?: number;
+    hasDuckDbTelemetry?: boolean;
+    duckdbFilename?: string;
   };
+  hasDuckDbTelemetry?: boolean;
+  duckdbFilename?: string;
 }
 
 export interface DetailedSession extends SessionMetadata {
@@ -595,6 +599,8 @@ export interface ReplayMetadata {
   laps?: ReplayLapSummary[];
   carClass?: string;
   carModel?: string;
+  hasDuckDbTelemetry?: boolean;
+  duckdbFilename?: string;
 }
 
 export interface TimingGateGeometry {
@@ -822,4 +828,6 @@ export interface ReplaySummary {
   carClass?: string;
   carModel?: string;
   carClasses?: string[];
+  hasDuckDbTelemetry?: boolean;
+  duckdbFilename?: string;
 }

@@ -74,6 +74,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     handleRemoveCompare,
     activeReplayName,
     handleSelectBaselineLap,
+    selectedSource,
+    handleSelectSource,
+    hasDuckDbTelemetry,
   } = useReplayInspectorData({
     isOpen,
     replayName,
@@ -259,6 +262,9 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
       colorBy={colorBy}
       setColorBy={setColorBy}
       drivers={metadata?.drivers || []}
+      hasDuckDbTelemetry={hasDuckDbTelemetry}
+      selectedSource={selectedSource}
+      onSelectSource={handleSelectSource}
     />
   );
 };

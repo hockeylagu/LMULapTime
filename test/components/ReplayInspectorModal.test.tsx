@@ -768,5 +768,70 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByTitle('Click to change the comparison lap')).toHaveTextContent(/1:12.484/);
     });
   });
+
+  it('allows switching data source between DuckDB and VCR in the toolbar', async () => {
+    const requestedUrls: string[] = [];
+    const metaWithDuck = {
+      ...mockMeta,
+      hasDuckDbTelemetry: true,
+      duckdbFilename: 'Test_Duck.duckdb',
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      requestedUrls.push(url);
+      if (url.includes('/metadata')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(metaWithDuck) });
+      }
+      if (url.includes('/trajectory')) {
+        const isVcr = url.includes('source=vcr');
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...mockTraj,
+            source: isVcr ? 'vcr' : 'duckdb',
+            duckdbFilename: 'Test_Duck.duckdb',
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unknown URL: ${url}`));
+    });
+
+    render(
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pts/i })).toBeInTheDocument();
+    });
+
+    // Open resolution popover
+    fireEvent.click(screen.getByRole('button', { name: /pts/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /🎬 Native VCR/i })).toBeInTheDocument();
+    });
+
+    // Click Native VCR button
+    fireEvent.click(screen.getByRole('button', { name: /🎬 Native VCR/i }));
+
+    await waitFor(() => {
+      expect(requestedUrls.some(u => u.includes('source=vcr'))).toBe(true);
+    });
+
+    // Open resolution popover again to switch back
+    fireEvent.click(screen.getByRole('button', { name: /pts/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i })).toBeInTheDocument();
+    });
+
+    // Click DuckDB button to switch back
+    fireEvent.click(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i }));
+
+    await waitFor(() => {
+      expect(requestedUrls.some(u => u.includes('source=duckdb'))).toBe(true);
+    });
+  });
 });
 

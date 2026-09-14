@@ -126,12 +126,54 @@ runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
   }
 })();
 
+function enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
+  try {
+    const duckFiles = scanDuckDbDirectory(currentTelemetryDir);
+    const telemetryMeta = sessionDb.getTelemetryMetadata();
+    const telemetryBySessionId = new Map<string, string>();
+    const telemetryByReplay = new Map<string, string>();
+
+    for (const tm of telemetryMeta) {
+      if (tm.matchedSessionId) telemetryBySessionId.set(tm.matchedSessionId, tm.filename);
+      if (tm.matchedReplayFilename) telemetryByReplay.set(tm.matchedReplayFilename, tm.filename);
+    }
+
+    for (const s of sessions) {
+      const replayName = s.matchingReplayFile?.name;
+      let matchedDuckFilename =
+        telemetryBySessionId.get(s.id) ||
+        (replayName ? telemetryByReplay.get(replayName) : undefined);
+
+      if (!matchedDuckFilename && duckFiles.length > 0) {
+        const matched = matchDuckDbToSession(duckFiles, s);
+        if (matched) {
+          matchedDuckFilename = matched.filename;
+          sessionDb.upsertTelemetryMetadata(matched, s.id, replayName);
+        }
+      }
+
+      if (matchedDuckFilename) {
+        s.hasDuckDbTelemetry = true;
+        s.duckdbFilename = matchedDuckFilename;
+        if (s.matchingReplayFile) {
+          s.matchingReplayFile.hasDuckDbTelemetry = true;
+          s.matchingReplayFile.duckdbFilename = matchedDuckFilename;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', err);
+  }
+}
+
 function loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
   if (forceRefresh) {
     sessionDb.syncSessionsFromDir(currentResultsDir, parser, forceReparse);
     runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
   }
-  return sessionDb.getAllSessions();
+  const sessions = sessionDb.getAllSessions();
+  enrichSessionsWithTelemetry(sessions);
+  return sessions;
 }
 
 function parseAndCacheFile(filePath: string): DetailedSession | null {
@@ -383,6 +425,7 @@ app.get('/api/session/:id', (req, res) => {
   // 1. Fast path: Check database / memory cache
   const cached = sessionDb.getSessionById(id);
   if (cached) {
+    enrichSessionsWithTelemetry([cached]);
     return res.json(cached);
   }
 
@@ -392,6 +435,7 @@ app.get('/api/session/:id', (req, res) => {
   if (fs.existsSync(singleFilePath)) {
     const parsed = parseAndCacheFile(singleFilePath);
     if (parsed) {
+      enrichSessionsWithTelemetry([parsed]);
       return res.json(parsed);
     }
   }
@@ -474,6 +518,7 @@ app.post('/api/scan', (req, res) => {
   // of this request blocking until every .Vcr file has been scanned.
   runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
   const sessions = sessionDb.getAllSessions();
+  enrichSessionsWithTelemetry(sessions);
 
   res.json({
     success: true,
@@ -589,6 +634,8 @@ app.get('/api/replays', (_req, res) => {
     const files = fs.readdirSync(currentReplaysDir);
     const sessions = loadSessions();
     const vcrFiles = files.filter(f => f.toLowerCase().endsWith('.vcr'));
+    const duckFiles = scanDuckDbDirectory(currentTelemetryDir);
+    const telemetryMeta = sessionDb.getTelemetryMetadata();
 
     const summaries: ReplaySummary[] = [];
 
@@ -619,6 +666,12 @@ app.get('/api/replays', (_req, res) => {
           ? getDisplayTrackName(matched.trackVenue, matched.trackCourse)
           : (meta?.displayTrack || filenameTrack || meta?.trackName);
 
+        const matchedDuckFilename =
+          telemetryMeta.find(tm => tm.matchedReplayFilename === f)?.filename ||
+          (matched ? telemetryMeta.find(tm => tm.matchedSessionId === matched.id)?.filename : undefined) ||
+          (meta ? matchDuckDbToReplay(duckFiles, meta, stat.mtime.getTime())?.filename : undefined) ||
+          (matched ? matchDuckDbToSession(duckFiles, matched)?.filename : undefined);
+
         summaries.push({
           name: f,
           path: filePath,
@@ -637,6 +690,8 @@ app.get('/api/replays', (_req, res) => {
           carClass: replayCarClass || undefined,
           carModel: replayCarModel || undefined,
           carClasses: allCarClasses.length > 0 ? allCarClasses : undefined,
+          hasDuckDbTelemetry: Boolean(matchedDuckFilename),
+          duckdbFilename: matchedDuckFilename,
         });
       } catch {
         // Skip unreadable files
@@ -732,6 +787,26 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       }
     }
 
+    try {
+      const duckFiles = scanDuckDbDirectory(currentTelemetryDir);
+      const telemetryMeta = sessionDb.getTelemetryMetadata();
+      const sessions = loadSessions();
+      const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
+      const stat = fs.statSync(filePath);
+      const matchedDuckFilename =
+        telemetryMeta.find(tm => tm.matchedReplayFilename === replayName)?.filename ||
+        (matchedSession ? telemetryMeta.find(tm => tm.matchedSessionId === matchedSession.id)?.filename : undefined) ||
+        matchDuckDbToReplay(duckFiles, metadata, stat.mtime.getTime())?.filename ||
+        (matchedSession ? matchDuckDbToSession(duckFiles, matchedSession)?.filename : undefined);
+
+      if (matchedDuckFilename) {
+        metadata.hasDuckDbTelemetry = true;
+        metadata.duckdbFilename = matchedDuckFilename;
+      }
+    } catch {
+      // Ignore
+    }
+
     res.json(metadata);
   } catch (err: unknown) {
     console.error(`Failed to parse replay metadata for ${req.params.name}:`, err);
@@ -756,6 +831,8 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
       ? (maxPointsParam === '0' || maxPointsParam.toLowerCase() === 'raw' ? 0 : parseInt(maxPointsParam, 10))
       : 1200;
     const lapNumber = req.query.lap ? parseInt(req.query.lap as string, 10) : undefined;
+    const sourceParam = (req.query.source as string | undefined)?.toLowerCase();
+    const allowDuckDb = sourceParam !== 'vcr';
 
     if (driverSlot === undefined && driverName) {
       driverSlot = resolveDriverSlotFromMetadata(filePath, replayName, driverName, parser.configuredPlayerName);
@@ -818,25 +895,30 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
 
         if (matchedDuck) {
           sessionDb.upsertTelemetryMetadata(matchedDuck, matchedSession?.id, replayName);
-          const chosenLapNum = trajectory.currentLap || lapNumber || 1;
-          let duckLap = sessionDb.getTelemetryLapCache(matchedDuck.filename, chosenLapNum);
-          if (!duckLap) {
-            try {
-              const duckReader = new DuckDbReader(matchedDuck.filePath);
-              await duckReader.open();
-              duckLap = await duckReader.getLapTelemetry(chosenLapNum);
-              await duckReader.close();
-              if (duckLap) {
-                sessionDb.upsertTelemetryLapCache(matchedDuck.filename, chosenLapNum, duckLap);
-              }
-            } catch (err) {
-              console.warn(`[DuckDB] Failed to extract lap ${chosenLapNum} from ${matchedDuck.filename}:`, err);
-            }
-          }
+          trajectory.duckdbFilename = matchedDuck.filename;
 
-          if (duckLap) {
-            const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
-            trajectory = downsampleReplayTrajectory(fused, maxPoints);
+          if (allowDuckDb) {
+            const chosenLapNum = trajectory.currentLap || lapNumber || 1;
+            const targetLapTimeSec = trajectory.laps?.find(l => l.lapNumber === chosenLapNum)?.lapTimeSec;
+            let duckLap = sessionDb.getTelemetryLapCache(matchedDuck.filename, chosenLapNum);
+            if (!duckLap) {
+              try {
+                const duckReader = new DuckDbReader(matchedDuck.filePath);
+                await duckReader.open();
+                duckLap = await duckReader.getLapTelemetry(chosenLapNum, targetLapTimeSec);
+                await duckReader.close();
+                if (duckLap) {
+                  sessionDb.upsertTelemetryLapCache(matchedDuck.filename, chosenLapNum, duckLap);
+                }
+              } catch (err) {
+                console.warn(`[DuckDB] Failed to extract lap ${chosenLapNum} from ${matchedDuck.filename}:`, err);
+              }
+            }
+
+            if (duckLap) {
+              const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
+              trajectory = downsampleReplayTrajectory(fused, maxPoints);
+            }
           }
         }
       }

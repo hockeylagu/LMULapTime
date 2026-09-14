@@ -101,16 +101,6 @@ describe('DuckDbReader', () => {
     });
   });
 
-  afterAll(() => {
-    if (fs.existsSync(testDbPath)) {
-      try {
-        fs.unlinkSync(testDbPath);
-      } catch {
-        // ignore
-      }
-    }
-  });
-
   it('reads metadata and catalogs correctly', async () => {
     const reader = new DuckDbReader(testDbPath);
     await reader.open();
@@ -160,5 +150,97 @@ describe('DuckDbReader', () => {
     expect(p0.brakeTemps![0]).toBeCloseTo(450.0, 1);
 
     await reader.close();
+  });
+
+  it('supports continuous TC channel, hasColumn detection, and lap time alignment', async () => {
+    const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
+    if (fs.existsSync(multiRateDbPath)) fs.unlinkSync(multiRateDbPath);
+
+    const db = new duckdb.Database(multiRateDbPath);
+    await new Promise<void>((resolve, reject) => {
+      db.exec(`
+        CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
+        INSERT INTO channelsList VALUES
+          ('GPS Time', 100, 's'),
+          ('Ground Speed', 100, 'km/h'),
+          ('Throttle Pos', 50, '%'),
+          ('Brake Pos', 50, '%'),
+          ('Steering Pos', 100, '%'),
+          ('TC', 100, ''),
+          ('TyresPressure', 10, 'kPa');
+
+        CREATE TABLE "GPS Time" (value FLOAT);
+        CREATE TABLE "Ground Speed" (value FLOAT);
+        CREATE TABLE "Throttle Pos" (value FLOAT);
+        CREATE TABLE "Brake Pos" (value FLOAT);
+        CREATE TABLE "Steering Pos" (value FLOAT);
+        CREATE TABLE "TC" (value BOOLEAN);
+        CREATE TABLE "TyresPressure" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
+
+        CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
+        -- Lap 0: Outlap ts=0 to ts=100 (100s)
+        -- Lap 1: Flying lap ts=100 to ts=200 (100s, lapTime=100.0)
+        INSERT INTO "Lap" VALUES (0.0, 0), (100.0, 1), (200.0, 2);
+
+        -- 100Hz channels: 2000 points (from 0 to 200s)
+        INSERT INTO "GPS Time" SELECT (i * 0.1)::FLOAT FROM range(2000) t(i);
+        INSERT INTO "Ground Speed" SELECT (150.0)::FLOAT FROM range(2000) t(i);
+        INSERT INTO "Steering Pos" SELECT (-2.5)::FLOAT FROM range(2000) t(i);
+        INSERT INTO "TC" SELECT (i % 200 < 50)::BOOLEAN FROM range(2000) t(i);
+
+        -- 50Hz channels: 1000 points (from 0 to 200s)
+        INSERT INTO "Throttle Pos" SELECT (100.0)::FLOAT FROM range(1000) t(i);
+        INSERT INTO "Brake Pos" SELECT (0.0)::FLOAT FROM range(1000) t(i);
+
+        -- 10Hz channel: 200 points (from 0 to 200s)
+        INSERT INTO "TyresPressure" SELECT 175.0::FLOAT, 175.0::FLOAT, 175.0::FLOAT, 175.0::FLOAT FROM range(200) t(i);
+      `, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      db.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    const reader = new DuckDbReader(multiRateDbPath);
+    await reader.open();
+
+    expect(await reader.hasColumn('TC', 'value')).toBe(true);
+    expect(await reader.hasColumn('TC', 'ts')).toBe(false);
+
+    const laps = await reader.getLapList();
+    expect(laps.length).toBe(2);
+    expect(laps[0].lapNumber).toBe(0);
+    expect(laps[1].lapNumber).toBe(1);
+
+    // Test lap alignment: requesting VCR Lap 2 with lapTime=100s should align to DuckDB Lap 1
+    const lapTelemetry = await reader.getLapTelemetry(2, 100.0);
+    expect(lapTelemetry).not.toBeNull();
+    expect(lapTelemetry!.points.length).toBeGreaterThan(0);
+    expect(lapTelemetry!.points[0].throttle).toBe(100);
+    expect(lapTelemetry!.points[0].steerYaw).toBe(-2.5);
+    expect(lapTelemetry!.points[0].tirePressures).toBeDefined();
+    expect(lapTelemetry!.points[0].tirePressures![0]).toBe(175);
+    expect(typeof lapTelemetry!.points[0].tcActive).toBe('boolean');
+
+    await reader.close();
+  });
+
+  afterAll(() => {
+    const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
+    for (const file of [testDbPath, multiRateDbPath]) {
+      if (fs.existsSync(file)) {
+        try {
+          fs.unlinkSync(file);
+        } catch {
+          // Ignore EBUSY on Windows file locks
+        }
+      }
+    }
   });
 });

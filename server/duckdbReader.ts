@@ -76,6 +76,15 @@ export class DuckDbReader {
     return tables.some((t) => t.toLowerCase() === tableName.toLowerCase());
   }
 
+  public async hasColumn(tableName: string, columnName: string): Promise<boolean> {
+    try {
+      const cols = await this.queryAll<{ column_name: string }>(`DESCRIBE "${tableName}"`);
+      return cols.some((c) => c.column_name.toLowerCase() === columnName.toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
   public async getMetadata(): Promise<DuckDbSessionMetadata> {
     if (!(await this.hasTable('metadata'))) {
       return {};
@@ -172,16 +181,40 @@ export class DuckDbReader {
     return summaries;
   }
 
-  public async getLapTelemetry(lapNumber: number): Promise<DuckDbLapTelemetry | null> {
+  public async getLapTelemetry(lapNumber: number, targetLapTimeSec?: number): Promise<DuckDbLapTelemetry | null> {
     const laps = await this.getLapList();
-    const targetLap = laps.find((l) => l.lapNumber === lapNumber);
+    if (laps.length === 0) return null;
+
+    let targetLap: DuckDbLapSummary | undefined;
+    if (targetLapTimeSec && targetLapTimeSec > 0) {
+      let minDiff = Infinity;
+      for (const l of laps) {
+        const diff = Math.abs(l.lapTimeSec - targetLapTimeSec);
+        if (diff < minDiff) {
+          minDiff = diff;
+          targetLap = l;
+        }
+      }
+      if (minDiff > 1.5) {
+        targetLap = undefined;
+      }
+    }
+
+    if (!targetLap) {
+      targetLap = laps.find((l) => l.lapNumber === lapNumber);
+    }
+    if (!targetLap && laps[0]?.lapNumber === 0) {
+      targetLap = laps.find((l) => l.lapNumber === lapNumber - 1);
+    }
     if (!targetLap) return null;
 
     const { startTs, endTs, lapTimeSec } = targetLap;
 
     // Determine sampling frequency and timeline
     const channels = await this.getChannelsList();
-    const speedChannel = channels.find((c) => c.channelName.toLowerCase() === 'ground speed');
+    const speedChannel = channels.find(
+      (c) => c.channelName.toLowerCase() === 'ground speed' || c.channelName.toLowerCase() === 'speed'
+    );
     const declaredHz = speedChannel?.frequency || 100;
 
     const hasGpsTime = await this.hasTable('GPS Time');
@@ -208,32 +241,82 @@ export class DuckDbReader {
     const rowCount = endIdx - startIdx + 1;
     if (rowCount <= 0) return null;
 
-    // Fetch continuous channels with OFFSET and LIMIT
-    const hasSpeed = await this.hasTable('Ground Speed');
-    const hasThrottle = await this.hasTable('Throttle Pos');
-    const hasBrake = await this.hasTable('Brake Pos');
-    const hasSteering = await this.hasTable('Steering Input');
-    const hasRpm = await this.hasTable('Engine RPM');
-    const hasSusp = await this.hasTable('Susp Pos');
-    const hasPressure = await this.hasTable('TyresPressure');
-    const hasWheelSpeed = await this.hasTable('Wheel Speed');
+    // Detect continuous channel tables
+    const speedTable = (await this.hasTable('Ground Speed'))
+      ? 'Ground Speed'
+      : (await this.hasTable('Speed'))
+      ? 'Speed'
+      : null;
+
+    const throttleTable = (await this.hasTable('Throttle Pos'))
+      ? 'Throttle Pos'
+      : (await this.hasTable('Throttle Pos Unfiltered'))
+      ? 'Throttle Pos Unfiltered'
+      : (await this.hasTable('Throttle'))
+      ? 'Throttle'
+      : null;
+
+    const brakeTable = (await this.hasTable('Brake Pos'))
+      ? 'Brake Pos'
+      : (await this.hasTable('Brake Pos Unfiltered'))
+      ? 'Brake Pos Unfiltered'
+      : (await this.hasTable('Brake'))
+      ? 'Brake'
+      : null;
+
+    const steerTable = (await this.hasTable('Steering Pos'))
+      ? 'Steering Pos'
+      : (await this.hasTable('Steering Pos Unfiltered'))
+      ? 'Steering Pos Unfiltered'
+      : (await this.hasTable('Steering Input'))
+      ? 'Steering Input'
+      : (await this.hasTable('Steering'))
+      ? 'Steering'
+      : null;
+
+    const rpmTable = (await this.hasTable('Engine RPM'))
+      ? 'Engine RPM'
+      : (await this.hasTable('RPM'))
+      ? 'RPM'
+      : null;
+
+    const suspTable = (await this.hasTable('Susp Pos')) ? 'Susp Pos' : null;
+
+    const pressureTable = (await this.hasTable('TyresPressure'))
+      ? 'TyresPressure'
+      : (await this.hasTable('Tyres Pressure'))
+      ? 'Tyres Pressure'
+      : (await this.hasTable('Tyre Pressure'))
+      ? 'Tyre Pressure'
+      : (await this.hasTable('Tire Pressure'))
+      ? 'Tire Pressure'
+      : null;
+
+    const wheelSpeedTable = (await this.hasTable('Wheel Speed')) ? 'Wheel Speed' : null;
+
     const brakeTempTable = (await this.hasTable('Brakes Temp'))
       ? 'Brakes Temp'
       : (await this.hasTable('Brake Temp'))
       ? 'Brake Temp'
       : null;
 
-    const tireWearTable = (await this.hasTable('TyresWear'))
+    const tireWearTable = (await this.hasTable('Tyres Wear'))
+      ? 'Tyres Wear'
+      : (await this.hasTable('TyresWear'))
       ? 'TyresWear'
       : (await this.hasTable('Tyre Wear'))
       ? 'Tyre Wear'
-      : (await this.hasTable('Tyres Wear'))
-      ? 'Tyres Wear'
       : (await this.hasTable('Tire Wear'))
       ? 'Tire Wear'
       : null;
 
-    const tireTempTable = (await this.hasTable('TyresTemp'))
+    const tireTempTable = (await this.hasTable('TyresTempCentre'))
+      ? 'TyresTempCentre'
+      : (await this.hasTable('TyresRubberTemp'))
+      ? 'TyresRubberTemp'
+      : (await this.hasTable('TyresCarcassTemp'))
+      ? 'TyresCarcassTemp'
+      : (await this.hasTable('TyresTemp'))
       ? 'TyresTemp'
       : (await this.hasTable('Tyre Temp'))
       ? 'Tyre Temp'
@@ -243,84 +326,120 @@ export class DuckDbReader {
       ? 'Tire Temp'
       : null;
 
-    const [
-      speedRows,
-      throttleRows,
-      brakeRows,
-      steerRows,
-      rpmRows,
-      suspRows,
-      pressureRows,
-      wheelSpeedRows,
-      brakeTempRows,
-      tireWearRows,
-      tireTempRows,
-    ] = await Promise.all([
-      hasSpeed
-        ? this.queryAll<{ value: number }>(`SELECT value FROM "Ground Speed" LIMIT ${rowCount} OFFSET ${startIdx}`)
-        : Promise.resolve([]),
-      hasThrottle
-        ? this.queryAll<{ value: number }>(`SELECT value FROM "Throttle Pos" LIMIT ${rowCount} OFFSET ${startIdx}`)
-        : Promise.resolve([]),
-      hasBrake
-        ? this.queryAll<{ value: number }>(`SELECT value FROM "Brake Pos" LIMIT ${rowCount} OFFSET ${startIdx}`)
-        : Promise.resolve([]),
-      hasSteering
-        ? this.queryAll<{ value: number }>(`SELECT value FROM "Steering Input" LIMIT ${rowCount} OFFSET ${startIdx}`)
-        : Promise.resolve([]),
-      hasRpm
-        ? this.queryAll<{ value: number }>(`SELECT value FROM "Engine RPM" LIMIT ${rowCount} OFFSET ${startIdx}`)
-        : Promise.resolve([]),
-      hasSusp
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "Susp Pos" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-      hasPressure
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "TyresPressure" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-      hasWheelSpeed
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "Wheel Speed" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-      brakeTempTable
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "${brakeTempTable}" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-      tireWearTable
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "${tireWearTable}" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-      tireTempTable
-        ? this.queryAll<{ value1: number; value2: number; value3: number; value4: number }>(
-            `SELECT value1, value2, value3, value4 FROM "${tireTempTable}" LIMIT ${rowCount} OFFSET ${startIdx}`
-          )
-        : Promise.resolve([]),
-    ]);
+    // Check discrete vs continuous for ABS, TC, Gear
+    const hasTc = await this.hasTable('TC');
+    const tcHasTs = hasTc ? await this.hasColumn('TC', 'ts') : false;
 
-    // Fetch sparse event tables for this lap
-    const [gearEvents, absEvents, tcEvents] = await Promise.all([
-      (await this.hasTable('Gear'))
+    const hasAbs = await this.hasTable('ABS');
+    const absHasTs = hasAbs ? await this.hasColumn('ABS', 'ts') : false;
+
+    const hasGear = await this.hasTable('Gear');
+    const gearHasTs = hasGear ? await this.hasColumn('Gear', 'ts') : false;
+
+    const fetchContinuousChannel = async <T>(
+      tableName: string | null,
+      columns: string,
+      defaultHz: number = declaredHz
+    ): Promise<{ rows: T[]; hz: number }> => {
+      if (!tableName) return { rows: [], hz: defaultHz };
+      const ch = channels.find((c) => c.channelName.toLowerCase() === tableName.toLowerCase());
+      const hz = ch?.frequency || defaultHz;
+      const chStart = Math.floor((startIdx * hz) / declaredHz);
+      const chCount = Math.ceil((rowCount * hz) / declaredHz) + 2;
+      const rows = await this.queryAll<T>(
+        `SELECT ${columns} FROM "${tableName}" LIMIT ${chCount} OFFSET ${chStart}`
+      );
+      return { rows, hz };
+    };
+
+    const [
+      speedData,
+      throttleData,
+      brakeData,
+      steerData,
+      rpmData,
+      suspData,
+      pressureData,
+      wheelSpeedData,
+      brakeTempData,
+      tireWearData,
+      tireTempData,
+      tcData,
+      absData,
+      gearData,
+      gearEvents,
+      absEvents,
+      tcEvents,
+    ] = await Promise.all([
+      fetchContinuousChannel<{ value: number }>(speedTable, 'value', declaredHz),
+      fetchContinuousChannel<{ value: number }>(throttleTable, 'value', 50),
+      fetchContinuousChannel<{ value: number }>(brakeTable, 'value', 50),
+      fetchContinuousChannel<{ value: number }>(steerTable, 'value', declaredHz),
+      fetchContinuousChannel<{ value: number }>(rpmTable, 'value', declaredHz),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        suspTable,
+        'value1, value2, value3, value4',
+        declaredHz
+      ),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        pressureTable,
+        'value1, value2, value3, value4',
+        10
+      ),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        wheelSpeedTable,
+        'value1, value2, value3, value4',
+        declaredHz
+      ),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        brakeTempTable,
+        'value1, value2, value3, value4',
+        50
+      ),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        tireWearTable,
+        'value1, value2, value3, value4',
+        10
+      ),
+      fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
+        tireTempTable,
+        'value1, value2, value3, value4',
+        declaredHz
+      ),
+      hasTc && !tcHasTs
+        ? fetchContinuousChannel<{ value: boolean | number }>('TC', 'value', declaredHz)
+        : Promise.resolve({ rows: [], hz: declaredHz }),
+      hasAbs && !absHasTs
+        ? fetchContinuousChannel<{ value: boolean | number }>('ABS', 'value', declaredHz)
+        : Promise.resolve({ rows: [], hz: declaredHz }),
+      hasGear && !gearHasTs
+        ? fetchContinuousChannel<{ value: number }>('Gear', 'value', declaredHz)
+        : Promise.resolve({ rows: [], hz: declaredHz }),
+      hasGear && gearHasTs
         ? this.queryAll<{ ts: number; value: number }>(
             `SELECT ts, value FROM "Gear" WHERE ts >= ${startTs - 5} AND ts <= ${endTs + 5} ORDER BY ts ASC`
           )
         : Promise.resolve([]),
-      (await this.hasTable('ABS'))
+      hasAbs && absHasTs
         ? this.queryAll<{ ts: number; value: number }>(
             `SELECT ts, value FROM "ABS" WHERE ts >= ${startTs - 1} AND ts <= ${endTs + 1} ORDER BY ts ASC`
           )
         : Promise.resolve([]),
-      (await this.hasTable('TC'))
+      hasTc && tcHasTs
         ? this.queryAll<{ ts: number; value: number }>(
             `SELECT ts, value FROM "TC" WHERE ts >= ${startTs - 1} AND ts <= ${endTs + 1} ORDER BY ts ASC`
           )
         : Promise.resolve([]),
     ]);
+
+    const getChannelRow = <T>(channelData: { rows: T[]; hz: number }, i: number): T | undefined => {
+      if (channelData.rows.length === 0) return undefined;
+      const idx = Math.min(
+        channelData.rows.length - 1,
+        Math.max(0, Math.floor((i * channelData.hz) / declaredHz))
+      );
+      return channelData.rows[idx];
+    };
 
     const points: ReplayTrajectoryPoint[] = [];
     let cumulativeDistM = 0;
@@ -348,30 +467,47 @@ export class DuckDbReader {
       else break;
     }
 
+    const speedUnit = speedChannel?.unit?.toLowerCase() || 'm/s';
+
     for (let i = 0; i < rowCount; i++) {
       const globalIdx = startIdx + i;
       const pointTime = gpsTimes.length > globalIdx ? gpsTimes[globalIdx] : startTs + i * dt;
       const lapElapsedSec = Math.max(0, pointTime - startTs);
 
-      // Advance discrete event states
-      while (gearEventIdx < gearEvents.length && gearEvents[gearEventIdx].ts <= pointTime) {
-        currentGear = gearEvents[gearEventIdx].value;
-        gearEventIdx++;
-      }
-      while (absEventIdx < absEvents.length && absEvents[absEventIdx].ts <= pointTime) {
-        currentAbs = absEvents[absEventIdx].value > 0;
-        absEventIdx++;
-      }
-      while (tcEventIdx < tcEvents.length && tcEvents[tcEventIdx].ts <= pointTime) {
-        currentTc = tcEvents[tcEventIdx].value > 0;
-        tcEventIdx++;
+      // Advance discrete event states or read continuous channels
+      if (gearHasTs) {
+        while (gearEventIdx < gearEvents.length && gearEvents[gearEventIdx].ts <= pointTime) {
+          currentGear = gearEvents[gearEventIdx].value;
+          gearEventIdx++;
+        }
+      } else if (hasGear) {
+        const gRow = getChannelRow(gearData, i);
+        if (gRow) currentGear = Number(gRow.value);
       }
 
-      // Read raw values
-      const rawSpeed = speedRows[i]?.value ?? 0;
-      // If speed is in m/s (typical in LMU physics engine), convert to km/h if rawSpeed < 120 (max speed in m/s is ~100m/s = 360km/h)
-      // If already km/h (> 120 or declared unit), handle accordingly
-      const speedUnit = speedChannel?.unit?.toLowerCase() || 'm/s';
+      if (absHasTs) {
+        while (absEventIdx < absEvents.length && absEvents[absEventIdx].ts <= pointTime) {
+          currentAbs = absEvents[absEventIdx].value > 0;
+          absEventIdx++;
+        }
+      } else if (hasAbs) {
+        const aRow = getChannelRow(absData, i);
+        if (aRow) currentAbs = Boolean(aRow.value);
+      }
+
+      if (tcHasTs) {
+        while (tcEventIdx < tcEvents.length && tcEvents[tcEventIdx].ts <= pointTime) {
+          currentTc = tcEvents[tcEventIdx].value > 0;
+          tcEventIdx++;
+        }
+      } else if (hasTc) {
+        const tRow = getChannelRow(tcData, i);
+        if (tRow) currentTc = Boolean(tRow.value);
+      }
+
+      // Read continuous values with frequency-adjusted indexing
+      const speedRow = getChannelRow(speedData, i);
+      const rawSpeed = speedRow?.value ?? 0;
       const speedKmh = speedUnit.includes('km') ? rawSpeed : rawSpeed * 3.6;
       const speedMs = speedUnit.includes('km') ? rawSpeed / 3.6 : rawSpeed;
 
@@ -379,56 +515,67 @@ export class DuckDbReader {
         cumulativeDistM += speedMs * dt;
       }
 
-      const rawThrottle = throttleRows[i]?.value ?? 0;
+      const throttleRow = getChannelRow(throttleData, i);
+      const rawThrottle = throttleRow?.value ?? 0;
       const throttle = rawThrottle <= 1.01 ? rawThrottle * 100 : rawThrottle;
 
-      const rawBrake = brakeRows[i]?.value ?? 0;
+      const brakeRow = getChannelRow(brakeData, i);
+      const rawBrake = brakeRow?.value ?? 0;
       const brake = rawBrake <= 1.01 ? rawBrake * 100 : rawBrake;
 
-      const steerYaw = steerRows[i]?.value ?? 0;
-      const engineRpm = rpmRows[i]?.value ?? 0;
+      const steerRow = getChannelRow(steerData, i);
+      const steerYaw = steerRow?.value ?? 0;
 
-      const suspPos: [number, number, number, number] | undefined = suspRows[i]
-        ? [suspRows[i].value1, suspRows[i].value2, suspRows[i].value3, suspRows[i].value4]
+      const rpmRow = getChannelRow(rpmData, i);
+      const engineRpm = rpmRow?.value ?? 0;
+
+      const suspRow = getChannelRow(suspData, i);
+      const suspPos: [number, number, number, number] | undefined = suspRow
+        ? [suspRow.value1, suspRow.value2, suspRow.value3, suspRow.value4]
         : undefined;
 
-      const tirePressures: [number, number, number, number] | undefined = pressureRows[i]
-        ? [pressureRows[i].value1, pressureRows[i].value2, pressureRows[i].value3, pressureRows[i].value4]
+      const pressureRow = getChannelRow(pressureData, i);
+      const tirePressures: [number, number, number, number] | undefined = pressureRow
+        ? [pressureRow.value1, pressureRow.value2, pressureRow.value3, pressureRow.value4]
         : undefined;
 
-      const wheelSpeeds: [number, number, number, number] | undefined = wheelSpeedRows[i]
+      const wheelSpeedRow = getChannelRow(wheelSpeedData, i);
+      const wheelSpeeds: [number, number, number, number] | undefined = wheelSpeedRow
         ? [
-            speedUnit.includes('km') ? wheelSpeedRows[i].value1 : wheelSpeedRows[i].value1 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRows[i].value2 : wheelSpeedRows[i].value2 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRows[i].value3 : wheelSpeedRows[i].value3 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRows[i].value4 : wheelSpeedRows[i].value4 * 3.6,
+            speedUnit.includes('km') ? wheelSpeedRow.value1 : wheelSpeedRow.value1 * 3.6,
+            speedUnit.includes('km') ? wheelSpeedRow.value2 : wheelSpeedRow.value2 * 3.6,
+            speedUnit.includes('km') ? wheelSpeedRow.value3 : wheelSpeedRow.value3 * 3.6,
+            speedUnit.includes('km') ? wheelSpeedRow.value4 : wheelSpeedRow.value4 * 3.6,
           ]
         : undefined;
 
-      const brakeTemps: [number, number, number, number] | undefined = brakeTempRows[i]
+      const brakeTempRow = getChannelRow(brakeTempData, i);
+      const brakeTemps: [number, number, number, number] | undefined = brakeTempRow
         ? [
-            Math.round(brakeTempRows[i].value1),
-            Math.round(brakeTempRows[i].value2),
-            Math.round(brakeTempRows[i].value3),
-            Math.round(brakeTempRows[i].value4),
+            Math.round(brakeTempRow.value1),
+            Math.round(brakeTempRow.value2),
+            Math.round(brakeTempRow.value3),
+            Math.round(brakeTempRow.value4),
           ]
         : undefined;
 
-      const tireWear: [number, number, number, number] | undefined = tireWearRows[i]
+      const tireWearRow = getChannelRow(tireWearData, i);
+      const tireWear: [number, number, number, number] | undefined = tireWearRow
         ? [
-            tireWearRows[i].value1 <= 1.01 ? parseFloat((tireWearRows[i].value1 * 100).toFixed(1)) : parseFloat(tireWearRows[i].value1.toFixed(1)),
-            tireWearRows[i].value2 <= 1.01 ? parseFloat((tireWearRows[i].value2 * 100).toFixed(1)) : parseFloat(tireWearRows[i].value2.toFixed(1)),
-            tireWearRows[i].value3 <= 1.01 ? parseFloat((tireWearRows[i].value3 * 100).toFixed(1)) : parseFloat(tireWearRows[i].value3.toFixed(1)),
-            tireWearRows[i].value4 <= 1.01 ? parseFloat((tireWearRows[i].value4 * 100).toFixed(1)) : parseFloat(tireWearRows[i].value4.toFixed(1)),
+            tireWearRow.value1 <= 1.01 ? parseFloat((tireWearRow.value1 * 100).toFixed(1)) : parseFloat(tireWearRow.value1.toFixed(1)),
+            tireWearRow.value2 <= 1.01 ? parseFloat((tireWearRow.value2 * 100).toFixed(1)) : parseFloat(tireWearRow.value2.toFixed(1)),
+            tireWearRow.value3 <= 1.01 ? parseFloat((tireWearRow.value3 * 100).toFixed(1)) : parseFloat(tireWearRow.value3.toFixed(1)),
+            tireWearRow.value4 <= 1.01 ? parseFloat((tireWearRow.value4 * 100).toFixed(1)) : parseFloat(tireWearRow.value4.toFixed(1)),
           ]
         : undefined;
 
-      const tireTemps: [number, number, number, number] | undefined = tireTempRows[i]
+      const tireTempRow = getChannelRow(tireTempData, i);
+      const tireTemps: [number, number, number, number] | undefined = tireTempRow
         ? [
-            Math.round(tireTempRows[i].value1),
-            Math.round(tireTempRows[i].value2),
-            Math.round(tireTempRows[i].value3),
-            Math.round(tireTempRows[i].value4),
+            Math.round(tireTempRow.value1),
+            Math.round(tireTempRow.value2),
+            Math.round(tireTempRow.value3),
+            Math.round(tireTempRow.value4),
           ]
         : undefined;
 
