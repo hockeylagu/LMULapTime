@@ -131,4 +131,40 @@ describe('ReplayMapContainer', () => {
     const colorModeButtons = buttons.filter(b => b.textContent === 'Pedal' || b.textContent === 'Speed');
     expect(colorModeButtons.map(b => b.textContent)).toEqual(['Pedal', 'Speed']);
   });
+
+  it('shows synchronized estimated grip utilization below the map', () => {
+    const points = trajectory.points.map((point, index) => ({
+      ...point,
+      accelLatG: index === 1 ? 2.8 : 0,
+      accelLonG: 0,
+      tireSlipPct: index === 1 ? 20 : 0,
+    }));
+
+    render(
+      <ReplayMapContainer
+        {...baseProps}
+        trajectory={{ ...trajectory, points }}
+        currentIndex={1}
+        currentPoint={points[1]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show friction circle' }));
+    expect(screen.getByLabelText('Estimated friction circle')).toHaveTextContent('100%');
+    expect(screen.getByLabelText('Estimated friction circle')).toHaveTextContent('AT LIMIT');
+  });
+
+  it('toggles the friction circle from the map toolbar', () => {
+    render(<ReplayMapContainer {...baseProps} />);
+
+    const toggle = screen.getByRole('button', { name: 'Show friction circle' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByLabelText('Estimated friction circle')).not.toBeInTheDocument();
+    expect(screen.queryByText('Circuit Map & Racing Line')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Hide friction circle' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Estimated friction circle')).toBeInTheDocument();
+  });
 });
