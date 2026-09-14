@@ -373,6 +373,7 @@ app.get('/api/status', (_req, res) => {
       dbSizeBytes: cacheStats.dbSizeBytes,
       replaysCount: cacheStats.replaysCount,
       replayTrajectoriesCount: cacheStats.replayTrajectoriesCount,
+      telemetryFilesCount: cacheStats.telemetryFilesCount,
     },
   });
 });

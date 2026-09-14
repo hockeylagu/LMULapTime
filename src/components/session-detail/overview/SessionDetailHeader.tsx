@@ -130,24 +130,19 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 title={`Matching Replay: ${session.matchingReplayFile.name}${
                   hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
                 }\nClick to inspect trajectory and telemetry`}
-                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
                   hasDuckDb
-                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
-                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                    : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
                 }`}
               >
                 {hasDuckDb ? (
-                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                  <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
                 ) : (
-                  <Video className="w-4 h-4 text-emerald-400" />
+                  <Video className="w-4 h-4 text-lmu-green" />
                 )}
-                <span>
-                  {session.matchingReplayFile.eventTitle
-                    ? `${session.matchingReplayFile.eventTitle}${session.matchingReplayFile.splitNo ? ` (Split ${session.matchingReplayFile.splitNo})` : ''}`
-                    : hasDuckDb
-                    ? '⚡ Inspect Telemetry (100Hz DuckDB)'
-                    : 'Inspect Replay (.VCR)'}
-                </span>
+                <span>{hasDuckDb ? 'Open Telemetry' : 'Open Replay'}</span>
+                {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">100Hz</span>}
               </button>
 
               <button

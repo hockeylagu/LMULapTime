@@ -33,6 +33,7 @@ export interface SettingsProps {
       dbSizeBytes: number;
       replaysCount?: number;
       replayTrajectoriesCount?: number;
+      telemetryFilesCount?: number;
     };
   } | null;
   onUpdatePaths: (resultsDir?: string, replaysDir?: string, telemetryDir?: string) => void;
