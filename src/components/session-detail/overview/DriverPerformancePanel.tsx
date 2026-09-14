@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Trophy, Gauge } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/types.js';
-import { computeTopNLapAverage, computeConsistencyRating } from '../../../utils/lapComparison.js';
+import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../utils/lapComparison.js';
 import { computeTheoreticalGap } from '../../../utils/formatters.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';
@@ -28,35 +28,8 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
     selectedDriver.gridPosition !== null ||
     selectedDriver.positionGain !== null;
 
-  const completedLaps = useMemo(() => {
-    return (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0);
-  }, [selectedDriver.laps]);
-
-  const hasMultipleLaps = completedLaps.length > 1;
-
-  const validFlyingLaps = useMemo(() => {
-    return completedLaps.filter((l, idx, arr) => {
-      const prevLap = idx > 0 ? arr[idx - 1] : null;
-      const prevIsValidPitStop = Boolean(
-        prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0
-      );
-      const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-      return l.isValid && !l.isPitStop && !isOut && (!hasMultipleLaps || l.lapNum > 1);
-    });
-  }, [completedLaps, hasMultipleLaps]);
-
-  const cleanLapsForAvg = useMemo(() => {
-    if (validFlyingLaps.length > 0) return validFlyingLaps;
-    const fallbackWithoutPit = completedLaps.filter((l, idx, arr) => {
-      const prevLap = idx > 0 ? arr[idx - 1] : null;
-      const prevIsValidPitStop = Boolean(
-        prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0
-      );
-      const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-      return !l.isPitStop && !isOut && (!hasMultipleLaps || l.lapNum > 1);
-    });
-    return fallbackWithoutPit.length > 0 ? fallbackWithoutPit : completedLaps;
-  }, [validFlyingLaps, completedLaps, hasMultipleLaps]);
+  const cleanLaps = useMemo(() => selectCleanLapCandidates(selectedDriver.laps || []), [selectedDriver.laps]);
+  const hasMultipleLaps = (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0).length > 1;
 
   const consistency = useMemo(() => {
     return computeConsistencyRating(selectedDriver.laps || []);
@@ -88,9 +61,9 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
 
   const s1Laps = useMemo(() => {
     return (selectedDriver.laps || []).filter(
-      (l) => l.s1 !== null && l.s1 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+      (l) => l.s1 !== null && l.s1 > 0 && cleanLaps.includes(l)
     );
-  }, [selectedDriver.laps, hasMultipleLaps, validFlyingLaps]);
+  }, [selectedDriver.laps, cleanLaps]);
 
   const avgS1 = useMemo(() => {
     return s1Laps.length > 0 ? s1Laps.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1Laps.length : null;
@@ -98,9 +71,9 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
 
   const s2Laps = useMemo(() => {
     return (selectedDriver.laps || []).filter(
-      (l) => l.s2 !== null && l.s2 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+      (l) => l.s2 !== null && l.s2 > 0 && cleanLaps.includes(l)
     );
-  }, [selectedDriver.laps, hasMultipleLaps, validFlyingLaps]);
+  }, [selectedDriver.laps, cleanLaps]);
 
   const avgS2 = useMemo(() => {
     return s2Laps.length > 0 ? s2Laps.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2Laps.length : null;
@@ -108,9 +81,9 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
 
   const s3Laps = useMemo(() => {
     return (selectedDriver.laps || []).filter(
-      (l) => l.s3 !== null && l.s3 > 0 && (!hasMultipleLaps || l.lapNum > 1) && (l.isValid || validFlyingLaps.length === 0)
+      (l) => l.s3 !== null && l.s3 > 0 && cleanLaps.includes(l)
     );
-  }, [selectedDriver.laps, hasMultipleLaps, validFlyingLaps]);
+  }, [selectedDriver.laps, cleanLaps]);
 
   const avgS3 = useMemo(() => {
     return s3Laps.length > 0 ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length : null;
@@ -171,7 +144,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
         deltaToBest={deltaToBest}
         lapStdDev={lapStdDev}
         consistencyScore={consistencyScore}
-        cleanLapsCount={cleanLapsForAvg.length}
+        cleanLapsCount={consistency.sampleCount}
         totalLapsCount={selectedDriver.laps?.length || 0}
         hasMultipleLaps={hasMultipleLaps}
         theoGap={theoGap}

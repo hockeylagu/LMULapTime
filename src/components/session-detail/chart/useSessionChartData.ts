@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { DetailedSession, DriverData, LapData } from '../../../../server/types.js';
 import { formatTime } from '../../../utils/formatters.js';
 import { matchesCarClass } from '../../../utils/paceCategory.js';
+import { selectCleanLapCandidates } from '../../../utils/lapComparison.js';
 
 export type SessionPositionChartPoint = Record<string, string | number | boolean | null | undefined>;
 
@@ -37,16 +38,7 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
           1
         );
 
-    const completed = (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0);
-    const hasMultiple = completed.length > 1;
-
-    const validFlying = completed.filter((l) => l.isValid && (!hasMultiple || l.lapNum > 1));
-    const cleanLaps =
-      validFlying.length > 0
-        ? validFlying
-        : completed.filter((l) => !hasMultiple || l.lapNum > 1).length > 0
-        ? completed.filter((l) => !hasMultiple || l.lapNum > 1)
-        : completed;
+    const cleanLaps = selectCleanLapCandidates(selectedDriver.laps || []);
 
     const avgTime =
       cleanLaps.length > 0
@@ -54,17 +46,17 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
         : null;
 
     const s1L = (selectedDriver.laps || []).filter(
-      (l) => l.s1 !== null && l.s1 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+      (l) => l.s1 !== null && l.s1 > 0 && cleanLaps.includes(l)
     );
     const s1Avg = s1L.length > 0 ? s1L.reduce((sum, l) => sum + (l.s1 || 0), 0) / s1L.length : null;
 
     const s2L = (selectedDriver.laps || []).filter(
-      (l) => l.s2 !== null && l.s2 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+      (l) => l.s2 !== null && l.s2 > 0 && cleanLaps.includes(l)
     );
     const s2Avg = s2L.length > 0 ? s2L.reduce((sum, l) => sum + (l.s2 || 0), 0) / s2L.length : null;
 
     const s3L = (selectedDriver.laps || []).filter(
-      (l) => l.s3 !== null && l.s3 > 0 && (!hasMultiple || l.lapNum > 1) && (l.isValid || validFlying.length === 0)
+      (l) => l.s3 !== null && l.s3 > 0 && cleanLaps.includes(l)
     );
     const s3Avg = s3L.length > 0 ? s3L.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3L.length : null;
 

@@ -295,6 +295,7 @@ describe('lapComparison utility', () => {
       expect(res.consistencyScore).toBe(100);
       expect(res.stdDev).toBe(0);
       expect(res.avgLapTime).toBe(120.0);
+      expect(res.sampleCount).toBe(1);
     });
 
     it('returns high consistency score for tightly grouped laps', () => {
