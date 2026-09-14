@@ -242,6 +242,9 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
           {100 > (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0) && (
             <div style={{ width: `${Math.max(0, 100 - (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0))}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>
           )}
+          {isCursorInView && (
+            <div style={{ left: `${cursorPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-white z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+          )}
         </div>
       )}
 

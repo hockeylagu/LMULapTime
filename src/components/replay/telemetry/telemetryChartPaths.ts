@@ -425,10 +425,10 @@ export function computeTelemetryChartPaths(
       const frY = 95 - Math.min(1, Math.max(0, frB / maxBrakeTemp)) * 85;
       const rlY = 95 - Math.min(1, Math.max(0, rlB / maxBrakeTemp)) * 85;
       const rrY = 95 - Math.min(1, Math.max(0, rrB / maxBrakeTemp)) * 85;
-      bt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-      bt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-      bt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-      bt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
+      bt.fl += `${bt.fl ? 'L' : 'M'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
+      bt.fr += `${bt.fr ? 'L' : 'M'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
+      bt.rl += `${bt.rl ? 'L' : 'M'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
+      bt.rr += `${bt.rr ? 'L' : 'M'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
     }
 
     // Suspension Deflection / Travel: minSuspPos to maxSuspPos mm -> 95 to 10 in SVG Y
@@ -439,10 +439,10 @@ export function computeTelemetryChartPaths(
       const frY = 95 - Math.min(1, Math.max(0, (fr - minSuspPos) / suspSpan)) * 85;
       const rlY = 95 - Math.min(1, Math.max(0, (rl - minSuspPos) / suspSpan)) * 85;
       const rrY = 95 - Math.min(1, Math.max(0, (rr - minSuspPos) / suspSpan)) * 85;
-      sp.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-      sp.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-      sp.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-      sp.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
+      sp.fl += `${sp.fl ? 'L' : 'M'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
+      sp.fr += `${sp.fr ? 'L' : 'M'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
+      sp.rl += `${sp.rl ? 'L' : 'M'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
+      sp.rr += `${sp.rr ? 'L' : 'M'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
     }
 
     // Wheel Speeds: 0 to maxWheelSpeed km/h -> 95 to 10 in SVG Y
@@ -598,10 +598,10 @@ export function computeTelemetryChartPaths(
         const frY = 95 - Math.min(1, Math.max(0, frB / maxBrakeTemp)) * 85;
         const rlY = 95 - Math.min(1, Math.max(0, rlB / maxBrakeTemp)) * 85;
         const rrY = 95 - Math.min(1, Math.max(0, rrB / maxBrakeTemp)) * 85;
-        bBt.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-        bBt.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-        bBt.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-        bBt.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
+        bBt.fl += `${bBt.fl ? 'L' : 'M'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
+        bBt.fr += `${bBt.fr ? 'L' : 'M'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
+        bBt.rl += `${bBt.rl ? 'L' : 'M'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
+        bBt.rr += `${bBt.rr ? 'L' : 'M'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
       }
 
       if (bp.suspPos) {
@@ -611,10 +611,10 @@ export function computeTelemetryChartPaths(
         const frY = 95 - Math.min(1, Math.max(0, (fr - minSuspPos) / suspSpan)) * 85;
         const rlY = 95 - Math.min(1, Math.max(0, (rl - minSuspPos) / suspSpan)) * 85;
         const rrY = 95 - Math.min(1, Math.max(0, (rr - minSuspPos) / suspSpan)) * 85;
-        bSp.fl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
-        bSp.fr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
-        bSp.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
-        bSp.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
+        bSp.fl += `${bSp.fl ? 'L' : 'M'} ${x.toFixed(1)} ${flY.toFixed(1)} `;
+        bSp.fr += `${bSp.fr ? 'L' : 'M'} ${x.toFixed(1)} ${frY.toFixed(1)} `;
+        bSp.rl += `${bSp.rl ? 'L' : 'M'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
+        bSp.rr += `${bSp.rr ? 'L' : 'M'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
       }
 
       if (bp.wheelSpeeds) {

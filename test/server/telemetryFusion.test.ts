@@ -8,6 +8,7 @@ describe('telemetryFusion', () => {
       replayName: 'Bahrain_R1.Vcr',
       pointsCount: 3,
       bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+      sectors: { s1Frame: 1, s2Frame: 2 },
       points: [
         { x: 0, y: 0, z: 0, timeSec: 0.0, speedKmh: 100 },
         { x: 50, y: 0, z: 25, timeSec: 1.0, speedKmh: 120 },
@@ -47,5 +48,6 @@ describe('telemetryFusion', () => {
     expect(midPoint.speedKmh).toBe(111);
     expect(midPoint.throttle).toBe(80);
     expect(midPoint.suspPos).toEqual([20, 20, 25, 25]);
+    expect(fused.sectors).toEqual({ s1Frame: 2, s2Frame: 4 });
   });
 });
