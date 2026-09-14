@@ -12,6 +12,7 @@ import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js'
 // invalidate previously-cached replay metadata/trajectory rows, without requiring
 // the underlying replay file's mtime/size to change.
 const REPLAY_CACHE_VERSION = 'v3';
+const DUCKDB_TELEMETRY_CACHE_VERSION = 'v3';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
@@ -192,10 +193,16 @@ export class SessionDatabase {
         lap_number INTEGER NOT NULL,
         points_count INTEGER NOT NULL,
         telemetry_br BLOB NOT NULL,
+        cache_version TEXT NOT NULL DEFAULT 'v1',
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (filename, lap_number)
       );
     `);
+
+    const telemetryCacheColumns = this.db.prepare('PRAGMA table_info(telemetry_lap_cache)').all() as Array<{ name: string }>;
+    if (!telemetryCacheColumns.some(column => column.name === 'cache_version')) {
+      this.db.exec("ALTER TABLE telemetry_lap_cache ADD COLUMN cache_version TEXT NOT NULL DEFAULT 'v1'");
+    }
   }
 
   public getDbPath(): string {
@@ -488,21 +495,22 @@ export class SessionDatabase {
 
   public getTelemetryLapCache(filename: string, lapNumber: number): DuckDbLapTelemetry | null {
     const row = this.db.prepare(
-      'SELECT telemetry_br FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
-    ).get(filename, lapNumber) as { telemetry_br: Buffer } | undefined;
-    if (!row) return null;
+      'SELECT telemetry_br, cache_version FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
+    ).get(filename, lapNumber) as { telemetry_br: Buffer; cache_version: string } | undefined;
+    if (!row || row.cache_version !== DUCKDB_TELEMETRY_CACHE_VERSION) return null;
     return decompressJson<DuckDbLapTelemetry>(row.telemetry_br);
   }
 
   public upsertTelemetryLapCache(filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {
     this.db.prepare(`
-      INSERT INTO telemetry_lap_cache (filename, lap_number, points_count, telemetry_br, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO telemetry_lap_cache (filename, lap_number, points_count, telemetry_br, cache_version, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(filename, lap_number) DO UPDATE SET
         points_count = excluded.points_count,
         telemetry_br = excluded.telemetry_br,
+        cache_version = excluded.cache_version,
         updated_at = excluded.updated_at
-    `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), Date.now());
+    `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), DUCKDB_TELEMETRY_CACHE_VERSION, Date.now());
   }
 
   public clearTelemetryCache(): void {

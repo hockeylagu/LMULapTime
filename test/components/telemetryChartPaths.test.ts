@@ -160,7 +160,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
   it('computes 4-corner paths and dynamic boundaries for suspension, wheel speeds, tire pressures, wear, temps, and brakes', () => {
     const ptA: ReplayTrajectoryPoint = {
       x: 0, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.0,
-      suspPos: [20, 22, 30, 32],
+      rideHeight: [20, 22, 30, 32],
       wheelSpeeds: [180, 181, 185, 186],
       tirePressures: [180, 181, 190, 191],
       tireWear: [99.5, 99.2, 98.8, 98.5],
@@ -170,7 +170,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
 
     const ptB: ReplayTrajectoryPoint = {
       x: 50, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, steerYaw: 0, timeSec: 11.0,
-      suspPos: [25, 27, 35, 37],
+      rideHeight: [25, 27, 35, 37],
       wheelSpeeds: [200, 202, 205, 207],
       tirePressures: [182, 183, 192, 193],
       tireWear: [99.0, 98.7, 98.2, 98.0],
@@ -187,7 +187,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       deltaSteer: 0,
       baseline: {
         timeSec: 10.0, speedKmh: 180, throttle: 100, brake: 0, gear: 4, steerYaw: 0, x: 0, y: 0, z: 0,
-        suspPos: [19, 21, 29, 31],
+        rideHeight: [19, 21, 29, 31],
         wheelSpeeds: [179, 180, 184, 185],
         tirePressures: [179, 180, 189, 190],
         tireWear: [99.8, 99.6, 99.1, 99.0],
@@ -205,7 +205,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       deltaSteer: 0,
       baseline: {
         timeSec: 11.0, speedKmh: 200, throttle: 100, brake: 0, gear: 4, steerYaw: 0, x: 50, y: 0, z: 0,
-        suspPos: [24, 26, 34, 36],
+        rideHeight: [24, 26, 34, 36],
         wheelSpeeds: [199, 201, 204, 206],
         tirePressures: [181, 182, 191, 192],
         tireWear: [99.2, 99.0, 98.6, 98.4],

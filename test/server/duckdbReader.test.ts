@@ -34,7 +34,7 @@ describe('DuckDbReader', () => {
           ('Brake Pos', 100, '%'),
           ('Steering Input', 100, 'deg'),
           ('Engine RPM', 100, 'rpm'),
-          ('Susp Pos', 100, 'mm'),
+          ('RideHeights', 100, 'm'),
           ('TyresPressure', 100, 'kPa'),
           ('TyresWear', 100, '%'),
           ('TyresTemp', 100, 'C'),
@@ -55,7 +55,7 @@ describe('DuckDbReader', () => {
         CREATE TABLE "Brake Pos" (value FLOAT);
         CREATE TABLE "Steering Input" (value FLOAT);
         CREATE TABLE "Engine RPM" (value FLOAT);
-        CREATE TABLE "Susp Pos" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
+        CREATE TABLE "RideHeights" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "TyresPressure" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "TyresWear" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "TyresTemp" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
@@ -81,7 +81,7 @@ describe('DuckDbReader', () => {
         INSERT INTO "Brake Pos" SELECT (CASE WHEN i >= 600 AND i < 800 THEN 0.8 ELSE 0.0 END)::FLOAT FROM range(1200) t(i);
         INSERT INTO "Steering Input" SELECT (15.0 * cos(i / 40.0))::FLOAT FROM range(1200) t(i);
         INSERT INTO "Engine RPM" SELECT (6000.0 + 1500.0 * sin(i / 30.0))::FLOAT FROM range(1200) t(i);
-        INSERT INTO "Susp Pos" SELECT 25.0::FLOAT, 26.0::FLOAT, 30.0::FLOAT, 31.0::FLOAT FROM range(1200) t(i);
+        INSERT INTO "RideHeights" SELECT 0.025::FLOAT, 0.026::FLOAT, 0.030::FLOAT, 0.031::FLOAT FROM range(1200) t(i);
         INSERT INTO "TyresPressure" SELECT 180.0::FLOAT, 181.0::FLOAT, 185.0::FLOAT, 186.0::FLOAT FROM range(1200) t(i);
         INSERT INTO "TyresWear" SELECT 98.5::FLOAT, 98.2::FLOAT, 97.5::FLOAT, 97.3::FLOAT FROM range(1200) t(i);
         INSERT INTO "TyresTemp" SELECT 85.0::FLOAT, 86.0::FLOAT, 92.0::FLOAT, 93.0::FLOAT FROM range(1200) t(i);
@@ -140,8 +140,9 @@ describe('DuckDbReader', () => {
     expect(p0.speedKmh).toBeGreaterThan(0);
     expect(p0.engineRpm).toBeGreaterThan(0);
     expect(p0.tirePressures).toBeDefined();
-    expect(p0.suspPos).toBeDefined();
-    expect(p0.wheelSpeeds).toBeDefined();
+    expect(p0.rideHeight).toEqual([25, 26, 30, 31]);
+    expect(p0.wheelSpeeds?.[0]).toBeCloseTo(245.47, 1);
+    expect(p0.wheelSpeeds?.[2]).toBeCloseTo(250.38, 1);
     expect(p0.tireWear).toBeDefined();
     expect(p0.tireWear![0]).toBeCloseTo(98.5, 1);
     expect(p0.tireTemps).toBeDefined();

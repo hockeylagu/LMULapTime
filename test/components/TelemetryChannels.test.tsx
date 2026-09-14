@@ -29,7 +29,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     engineRpm: 7850,
     lateralOffsetM: 1.85,
     brakeTemps: [450, 445, 380, 375],
-    suspPos: [24.5, 25.0, 32.1, 31.8],
+    rideHeight: [24.5, 25.0, 32.1, 31.8],
     wheelSpeeds: [201.2, 200.8, 202.5, 202.0],
     tirePressures: [185.2, 186.1, 192.4, 193.0],
     tireWear: [98.5, 98.2, 97.6, 97.4],
@@ -145,7 +145,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getAllByText(/RR:\s*375°C/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders TelemetrySuspPosChannel with 4-corner deflection and emerald header', () => {
+  it('renders TelemetrySuspPosChannel with 4-corner ride height and emerald header', () => {
     render(
       <TelemetrySuspPosChannel
         suspPosPaths={{ fl: 'M 0 50 L 1000 50', fr: 'M 0 50 L 1000 50', rl: 'M 0 60 L 1000 60', rr: 'M 0 60 L 1000 60' }}
@@ -157,7 +157,7 @@ describe('Authentic VCR Telemetry Channels', () => {
       />
     );
 
-    expect(screen.getByText(/SUSPENSION TRAVEL/i)).toBeInTheDocument();
+    expect(screen.getByText(/RIDE HEIGHT/i)).toBeInTheDocument();
     expect(screen.getAllByText(/FL:\s*24\.5mm/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/FR:\s*25\.0mm/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/RL:\s*32\.1mm/i).length).toBeGreaterThanOrEqual(1);
@@ -213,7 +213,7 @@ describe('Authentic VCR Telemetry Channels', () => {
       />
     );
 
-    expect(screen.getByText(/TIRE CONDITION & WEAR/i)).toBeInTheDocument();
+    expect(screen.getByText(/TIRE WEAR/i)).toBeInTheDocument();
     expect(screen.getAllByText(/FL:\s*98\.5%/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/FR:\s*98\.2%/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/RL:\s*97\.6%/i).length).toBeGreaterThanOrEqual(1);
@@ -253,7 +253,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     engineRpm: 7850,
     lateralOffsetM: 1.85,
     brakeTemps: [450, 445, 380, 375],
-    suspPos: [24.5, 25.0, 32.1, 31.8],
+    rideHeight: [24.5, 25.0, 32.1, 31.8],
     wheelSpeeds: [201.2, 200.8, 202.5, 202.0],
     tirePressures: [185.2, 186.1, 192.4, 193.0],
     tireWear: [98.5, 98.2, 97.6, 97.4],
@@ -267,7 +267,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
 
     const { rerender } = render(
       <TelemetryChannelRenderer
-        channelId="susp-pos"
+        channelId="ride-height"
         currentPoint={mockPoint}
         currentComparison={null}
         pointComparisons={[]}
@@ -276,7 +276,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
         cursorPct={50}
       />
     );
-    expect(screen.getByText(/SUSPENSION TRAVEL/i)).toBeInTheDocument();
+    expect(screen.getByText(/RIDE HEIGHT/i)).toBeInTheDocument();
 
     rerender(
       <TelemetryChannelRenderer
@@ -315,7 +315,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
         cursorPct={50}
       />
     );
-    expect(screen.getByText(/TIRE CONDITION & WEAR/i)).toBeInTheDocument();
+    expect(screen.getByText(/TIRE WEAR/i)).toBeInTheDocument();
 
     rerender(
       <TelemetryChannelRenderer
@@ -348,10 +348,10 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     const { TelemetryPresetChannelRow } = await import('../../src/components/replay/telemetry/TelemetryPresetChannelRow.js');
     const { AVAILABLE_TELEMETRY_CHANNELS } = await import('../../src/components/replay/telemetry/telemetryPresets.js');
 
-    const suspChannel = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'susp-pos')!;
+    const rideHeightChannel = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'ride-height')!;
     render(
       <TelemetryPresetChannelRow
-        channel={suspChannel}
+        channel={rideHeightChannel}
         isActive={true}
         isFirst={false}
         isLast={false}
@@ -361,6 +361,6 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     );
 
     expect(screen.getByText(/WHEEL \/ TIRE/i)).toBeInTheDocument();
-    expect(screen.getByText(suspChannel.name)).toBeInTheDocument();
+    expect(screen.getByText(rideHeightChannel.name)).toBeInTheDocument();
   });
 });

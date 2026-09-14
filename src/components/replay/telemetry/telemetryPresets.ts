@@ -7,7 +7,7 @@ export type TelemetryChannelId =
   | 'steer'
   | 'rpm'
   | 'brake-temps'
-  | 'susp-pos'
+  | 'ride-height'
   | 'wheel-speeds'
   | 'tire-pressures'
   | 'tire-wear'
@@ -130,13 +130,13 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     lineColor: '#fb923c',
   },
   {
-    id: 'susp-pos',
-    name: 'Suspension Travel (4-Corner)',
-    shortName: 'SUSP TRAVEL',
+    id: 'ride-height',
+    name: 'Ride Height (4-Corner)',
+    shortName: 'RIDE HEIGHT',
     unit: 'mm',
     category: 'wheels',
     isComputed: false,
-    description: 'Suspension spring / damper displacement across all 4 corners',
+    description: 'Measured ride height in millimetres across all 4 corners',
     badgeColor: 'text-emerald-400 bg-emerald-500/20',
     lineColor: '#10b981',
   },
@@ -291,7 +291,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     id: 'wheels-suspension',
     name: 'Suspension & Wheels',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'susp-pos', 'wheel-speeds', 'tire-pressures', 'brake-temps'],
+    channels: ['speed', 'delta', 'ride-height', 'wheel-speeds', 'tire-pressures', 'brake-temps'],
   },
   {
     id: 'tires-wear',
@@ -342,7 +342,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'steer',
       'rpm',
       'brake-temps',
-      'susp-pos',
+      'ride-height',
       'wheel-speeds',
       'tire-pressures',
       'tire-wear',

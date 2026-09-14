@@ -53,7 +53,7 @@ describe('replayComparison utility', () => {
       const pointsWithWheels: ReplayTrajectoryPoint[] = [
         {
           x: 0, y: 0, z: 0, speedKmh: 100, throttle: 50, brake: 0, steerYaw: 0, timeSec: 0,
-          suspPos: [20, 20, 30, 30],
+          rideHeight: [20, 20, 30, 30],
           wheelSpeeds: [100, 100, 100, 100],
           tirePressures: [180, 180, 190, 190],
           tireWear: [100, 100, 100, 100],
@@ -62,7 +62,7 @@ describe('replayComparison utility', () => {
         },
         {
           x: 10, y: 0, z: 0, speedKmh: 120, throttle: 80, brake: 0, steerYaw: 0, timeSec: 1,
-          suspPos: [30, 30, 40, 40],
+          rideHeight: [30, 30, 40, 40],
           wheelSpeeds: [120, 120, 120, 120],
           tirePressures: [182, 182, 192, 192],
           tireWear: [98, 98, 96, 96],
@@ -75,7 +75,7 @@ describe('replayComparison utility', () => {
       // Interpolate at 5m (exactly 50% between node 0 and 1)
       const pt = interpolatePointAtDistance(pointsWithWheels, cumDists, 5);
 
-      expect(pt.suspPos).toEqual([25, 25, 35, 35]);
+      expect(pt.rideHeight).toEqual([25, 25, 35, 35]);
       expect(pt.wheelSpeeds).toEqual([110, 110, 110, 110]);
       expect(pt.tirePressures).toEqual([181, 181, 191, 191]);
       expect(pt.tireWear).toEqual([99, 99, 98, 98]);

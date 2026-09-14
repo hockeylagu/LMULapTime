@@ -75,7 +75,7 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
       return <TelemetryRpmChannel rpmPath={paths.rpmPath} rpmArea={paths.rpmArea} baselineRpmPath={paths.baselineRpmPath} maxRpm={paths.maxRpm} {...cursorProps} />;
     case 'brake-temps':
       return <TelemetryBrakeTempsChannel brakeTempsPaths={paths.brakeTempsPaths} baselineBrakeTempsPaths={paths.baselineBrakeTempsPaths} maxBrakeTemp={paths.maxBrakeTemp} {...cursorProps} />;
-    case 'susp-pos':
+    case 'ride-height':
       return <TelemetrySuspPosChannel suspPosPaths={paths.suspPosPaths} baselineSuspPosPaths={paths.baselineSuspPosPaths} minSuspPos={paths.minSuspPos} maxSuspPos={paths.maxSuspPos} {...cursorProps} />;
     case 'wheel-speeds':
       return <TelemetryWheelSpeedsChannel wheelSpeedsPaths={paths.wheelSpeedsPaths} baselineWheelSpeedsPaths={paths.baselineWheelSpeedsPaths} maxWheelSpeed={paths.maxWheelSpeed} {...cursorProps} />;

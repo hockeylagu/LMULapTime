@@ -22,11 +22,11 @@ describe('telemetryFusion', () => {
       pointsCount: 5,
       sampleRateHz: 100,
       points: [
-        { x: 0, y: 0, z: 0, timeSec: 0.0, speedKmh: 101, throttle: 50, brake: 0, suspPos: [20, 20, 25, 25] },
-        { x: 0, y: 0, z: 0, timeSec: 0.5, speedKmh: 111, throttle: 80, brake: 0, suspPos: [20, 20, 25, 25] },
-        { x: 0, y: 0, z: 0, timeSec: 1.0, speedKmh: 121, throttle: 100, brake: 0, suspPos: [21, 21, 26, 26] },
-        { x: 0, y: 0, z: 0, timeSec: 1.5, speedKmh: 131, throttle: 100, brake: 0, suspPos: [21, 21, 26, 26] },
-        { x: 0, y: 0, z: 0, timeSec: 2.0, speedKmh: 141, throttle: 100, brake: 0, suspPos: [22, 22, 27, 27] },
+        { x: 0, y: 0, z: 0, timeSec: 0.0, speedKmh: 101, throttle: 50, brake: 0, rideHeight: [20, 20, 25, 25] },
+        { x: 0, y: 0, z: 0, timeSec: 0.5, speedKmh: 111, throttle: 80, brake: 0, rideHeight: [20, 20, 25, 25] },
+        { x: 0, y: 0, z: 0, timeSec: 1.0, speedKmh: 121, throttle: 100, brake: 0, rideHeight: [21, 21, 26, 26] },
+        { x: 0, y: 0, z: 0, timeSec: 1.5, speedKmh: 131, throttle: 100, brake: 0, rideHeight: [21, 21, 26, 26] },
+        { x: 0, y: 0, z: 0, timeSec: 2.0, speedKmh: 141, throttle: 100, rideHeight: [22, 22, 27, 27] },
       ],
     };
 
@@ -47,7 +47,7 @@ describe('telemetryFusion', () => {
     // Verify DuckDB native channels preserved
     expect(midPoint.speedKmh).toBe(111);
     expect(midPoint.throttle).toBe(80);
-    expect(midPoint.suspPos).toEqual([20, 20, 25, 25]);
+    expect(midPoint.rideHeight).toEqual([20, 20, 25, 25]);
     expect(fused.sectors).toEqual({ s1Frame: 2, s2Frame: 4 });
   });
 });

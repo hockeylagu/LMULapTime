@@ -47,7 +47,7 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(channelIds).toContain('tire-slip');
     expect(channelIds).toContain('yaw-rate');
     expect(channelIds).toContain('brake-temps');
-    expect(channelIds).toContain('susp-pos');
+    expect(channelIds).toContain('ride-height');
     expect(channelIds).toContain('wheel-speeds');
     expect(channelIds).toContain('tire-pressures');
     expect(channelIds).toContain('tire-wear');
@@ -57,11 +57,11 @@ describe('telemetryPresets - Management and Storage', () => {
     const latG = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'accel-lat');
     const speed = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'speed');
     const brakeTemps = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'brake-temps');
-    const suspPos = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'susp-pos');
+    const rideHeight = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'ride-height');
     expect(latG?.isComputed).toBe(true);
     expect(speed?.isComputed).toBe(false);
     expect(brakeTemps?.isComputed).toBe(false);
-    expect(suspPos?.isComputed).toBe(false);
+    expect(rideHeight?.isComputed).toBe(false);
   });
 
   it('includes built-in presets for G-forces, handling balance, tire slip, suspension and wear', () => {
