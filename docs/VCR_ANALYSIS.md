@@ -167,7 +167,6 @@ forward-gear-to-forward-gear errors.
 |---|---|---|---|
 | lateral acceleration / lateral G (`LocalAccel.X`) | `i8 @14` | −0.76 to −0.97 | Strong lead from the two valid Algarve captures. `Algarve International Circuit P1 45.Vcr` paired with `Algarve-International-Circuit_20260906-175519.jsonl` gives r = −0.7646 overall; `P1 47.Vcr` paired with `Algarve-International-Circuit_20260906-182704.jsonl` gives r = −0.9060 overall, −0.9522 above 80 km/h, and −0.9664 below 80 km/h. Controls rediscovered throttle/brake/steering/RPM in the same `P1 47` run. Treat as a lead, not ground truth, until the sign/scale and axis naming are confirmed with a purpose-built left/right slalom capture. In rF2 local coordinates, X is expected to be lateral, so G would be `LocalAccel.X / 9.80665`. |
 | longitudinal acceleration / longitudinal G (`LocalAccel.Z`) | unresolved; brake-region aliases around `bits@33..36` | 0.69 to 0.90 in one valid capture | Not enough to promote. The best rows overlap the known brake payload byte (`@36`), and the high-speed window where `LocalAccel.Z` reaches r = 0.9025 is also where the brake control scores r = 0.9992 on the same bit region. This currently looks like brake/deceleration confounding, not an independent longitudinal-G field. |
-| rideHeight FL | `i16 @18` | −0.83 (Portimão), −0.72 (Monza quali), −0.77 (Monza race) | Reproduces across 3 independent sessions with consistent sign and offset; not shared with any other channel. Strong enough to treat as a semi-confirmed suspension/ride-height field around bytes 16–19, pending a purpose-built kerb/braking capture to confirm scale (§7.3). |
 
 ### 2.4 Known artifacts — do not pursue
 
@@ -280,7 +279,7 @@ To settle whether local single-player practice replays record tire wear/temps th
 
 **Conclusion**: The "Session-Level Protocol Omission Hypothesis" is definitively resolved. `.Vcr` binary replay files do **not** record dynamic rubber degradation or 12-point tread/carcass temperatures in any session mode. Commit `a6587c3` was 100% correct in stripping these speculative formulas. Ground truth tire wear and thermals reside strictly in native DuckDB telemetry (`UserData/Telemetry/*.duckdb`).
 
-### 2.8 Ground-Truth Discoveries: Authentic Wheel Dynamics, Brake Rotor Temp, and Fuel
+### 2.8 Ground-Truth Discoveries: Authentic Brake Data and Fuel
 
 A full reverse-engineering sweep across all 46,162 slices of the offline practice session discovered authentic per-wheel physical telemetry and vehicle states in previously unmapped packets:
 
@@ -300,11 +299,8 @@ Present at 100 Hz (**44,361 packets** across the session for the player car), st
      - **FR**: $r = 0.930$
      - **RL**: $r = 0.890$
      - **RR**: $r = 0.869$
-3. **4-Wheel Suspension Deflection**:
-   - Bytes 0 (UInt8, signed damper offset) and 7..8 (Int16LE) correlate with physical damper/suspension deflection ($r = 0.673$ to $0.729$).
-
 #### B. Class 2 Type 15 (`sz === 24` or `37`): Authentic Brake Rotor Disc Temperature ($r = 1.000$)
-- While bytes 0..15 carry internal suspension/camber states and bytes 19..22 are cycle counters, **Byte 23** (and `UInt16LE@22`) correlates **$r = 1.000$** with overall brake rotor disc core temperature ($29^\circ\text{C}$ to $550^\circ\text{C}$).
+- While bytes 0..15 remain unestablished and bytes 19..22 are cycle counters, **Byte 23** (and `UInt16LE@22`) correlates **$r = 1.000$** with overall brake rotor disc core temperature ($29^\circ\text{C}$ to $550^\circ\text{C}$).
 - Exact calibration formula: $T^\circ\text{C} = \max(20, \text{round}((\text{rawByte}_{23} - 51) \times 5.86 + 29))$.
 - Front axle reports identical values `[T, T]`; rear axle scales by ~0.88 (`Math.round(T * 0.88)`).
 - **Application Integration**: Surfaced in the telemetry strip charts via `TelemetryBrakeTempsChannel`. When native DuckDB telemetry is absent, this authentic VCR thermal stream is automatically displayed.
@@ -323,7 +319,7 @@ The empirical scan confirms the following netcode distribution rules:
 
 | Packet Type | Function | Online Multiplayer Presence | Grid Scope (Online) | Offline Practice Scope |
 |---|---|---|---|---|
-| **Class 1 Type 24 (`sz === 40`)** | 4-Corner Wheel Dynamics (wheel speed, brake pressure, deflection) | **Present** (e.g. 99,055 packets in Imola, 68,007 in Monza) | **Player Car Only** (0 opponent packets) | Player Car Only |
+| **Class 1 Type 24 (`sz === 40`)** | 4-Corner brake pressure and unestablished corner state | **Present** (e.g. 99,055 packets in Imola, 68,007 in Monza) | **Player Car Only** (0 opponent packets) | Player Car Only |
 | **Class 0 Type 51 (`sz === 3`)** | Onboard Fuel Level (decreasing smoothly across stint) | **Present** (e.g. 99,055 packets in Imola, 70,714 in Portimão) | **Player Car Only** (0 opponent packets) | Player Car Only |
 | **Class 2 Type 15 (`sz === 24`)** | Brake Rotor Core Temperature & Chassis State | **Present** (e.g. 731,394 packets in Imola, 255,037 in Monza) | **All Grid Participants** (45/45 drivers) | All Grid Participants |
 
@@ -450,9 +446,9 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
 2. **Isolate fuel.** A long constant-pace stint, so fuel drift is large relative to noise and
    separable from other monotonic channels (§2.4).
 3. **Confirm the ride-height lead** at `i16 @18` with a purpose-built capture — e.g. heavy
-   braking and kerb strikes to force large suspension travel (§2.3).
+  braking and kerb strikes to validate unknown corner-state fields (§2.3).
 4. **Extend the track model** to more circuits: 2 edge laps each, per §3.
-5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** **[COMPLETED]** Verified via paired capture on Bahrain P1 19 (§2.7, §2.8). Proved that dynamic rubber wear counters and 12-point tire carcass/tread temperatures are universally omitted across both multiplayer and offline practice replays. Simultaneously discovered authentic 100 Hz 4-corner wheel rotation ($r = -0.975$), individual brake line pressures ($r = 0.930$), and suspension deflections ($r = 0.729$) in Class 1 Type 24, as well as brake rotor disc temperature ($r = 1.000$) in Class 2 Type 15.
+5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** **[COMPLETED]** Verified via paired capture on Bahrain P1 19 (§2.7, §2.8). Proved that dynamic rubber wear counters and 12-point tire carcass/tread temperatures are universally omitted across both multiplayer and offline practice replays. Simultaneously confirmed individual brake line pressures ($r = 0.930$) in Class 1 Type 24 and brake rotor disc temperature ($r = 1.000$) in Class 2 Type 15.
 
 ---
 
@@ -470,7 +466,7 @@ This section quantifies the empirical accuracy loss, bandwidth decimation, and s
 | **Vehicle Speed** | Native `Ground Speed` float (m/s) | Native vector magnitude $\|(v_x, v_y, v_z)\|$ | Derived from displacement $\Delta(x, z)/\Delta t$ or packed velocity | Speed differentiation introduces high-frequency noise, requiring smoothing filters that shave 1–3 km/h off true apex minimum speeds ($V_{\min}$). |
 | **Engine RPM** | Native `Engine RPM` float | Native `mEngineRPM` float | 10-bit packed field (0–1023) scaled by ~10.9228 | RPM quantised into ~11 RPM bins. Maximum headroom caps at 11,170 RPM. |
 | **Gear Selection** | Timestamped sparse event (`Gear` table) | Native `mGear` (-1, 0, 1..8) | Reconstructed from event header (`eventType - 8`) | Transient neutral (0) frame dips during shifts can cause gear flicker if not debounced. |
-| **4-Wheel Dynamics** | Native 4-corner arrays (`Susp Pos`, `TyresPressure`, `Wheel Speed`, `TyresCarcassTemp`, `TyresRubberTemp`) | Full `mWheel[4]` telemetry (deflection, tire load, rotation, temp zones) | Partial dynamics in Class 1 Type 24 (corner brake line pressures, suspension deflection) and Class 2 Type 15 (rotor temps). **Wheel angular velocities, tire rubber wear, and 12-point tread/carcass temps are 100% omitted** in VCR replays. | While corner brake pressures, suspension deflection, and rotor temps exist in replays, **100% data loss** occurs for wheel angular speeds, dynamic tire degradation, and tire surface/carcass thermals in VCR replays. |
+| **4-Wheel Dynamics** | Native 4-corner arrays (`RideHeights`, `TyresPressure`, `Wheel Speed`, `TyresCarcassTemp`, `TyresRubberTemp`) | Full `mWheel[4]` telemetry (ride height, tire load, rotation, temp zones) | Corner brake pressure in Class 1 Type 24 and rotor temps in Class 2 Type 15. **Wheel angular velocities, ride height, tire rubber wear, and 12-point tread/carcass temps are not available as verified VCR fields.** | VCR has no verified physical ride-height or wheel-speed stream; DuckDB is required for those signals. |
 | **2D Spatial Racing Line** | None (1D distance / time based) | World $(x, y, z)$ via `mPos` | **World $(x, y, z)$ + Yaw** | VCR is the **only source providing complete multi-car 2D grid coordinates** for circuit map visualization. |
 | **Grid Scope** | **Main driver only** | **Main driver only** | **All drivers & AI grid** | VCR remains indispensable for head-to-head opponent comparisons and alien reference overlays. |
 | **Setup & Friction** | Background native game exporter | Requires external C# console app running live | Automatic game recording | DuckDB and VCR require no secondary tools running while driving. |
@@ -492,7 +488,7 @@ This section quantifies the empirical accuracy loss, bandwidth decimation, and s
 ### 8.3 Recommended Architecture: Fused Telemetry
 
 To achieve zero-compromise analytics:
-- **Ground Truth Driving Telemetry**: Use **DuckDB** for the main driver whenever available (exact 100 Hz pedals, speed, RPM, gear, wheel speeds, suspension).
+- **Ground Truth Driving Telemetry**: Use **DuckDB** for the main driver whenever available (exact 100 Hz pedals, speed, RPM, gear, wheel speeds, ride height).
 - **Spatial Track Position**: Use **VCR Replay** for world coordinates $(x, z)$, yaw heading, and track map display (interpolating the VCR trajectory onto the DuckDB timeline).
 - **Opponent Overlays**: Use **VCR Replay** for multi-car telemetry traces and benchmark ghost comparisons.
 - **Offline Development & Deep Reverse Engineering**: Use **`npm run telemetry:record`** (`tools/telemetry-recorder`) for live memory-mapped calibration sweeps and unknown byte validation.

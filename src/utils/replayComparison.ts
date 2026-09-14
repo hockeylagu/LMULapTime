@@ -22,7 +22,7 @@ export interface InterpolatedPoint {
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
-  suspPos?: [number, number, number, number];
+  rideHeight?: [number, number, number, number];
   wheelSpeeds?: [number, number, number, number];
   tirePressures?: [number, number, number, number];
   lateralOffsetM?: number;
@@ -207,7 +207,7 @@ export function interpolatePointAtDistance(
       tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
       tireWear: p.tireWear ? [...p.tireWear] : undefined,
       brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
-      suspPos: p.suspPos ? [...p.suspPos] : undefined,
+      rideHeight: p.rideHeight ? [...p.rideHeight] : undefined,
       wheelSpeeds: p.wheelSpeeds ? [...p.wheelSpeeds] : undefined,
       tirePressures: p.tirePressures ? [...p.tirePressures] : undefined,
       lateralOffsetM: p.lateralOffsetM,
@@ -263,14 +263,14 @@ export function interpolatePointAtDistance(
       ] as [number, number, number, number])
     : (p0.brakeTemps ?? p1.brakeTemps);
 
-  const suspPos = p0.suspPos && p1.suspPos
-    ? ([
-        Number((p0.suspPos[0] + t * (p1.suspPos[0] - p0.suspPos[0])).toFixed(1)),
-        Number((p0.suspPos[1] + t * (p1.suspPos[1] - p0.suspPos[1])).toFixed(1)),
-        Number((p0.suspPos[2] + t * (p1.suspPos[2] - p0.suspPos[2])).toFixed(1)),
-        Number((p0.suspPos[3] + t * (p1.suspPos[3] - p0.suspPos[3])).toFixed(1)),
-      ] as [number, number, number, number])
-    : (p0.suspPos ?? p1.suspPos);
+    const rideHeight = p0.rideHeight && p1.rideHeight
+      ? [
+        Number((p0.rideHeight[0] + t * (p1.rideHeight[0] - p0.rideHeight[0])).toFixed(1)),
+        Number((p0.rideHeight[1] + t * (p1.rideHeight[1] - p0.rideHeight[1])).toFixed(1)),
+        Number((p0.rideHeight[2] + t * (p1.rideHeight[2] - p0.rideHeight[2])).toFixed(1)),
+        Number((p0.rideHeight[3] + t * (p1.rideHeight[3] - p0.rideHeight[3])).toFixed(1)),
+      ] as [number, number, number, number]
+      : (p0.rideHeight ?? p1.rideHeight);
 
   const wheelSpeeds = p0.wheelSpeeds && p1.wheelSpeeds
     ? ([
@@ -340,7 +340,7 @@ export function interpolatePointAtDistance(
     tireTemps,
     tireWear,
     brakeTemps,
-    suspPos,
+    rideHeight,
     wheelSpeeds,
     tirePressures,
     lateralOffsetM,

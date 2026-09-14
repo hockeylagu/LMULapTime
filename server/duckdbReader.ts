@@ -302,7 +302,9 @@ export class DuckDbReader {
       ? 'RPM'
       : null;
 
-    const suspTable = (await this.hasTable('Susp Pos')) ? 'Susp Pos' : null;
+    const rideHeightTable = (await this.hasTable('RideHeights')) ? 'RideHeights' : null;
+    const frontRideHeightTable = (await this.hasTable('FrontRideHeight')) ? 'FrontRideHeight' : null;
+    const rearRideHeightTable = (await this.hasTable('RearRideHeight')) ? 'RearRideHeight' : null;
 
     const pressureTable = (await this.hasTable('TyresPressure'))
       ? 'TyresPressure'
@@ -315,6 +317,9 @@ export class DuckDbReader {
       : null;
 
     const wheelSpeedTable = (await this.hasTable('Wheel Speed')) ? 'Wheel Speed' : null;
+    const wheelSpeedChannel = channels.find(
+      (c) => c.channelName.toLowerCase() === 'wheel speed'
+    );
 
     const brakeTempTable = (await this.hasTable('Brakes Temp'))
       ? 'Brakes Temp'
@@ -380,7 +385,9 @@ export class DuckDbReader {
       brakeData,
       steerData,
       rpmData,
-      suspData,
+      rideHeightData,
+      frontRideHeightData,
+      rearRideHeightData,
       pressureData,
       wheelSpeedData,
       brakeTempData,
@@ -399,10 +406,12 @@ export class DuckDbReader {
       fetchContinuousChannel<{ value: number }>(steerTable, 'value', declaredHz),
       fetchContinuousChannel<{ value: number }>(rpmTable, 'value', declaredHz),
       fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
-        suspTable,
+        rideHeightTable,
         'value1, value2, value3, value4',
         declaredHz
       ),
+      fetchContinuousChannel<{ value: number }>(frontRideHeightTable, 'value', declaredHz),
+      fetchContinuousChannel<{ value: number }>(rearRideHeightTable, 'value', declaredHz),
       fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
         pressureTable,
         'value1, value2, value3, value4',
@@ -490,6 +499,7 @@ export class DuckDbReader {
     }
 
     const speedUnit = speedChannel?.unit?.toLowerCase() || 'm/s';
+    const wheelSpeedUnit = wheelSpeedChannel?.unit?.toLowerCase() || 'm/s';
     const steerChannel = steerTable
       ? channels.find((c) => c.channelName.toLowerCase() === steerTable.toLowerCase())
       : null;
@@ -565,10 +575,14 @@ export class DuckDbReader {
       const rpmRow = getChannelRow(rpmData, i);
       const engineRpm = rpmRow?.value ?? 0;
 
-      const suspRow = getChannelRow(suspData, i);
-      const suspPos: [number, number, number, number] | undefined = suspRow
-        ? [suspRow.value1, suspRow.value2, suspRow.value3, suspRow.value4]
-        : undefined;
+      const rideHeightRow = getChannelRow(rideHeightData, i);
+      const frontRideHeight = getChannelRow(frontRideHeightData, i)?.value;
+      const rearRideHeight = getChannelRow(rearRideHeightData, i)?.value;
+      const rideHeight: [number, number, number, number] | undefined = rideHeightRow
+        ? [rideHeightRow.value1, rideHeightRow.value2, rideHeightRow.value3, rideHeightRow.value4].map(value => parseFloat((value * 1000).toFixed(1))) as [number, number, number, number]
+        : frontRideHeight !== undefined && rearRideHeight !== undefined
+          ? [frontRideHeight, frontRideHeight, rearRideHeight, rearRideHeight].map(value => parseFloat((value * 1000).toFixed(1))) as [number, number, number, number]
+          : undefined;
 
       const pressureRow = getChannelRow(pressureData, i);
       const tirePressures: [number, number, number, number] | undefined = pressureRow
@@ -578,10 +592,10 @@ export class DuckDbReader {
       const wheelSpeedRow = getChannelRow(wheelSpeedData, i);
       const wheelSpeeds: [number, number, number, number] | undefined = wheelSpeedRow
         ? [
-            speedUnit.includes('km') ? wheelSpeedRow.value1 : wheelSpeedRow.value1 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRow.value2 : wheelSpeedRow.value2 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRow.value3 : wheelSpeedRow.value3 * 3.6,
-            speedUnit.includes('km') ? wheelSpeedRow.value4 : wheelSpeedRow.value4 * 3.6,
+            wheelSpeedUnit.includes('km') ? wheelSpeedRow.value1 : wheelSpeedRow.value1 * 3.6,
+            wheelSpeedUnit.includes('km') ? wheelSpeedRow.value2 : wheelSpeedRow.value2 * 3.6,
+            wheelSpeedUnit.includes('km') ? wheelSpeedRow.value3 : wheelSpeedRow.value3 * 3.6,
+            wheelSpeedUnit.includes('km') ? wheelSpeedRow.value4 : wheelSpeedRow.value4 * 3.6,
           ]
         : undefined;
 
@@ -629,7 +643,7 @@ export class DuckDbReader {
         absActive: currentAbs,
         tcActive: currentTc,
         engineRpm: Math.round(engineRpm),
-        suspPos,
+        rideHeight,
         tirePressures,
         wheelSpeeds,
         brakeTemps,

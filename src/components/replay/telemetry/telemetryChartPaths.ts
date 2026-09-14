@@ -209,12 +209,12 @@ export function computeTelemetryChartPaths(
   // 4-Corner Suspension Deflection / Travel
   const rawMaxSusp = Math.max(
     30,
-    ...points.map(p => p.suspPos ? Math.max(...p.suspPos) : 0),
-    ...(pointComparisons.map(c => c.baseline.suspPos ? Math.max(...c.baseline.suspPos) : 0))
+    ...points.map(p => p.rideHeight ? Math.max(...p.rideHeight) : 0),
+    ...(pointComparisons.map(c => c.baseline.rideHeight ? Math.max(...c.baseline.rideHeight) : 0))
   );
   const minSuspPos = 0;
   const maxSuspPos = Math.ceil(rawMaxSusp / 10) * 10;
-  const hasSuspPos = points.some(p => p.suspPos !== undefined);
+  const hasSuspPos = points.some(p => p.rideHeight !== undefined);
 
   // 4-Corner Wheel Speeds
   const rawMaxWheelSpeed = Math.max(
@@ -432,8 +432,8 @@ export function computeTelemetryChartPaths(
     }
 
     // Suspension Deflection / Travel: minSuspPos to maxSuspPos mm -> 95 to 10 in SVG Y
-    if (p.suspPos) {
-      const [fl, fr, rl, rr] = p.suspPos;
+    if (p.rideHeight) {
+      const [fl, fr, rl, rr] = p.rideHeight;
       const suspSpan = Math.max(1, maxSuspPos - minSuspPos);
       const flY = 95 - Math.min(1, Math.max(0, (fl - minSuspPos) / suspSpan)) * 85;
       const frY = 95 - Math.min(1, Math.max(0, (fr - minSuspPos) / suspSpan)) * 85;
@@ -604,8 +604,8 @@ export function computeTelemetryChartPaths(
         bBt.rr += `${bBt.rr ? 'L' : 'M'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
       }
 
-      if (bp.suspPos) {
-        const [fl, fr, rl, rr] = bp.suspPos;
+      if (bp.rideHeight) {
+        const [fl, fr, rl, rr] = bp.rideHeight;
         const suspSpan = Math.max(1, maxSuspPos - minSuspPos);
         const flY = 95 - Math.min(1, Math.max(0, (fl - minSuspPos) / suspSpan)) * 85;
         const frY = 95 - Math.min(1, Math.max(0, (fr - minSuspPos) / suspSpan)) * 85;

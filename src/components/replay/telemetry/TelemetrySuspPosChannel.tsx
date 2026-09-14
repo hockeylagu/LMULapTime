@@ -49,7 +49,7 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
     </svg>
   ), [suspPosPaths, baselineSuspPosPaths]);
 
-  const susp = currentPoint?.suspPos;
+  const susp = currentPoint?.rideHeight;
   const hasData = susp !== undefined || Boolean(suspPosPaths.fl);
   const midSusp = Math.round((minSuspPos + maxSuspPos) / 2);
 
@@ -58,7 +58,7 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
         <span className="p-1 rounded bg-emerald-500/20 text-emerald-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Activity className="w-3 h-3" />
-          SUSPENSION TRAVEL
+          RIDE HEIGHT
         </span>
         {hasData && susp ? (
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
@@ -69,12 +69,12 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
           </div>
         ) : (
           <span className="text-[10px] font-mono text-lmu-muted italic">
-            No suspension deflection stream recorded
+            No ride-height stream recorded
           </span>
         )}
-        {currentComparison?.baseline.suspPos && (
+        {currentComparison?.baseline.rideHeight && (
           <span className="text-[10px] font-mono text-amber-400/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
-            Base: {currentComparison.baseline.suspPos[0].toFixed(0)} / {currentComparison.baseline.suspPos[1].toFixed(0)} / {currentComparison.baseline.suspPos[2].toFixed(0)} / {currentComparison.baseline.suspPos[3].toFixed(0)}mm
+            Base: {currentComparison.baseline.rideHeight[0].toFixed(0)} / {currentComparison.baseline.rideHeight[1].toFixed(0)} / {currentComparison.baseline.rideHeight[2].toFixed(0)} / {currentComparison.baseline.rideHeight[3].toFixed(0)}mm
           </span>
         )}
       </div>

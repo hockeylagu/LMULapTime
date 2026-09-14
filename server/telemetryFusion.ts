@@ -77,7 +77,7 @@ export function fuseDuckDbWithVcrTrajectory(
     fusedPoints.push({
       ...dp,
       brakeTemps: dp.brakeTemps ?? p0.brakeTemps,
-      suspPos: dp.suspPos ?? p0.suspPos,
+      rideHeight: dp.rideHeight,
       x: parseFloat(x.toFixed(3)),
       y: parseFloat(y.toFixed(3)),
       z: parseFloat(z.toFixed(3)),
@@ -91,7 +91,7 @@ export function fuseDuckDbWithVcrTrajectory(
     (p) =>
       p.wheelSpeeds !== undefined ||
       p.brakeTemps !== undefined ||
-      p.suspPos !== undefined ||
+      p.rideHeight !== undefined ||
       p.tirePressures !== undefined ||
       p.tireWear !== undefined ||
       p.tireTemps !== undefined

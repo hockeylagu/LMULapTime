@@ -58,7 +58,7 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
         <span className="p-1 rounded bg-amber-500/20 text-amber-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Layers className="w-3 h-3" />
-          TIRE CONDITION & WEAR
+          TIRE WEAR
         </span>
         {hasData && tw ? (
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">

@@ -148,7 +148,7 @@ The field saturates at 1023, i.e. ~11,170 rpm, and would wrap silently above tha
 | `5` | 1 byte | UInt8 | **`rawThrottle`**: 8-bit throttle pedal position (1 = 0%, 249 = 100%) |
 | `6..7` | 10 bits | Bitfield | **`engineRpm`**: `(readUInt16LE(6) >>> 5) & 0x3FF`, rpm = `raw * 10.9228` |
 | `8..12` | 5 bytes | Binary | Speed / velocity vector info |
-| `13..35` | 23 bytes | Binary | Vehicle dynamics / suspension travel |
+| `13..35` | 23 bytes | Binary | Vehicle dynamics; individual fields are not established |
 | `36` | 1 byte | UInt8 | **`rawBrake`** & Systems: <br>• Bits 0..5: Analog brake pressure (0 to 63 = 0% to 100%) <br>• Bit 6 (`0x40`): ABS Active flag <br>• Bit 7 (`0x80`): Traction Control (TC) Active flag |
 | `38` | 1 byte | UInt8 | **`vehicleStatus`**: <br>• Bit 0 (`0x01`): Off-track / track limit cut violation <br>• Bit 2 (`0x04`): Pit limiter engaged (holding 60 km/h) <br>• Bit 7 (`0x80`): Inside pit lane boundary |
 | `41` | 4 bytes | Float32LE | **`x`**: World coordinates X (lateral position in meters) |
@@ -163,7 +163,7 @@ Emitted periodically alongside vehicle motion packets (at up to ~50 Hz per car).
 
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `0..15` | 16 bytes | Binary | 4-corner suspension deflection and chassis dynamics state (4 bytes per corner). |
+| `0..15` | 16 bytes | Binary | Unestablished chassis dynamics state. |
 | `16..21` | 6 bytes | Binary | Internal chassis motion sync and cycle counter bitfields. |
 | `22..23` | 2 bytes | UInt16LE | **Brake Rotor Temperature**: Byte 23 (and UInt16LE at byte 22) tracks brake rotor disc thermal state ($29^\circ\text{C}$ to $550^\circ\text{C}$, $r = 1.000$). <br>Calibration: $T^\circ\text{C} = \max(20, \text{round}((\text{byte}_{23} - 51) \times 5.86 + 29))$. <br>Front axle: $[T, T]$; Rear axle: $[0.88T, 0.88T]$. |
 | `24..36` (`sz === 37`) | 13 bytes | Binary | Extended dynamics / chassis state (rare variant, present on select vehicles). |
@@ -198,10 +198,10 @@ Each 10-byte corner block contains:
 
 | Relative Offset | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `+0` | 1 byte | UInt8 | **Suspension Deflection**: High-frequency suspension travel indicator ($r = 0.673$). |
+| `+0` | 1 byte | UInt8 | Unestablished corner state byte. |
 | `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure ($r = 0.905$ to $0.930$). |
 | `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). <br>*Ground Truth Note*: Does not vary with wheel rotation or speed. The earlier hypothesis of bytes 5..6 being angular velocity in rad/s was disproved as an artifact of regression with a slowly drifting thermal counter. Wheel speeds are not recorded in this packet. |
-| `+7..8` | 2 bytes | Int16LE | **Dynamic Suspension Deflection**: Bipolar damper displacement ($r = 0.729$). |
+| `+7..8` | 2 bytes | Int16LE | Unestablished corner dynamics field. |
 | `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag ($r = 0.912$). |
 
 *Note on Grid Scope: In online multiplayer races, this packet is **recorded exclusively for the local player's vehicle** (e.g. 99,055 packets for player in Imola R1, 0 for opponents). Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*

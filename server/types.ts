@@ -641,7 +641,7 @@ export interface ReplayTrajectoryPoint {
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   tirePressures?: [number, number, number, number];
-  suspPos?: [number, number, number, number];
+  rideHeight?: [number, number, number, number];
   wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   engineRpm?: number;
