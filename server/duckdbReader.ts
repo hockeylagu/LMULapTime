@@ -471,17 +471,20 @@ export class DuckDbReader {
         : Promise.resolve({ rows: [], hz: declaredHz }),
       hasGear && gearHasTs
         ? this.queryAll<{ ts: number; value: number }>(
-            `SELECT ts, value FROM "Gear" WHERE ts >= ${startTs - 5} AND ts <= ${endTs + 5} ORDER BY ts ASC`
+            'SELECT ts, value FROM "Gear" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
+            [startTs - 5, endTs + 5]
           )
         : Promise.resolve([]),
       hasAbs && absHasTs
         ? this.queryAll<{ ts: number; value: number }>(
-            `SELECT ts, value FROM "ABS" WHERE ts >= ${startTs - 1} AND ts <= ${endTs + 1} ORDER BY ts ASC`
+            'SELECT ts, value FROM "ABS" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
+            [startTs - 1, endTs + 1]
           )
         : Promise.resolve([]),
       hasTc && tcHasTs
         ? this.queryAll<{ ts: number; value: number }>(
-            `SELECT ts, value FROM "TC" WHERE ts >= ${startTs - 1} AND ts <= ${endTs + 1} ORDER BY ts ASC`
+            'SELECT ts, value FROM "TC" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
+            [startTs - 1, endTs + 1]
           )
         : Promise.resolve([]),
     ]);
