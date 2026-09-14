@@ -42,10 +42,13 @@ export function parseDuckDbFilename(filename: string): {
     if (!cleanName.toLowerCase().endsWith('.duckdb')) return null;
     const nameWithoutExt = cleanName.replace(/\.duckdb$/i, '');
     const parts = nameWithoutExt.split('_');
-    if (parts.length >= 2) {
+    const sessionIndex = parts.findIndex((part, index) =>
+      index > 0 && /^[PQRW]\d*$/i.test(part)
+    );
+    if (sessionIndex > 0) {
       return {
-        trackName: parts[0].trim(),
-        sessionType: parts[1].trim(),
+        trackName: parts.slice(0, sessionIndex).join('_').trim(),
+        sessionType: parts[sessionIndex].trim().toUpperCase(),
         timestampStr: '',
         timestampEpochMs: 0,
       };

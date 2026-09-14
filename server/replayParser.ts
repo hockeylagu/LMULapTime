@@ -1038,12 +1038,9 @@ export function extractReplayTrajectory(
 
       const validLaps = detectedLaps.filter(l => l.isValid && l.lapTimeSec > 30);
       const validFlying = validLaps.filter(l => !l.isOutlap);
-      const fallbackFlying = detectedLaps.filter(l => !l.isOutlap && l.lapTimeSec > 30);
       const pool = validFlying.length > 0
         ? validFlying
-        : (validLaps.length > 0
-            ? validLaps
-            : (fallbackFlying.length > 0 ? fallbackFlying : detectedLaps));
+        : validLaps;
       let minTime = Infinity;
       let bestLapNum = pool[0]?.lapNumber;
       for (const l of pool) {
@@ -1080,7 +1077,7 @@ export function extractReplayTrajectory(
         s1Idx,
         s2Idx,
         isOutlap: false,
-        isBest: true,
+        isBest: false,
       }];
     }
 

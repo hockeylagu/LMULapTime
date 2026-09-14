@@ -537,6 +537,7 @@ describe('replayParser', () => {
       expect(traj.pointsCount).toBe(0);
       expect(traj.points).toEqual([]);
       expect(traj.laps?.length).toBe(1);
+      expect(traj.laps?.[0].isBest).toBeFalsy();
 
       fs.unlinkSync(sliceVcrPath);
     });

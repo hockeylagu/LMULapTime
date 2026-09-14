@@ -23,6 +23,16 @@ describe('telemetryMatcher', () => {
     expect(parsed2!.sessionType).toBe('Q');
   });
 
+  it('preserves underscore-containing track names in fallback filenames', () => {
+    const parsed = parseDuckDbFilename('Circuit_de_la_Sarthe_R_partial.duckdb');
+    expect(parsed).toEqual({
+      trackName: 'Circuit_de_la_Sarthe',
+      sessionType: 'R',
+      timestampStr: '',
+      timestampEpochMs: 0,
+    });
+  });
+
   it('normalizes session types correctly', () => {
     expect(normalizeSessionType('P')).toBe('P');
     expect(normalizeSessionType('PRACTICE 1')).toBe('P');

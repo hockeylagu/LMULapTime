@@ -4,6 +4,51 @@ import { matchesCarClass } from './paceCategory.js';
 
 export type { ComparableLap };
 
+export interface LapSelectionInput {
+  lapTime: number | null;
+  isValid?: boolean;
+  isPitStop?: boolean;
+  isOutLap?: boolean;
+  lapNum?: number;
+  s1?: number | null;
+  s2?: number | null;
+  s3?: number | null;
+}
+
+/**
+ * Selects the laps used for clean-lap averages and consistency metrics.
+ * Prefer valid flying laps, then valid non-pit laps when a session has too few flying laps.
+ */
+export function selectCleanLapCandidates<T extends LapSelectionInput>(
+  laps: T[],
+  options: { minimumFlyingLaps?: number } = {}
+): T[] {
+  const completed = laps.filter((l) => l.lapTime !== null && l.lapTime > 0);
+  const hasMultiple = completed.length > 1;
+  const isAfterPitStop = (index: number): boolean => {
+    const previousLap = index > 0 ? completed[index - 1] : null;
+    return Boolean(previousLap?.isPitStop && previousLap.lapTime !== null && previousLap.lapTime > 0);
+  };
+  const validFlying = completed.filter((lap, index) =>
+    (lap.isValid ?? true) &&
+    !lap.isPitStop &&
+    !lap.isOutLap &&
+    !isAfterPitStop(index) &&
+    (!hasMultiple || (lap.lapNum ?? 2) > 1)
+  );
+  const validNonPit = completed.filter((lap, index) =>
+    (lap.isValid ?? true) &&
+    !lap.isPitStop &&
+    !lap.isOutLap &&
+    !isAfterPitStop(index)
+  );
+
+  const minimumFlyingLaps = options.minimumFlyingLaps ?? 1;
+  return validFlying.length >= minimumFlyingLaps
+    ? validFlying
+    : (validNonPit.length >= 2 ? validNonPit : (validFlying.length > 0 ? validFlying : validNonPit));
+}
+
 export interface LapDeltaResult {
   lapTimeDelta: number | null;
   lapTimeDeltaFormatted: string;
@@ -263,25 +308,10 @@ export function computeLapToLapDelta(
  * Computes average of the top N cleanest/fastest flying laps in a session.
  */
 export function computeTopNLapAverage(
-  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; isOutLap?: boolean; lapNum?: number }>,
+  laps: LapSelectionInput[],
   n = 3
 ): number | null {
-  const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
-  const hasMultiple = completed.length > 1;
-  const validFlying = completed.filter((l, idx, arr) => {
-    const prevLap = idx > 0 ? arr[idx - 1] : null;
-    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-    return (l.isValid ?? true) && !l.isPitStop && !isOut && (!hasMultiple || (l.lapNum ?? 2) > 1);
-  });
-  const candidates = validFlying.length > 0
-    ? validFlying
-    : completed.filter((l, idx, arr) => {
-        const prevLap = idx > 0 ? arr[idx - 1] : null;
-        const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-        const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-        return (l.isValid ?? true) && !l.isPitStop && !isOut;
-      });
+  const candidates = selectCleanLapCandidates(laps);
 
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
@@ -295,37 +325,19 @@ export function computeTopNLapAverage(
  * Excludes pit stop laps (in-laps) and out-laps (laps immediately following a pit stop).
  */
 export function computeConsistencyRating(
-  laps: Array<{ lapTime: number | null; isValid?: boolean; isPitStop?: boolean; isOutLap?: boolean; lapNum?: number }>
-): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null } {
-  const completed = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
-  const hasMultiple = completed.length > 1;
+  laps: LapSelectionInput[]
+): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null; sampleCount: number } {
+  const candidates = selectCleanLapCandidates(laps, { minimumFlyingLaps: 2 });
 
-  // Filter out pit stops, out laps after valid pit stops, and start laps (lap 1)
-  const validFlying = completed.filter((l, idx, arr) => {
-    const prevLap = idx > 0 ? arr[idx - 1] : null;
-    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-    return (l.isValid ?? true) && !l.isPitStop && !isOut && (!hasMultiple || (l.lapNum ?? 2) > 1);
-  });
-
-  const fallback = completed.filter((l, idx, arr) => {
-    const prevLap = idx > 0 ? arr[idx - 1] : null;
-    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-    return (l.isValid ?? true) && !l.isPitStop && !isOut;
-  });
-
-  const candidates = validFlying.length >= 2
-    ? validFlying
-    : (fallback.length >= 2 ? fallback : (validFlying.length > 0 ? validFlying : fallback));
-
-  if (candidates.length === 0) return { consistencyScore: null, avgLapTime: null, stdDev: null };
+  if (candidates.length === 0) {
+    return { consistencyScore: null, avgLapTime: null, stdDev: null, sampleCount: 0 };
+  }
 
   const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
   const avg = sum / candidates.length;
 
   if (candidates.length <= 1) {
-    return { consistencyScore: 100, avgLapTime: parseFloat(avg.toFixed(3)), stdDev: 0 };
+    return { consistencyScore: 100, avgLapTime: parseFloat(avg.toFixed(3)), stdDev: 0, sampleCount: candidates.length };
   }
 
   const variance = candidates.reduce((acc, l) => acc + Math.pow((l.lapTime || 0) - avg, 2), 0) / candidates.length;
@@ -336,6 +348,7 @@ export function computeConsistencyRating(
     consistencyScore: parseFloat(score.toFixed(1)),
     avgLapTime: parseFloat(avg.toFixed(3)),
     stdDev: parseFloat(stdDev.toFixed(3)),
+    sampleCount: candidates.length,
   };
 }
 

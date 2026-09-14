@@ -29,7 +29,7 @@ import {
   compareSessions,
   minValidTime,
 } from '../src/utils/formatters.js';
-import { computeTopNLapAverage, computeConsistencyRating } from '../src/utils/lapComparison.js';
+import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../src/utils/lapComparison.js';
 import { calculatePaceCategory } from './referenceLaptimes.js';
 import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
 
@@ -186,42 +186,10 @@ export interface ReplayFileEntry {
 const updateMinTime = minValidTime;
 
 const computeAverageLapTime = (laps: LapData[]): number | null => {
-  const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
-  if (completedLaps.length === 0) return null;
-
-  const hasMultipleLaps = completedLaps.length > 1;
-  const cleanFlyingCandidates = completedLaps.filter((l, idx, arr) => {
-    const prevLap = idx > 0 ? arr[idx - 1] : null;
-    const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-    const isOut = Boolean(l.isOutLap || prevIsValidPitStop);
-    return !l.isPitStop && !isOut;
-  });
-
-  // 1. Prefer valid flying laps (lapNum > 1, not pit stop, and not out-lap)
-  const validFlying = cleanFlyingCandidates.filter(l => l.isValid && (!hasMultipleLaps || l.lapNum > 1));
-  if (validFlying.length > 0) {
-    const sum = validFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-    return parseFloat((sum / validFlying.length).toFixed(3));
-  }
-
-  // 2. Otherwise any valid non-pit non-out laps (including lap 1 if it's the only valid non-pit lap)
-  const anyValid = cleanFlyingCandidates.filter(l => l.isValid);
-  if (anyValid.length > 0) {
-    const sum = anyValid.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-    return parseFloat((sum / anyValid.length).toFixed(3));
-  }
-
-  // 3. Otherwise non-pit non-out flying laps
-  const nonPitFlying = cleanFlyingCandidates.filter(l => !hasMultipleLaps || l.lapNum > 1);
-  if (nonPitFlying.length > 0) {
-    const sum = nonPitFlying.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-    return parseFloat((sum / nonPitFlying.length).toFixed(3));
-  }
-
-  // 4. Fallback to cleanFlyingCandidates, or completedLaps
-  const fallback = cleanFlyingCandidates.length > 0 ? cleanFlyingCandidates : completedLaps;
-  const sum = fallback.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-  return parseFloat((sum / fallback.length).toFixed(3));
+  const candidates = selectCleanLapCandidates(laps);
+  if (candidates.length === 0) return null;
+  const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
+  return parseFloat((sum / candidates.length).toFixed(3));
 };
 
 export class LmuParser {
