@@ -58,6 +58,7 @@ export function useReplayInspectorData({
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const hasInitializedRef = useRef<boolean>(false);
+  const trajectoryRequestIdRef = useRef(0);
 
   useEffect(() => {
     setActiveReplayName(replayName);
@@ -93,6 +94,7 @@ export function useReplayInspectorData({
     }
 
     let isMounted = true;
+    const requestId = ++trajectoryRequestIdRef.current;
     setIsLoading(true);
     setError(null);
     const requestedLap = pendingLapNumber ?? initialLapNumber;
@@ -105,7 +107,7 @@ export function useReplayInspectorData({
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, rawTrajData]) => {
-        if (!isMounted) return;
+        if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
         if (!metaData) setError(`Could not load metadata for replay ${activeReplayName}`);
         else setMetadata(metaData);
 
@@ -131,7 +133,7 @@ export function useReplayInspectorData({
         setIsLoading(false);
       })
       .catch(err => {
-        if (!isMounted) return;
+        if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load replay data');
         setIsLoading(false);
       });
@@ -277,6 +279,7 @@ export function useReplayInspectorData({
     src: 'duckdb' | 'vcr' = selectedSource
   ) => {
     if (!activeReplayName) return;
+    const requestId = ++trajectoryRequestIdRef.current;
     setIsTrajLoading(true);
     const targetLap = lapNum ?? trajectory?.currentLap ?? initialLapNumber ?? 1;
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
@@ -285,6 +288,7 @@ export function useReplayInspectorData({
     fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}${sourceParam}`)
       .then(r => (r.ok ? r.json() : null))
       .then((rawTrajData: ReplayTrajectoryData | null) => {
+        if (requestId !== trajectoryRequestIdRef.current) return;
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
           setTrajectory(previous => ({
@@ -296,7 +300,9 @@ export function useReplayInspectorData({
         }
         setIsTrajLoading(false);
       })
-      .catch(() => setIsTrajLoading(false));
+      .catch(() => {
+        if (requestId === trajectoryRequestIdRef.current) setIsTrajLoading(false);
+      });
   };
 
   const handleSelectSource = (newSource: 'duckdb' | 'vcr') => {

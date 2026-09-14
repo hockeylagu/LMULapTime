@@ -44,7 +44,6 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(channelIds).toContain('accel-total');
     expect(channelIds).toContain('slip-angle');
     expect(channelIds).toContain('under-over-steer');
-    expect(channelIds).toContain('tire-slip');
     expect(channelIds).toContain('yaw-rate');
     expect(channelIds).toContain('brake-temps');
     expect(channelIds).toContain('ride-height');
@@ -64,14 +63,13 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(rideHeight?.isComputed).toBe(false);
   });
 
-  it('includes built-in presets for G-forces, handling balance, tire slip, suspension and wear', () => {
+  it('includes the focused built-in telemetry presets', () => {
     const presetIds = DEFAULT_TELEMETRY_PRESETS.map(p => p.id);
     expect(presetIds).toContain('g-forces');
     expect(presetIds).toContain('handling');
-    expect(presetIds).toContain('tire-slip-limits');
-    expect(presetIds).toContain('thermals');
     expect(presetIds).toContain('wheels-suspension');
-    expect(presetIds).toContain('tires-wear');
+    expect(presetIds).toContain('all-channels');
+    expect(DEFAULT_TELEMETRY_PRESETS).toHaveLength(6);
   });
 
   it('loads default presets when localStorage is empty', () => {
