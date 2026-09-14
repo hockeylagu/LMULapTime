@@ -12,7 +12,7 @@ import { getSessionDatabase } from './db.js';
 import { AI_MODELS, analyzeLap, clearSessionApiKey, createAiReportRecord, getAiCacheKey, getAiSettings, setSessionApiKey, setSessionModel, toAiError } from './aiReport.js';
 import { enrichTrajectoryWithTrackGeometry } from './serverTrackSync.js';
 import { DuckDbReader } from './duckdbReader.js';
-import { scanDuckDbDirectory, matchDuckDbToReplay, matchDuckDbToSession } from './telemetryMatcher.js';
+import { enrichDuckDbDirectory, scanDuckDbDirectory, matchDuckDbToReplay, matchDuckDbToSession } from './telemetryMatcher.js';
 import { fuseDuckDbWithVcrTrajectory } from './telemetryFusion.js';
 
 const app = express();
@@ -102,6 +102,9 @@ function runReplaySyncInBackground(replaysDir: string, playerName?: string): voi
 try {
   const syncRes = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
   console.log(`[SQLite Cache] Loaded ${syncRes.total} sessions (${syncRes.added} new, ${syncRes.updated} updated) from ${currentResultsDir}`);
+  void syncTelemetryDirectory().then((count) => {
+    console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${currentTelemetryDir}`);
+  });
 } catch (err) {
   console.warn('[SQLite Cache] Initial sync warning:', err);
 }
@@ -129,6 +132,10 @@ runReplaySyncInBackground(currentReplaysDir, parser.configuredPlayerName);
 function enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
   try {
     const duckFiles = scanDuckDbDirectory(currentTelemetryDir);
+    for (const duckFile of duckFiles) {
+      sessionDb.upsertTelemetryMetadata(duckFile);
+    }
+
     const telemetryMeta = sessionDb.getTelemetryMetadata();
     const telemetryBySessionId = new Map<string, string>();
     const telemetryByReplay = new Map<string, string>();
@@ -140,16 +147,14 @@ function enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
 
     for (const s of sessions) {
       const replayName = s.matchingReplayFile?.name;
-      let matchedDuckFilename =
-        telemetryBySessionId.get(s.id) ||
-        (replayName ? telemetryByReplay.get(replayName) : undefined);
-
-      if (!matchedDuckFilename && duckFiles.length > 0) {
-        const matched = matchDuckDbToSession(duckFiles, s);
-        if (matched) {
-          matchedDuckFilename = matched.filename;
-          sessionDb.upsertTelemetryMetadata(matched, s.id, replayName);
-        }
+      const matched = duckFiles.length > 0 ? matchDuckDbToSession(duckFiles, s) : null;
+      let matchedDuckFilename = matched?.filename;
+      if (matched) {
+        sessionDb.upsertTelemetryMetadata(matched, s.id, replayName);
+      } else {
+        matchedDuckFilename =
+          telemetryBySessionId.get(s.id) ||
+          (replayName ? telemetryByReplay.get(replayName) : undefined);
       }
 
       if (matchedDuckFilename) {
@@ -164,6 +169,14 @@ function enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
   } catch (err) {
     console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', err);
   }
+}
+
+async function syncTelemetryDirectory(): Promise<number> {
+  const duckFiles = await enrichDuckDbDirectory(currentTelemetryDir);
+  for (const duckFile of duckFiles) {
+    sessionDb.upsertTelemetryMetadata(duckFile);
+  }
+  return duckFiles.length;
 }
 
 function loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
@@ -505,7 +518,7 @@ app.post('/api/cache/clear', (_req, res) => {
   }
 });
 
-app.post('/api/scan', (req, res) => {
+app.post('/api/scan', async (req, res) => {
   const { resultsDir, replaysDir, telemetryDir, playerName } = req.body;
 
   if (resultsDir && fs.existsSync(resultsDir)) {
@@ -525,6 +538,7 @@ app.post('/api/scan', (req, res) => {
   }
 
   const syncResult = sessionDb.syncSessionsFromDir(currentResultsDir, parser);
+  const telemetryFilesScanned = await syncTelemetryDirectory();
   // Replay trajectory extraction can take a long time for large libraries, so it runs
   // in the background - the frontend polls GET /api/scan/status for progress instead
   // of this request blocking until every .Vcr file has been scanned.
@@ -542,6 +556,7 @@ app.post('/api/scan', (req, res) => {
     sessionsCount: sessions.length,
     sync: syncResult,
     replayScanStarted: true,
+    telemetryFilesScanned,
     sqliteCache: sessionDb.getCacheStats(),
   });
 });
@@ -806,10 +821,10 @@ app.get('/api/replays/:name/metadata', (req, res) => {
       const matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
       const stat = fs.statSync(filePath);
       const matchedDuckFilename =
-        telemetryMeta.find(tm => tm.matchedReplayFilename === replayName)?.filename ||
-        (matchedSession ? telemetryMeta.find(tm => tm.matchedSessionId === matchedSession.id)?.filename : undefined) ||
         matchDuckDbToReplay(duckFiles, metadata, stat.mtime.getTime())?.filename ||
-        (matchedSession ? matchDuckDbToSession(duckFiles, matchedSession)?.filename : undefined);
+        (matchedSession ? matchDuckDbToSession(duckFiles, matchedSession)?.filename : undefined) ||
+        telemetryMeta.find(tm => tm.matchedReplayFilename === replayName)?.filename ||
+        (matchedSession ? telemetryMeta.find(tm => tm.matchedSessionId === matchedSession.id)?.filename : undefined);
 
       if (matchedDuckFilename) {
         metadata.hasDuckDbTelemetry = true;

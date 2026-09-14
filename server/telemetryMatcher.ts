@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { normalizeTrackName } from '../src/utils/paceCategory.js';
+import { matchesTrack } from '../src/utils/paceCategory.js';
 import { DuckDbReader } from './duckdbReader.js';
 import { DetailedSession, ReplayMetadata } from './types.js';
 
@@ -18,6 +18,13 @@ export interface DuckDbFileInfo {
   lapsCount?: number;
   bestLapTime?: number;
 }
+
+const duckDbMetadataCache = new Map<string, {
+  trackName?: string;
+  sessionType?: string;
+  driverName?: string;
+  recordingTimeEpochMs?: number;
+}>();
 
 export function parseDuckDbFilename(filename: string): {
   trackName: string;
@@ -85,15 +92,17 @@ export function scanDuckDbDirectory(telemetryDir: string): DuckDbFileInfo[] {
         const stats = fs.statSync(filePath);
         const parsed = parseDuckDbFilename(f);
         if (parsed) {
+          const cachedMetadata = duckDbMetadataCache.get(filePath);
           entries.push({
             filename: f,
             filePath,
             fileMtimeMs: Math.floor(stats.mtimeMs),
             fileSizeBytes: stats.size,
-            trackName: parsed.trackName,
-            sessionType: parsed.sessionType,
+            trackName: cachedMetadata?.trackName || parsed.trackName,
+            sessionType: cachedMetadata?.sessionType || parsed.sessionType,
             timestampStr: parsed.timestampStr,
-            timestampEpochMs: parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
+            timestampEpochMs: cachedMetadata?.recordingTimeEpochMs || parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
+            driverName: cachedMetadata?.driverName,
           });
         }
       } catch (err) {
@@ -116,14 +125,31 @@ export function normalizeSessionType(typeStr: string = ''): 'P' | 'Q' | 'R' | 'W
   return 'OTHER';
 }
 
+function shouldReplaceMatch(
+  candidate: DuckDbFileInfo,
+  candidateDeltaSec: number,
+  current: DuckDbFileInfo | null,
+  currentDeltaSec: number
+): boolean {
+  if (!current) return true;
+
+  // LMU can emit a short partial DuckDB and then a larger complete recording
+  // for the same session within seconds of each other.
+  const sameRecordingBurst = Math.abs(candidateDeltaSec - currentDeltaSec) <= 60;
+  if (sameRecordingBurst && candidate.fileSizeBytes !== current.fileSizeBytes) {
+    return candidate.fileSizeBytes > current.fileSizeBytes;
+  }
+
+  return candidateDeltaSec < currentDeltaSec;
+}
+
 export function matchDuckDbToSession(
   duckdbFiles: DuckDbFileInfo[],
   session: DetailedSession,
-  maxTimeDeltaSec = 300
+  maxTimeDeltaSec = 3600
 ): DuckDbFileInfo | null {
   if (duckdbFiles.length === 0) return null;
 
-  const sessionNormTrack = normalizeTrackName(session.trackVenue, session.trackCourse);
   const sessionTypeNorm = normalizeSessionType(session.sessionType || session.sessionName);
 
   // Parse session timestamp
@@ -146,13 +172,11 @@ export function matchDuckDbToSession(
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
-    const duckNormTrack = normalizeTrackName(duck.trackName);
-    if (duckNormTrack && sessionNormTrack && duckNormTrack !== sessionNormTrack) {
-      // If neither is a substring of the other, skip
-      if (
-        !duck.trackName.toLowerCase().includes(session.trackVenue.toLowerCase()) &&
-        !session.trackVenue.toLowerCase().includes(duck.trackName.toLowerCase())
-      ) {
+    if (!matchesTrack(duck.trackName, session.trackVenue, session.trackCourse)) continue;
+
+    if (duck.driverName && session.drivers.length > 0) {
+      const duckDriver = duck.driverName.toLowerCase();
+      if (!session.drivers.some((driver) => (driver.name || '').toLowerCase().includes(duckDriver) || duckDriver.includes((driver.name || '').toLowerCase()))) {
         continue;
       }
     }
@@ -166,7 +190,7 @@ export function matchDuckDbToSession(
     // 3. Check time delta if timestamps are available
     if (sessionEpochMs > 0 && duck.timestampEpochMs > 0) {
       const deltaSec = Math.abs(duck.timestampEpochMs - sessionEpochMs) / 1000;
-      if (deltaSec <= maxTimeDeltaSec && deltaSec < smallestTimeDelta) {
+      if (deltaSec <= maxTimeDeltaSec && shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
         smallestTimeDelta = deltaSec;
         bestMatch = duck;
       }
@@ -192,7 +216,6 @@ export function matchDuckDbToReplay(
 ): DuckDbFileInfo | null {
   if (duckdbFiles.length === 0) return null;
 
-  const replayTrack = normalizeTrackName(replay.trackName || replay.eventInfo?.sceneDesc || '');
   const replayTypeNorm = normalizeSessionType(replay.sessionType || replay.eventInfo?.session || '');
 
   let bestMatch: DuckDbFileInfo | null = null;
@@ -201,12 +224,11 @@ export function matchDuckDbToReplay(
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
-    const duckNormTrack = normalizeTrackName(duck.trackName);
-    if (duckNormTrack && replayTrack && duckNormTrack !== replayTrack) {
-      if (
-        !duck.trackName.toLowerCase().includes((replay.trackName || '').toLowerCase()) &&
-        !(replay.trackName || '').toLowerCase().includes(duck.trackName.toLowerCase())
-      ) {
+    if (!matchesTrack(duck.trackName, replay.trackName || replay.eventInfo?.sceneDesc || '', '')) continue;
+
+    if (duck.driverName && replay.drivers.length > 0) {
+      const duckDriver = duck.driverName.toLowerCase();
+      if (!replay.drivers.some((driver) => driver.name.toLowerCase().includes(duckDriver) || duckDriver.includes(driver.name.toLowerCase()))) {
         continue;
       }
     }
@@ -220,7 +242,7 @@ export function matchDuckDbToReplay(
     // 3. Time comparison against replay file mtime
     if (replayMtimeMs && duck.timestampEpochMs > 0) {
       const deltaSec = Math.abs(duck.timestampEpochMs - replayMtimeMs) / 1000;
-      if (deltaSec <= maxTimeDeltaSec && deltaSec < smallestTimeDelta) {
+      if (deltaSec <= maxTimeDeltaSec && shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
         smallestTimeDelta = deltaSec;
         bestMatch = duck;
       }
@@ -246,12 +268,24 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
     const laps = await reader.getLapList();
     await reader.close();
 
+    const recordingTimeEpochMs = meta.RecordingTime
+      ? new Date(meta.RecordingTime.replace(/_/g, ':')).getTime()
+      : undefined;
+    duckDbMetadataCache.set(duck.filePath, {
+      trackName: meta.trackName,
+      sessionType: meta.sessionType,
+      driverName: meta.driverName,
+      recordingTimeEpochMs: recordingTimeEpochMs && !isNaN(recordingTimeEpochMs) ? recordingTimeEpochMs : undefined,
+    });
+
     const validLaps = laps.filter((l) => l.lapTimeSec > 30);
     const bestLapTime = validLaps.length > 0 ? Math.min(...validLaps.map((l) => l.lapTimeSec)) : undefined;
 
     return {
       ...duck,
       trackName: meta.trackName || duck.trackName,
+      sessionType: meta.sessionType || duck.sessionType,
+      timestampEpochMs: recordingTimeEpochMs && !isNaN(recordingTimeEpochMs) ? recordingTimeEpochMs : duck.timestampEpochMs,
       driverName: meta.driverName || duck.driverName,
       carName: meta.carName || duck.carName,
       lapsCount: laps.length,
@@ -261,4 +295,9 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
     console.warn(`[TelemetryMatcher] Could not enrich DuckDB file ${duck.filePath}:`, err);
     return duck;
   }
+}
+
+export async function enrichDuckDbDirectory(telemetryDir: string): Promise<DuckDbFileInfo[]> {
+  const files = scanDuckDbDirectory(telemetryDir);
+  return Promise.all(files.map((file) => enrichDuckDbFileInfo(file)));
 }

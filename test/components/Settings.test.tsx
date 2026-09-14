@@ -124,7 +124,7 @@ describe('Settings component', () => {
     expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
     expect(screen.getByText(/42 Sessions Cached/i)).toBeInTheDocument();
     expect(screen.getByText('512.0 KB')).toBeInTheDocument();
-    expect(screen.getByText('Cached Telemetry Files')).toBeInTheDocument();
+    expect(screen.getByText('Cached Telemetry')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
 
     const clearBtn = screen.getByRole('button', { name: /clear cache/i });

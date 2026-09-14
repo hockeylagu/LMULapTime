@@ -66,7 +66,7 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Telemetry Files</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Telemetry</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.telemetryFilesCount ?? 0}
           </span>

@@ -71,6 +71,97 @@ describe('telemetryMatcher', () => {
     expect(matched!.sessionType).toBe('R');
   });
 
+  it('matches Le Mans aliases and chooses the nearest telemetry session', () => {
+    const duckFiles: DuckDbFileInfo[] = [
+      {
+        filename: 'Circuit de la Sarthe_R_2026-09-14T18_58_09Z.duckdb',
+        filePath: 'C:\\fake\\lemans-old.duckdb',
+        fileMtimeMs: 0,
+        fileSizeBytes: 1024,
+        trackName: 'Circuit de la Sarthe',
+        sessionType: 'R',
+        timestampStr: '2026-09-14T18:58:09Z',
+        timestampEpochMs: new Date('2026-09-14T18:58:09Z').getTime(),
+      },
+      {
+        filename: 'Circuit de la Sarthe_R_2026-09-14T19_42_54Z.duckdb',
+        filePath: 'C:\\fake\\lemans-last.duckdb',
+        fileMtimeMs: 0,
+        fileSizeBytes: 1024,
+        trackName: 'Circuit de la Sarthe',
+        sessionType: 'R',
+        timestampStr: '2026-09-14T19:42:54Z',
+        timestampEpochMs: new Date('2026-09-14T19:42:54Z').getTime(),
+      },
+    ];
+
+    const session = {
+      id: 'lemans-session',
+      trackVenue: 'Le Mans',
+      trackCourse: '24 Heures du Mans',
+      sessionType: 'Race',
+      timestamp: '2026-09-14T19:43:10Z',
+      drivers: [],
+    } as unknown as DetailedSession;
+
+    expect(matchDuckDbToSession(duckFiles, session)?.filename).toBe(
+      'Circuit de la Sarthe_R_2026-09-14T19_42_54Z.duckdb'
+    );
+  });
+
+  it('allows local versus UTC timestamp drift when matching a session', () => {
+    const duckFile: DuckDbFileInfo = {
+      filename: 'Circuit de la Sarthe_R_2026-09-14T18_58_09Z.duckdb',
+      filePath: 'C:\\fake\\lemans.duckdb',
+      fileMtimeMs: 0,
+      fileSizeBytes: 1024,
+      trackName: 'Circuit de la Sarthe',
+      sessionType: 'R',
+      timestampStr: '2026-09-14T18:58:09Z',
+      timestampEpochMs: new Date('2026-09-14T18:58:09Z').getTime(),
+    };
+    const session = {
+      id: 'lemans-offset-session',
+      trackVenue: 'Circuit de la Sarthe',
+      trackCourse: 'Circuit de la Sarthe',
+      sessionType: 'Race',
+      timestamp: '2026-09-14T15:31:10',
+      drivers: [],
+    } as unknown as DetailedSession;
+
+    expect(matchDuckDbToSession([duckFile], session)).toBe(duckFile);
+  });
+
+  it('prefers the larger recording when duplicate files belong to one session burst', () => {
+    const partial: DuckDbFileInfo = {
+      filename: 'Circuit de la Sarthe_R_partial.duckdb',
+      filePath: 'C:\\fake\\partial.duckdb',
+      fileMtimeMs: 0,
+      fileSizeBytes: 1024,
+      trackName: 'Circuit de la Sarthe',
+      sessionType: 'R',
+      timestampStr: '2026-09-14T18:58:09Z',
+      timestampEpochMs: new Date('2026-09-14T18:58:09Z').getTime(),
+    };
+    const complete = { ...partial,
+      filename: 'Circuit de la Sarthe_R_complete.duckdb',
+      filePath: 'C:\\fake\\complete.duckdb',
+      fileSizeBytes: 37 * 1024 * 1024,
+      timestampStr: '2026-09-14T18:58:30Z',
+      timestampEpochMs: new Date('2026-09-14T18:58:30Z').getTime(),
+    };
+    const session = {
+      id: 'lemans-duplicate-session',
+      trackVenue: 'Circuit de la Sarthe',
+      trackCourse: 'Circuit de la Sarthe',
+      sessionType: 'Race',
+      timestamp: '2026-09-14T18:58:00Z',
+      drivers: [],
+    } as unknown as DetailedSession;
+
+    expect(matchDuckDbToSession([partial, complete], session)).toBe(complete);
+  });
+
   it('matches DuckDb file to a replay metadata object', () => {
     const duckFiles: DuckDbFileInfo[] = [
       {
