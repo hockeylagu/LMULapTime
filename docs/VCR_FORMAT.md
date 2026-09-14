@@ -165,20 +165,20 @@ Emitted periodically alongside vehicle motion packets (at up to ~50 Hz per car).
 | :--- | :--- | :--- | :--- |
 | `0..15` | 16 bytes | Binary | Unestablished chassis dynamics state. |
 | `16..21` | 6 bytes | Binary | Internal chassis motion sync and cycle counter bitfields. |
-| `22..23` | 2 bytes | UInt16LE | **Brake Rotor Temperature**: Byte 23 (and UInt16LE at byte 22) tracks brake rotor disc thermal state ($29^\circ\text{C}$ to $550^\circ\text{C}$, $r = 1.000$). <br>Calibration: $T^\circ\text{C} = \max(20, \text{round}((\text{byte}_{23} - 51) \times 5.86 + 29))$. <br>Front axle: $[T, T]$; Rear axle: $[0.88T, 0.88T]$. |
+| `22..23` | 2 bytes | UInt16LE | **Brake Rotor Temperature**: Byte 23 (and UInt16LE at byte 22) is the brake rotor disc thermal state. <br>Calibration: `tempC = max(20, round((byte23 - 51) * 5.86 + 29))`. <br>Front axle: `[tempC, tempC]`; Rear axle: `[0.88 * tempC, 0.88 * tempC]`. |
 | `24..36` (`sz === 37`) | 13 bytes | Binary | Extended dynamics / chassis state (rare variant, present on select vehicles). |
 
-*Note on Grid Scope: In online multiplayer races, this packet is **recorded for all drivers across the entire grid** (e.g. 731,394 packets across all 45 cars in Imola R1). Per-wheel rubber wear degradation and carcass temperatures are NOT stored in this packet.*
+*Grid Scope: In online multiplayer races, this packet is recorded for all drivers across the entire grid. Per-wheel rubber wear degradation and carcass temperatures are not stored in this packet.*
 
 #### Type 51 (`eventSize === 3`): Onboard Fuel Level Packet
 Emitted continuously throughout stints (~50 Hz per car) to broadcast fuel remaining in tank:
 
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `0..1` | 2 bytes | UInt16LE | **Fuel Level**: Onboard fuel remaining in tank (monotonically decreases from full capacity down to reserve across stints, $r = 0.999$). |
+| `0..1` | 2 bytes | UInt16LE | **Fuel Level**: Onboard fuel remaining in tank (monotonically decreases from full capacity down to reserve across stints). |
 | `2` | 1 byte | UInt8 | Fuel pump / feed status indicator. |
 
-*Note on Grid Scope: In online multiplayer races, this packet is **recorded exclusively for the local player's vehicle** (the dedicated server netcode omits opponents' live fuel levels from client replays).*
+*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle.*
 
 #### Type 7: Garage Event
 - Float32LE: Timestamp of entering/exiting garage bay.
@@ -199,12 +199,12 @@ Each 10-byte corner block contains:
 | Relative Offset | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
 | `+0` | 1 byte | UInt8 | Unestablished corner state byte. |
-| `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure ($r = 0.905$ to $0.930$). |
-| `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). <br>*Ground Truth Note*: Does not vary with wheel rotation or speed. The earlier hypothesis of bytes 5..6 being angular velocity in rad/s was disproved as an artifact of regression with a slowly drifting thermal counter. Wheel speeds are not recorded in this packet. |
+| `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure. |
+| `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). Does not vary with wheel rotation or speed; wheel speeds are not recorded in this packet. |
 | `+7..8` | 2 bytes | Int16LE | Unestablished corner dynamics field. |
-| `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag ($r = 0.912$). |
+| `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag. |
 
-*Note on Grid Scope: In online multiplayer races, this packet is **recorded exclusively for the local player's vehicle** (e.g. 99,055 packets for player in Imola R1, 0 for opponents). Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
+*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle. Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
 
 - **Type 10**: payload size and layout not established (a documented single-byte `startLightsCode`
   variant has not been observed).

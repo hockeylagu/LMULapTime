@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/types.js';
-import { computeLapComparisons, getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { computeLapComparisons } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
 import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './telemetryPresets.js';
 import { TelemetryPresetModal } from './TelemetryPresetModal.js';
+import { useTelemetryStripInteraction } from './useTelemetryStripInteraction.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -53,14 +54,24 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   rawPointsCount, rawSampleRateHz, vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
   hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingRef = useRef(false);
-  const rectRef = useRef<{ left: number; width: number } | null>(null);
-  const pendingIndexRef = useRef<number | null>(null);
-  const rafIdRef = useRef<number | null>(null);
-  const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
-  const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
-  const [dragSelection, setDragSelection] = useState<{ startX: number; currentX: number; startPct: number; currentPct: number } | null>(null);
+  const {
+    containerRef,
+    interactionMode,
+    setInteractionMode,
+    dragSelection,
+    isZoomed,
+    viewStart,
+    viewEnd,
+    cumDists,
+    safeIndex,
+    pctForIndex,
+    onJumpToDistance,
+    handleResetZoom,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, zoomRange, onZoomRangeChange });
 
   const [presets, setPresets] = useState<TelemetryPreset[]>(() => loadTelemetryPresets());
   const [activePresetId, setActivePresetId] = useState<string>(() => loadActivePresetId(presets));
@@ -84,96 +95,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
   const activePreset = presets.find(p => p.id === activePresetId) || presets[0];
 
-  const activeZoomRange = zoomRange !== undefined ? zoomRange : internalZoomRange;
-  const updateZoomRange = useCallback((range: { start: number; end: number } | null) => {
-    setInternalZoomRange(range);
-    onZoomRangeChange?.(range);
-  }, [onZoomRangeChange]);
-  const handleResetZoom = useCallback(() => updateZoomRange(null), [updateZoomRange]);
-
-  useEffect(() => {
-    if (activeZoomRange && (points.length === 0 || activeZoomRange.end >= points.length)) updateZoomRange(null);
-  }, [points.length, activeZoomRange, updateZoomRange]);
-
-  useEffect(() => () => {
-    if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
-  }, []);
-
-  const totalPoints = points.length;
-  const isZoomed = !!(activeZoomRange && totalPoints > 0 && activeZoomRange.end > activeZoomRange.start);
-  const viewStart = isZoomed ? Math.max(0, Math.min(activeZoomRange.start, totalPoints - 2)) : 0;
-  const viewEnd = isZoomed ? Math.min(totalPoints - 1, Math.max(activeZoomRange.end, viewStart + 1)) : Math.max(0, totalPoints - 1);
-  const cumDists = useMemo(() => getTrajectoryDistances(points), [points]);
-  const distStart = cumDists[viewStart] ?? 0;
-  const distEnd = cumDists[viewEnd] ?? distStart;
-  const distSpan = Math.max(1e-6, distEnd - distStart);
-  const indexAtRatio = useCallback((ratio: number): number => {
-    const targetDist = distStart + Math.max(0, Math.min(1, ratio)) * distSpan;
-    return Math.max(0, Math.min(totalPoints - 1, findIndexAtDistance(cumDists, targetDist)));
-  }, [cumDists, distStart, distSpan, totalPoints]);
-
-  const safeIndex = Math.max(0, Math.min(currentIndex, totalPoints - 1));
   const currentPoint = points[safeIndex];
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button, input, select, a')) return;
-    if (!containerRef.current || points.length === 0) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    rectRef.current = { left: rect.left, width: rect.width };
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const pct = rect.width > 0 ? (x / rect.width) * 100 : 0;
-    if (interactionMode === 'zoom' || e.shiftKey) {
-      setDragSelection({ startX: x, currentX: x, startPct: pct, currentPct: pct });
-      isDraggingRef.current = false;
-    } else {
-      isDraggingRef.current = true;
-      setDragSelection(null);
-      onSelectIndex(indexAtRatio(rect.width > 0 ? x / rect.width : 0));
-    }
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!containerRef.current || points.length === 0) return;
-    const rect = rectRef.current || containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const pct = rect.width > 0 ? (x / rect.width) * 100 : 0;
-    if (dragSelection) {
-      setDragSelection(prev => (prev ? { ...prev, currentX: x, currentPct: pct } : null));
-    } else if (isDraggingRef.current) {
-      const nextIdx = indexAtRatio(rect.width > 0 ? x / rect.width : 0);
-      pendingIndexRef.current = nextIdx;
-      if (rafIdRef.current === null) {
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          if (pendingIndexRef.current !== null) onSelectIndex(pendingIndexRef.current);
-        });
-      }
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-    if (pendingIndexRef.current !== null) { onSelectIndex(pendingIndexRef.current); pendingIndexRef.current = null; }
-    rectRef.current = null;
-    if (dragSelection && containerRef.current) {
-      const dist = Math.abs(dragSelection.currentX - dragSelection.startX);
-      if (dist >= 10) {
-        const newStart = indexAtRatio(Math.min(dragSelection.startPct, dragSelection.currentPct) / 100);
-        const newEnd = indexAtRatio(Math.max(dragSelection.startPct, dragSelection.currentPct) / 100);
-        if (newEnd - newStart >= 3) {
-          updateZoomRange({ start: newStart, end: newEnd });
-          if (safeIndex < newStart || safeIndex > newEnd) onSelectIndex(newStart);
-        }
-      } else {
-        const rect = containerRef.current.getBoundingClientRect();
-        const ratio = rect.width > 0 ? dragSelection.startX / rect.width : 0;
-        onSelectIndex(indexAtRatio(ratio));
-      }
-      setDragSelection(null);
-    }
-    isDraggingRef.current = false;
-    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-  };
 
   const pointComparisons = useMemo(
     () => (baselinePoints && baselinePoints.length > 0 && points.length > 0
@@ -185,17 +107,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const currentTimeSec = currentPoint && points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (points[0].timeSec || 0)) : 0;
   const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists), [points, pointComparisons, viewStart, viewEnd, cumDists]);
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
-  const pctForIndex = (i: number): number => Math.max(0, Math.min(100, ((cumDists[i] ?? distStart) - distStart) / distSpan * 100));
   const cursorPct = pctForIndex(safeIndex);
-
-  const onJumpToDistance = useCallback(
-    (distM: number) => {
-      if (cumDists.length === 0) return;
-      const targetFrame = findIndexAtDistance(cumDists, distM);
-      onSelectIndex(targetFrame);
-    },
-    [cumDists, onSelectIndex]
-  );
 
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
@@ -222,12 +134,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => {
-        if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-        rectRef.current = null;
-        setDragSelection(null);
-        isDraggingRef.current = false;
-      }}
+      onPointerCancel={handlePointerCancel}
       onDoubleClick={handleResetZoom}
       className={`relative select-none flex flex-col justify-between h-full bg-[#0a0e17] rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
     >

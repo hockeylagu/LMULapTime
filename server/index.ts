@@ -513,7 +513,7 @@ app.post('/api/scan', (req, res) => {
   if (replaysDir && fs.existsSync(replaysDir)) {
     currentReplaysDir = replaysDir;
   }
-  if (telemetryDir) {
+  if (telemetryDir && fs.existsSync(telemetryDir)) {
     currentTelemetryDir = telemetryDir;
     sessionDb.setMetadata('telemetry_dir', currentTelemetryDir);
   }
@@ -898,7 +898,7 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
 
     // If querying the main driver and a matched DuckDB telemetry file exists, fuse native 100 Hz channels
     try {
-      const isPlayer = (!driverSlot && !driverName) ||
+      const isPlayer = (driverSlot === undefined && !driverName) ||
         (driverName && driverName.toLowerCase().includes(parser.configuredPlayerName.toLowerCase())) ||
         (typeof driverSlot === 'number' && getCachedReplayMetadata(filePath, replayName, parser.configuredPlayerName)?.drivers?.find(d => d.slot === driverSlot)?.isPlayer);
 

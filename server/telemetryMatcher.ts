@@ -142,6 +142,7 @@ export function matchDuckDbToSession(
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
+  const untimedCandidates: DuckDbFileInfo[] = [];
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
@@ -169,9 +170,15 @@ export function matchDuckDbToSession(
         smallestTimeDelta = deltaSec;
         bestMatch = duck;
       }
-    } else if (!bestMatch) {
-      bestMatch = duck;
+    } else {
+      untimedCandidates.push(duck);
     }
+  }
+
+  // Only fall back to an untimed match when it is the single unambiguous candidate;
+  // with multiple untimed candidates there's no reliable way to pick the right one.
+  if (!bestMatch && untimedCandidates.length === 1) {
+    bestMatch = untimedCandidates[0];
   }
 
   return bestMatch;
@@ -190,6 +197,7 @@ export function matchDuckDbToReplay(
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
+  const untimedCandidates: DuckDbFileInfo[] = [];
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
@@ -216,9 +224,15 @@ export function matchDuckDbToReplay(
         smallestTimeDelta = deltaSec;
         bestMatch = duck;
       }
-    } else if (!bestMatch) {
-      bestMatch = duck;
+    } else {
+      untimedCandidates.push(duck);
     }
+  }
+
+  // Only fall back to an untimed match when it is the single unambiguous candidate;
+  // with multiple untimed candidates there's no reliable way to pick the right one.
+  if (!bestMatch && untimedCandidates.length === 1) {
+    bestMatch = untimedCandidates[0];
   }
 
   return bestMatch;
