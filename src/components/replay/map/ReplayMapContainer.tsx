@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Eye, EyeOff, Disc } from 'lucide-react';
+import { CircleDot, Eye, EyeOff, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/types.js';
 import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../modal/ReplayTelemetryHud.js';
@@ -8,6 +8,7 @@ import { MapColorMode } from './replayMapUtils.js';
 import { getTrajectoryDistances } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData | null;
@@ -51,6 +52,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const primaryOpacity = fadedLine === 'primary' ? 0.12 : 1;
   const baselineOpacity = fadedLine === 'baseline' ? 0.12 : 1;
   const [showPedalMarkers, setShowPedalMarkers] = useState<boolean>(false);
+  const [showFrictionCircle, setShowFrictionCircle] = useState<boolean>(false);
 
   const pedalMarkers = useMemo(() => {
     if (!corners || corners.length === 0) return [];
@@ -162,11 +164,22 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 Baseline
               </button>
             </div>
-          ) : (
-            <span className="text-[10px] text-lmu-muted font-mono hidden sm:inline">
-              Circuit Map & Racing Line
-            </span>
-          )}
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowFrictionCircle(value => !value)}
+            title={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
+            aria-label={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
+            aria-pressed={showFrictionCircle}
+            className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+              showFrictionCircle
+                ? 'bg-sky-500/20 border-sky-500/60 text-sky-300 shadow-sm'
+                : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
+            }`}
+          >
+            <CircleDot className="w-4 h-4" />
+            <span>Friction</span>
+          </button>
         </div>
       </div>
 
@@ -198,6 +211,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         {apexChart}
       </div>
 
+      {showFrictionCircle && <ReplayFrictionCircle points={trajectory.points} currentIndex={currentIndex} />}
       <ReplayTelemetryHud currentPoint={currentPoint} />
     </>
   );
