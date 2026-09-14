@@ -916,8 +916,20 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
             }
 
             if (duckLap) {
-              const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
-              trajectory = downsampleReplayTrajectory(fused, maxPoints);
+              const expectedLapTimeSec = targetLapTimeSec || fullTrajectory.laps?.find(l => l.lapNumber === chosenLapNum)?.lapTimeSec || (
+                fullTrajectory.points.length > 1
+                  ? (fullTrajectory.points[fullTrajectory.points.length - 1].timeSec ?? 0) - (fullTrajectory.points[0].timeSec ?? 0)
+                  : undefined
+              );
+
+              const isComplete = !expectedLapTimeSec || expectedLapTimeSec <= 0 || (duckLap.lapTimeSec >= expectedLapTimeSec - 0.5);
+
+              if (isComplete) {
+                const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
+                trajectory = downsampleReplayTrajectory(fused, maxPoints);
+              } else {
+                console.warn(`[DuckDB] DuckDB lap ${chosenLapNum} is incomplete (${duckLap.lapTimeSec}s vs expected ${expectedLapTimeSec}s). Falling back to VCR replay trajectory.`);
+              }
             }
           }
         }
@@ -992,4 +1004,5 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export { app, loadSessions, sessionDb };
+
 
