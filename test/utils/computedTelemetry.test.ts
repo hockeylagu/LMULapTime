@@ -174,7 +174,7 @@ describe('computedTelemetry physics engine', () => {
     it('returns 0 when driving straight on straightaways', () => {
       const points = [
         makePoint({ speedKmh: 200, steerYaw: 0 }),
-        makePoint({ speedKmh: 200, steerYaw: 0.5 }),
+        makePoint({ speedKmh: 200, steerYaw: 0.005 }),
       ];
       const balance = computeUnderOversteer(points, [0, 0]);
       expect(balance).toEqual([0, 0]);

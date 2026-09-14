@@ -45,42 +45,45 @@ export const TelemetrySteerGearChannel: React.FC<TelemetrySteerGearChannelProps>
     </svg>
   ), [baselineGearPath, gearPath]);
 
-  return (
-    <>
-      {/* STEERING ANGLE CHANNEL */}
-      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#0e0f1e]/50">
-        <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-          <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-black text-[10px] tracking-wider flex items-center gap-1">
-            <Compass className="w-3 h-3" />
-            STEERING
-          </span>
-          <span className="text-xs font-mono font-bold text-indigo-300">
-            {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
-          </span>
-          {currentComparison && (
-            <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
-              Base: {Math.abs(currentComparison.baseline.steerYaw)}° {currentComparison.baseline.steerYaw < -5 ? 'L' : currentComparison.baseline.steerYaw > 5 ? 'R' : 'C'}
+  const steerAngle = Math.round(currentPoint?.steerYaw ?? 0);
+  const baseSteerAngle = Math.round(currentComparison?.baseline.steerYaw ?? 0);
+
+    return (
+      <>
+        {/* STEERING ANGLE CHANNEL */}
+        <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#0e0f1e]/50">
+          <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
+            <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+              <Compass className="w-3 h-3" />
+              STEERING
             </span>
-          )}
-        </div>
+            <span className="text-xs font-mono font-bold text-indigo-300">
+              {Math.abs(steerAngle)}° {steerAngle < -5 ? 'L' : steerAngle > 5 ? 'R' : 'C'}
+            </span>
+            {currentComparison && (
+              <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+                Base: {Math.abs(baseSteerAngle)}° {baseSteerAngle < -5 ? 'L' : baseSteerAngle > 5 ? 'R' : 'C'}
+              </span>
+            )}
+          </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-          <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">+180° (Right)</div>
-          <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">0° (Center)</div>
-          <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">-180° (Left)</div>
-        </div>
+          <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
+            <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">+270° (Right)</div>
+            <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">0° (Center)</div>
+            <div className="border-b border-indigo-400/40 w-full text-[9px] text-indigo-400">-270° (Left)</div>
+          </div>
 
-        {steerSvg}
+          {steerSvg}
 
-        {isCursorInView && (
-          <div
-            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-              cursorPct < 15 ? 'bottom-2' : 'top-2'
-            } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
-            style={{ left: `${cursorPct}%` }}
-          >
-            <span className="px-2 py-0.5 rounded-md bg-[#070c18] text-indigo-300 border border-indigo-400/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-              {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
+          {isCursorInView && (
+            <div
+              className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
+                cursorPct < 15 ? 'bottom-2' : 'top-2'
+              } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+              style={{ left: `${cursorPct}%` }}
+            >
+              <span className="px-2 py-0.5 rounded-md bg-[#070c18] text-indigo-300 border border-indigo-400/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+                {Math.abs(steerAngle)}° {steerAngle < -5 ? 'L' : steerAngle > 5 ? 'R' : 'C'}
             </span>
           </div>
         )}

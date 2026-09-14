@@ -7,11 +7,12 @@ import { AiReportRecord, DetailedSession, SessionMetadata, ReferenceLaptimeEntry
 import { DuckDbFileInfo } from './telemetryMatcher.js';
 import { LmuParser } from './parser.js';
 import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
+import { migrateSteeringCache } from './migration.js';
 
 // Bumped whenever the .Vcr binary parsing algorithm changes in a way that would
 // invalidate previously-cached replay metadata/trajectory rows, without requiring
 // the underlying replay file's mtime/size to change.
-const REPLAY_CACHE_VERSION = 'v1';
+const REPLAY_CACHE_VERSION = 'v2';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
@@ -72,10 +73,11 @@ export class SessionDatabase {
       this.dbPath = path.join(serverDir, 'lmu_cache.db');
     }
 
-    this.db = new Database(this.dbPath);
+    this.db = new Database(this.dbPath, { timeout: 5000 });
     // Performance pragmas
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('busy_timeout = 5000');
     this.initSchema();
   }
 
@@ -195,6 +197,9 @@ export class SessionDatabase {
         PRIMARY KEY (filename, lap_number)
       );
     `);
+
+    // Run seamless migration for steering telemetry format & v1 -> v2 version update
+    migrateSteeringCache(this.db);
   }
 
   public getDbPath(): string {

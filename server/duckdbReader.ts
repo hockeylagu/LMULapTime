@@ -468,6 +468,10 @@ export class DuckDbReader {
     }
 
     const speedUnit = speedChannel?.unit?.toLowerCase() || 'm/s';
+    const steerChannel = steerTable
+      ? channels.find((c) => c.channelName.toLowerCase() === steerTable.toLowerCase())
+      : null;
+    const steerUnit = steerChannel?.unit?.toLowerCase() || '';
 
     for (let i = 0; i < rowCount; i++) {
       const globalIdx = startIdx + i;
@@ -524,7 +528,16 @@ export class DuckDbReader {
       const brake = rawBrake <= 1.01 ? rawBrake * 100 : rawBrake;
 
       const steerRow = getChannelRow(steerData, i);
-      const steerYaw = steerRow?.value ?? 0;
+      const rawSteer = steerRow?.value ?? 0;
+      let steerYaw = rawSteer;
+      if (steerUnit.includes('rad')) {
+        steerYaw = rawSteer / (1.5 * Math.PI);
+      } else if (steerUnit.includes('deg')) {
+        steerYaw = rawSteer / 270;
+      } else if (steerUnit.includes('%') || steerUnit.includes('percent') || Math.abs(rawSteer) > 1.01) {
+        steerYaw = rawSteer / 100;
+      }
+      steerYaw = parseFloat(Math.max(-1, Math.min(1, steerYaw)).toFixed(4));
 
       const rpmRow = getChannelRow(rpmData, i);
       const engineRpm = rpmRow?.value ?? 0;
@@ -588,7 +601,7 @@ export class DuckDbReader {
         speedKmh: parseFloat(speedKmh.toFixed(1)),
         throttle: parseFloat(throttle.toFixed(1)),
         brake: parseFloat(brake.toFixed(1)),
-        steerYaw: parseFloat(steerYaw.toFixed(2)),
+        steerYaw: parseFloat(steerYaw.toFixed(4)),
         gear: currentGear,
         absActive: currentAbs,
         tcActive: currentTc,

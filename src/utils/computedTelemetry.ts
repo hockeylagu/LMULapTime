@@ -2,7 +2,7 @@ import { ReplayTrajectoryPoint } from '../../server/types.js';
 
 const G_CONST = 9.80665;
 const WHEELBASE_M = 2.7; // Standard GT3 / Prototype wheelbase (~2.7m)
-const STEERING_RATIO = 22.0; // Effective ratio mapping LMU 540-deg steerYaw encoding to ~24.5 deg road wheel lock
+const STEERING_RATIO = 11.0; // Effective ratio mapping LMU 270-deg steerYaw (540 lock-to-lock) to ~24.5 deg road wheel lock
 
 /**
  * Normalizes an angle difference in radians to the range [-pi, pi].
