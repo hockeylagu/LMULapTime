@@ -17,7 +17,6 @@ import {
   TelemetryAccelTotalChannel,
   TelemetrySlipAngleChannel,
   TelemetryUndersteerChannel,
-  TelemetryTireSlipChannel,
   TelemetryYawRateChannel,
   TelemetryBrakeTempsChannel,
   TelemetrySuspPosChannel,
@@ -99,8 +98,6 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
       return <TelemetrySlipAngleChannel slipAnglePath={paths.slipAnglePath} baselineSlipAnglePath={paths.baselineSlipAnglePath} {...cursorProps} />;
     case 'under-over-steer':
       return <TelemetryUndersteerChannel understeerPath={paths.understeerPath} baselineUndersteerPath={paths.baselineUndersteerPath} {...cursorProps} />;
-    case 'tire-slip':
-      return <TelemetryTireSlipChannel tireSlipPath={paths.tireSlipPath} tireSlipArea={paths.tireSlipArea} baselineTireSlipPath={paths.baselineTireSlipPath} {...cursorProps} />;
     case 'yaw-rate':
       return <TelemetryYawRateChannel yawRatePath={paths.yawRatePath} baselineYawRatePath={paths.baselineYawRatePath} {...cursorProps} />;
     default:

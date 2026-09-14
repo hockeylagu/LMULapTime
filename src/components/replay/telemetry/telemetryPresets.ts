@@ -18,7 +18,6 @@ export type TelemetryChannelId =
   | 'accel-total'
   | 'slip-angle'
   | 'under-over-steer'
-  | 'tire-slip'
   | 'yaw-rate';
 
 export interface TelemetryChannelInfo {
@@ -251,17 +250,6 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     lineColor: '#fbbf24',
   },
   {
-    id: 'tire-slip',
-    name: 'Tire Slip & Lockup Index',
-    shortName: 'TIRE SLIP',
-    unit: '%',
-    category: 'dynamics',
-    isComputed: true,
-    description: 'Synthesized traction saturation and non-ABS / ABS wheel lockup detection',
-    badgeColor: 'text-red-400 bg-red-500/20',
-    lineColor: '#ef4444',
-  },
-  {
     id: 'yaw-rate',
     name: 'Yaw Angular Rate',
     shortName: 'YAW RATE',
@@ -289,21 +277,9 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
   },
   {
     id: 'wheels-suspension',
-    name: 'Suspension & Wheels',
+    name: 'Wheels & Tires',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'ride-height', 'wheel-speeds', 'tire-pressures', 'brake-temps'],
-  },
-  {
-    id: 'tires-wear',
-    name: 'Tires & Wear',
-    isBuiltIn: true,
-    channels: ['speed', 'delta', 'tire-wear', 'tire-pressures', 'tire-temps', 'brake-temps'],
-  },
-  {
-    id: 'thermals',
-    name: 'Brakes & Thermals',
-    isBuiltIn: true,
-    channels: ['speed', 'delta', 'brake-temps', 'tire-temps', 'tire-pressures', 'throttle', 'brake'],
+    channels: ['speed', 'delta', 'ride-height', 'wheel-speeds', 'tire-pressures', 'tire-wear', 'tire-temps', 'brake-temps'],
   },
   {
     id: 'g-forces',
@@ -313,21 +289,9 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
   },
   {
     id: 'handling',
-    name: 'Handling & Balance',
+    name: 'Handling & Line',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'steer', 'under-over-steer', 'slip-angle', 'accel-lat'],
-  },
-  {
-    id: 'tire-slip-limits',
-    name: 'Tire Slip & Limits',
-    isBuiltIn: true,
-    channels: ['speed', 'delta', 'tire-slip', 'accel-total', 'throttle', 'brake'],
-  },
-  {
-    id: 'dynamics',
-    name: 'Vehicle Dynamics & Line',
-    isBuiltIn: true,
-    channels: ['speed', 'delta', 'steer', 'lateral-offset', 'accel-lat', 'throttle', 'brake'],
+    channels: ['speed', 'delta', 'steer', 'lateral-offset', 'accel-lat', 'under-over-steer', 'slip-angle', 'throttle', 'brake'],
   },
   {
     id: 'all-channels',
@@ -353,7 +317,6 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'accel-total',
       'slip-angle',
       'under-over-steer',
-      'tire-slip',
       'yaw-rate',
     ],
   },
