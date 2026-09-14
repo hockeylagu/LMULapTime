@@ -193,6 +193,11 @@ function parseAndCacheFile(filePath: string): DetailedSession | null {
 // cache when the on-disk file hasn't changed; otherwise parses the .Vcr binary once
 // and persists the (brotli-compressed) result so subsequent requests skip the parse.
 function getCachedReplayMetadata(filePath: string, replayName: string, playerName?: string): ReplayMetadata {
+  if (!fs.existsSync(filePath)) {
+    const stored = sessionDb.getStoredReplayMetadata(replayName);
+    if (stored) return stored;
+    throw new Error(`Replay file and cached metadata not found: ${replayName}`);
+  }
   const stat = fs.statSync(filePath);
   const mtime = Math.floor(stat.mtimeMs);
   const cached = sessionDb.getReplayMetadataCache(replayName, mtime, stat.size);
@@ -231,15 +236,21 @@ function getCachedFullTrajectory(
   replayName: string,
   opts: { driverSlot?: number; driverName?: string; lapNumber?: number; playerName?: string }
 ): ReplayTrajectoryData {
-  const stat = fs.statSync(filePath);
-  const mtime = Math.floor(stat.mtimeMs);
-
   const resolvedSlot = typeof opts.driverSlot === 'number'
     ? opts.driverSlot
     : resolveDriverSlotFromMetadata(filePath, replayName, opts.driverName, opts.playerName);
 
   const driverSlotKey = typeof resolvedSlot === 'number' ? resolvedSlot : -1;
   const lapKey = typeof opts.lapNumber === 'number' ? opts.lapNumber : -1;
+
+  if (!fs.existsSync(filePath)) {
+    const stored = sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey);
+    if (stored) return stored;
+    throw new Error(`Replay file and cached trajectory not found: ${replayName}`);
+  }
+
+  const stat = fs.statSync(filePath);
+  const mtime = Math.floor(stat.mtimeMs);
 
   const cached = sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size);
   if (cached) return cached;
@@ -722,7 +733,7 @@ app.get('/api/replays/:name/metadata', (req, res) => {
     const replayName = req.params.name;
     const filePath = path.join(currentReplaysDir, replayName);
 
-    if (!fs.existsSync(filePath)) {
+    if (!fs.existsSync(filePath) && !sessionDb.getStoredReplayMetadata(replayName)) {
       return res.status(404).json({ error: `Replay file "${replayName}" not found` });
     }
 
@@ -820,7 +831,9 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
     const replayName = req.params.name;
     const filePath = path.join(currentReplaysDir, replayName);
 
-    if (!fs.existsSync(filePath)) {
+    const requestedDriverSlot = req.query.driverSlot ? parseInt(req.query.driverSlot as string, 10) : -1;
+    const requestedLapKey = req.query.lap ? parseInt(req.query.lap as string, 10) : -1;
+    if (!fs.existsSync(filePath) && !sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey)) {
       return res.status(404).json({ error: `Replay file "${replayName}" not found` });
     }
 
@@ -840,6 +853,7 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
 
     let matchedSession: DetailedSession | undefined = undefined;
     let matchedDriver: DriverData | undefined = undefined;
+    let duckdbUnavailableReason: string | undefined;
     try {
       const sessions = loadSessions();
       matchedSession = sessions.find(s => s.matchingReplayFile?.name === replayName);
@@ -879,6 +893,8 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
     });
     let trajectory = downsampleReplayTrajectory(fullTrajectory, maxPoints);
     trajectory.source = 'vcr';
+    trajectory.vcrRawPointsCount = fullTrajectory.rawPointsCount ?? fullTrajectory.points.length;
+    trajectory.vcrRawSampleRateHz = fullTrajectory.rawSampleRateHz;
 
     // If querying the main driver and a matched DuckDB telemetry file exists, fuse native 100 Hz channels
     try {
@@ -916,6 +932,8 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
             }
 
             if (duckLap) {
+              trajectory.duckdbRawPointsCount = duckLap.pointsCount;
+              trajectory.duckdbRawSampleRateHz = duckLap.sampleRateHz;
               const expectedLapTimeSec = targetLapTimeSec || fullTrajectory.laps?.find(l => l.lapNumber === chosenLapNum)?.lapTimeSec || (
                 fullTrajectory.points.length > 1
                   ? (fullTrajectory.points[fullTrajectory.points.length - 1].timeSec ?? 0) - (fullTrajectory.points[0].timeSec ?? 0)
@@ -927,8 +945,12 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
               if (isComplete) {
                 const fused = fuseDuckDbWithVcrTrajectory(duckLap, fullTrajectory, matchedDuck.filename);
                 trajectory = downsampleReplayTrajectory(fused, maxPoints);
+                trajectory.vcrRawPointsCount = fullTrajectory.rawPointsCount ?? fullTrajectory.points.length;
+                trajectory.vcrRawSampleRateHz = fullTrajectory.rawSampleRateHz;
+                trajectory.duckdbRawPointsCount = duckLap.pointsCount;
+                trajectory.duckdbRawSampleRateHz = duckLap.sampleRateHz;
               } else {
-                console.warn(`[DuckDB] DuckDB lap ${chosenLapNum} is incomplete (${duckLap.lapTimeSec}s vs expected ${expectedLapTimeSec}s). Falling back to VCR replay trajectory.`);
+                duckdbUnavailableReason = 'DuckDB telemetry is incomplete for this lap; using Native VCR data.';
               }
             }
           }
@@ -936,6 +958,11 @@ app.get('/api/replays/:name/trajectory', async (req, res) => {
       }
     } catch (duckErr) {
       console.warn(`[DuckDB] Error fusing DuckDB telemetry for ${replayName}:`, duckErr);
+    }
+
+    if (duckdbUnavailableReason) {
+      trajectory.duckdbAvailable = false;
+      trajectory.duckdbUnavailableReason = duckdbUnavailableReason;
     }
 
     // Validate replay against matched session log (decoupled validation layer)

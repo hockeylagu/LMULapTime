@@ -111,7 +111,11 @@ export function useReplayInspectorData({
 
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
-          setTrajectory(trajData);
+          setTrajectory(previous => ({
+            ...trajData,
+            duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,
+            duckdbRawSampleRateHz: trajData.duckdbRawSampleRateHz ?? previous?.duckdbRawSampleRateHz,
+          }));
           if (trajData.currentLap) onLapChange?.(trajData.currentLap);
           const pendingDriver = requestedDriverName ? metaData?.drivers?.find((d: ReplayDriverEntry) => d.name.toLowerCase() === requestedDriverName.toLowerCase()) : undefined;
           const defaultSlot = pendingDriver?.slot ?? trajData.driverSlot ??
@@ -283,7 +287,11 @@ export function useReplayInspectorData({
       .then((rawTrajData: ReplayTrajectoryData | null) => {
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
-          setTrajectory(trajData);
+          setTrajectory(previous => ({
+            ...trajData,
+            duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,
+            duckdbRawSampleRateHz: trajData.duckdbRawSampleRateHz ?? previous?.duckdbRawSampleRateHz,
+          }));
           if (trajData.currentLap) onLapChange?.(trajData.currentLap);
         }
         setIsTrajLoading(false);
@@ -403,5 +411,6 @@ export function useReplayInspectorData({
     selectedSource,
     handleSelectSource,
     hasDuckDbTelemetry: Boolean(metadata?.hasDuckDbTelemetry || trajectory?.duckdbFilename || trajectory?.source === 'duckdb'),
+    duckdbUnavailableReason: trajectory?.duckdbUnavailableReason,
   };
 }

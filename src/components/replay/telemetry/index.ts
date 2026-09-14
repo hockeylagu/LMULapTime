@@ -3,7 +3,6 @@ export * from './TelemetryStripToolbar.js';
 export * from './TelemetryStripCharts.js';
 export * from './TelemetrySpeedChannel.js';
 export * from './TelemetryPedalsChannel.js';
-export * from './TelemetrySteerGearChannel.js';
 export * from './TelemetryThrottleChannel.js';
 export * from './TelemetryBrakeChannel.js';
 export * from './TelemetryGearChannel.js';

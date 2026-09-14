@@ -33,11 +33,16 @@ export interface TelemetryStripChartsProps {
   onChangeResolution?: (res: number) => void;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
+  duckdbRawPointsCount?: number;
+  duckdbRawSampleRateHz?: number;
   isFullResolution?: boolean;
   selectedCornerMarkers?: SelectedCornerMarkers | null;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
   hasDuckDb?: boolean;
+  duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
@@ -45,8 +50,8 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   points, currentIndex, onSelectIndex, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
-  rawPointsCount, rawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
-  hasDuckDb, onSelectSource,
+  rawPointsCount, rawSampleRateHz, vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
+  hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -269,6 +274,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         onChangeResolution={onChangeResolution}
         rawPointsCount={rawPointsCount}
         rawSampleRateHz={rawSampleRateHz}
+        vcrRawPointsCount={vcrRawPointsCount}
+        vcrRawSampleRateHz={vcrRawSampleRateHz}
+        duckdbRawPointsCount={duckdbRawPointsCount}
+        duckdbRawSampleRateHz={duckdbRawSampleRateHz}
         isFullResolution={isFullResolution}
         currentTimeSec={currentTimeSec}
         totalFrames={points.length}
@@ -278,7 +287,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}
         onOpenManageModal={() => setIsPresetModalOpen(true)}
         source={source} duckdbFilename={duckdbFilename}
-        hasDuckDb={hasDuckDb} onSelectSource={onSelectSource}
+        hasDuckDb={hasDuckDb} duckdbUnavailableReason={duckdbUnavailableReason} onSelectSource={onSelectSource}
       />
 
       <TelemetryPresetModal

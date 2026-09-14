@@ -149,6 +149,16 @@ describe('SessionDatabase replay cache', () => {
     expect(cached?.drivers[0].name).toBe('Samuel Lague');
   });
 
+  it('retrieves stored replay data after the source file is deleted', () => {
+    const metadata = buildMetadata();
+    const trajectory = buildTrajectory();
+    db.upsertReplayMetadataCache('Deleted_Replay_P1.Vcr', metadata.filePath, 1000, 12345, metadata);
+    db.upsertReplayTrajectoryCache('Deleted_Replay_P1.Vcr', -1, -1, 1000, 12345, trajectory);
+
+    expect(db.getStoredReplayMetadata('Deleted_Replay_P1.Vcr')?.filename).toBe(metadata.filename);
+    expect(db.getStoredReplayTrajectory('Deleted_Replay_P1.Vcr', -1, -1)?.points).toHaveLength(3);
+  });
+
   it('invalidates replay metadata cache when mtime or size changes', () => {
     const metadata = buildMetadata();
     db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', metadata.filePath, 1000, 12345, metadata);

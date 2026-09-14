@@ -78,7 +78,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getAllByText(/85%/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders TelemetrySteerChannel with steering angle', () => {
+  it('renders TelemetrySteerChannel with steering input percentage', () => {
     render(
       <TelemetrySteerChannel
         steerPath="M 0 50 L 1000 50"
@@ -89,7 +89,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     );
 
     expect(screen.getByText(/STEERING/i)).toBeInTheDocument();
-    expect(screen.getByText(/12\.5°/i)).toBeInTheDocument();
+    expect(screen.getByText(/4\.6%/i)).toBeInTheDocument();
     expect(screen.getByText(/RIGHT/i)).toBeInTheDocument();
   });
 

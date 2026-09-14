@@ -39,6 +39,54 @@ describe('TelemetryResolutionPopover', () => {
     expect(screen.getByText(/Trade-off:/i)).toBeInTheDocument();
   });
 
+  it('shows separate VCR and DuckDB resolutions', () => {
+    render(
+      <TelemetryResolutionPopover
+        isOpen={true}
+        onClose={vi.fn()}
+        telemetryResolution={2400}
+        onChangeResolution={vi.fn()}
+        pointsCount={2400}
+        rawPointsCount={7200}
+        rawSampleRateHz={100}
+        vcrRawPointsCount={1800}
+        vcrRawSampleRateHz={30}
+        duckdbRawPointsCount={9600}
+        duckdbRawSampleRateHz={100}
+        source="duckdb"
+        hasDuckDb={true}
+        onSelectSource={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('1,800 pts @ 30 Hz')).toBeInTheDocument();
+    expect(screen.getByText('9,600 pts @ 100 Hz')).toBeInTheDocument();
+  });
+
+  it('disables DuckDB and explains an incomplete lap fallback', () => {
+    const onSelectSource = vi.fn();
+    render(
+      <TelemetryResolutionPopover
+        isOpen={true}
+        onClose={vi.fn()}
+        telemetryResolution={2400}
+        onChangeResolution={vi.fn()}
+        pointsCount={2400}
+        hasDuckDb={true}
+        source="vcr"
+        duckdbUnavailableReason="DuckDB telemetry is incomplete for this lap; using Native VCR data."
+        onSelectSource={onSelectSource}
+      />
+    );
+
+    const duckdbButton = screen.getByRole('button', { name: /100Hz DuckDB/i });
+    expect(duckdbButton).toBeDisabled();
+    expect(screen.getByText(/DuckDB telemetry is incomplete/i)).toBeInTheDocument();
+
+    fireEvent.click(duckdbButton);
+    expect(onSelectSource).not.toHaveBeenCalled();
+  });
+
   it('triggers onChangeResolution when selecting different resolution presets', () => {
     const handleChangeResolution = vi.fn();
     const handleClose = vi.fn();

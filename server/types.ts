@@ -769,6 +769,12 @@ export interface ReplayTrajectoryData {
   timingGates?: TrackTimingGates;
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
+  duckdbAvailable?: boolean;
+  duckdbUnavailableReason?: string;
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
+  duckdbRawPointsCount?: number;
+  duckdbRawSampleRateHz?: number;
   // Present only when the trajectory was extracted with `allLaps: true` - one fully
   // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
   allLapsData?: ReplayTrajectoryData[];
