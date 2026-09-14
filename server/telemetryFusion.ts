@@ -32,6 +32,21 @@ export function fuseDuckDbWithVcrTrajectory(
 
   let vcrIdx = 0;
 
+  const mapVcrFrameToDuckIndex = (vcrFrame: number): number => {
+    const vcrPoint = vcrPoints[Math.max(0, Math.min(vcrPoints.length - 1, vcrFrame))];
+    const targetTime = (vcrPoint?.timeSec ?? 0) - vcrBaseTime;
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < duckPoints.length; i++) {
+      const distance = Math.abs((duckPoints[i].timeSec ?? 0) - targetTime);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  };
+
   for (let i = 0; i < duckPoints.length; i++) {
     const dp = duckPoints[i];
     const t = dp.timeSec ?? 0;
@@ -92,5 +107,11 @@ export function fuseDuckDbWithVcrTrajectory(
     rawSampleRateHz: duckLap.sampleRateHz,
     isFullResolution: true,
     wheelTelemetryAvailable: Boolean(vcrTrajectory.wheelTelemetryAvailable || hasWheelData),
+    sectors: vcrTrajectory.sectors
+      ? {
+          s1Frame: mapVcrFrameToDuckIndex(vcrTrajectory.sectors.s1Frame),
+          s2Frame: mapVcrFrameToDuckIndex(vcrTrajectory.sectors.s2Frame),
+        }
+      : undefined,
   };
 }
