@@ -144,7 +144,7 @@ The field saturates at 1023, i.e. ~11,170 rpm, and would wrap silently above tha
 | :--- | :--- | :--- | :--- |
 | `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17: `inPit` (1 = in pit lane / garage) <br>• Bits 18..31: unidentified (**not** RPM) |
 | `4` | 4 bytes | UInt32LE | **`info2`**: <br>• Bits 0..9: `detachablePartState` (Bitmask of detached / damaged aero body parts) |
-| `4` | 2 bytes | UInt16LE | **`steer10`**: Steering wheel position: `(raw16 & 0x3FF)`, angle = `((steer10 - 512) / 512) * 540` deg |
+| `4` | 2 bytes | UInt16LE | **`steer10`**: Steering wheel position: `(raw16 & 0x3FF)`, angle = `((steer10 - 512) / 512) * 270` deg (540° lock-to-lock range, ±270°) |
 | `5` | 1 byte | UInt8 | **`rawThrottle`**: 8-bit throttle pedal position (1 = 0%, 249 = 100%) |
 | `6..7` | 10 bits | Bitfield | **`engineRpm`**: `(readUInt16LE(6) >>> 5) & 0x3FF`, rpm = `raw * 10.9228` |
 | `8..12` | 5 bytes | Binary | Speed / velocity vector info |

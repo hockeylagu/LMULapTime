@@ -223,7 +223,7 @@ describe('DuckDbReader', () => {
     expect(lapTelemetry).not.toBeNull();
     expect(lapTelemetry!.points.length).toBeGreaterThan(0);
     expect(lapTelemetry!.points[0].throttle).toBe(100);
-    expect(lapTelemetry!.points[0].steerYaw).toBe(-2.5);
+    expect(lapTelemetry!.points[0].steerYaw).toBe(-0.025);
     expect(lapTelemetry!.points[0].tirePressures).toBeDefined();
     expect(lapTelemetry!.points[0].tirePressures![0]).toBe(175);
     expect(typeof lapTelemetry!.points[0].tcActive).toBe('boolean');

@@ -394,9 +394,9 @@ export function computeTelemetryChartPaths(
     const by = 95 - brkNorm * 85;
     brk += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${by.toFixed(1)} `;
 
-    // Steering: -180 to +180 deg -> 10 to 90, center at 50
-    const st = Math.min(180, Math.max(-180, p.steerYaw || 0));
-    const sty = 50 + (st / 180) * 40;
+    // Steering: -270 to +270 deg -> 10 to 90, center at 50
+    const st = Math.min(270, Math.max(-270, p.steerYaw || 0));
+    const sty = 50 + (st / 270) * 40;
     str += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${sty.toFixed(1)} `;
 
     // Gear: 1 to 7 -> 95 to 15 in SVG Y
@@ -573,8 +573,8 @@ export function computeTelemetryChartPaths(
       const bby = 95 - bBrkNorm * 85;
       bBrk += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bby.toFixed(1)} `;
 
-      const bst = Math.min(180, Math.max(-180, bp.steerYaw || 0));
-      const bsty = 50 + (bst / 180) * 40;
+      const bst = Math.min(270, Math.max(-270, bp.steerYaw || 0));
+      const bsty = 50 + (bst / 270) * 40;
       bStr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bsty.toFixed(1)} `;
 
       const bGy = 95 - (bp.gear / 7) * 80;

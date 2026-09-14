@@ -606,7 +606,7 @@ export function extractReplayTrajectory(
 
               const raw16 = buf.readUInt16LE(eventSp + 5 + 4);
               const steer10 = raw16 & 0x3ff;
-              const steerYaw = Math.round(((steer10 - 512) / 512) * 540);
+              const steerYaw = parseFloat(((steer10 - 512) / 512).toFixed(4));
 
               // Byte 5 is the raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
               const rawThrByte = buf[eventSp + 5 + 5];
@@ -1339,12 +1339,7 @@ export function extractReplayTrajectory(
  */
 export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints: number | undefined): ReplayTrajectoryData {
   if (!maxPoints || maxPoints <= 0 || full.points.length <= maxPoints) {
-    return {
-      ...full,
-      isFullResolution: true,
-      pointsCount: full.points.length,
-      rawPointsCount: full.rawPointsCount || full.points.length,
-    };
+    return full;
   }
 
   const points = full.points;

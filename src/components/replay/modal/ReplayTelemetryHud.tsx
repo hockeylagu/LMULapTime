@@ -58,7 +58,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
         <span className="text-[9px] text-indigo-400 font-bold">STEER</span>
         <span className="text-xs font-black text-indigo-300 font-mono">
-          {Math.abs(currentPoint?.steerYaw ?? 0)}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
+          {Math.abs(Math.round(currentPoint?.steerYaw ?? 0))}° {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
         </span>
         <span className="text-[8px] text-lmu-muted">angle</span>
       </div>

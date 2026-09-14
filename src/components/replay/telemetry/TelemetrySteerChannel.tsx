@@ -50,6 +50,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
   ), [steerPath, baselineSteerPath]);
 
   const steerAngle = currentPoint?.steerYaw ?? 0;
+  const baseSteerAngle = currentComparison?.baseline.steerYaw ?? 0;
   const steerDir = steerAngle < -3 ? 'LEFT' : steerAngle > 3 ? 'RIGHT' : 'CENTER';
 
   return (
@@ -64,15 +65,15 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
         </span>
         {currentComparison && (
           <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
-            Base: {Math.abs(currentComparison.baseline.steerYaw).toFixed(1)}°
+            Base: {Math.abs(baseSteerAngle).toFixed(1)}°
           </span>
         )}
       </div>
 
       <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+180° R</div>
+        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+270° R</div>
         <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0° Center</div>
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-180° L</div>
+        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-270° L</div>
       </div>
 
       {chartSvg}
@@ -89,7 +90,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           </span>
           {currentComparison && (
             <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-              B: {currentComparison.baseline.steerYaw.toFixed(0)}°
+              B: {baseSteerAngle.toFixed(0)}°
             </span>
           )}
         </div>
