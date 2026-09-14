@@ -140,12 +140,34 @@ export class DuckDbReader {
       );
     }
 
+    let minGpsTime = lapEvents[0].ts;
+    if (await this.hasTable('GPS Time')) {
+      const firstGps = await this.queryAll<{ value: number }>('SELECT value FROM "GPS Time" LIMIT 1');
+      if (firstGps.length > 0 && typeof firstGps[0].value === 'number') {
+        minGpsTime = firstGps[0].value;
+      }
+    }
+
+    // Filter lap events to distinct lap number transitions, keeping the first event for each distinct value
+    const distinctEvents: Array<{ ts: number; value: number }> = [];
+    for (const evt of lapEvents) {
+      if (distinctEvents.length === 0 || evt.value !== distinctEvents[distinctEvents.length - 1].value) {
+        distinctEvents.push({ ...evt });
+      }
+    }
+
+    if (distinctEvents.length === 0) return [];
+
+    // If the first distinct event is value=0 (outlap in progress), start its timestamp at the beginning of session telemetry
+    if (distinctEvents[0].value === 0) {
+      distinctEvents[0].ts = Math.min(minGpsTime, distinctEvents[0].ts);
+    }
+
     const summaries: DuckDbLapSummary[] = [];
 
-    for (let i = 0; i < lapEvents.length; i++) {
-      const current = lapEvents[i];
-      const next = lapEvents[i + 1];
-      if (!next) break;
+    for (let i = 0; i < distinctEvents.length - 1; i++) {
+      const current = distinctEvents[i];
+      const next = distinctEvents[i + 1];
 
       const startTs = current.ts;
       const endTs = next.ts;
@@ -195,16 +217,16 @@ export class DuckDbReader {
           targetLap = l;
         }
       }
-      if (minDiff > 1.5) {
+      if (minDiff > 0.5) {
         targetLap = undefined;
       }
     }
 
-    if (!targetLap) {
+    if (!targetLap && (!targetLapTimeSec || targetLapTimeSec <= 0)) {
       targetLap = laps.find((l) => l.lapNumber === lapNumber);
-    }
-    if (!targetLap && laps[0]?.lapNumber === 0) {
-      targetLap = laps.find((l) => l.lapNumber === lapNumber - 1);
+      if (!targetLap && laps[0]?.lapNumber === 0) {
+        targetLap = laps.find((l) => l.lapNumber === lapNumber - 1);
+      }
     }
     if (!targetLap) return null;
 
@@ -529,13 +551,14 @@ export class DuckDbReader {
 
       const steerRow = getChannelRow(steerData, i);
       const rawSteer = steerRow?.value ?? 0;
+      const absSteer = Math.abs(rawSteer);
       let steerYaw = rawSteer;
-      if (steerUnit.includes('rad')) {
-        steerYaw = rawSteer / (1.5 * Math.PI);
-      } else if (steerUnit.includes('deg')) {
-        steerYaw = rawSteer / 270;
-      } else if (steerUnit.includes('%') || steerUnit.includes('percent') || Math.abs(rawSteer) > 1.01) {
+      if (steerUnit.includes('%') || steerUnit.includes('percent') || (absSteer > 1.01 && absSteer <= 100.0 && !steerUnit.includes('deg'))) {
         steerYaw = rawSteer / 100;
+      } else if (absSteer > 1.01 && steerUnit.includes('deg')) {
+        steerYaw = rawSteer / 270;
+      } else if (absSteer > 1.01 && steerUnit.includes('rad')) {
+        steerYaw = rawSteer / Math.PI;
       }
       steerYaw = parseFloat(Math.max(-1, Math.min(1, steerYaw)).toFixed(4));
 

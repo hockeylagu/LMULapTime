@@ -8,11 +8,11 @@ export function formatTime(seconds: number | string | null | undefined): string 
 }
 
 /**
- * Converts normalized steering ratio (-1.0 to +1.0) to wheel angle in degrees (default ±270°).
+ * Converts a raw steering ratio (-1.0 to +1.0) to wheel angle in degrees (default ±270°).
  */
 export function getSteerAngleDeg(steerYaw: number | undefined | null, maxLockDeg = 270): number {
   if (steerYaw === undefined || steerYaw === null) return 0;
-  return parseFloat((steerYaw * maxLockDeg).toFixed(2));
+  return parseFloat((steerYaw * maxLockDeg).toFixed(1));
 }
 
 export function formatElapsedSeconds(seconds: number | string | null | undefined): string {
