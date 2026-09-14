@@ -13,8 +13,13 @@ import {
   TelemetryTirePressuresChannel,
   TelemetryTireWearChannel,
   TelemetryTireTempsChannel,
+  TelemetryAccelLatChannel,
+  TelemetryAccelLonChannel,
+  TelemetryAccelTotalChannel,
 } from '../../src/components/replay/telemetry/index.js';
 import { ReplayTrajectoryPoint } from '../../server/types.js';
+import { computeTelemetryChartPaths } from '../../src/components/replay/telemetry/telemetryChartPaths.js';
+import { TelemetryChannelRenderer } from '../../src/components/replay/telemetry/TelemetryChannelRenderer.js';
 
 describe('Authentic VCR Telemetry Channels', () => {
   const mockPoint: ReplayTrajectoryPoint = {
@@ -241,6 +246,74 @@ describe('Authentic VCR Telemetry Channels', () => {
 });
 
 describe('TelemetryChannelRenderer & Preset Rows', () => {
+  it('hides the computed badge for native DuckDB G channels and keeps it for VCR', () => {
+    const point = { ...mockPoint, accelLatG: 1.2, accelLonG: -0.4, accelTotalG: 1.3 };
+    const shared = { currentPoint: point, currentComparison: null, isCursorInView: false, cursorPct: 50 };
+
+    const { rerender } = render(<TelemetryAccelLatChannel accelLatPath="M 0 50" {...shared} source="duckdb" />);
+    expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
+    rerender(<TelemetryAccelLonChannel accelLonPath="M 0 50" {...shared} source="vcr" />);
+    expect(screen.getByText('COMPUTED')).toBeInTheDocument();
+    rerender(<TelemetryAccelTotalChannel accelTotalPath="M 0 50" {...shared} source="duckdb" />);
+    expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
+  });
+
+  it('passes native acceleration telemetry through the channel renderer', () => {
+    const point = { ...mockPoint, accelLatG: 1.2 };
+    const paths = computeTelemetryChartPaths([], [], 0, 0);
+
+    render(
+      <TelemetryChannelRenderer
+        channelId="accel-lat"
+        currentPoint={point}
+        pointComparisons={[]}
+        paths={paths}
+        isCursorInView={true}
+        cursorPct={50}
+        source="duckdb"
+      />
+    );
+
+    expect(screen.getAllByText('+1.20 G R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
+  });
+
+  it('renders canonical signs and labels for every acceleration channel', () => {
+    const point = {
+      ...mockPoint,
+      accelLatG: 1.2,
+      accelLonG: -0.4,
+      accelTotalG: 1.3,
+    };
+    const paths = computeTelemetryChartPaths([], [], 0, 0);
+    const shared = {
+      currentPoint: point,
+      currentComparison: null,
+      pointComparisons: [],
+      paths,
+      isCursorInView: true,
+      cursorPct: 50,
+    };
+
+    const { rerender } = render(
+      <TelemetryChannelRenderer channelId="accel-lat" source="duckdb" {...shared} />
+    );
+    expect(screen.getAllByText('+1.20 G R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
+
+    rerender(
+      <TelemetryChannelRenderer channelId="accel-lon" source="vcr" {...shared} />
+    );
+    expect(screen.getAllByText('-0.40 G Braking').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('COMPUTED').length).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <TelemetryChannelRenderer channelId="accel-total" source="duckdb" {...shared} />
+    );
+    expect(screen.getAllByText('1.30 G Resultant').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
+  });
+
   const mockPoint: ReplayTrajectoryPoint = {
     x: 0,
     y: 0,

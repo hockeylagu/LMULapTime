@@ -16,6 +16,22 @@ export interface DuckDbSessionMetadata {
   [key: string]: string | undefined;
 }
 
+/**
+ * Maps LMU's exported G-force labels and signs to the application's canonical vehicle axes:
+ * lateral positive right, longitudinal positive power and negative braking.
+ */
+export function normalizeDuckDbGForces(
+  exportedLatG: number | undefined,
+  exportedLongG: number | undefined
+): { accelLatG: number | undefined; accelLonG: number | undefined; accelTotalG: number | undefined } {
+  const accelLatG = exportedLongG;
+  const accelLonG = exportedLatG !== undefined ? -exportedLatG : undefined;
+  const accelTotalG = accelLatG !== undefined && accelLonG !== undefined
+    ? parseFloat(Math.hypot(accelLatG, accelLonG).toFixed(2))
+    : undefined;
+  return { accelLatG, accelLonG, accelTotalG };
+}
+
 export class DuckDbReader {
   private db: duckdb.Database | null = null;
   private filePath: string;
@@ -302,6 +318,9 @@ export class DuckDbReader {
       ? 'RPM'
       : null;
 
+    const gForceLatTable = (await this.hasTable('G Force Lat')) ? 'G Force Lat' : null;
+    const gForceLongTable = (await this.hasTable('G Force Long')) ? 'G Force Long' : null;
+
     const rideHeightTable = (await this.hasTable('RideHeights')) ? 'RideHeights' : null;
     const frontRideHeightTable = (await this.hasTable('FrontRideHeight')) ? 'FrontRideHeight' : null;
     const rearRideHeightTable = (await this.hasTable('RearRideHeight')) ? 'RearRideHeight' : null;
@@ -385,6 +404,8 @@ export class DuckDbReader {
       brakeData,
       steerData,
       rpmData,
+      gForceLatData,
+      gForceLongData,
       rideHeightData,
       frontRideHeightData,
       rearRideHeightData,
@@ -405,6 +426,8 @@ export class DuckDbReader {
       fetchContinuousChannel<{ value: number }>(brakeTable, 'value', 50),
       fetchContinuousChannel<{ value: number }>(steerTable, 'value', declaredHz),
       fetchContinuousChannel<{ value: number }>(rpmTable, 'value', declaredHz),
+      fetchContinuousChannel<{ value: number }>(gForceLatTable, 'value', 10),
+      fetchContinuousChannel<{ value: number }>(gForceLongTable, 'value', 10),
       fetchContinuousChannel<{ value1: number; value2: number; value3: number; value4: number }>(
         rideHeightTable,
         'value1, value2, value3, value4',
@@ -574,6 +597,10 @@ export class DuckDbReader {
 
       const rpmRow = getChannelRow(rpmData, i);
       const engineRpm = rpmRow?.value ?? 0;
+      const nativeG = normalizeDuckDbGForces(
+        getChannelRow(gForceLatData, i)?.value,
+        getChannelRow(gForceLongData, i)?.value
+      );
 
       const rideHeightRow = getChannelRow(rideHeightData, i);
       const frontRideHeight = getChannelRow(frontRideHeightData, i)?.value;
@@ -643,6 +670,7 @@ export class DuckDbReader {
         absActive: currentAbs,
         tcActive: currentTc,
         engineRpm: Math.round(engineRpm),
+        ...nativeG,
         rideHeight,
         tirePressures,
         wheelSpeeds,
