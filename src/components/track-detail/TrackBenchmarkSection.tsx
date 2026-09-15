@@ -28,7 +28,7 @@ export const TrackBenchmarkSection: React.FC<TrackBenchmarkSectionProps> = ({ cu
         </div>
       ) : (
         <div className="py-8 text-center text-lmu-muted">
-          No reference benchmarks found for this track. Update reference laptimes in Settings.
+            No reference benchmarks found for this track. Update reference lap time benchmarks in Settings.
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, Trophy, Sparkles, Award, RotateCcw } from 'lucide-react';
+import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2 } from 'lucide-react';
 import { formatTime } from '../../utils/formatters';
 import { ComparableLap } from '../../utils/lapComparison';
 
@@ -36,15 +36,15 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30 flex items-center gap-1">
             <ArrowLeftRight className="w-3.5 h-3.5" />
-            Telemetry Studio
+            Compare Laps
           </span>
           <span className="text-xs text-lmu-muted">Apples-to-Apples Sector & Speed Analysis</span>
         </div>
         <h2 className="text-2xl font-extrabold text-white mt-1 flex items-center gap-2">
-          Multi-Lap & Cross-Session Comparator
+          Compare Laps
         </h2>
         <p className="text-xs text-lmu-muted mt-0.5">
-          Compare any lap against Session Bests, Driver All-Time PBs, Theoretical Optimal Sectors, and Alien Reference Targets.
+          Compare laps across sessions using session bests, personal bests, theoretical sectors, and reference targets.
         </p>
       </div>
 
@@ -92,7 +92,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
             onClick={onClearAll}
             className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-rose-950/40 border border-lmu-border hover:border-rose-500/40 text-xs text-lmu-muted hover:text-rose-400 font-semibold transition-all flex items-center gap-1 cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5" />
             Clear
           </button>
         )}

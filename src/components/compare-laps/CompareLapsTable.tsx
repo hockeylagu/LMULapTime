@@ -1,8 +1,9 @@
 import React from 'react';
-import { Gauge, FilterX, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Gauge, ChevronDown, ChevronUp } from 'lucide-react';
 import { ComparableLap } from '../../utils/lapComparison';
 import { AvailableLapsSortOption } from './useCompareLapsData';
 import { CompareLapsTableRow } from './CompareLapsTableRow';
+import { HideEmptyToggle, SortDropdown } from '../common/index.js';
 
 export interface CompareLapsTableProps {
   selectedTrack: string;
@@ -58,55 +59,30 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setHideEmpty(!hideEmpty)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              hideEmpty
-                ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
-                : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-            }`}
-            title={
-              hideEmpty
-                ? 'Hiding invalid, pit stop, and empty laps. Click to show all.'
-                : 'Showing all laps including invalid/pit stops. Click to filter out empty results.'
-            }
-          >
-            <FilterX className="w-3.5 h-3.5" />
-            <span>Hide Empty Laps</span>
-            {emptyCount > 0 && (
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                  hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
-                }`}
-              >
-                {emptyCount}
-              </span>
-            )}
-          </button>
+          <HideEmptyToggle
+            hideEmpty={hideEmpty}
+            onToggle={setHideEmpty}
+            emptyCount={emptyCount}
+            label="Hide Empty Laps"
+            titleHiding="Hiding invalid, pit stop, and empty laps. Click to show all."
+            titleShowing="Showing all laps including invalid/pit stops. Click to filter out empty laps."
+          />
 
-          <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-2.5 py-1">
-            <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
-            <label htmlFor="sort-laps-select" className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider">
-              Order:
-            </label>
-            <select
-              id="sort-laps-select"
-              value={availableLapsSort}
-              onChange={(e) => setAvailableLapsSort(e.target.value as AvailableLapsSortOption)}
-              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="lap-asc" className="bg-lmu-card text-white">⚡ Best Lap Time (Fastest First)</option>
-              <option value="lap-desc" className="bg-lmu-card text-white">🐢 Slowest Lap Time</option>
-              <option value="date-desc" className="bg-lmu-card text-white">🕒 Most Recent Session (Last)</option>
-              <option value="date-asc" className="bg-lmu-card text-white">📅 Oldest Session First</option>
-              <option value="speed-desc" className="bg-lmu-card text-white">🚀 Highest Top Speed</option>
-              <option value="s1-asc" className="bg-lmu-card text-white">⏱️ Best Sector 1 (S1)</option>
-              <option value="s2-asc" className="bg-lmu-card text-white">⏱️ Best Sector 2 (S2)</option>
-              <option value="s3-asc" className="bg-lmu-card text-white">⏱️ Best Sector 3 (S3)</option>
-              <option value="pace-asc" className="bg-lmu-card text-white">🏆 Benchmark Pace %</option>
-            </select>
-          </div>
+          <SortDropdown<AvailableLapsSortOption>
+            value={availableLapsSort}
+            onChange={setAvailableLapsSort}
+            options={[
+              { value: 'lap-asc', label: 'Best Lap Time (Fastest First)' },
+              { value: 'lap-desc', label: 'Slowest Lap Time' },
+              { value: 'date-desc', label: 'Most Recent Session (Last)' },
+              { value: 'date-asc', label: 'Oldest Session First' },
+              { value: 'speed-desc', label: 'Highest Top Speed' },
+              { value: 's1-asc', label: 'Best Sector 1 (S1)' },
+              { value: 's2-asc', label: 'Best Sector 2 (S2)' },
+              { value: 's3-asc', label: 'Best Sector 3 (S3)' },
+              { value: 'pace-asc', label: 'Benchmark Pace %' },
+            ]}
+          />
         </div>
       </div>
 

@@ -174,8 +174,7 @@ describe('CompareLaps component', () => {
   it('renders CompareLaps studio with title and filter controls', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
-    expect(screen.getByText('Multi-Lap & Cross-Session Comparator')).toBeInTheDocument();
-    expect(screen.getByText('Telemetry Studio')).toBeInTheDocument();
+    expect(screen.getAllByText('Compare Laps').length).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
@@ -258,10 +257,10 @@ describe('CompareLaps component', () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Order:/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Sort:/i)).toBeInTheDocument();
     });
 
-    const sortSelect = screen.getByLabelText(/Order:/i) as HTMLSelectElement;
+    const sortSelect = screen.getByLabelText(/Sort:/i) as HTMLSelectElement;
     expect(sortSelect.value).toBe('lap-asc');
 
     // Change to Most Recent (Last)

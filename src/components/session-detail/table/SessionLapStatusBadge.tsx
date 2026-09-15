@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flag } from 'lucide-react';
+import { AlertTriangle, Ban, Flag, ShieldAlert } from 'lucide-react';
 import { LapData } from '../../../../server/core/types';
 import { LapStatusBadge } from '../../common/index.js';
 import {
@@ -60,25 +60,25 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       {hasLapIncidents && (
         <span
           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-help"
-          title={l.incidents?.map((i) => `💥 ${i.description}`).join('\n')}
+          title={l.incidents?.map((i) => i.description).join('\n')}
         >
-          💥 {l.incidentCount}
+          <ShieldAlert className="w-3 h-3" /> {l.incidentCount}
         </span>
       )}
       {hasLapTrackLimits && (
         <span
           className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-help ${tlBadgeClass}`}
-          title={l.trackLimits?.map((tl) => `⚠️ ${tl.description}`).join('\n')}
+          title={l.trackLimits?.map((tl) => tl.description).join('\n')}
         >
-          ⚠️ {l.trackLimitCount}
+          <AlertTriangle className="w-3 h-3" /> {l.trackLimitCount}
         </span>
       )}
       {hasLapPenalties && (
         <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40 cursor-help"
-          title={l.penalties?.map((p) => `🛑 ${p.description}`).join('\n')}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-help"
+          title={l.penalties?.map((p) => p.description).join('\n')}
         >
-          🛑 {l.penalties?.[0]?.penalty || 'Pen'}
+          <Ban className="w-3 h-3" /> {l.penalties?.[0]?.penalty || 'Pen'}
         </span>
       )}
     </div>

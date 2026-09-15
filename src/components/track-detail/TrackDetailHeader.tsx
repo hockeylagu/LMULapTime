@@ -61,10 +61,10 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
             navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
           }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-accent transition-all"
-          title="Compare laps on this circuit"
+          title="Compare laps on this track"
         >
           <ArrowLeftRight className="w-4 h-4 text-lmu-gold" />
-          Compare Laps on Circuit
+          Compare Laps
         </button>
       </div>
 
@@ -158,7 +158,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
           </div>
         ) : (
           <div className="pt-3 border-t border-lmu-border/50 py-3 text-center text-xs text-lmu-muted">
-            No reference benchmarks found for this track. Update reference laptimes in Settings.
+            No reference benchmarks found for this track. Update reference lap time benchmarks in Settings.
           </div>
         )}
       </div>

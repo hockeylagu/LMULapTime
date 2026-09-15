@@ -89,7 +89,7 @@ const PickerBody: React.FC<ReplayCompareLapPickerProps> = ({
         onChange={event => setOrder(event.target.value as typeof order)}
         className="bg-lmu-bg border border-lmu-border rounded-md px-2 py-1 text-[10px] font-bold text-white"
       >
-        <option value="lap-asc">Best lap</option>
+        <option value="lap-asc">Best Lap</option>
         <option value="date-desc">Most recent</option>
         <option value="driver-asc">Driver</option>
       </select>

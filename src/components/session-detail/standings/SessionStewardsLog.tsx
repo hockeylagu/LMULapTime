@@ -1,3 +1,4 @@
+import { AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
 import { DriverData } from '../../../../server/core/types';
 import { formatElapsedSeconds } from '../../../utils/formatters.js';
 import {
@@ -42,7 +43,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         kind: 'incident',
         et: inc.elapsedSeconds,
         description: inc.description,
-        badge: inc.isWallImpact ? '🧱 Wall Contact' : inc.type === 'damage' ? '🔧 Damage' : '💥 Collision',
+        badge: inc.isWallImpact ? 'Wall Contact' : inc.type === 'damage' ? 'Damage' : 'Collision',
         badgeClass: inc.isWallImpact
           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
           : inc.type === 'damage'
@@ -58,7 +59,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         kind: 'trackLimit',
         et: tl.elapsedSeconds,
         description: tl.description,
-        badge: '⚠️ Track Limit',
+        badge: 'Track Limit',
         badgeClass: getTrackLimitBadgeClasses(severity),
         lapNum: l.lapNum,
       });
@@ -68,8 +69,8 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         kind: 'penalty',
         et: pen.elapsedSeconds,
         description: pen.description,
-        badge: `🛑 ${pen.penalty}`,
-        badgeClass: 'bg-lmu-accent/20 text-lmu-accent border-lmu-accent/40',
+        badge: pen.penalty,
+        badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
         lapNum: l.lapNum,
       });
     });
@@ -82,7 +83,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         kind: 'trackLimit',
         et: tl.elapsedSeconds,
         description: tl.description,
-        badge: '⚠️ Track Limit',
+        badge: 'Track Limit',
         badgeClass: getTrackLimitBadgeClasses(severity),
         lapNum: tl.lapNum,
       });
@@ -98,14 +99,14 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         className="flex items-center justify-between cursor-pointer group select-none"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-base">💥</span>
+          <ShieldAlert className="w-4 h-4 text-rose-300" />
           <h3 className="text-sm font-bold text-white uppercase tracking-wider group-hover:text-lmu-gold transition-colors">
             Incidents & Stewards Log ({selectedDriver.name})
           </h3>
           <div className="flex items-center gap-1.5 ml-2 flex-wrap">
             {hasIncidents && (
               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                💥 {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}
+                <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}</span>
               </span>
             )}
             {hasTrackLimits && (() => {
@@ -116,13 +117,13 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
               const badgeClass = getTrackLimitBadgeClasses(tlSeverity);
               return (
                 <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}`}>
-                  ⚠️ {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}
+                  <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}</span>
                 </span>
               );
             })()}
             {hasPenalties && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40">
-                🛑 {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}
+              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}</span>
               </span>
             )}
           </div>
@@ -138,7 +139,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
             <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${evt.badgeClass}`}>
-                  {evt.badge}
+                  {evt.kind === 'incident' ? <ShieldAlert className="w-3 h-3" /> : evt.kind === 'trackLimit' ? <AlertTriangle className="w-3 h-3" /> : <Ban className="w-3 h-3" />} {evt.badge}
                 </span>
                 <span className="font-mono text-lmu-gold text-xs shrink-0">
                   {evt.lapNum ? `Lap ${evt.lapNum}` : '-'}

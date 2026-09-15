@@ -81,7 +81,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
           hideEmpty={hideEmpty}
           onToggle={setHideEmpty}
           emptyCount={emptyCount}
-          label="Hide Empty Results"
+          label="Hide Empty Sessions"
         />
 
         {/* Sort Dropdown (Date / Benchmark Pace) */}

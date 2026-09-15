@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Ban, ShieldAlert, ShieldCheck, Trophy } from 'lucide-react';
 import { DetailedSession } from '../../../../server/core/types';
 import { formatElapsedSeconds } from '../../../utils/formatters.js';
 import {
@@ -201,7 +201,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-950/70 text-rose-300 border border-rose-500/40 cursor-help"
                             title={tooltip}
                           >
-                            <span>🛑 {penCount} Pen</span>
+                            <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {penCount} Pen</span>
                             {incCount > 0 && (
                               <span className="text-[10px] text-rose-200/70 font-mono">({incCount}x)</span>
                             )}
@@ -221,7 +221,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-950/60 text-orange-300 border border-orange-500/30 cursor-help"
                             title={tooltip}
                           >
-                            <span>💥 {incCount}x</span>
+                            <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {incCount}x</span>
                             {tlCount > 0 && (
                               <span
                                 className={`text-[10px] font-mono ${
@@ -244,7 +244,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border cursor-help ${tlPillClass}`}
                           title={tooltip}
                         >
-                          <span>⚠️ {tlCount} TL</span>
+                          <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {tlCount} TL</span>
                         </span>
                       );
                     })()}

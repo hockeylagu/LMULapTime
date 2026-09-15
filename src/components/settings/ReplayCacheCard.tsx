@@ -63,7 +63,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
           <Film className="w-5 h-5 text-lmu-accent" />
-          <h3 className="text-base font-bold text-white uppercase tracking-wider">Cached Replays (.Vcr)</h3>
+          <h3 className="text-base font-bold text-white uppercase tracking-wider">Cached Replays (.VCR)</h3>
         </div>
         <div className="flex items-center gap-2">
           <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30">
@@ -82,7 +82,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
       </div>
 
       <p className="text-xs text-lmu-muted leading-relaxed">
-        Replay metadata, drivers, laps and full-resolution telemetry are parsed once and cached in SQLite (brotli-compressed) during each session scan, so they stay available even after LMU deletes the original .Vcr file.
+        Replay metadata, drivers, laps and full-resolution telemetry are parsed once and cached in SQLite (brotli-compressed) during each session scan, so they stay available even after LMU deletes the original .VCR file.
       </p>
 
       {isReplayScanRunning && (
