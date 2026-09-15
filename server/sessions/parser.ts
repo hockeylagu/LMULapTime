@@ -655,9 +655,6 @@ export class LmuParser {
       ? Math.floor(100 / avgVePerLap)
       : null;
 
-    // Completed laps (valid or not, but completed with recorded lap time)
-    const completedLaps = laps.filter(l => l.lapTime !== null && l.lapTime > 0);
-
     // Starting Grid, Finish Position & Position Deltas
     const parsedGrid = parseInt(String(d.GridPos ?? d.GridPosition ?? d.QualPosition ?? d.Grid ?? ''), 10);
     const gridPosition: number | null = !isNaN(parsedGrid) && parsedGrid > 0
@@ -737,7 +734,7 @@ export class LmuParser {
       avgVePerLap,
       estVeStintLaps,
       top3LapsCount,
-      lapsCount: completedLaps.length,
+      lapsCount: laps.length,
       totalIncidents: 0,
       totalTrackLimits: 0,
       totalPenalties: 0,

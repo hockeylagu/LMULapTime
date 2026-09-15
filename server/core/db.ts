@@ -935,7 +935,7 @@ export class SessionDatabase {
       };
     }
 
-    const DB_PARSER_VERSION = '2.9_replay_match_session_scoped';
+    const DB_PARSER_VERSION = '2.10_laps_count_includes_all_records';
     const cachedVersion = this.getMetadata('parser_version');
     const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
     if (versionMismatch) {
