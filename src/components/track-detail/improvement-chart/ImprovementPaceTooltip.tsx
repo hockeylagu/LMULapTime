@@ -1,16 +1,19 @@
 import React from 'react';
 import { formatTime } from '../../../utils/formatters.js';
+import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementTooltipPayloadEntry } from './ImprovementPaceChart.js';
 
 export interface ImprovementPaceTooltipProps {
   active?: boolean;
   payload?: ImprovementTooltipPayloadEntry[];
+  metric: ImprovementMetric;
   onSelectSession?: (sessionId: string) => void;
 }
 
 export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
   active,
   payload,
+  metric,
   onSelectSession,
 }) => {
   if (!active || !payload || !payload.length) return null;
@@ -49,7 +52,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
           {uniqueEntries.map((entry, index: number) => (
             <div key={`item-${index}`} className="flex items-center justify-between text-xs font-mono">
               <span style={{ color: entry.color }} className="font-sans font-medium text-[11px]">
-                {entry.name}:
+                {entry.name === 'Personal Best Over Time' ? 'PR' : entry.name}:
               </span>
               <span className="font-bold text-white">
                 {entry.dataKey === 'consistencyScore'
@@ -62,20 +65,36 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
       )}
 
       <div className="flex items-center gap-2 flex-wrap pt-1 text-[10px] text-lmu-muted border-t border-lmu-border/40 font-mono">
-        {data.top3AvgStr && (
-          <span title="Average of 3 fastest valid laps in session">
-            Top 3: <strong className="text-cyan-300 font-mono">{data.top3AvgStr}</strong>
-          </span>
-        )}
-        {data.theoreticalGap !== null && (
-          <span title="Gap between actual PB and theoretical best">
-            Opt Gap: <strong className="text-emerald-300 font-mono">+{data.theoreticalGap.toFixed(3)}s</strong>
-          </span>
-        )}
-        {data.consistencyScore !== null && (
-          <span title="Pace consistency rating">
-            Consist: <strong className="text-emerald-300 font-mono">{data.consistencyScore.toFixed(1)}%</strong>
-          </span>
+        {metric === 'bestPr' ? (
+          <>
+            <span>
+              Benchmark: <strong className="text-emerald-300 font-mono">{data.benchmarkPercentage !== null ? `${data.benchmarkPercentage.toFixed(1)}%` : '--'}</strong>
+            </span>
+            <span>
+              From Lap PR:{' '}
+              <strong className={`${data.lapPrDelta !== null && data.lapPrDelta < 0 ? 'text-emerald-300' : 'text-lmu-muted'} font-mono`}>
+                {data.lapPrDelta !== null && data.lapPrDelta < 0 ? `${data.lapPrDelta.toFixed(3)}s` : '—'}
+              </strong>
+            </span>
+          </>
+        ) : (
+          <>
+            {data.top3AvgStr && (
+              <span title="Average of 3 fastest valid laps in session">
+                Top 3: <strong className="text-cyan-300 font-mono">{data.top3AvgStr}</strong>
+              </span>
+            )}
+            {data.theoreticalGap !== null && (
+              <span title="Gap between actual PB and theoretical best">
+                Opt Gap: <strong className="text-emerald-300 font-mono">+{data.theoreticalGap.toFixed(3)}s</strong>
+              </span>
+            )}
+            {data.consistencyScore !== null && (
+              <span title="Pace consistency rating">
+                Consist: <strong className="text-emerald-300 font-mono">{data.consistencyScore.toFixed(1)}%</strong>
+              </span>
+            )}
+          </>
         )}
       </div>
 

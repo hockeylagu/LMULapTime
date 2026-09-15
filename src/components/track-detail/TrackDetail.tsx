@@ -219,7 +219,18 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     return compareSessions(a, b, 'desc');
   });
 
-  const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression);
+  const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression).map((point) => {
+    const paceInfo = getPaceCategoryForLap(
+      point.bestLapTime,
+      findBenchmarkForClass(point.carClass, point.carType)
+    );
+
+    return {
+      ...point,
+      benchmarkCategory: paceInfo?.category ?? null,
+      benchmarkPercentage: paceInfo?.percentage ?? null,
+    };
+  });
 
   const bestLapSec = bestLapSession?.playerDriver?.bestLapTime || null;
 

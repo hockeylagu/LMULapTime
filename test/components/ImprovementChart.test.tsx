@@ -1,8 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ImprovementChart } from '../../src/components/track-detail/improvement-chart/index.js';
+import { buildPersonalBestSeries, calculateLapPrDelta, ImprovementChart } from '../../src/components/track-detail/improvement-chart/index.js';
 
 describe('ImprovementChart component', () => {
+  it('builds a personal-best series that never increases over time', () => {
+    expect(buildPersonalBestSeries([122, 124, 121, null, 123, 119])).toEqual([122, 122, 121, 121, 121, 119]);
+  });
+
+  it('calculates PR improvement against the previous personal best', () => {
+    expect(calculateLapPrDelta(121.5, 121.575)).toBe(-0.075);
+    expect(calculateLapPrDelta(121.8, 121.575)).toBe(0.225);
+  });
+
   const mockProgressionData = [
     {
       sessionId: 'sess1',
@@ -67,8 +76,8 @@ describe('ImprovementChart component', () => {
     expect(screen.getByText('Top 3 Lap True Pace')).toBeInTheDocument();
 
     // Switch metrics
-    const theoreticalBtn = screen.getByRole('button', { name: /theoretical/i });
-    fireEvent.click(theoreticalBtn);
+    const personalBestBtn = screen.getByRole('button', { name: /personal best over time/i });
+    fireEvent.click(personalBestBtn);
 
     const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
     fireEvent.click(sectorsBtn);

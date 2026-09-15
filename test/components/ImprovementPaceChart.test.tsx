@@ -16,6 +16,10 @@ describe('ImprovementPaceChart legend toggle', () => {
       top3AvgStr: '2:03.000',
       movingAvg: 122.5,
       avgLap: 124.0,
+      bestPr: 122.0,
+      lapPrDelta: 0,
+      personalBestImproved: true,
+      benchmarkPercentage: 101.2,
       theoretical: 121.5,
       theoreticalGap: 0.5,
       consistencyScore: 94.5,
@@ -39,6 +43,10 @@ describe('ImprovementPaceChart legend toggle', () => {
       top3AvgStr: '2:02.000',
       movingAvg: 121.5,
       avgLap: 123.0,
+      bestPr: 121.0,
+      lapPrDelta: 0,
+      personalBestImproved: true,
+      benchmarkPercentage: 102.1,
       theoretical: 120.8,
       theoreticalGap: 0.2,
       consistencyScore: 96.0,
@@ -125,11 +133,11 @@ describe('ImprovementPaceChart legend toggle', () => {
     expect(s2Item.className).toContain('line-through');
   });
 
-  it('allows toggling series in theoretical and consistency metrics', () => {
+  it('allows toggling series in personal-best and consistency metrics', () => {
     const { rerender } = render(
       <ImprovementPaceChart
         chartData={samplePoints}
-        metric="theoretical"
+        metric="bestPr"
         minTime={120}
         maxTime={125}
         activeTrack="Spa"
@@ -141,10 +149,10 @@ describe('ImprovementPaceChart legend toggle', () => {
       />
     );
 
-    const theoItem = screen.getByTitle('Click to toggle Theoretical Best (S1+S2+S3) visibility');
-    expect(theoItem).toBeInTheDocument();
-    fireEvent.click(theoItem);
-    expect(theoItem.className).toContain('line-through');
+    const personalBestItem = screen.getByTitle('Click to toggle Personal Best Over Time visibility');
+    expect(personalBestItem).toBeInTheDocument();
+    fireEvent.click(personalBestItem);
+    expect(personalBestItem.className).toContain('line-through');
 
     rerender(
       <ImprovementPaceChart
