@@ -1,9 +1,45 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { Clock, ArrowLeftRight } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { ArrowDown, ArrowLeftRight, ArrowUp, Clock } from 'lucide-react';
+import { DetailedSession, DriverData, LapData } from '../../../../server/core/types';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
+import { computeLapToLapDelta } from '../../../utils/lapComparison.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
+
+type SortableLapColumn = 'lap' | 'position' | 'lapTime' | 'delta' | 'prevDelta' | 's1' | 's2' | 's3' | 'topSpeed';
+
+interface LapTableEntry {
+  lap: LapData;
+  prevLap: LapData | null;
+  originalIndex: number;
+}
+
+function getDisplayLapTime(lap: LapData, prevLap: LapData | null, bestLap: number | null): number | null {
+  if (lap.lapTime !== null && lap.lapTime > 0) return lap.lapTime;
+  if (lap.elapsedSeconds === null || lap.elapsedSeconds === undefined || prevLap?.elapsedSeconds === null || prevLap?.elapsedSeconds === undefined) {
+    return null;
+  }
+
+  const deltaEt = parseFloat((lap.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
+  const knownSectors = (lap.s1 || 0) + (lap.s2 || 0) + (lap.s3 || 0);
+  const maxAllowed = bestLap ? Math.max(bestLap * 3.5, 300) : 600;
+  return deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed
+    ? deltaEt
+    : null;
+}
+
+function getLapSortValue(entry: LapTableEntry, column: SortableLapColumn, bestLap: number | null): number | null {
+  const displayLapTime = getDisplayLapTime(entry.lap, entry.prevLap, bestLap);
+  if (column === 'lap') return entry.lap.lapNum;
+  if (column === 'position') return entry.lap.position > 0 ? entry.lap.position : null;
+  if (column === 'lapTime') return displayLapTime;
+  if (column === 'delta') return displayLapTime !== null && bestLap !== null ? displayLapTime - bestLap : null;
+  if (column === 'prevDelta') return computeLapToLapDelta(entry.prevLap?.lapTime, displayLapTime).delta;
+  if (column === 's1') return entry.lap.s1;
+  if (column === 's2') return entry.lap.s2;
+  if (column === 's3') return entry.lap.s3;
+  return entry.lap.topSpeed;
+}
 
 export interface SessionLapTableProps {
   session: DetailedSession;
@@ -25,11 +61,51 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
   isCurrentSessionAllTimePB,
 }) => {
   const navigate = useNavigate();
+  const [sortColumn, setSortColumn] = React.useState<SortableLapColumn>('lap');
+  const [sortDescending, setSortDescending] = React.useState(false);
   const bestLap = selectedDriver?.bestLapTime ?? null;
   const bestS1 = selectedDriver?.bestS1 ?? null;
   const bestS2 = selectedDriver?.bestS2 ?? null;
   const bestS3 = selectedDriver?.bestS3 ?? null;
   const theoBest = selectedDriver?.theoreticalBest ?? null;
+  const lapEntries = (selectedDriver?.laps || []).map((lap, index, laps): LapTableEntry => ({
+    lap,
+    prevLap: index > 0 ? laps[index - 1] : null,
+    originalIndex: index,
+  }));
+  const displayLapEntries = [...lapEntries].sort((firstEntry, secondEntry) => {
+    const firstValue = getLapSortValue(firstEntry, sortColumn, bestLap);
+    const secondValue = getLapSortValue(secondEntry, sortColumn, bestLap);
+    if (firstValue === null && secondValue === null) return firstEntry.originalIndex - secondEntry.originalIndex;
+    if (firstValue === null) return 1;
+    if (secondValue === null) return -1;
+    const result = firstValue - secondValue;
+    return result === 0
+      ? firstEntry.originalIndex - secondEntry.originalIndex
+      : sortDescending
+      ? -result
+      : result;
+  });
+  const sortHeader = (column: SortableLapColumn, label: string, alignment = 'text-left', title?: string) => (
+    <th className={`px-3 py-3 ${alignment}`} title={title}>
+      <button
+        type="button"
+        onClick={() => {
+          if (sortColumn === column) {
+            setSortDescending((descending) => !descending);
+          } else {
+            setSortColumn(column);
+            setSortDescending(false);
+          }
+        }}
+        className="inline-flex items-center gap-1 uppercase hover:text-white"
+        title={`Sort by ${label}`}
+      >
+        {label}
+        {sortColumn === column && (sortDescending ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
+      </button>
+    </th>
+  );
 
   return (
     <div className="glass-panel p-5 rounded-2xl relative space-y-4">
@@ -67,23 +143,16 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
         <table className="w-full text-left text-xs text-lmu-muted">
           <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
             <tr>
-              <th className="px-3 py-3">Lap</th>
-              <th
-                className="px-3 py-3"
-                title={isMultiClass ? `Class Position (in ${selectedDriver?.carClass || 'Class'})` : 'Position'}
-              >
-                {isMultiClass ? 'Class Pos' : 'Pos'}
-              </th>
-              <th className="px-3 py-3 text-right">Lap Time</th>
+              {sortHeader('lap', 'Lap')}
+              {sortHeader('position', isMultiClass ? 'Class Pos' : 'Pos', 'text-left', isMultiClass ? `Class Position (in ${selectedDriver?.carClass || 'Class'})` : 'Position')}
+              {sortHeader('lapTime', 'Lap Time', 'text-right')}
               <th className="px-3 py-3 text-center">Pace Category</th>
-              <th className="px-3 py-3 text-right">Delta</th>
-              <th className="px-3 py-3 text-right" title="Consecutive lap-to-lap delta (Lap N - Lap N-1)">
-                Δ Prev
-              </th>
-              <th className="px-3 py-3 text-right">Sector 1</th>
-              <th className="px-3 py-3 text-right">Sector 2</th>
-              <th className="px-3 py-3 text-right">Sector 3</th>
-              <th className="px-3 py-3 text-right">Top Speed</th>
+              {sortHeader('delta', 'Delta', 'text-right')}
+              {sortHeader('prevDelta', 'Δ Prev', 'text-right', 'Consecutive lap-to-lap delta (Lap N - Lap N-1)')}
+              {sortHeader('s1', 'Sector 1', 'text-right')}
+              {sortHeader('s2', 'Sector 2', 'text-right')}
+              {sortHeader('s3', 'Sector 3', 'text-right')}
+              {sortHeader('topSpeed', 'Top Speed', 'text-right')}
               <th className="px-3 py-3 text-center">Tire Compound</th>
               {hasTireWearData && <th className="px-3 py-3 text-center">Tire Wear</th>}
               {hasFuelData && (
@@ -94,13 +163,13 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-lmu-border/50 font-mono">
-            {(selectedDriver?.laps || []).map((l, idx, allLaps) => (
+            {displayLapEntries.map(({ lap: l, prevLap }) => (
               <SessionLapTableRow
                 key={l.lapNum}
                 session={session}
                 selectedDriver={selectedDriver}
                 lap={l}
-                prevLap={idx > 0 ? allLaps[idx - 1] : null}
+                prevLap={prevLap}
                 bestLap={bestLap}
                 bestS1={bestS1}
                 bestS2={bestS2}

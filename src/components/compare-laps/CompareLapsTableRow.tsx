@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, Plus } from 'lucide-react';
 import { ComparableLap } from '../../utils/lapComparison';
 import { formatTime } from '../../utils/formatters';
-import { PaceBadge, LapStatusBadge } from '../common';
+import { PaceBadge } from '../common';
 
 export interface CompareLapsTableRowProps {
   lap: ComparableLap;
@@ -125,17 +125,6 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
 
       <td className="px-3 py-2.5 text-right text-white">
         {lap.topSpeed ? `${lap.topSpeed.toFixed(1)}` : '-'}
-      </td>
-
-      <td className="px-3 py-2.5 text-center font-sans">
-        <LapStatusBadge
-          isPitStop={lap.isPitStop}
-          isOutLap={lap.isOutLap}
-          isValid={lap.isValid}
-          isInferred={lap.isInferred}
-          pitTooltip={lap.pitStopDurationString ? `Estimated pit loss: ${lap.pitStopDurationString}` : undefined}
-          size="xs"
-        />
       </td>
     </tr>
   );

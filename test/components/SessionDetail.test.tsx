@@ -298,7 +298,7 @@ describe('SessionDetail component', () => {
     const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
     fireEvent.click(sectorsBtn);
 
-    const topSpeedBtn = screen.getByRole('button', { name: /^top speed$/i });
+    const topSpeedBtn = screen.getAllByRole('button', { name: /^top speed$/i })[0];
     fireEvent.click(topSpeedBtn);
 
     const lapPaceBtn = screen.getByRole('button', { name: /^lap pace$/i });
@@ -307,6 +307,38 @@ describe('SessionDetail component', () => {
     const backBtn = screen.getByRole('button', { name: /back to sessions/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it('sorts lap timing columns while keeping the direction icon on the active column', async () => {
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
+    });
+
+    const getLapTitles = () => screen
+      .getAllByTitle(/Click to open telemetry for Lap/)
+      .map((row) => row.getAttribute('title'));
+    const lapHeader = screen.getByTitle('Sort by Lap');
+    const lapTimeHeader = screen.getByTitle('Sort by Lap Time');
+
+    expect(getLapTitles()).toEqual([
+      'Click to open telemetry for Lap 1',
+      'Click to open telemetry for Lap 2',
+      'Click to open telemetry for Lap 3',
+    ]);
+    expect(lapHeader.querySelector('svg')).not.toBeNull();
+    expect(lapTimeHeader.querySelector('svg')).toBeNull();
+
+    fireEvent.click(lapTimeHeader);
+
+    expect(getLapTitles()).toEqual([
+      'Click to open telemetry for Lap 2',
+      'Click to open telemetry for Lap 1',
+      'Click to open telemetry for Lap 3',
+    ]);
+    expect(lapHeader.querySelector('svg')).toBeNull();
+    expect(lapTimeHeader.querySelector('svg')).not.toBeNull();
   });
 
   it('allows switching drivers and exporting CSV', async () => {
@@ -568,7 +600,7 @@ describe('SessionDetail component', () => {
     expect(sectorsBtn).toHaveClass('bg-lmu-accent');
 
     // Switch to Top Speed
-    const topSpeedBtn = screen.getByRole('button', { name: /Top Speed/i });
+    const topSpeedBtn = screen.getAllByRole('button', { name: /^top speed$/i })[0];
     fireEvent.click(topSpeedBtn);
     expect(topSpeedBtn).toHaveClass('bg-lmu-accent');
 
