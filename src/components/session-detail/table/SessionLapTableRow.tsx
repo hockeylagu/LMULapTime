@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { DetailedSession, DriverData, LapData } from '../../../../server/types.js';
+import { DetailedSession, DriverData, LapData } from '../../../../server/core/types';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../utils/formatters.js';
 import { computeLapToLapDelta } from '../../../utils/lapComparison.js';
 import { PaceBadge } from '../../common';

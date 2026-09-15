@@ -5,7 +5,7 @@ import { VEHICLE_CLASS_OPTIONS } from '../../utils/paceCategory.js';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { BenchmarkTargetsGrid } from '../common/BenchmarkTargetsGrid.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
-import { ReferenceLaptimeEntry } from '../../../server/types.js';
+import { ReferenceLaptimeEntry } from '../../../server/core/types';
 
 export interface TrackDetailHeaderProps {
   trackName: string;

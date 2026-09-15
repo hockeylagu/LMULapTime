@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { computeLapComparisons } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';

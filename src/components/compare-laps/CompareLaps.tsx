@@ -7,7 +7,7 @@ import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
 import { CompareLapsTable } from './CompareLapsTable.js';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
-import { ReplaySummary } from '../../../server/types.js';
+import { ReplaySummary } from '../../../server/core/types';
 import { matchesTrack } from '../../utils/paceCategory.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };

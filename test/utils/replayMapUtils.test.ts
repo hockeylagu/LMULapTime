@@ -6,7 +6,7 @@ import {
   getHeatmapColor,
   computeTrackBoundaryPathD,
 } from '../../src/components/replay/map/replayMapUtils.js';
-import type { ReplayTelemetryPoint } from '../../server/types.js';
+import type { ReplayTelemetryPoint } from '../../server/core/types.js';
 
 describe('replayMapUtils', () => {
   const mockPoints: ReplayTelemetryPoint[] = [

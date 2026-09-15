@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { PointComparison, getTrajectoryDistances } from '../../../utils/replayComparison.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans

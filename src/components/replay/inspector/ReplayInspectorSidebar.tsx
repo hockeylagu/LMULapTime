@@ -5,7 +5,7 @@ import {
   ReplayLapSummary,
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
-} from '../../../../server/types.js';
+} from '../../../../server/core/types';
 import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';

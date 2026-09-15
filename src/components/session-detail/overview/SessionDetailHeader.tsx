@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
-import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/types.js';
+import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/core/types';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types';
+import { PaceCategory, ReferenceLaptimeEntry } from '../../server/core/types.js';
 import {
   getPaceCategoryStyle,
   formatPacePercentage,
@@ -13,7 +13,7 @@ import {
   findReferenceEntry,
   PACE_CATEGORY_STYLES,
   VEHICLE_CLASS_OPTIONS,
-} from '../../src/utils/paceCategory';
+} from '../../src/utils/paceCategory.js';
 
 describe('paceCategory utility', () => {
   describe('getPaceCategoryStyle', () => {

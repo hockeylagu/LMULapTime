@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { fuseDuckDbWithVcrTrajectory } from '../../server/telemetryFusion.js';
-import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../server/types.js';
+import { fuseDuckDbWithVcrTrajectory } from '../../server/telemetry/telemetryFusion.js';
+import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../server/core/types.js';
 
 describe('telemetryFusion', () => {
   it('fuses DuckDB 100Hz telemetry channels with VCR 2D spatial coordinates accurately', () => {

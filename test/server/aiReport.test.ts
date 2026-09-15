@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { analyzeLap, clearSessionApiKey, parseAiJsonContent, setSessionApiKey, setSessionModel } from '../../server/aiReport.js';
-import { AiLapEvidence } from '../../server/types.js';
+import { analyzeLap, clearSessionApiKey, parseAiJsonContent, setSessionApiKey, setSessionModel } from '../../server/ai/aiReport.js';
+import { AiLapEvidence } from '../../server/core/types.js';
 
 const { generateContentMock } = vi.hoisted(() => ({ generateContentMock: vi.fn() }));
 vi.mock('@google/genai', () => ({

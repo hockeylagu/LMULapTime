@@ -15,8 +15,8 @@ import {
   TireWear,
   TrackSummary,
   ComparableLap,
-} from './types.js';
-import { parseReplayMetadata, detectPlayerName } from './replayParser.js';
+} from '../core/types.js';
+import { parseReplayMetadata, detectPlayerName } from '../replay/replayParser.js';
 import {
   formatTime,
   formatElapsedSeconds,
@@ -28,10 +28,10 @@ import {
   getSessionTypeWeight,
   compareSessions,
   minValidTime,
-} from '../src/utils/formatters.js';
-import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../src/utils/lapComparison.js';
-import { calculatePaceCategory } from './referenceLaptimes.js';
-import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../src/utils/paceCategory.js';
+} from '../../src/utils/formatters.js';
+import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../src/utils/lapComparison.js';
+import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
+import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../../src/utils/paceCategory.js';
 
 export { getDisplayTrackName };
 

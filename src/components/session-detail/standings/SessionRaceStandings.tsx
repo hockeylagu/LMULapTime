@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trophy, ShieldCheck } from 'lucide-react';
-import { DetailedSession } from '../../../../server/types.js';
+import { DetailedSession } from '../../../../server/core/types';
 import { formatElapsedSeconds } from '../../../utils/formatters.js';
 import {
   getWorstTrackLimitSeverity,

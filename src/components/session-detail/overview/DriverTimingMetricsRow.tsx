@@ -1,6 +1,6 @@
 import { Activity } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { DetailedSession, DriverData } from '../../../../server/types.js';
+import { DetailedSession, DriverData } from '../../../../server/core/types';
 import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
 import { PaceBadge } from '../../common';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis';
-import { ReplayTrajectoryPoint } from '../../server/types';
+import { computeCornerConsistencyStats, computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../src/utils/cornerAnalysis.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('computeLapSegmentComparisons', () => {
   // Speed trace with genuine turning points at both ends (100->200->minSpeed->200->100),
@@ -188,5 +188,39 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.entryDistM).toBe(30);
     expect(corner.minDistM).toBe(70);
     expect(corner.exitDistM).toBe(110);
+  });
+
+  it('computes consistency metrics across valid laps and ignores empty lap inputs', () => {
+    const reference = buildLap(100, 0.3);
+    const second = buildLap(95, 0.35).map((point, index) => ({ ...point, timeSec: (point.timeSec ?? 0) + index * 0.02 }));
+    const stats = computeCornerConsistencyStats([
+      { lapNumber: 2, points: reference },
+      { lapNumber: 1, points: second },
+      { lapNumber: 3, points: [] },
+    ], reference);
+
+    expect(stats).toHaveLength(1);
+    expect(stats[0].lapsSampled).toBe(2);
+    expect(stats[0].time.samples.map(sample => sample.lapNumber)).toEqual([1, 2]);
+    expect(stats[0].entrySpeedKmh).not.toBeNull();
+    expect(stats[0].apexSpeedKmh).not.toBeNull();
+  });
+
+  it('returns no consistency stats when there are too few samples after filtering', () => {
+    const reference = buildLap(100, 0.3);
+    const stats = computeCornerConsistencyStats([
+      { lapNumber: 1, points: reference },
+      { lapNumber: 2, points: reference },
+    ], reference);
+    expect(stats).toHaveLength(1);
+
+    expect(filterCornerConsistencyStats(stats, new Set())).toBe(stats);
+    expect(filterCornerConsistencyStats(stats, new Set([1]))).toEqual([]);
+  });
+
+  it('returns empty consistency results for missing reference or lap data', () => {
+    expect(computeCornerConsistencyStats([], buildLap(100, 0.3))).toEqual([]);
+    expect(computeCornerConsistencyStats([{ lapNumber: 1, points: [] }], buildLap(100, 0.3))).toEqual([]);
+    expect(computeCornerConsistencyStats([{ lapNumber: 1, points: buildLap(100, 0.3) }], [])).toEqual([]);
   });
 });

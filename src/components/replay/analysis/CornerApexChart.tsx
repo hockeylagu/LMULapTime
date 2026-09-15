@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { X, Flag } from 'lucide-react';
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 

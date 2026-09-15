@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { LapStatusBadge } from '../../src/components/common/LapStatusBadge';
-import { resolveLapStatus } from '../../src/components/common/lapStatus';
+import { LapStatusBadge } from '../../src/components/common/LapStatusBadge.js';
+import { resolveLapStatus } from '../../src/components/common/lapStatus.js';
 
 describe('resolveLapStatus', () => {
   it('prioritizes pit stop over every other flag', () => {

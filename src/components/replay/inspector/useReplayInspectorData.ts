@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/types.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/core/types';
 import { ComparableLap } from '../../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../../utils/replayComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';

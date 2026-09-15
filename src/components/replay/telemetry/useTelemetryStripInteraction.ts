@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 
 export interface TelemetryDragSelection {

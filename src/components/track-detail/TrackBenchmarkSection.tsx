@@ -1,6 +1,6 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
-import { ReferenceLaptimeEntry } from '../../../server/types';
+import { ReferenceLaptimeEntry } from '../../../server/core/types';
 import { BenchmarkTargetsGrid } from '../common/BenchmarkTargetsGrid';
 
 export interface TrackBenchmarkSectionProps {

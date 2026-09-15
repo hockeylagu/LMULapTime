@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { History, RefreshCw } from 'lucide-react';
-import { AiReportHistoryEntry } from '../../../server/types';
+import { AiReportHistoryEntry } from '../../../server/core/types';
 
 export const AiReportsHistoryCard: React.FC = () => {
   const [reports, setReports] = useState<AiReportHistoryEntry[] | null>(null);

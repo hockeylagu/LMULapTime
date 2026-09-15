@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildCenterlineSpatialIndex,
   projectTrajectoryToCenterline,
-} from '../../server/trackProjection';
-import { ReplayTrajectoryPoint } from '../../server/types';
+} from '../../server/tracks/trackProjection.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('trackProjection utility', () => {
   // Simple rectangular circuit:

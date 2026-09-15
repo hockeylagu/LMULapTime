@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMap, projectTrajectoryPoints } from '../../src/components/replay/index.js';
-import { computeCumulativeDistances } from '../../src/utils/replayComparison';
-import { ReplayTrajectoryPoint } from '../../server/types';
+import { computeCumulativeDistances } from '../../src/utils/replayComparison.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('GpsTrackMap', () => {
   const mockPoints: ReplayTrajectoryPoint[] = [

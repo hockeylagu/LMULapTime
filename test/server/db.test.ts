@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs';
-import { SessionDatabase } from '../../server/db';
-import { LmuParser } from '../../server/parser';
-import { parseReplayMetadata } from '../../server/replayParser';
-import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../server/types';
-import { createSliceVcrBuffer } from '../utils/mockVcr';
+import { SessionDatabase } from '../../server/core/db.js';
+import { LmuParser } from '../../server/sessions/parser.js';
+import { parseReplayMetadata } from '../../server/replay/replayParser.js';
+import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../server/core/types.js';
+import { createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 describe('SessionDatabase (SQLite Cache)', () => {
   let db: SessionDatabase;
@@ -166,6 +166,22 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getReplayMetadataCache('Test_Replay_P1.Vcr', 1000, 12345)).not.toBeNull();
     expect(db.getReplayMetadataCache('Test_Replay_P1.Vcr', 1001, 12345)).toBeNull();
     expect(db.getReplayMetadataCache('Test_Replay_P1.Vcr', 1000, 99999)).toBeNull();
+  });
+
+  it('does not reuse live metadata for the same filename from another source path', () => {
+    const metadata = buildMetadata();
+    db.upsertReplayMetadataCache('Same_Name_P1.Vcr', 'C:\\replays-a\\Same_Name_P1.Vcr', 1000, 12345, metadata);
+
+    expect(db.getReplayMetadataCache('Same_Name_P1.Vcr', 1000, 12345, 'C:\\replays-a\\Same_Name_P1.Vcr')).not.toBeNull();
+    expect(db.getReplayMetadataCache('Same_Name_P1.Vcr', 1000, 12345, 'C:\\replays-b\\Same_Name_P1.Vcr')).toBeNull();
+  });
+
+  it('does not reuse live trajectory data for the same filename from another source path', () => {
+    const trajectory = buildTrajectory();
+    db.upsertReplayTrajectoryCache('Same_Name_P1.Vcr', -1, -1, 1000, 12345, trajectory, 'C:\\replays-a\\Same_Name_P1.Vcr');
+
+    expect(db.getReplayTrajectoryCache('Same_Name_P1.Vcr', -1, -1, 1000, 12345, 'C:\\replays-a\\Same_Name_P1.Vcr')).not.toBeNull();
+    expect(db.getReplayTrajectoryCache('Same_Name_P1.Vcr', -1, -1, 1000, 12345, 'C:\\replays-b\\Same_Name_P1.Vcr')).toBeNull();
   });
 
   it('round-trips a full-resolution trajectory keyed by driver slot and lap', () => {
@@ -535,6 +551,25 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(cached!.lapTimeSec).toBe(91.45);
     expect(cached!.points).toHaveLength(2);
     expect(cached!.points[0].speedKmh).toBe(120);
+
+    db.recordIngestError('duckdb', fileInfo.filePath, new Error('temporary read failure'));
+    expect(db.getIngestErrors()).toEqual([
+      expect.objectContaining({
+        sourceType: 'duckdb',
+        sourcePath: fileInfo.filePath,
+        errorMessage: 'temporary read failure',
+        attempts: 1,
+      }),
+    ]);
+    db.recordIngestError('duckdb', fileInfo.filePath, 'retry failure');
+    expect(db.getIngestErrors()[0].attempts).toBe(2);
+    db.clearIngestError('duckdb', fileInfo.filePath);
+    expect(db.getIngestErrors()).toHaveLength(0);
+
+    db.upsertTelemetryLapCache(fileInfo.filename, 3, mockLapData);
+    db.pruneTelemetryLapCache(365 * 24 * 60 * 60 * 1000, 1);
+    expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
+    expect(db.getTelemetryLapCache(fileInfo.filename, 3)).toBeNull();
 
     // Verify clearTelemetryCache clears data
     db.clearTelemetryCache();

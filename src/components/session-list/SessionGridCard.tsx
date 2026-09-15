@@ -3,7 +3,7 @@ import { Car, ChevronRight, AlertCircle } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../utils/formatters';
 import { PaceBadge, ReplayIndicator } from '../common';
 import { SessionListItem } from './SessionList.js';
-import { PaceCategory } from '../../../server/types';
+import { PaceCategory } from '../../../server/core/types';
 
 export interface SessionGridCardProps {
   session: SessionListItem;

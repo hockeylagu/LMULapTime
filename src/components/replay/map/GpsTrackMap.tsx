@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { MapColorMode } from './replayMapUtils.js';
 import { GpsTrackMapScene } from './GpsTrackMapScene.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';

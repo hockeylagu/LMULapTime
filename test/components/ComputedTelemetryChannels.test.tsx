@@ -11,7 +11,7 @@ import {
 } from '../../src/components/replay/telemetry/index.js';
 import { TelemetryPresetChannelRow } from '../../src/components/replay/telemetry/TelemetryPresetChannelRow.js';
 import { AVAILABLE_TELEMETRY_CHANNELS } from '../../src/components/replay/telemetry/telemetryPresets.js';
-import { ReplayTelemetryPoint } from '../../server/types.js';
+import { ReplayTelemetryPoint } from '../../server/core/types.js';
 
 const mockPoint: ReplayTelemetryPoint = {
   x: 100,

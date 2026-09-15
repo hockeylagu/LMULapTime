@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { ReplayCacheCard } from '../../src/components/settings/ReplayCacheCard';
+import { ReplayCacheCard } from '../../src/components/settings/ReplayCacheCard.js';
 
 describe('ReplayCacheCard', () => {
   beforeEach(() => {

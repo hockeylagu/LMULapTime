@@ -11,7 +11,7 @@ import {
   Legend,
   type LegendPayload,
 } from 'recharts';
-import { DetailedSession, DriverData, FuelStrategyData } from '../../../../server/types.js';
+import { DetailedSession, DriverData, FuelStrategyData } from '../../../../server/core/types';
 import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
 import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';

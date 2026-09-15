@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { enrichTrajectoryWithTrackGeometry, clearTrackDefinitionCache, getTrackDefinition } from '../../server/serverTrackSync.js';
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/types.js';
+import { enrichTrajectoryWithTrackGeometry, clearTrackDefinitionCache, getTrackDefinition } from '../../server/tracks/serverTrackSync.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('serverTrackSync', () => {
   beforeEach(() => {

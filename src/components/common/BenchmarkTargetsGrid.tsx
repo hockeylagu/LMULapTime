@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReferenceLaptimeEntry } from '../../../server/types';
+import { ReferenceLaptimeEntry } from '../../../server/core/types';
 import { formatTime } from '../../utils/formatters';
 
 export interface BenchmarkTargetsGridProps {

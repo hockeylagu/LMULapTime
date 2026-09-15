@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { ComparableLap } from '../../../utils/lapComparison.js';
 import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';

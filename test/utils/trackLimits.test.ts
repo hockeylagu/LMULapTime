@@ -7,7 +7,7 @@ import {
   getTrackLimitBadgeClasses,
   getTrackLimitStandingsPillClasses,
 } from '../../src/utils/trackLimits.js';
-import { LapTrackLimit } from '../../server/types.js';
+import { LapTrackLimit } from '../../server/core/types.js';
 
 describe('trackLimits utility', () => {
   describe('isNoFurtherActionTrackLimit', () => {

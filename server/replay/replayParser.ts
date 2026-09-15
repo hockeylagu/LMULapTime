@@ -11,12 +11,12 @@ import {
   ReplayPitEvent,
   ReplayFlagEvent,
   ReplayStandingsSnapshot,
-} from './types.js';
+} from '../core/types.js';
 
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
-} from '../src/utils/vehicleMapping.js';
+} from '../../src/utils/vehicleMapping.js';
 
 export { mapVehicleIdToModel, mapVehicleIdToClass };
 

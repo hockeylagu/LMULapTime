@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line } from 'recharts';
-import { DetailedSession, DriverData } from '../../../../server/types.js';
+import { DetailedSession, DriverData } from '../../../../server/core/types';
 import { OPPONENT_COLORS, PLAYER_HIGHLIGHT_COLOR } from '../sessionDetailHelpers.js';
 
 export interface SessionTelemetrySeriesProps {

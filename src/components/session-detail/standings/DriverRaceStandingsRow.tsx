@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, ShieldCheck } from 'lucide-react';
-import { DriverData } from '../../../../server/types.js';
+import { DriverData } from '../../../../server/core/types';
 
 export interface DriverRaceStandingsRowProps {
   selectedDriver: DriverData;

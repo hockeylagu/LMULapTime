@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ReplayTrajectoryData, TrackTimingGates } from './types.js';
-import { resolveTrackLayoutKey } from '../src/utils/trackLayout.js';
+import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
+import { resolveTrackLayoutKey } from '../../src/utils/trackLayout.js';
 import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
 
 interface CachedTrackDefinition {

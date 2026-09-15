@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReplayTelemetryPoint } from '../../../../server/types.js';
+import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryChannelId } from './telemetryPresets.js';

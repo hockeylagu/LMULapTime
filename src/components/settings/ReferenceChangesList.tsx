@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, CheckCircle2 } from 'lucide-react';
-import { ReferenceBenchmarkDiff } from '../../../server/types';
+import { ReferenceBenchmarkDiff } from '../../../server/core/types';
 
 export interface ReferenceChangesListProps {
   updateDiff: ReferenceBenchmarkDiff;

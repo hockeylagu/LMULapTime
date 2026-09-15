@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types';
 import {
   InterpolatedPoint,
   interpolatePointAtDistance,

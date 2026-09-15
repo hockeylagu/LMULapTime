@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildAiLapEvidence } from '../../src/utils/aiReportPayload.js';
-import { ReplayTrajectoryData } from '../../server/types.js';
+import { ReplayTrajectoryData } from '../../server/core/types.js';
 
 const trajectory: ReplayTrajectoryData = {
   replayName: 'primary.Vcr',

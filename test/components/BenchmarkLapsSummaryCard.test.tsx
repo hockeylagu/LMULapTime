@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BenchmarkLapsSummaryCard, BestRefLapInfo } from '../../src/components/dashboard/BenchmarkLapsSummaryCard';
+import { BenchmarkLapsSummaryCard, BestRefLapInfo } from '../../src/components/dashboard/BenchmarkLapsSummaryCard.js';
 
 describe('BenchmarkLapsSummaryCard', () => {
   const mockRefLaps: BestRefLapInfo[] = [

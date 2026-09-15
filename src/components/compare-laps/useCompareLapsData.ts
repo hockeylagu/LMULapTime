@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/core/types';
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import {
   matchesCarClass,

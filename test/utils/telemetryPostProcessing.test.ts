@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { applyTelemetryPostProcessing, applyTelemetryPostProcessingToTrajectory } from '../../src/utils/telemetryPostProcessing';
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/types';
+import { applyTelemetryPostProcessing, applyTelemetryPostProcessingToTrajectory } from '../../src/utils/telemetryPostProcessing.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 function point(overrides: Partial<ReplayTrajectoryPoint>): ReplayTrajectoryPoint {
   return { x: 0, y: 0, z: 0, ...overrides };

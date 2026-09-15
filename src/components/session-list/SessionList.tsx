@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { PaceCategory } from '../../../server/types.js';
+import { PaceCategory } from '../../../server/core/types';
 import { SessionListHeader } from './SessionListHeader.js';
 import { SessionEmptyState } from './SessionEmptyState.js';
 import { SessionGridView } from './SessionGridView.js';

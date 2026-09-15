@@ -20,6 +20,8 @@ export default defineConfig({
         '**/*.json',
         '**/*.css',
         '**/*.html',
+        '**/*.db',
+        '**/*.db-*',
       ],
       thresholds: {
         lines: 80,
