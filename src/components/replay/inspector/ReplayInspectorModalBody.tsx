@@ -155,7 +155,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   }, [lapSegments]);
 
   return (
-    <main className="min-h-screen flex flex-col bg-[#07090e] text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
+    <main className="h-dvh min-h-0 flex flex-col bg-[#07090e] text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={activeReplayName || replayName}

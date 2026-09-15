@@ -71,7 +71,7 @@ export class SessionDatabase {
       this.dbPath = ':memory:';
     } else {
       const serverDir = path.dirname(fileURLToPath(import.meta.url));
-      this.dbPath = path.join(serverDir, 'lmu_cache.db');
+      this.dbPath = path.join(serverDir, '..', 'lmu_cache.db');
     }
 
     this.db = new Database(this.dbPath, { timeout: 5000 });
