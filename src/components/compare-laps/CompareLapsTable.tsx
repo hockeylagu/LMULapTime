@@ -189,7 +189,6 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
                     {availableLapsSort === 'speed-asc' && <ChevronUp className="w-3 h-3 text-lmu-accent" />}
                   </div>
                 </th>
-                <th className="px-3 py-3 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-lmu-border/50 font-mono">

@@ -260,6 +260,8 @@ describe('CompareLaps component', () => {
       expect(screen.getByLabelText(/Sort:/i)).toBeInTheDocument();
     });
 
+    expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument();
+
     const sortSelect = screen.getByLabelText(/Sort:/i) as HTMLSelectElement;
     expect(sortSelect.value).toBe('lap-asc');
 
