@@ -116,21 +116,21 @@ describe('App component', () => {
       expect(screen.getByText('Driving Overview')).toBeInTheDocument();
     });
 
-    const tracksTab = screen.getByRole('button', { name: /tracks/i });
+    const tracksTab = screen.getByRole('link', { name: /tracks/i });
     fireEvent.click(tracksTab);
 
     await waitFor(() => {
       expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
     });
 
-    const settingsTab = screen.getByRole('button', { name: /settings/i });
+    const settingsTab = screen.getByRole('link', { name: /settings/i });
     fireEvent.click(settingsTab);
 
     await waitFor(() => {
       expect(screen.getByText('Application Settings')).toBeInTheDocument();
     });
 
-    const dashboardTab = screen.getByRole('button', { name: /dashboard/i });
+    const dashboardTab = screen.getByRole('link', { name: /dashboard/i });
     fireEvent.click(dashboardTab);
 
     await waitFor(() => {

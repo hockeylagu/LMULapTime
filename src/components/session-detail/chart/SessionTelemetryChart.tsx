@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Clock, Zap, Gauge, ArrowUpDown, Disc, Fuel, TrendingUp } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -12,7 +13,6 @@ import {
 } from 'recharts';
 import { DetailedSession, DriverData, FuelStrategyData } from '../../../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
-import { updateHashParams } from '../../../utils/urlParams.js';
 import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
@@ -46,6 +46,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   hiddenSeries,
   handleLegendClick,
 }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     driversToPlot,
     maxPosInClass,
@@ -62,13 +64,16 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
       const lapNum = parseInt(String(state.activeLabel), 10);
       if (!isNaN(lapNum) && lapNum > 0) {
         if (session.matchingReplayFile) {
-          updateHashParams({ replay: '1', lap: String(lapNum) });
+          const telemetryParams = new URLSearchParams(searchParams);
+          telemetryParams.set('replayName', session.matchingReplayFile.name);
+          telemetryParams.set('lap', String(lapNum));
+          navigate(`/telemetry?${telemetryParams.toString()}`);
         } else {
           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
           const carClass = selectedDriver?.carClass || 'LMGT3';
-          window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+          navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
             carClass
-          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`;
+          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`);
         }
       }
     }

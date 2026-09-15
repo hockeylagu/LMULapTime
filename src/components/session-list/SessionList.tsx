@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
+import { useSearchParams } from 'react-router';
+import { updateSearchParams } from '../../utils/urlParams.js';
 import { PaceCategory } from '../../../server/types.js';
 import { SessionListHeader } from './SessionListHeader.js';
 import { SessionEmptyState } from './SessionEmptyState.js';
@@ -70,9 +71,9 @@ export const SessionList: React.FC<SessionListProps> = ({
   viewMode: controlledViewMode,
   onViewModeChange,
 }) => {
-  const { params: initialParams } = getHashRouteAndParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [internalViewMode, setInternalViewMode] = useState<'grid' | 'table'>(() => {
-    const paramView = initialParams.get('view');
+    const paramView = searchParams.get('view');
     if (paramView === 'table' || paramView === 'grid') return paramView;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lmu_dashboard_view');
@@ -81,7 +82,10 @@ export const SessionList: React.FC<SessionListProps> = ({
     return 'grid';
   });
 
-  const viewMode = controlledViewMode ?? internalViewMode;
+  const paramView = searchParams.get('view');
+  const viewMode = controlledViewMode ?? (
+    paramView === 'table' || paramView === 'grid' ? paramView : internalViewMode
+  );
 
   const handleSetViewMode = (mode: 'grid' | 'table') => {
     if (onViewModeChange) {
@@ -93,7 +97,7 @@ export const SessionList: React.FC<SessionListProps> = ({
           localStorage.setItem('lmu_dashboard_view', mode);
         } catch {}
       }
-      updateHashParams({ view: mode });
+      updateSearchParams(searchParams, setSearchParams, { view: mode });
     }
   };
 

@@ -93,7 +93,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         handleNavigateToSession={handleNavigateToSession}
         handleExportCsv={handleExportCsv}
         refEntry={refEntry}
-        sessions={sessions}
       />
 
       <DriverPerformancePanel

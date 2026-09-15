@@ -373,8 +373,6 @@ export function useSessionDetailData({
   const handleNavigateToSession = (targetId: string) => {
     if (onSelectSession) {
       onSelectSession(targetId);
-    } else {
-      window.location.hash = `#session/${encodeURIComponent(targetId)}`;
     }
   };
 

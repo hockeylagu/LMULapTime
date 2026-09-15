@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import { ArrowLeftRight, Activity } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/types.js';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
@@ -16,6 +17,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
   selectedDriver,
   onOpenTelemetry,
 }) => {
+  const navigate = useNavigate();
   return (
     <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
       <button
@@ -41,9 +43,9 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         onClick={() => {
           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
           const carClass = selectedDriver?.carClass || 'LMGT3';
-          window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+          navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
             carClass
-          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`;
+          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`);
         }}
         aria-label="Compare"
         className="p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border transition-all flex items-center justify-center cursor-pointer"

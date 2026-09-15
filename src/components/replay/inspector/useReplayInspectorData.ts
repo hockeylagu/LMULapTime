@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/types.js';
 import { ComparableLap } from '../../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../../utils/replayComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
-import { updateHashParams } from '../../../utils/urlParams.js';
+import { updateSearchParams } from '../../../utils/urlParams.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function useReplayInspectorData({
   initialBaselineLapNumber,
   initialBaselineDriverName,
 }: UseReplayInspectorDataProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeReplayName, setActiveReplayName] = useState<string | null>(replayName);
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
   const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
@@ -190,7 +192,7 @@ export function useReplayInspectorData({
     setPendingLapNumber(null);
     setBaselineTrajectory(null);
     setBaselineMetadata(null);
-    updateHashParams({ compareSessionId: null, compareDriver: null, compareLapNum: null });
+    updateSearchParams(searchParams, setSearchParams, { compareSessionId: null, compareDriver: null, compareLapNum: null });
   };
 
   // Swap primary lap and baseline lap
@@ -331,7 +333,7 @@ export function useReplayInspectorData({
     setBaselineLapNumber(lap.lapNum ?? 1);
     setBaselineDriverName(lap.driverName || null);
     setIsComparePickerOpen(false);
-    updateHashParams({
+    updateSearchParams(searchParams, setSearchParams, {
       compareSessionId: lap.sessionId ? String(lap.sessionId) : null,
       compareDriver: lap.driverName || null,
       compareLapNum: lap.lapNum === undefined ? null : String(lap.lapNum),
@@ -347,7 +349,7 @@ export function useReplayInspectorData({
     setBaselineReplayName(activeReplayName);
     setBaselineLapNumber(lapNumber);
     setBaselineDriverName(driverName);
-    updateHashParams({
+    updateSearchParams(searchParams, setSearchParams, {
       compareSessionId: null,
       compareDriver: driverName,
       compareLapNum: String(lapNumber),

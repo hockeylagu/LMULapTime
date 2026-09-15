@@ -155,7 +155,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   }, [lapSegments]);
 
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex flex-col bg-[#07090e] text-white w-screen h-screen overflow-hidden select-none overscroll-none animate-fadeIn">
+    <main className="min-h-screen flex flex-col bg-[#07090e] text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={activeReplayName || replayName}
@@ -275,6 +275,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           trackCourse={metadata?.trackCourse}
         />
       </div>
-    </div>
+    </main>
   );
 };

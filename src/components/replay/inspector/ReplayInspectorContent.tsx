@@ -8,7 +8,7 @@ import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../utils/formatters.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 
-export interface ReplayInspectorModalProps {
+export interface ReplayInspectorContentProps {
   isOpen: boolean;
   onClose: () => void;
   replayName: string | null;
@@ -21,7 +21,7 @@ export interface ReplayInspectorModalProps {
   initialBaselineDriverName?: string | null;
 }
 
-export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
+export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   isOpen,
   onClose,
   replayName,
@@ -270,3 +270,12 @@ export const ReplayInspectorModal: React.FC<ReplayInspectorModalProps> = ({
     />
   );
 };
+
+/** @deprecated Use ReplayInspectorPage through the /telemetry route. */
+export const ReplayInspectorModal: React.FC<ReplayInspectorContentProps> = (props) => (
+  props.isOpen ? (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
+      <ReplayInspectorContent {...props} />
+    </div>
+  ) : null
+);

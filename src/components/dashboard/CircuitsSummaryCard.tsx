@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import { MapPin, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
@@ -15,6 +16,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
   showMoreTracks,
   setShowMoreTracks,
 }) => {
+  const navigate = useNavigate();
   return (
     <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
@@ -30,7 +32,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
             <div
               key={item.track}
               onClick={() => {
-                window.location.hash = `track/${encodeURIComponent(item.track)}`;
+                navigate(`/track/${encodeURIComponent(item.track)}`);
               }}
               className="flex items-center justify-between text-xs cursor-pointer hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
               title={`View ${item.track} Track Details`}

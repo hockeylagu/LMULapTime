@@ -360,7 +360,7 @@ describe('SessionDetail component', () => {
 
     const trackHeading = screen.getByRole('heading', { level: 2, name: /Spa/i });
     fireEvent.click(trackHeading);
-    expect(window.location.hash).toBe('#track/Spa');
+    expect(window.location.hash).toBe('#/track/Spa');
   });
 
   it('opens the full comparison studio when clicking compare buttons', async () => {
@@ -1315,16 +1315,13 @@ describe('SessionDetail component', () => {
     // Click replay for Lap 2
     fireEvent.click(replayButtons[1]);
 
-    expect(window.location.hash).toContain('replay=1');
     expect(window.location.hash).toContain('lap=2');
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'));
-    });
+    expect(window.location.hash).toContain('replayName=spa_replay.vcr');
   });
 
-  it('automatically opens replay modal and queries lap when URL contains replay and lap params', async () => {
-    window.location.hash = '#/session/sess123?replay=1&lap=3';
+  it('does not open replay UI from legacy session URL parameters', async () => {
+    window.location.hash = '#/session/sess123?lap=3';
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
         return Promise.resolve({
@@ -1357,9 +1354,7 @@ describe('SessionDetail component', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=3'));
-    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('opens telemetry when clicking a lap table row or clicking the Best Lap card in timing metrics', async () => {
@@ -1402,28 +1397,15 @@ describe('SessionDetail component', () => {
     const lap1Row = screen.getByTitle('Click to open telemetry for Lap 1');
     fireEvent.click(lap1Row);
 
-    expect(window.location.hash).toContain('replay=1');
     expect(window.location.hash).toContain('lap=1');
-
-    // Let the replay modal's metadata/trajectory fetches settle before closing it
-    await waitFor(() => {
-      expect(screen.getAllByText(/Sim Driver/i).length).toBeGreaterThan(0);
-    });
-
-    // Close replay modal
-    const closeBtn = screen.getByTitle('Close');
-    fireEvent.click(closeBtn);
 
     // 2. Click Best Lap card (best lap is Lap 2 with time 122.0)
     const bestLapCard = screen.getByTitle(/Click to open telemetry for Best Lap/i);
     fireEvent.click(bestLapCard);
 
-    expect(window.location.hash).toContain('replay=1');
     expect(window.location.hash).toContain('lap=2');
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/Sim Driver/i).length).toBeGreaterThan(0);
-    });
+    expect(window.location.hash).toContain('replayName=spa_replay.vcr');
   });
 });
 

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, X } from 'lucide-react';
 import { CompareLapsHeader } from './CompareLapsHeader.js';
 import { CompareLapsFilters } from './CompareLapsFilters.js';
 import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
 import { CompareLapsTable } from './CompareLapsTable.js';
-import { ReplayInspectorModal } from '../replay/index.js';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
 import { ReplaySummary } from '../../../server/types.js';
 import { matchesTrack } from '../../utils/paceCategory.js';
@@ -37,6 +37,8 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   initialCompareLapNum,
   onSelectSession,
 }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     availableTracks,
     selectedTrack,
@@ -88,13 +90,6 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialCompareLapNum,
   });
 
-  const [telemetryModalOpen, setTelemetryModalOpen] = useState(false);
-  const [telemetryTargetReplay, setTelemetryTargetReplay] = useState<string>('');
-  const [telemetryTargetLap, setTelemetryTargetLap] = useState<number>(1);
-  const [telemetryTargetDriver, setTelemetryTargetDriver] = useState<string | null>(null);
-  const [telemetryBaselineReplay, setTelemetryBaselineReplay] = useState<string | null>(null);
-  const [telemetryBaselineLap, setTelemetryBaselineLap] = useState<number | null>(null);
-  const [telemetryBaselineDriver, setTelemetryBaselineDriver] = useState<string | null>(null);
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
 
   const handleCompareTelemetry = async () => {
@@ -146,26 +141,18 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       return;
     }
 
-    setTelemetryTargetReplay(targetReplay);
-    setTelemetryTargetLap(targetLap.lapNum ?? 1);
-    setTelemetryTargetDriver(targetLap.driverName ?? null);
-    setTelemetryBaselineReplay(baseReplay);
-    setTelemetryBaselineLap(baseLap.lapNum ?? 1);
-    setTelemetryBaselineDriver(baseLap.driverName ?? null);
-    setTelemetryModalOpen(true);
+    const telemetryParams = new URLSearchParams(searchParams);
+    telemetryParams.set('replayName', targetReplay);
+    telemetryParams.set('lap', String(targetLap.lapNum ?? 1));
+    if (targetLap.driverName) telemetryParams.set('driverName', targetLap.driverName);
+    telemetryParams.set('baselineReplay', baseReplay);
+    if (baseLap.sessionId) telemetryParams.set('compareSessionId', String(baseLap.sessionId));
+    if (baseLap.driverName) telemetryParams.set('compareDriver', baseLap.driverName);
+    if (baseLap.lapNum !== undefined) telemetryParams.set('compareLapNum', String(baseLap.lapNum));
+    navigate(`/telemetry?${telemetryParams.toString()}`);
   };
 
   const onCompareTelemetry = selectedLaps.length === 2 ? handleCompareTelemetry : undefined;
-
-  const handleCloseTelemetry = () => {
-    setTelemetryModalOpen(false);
-    setTelemetryTargetReplay('');
-    setTelemetryTargetLap(1);
-    setTelemetryTargetDriver(null);
-    setTelemetryBaselineReplay(null);
-    setTelemetryBaselineLap(null);
-    setTelemetryBaselineDriver(null);
-  };
 
   return (
     <div className="space-y-6">
@@ -262,19 +249,6 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         onToggleLap={handleToggleLap}
       />
 
-      {telemetryModalOpen && telemetryTargetReplay && (
-        <ReplayInspectorModal
-          isOpen={telemetryModalOpen}
-          onClose={handleCloseTelemetry}
-          replayName={telemetryTargetReplay}
-          initialLapNumber={telemetryTargetLap}
-          initialDriverName={telemetryTargetDriver}
-          initialCompareMode={true}
-          initialBaselineReplayName={telemetryBaselineReplay}
-          initialBaselineLapNumber={telemetryBaselineLap}
-          initialBaselineDriverName={telemetryBaselineDriver}
-        />
-      )}
     </div>
   );
 };

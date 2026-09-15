@@ -1,4 +1,4 @@
-export * from './ReplayInspectorModal.js';
+export * from './ReplayInspectorContent.js';
 export * from './ReplayInspectorModalBody.js';
 export * from './ReplayInspectorHeader.js';
 export * from './ReplayInspectorSidebar.js';

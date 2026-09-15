@@ -432,7 +432,7 @@ describe('CompareLaps component', () => {
     });
   });
 
-  it('renders Compare Telemetry button when 2 laps are selected and launches comparison modal', async () => {
+  it('renders Compare Telemetry button when 2 laps are selected and navigates to telemetry', async () => {
     const sessionsWithReplay = [
       {
         ...mockSessions[0],
@@ -464,17 +464,12 @@ describe('CompareLaps component', () => {
     // Click "Compare Telemetry"
     fireEvent.click(compareTelemetryButtons[0]);
 
-    // Modal dialog opens with return button
+    // Telemetry route receives target and baseline replay parameters.
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByTitle('Return to Lap Times')).toBeInTheDocument();
-    });
-
-    // Close the modal
-    fireEvent.click(screen.getByTitle('Return to Lap Times'));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(window.location.hash).toContain('/telemetry?');
+      expect(window.location.hash).toContain('replayName=spa_p1.vcr');
+      expect(window.location.hash).toContain('compareSessionId=');
+      expect(window.location.hash).toContain('compareLapNum=');
     });
   });
 });

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { FileText } from 'lucide-react';
 import { SessionList } from '../session-list/SessionList.js';
-import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
 import { LapData, PaceCategory } from '../../../server/types.js';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
@@ -57,31 +58,72 @@ export interface SessionSummary {
 export interface DashboardProps {
   sessions: SessionSummary[];
   onSelectSession: (id: string) => void;
-  onOpenReplay?: (id: string) => void;
-  selectedTrack: string;
-  setSelectedTrack: (track: string) => void;
+  selectedTrack?: string;
+  setSelectedTrack?: (track: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
-  filterType: string;
-  setFilterType: (type: string) => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  filterType?: string;
+  setFilterType?: (type: string) => void;
+  searchQuery?: string;
+  setSearchQuery?: (query: string) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   sessions,
   onSelectSession,
-  onOpenReplay,
-  selectedTrack,
-  setSelectedTrack,
+  selectedTrack: initialSelectedTrack = 'All',
+  setSelectedTrack: legacySetSelectedTrack,
   selectedCarClass,
   setSelectedCarClass,
-  filterType,
-  setFilterType,
-  searchQuery,
-  setSearchQuery,
+  filterType: initialFilterType = 'All',
+  setFilterType: legacySetFilterType,
+  searchQuery: initialSearchQuery = '',
+  setSearchQuery: legacySetSearchQuery,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const handleOpenReplay = (id: string) => {
+    const session = sessions.find(item => item.id === id);
+    if (!session?.matchingReplayFile) return;
+    const replayParams = new URLSearchParams(searchParams);
+    replayParams.set('replayName', session.matchingReplayFile.name);
+    replayParams.set('lap', '1');
+    navigate(`/telemetry?${replayParams.toString()}`);
+  };
+  const [selectedTrack, setSelectedTrackState] = useState<string>(
+    () => searchParams.get('track') || initialSelectedTrack
+  );
+  const [filterType, setFilterTypeState] = useState<string>(
+    () => searchParams.get('type') || initialFilterType
+  );
+  const [searchQuery, setSearchQueryState] = useState<string>(
+    () => searchParams.get('q') || initialSearchQuery
+  );
+
+  useEffect(() => {
+    setSelectedTrackState(searchParams.get('track') || initialSelectedTrack);
+    setFilterTypeState(searchParams.get('type') || initialFilterType);
+    setSearchQueryState(searchParams.get('q') || initialSearchQuery);
+  }, [initialFilterType, initialSearchQuery, initialSelectedTrack, searchParams]);
+
+  const setSelectedTrack = (track: string) => {
+    setSelectedTrackState(track);
+    legacySetSelectedTrack?.(track);
+    updateSearchParams(searchParams, setSearchParams, { track });
+  };
+
+  const setFilterType = (type: string) => {
+    setFilterTypeState(type);
+    legacySetFilterType?.(type);
+    updateSearchParams(searchParams, setSearchParams, { type });
+  };
+
+  const setSearchQuery = (query: string) => {
+    setSearchQueryState(query);
+    legacySetSearchQuery?.(query);
+    updateSearchParams(searchParams, setSearchParams, { q: query });
+  };
 
   const toggleExpanded = (val?: boolean | ((prev: boolean) => boolean)) => {
     if (typeof val === 'boolean') {
@@ -93,20 +135,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const { params: initialParams } = getHashRouteAndParams();
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.get('hideEmpty') !== 'false');
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
   const [sortBy, setSortByState] = useState<DashboardSortOption>(
-    (initialParams.get('sort') as DashboardSortOption) || 'date-desc'
+    (searchParams.get('sort') as DashboardSortOption) || 'date-desc'
   );
 
   const setSortBy = (sort: DashboardSortOption) => {
     setSortByState(sort);
-    updateHashParams({ sort });
+    updateSearchParams(searchParams, setSearchParams, { sort });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateHashParams({ hideEmpty: hide });
+    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
   const {
@@ -214,7 +255,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <SessionList
             sessions={sortedSessions}
             onSelectSession={onSelectSession}
-            onOpenReplay={onOpenReplay}
+            onOpenReplay={handleOpenReplay}
             showTrackColumn={true}
             headerTitle={
               <>

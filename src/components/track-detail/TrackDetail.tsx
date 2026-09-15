@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { formatTime, matchesSessionType, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
-import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../../server/types.js';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
@@ -30,14 +31,15 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
-  const { params: initialParams } = getHashRouteAndParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(true);
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(initialParams.get('hideEmpty') !== 'false');
-  const [selectedCarModel, setSelectedCarModelState] = useState<string>(initialParams.get('model') || 'All');
-  const [filterType, setFilterTypeState] = useState<string>(initialParams.get('type') || 'All');
-  const [searchQuery, setSearchQueryState] = useState<string>(initialParams.get('q') || '');
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
+  const [selectedCarModel, setSelectedCarModelState] = useState<string>(searchParams.get('model') || 'All');
+  const [filterType, setFilterTypeState] = useState<string>(searchParams.get('type') || 'All');
+  const [searchQuery, setSearchQueryState] = useState<string>(searchParams.get('q') || '');
   const [sortBy, setSortByState] = useState<TrackDetailSortOption>(
-    (initialParams.get('sort') as TrackDetailSortOption) || 'date-desc'
+    (searchParams.get('sort') as TrackDetailSortOption) || 'date-desc'
   );
   const [data, setData] = useState<{
     trackName: string;
@@ -49,30 +51,38 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const selectedClass = selectedCarClass;
   const setSelectedClass = setSelectedCarClass;
+  const handleOpenReplay = (sessionId: string) => {
+    const session = data?.sessions.find(item => item.id === sessionId);
+    if (!session?.matchingReplayFile) return;
+    const replayParams = new URLSearchParams(searchParams);
+    replayParams.set('replayName', session.matchingReplayFile.name);
+    replayParams.set('lap', '1');
+    navigate(`/telemetry?${replayParams.toString()}`);
+  };
 
   const setSortBy = (val: TrackDetailSortOption) => {
     setSortByState(val);
-    updateHashParams({ sort: val });
+    updateSearchParams(searchParams, setSearchParams, { sort: val });
   };
 
   const setSelectedCarModel = (model: string) => {
     setSelectedCarModelState(model);
-    updateHashParams({ model });
+    updateSearchParams(searchParams, setSearchParams, { model });
   };
 
   const setFilterType = (type: string) => {
     setFilterTypeState(type);
-    updateHashParams({ type });
+    updateSearchParams(searchParams, setSearchParams, { type });
   };
 
   const setSearchQuery = (q: string) => {
     setSearchQueryState(q);
-    updateHashParams({ q });
+    updateSearchParams(searchParams, setSearchParams, { q });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateHashParams({ hideEmpty: hide });
+    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
   useEffect(() => {
@@ -266,7 +276,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         hideEmpty={hideEmpty}
         setHideEmpty={setHideEmpty}
         onSelectSession={onSelectSession}
-        onOpenReplay={onOpenReplay}
+        onOpenReplay={onOpenReplay || handleOpenReplay}
         filterType={filterType}
         setFilterType={setFilterType}
         searchQuery={searchQuery}
