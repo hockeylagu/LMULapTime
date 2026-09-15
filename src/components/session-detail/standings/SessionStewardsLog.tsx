@@ -1,11 +1,22 @@
 import { AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
-import { DriverData } from '../../../../server/core/types';
+import { DriverData, LapTrackLimit } from '../../../../server/core/types';
 import { formatElapsedSeconds } from '../../../utils/formatters.js';
 import {
   getTrackLimitSeverity,
   getWorstTrackLimitSeverity,
   getTrackLimitBadgeClasses,
 } from '../../../utils/trackLimits.js';
+
+function getTrackLimitKey(trackLimit: LapTrackLimit): string {
+  return [
+    trackLimit.lapNum ?? '',
+    trackLimit.elapsedSeconds ?? '',
+    trackLimit.description,
+    trackLimit.warningPoints ?? '',
+    trackLimit.currentPoints ?? '',
+    trackLimit.action ?? '',
+  ].join('|');
+}
 
 export interface SessionStewardsLogProps {
   selectedDriver: DriverData;
@@ -35,7 +46,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
     lapNum?: number;
   }> = [];
 
-  const seenTrackLimits = new Set();
+  const seenTrackLimits = new Set<string>();
 
   selectedDriver.laps?.forEach((l) => {
     l.incidents?.forEach((inc) => {
@@ -53,7 +64,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
       });
     });
     l.trackLimits?.forEach((tl) => {
-      seenTrackLimits.add(tl);
+      seenTrackLimits.add(getTrackLimitKey(tl));
       const severity = getTrackLimitSeverity(tl);
       allEvents.push({
         kind: 'trackLimit',
@@ -77,7 +88,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
   });
 
   selectedDriver.trackLimits?.forEach((tl) => {
-    if (!seenTrackLimits.has(tl)) {
+    if (!seenTrackLimits.has(getTrackLimitKey(tl))) {
       const severity = getTrackLimitSeverity(tl);
       allEvents.push({
         kind: 'trackLimit',
@@ -105,7 +116,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
           </h3>
           <div className="flex items-center gap-1.5 ml-2 flex-wrap">
             {hasIncidents && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                 <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}</span>
               </span>
             )}
@@ -116,13 +127,13 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
               const tlSeverity = getWorstTrackLimitSeverity(allTls);
               const badgeClass = getTrackLimitBadgeClasses(tlSeverity);
               return (
-                <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}`}>
+                <span className={`inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}`}>
                   <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {selectedDriver.totalTrackLimits} Track Limit{(selectedDriver.totalTrackLimits ?? 0) !== 1 ? 's' : ''}</span>
                 </span>
               );
             })()}
             {hasPenalties && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
                 <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}</span>
               </span>
             )}
@@ -138,7 +149,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
           {allEvents.map((evt, idx) => (
             <div key={idx} className="py-2 flex items-center justify-between text-xs gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${evt.badgeClass}`}>
+                <span className={`inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${evt.badgeClass}`}>
                   {evt.kind === 'incident' ? <ShieldAlert className="w-3 h-3" /> : evt.kind === 'trackLimit' ? <AlertTriangle className="w-3 h-3" /> : <Ban className="w-3 h-3" />} {evt.badge}
                 </span>
                 <span className="font-mono text-lmu-gold text-xs shrink-0">
