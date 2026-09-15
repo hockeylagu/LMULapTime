@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/types.js';
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import {
@@ -10,7 +11,7 @@ import {
   createTheoreticalBestLap,
   filterLapsByCarCategory,
 } from '../../utils/lapComparison.js';
-import { getHashRouteAndParams, updateHashParams } from '../../utils/urlParams.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
 
 export type AvailableLapsSortOption =
   | 'lap-asc'
@@ -54,7 +55,7 @@ export function useCompareLapsData({
   initialCompareDriver,
   initialCompareLapNum,
 }: UseCompareLapsParams) {
-  const { params } = getHashRouteAndParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const availableTracks = useMemo(() => {
     const set = new Set<string>();
@@ -65,18 +66,18 @@ export function useCompareLapsData({
     return Array.from(set).sort();
   }, [sessions]);
 
-  const defaultTrack = initialTrack || params.get('track') || (availableTracks.length > 0 ? availableTracks[0] : 'Bahrain');
-  const defaultCarClass = initialCarClass || params.get('carClass') || 'LMGT3';
+  const defaultTrack = initialTrack || searchParams.get('track') || (availableTracks.length > 0 ? availableTracks[0] : 'Bahrain');
+  const defaultCarClass = initialCarClass || searchParams.get('carClass') || 'LMGT3';
 
   const [selectedTrack, setSelectedTrackState] = useState<string>(defaultTrack);
   const [selectedCarClass, setSelectedCarClassState] = useState<string>(defaultCarClass);
-  const [selectedCarModel, setSelectedCarModelState] = useState<string>(params.get('model') || 'All');
+  const [selectedCarModel, setSelectedCarModelState] = useState<string>(searchParams.get('model') || 'All');
   const [playerOnly, setPlayerOnlyState] = useState<boolean>(
-    params.get('playerOnly') === 'false' ? false : true
+    searchParams.get('playerOnly') === 'false' ? false : true
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [availableLapsSort, setAvailableLapsSort] = useState<AvailableLapsSortOption>('lap-asc');
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(params.get('hideEmpty') !== 'false');
+  const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
 
   const [apiData, setApiData] = useState<{
     laps: ComparableLap[];
@@ -113,7 +114,7 @@ export function useCompareLapsData({
     setBaselineLapId('');
     initializedScopeRef.current = '';
     hasFetchedRef.current = false;
-    updateHashParams({ track, model: null });
+    updateSearchParams(searchParams, setSearchParams, { track, model: null });
   };
 
   const setSelectedCarClass = (carClass: string) => {
@@ -123,23 +124,23 @@ export function useCompareLapsData({
     setBaselineLapId('');
     initializedScopeRef.current = '';
     hasFetchedRef.current = false;
-    updateHashParams({ carClass, model: null });
+    updateSearchParams(searchParams, setSearchParams, { carClass, model: null });
   };
 
   const setSelectedCarModel = (model: string) => {
     setSelectedCarModelState(model);
-    updateHashParams({ model });
+    updateSearchParams(searchParams, setSearchParams, { model });
   };
 
   const setPlayerOnly = (val: boolean) => {
     setPlayerOnlyState(val);
     // Keep whatever laps are currently selected when switching driver scope
-    updateHashParams({ playerOnly: val ? null : 'false' });
+    updateSearchParams(searchParams, setSearchParams, { playerOnly: val ? null : 'false' });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateHashParams({ hideEmpty: hide });
+    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
   useEffect(() => {
@@ -169,20 +170,20 @@ export function useCompareLapsData({
     };
   }, [selectedTrack, selectedCarClass, playerOnly]);
 
-  const targetSessionId = initialSessionId || params.get('sessionId') || undefined;
+  const targetSessionId = initialSessionId || searchParams.get('sessionId') || undefined;
   const targetLapNum =
     initialLapNum !== undefined
       ? initialLapNum
-      : params.get('lapNum')
-      ? parseInt(params.get('lapNum')!, 10)
+      : searchParams.get('lapNum')
+      ? parseInt(searchParams.get('lapNum')!, 10)
       : undefined;
-  const targetCompareSessionId = initialCompareSessionId || params.get('compareSessionId') || undefined;
-  const targetCompareDriver = initialCompareDriver || params.get('compareDriver') || undefined;
+  const targetCompareSessionId = initialCompareSessionId || searchParams.get('compareSessionId') || undefined;
+  const targetCompareDriver = initialCompareDriver || searchParams.get('compareDriver') || undefined;
   const targetCompareLapNum =
     initialCompareLapNum !== undefined
       ? initialCompareLapNum
-      : params.get('compareLapNum')
-      ? parseInt(params.get('compareLapNum')!, 10)
+      : searchParams.get('compareLapNum')
+      ? parseInt(searchParams.get('compareLapNum')!, 10)
       : undefined;
 
   useEffect(() => {

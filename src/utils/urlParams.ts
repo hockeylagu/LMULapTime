@@ -1,25 +1,11 @@
-export interface HashRouteAndParams {
-  path: string;
-  params: URLSearchParams;
-}
+import type { SetURLSearchParams } from 'react-router';
 
-export function getHashRouteAndParams(): HashRouteAndParams {
-  const fullHash = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#\/?/, '');
-  const qIndex = fullHash.indexOf('?');
-  const path = qIndex !== -1 ? fullHash.substring(0, qIndex) : fullHash;
-  const searchPart = qIndex !== -1
-    ? fullHash.substring(qIndex + 1)
-    : (typeof window !== 'undefined' ? window.location.search.replace(/^\?/, '') : '');
-
-  return {
-    path,
-    params: new URLSearchParams(searchPart),
-  };
-}
-
-export function updateHashParams(updates: Record<string, string | boolean | null | undefined>): void {
-  if (typeof window === 'undefined') return;
-  const { path, params } = getHashRouteAndParams();
+export function updateSearchParams(
+  currentParams: URLSearchParams,
+  setSearchParams: SetURLSearchParams,
+  updates: Record<string, string | boolean | null | undefined>
+): void {
+  const params = new URLSearchParams(currentParams);
 
   for (const [key, value] of Object.entries(updates)) {
     if (value === undefined || value === null || value === '' || value === 'All' || value === 'date-desc' || (key === 'view' && value === 'grid')) {
@@ -32,20 +18,5 @@ export function updateHashParams(updates: Record<string, string | boolean | null
     }
   }
 
-  const paramStr = params.toString();
-  const newHash = `#/${path}${paramStr ? `?${paramStr}` : ''}`;
-  window.history.replaceState(null, '', newHash);
-  try {
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
-  } catch {
-    window.dispatchEvent(new Event('hashchange'));
-  }
-}
-
-export function setHashRoute(newPath: string, preserveParams = true): void {
-  if (typeof window === 'undefined') return;
-  const { params } = getHashRouteAndParams();
-  const paramStr = preserveParams ? params.toString() : '';
-  const cleanPath = newPath.replace(/^#?\/?/, '');
-  window.location.hash = `#/${cleanPath}${paramStr ? `?${paramStr}` : ''}`;
+  setSearchParams(params, { replace: true });
 }

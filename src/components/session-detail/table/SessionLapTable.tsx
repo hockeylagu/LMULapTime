@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router';
 import { Clock, ArrowLeftRight } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/types.js';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
@@ -23,6 +24,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
   hasVirtualEnergyData,
   isCurrentSessionAllTimePB,
 }) => {
+  const navigate = useNavigate();
   const bestLap = selectedDriver?.bestLapTime ?? null;
   const bestS1 = selectedDriver?.bestS1 ?? null;
   const bestS2 = selectedDriver?.bestS2 ?? null;
@@ -48,9 +50,9 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             onClick={() => {
               const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
               const carClass = selectedDriver?.carClass || 'LMGT3';
-              window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+              navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
                 carClass
-              )}&sessionId=${encodeURIComponent(session.id)}`;
+              )}&sessionId=${encodeURIComponent(session.id)}`);
             }}
             className="px-3.5 py-1.5 rounded-xl bg-lmu-accent/20 hover:bg-lmu-accent/30 border border-lmu-accent/40 text-lmu-accent text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
             title="Open full telemetry comparator studio for this session"

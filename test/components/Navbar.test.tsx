@@ -4,13 +4,10 @@ import { Navbar } from '../../src/components/navbar/index.js';
 
 describe('Navbar component', () => {
   it('renders brand title and active tab correctly', () => {
-    const setActiveTab = vi.fn();
     const onRefresh = vi.fn();
 
     render(
       <Navbar
-        activeTab="dashboard"
-        setActiveTab={setActiveTab}
         status={{ resultsExist: true, replaysExist: true, sessionsCount: 15 }}
         onRefresh={onRefresh}
         isRefreshing={false}
@@ -20,19 +17,14 @@ describe('Navbar component', () => {
     expect(screen.getByText(/LMU/)).toBeInTheDocument();
     expect(screen.getByText(/15 Sessions Parsed/)).toBeInTheDocument();
 
-    const tracksBtn = screen.getByRole('button', { name: /tracks/i });
-    fireEvent.click(tracksBtn);
-    expect(setActiveTab).toHaveBeenCalledWith('tracks');
+    expect(screen.getByRole('link', { name: /tracks/i })).toHaveAttribute('href', '/tracks');
   });
 
   it('handles refresh button click and triggers onRefresh', () => {
-    const setActiveTab = vi.fn();
     const onRefresh = vi.fn();
 
     render(
       <Navbar
-        activeTab="tracks"
-        setActiveTab={setActiveTab}
         status={{ resultsExist: false, replaysExist: false, sessionsCount: 0 }}
         onRefresh={onRefresh}
         isRefreshing={false}
@@ -45,11 +37,8 @@ describe('Navbar component', () => {
   });
 
   it('returns to dashboard when clicking the top-right status section or the brand logo', () => {
-    const setActiveTab = vi.fn();
     render(
       <Navbar
-        activeTab="tracks"
-        setActiveTab={setActiveTab}
         status={{ resultsExist: true, replaysExist: true, sessionsCount: 15 }}
         onRefresh={vi.fn()}
         isRefreshing={false}
@@ -58,12 +47,10 @@ describe('Navbar component', () => {
 
     // Click top-right status section
     const statusCard = screen.getByText(/15 Sessions Parsed/i);
-    fireEvent.click(statusCard);
-    expect(setActiveTab).toHaveBeenCalledWith('dashboard');
+    expect(statusCard.closest('a')).toHaveAttribute('href', '/dashboard');
 
     // Click brand title
     const brandHeading = screen.getByRole('heading', { level: 1, name: /LMU Lap Time Analyzer/i });
-    fireEvent.click(brandHeading);
-    expect(setActiveTab).toHaveBeenCalledWith('dashboard');
+    expect(brandHeading.closest('a')).toHaveAttribute('href', '/dashboard');
   });
 });

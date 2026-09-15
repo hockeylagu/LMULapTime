@@ -582,7 +582,7 @@ describe('GpsTrackMap', () => {
 
     // Zoom increases to 4.5x
     expect(screen.getByText('4.5x')).toBeInTheDocument();
-    const cornerViewBox = svgEl?.getAttribute('viewBox');
+    const cornerViewBox = container.querySelector('svg.drop-shadow-md')?.getAttribute('viewBox');
     expect(cornerViewBox).not.toEqual(defaultViewBox);
     const [, , vw, vh] = (cornerViewBox || '').split(' ').map(Number);
     expect(vw).toBeLessThan(150);

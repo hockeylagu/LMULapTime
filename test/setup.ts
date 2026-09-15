@@ -1,11 +1,46 @@
 import '@testing-library/jest-dom/vitest';
 import '@testing-library/jest-dom';
 import { afterEach, vi } from 'vitest';
+import React, { useEffect } from 'react';
+import { MemoryRouter, useLocation } from 'react-router';
+
+vi.mock('@testing-library/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@testing-library/react')>();
+  const RouterMirror: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const location = useLocation();
+
+    useEffect(() => {
+      window.location.hash = `#${location.pathname}${location.search}${location.hash}`;
+    }, [location]);
+
+    return React.createElement(React.Fragment, null, children);
+  };
+
+  const render = (ui: React.ReactElement, options?: Parameters<typeof actual.render>[1]) => {
+    const rawHash = window.location.hash.replace(/^#/, '');
+    const initialEntry = rawHash.startsWith('/') ? rawHash : `/${rawHash}`;
+    const RouterWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: [initialEntry || '/'] },
+        React.createElement(RouterMirror, null, children),
+      );
+
+    return actual.render(
+      ui,
+      { ...options, wrapper: RouterWrapper },
+    );
+  };
+
+  return { ...actual, render };
+});
+
 import { cleanup } from '@testing-library/react';
 
 // Automatically clean up React DOM after each test
 afterEach(() => {
   cleanup();
+  window.location.hash = '#/';
 });
 
 // Mock window.matchMedia for responsive components

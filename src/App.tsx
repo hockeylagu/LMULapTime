@@ -1,27 +1,109 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   Navbar,
-  NavTab,
   Dashboard,
   TrackSummaries,
   SessionDetail,
   TrackDetail,
   Settings,
   CompareLaps,
+  ReplayInspectorPage,
 } from './components/index.js';
-import { getHashRouteAndParams, updateHashParams, setHashRoute } from './utils/urlParams';
+import { updateSearchParams } from './utils/urlParams';
 import { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/types.js';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [selectedRouteTrackName, setSelectedRouteTrackName] = useState<string | null>(null);
+interface SessionRouteProps {
+  onBack: () => void;
+  onSelectSession: (id: string) => void;
+  progression: SessionProgressionPoint[];
+  sessions: DetailedSession[];
+}
 
+function SessionRoute({ onBack, onSelectSession, progression, sessions }: SessionRouteProps) {
+  const { sessionId } = useParams();
+  if (!sessionId) return <Navigate to="/dashboard" replace />;
+  return (
+    <SessionDetail
+      sessionId={sessionId}
+      onBack={onBack}
+      onSelectSession={onSelectSession}
+      progression={progression}
+      sessions={sessions}
+    />
+  );
+}
+
+interface TrackRouteProps {
+  onSelectSession: (id: string) => void;
+  selectedCarClass: string;
+  setSelectedCarClass: (carClass: string) => void;
+  progression: SessionProgressionPoint[];
+}
+
+interface DashboardRouteProps {
+  sessions: DetailedSession[];
+  onSelectSession: (id: string) => void;
+  selectedCarClass: string;
+  setSelectedCarClass: (carClass: string) => void;
+}
+
+function DashboardRoute({ sessions, onSelectSession, selectedCarClass, setSelectedCarClass }: DashboardRouteProps) {
+  return (
+    <Dashboard
+      sessions={sessions}
+      onSelectSession={onSelectSession}
+      selectedCarClass={selectedCarClass}
+      setSelectedCarClass={setSelectedCarClass}
+    />
+  );
+}
+
+interface CompareRouteProps {
+  sessions: DetailedSession[];
+  onSelectSession: (id: string) => void;
+}
+
+function CompareRoute({ sessions, onSelectSession }: CompareRouteProps) {
+  const [searchParams] = useSearchParams();
+  return (
+    <CompareLaps
+      sessions={sessions}
+      onSelectSession={onSelectSession}
+      initialTrack={searchParams.get('track') || undefined}
+      initialCarClass={searchParams.get('carClass') || undefined}
+      initialSessionId={searchParams.get('sessionId') || undefined}
+      initialLapNum={searchParams.get('lapNum') ? parseInt(searchParams.get('lapNum')!, 10) : undefined}
+      initialCompareSessionId={searchParams.get('compareSessionId') || undefined}
+      initialCompareDriver={searchParams.get('compareDriver') || undefined}
+      initialCompareLapNum={searchParams.get('compareLapNum') ? parseInt(searchParams.get('compareLapNum')!, 10) : undefined}
+    />
+  );
+}
+
+function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass, progression }: TrackRouteProps) {
+  const { trackName } = useParams();
+  const navigate = useNavigate();
+  if (!trackName) return <Navigate to="/tracks" replace />;
+  return (
+    <TrackDetail
+      trackName={trackName}
+      onBack={() => navigate('/tracks', { replace: true })}
+      onSelectSession={onSelectSession}
+      selectedCarClass={selectedCarClass}
+      setSelectedCarClass={setSelectedCarClass}
+      progression={progression}
+    />
+  );
+}
+
+export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isTelemetryRoute = location.pathname === '/telemetry';
   // Global Filter States
-  const [selectedTrack, setSelectedTrackState] = useState<string>('All');
   const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
-  const [filterType, setFilterTypeState] = useState<string>('All');
-  const [searchQuery, setSearchQueryState] = useState<string>('');
 
   // Data States
   const [status, setStatus] = useState<AppStatus | null>(null);
@@ -73,76 +155,15 @@ export default function App() {
     };
   }, [startScanPolling]);
 
-  // Helper to parse location hash and query parameters for routing and filter state
-  const parseUrlState = () => {
-    const { path: pathPart, params } = getHashRouteAndParams();
-
-    let tab: NavTab = 'dashboard';
-    let sessionId: string | null = null;
-    let trackRouteName: string | null = null;
-
-    if (pathPart.startsWith('session/')) {
-      sessionId = decodeURIComponent(pathPart.replace('session/', ''));
-    } else if (pathPart.startsWith('track/')) {
-      tab = 'tracks';
-      trackRouteName = decodeURIComponent(pathPart.replace('track/', ''));
-    } else if (['tracks', 'compare', 'settings', 'dashboard'].includes(pathPart)) {
-      tab = pathPart as NavTab;
-    }
-
-    return {
-      tab,
-      sessionId,
-      trackRouteName,
-      filters: {
-        track: params.get('track') || 'All',
-        carClass: params.get('carClass') || 'All',
-        type: params.get('type') || 'All',
-        q: params.get('q') || '',
-      },
-    };
-  };
-
-  const setSelectedTrack = (track: string) => {
-    setSelectedTrackState(track);
-    updateHashParams({ track });
-  };
+  // Keep view filters synchronized with the router URL.
+  useEffect(() => {
+    setSelectedCarClassState(searchParams.get('carClass') || 'All');
+  }, [searchParams]);
 
   const setSelectedCarClass = (carClass: string) => {
     setSelectedCarClassState(carClass);
-    updateHashParams({ carClass });
+    updateSearchParams(searchParams, setSearchParams, { carClass });
   };
-
-  const setFilterType = (type: string) => {
-    setFilterTypeState(type);
-    updateHashParams({ type });
-  };
-
-  const setSearchQuery = (q: string) => {
-    setSearchQueryState(q);
-    updateHashParams({ q });
-  };
-
-  const handleHashChange = useCallback(() => {
-    const { tab, sessionId, trackRouteName, filters } = parseUrlState();
-    setActiveTab(tab);
-    setSelectedSessionId(sessionId);
-    setSelectedRouteTrackName(trackRouteName);
-    setSelectedTrackState(filters.track);
-    setSelectedCarClassState(filters.carClass);
-    setFilterTypeState(filters.type);
-    setSearchQueryState(filters.q);
-  }, []);
-
-  useEffect(() => {
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    window.addEventListener('popstate', handleHashChange);
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-      window.removeEventListener('popstate', handleHashChange);
-    };
-  }, [handleHashChange]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
     setIsRefreshing(true);
@@ -176,50 +197,31 @@ export default function App() {
   }, [fetchData]);
 
   const handleSelectSession = (id: string) => {
-    window.location.hash = `session/${encodeURIComponent(id)}`;
-  };
-
-  const handleOpenReplay = (id: string) => {
-    window.location.hash = `session/${encodeURIComponent(id)}?replay=1`;
+    navigate(`/session/${encodeURIComponent(id)}`);
   };
 
   const handleBackToSessions = () => {
-    if (window.location.hash.startsWith('#session/')) {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.hash = 'dashboard';
-      }
-    } else {
-      setSelectedSessionId(null);
-    }
-  };
-
-  const handleTabChange = (tab: NavTab) => {
-    setHashRoute(tab);
+    navigate('/dashboard', { replace: true });
   };
 
   const handleSelectTrack = (trackName: string) => {
-    setHashRoute(`track/${encodeURIComponent(trackName)}`);
+    navigate(`/track/${encodeURIComponent(trackName)}`);
   };
-
-  const compareParams = activeTab === 'compare' ? getHashRouteAndParams().params : null;
 
   return (
     <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
-      {/* Top Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={handleTabChange}
-        status={status}
-        replayScanStatus={replayScanStatus}
-        onRefresh={() => fetchData(true)}
-        isRefreshing={isRefreshing}
-      />
+      {!isTelemetryRoute && (
+        <Navbar
+          status={status}
+          replayScanStatus={replayScanStatus}
+          onRefresh={() => fetchData(true)}
+          isRefreshing={isRefreshing}
+        />
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6'}>
 
         {loading ? (
           <div className="py-24 text-center glass-panel rounded-2xl">
@@ -227,72 +229,52 @@ export default function App() {
             <h3 className="text-lg font-bold text-white uppercase tracking-wider">Loading LMU Replay & Timing Database</h3>
             <p className="text-xs text-lmu-muted mt-1">Scanning UserData\LOG\Results and UserData\Replays...</p>
           </div>
-        ) : selectedSessionId ? (
-          <SessionDetail
-            sessionId={selectedSessionId}
-            onBack={handleBackToSessions}
-            onSelectSession={handleSelectSession}
-            progression={progression}
-            sessions={sessions}
-          />
-        ) : selectedRouteTrackName ? (
-          <TrackDetail
-            trackName={selectedRouteTrackName}
-            onBack={() => { window.location.hash = 'tracks'; }}
-            onSelectSession={handleSelectSession}
-            onOpenReplay={handleOpenReplay}
-            selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setSelectedCarClass}
-            progression={progression}
-          />
-        ) : activeTab === 'dashboard' ? (
-          <Dashboard
-            sessions={sessions}
-            onSelectSession={handleSelectSession}
-            onOpenReplay={handleOpenReplay}
-            selectedTrack={selectedTrack}
-            setSelectedTrack={setSelectedTrack}
-            selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setSelectedCarClass}
-            filterType={filterType}
-            setFilterType={setFilterType}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-          />
-        ) : activeTab === 'tracks' ? (
-          <TrackSummaries
-            sessions={sessions}
-            tracksMap={tracksMap}
-            onSelectTrack={handleSelectTrack}
-            selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setSelectedCarClass}
-          />
-        ) : activeTab === 'compare' ? (
-          <CompareLaps
-            sessions={sessions}
-            onSelectSession={handleSelectSession}
-            initialTrack={compareParams?.get('track') || (selectedTrack !== 'All' ? selectedTrack : undefined)}
-            initialCarClass={compareParams?.get('carClass') || (selectedCarClass !== 'All' ? selectedCarClass : undefined)}
-            initialSessionId={compareParams?.get('sessionId') || undefined}
-            initialLapNum={compareParams?.get('lapNum') ? parseInt(compareParams.get('lapNum')!, 10) : undefined}
-            initialCompareSessionId={compareParams?.get('compareSessionId') || undefined}
-            initialCompareDriver={compareParams?.get('compareDriver') || undefined}
-            initialCompareLapNum={compareParams?.get('compareLapNum') ? parseInt(compareParams.get('compareLapNum')!, 10) : undefined}
-          />
-        ) : activeTab === 'settings' ? (
-          <Settings
-            status={status}
-            onUpdatePaths={() => fetchData(true)}
-            replayScanStatus={replayScanStatus}
-            onReplayScanTriggered={refreshReplayScanStatus}
-          />
-        ) : null}
+        ) : (
+          <Routes>
+            <Route path="/dashboard" element={
+              <DashboardRoute
+                sessions={sessions}
+                onSelectSession={handleSelectSession}
+                selectedCarClass={selectedCarClass}
+                setSelectedCarClass={setSelectedCarClass}
+              />
+            } />
+            <Route path="/tracks" element={
+              <TrackSummaries
+                sessions={sessions}
+                tracksMap={tracksMap}
+                onSelectTrack={handleSelectTrack}
+                selectedCarClass={selectedCarClass}
+                setSelectedCarClass={setSelectedCarClass}
+              />
+            } />
+            <Route path="/compare" element={
+              <CompareRoute
+                sessions={sessions}
+                onSelectSession={handleSelectSession}
+              />
+            } />
+            <Route path="/settings" element={
+              <Settings
+                status={status}
+                onUpdatePaths={() => fetchData(true)}
+                replayScanStatus={replayScanStatus}
+                onReplayScanTriggered={refreshReplayScanStatus}
+              />
+            } />
+            <Route path="/session/:sessionId" element={<SessionRoute onBack={handleBackToSessions} onSelectSession={handleSelectSession} progression={progression} sessions={sessions} />} />
+            <Route path="/telemetry" element={<ReplayInspectorPage />} />
+            <Route path="/track/:trackName" element={<TrackRoute onSelectSession={handleSelectSession} selectedCarClass={selectedCarClass} setSelectedCarClass={setSelectedCarClass} progression={progression} />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted glass-panel">
-        <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
-      </footer>
+      {!isTelemetryRoute && (
+        <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted glass-panel">
+          <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
+        </footer>
+      )}
     </div>
   );
 }

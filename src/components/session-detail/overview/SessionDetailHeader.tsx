@@ -1,12 +1,11 @@
 import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/types.js';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
-import { getHashRouteAndParams, updateHashParams } from '../../../utils/urlParams.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
-import { ReplayInspectorModal } from '../../replay/index.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 
 export interface SessionDetailHeaderProps {
@@ -21,7 +20,6 @@ export interface SessionDetailHeaderProps {
   handleNavigateToSession: (id: string) => void;
   handleExportCsv: () => void;
   refEntry: ReferenceLaptimeEntry | null;
-  sessions?: DetailedSession[];
 }
 
 export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
@@ -36,59 +34,15 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   handleNavigateToSession,
   handleExportCsv,
   refEntry,
-  sessions,
 }) => {
-  const { params: urlParams } = getHashRouteAndParams();
-  const compareSessionId = urlParams.get('compareSessionId');
-  const compareSession = compareSessionId === session.id
-    ? session
-    : sessions?.find(candidate => candidate.id === compareSessionId);
-  const initialBaselineReplayName = compareSession?.matchingReplayFile?.name ?? null;
-  const initialBaselineLapNumber = urlParams.get('compareLapNum') ? parseInt(urlParams.get('compareLapNum')!, 10) : null;
-  const initialBaselineDriverName = urlParams.get('compareDriver');
-  const [showReplayModal, setShowReplayModal] = React.useState(() => {
-    const { params } = getHashRouteAndParams();
-    return Boolean(params.get('replay') || params.get('replayLap') || (session.matchingReplayFile && (params.get('lap') || params.get('lapNum'))));
-  });
-
-  const [replayLap, setReplayLap] = React.useState<number | undefined>(() => {
-    const { params } = getHashRouteAndParams();
-    const l = params.get('lap') || params.get('lapNum') || params.get('replayLap');
-    return l ? parseInt(l, 10) : undefined;
-  });
-
-  React.useEffect(() => {
-    const syncFromUrl = () => {
-      const { params } = getHashRouteAndParams();
-      const hasReplay = Boolean(params.get('replay') || params.get('replayLap') || (session.matchingReplayFile && (params.get('lap') || params.get('lapNum'))));
-      const l = params.get('lap') || params.get('lapNum') || params.get('replayLap');
-      setShowReplayModal(hasReplay);
-      if (l) setReplayLap(parseInt(l, 10));
-    };
-
-    window.addEventListener('hashchange', syncFromUrl);
-    window.addEventListener('popstate', syncFromUrl);
-    return () => {
-      window.removeEventListener('hashchange', syncFromUrl);
-      window.removeEventListener('popstate', syncFromUrl);
-    };
-  }, [session.matchingReplayFile]);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const handleOpenReplay = (targetLap?: number) => {
-    const lapToOpen = targetLap || replayLap || selectedDriver?.bestLapNum || 1;
-    updateHashParams({ replay: '1', lap: String(lapToOpen) });
-    setReplayLap(lapToOpen);
-    setShowReplayModal(true);
-  };
-
-  const handleCloseReplay = () => {
-    updateHashParams({ replay: null, lap: null, lapNum: null, replayLap: null, compareSessionId: null, compareDriver: null, compareLapNum: null });
-    setShowReplayModal(false);
-  };
-
-  const handleLapChange = (newLap: number) => {
-    setReplayLap(newLap);
-    updateHashParams({ lap: String(newLap) });
+    const telemetryParams = new URLSearchParams(searchParams);
+    telemetryParams.set('replayName', session.matchingReplayFile?.name || '');
+    telemetryParams.set('lap', String(targetLap || selectedDriver?.bestLapNum || 1));
+    navigate(`/telemetry?${telemetryParams.toString()}`);
   };
 
   const [showRulesModal, setShowRulesModal] = React.useState(false);
@@ -157,17 +111,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 {copiedReplay ? 'Path Copied!' : 'Copy Replay'}
               </button>
 
-              <ReplayInspectorModal
-                isOpen={showReplayModal}
-                onClose={handleCloseReplay}
-                replayName={session.matchingReplayFile.name}
-                initialLapNumber={replayLap}
-                onLapChange={handleLapChange}
-                initialCompareMode={Boolean(initialBaselineReplayName)}
-                initialBaselineReplayName={initialBaselineReplayName}
-                initialBaselineLapNumber={initialBaselineLapNumber}
-                initialBaselineDriverName={initialBaselineDriverName}
-              />
             </>
           )}
 
@@ -234,7 +177,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                   <span className="text-xs text-lmu-muted">{session.timeString}</span>
                 </div>
                 <h2
-                  onClick={() => { window.location.hash = `#track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`; }}
+                  onClick={() => navigate(`/track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`)}
                   className="text-2xl font-extrabold text-white cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
                   title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
                 >

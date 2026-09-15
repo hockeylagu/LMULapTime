@@ -1,8 +1,8 @@
 import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData, LapData } from '../../../../server/types.js';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../utils/formatters.js';
 import { computeLapToLapDelta } from '../../../utils/lapComparison.js';
-import { updateHashParams } from '../../../utils/urlParams.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
@@ -38,6 +38,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   hasTireWearData,
   hasFuelData,
 }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   let displayLapTime = l.lapTime;
   let displayLapTimeString = l.lapTimeString;
   let isInferredLap = !!l.isInferred;
@@ -130,13 +132,16 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
 
   const handleOpenTelemetry = () => {
     if (session.matchingReplayFile) {
-      updateHashParams({ replay: '1', lap: String(l.lapNum) });
+      const telemetryParams = new URLSearchParams(searchParams);
+      telemetryParams.set('replayName', session.matchingReplayFile.name);
+      telemetryParams.set('lap', String(l.lapNum));
+      navigate(`/telemetry?${telemetryParams.toString()}`);
     } else {
       const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
       const carClass = selectedDriver?.carClass || 'LMGT3';
-      window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+      navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
         carClass
-      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
+      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`);
     }
   };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
 import { VEHICLE_CLASS_OPTIONS } from '../../utils/paceCategory.js';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
@@ -38,6 +39,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
   xmlTrackLengthMeters,
 }) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -56,7 +58,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
           type="button"
           onClick={() => {
             const carClass = selectedClass !== 'All' ? selectedClass : 'LMGT3';
-            window.location.hash = `compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`;
+            navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
           }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-accent transition-all"
           title="Compare laps on this circuit"

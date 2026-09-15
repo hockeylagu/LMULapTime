@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CircleDot, Eye, EyeOff, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/types.js';
 import { GpsTrackMap } from './GpsTrackMap.js';
-import { ReplayTelemetryHud } from '../modal/ReplayTelemetryHud.js';
+import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { getTrajectoryDistances } from '../../../utils/replayComparison.js';

@@ -1,7 +1,7 @@
 import { Activity } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../server/types.js';
 import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
-import { updateHashParams } from '../../../utils/urlParams.js';
 import { PaceBadge } from '../../common';
 
 export interface DriverTimingMetricsRowProps {
@@ -45,6 +45,8 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
   avgS2,
   avgS3,
 }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const bestLapNum =
     selectedDriver.bestLapNum ||
     (selectedDriver.bestLapTime
@@ -57,13 +59,16 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
   const handleOpenBestLapTelemetry = () => {
     if (!bestLapNum) return;
     if (session?.matchingReplayFile) {
-      updateHashParams({ replay: '1', lap: String(bestLapNum) });
+      const telemetryParams = new URLSearchParams(searchParams);
+      telemetryParams.set('replayName', session.matchingReplayFile.name);
+      telemetryParams.set('lap', String(bestLapNum));
+      navigate(`/telemetry?${telemetryParams.toString()}`);
     } else if (session) {
       const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
       const carClass = selectedDriver.carClass || 'LMGT3';
-      window.location.hash = `#compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+      navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
         carClass
-      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`;
+      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`);
     }
   };
 
