@@ -95,7 +95,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
                 isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold' : 'text-lmu-blue font-semibold'
               }`}
             >
-              {isCurrentSessionAllTimePB ? `⭐ Personal Best` : '★ Session Best Lap'}
+              {isCurrentSessionAllTimePB ? `⭐ Personal Best` : '★ Session Best'}
             </p>
             {bestLapNum && (
               <span className="text-[9px] text-lmu-muted group-hover/card:text-lmu-gold transition-colors font-sans flex items-center gap-0.5">

@@ -50,7 +50,7 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
         hideEmpty={hideEmpty}
         onToggle={setHideEmpty}
         emptyCount={emptyCount}
-        label="Hide Empty"
+        label="Hide Empty Sessions"
         titleHiding="Hiding empty sessions (0 laps). Click to show all."
         titleShowing="Showing all sessions. Click to filter out empty results."
       />

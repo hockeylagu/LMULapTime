@@ -144,7 +144,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
             : ' (no changes detected)';
           setLaptimesMessage(`Updated ${data.entriesCount} benchmark entries from Google Sheets!${diffSummary}`);
         } else {
-          setLaptimesMessage('Failed to update reference laptimes.');
+          setLaptimesMessage('Failed to update reference lap time benchmarks.');
         }
       })
       .catch((err) => {
@@ -188,7 +188,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         <div>
           <h2 className="text-xl font-extrabold text-white">Application Settings</h2>
           <p className="text-xs text-lmu-muted mt-0.5">
-            Manage LMU telemetry log paths, SQLite session database cache & sync reference lap time benchmarks
+            Manage LMU telemetry log paths, SQLite session database cache, and reference lap time benchmarks
           </p>
         </div>
       </div>

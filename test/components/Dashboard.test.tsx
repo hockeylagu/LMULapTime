@@ -251,7 +251,7 @@ describe('Dashboard component', () => {
     fireEvent.click(lessButtons[0]);
   });
 
-  it('toggles Hide Empty Results filter', () => {
+  it('toggles Hide Empty Sessions filter', () => {
     render(
       <Dashboard
         sessions={mockSessions}
@@ -267,7 +267,7 @@ describe('Dashboard component', () => {
       />
     );
 
-    const hideEmptyBtn = screen.getByRole('button', { name: /Hide Empty Results/i });
+    const hideEmptyBtn = screen.getByRole('button', { name: /Hide Empty Sessions/i });
     fireEvent.click(hideEmptyBtn);
     fireEvent.click(hideEmptyBtn);
   });

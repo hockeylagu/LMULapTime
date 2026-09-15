@@ -44,7 +44,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
           </p>
         </div>
 
-        {/* Open Full Comparison Studio */}
+        {/* Open the lap comparison view */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -55,10 +55,10 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
               )}&sessionId=${encodeURIComponent(session.id)}`);
             }}
             className="px-3.5 py-1.5 rounded-xl bg-lmu-accent/20 hover:bg-lmu-accent/30 border border-lmu-accent/40 text-lmu-accent text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-            title="Open full telemetry comparator studio for this session"
+            title="Compare laps from this session"
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />
-            <span>Open in Comparison Studio</span>
+            <span>Compare Laps</span>
           </button>
         </div>
       </div>

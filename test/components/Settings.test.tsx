@@ -37,7 +37,7 @@ describe('Settings component', () => {
     await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
-    expect(screen.getByText('Cached Replays (.Vcr)')).toBeInTheDocument();
+    expect(screen.getByText('Cached Replays (.VCR)')).toBeInTheDocument();
     expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
@@ -59,9 +59,9 @@ describe('Settings component', () => {
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
     await screen.findByText(/no replays cached yet/i);
 
-    expect(screen.getByText('Reference Laptimes Benchmark')).toBeInTheDocument();
+    expect(screen.getByText('Reference Lap Time Benchmarks')).toBeInTheDocument();
 
-    const refreshBtn = screen.getByRole('button', { name: /update reference laptimes/i });
+    const refreshBtn = screen.getByRole('button', { name: /update reference lap time benchmarks/i });
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
@@ -231,7 +231,7 @@ describe('Settings component', () => {
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
     await screen.findByText(/no replays cached yet/i);
 
-    const refreshBtn = screen.getByRole('button', { name: /update reference laptimes/i });
+    const refreshBtn = screen.getByRole('button', { name: /update reference lap time benchmarks/i });
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {

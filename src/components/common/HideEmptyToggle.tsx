@@ -15,7 +15,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
   hideEmpty,
   onToggle,
   emptyCount = 0,
-  label = 'Hide Empty Results',
+  label = 'Hide Empty Sessions',
   titleHiding = 'Hiding empty sessions (0 laps). Click to show all.',
   titleShowing = 'Showing all sessions including empty results. Click to filter out empty results.',
   className = '',

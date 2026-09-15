@@ -26,6 +26,7 @@ export function SortDropdown<T extends string = string>({
       <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
       {label && <span className="text-lmu-muted font-medium">{label}</span>}
       <select
+        aria-label={label || 'Sort'}
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"

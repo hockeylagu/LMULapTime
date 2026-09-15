@@ -27,7 +27,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-lmu-gold" />
-          <h3 className="text-base font-bold text-white uppercase tracking-wider">Reference Laptimes Benchmark</h3>
+          <h3 className="text-base font-bold text-white uppercase tracking-wider">Reference Lap Time Benchmarks</h3>
         </div>
         <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30">
           {status?.referenceLaptimes?.entriesCount || 0} Benchmarks Cached
@@ -65,7 +65,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-amber-400 transition-all shadow-md shadow-lmu-gold/20 shrink-0 disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isUpdatingLaptimes ? 'animate-spin' : ''}`} />
-          {isUpdatingLaptimes ? 'Fetching Spreadsheet...' : 'Update Reference Laptimes'}
+          {isUpdatingLaptimes ? 'Fetching Spreadsheet...' : 'Update Reference Lap Time Benchmarks'}
         </button>
       </div>
 

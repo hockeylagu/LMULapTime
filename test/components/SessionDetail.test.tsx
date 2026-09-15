@@ -381,8 +381,8 @@ describe('SessionDetail component', () => {
     expect(window.location.hash).toContain('sessionId=sess123');
     expect(window.location.hash).toContain('lapNum=1');
 
-    // Click Open in Comparison Studio in header
-    const openStudioBtn = screen.getByRole('button', { name: /Open in Comparison Studio/i });
+    // Click Compare Laps in the header
+    const openStudioBtn = screen.getByRole('button', { name: /Compare Laps/i });
     fireEvent.click(openStudioBtn);
     expect(window.location.hash).toContain('compare');
     expect(window.location.hash).toContain('sessionId=sess123');
@@ -681,7 +681,7 @@ describe('SessionDetail component', () => {
     // Classification table has Safety column
     expect(screen.getByText('Safety')).toBeInTheDocument();
     expect(screen.getAllByText('Clean').length).toBeGreaterThanOrEqual(1);
-    const incidentBadge = screen.getByText(/💥\s*2x/i).parentElement;
+    const incidentBadge = screen.getByTitle(/Contact with Ferrari 499P \(1200N\)/i);
     expect(incidentBadge).toBeInTheDocument();
     expect(incidentBadge?.getAttribute('title')).toContain('Lap 2: Contact with Ferrari 499P (1200N)');
     expect(incidentBadge?.getAttribute('title')).not.toContain('contact ()');
@@ -1154,11 +1154,11 @@ describe('SessionDetail component', () => {
     expect(incompleteContainer?.getAttribute('title')).toContain('Contact with Immovable (4522N)');
 
     // Verify compact badges on laps - yellow for 0.25 pts
-    expect(screen.getAllByText('💥 1').length).toBe(2);
-    const tlBadge = screen.getByText('⚠️ 1');
+    expect(screen.getAllByTitle(/Contact with Archie Porter/i).length).toBe(2);
+    const tlBadge = screen.getByTitle(/Track limits violation \(\+0\.25 pts\)/i);
     expect(tlBadge).toBeInTheDocument();
     expect(tlBadge.className).toContain('text-yellow-300');
-    expect(screen.getByText('🛑 Drive Thru')).toBeInTheDocument();
+    expect(screen.getByText('Drive Thru')).toBeInTheDocument();
 
     // Verify Expandable Incidents & Stewards Log toggle
     const toggleLogBtn = screen.getByText(/Incidents & Stewards Log/i);
@@ -1265,7 +1265,7 @@ describe('SessionDetail component', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    const badges = screen.getAllByText('⚠️ 1');
+    const badges = screen.getAllByTitle(/Track limits (review|violation)/i);
     expect(badges.length).toBe(2);
 
     // Lap 1: No Further Action -> Green (emerald)

@@ -32,7 +32,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         title={
           session.matchingReplayFile
             ? `Inspect Replay for Lap ${lapNum} Telemetry`
-            : `Open Lap ${lapNum} in Telemetry Studio`
+            : `Open Lap ${lapNum} in Telemetry`
         }
       >
         <Activity className="w-3.5 h-3.5" />
@@ -49,7 +49,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         }}
         aria-label="Compare"
         className="p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border transition-all flex items-center justify-center cursor-pointer"
-        title={`Compare Lap ${lapNum} in Telemetry Studio`}
+        title={`Compare Lap ${lapNum}`}
       >
         <ArrowLeftRight className="w-3.5 h-3.5" />
       </button>
