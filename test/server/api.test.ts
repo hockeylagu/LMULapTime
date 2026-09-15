@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
-import { app } from '../../server/index';
-import * as refModule from '../../server/referenceLaptimes';
-import { createSliceVcrBuffer } from '../utils/mockVcr';
+import { app } from '../../server/index.js';
+import * as refModule from '../../server/benchmarks/referenceLaptimes.js';
+import { createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 describe('Server API routes', () => {
   beforeEach(() => {
@@ -144,6 +144,17 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('error');
   });
 
+  it('rejects unsafe replay names and unbounded trajectory parameters', async () => {
+    const unsafe = await request(app).get('/api/replays/%2E%2E%2Fsecret.vcr/metadata');
+    expect(unsafe.status).toBe(400);
+
+    const invalidSlot = await request(app).get('/api/replays/valid.vcr/trajectory?driverSlot=999999');
+    expect(invalidSlot.status).toBe(400);
+
+    const invalidPoints = await request(app).get('/api/replays/valid.vcr/trajectory?maxPoints=-1');
+    expect(invalidPoints.status).toBe(400);
+  });
+
   it('GET /api/replays/cache returns the cached replay list', async () => {
     const res = await request(app).get('/api/replays/cache');
     expect(res.status).toBe(200);
@@ -154,6 +165,32 @@ describe('Server API routes', () => {
     const res = await request(app).get('/api/ai/reports');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('validates AI settings and analysis payloads before calling Gemini', async () => {
+    const invalidModel = await request(app)
+      .post('/api/ai/settings')
+      .send({ model: 'unsupported-model' });
+    expect(invalidModel.status).toBe(400);
+    expect(invalidModel.body.errorCode).toBe('invalid_model');
+
+    const invalidKey = await request(app)
+      .post('/api/ai/settings')
+      .send({ apiKey: 123 });
+    expect(invalidKey.status).toBe(400);
+    expect(invalidKey.body.errorCode).toBe('invalid_request');
+
+    const missingEvidence = await request(app)
+      .post('/api/ai/analyze-lap')
+      .send({});
+    expect(missingEvidence.status).toBe(400);
+    expect(missingEvidence.body.errorCode).toBe('invalid_request');
+
+    const oversizedEvidence = await request(app)
+      .post('/api/ai/analyze-lap')
+      .send({ evidence: 'x'.repeat(64 * 1024 + 1) });
+    expect(oversizedEvidence.status).toBe(413);
+    expect(oversizedEvidence.body.errorCode).toBe('payload_too_large');
   });
 
   it('GET /api/telemetry returns list of scanned DuckDB telemetry files', async () => {
@@ -207,6 +244,13 @@ describe('Server API routes', () => {
       const metadataRes = await request(app).get('/api/replays/Api_Cache_Test_P1.Vcr/metadata');
       expect(metadataRes.status).toBe(200);
       expect(metadataRes.body.drivers?.[0]?.name).toBe('Api Test Driver');
+
+      const trajectoryRes = await request(app)
+        .get('/api/replays/Api_Cache_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr&maxPoints=10');
+      expect(trajectoryRes.status).toBe(200);
+      expect(trajectoryRes.body.source).toBe('vcr');
+      expect(Array.isArray(trajectoryRes.body.points)).toBe(true);
+      expect(trajectoryRes.body.points.length).toBeGreaterThan(0);
     } finally {
       // Restore the default fixtures replays dir so later test runs aren't affected
       await request(app)

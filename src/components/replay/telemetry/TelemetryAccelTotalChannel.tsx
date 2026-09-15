@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Activity, Sparkles } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../server/types.js';
+import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 
 export interface TelemetryAccelTotalChannelProps {

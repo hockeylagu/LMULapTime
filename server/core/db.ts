@@ -4,9 +4,9 @@ import fs from 'fs';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import { AiReportRecord, DetailedSession, SessionMetadata, ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReplayMetadata, ReplayTrajectoryData, ReplayCacheSummary, AiReportHistoryEntry, AiLapReport, DuckDbLapTelemetry } from './types.js';
-import { DuckDbFileInfo } from './telemetryMatcher.js';
-import { LmuParser } from './parser.js';
-import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
+import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
+import { LmuParser } from '../sessions/parser.js';
+import { parseReplayMetadata, extractReplayTrajectory } from '../replay/replayParser.js';
 
 // Bumped whenever the .Vcr binary parsing algorithm changes in a way that would
 // invalidate previously-cached replay metadata/trajectory rows, without requiring
@@ -163,6 +163,7 @@ export class SessionDatabase {
 
       CREATE TABLE IF NOT EXISTS replay_trajectories (
         filename TEXT NOT NULL,
+        source_path TEXT,
         driver_slot INTEGER NOT NULL,
         lap_key INTEGER NOT NULL,
         file_mtime INTEGER NOT NULL,
@@ -198,11 +199,25 @@ export class SessionDatabase {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (filename, lap_number)
       );
+
+      CREATE TABLE IF NOT EXISTS ingest_errors (
+        source_type TEXT NOT NULL,
+        source_path TEXT NOT NULL,
+        error_message TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 1,
+        first_seen_at INTEGER NOT NULL,
+        last_seen_at INTEGER NOT NULL,
+        PRIMARY KEY (source_type, source_path)
+      );
     `);
 
     const telemetryCacheColumns = this.db.prepare('PRAGMA table_info(telemetry_lap_cache)').all() as Array<{ name: string }>;
     if (!telemetryCacheColumns.some(column => column.name === 'cache_version')) {
       this.db.exec("ALTER TABLE telemetry_lap_cache ADD COLUMN cache_version TEXT NOT NULL DEFAULT 'v1'");
+    }
+    const trajectoryColumns = this.db.prepare('PRAGMA table_info(replay_trajectories)').all() as Array<{ name: string }>;
+    if (!trajectoryColumns.some(column => column.name === 'source_path')) {
+      this.db.exec('ALTER TABLE replay_trajectories ADD COLUMN source_path TEXT');
     }
   }
 
@@ -330,11 +345,11 @@ export class SessionDatabase {
     );
   }
 
-  public getReplayMetadataCache(filename: string, mtime: number, size: number): ReplayMetadata | null {
+  public getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null {
     const row = this.db.prepare(
-      'SELECT file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
-    ).get(filename) as { file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION) {
+      'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
+    ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
+    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION || (filePath && row.file_path !== filePath)) {
       return null;
     }
     return decompressJson<ReplayMetadata>(row.metadata_br);
@@ -371,11 +386,11 @@ export class SessionDatabase {
     });
   }
 
-  public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number): ReplayTrajectoryData | null {
+  public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null {
     const row = this.db.prepare(
-      'SELECT file_mtime, file_size, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
-    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; parser_version: string; trajectory_br: Buffer } | undefined;
-    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION) {
+      'SELECT file_mtime, file_size, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; source_path: string | null; parser_version: string; trajectory_br: Buffer } | undefined;
+    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION || (filePath && row.source_path && row.source_path !== filePath)) {
       return null;
     }
     return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
@@ -393,18 +408,19 @@ export class SessionDatabase {
   // Same validity check as getReplayTrajectoryCache but never reads/decompresses the
   // (potentially multi-MB) trajectory_br blob - used by the eager sync loop, which only
   // needs to know whether a row is already cached, not its contents.
-  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number): boolean {
+  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {
     const row = this.db.prepare(
-      'SELECT file_mtime, file_size, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
-    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; parser_version: string } | undefined;
-    return !!row && row.file_mtime === mtime && row.file_size === size && row.parser_version === REPLAY_CACHE_VERSION;
+      'SELECT file_mtime, file_size, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; source_path: string | null; parser_version: string } | undefined;
+    return !!row && row.file_mtime === mtime && row.file_size === size && row.parser_version === REPLAY_CACHE_VERSION && (!filePath || !row.source_path || row.source_path === filePath);
   }
 
-  public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData): void {
+  public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData, filePath?: string): void {
     this.db.prepare(`
-      INSERT INTO replay_trajectories (filename, driver_slot, lap_key, file_mtime, file_size, parser_version, points_count, trajectory_br, updated_at)
-      VALUES (@filename, @driverSlot, @lapKey, @mtime, @size, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
+      INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime, file_size, parser_version, points_count, trajectory_br, updated_at)
+      VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtime, @size, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
       ON CONFLICT(filename, driver_slot, lap_key) DO UPDATE SET
+        source_path = excluded.source_path,
         file_mtime = excluded.file_mtime,
         file_size = excluded.file_size,
         parser_version = excluded.parser_version,
@@ -413,6 +429,7 @@ export class SessionDatabase {
         updated_at = excluded.updated_at
     `).run({
       filename,
+      filePath: filePath || null,
       driverSlot,
       lapKey,
       mtime,
@@ -467,6 +484,52 @@ export class SessionDatabase {
     });
   }
 
+  public recordIngestError(sourceType: string, sourcePath: string, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT INTO ingest_errors (source_type, source_path, error_message, attempts, first_seen_at, last_seen_at)
+      VALUES (?, ?, ?, 1, ?, ?)
+      ON CONFLICT(source_type, source_path) DO UPDATE SET
+        error_message = excluded.error_message,
+        attempts = ingest_errors.attempts + 1,
+        last_seen_at = excluded.last_seen_at
+    `).run(sourceType, sourcePath, message, now, now);
+  }
+
+  public clearIngestError(sourceType: string, sourcePath: string): void {
+    this.db.prepare('DELETE FROM ingest_errors WHERE source_type = ? AND source_path = ?').run(sourceType, sourcePath);
+  }
+
+  public getIngestErrors(): Array<{
+    sourceType: string;
+    sourcePath: string;
+    errorMessage: string;
+    attempts: number;
+    firstSeenAt: number;
+    lastSeenAt: number;
+  }> {
+    const rows = this.db.prepare(`
+      SELECT source_type, source_path, error_message, attempts, first_seen_at, last_seen_at
+      FROM ingest_errors ORDER BY last_seen_at DESC
+    `).all() as Array<{
+      source_type: string;
+      source_path: string;
+      error_message: string;
+      attempts: number;
+      first_seen_at: number;
+      last_seen_at: number;
+    }>;
+    return rows.map(row => ({
+      sourceType: row.source_type,
+      sourcePath: row.source_path,
+      errorMessage: row.error_message,
+      attempts: row.attempts,
+      firstSeenAt: row.first_seen_at,
+      lastSeenAt: row.last_seen_at,
+    }));
+  }
+
   public getTelemetryFiles(): DuckDbFileInfo[] {
     const rows = this.db.prepare('SELECT metadata_json FROM telemetry_metadata').all() as { metadata_json: string }[];
     return rows.map((r) => JSON.parse(r.metadata_json) as DuckDbFileInfo);
@@ -514,6 +577,27 @@ export class SessionDatabase {
     `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), DUCKDB_TELEMETRY_CACHE_VERSION, Date.now());
   }
 
+  public pruneTelemetryLapCache(maxAgeMs = 30 * 24 * 60 * 60 * 1000, maxBytes = 512 * 1024 * 1024): void {
+    const cutoff = Date.now() - maxAgeMs;
+    this.db.prepare('DELETE FROM telemetry_lap_cache WHERE updated_at < ?').run(cutoff);
+    const sizeRow = this.db.prepare('SELECT COALESCE(SUM(LENGTH(telemetry_br)), 0) AS bytes FROM telemetry_lap_cache').get() as { bytes: number };
+    if (sizeRow.bytes <= maxBytes) return;
+
+    const deleteOldest = this.db.prepare('DELETE FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?');
+    const oldestRows = this.db.prepare(
+      'SELECT filename, lap_number, LENGTH(telemetry_br) AS bytes FROM telemetry_lap_cache ORDER BY updated_at ASC'
+    ).all() as Array<{ filename: string; lap_number: number; bytes: number }>;
+    let currentBytes = sizeRow.bytes;
+    const prune = this.db.transaction(() => {
+      for (const row of oldestRows) {
+        if (currentBytes <= maxBytes) break;
+        deleteOldest.run(row.filename, row.lap_number);
+        currentBytes -= row.bytes;
+      }
+    });
+    prune();
+  }
+
   public clearTelemetryCache(): void {
     this.db.exec('DELETE FROM telemetry_metadata; DELETE FROM telemetry_lap_cache;');
   }
@@ -556,15 +640,15 @@ export class SessionDatabase {
    * cache row, plus one extra row keyed by lap -1 mirroring the trajectory's chosen/best lap -
    * matching the cache-key convention used for "no explicit lap requested" lookups.
    */
-  private cacheAllLapsForDriver(filename: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData): void {
+  private cacheAllLapsForDriver(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData): void {
     const perLap = trajectory.allLapsData && trajectory.allLapsData.length > 0 ? trajectory.allLapsData : [trajectory];
     for (const lapTrajectory of perLap) {
       if (typeof lapTrajectory.currentLap !== 'number') continue;
       const { allLapsData: _unused, ...single } = lapTrajectory;
-      this.upsertReplayTrajectoryCache(filename, driverSlotKey, lapTrajectory.currentLap, mtime, size, single);
+      this.upsertReplayTrajectoryCache(filename, driverSlotKey, lapTrajectory.currentLap, mtime, size, single, filePath);
     }
     const { allLapsData: _unused2, ...defaultSingle } = trajectory;
-    this.upsertReplayTrajectoryCache(filename, driverSlotKey, -1, mtime, size, defaultSingle);
+    this.upsertReplayTrajectoryCache(filename, driverSlotKey, -1, mtime, size, defaultSingle, filePath);
   }
 
   /**
@@ -610,16 +694,18 @@ export class SessionDatabase {
         const mtime = Math.floor(stat.mtimeMs);
         const size = stat.size;
 
-        let metadata = this.getReplayMetadataCache(f, mtime, size);
+        let metadata = this.getReplayMetadataCache(f, mtime, size, filePath);
         const isNewMetadata = !metadata;
         if (!metadata) {
           try {
             metadata = parseReplayMetadata(filePath, { playerName: options.playerName });
-          } catch {
+          } catch (err) {
+            this.recordIngestError('vcr', filePath, err);
             skipped++; // invalid or currently-active recording file
             continue;
           }
           this.upsertReplayMetadataCache(f, filePath, mtime, size, metadata);
+          this.clearIngestError('vcr', filePath);
         }
 
         let anyTrajectoryNewlyCached = false;
@@ -633,19 +719,20 @@ export class SessionDatabase {
         // resolved slot is looked up on-demand elsewhere; on an already-cached rescan this
         // avoids decompressing every driver's full trajectory just to test presence.
         let defaultDriverSlot: number | undefined;
-        if (!this.hasValidReplayTrajectoryCache(f, -1, -1, mtime, size)) {
+        if (!this.hasValidReplayTrajectoryCache(f, -1, -1, mtime, size, filePath)) {
           try {
             const trajectory = extractReplayTrajectory(filePath, { playerName: options.playerName, maxPoints: 0, allLaps: true });
             defaultDriverSlot = trajectory.driverSlot;
-            this.cacheAllLapsForDriver(f, mtime, size, -1, trajectory);
+            this.cacheAllLapsForDriver(f, filePath, mtime, size, -1, trajectory);
             // Also cache under the resolved driver's own slot number, since the frontend
             // sends an explicit driverSlot once one has been resolved - even for laps of
             // the default/player driver - and that lookup uses the real slot, not -1.
             if (typeof defaultDriverSlot === 'number') {
-              this.cacheAllLapsForDriver(f, mtime, size, defaultDriverSlot, trajectory);
+              this.cacheAllLapsForDriver(f, filePath, mtime, size, defaultDriverSlot, trajectory);
             }
             anyTrajectoryNewlyCached = true;
-          } catch {
+          } catch (err) {
+            this.recordIngestError('vcr', filePath, err);
             // Metadata is still cached even if trajectory extraction fails
           }
           // Yield after this driver's (expensive) full binary scan before moving on to others.
@@ -658,7 +745,7 @@ export class SessionDatabase {
             break;
           }
           if (typeof driver.slot !== 'number' || driver.slot === defaultDriverSlot) continue;
-          if (this.hasValidReplayTrajectoryCache(f, driver.slot, -1, mtime, size)) continue; // already cached
+          if (this.hasValidReplayTrajectoryCache(f, driver.slot, -1, mtime, size, filePath)) continue; // already cached
           try {
             const driverTrajectory = extractReplayTrajectory(filePath, {
               driverSlot: driver.slot,
@@ -666,9 +753,10 @@ export class SessionDatabase {
               maxPoints: 0,
               allLaps: true,
             });
-            this.cacheAllLapsForDriver(f, mtime, size, driver.slot, driverTrajectory);
+            this.cacheAllLapsForDriver(f, filePath, mtime, size, driver.slot, driverTrajectory);
             anyTrajectoryNewlyCached = true;
-          } catch {
+          } catch (err) {
+            this.recordIngestError('vcr', filePath, err);
             // Skip drivers whose trajectory can't be extracted (e.g. no telemetry frames)
           }
           // Yield between every driver's extraction - the truly expensive per-file work.
@@ -681,6 +769,7 @@ export class SessionDatabase {
           updated++;
         }
       } catch (err) {
+        this.recordIngestError('vcr', filePath, err);
         console.error(`Error caching replay file ${filePath}:`, err);
       } finally {
         processedCount = i + 1;
@@ -907,8 +996,10 @@ export class SessionDatabase {
           } else {
             added++;
           }
+          this.clearIngestError('xml', filePath);
         }
       } catch (err) {
+        this.recordIngestError('xml', filePath, err);
         console.error(`Error processing session XML file ${filePath}:`, err);
       }
     }

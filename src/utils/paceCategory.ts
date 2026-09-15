@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry } from '../../server/types';
+import { PaceCategory, ReferenceLaptimeEntry } from '../../server/core/types';
 
 export interface PaceCategoryStyle {
   category: PaceCategory;

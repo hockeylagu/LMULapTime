@@ -2,7 +2,7 @@ import React from 'react';
 import { Clock, Trophy, Zap, Activity } from 'lucide-react';
 import { formatTime } from '../../../utils/formatters.js';
 import { PaceBadge } from '../../common/index.js';
-import { PaceCategory } from '../../../../server/types.js';
+import { PaceCategory } from '../../../../server/core/types';
 
 export interface ImprovementStatsBannerProps {
   trackDataCount: number;

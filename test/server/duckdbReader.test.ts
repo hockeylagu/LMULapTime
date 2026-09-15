@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import duckdb from 'duckdb';
 import path from 'path';
 import fs from 'fs';
-import { DuckDbReader, normalizeDuckDbGForces } from '../../server/duckdbReader.js';
+import { DuckDbReader, normalizeDuckDbGForces } from '../../server/telemetry/duckdbReader.js';
 
 describe('DuckDbReader', () => {
   it('normalizes exported G-force labels to canonical lateral and longitudinal axes', () => {

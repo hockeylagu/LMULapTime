@@ -1,4 +1,4 @@
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types';
 import { computeVehicleDynamics } from './computedTelemetry.js';
 import { getSteerAngleDeg } from './formatters.js';
 

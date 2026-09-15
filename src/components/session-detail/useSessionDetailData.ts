@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { LegendPayload } from 'recharts';
-import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../server/types.js';
+import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../server/core/types';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../utils/paceCategory.js';
 import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
 

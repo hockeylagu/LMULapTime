@@ -1,7 +1,7 @@
 import React from 'react';
 import { SessionListItem } from './SessionList.js';
 import { SessionTableRow } from './SessionTableRow';
-import { PaceCategory } from '../../../server/types';
+import { PaceCategory } from '../../../server/core/types';
 
 export interface SessionTableViewProps {
   sessions: SessionListItem[];

@@ -1,4 +1,4 @@
-import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory } from '../../../server/core/types';
 import { getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
 import { parseDateStringToTimestamp, computeTheoreticalGap } from '../../utils/formatters.js';
 import { SessionProgressionPoint } from './improvement-chart/index.js';

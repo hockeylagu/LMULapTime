@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
-import { LapData } from '../../../../server/types.js';
+import { LapData } from '../../../../server/core/types';
 import { LapStatusBadge } from '../../common/index.js';
 import {
   getWorstTrackLimitSeverity,

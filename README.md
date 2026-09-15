@@ -6,7 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/Tests-693%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-721%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Ingests high-fidelity native **100 Hz DuckDB telemetry** (`UserData/Telemetry/*.duckdb`), scans session XML logs, and reverse-engineers binary `.Vcr` replays to deliver professional-grade driver coaching, synchronized multi-metric waveforms, 4-wheel dynamics, physical track limit corridors, and alien benchmark tracking.
 
@@ -161,7 +161,7 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - **C# .NET 8 Telemetry Recorder** (`tools/telemetry-recorder/`) - Real-time memory-mapped telemetry probes
   - **TSX Offline Analysis & Geometry Pipeline** (`tools/analysis/`) - Replay binary verification, boundary generation (`buildAllTrackBoundaries.ts`), and correlation utilities
 - **Testing**:
-  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **693+ automated unit and integration tests** (62 test suites)
+  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **721 automated unit and integration tests** (71 test files; 3 opt-in integration tests skipped without Steam replay files)
 
 ---
 
@@ -230,12 +230,14 @@ For a controlled workflow that turns lap comparison, corner phases, tyre trends,
 | `npm run dev:server` | Runs the backend server using `tsx watch`. |
 | `npm run dev:client` | Runs the Vite client development server. |
 | `npm run build` | Runs TypeScript typechecks and compiles the production client bundle. |
-| `npm test` | Runs all 647+ automated test suites with Vitest. |
+| `npm test` | Runs all automated tests with Vitest. |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
-| `npm run test:coverage` | Generates detailed test coverage reports. |
+| `npm run test:coverage` | Runs the full suite and generates the V8 coverage report. The validated baseline is 86.27% statements, 74.32% branches, 85.44% functions, and 88.68% lines. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
 | `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
+
+Real Steam replay integration tests are opt-in because they require local `.Vcr` files. Run them with `RUN_REAL_REPLAY_TESTS=1` when replay fixtures are available.
 
 ---
 

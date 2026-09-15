@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Clock, ArrowLeftRight } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/types.js';
+import { DetailedSession, DriverData } from '../../../../server/core/types';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
 

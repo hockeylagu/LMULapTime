@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp, minValidTime } from '../../utils/formatters.js';
 import { matchesSessionCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
-import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache } from '../../../server/types.js';
+import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache } from '../../../server/core/types';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
 import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
 

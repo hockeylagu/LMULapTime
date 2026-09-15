@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { FileText } from 'lucide-react';
 import { SessionList } from '../session-list/SessionList.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { LapData, PaceCategory } from '../../../server/types.js';
+import { LapData, PaceCategory } from '../../../server/core/types';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';

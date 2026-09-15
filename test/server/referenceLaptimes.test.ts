@@ -8,9 +8,9 @@ import {
   fetchAndCacheReferenceLaptimes,
   computeReferenceBenchmarkDiff,
   resetCachedReferenceLaptimes,
-} from '../../server/referenceLaptimes';
-import { getSessionDatabase, resetSessionDatabaseForTest } from '../../server/db';
-import { ReferenceLaptimeEntry } from '../../server/types';
+} from '../../server/benchmarks/referenceLaptimes.js';
+import { getSessionDatabase, resetSessionDatabaseForTest } from '../../server/core/db.js';
+import { ReferenceLaptimeEntry } from '../../server/core/types.js';
 
 describe('referenceLaptimes server module', () => {
   const sampleCsv = `Key,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest Car,Record,Diff,Diff%,Class

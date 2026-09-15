@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Trophy, Gauge } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/types.js';
+import { DetailedSession, DriverData } from '../../../../server/core/types';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../utils/lapComparison.js';
 import { computeTheoreticalGap } from '../../../utils/formatters.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';

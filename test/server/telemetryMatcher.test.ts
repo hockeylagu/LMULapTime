@@ -5,8 +5,8 @@ import {
   matchDuckDbToSession,
   matchDuckDbToReplay,
   DuckDbFileInfo,
-} from '../../server/telemetryMatcher.js';
-import { DetailedSession, ReplayMetadata } from '../../server/types.js';
+} from '../../server/telemetry/telemetryMatcher.js';
+import { DetailedSession, ReplayMetadata } from '../../server/core/types.js';
 
 describe('telemetryMatcher', () => {
   it('parses typical DuckDB telemetry filenames accurately', () => {
@@ -202,5 +202,92 @@ describe('telemetryMatcher', () => {
     const matched = matchDuckDbToReplay(duckFiles, mockReplay, new Date('2026-09-13T20:33:40Z').getTime());
     expect(matched).not.toBeNull();
     expect(matched!.trackName).toBe('Bahrain International Circuit');
+  });
+
+  it('rejects a low-margin session match instead of silently choosing one candidate', () => {
+    const first = {
+      filename: 'Spa_P_2026-09-14T10_00_00Z.duckdb',
+      filePath: 'C:\\fake\\spa-first.duckdb',
+      fileMtimeMs: 0,
+      fileSizeBytes: 1024,
+      trackName: 'Spa-Francorchamps',
+      sessionType: 'P',
+      timestampStr: '2026-09-14T10:00:00Z',
+      timestampEpochMs: new Date('2026-09-14T10:00:00Z').getTime(),
+    } satisfies DuckDbFileInfo;
+    const second = { ...first,
+      filename: 'Spa_P_2026-09-14T10_00_08Z.duckdb',
+      filePath: 'C:\\fake\\spa-second.duckdb',
+      timestampStr: '2026-09-14T10:00:08Z',
+      timestampEpochMs: new Date('2026-09-14T10:00:08Z').getTime(),
+    };
+    const session = {
+      id: 'ambiguous-session',
+      trackVenue: 'Spa-Francorchamps',
+      trackCourse: 'Grand Prix',
+      sessionType: 'Practice',
+      timestamp: '2026-09-14T10:00:04Z',
+      drivers: [],
+    } as unknown as DetailedSession;
+
+    expect(matchDuckDbToSession([first, second], session)).toBeNull();
+  });
+
+  it('returns null for empty candidates and rejects incompatible track or session type', () => {
+    const session = {
+      id: 'session', trackVenue: 'Spa-Francorchamps', trackCourse: 'Grand Prix',
+      sessionType: 'Race', timestamp: '2026-09-14T10:00:00Z', drivers: [],
+    } as unknown as DetailedSession;
+    expect(matchDuckDbToSession([], session)).toBeNull();
+
+    const wrongTrack: DuckDbFileInfo = {
+      filename: 'Bahrain_R_2026-09-14T10_00_00Z.duckdb', filePath: 'wrong', fileMtimeMs: 0,
+      fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'R', timestampStr: '', timestampEpochMs: 0,
+    };
+    const wrongType = { ...wrongTrack, trackName: 'Spa-Francorchamps', sessionType: 'P' };
+    expect(matchDuckDbToSession([wrongTrack, wrongType], session)).toBeNull();
+  });
+
+  it('uses a single untimed candidate but rejects multiple untimed candidates', () => {
+    const replay: ReplayMetadata = {
+      filename: 'Spa_P1.Vcr', filePath: 'C:\\fake\\Spa_P1.Vcr', fileSizeBytes: 1, mtimeMs: 0,
+      trackName: 'Spa-Francorchamps', sessionType: 'Practice', timeSliceCount: 1, totalEvents: 1,
+      durationSec: 1, drivers: [],
+    };
+    const candidate: DuckDbFileInfo = {
+      filename: 'Spa_P_partial.duckdb', filePath: 'single', fileMtimeMs: 0, fileSizeBytes: 1,
+      trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs: 0,
+    };
+    expect(matchDuckDbToReplay([candidate], replay)).toBe(candidate);
+    expect(matchDuckDbToReplay([candidate, { ...candidate, filename: 'Spa_P_other.duckdb', filePath: 'other' }], replay)).toBeNull();
+  });
+
+  it('rejects replay candidates outside the time window and with mismatched drivers', () => {
+    const replay: ReplayMetadata = {
+      filename: 'Spa_P1.Vcr', filePath: 'C:\\fake\\Spa_P1.Vcr', fileSizeBytes: 1, mtimeMs: 0,
+      trackName: 'Spa-Francorchamps', sessionType: 'Practice', timeSliceCount: 1, totalEvents: 1,
+      durationSec: 1, drivers: [{ slot: 1, name: 'Samuel', carNumber: '1', vehicleId: 'car' }],
+    };
+    const candidate: DuckDbFileInfo = {
+      filename: 'Spa_P_2026.duckdb', filePath: 'candidate', fileMtimeMs: 0, fileSizeBytes: 1,
+      trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs: 2_000_000,
+      driverName: 'Other Driver',
+    };
+    expect(matchDuckDbToReplay([candidate], replay, 0, 300)).toBeNull();
+  });
+
+  it('prefers the nearest replay candidate when the time margin is unambiguous', () => {
+    const replay: ReplayMetadata = {
+      filename: 'Spa_P1.Vcr', filePath: 'C:\\fake\\Spa_P1.Vcr', fileSizeBytes: 1, mtimeMs: 0,
+      trackName: 'Spa-Francorchamps', sessionType: 'Practice', timeSliceCount: 1, totalEvents: 1,
+      durationSec: 1, drivers: [],
+    };
+    const makeCandidate = (name: string, timestampEpochMs: number): DuckDbFileInfo => ({
+      filename: name, filePath: name, fileMtimeMs: 0, fileSizeBytes: 1,
+      trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs,
+    });
+    const nearest = makeCandidate('nearest.duckdb', 105_000);
+    const distant = makeCandidate('distant.duckdb', 120_000);
+    expect(matchDuckDbToReplay([distant, nearest], replay, 100_000)?.filename).toBe('nearest.duckdb');
   });
 });

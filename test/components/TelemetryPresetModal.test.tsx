@@ -96,4 +96,95 @@ describe('TelemetryPresetModal', () => {
     const updatedPresets = handleSave.mock.calls[0][0] as TelemetryPreset[];
     expect(updatedPresets.length).toBe(DEFAULT_TELEMETRY_PRESETS.length + 1);
   });
+
+  it('duplicates, applies, and deletes a custom preset', () => {
+    const handleSave = vi.fn();
+    const handleSelect = vi.fn();
+    const custom: TelemetryPreset = {
+      id: 'custom-one', name: 'Custom One', isBuiltIn: false, channels: ['speed', 'delta'],
+    };
+    const { rerender } = render(
+      <TelemetryPresetModal
+        isOpen={true}
+        onClose={vi.fn()}
+        presets={[...DEFAULT_TELEMETRY_PRESETS, custom]}
+        activePresetId={custom.id}
+        onSavePresets={handleSave}
+        onSelectActivePreset={handleSelect}
+        onResetDefaults={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle(/Duplicate this preset/i));
+    expect(handleSave).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ name: 'Custom One (Copy)', isBuiltIn: false }),
+    ]));
+    expect(handleSelect).toHaveBeenCalled();
+
+    const duplicatedPresets = handleSave.mock.calls[0][0] as TelemetryPreset[];
+    const duplicatedId = duplicatedPresets[duplicatedPresets.length - 1].id;
+    rerender(
+      <TelemetryPresetModal
+        isOpen={true}
+        onClose={vi.fn()}
+        presets={duplicatedPresets}
+        activePresetId={duplicatedId}
+        onSavePresets={handleSave}
+        onSelectActivePreset={handleSelect}
+        onResetDefaults={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply & Use Preset/i }));
+    expect(handleSelect).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTitle(/Delete this preset/i));
+    expect(handleSave.mock.calls[handleSave.mock.calls.length - 1]?.[0]).toEqual(expect.not.arrayContaining([
+      expect.objectContaining({ id: duplicatedId }),
+    ]));
+    rerender(<TelemetryPresetModal isOpen={false} onClose={vi.fn()} presets={duplicatedPresets} activePresetId="default" onSavePresets={handleSave} onSelectActivePreset={handleSelect} onResetDefaults={vi.fn()} />);
+  });
+
+  it('keeps the final active channel and supports reset and close actions', () => {
+    const handleSave = vi.fn();
+    const handleReset = vi.fn();
+    const handleClose = vi.fn();
+    const singleChannel: TelemetryPreset = {
+      id: 'single', name: 'Single Channel', isBuiltIn: false, channels: ['speed'],
+    };
+    const { rerender } = render(
+      <TelemetryPresetModal
+        isOpen={true}
+        onClose={handleClose}
+        presets={[singleChannel]}
+        activePresetId="single"
+        onSavePresets={handleSave}
+        onSelectActivePreset={vi.fn()}
+        onResetDefaults={handleReset}
+      />
+    );
+
+    const speedCheckbox = screen.getByLabelText(/Vehicle Speed/i);
+    expect(speedCheckbox).toBeChecked();
+    fireEvent.click(speedCheckbox);
+    expect(handleSave).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTitle(/Reset all presets/i));
+    expect(handleReset).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: /Apply & Use Preset/i }));
+    expect(handleClose).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <TelemetryPresetModal
+        isOpen={false}
+        onClose={handleClose}
+        presets={[singleChannel]}
+        activePresetId="single"
+        onSavePresets={handleSave}
+        onSelectActivePreset={vi.fn()}
+        onResetDefaults={handleReset}
+      />
+    );
+    expect(screen.queryByTestId('telemetry-preset-modal')).not.toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName, extractComparableLaps } from '../../server/parser';
-import { DetailedSession } from '../../server/types';
+import { LmuParser, computeProgression, computeTrackSummaries, getDisplayTrackName, extractComparableLaps } from '../../server/sessions/parser.js';
+import { DetailedSession } from '../../server/core/types.js';
 import fs from 'fs';
 
 const samplePracticeXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -535,7 +535,7 @@ describe('parser server module', () => {
 
   describe('extractComparableLaps layout isolation', () => {
     it('does not mix Sebring Full and Sebring School laps when filtering', async () => {
-      const { extractComparableLaps } = await import('../../server/parser');
+      const { extractComparableLaps } = await import('../../server/sessions/parser');
 
       const mockSessions = [
         {

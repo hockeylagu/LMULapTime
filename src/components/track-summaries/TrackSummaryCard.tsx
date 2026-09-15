@@ -2,7 +2,7 @@ import React from 'react';
 import { Trophy } from 'lucide-react';
 import { formatTime } from '../../utils/formatters.js';
 import { PaceBadge, SectorSplitsRow } from '../common';
-import { PaceCategory } from '../../../server/types.js';
+import { PaceCategory } from '../../../server/core/types';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
 export interface TrackSummaryItem {

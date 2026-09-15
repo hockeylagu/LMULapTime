@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { AiReportsHistoryCard } from '../../src/components/settings/AiReportsHistoryCard';
+import { AiReportsHistoryCard } from '../../src/components/settings/AiReportsHistoryCard.js';
 
 describe('AiReportsHistoryCard', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@ import {
   ReplayInspectorPage,
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
-import { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/types.js';
+import type { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/core/types';
 
 interface SessionRouteProps {
   onBack: () => void;

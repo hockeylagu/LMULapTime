@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
-import { ReplayTrajectoryData, ReplayLapSummary } from '../../../../server/types.js';
+import { ReplayTrajectoryData, ReplayLapSummary } from '../../../../server/core/types';
 
 export interface ReplayPerformanceHeaderProps {
   currentLap: number;

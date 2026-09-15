@@ -17,7 +17,7 @@ import {
   TelemetryAccelLonChannel,
   TelemetryAccelTotalChannel,
 } from '../../src/components/replay/telemetry/index.js';
-import { ReplayTrajectoryPoint } from '../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 import { computeTelemetryChartPaths } from '../../src/components/replay/telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../src/components/replay/telemetry/TelemetryChannelRenderer.js';
 

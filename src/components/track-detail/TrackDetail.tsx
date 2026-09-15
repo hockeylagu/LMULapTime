@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { formatTime, matchesSessionType, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { ReferenceLaptimeEntry } from '../../../server/types.js';
+import { ReferenceLaptimeEntry } from '../../../server/core/types';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';

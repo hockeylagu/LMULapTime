@@ -6,8 +6,8 @@ import {
   findIndexAtDistance,
   filterCompatibleReplays,
   mapVehicleIdToClass,
-} from '../../src/utils/replayComparison';
-import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/types';
+} from '../../src/utils/replayComparison.js';
+import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/core/types.js';
 
 describe('replayComparison utility', () => {
   const mockPoints: ReplayTrajectoryPoint[] = [

@@ -41,7 +41,7 @@
  */
 import fs from 'fs';
 import readline from 'readline';
-import { parseReplayMetadata } from '../../server/replayParser.js';
+import { parseReplayMetadata } from '../../server/replay/replayParser.js';
 
 const PACKET_SIZE = 65;
 

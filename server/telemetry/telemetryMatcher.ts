@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { matchesTrack } from '../src/utils/paceCategory.js';
+import { matchesTrack } from '../../src/utils/paceCategory.js';
 import { DuckDbReader } from './duckdbReader.js';
-import { DetailedSession, ReplayMetadata } from './types.js';
+import { DetailedSession, ReplayMetadata } from '../core/types.js';
 
 export interface DuckDbFileInfo {
   filename: string;
@@ -17,6 +17,7 @@ export interface DuckDbFileInfo {
   carName?: string;
   lapsCount?: number;
   bestLapTime?: number;
+  enrichmentError?: string;
 }
 
 const duckDbMetadataCache = new Map<string, {
@@ -171,6 +172,7 @@ export function matchDuckDbToSession(
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
+  const timedCandidateDeltas: number[] = [];
   const untimedCandidates: DuckDbFileInfo[] = [];
 
   for (const duck of duckdbFiles) {
@@ -193,9 +195,12 @@ export function matchDuckDbToSession(
     // 3. Check time delta if timestamps are available
     if (sessionEpochMs > 0 && duck.timestampEpochMs > 0) {
       const deltaSec = Math.abs(duck.timestampEpochMs - sessionEpochMs) / 1000;
-      if (deltaSec <= maxTimeDeltaSec && shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
-        smallestTimeDelta = deltaSec;
-        bestMatch = duck;
+      if (deltaSec <= maxTimeDeltaSec) {
+        timedCandidateDeltas.push(deltaSec);
+        if (shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
+          smallestTimeDelta = deltaSec;
+          bestMatch = duck;
+        }
       }
     } else {
       untimedCandidates.push(duck);
@@ -206,6 +211,11 @@ export function matchDuckDbToSession(
   // with multiple untimed candidates there's no reliable way to pick the right one.
   if (!bestMatch && untimedCandidates.length === 1) {
     bestMatch = untimedCandidates[0];
+  }
+
+  const sortedDeltas = timedCandidateDeltas.sort((a, b) => a - b);
+  if (bestMatch && sortedDeltas.length > 1 && sortedDeltas[1] - sortedDeltas[0] < 5) {
+    return null;
   }
 
   return bestMatch;
@@ -223,6 +233,7 @@ export function matchDuckDbToReplay(
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
+  const timedCandidateDeltas: number[] = [];
   const untimedCandidates: DuckDbFileInfo[] = [];
 
   for (const duck of duckdbFiles) {
@@ -245,9 +256,12 @@ export function matchDuckDbToReplay(
     // 3. Time comparison against replay file mtime
     if (replayMtimeMs && duck.timestampEpochMs > 0) {
       const deltaSec = Math.abs(duck.timestampEpochMs - replayMtimeMs) / 1000;
-      if (deltaSec <= maxTimeDeltaSec && shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
-        smallestTimeDelta = deltaSec;
-        bestMatch = duck;
+      if (deltaSec <= maxTimeDeltaSec) {
+        timedCandidateDeltas.push(deltaSec);
+        if (shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
+          smallestTimeDelta = deltaSec;
+          bestMatch = duck;
+        }
       }
     } else {
       untimedCandidates.push(duck);
@@ -260,16 +274,20 @@ export function matchDuckDbToReplay(
     bestMatch = untimedCandidates[0];
   }
 
+  const sortedDeltas = timedCandidateDeltas.sort((a, b) => a - b);
+  if (bestMatch && sortedDeltas.length > 1 && sortedDeltas[1] - sortedDeltas[0] < 5) {
+    return null;
+  }
+
   return bestMatch;
 }
 
 export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDbFileInfo> {
+  const reader = new DuckDbReader(duck.filePath);
   try {
-    const reader = new DuckDbReader(duck.filePath);
     await reader.open();
     const meta = await reader.getMetadata();
     const laps = await reader.getLapList();
-    await reader.close();
 
     const recordingTimeEpochMs = meta.RecordingTime
       ? new Date(meta.RecordingTime.replace(/_/g, ':')).getTime()
@@ -296,7 +314,16 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
     };
   } catch (err) {
     console.warn(`[TelemetryMatcher] Could not enrich DuckDB file ${duck.filePath}:`, err);
-    return duck;
+    return {
+      ...duck,
+      enrichmentError: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    try {
+      await reader.close();
+    } catch (closeError) {
+      console.warn(`[TelemetryMatcher] Could not close DuckDB file ${duck.filePath}:`, closeError);
+    }
   }
 }
 

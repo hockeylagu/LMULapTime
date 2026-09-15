@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { getTrajectoryDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
 import {
   MapColorMode,

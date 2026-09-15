@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Compass } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../server/types.js';
+import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { getSteerPercent } from '../../../utils/formatters.js';
 

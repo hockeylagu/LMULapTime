@@ -6,7 +6,7 @@ import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
-import { DetailedSession, SessionProgressionPoint } from '../../../server/types.js';
+import { DetailedSession, SessionProgressionPoint } from '../../../server/core/types';
 
 export interface SessionDetailProps {
   sessionId: string;

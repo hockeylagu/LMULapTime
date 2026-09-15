@@ -1,5 +1,5 @@
 import React from 'react';
-import { PaceCategory } from '../../../server/types';
+import { PaceCategory } from '../../../server/core/types';
 import { getPaceCategoryStyle, formatPacePercentage } from '../../utils/paceCategory';
 
 export interface PaceBadgeProps {

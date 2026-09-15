@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeTelemetryChartPaths, DeltaGradientStop } from '../../src/components/replay/index.js';
-import { ReplayTrajectoryPoint } from '../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 import { PointComparison } from '../../src/utils/replayComparison.js';
 
 describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {

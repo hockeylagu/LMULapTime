@@ -8,10 +8,12 @@ import {
   detectPlayerName,
   extractReplayLapSummaries,
   downsampleReplayTrajectory,
-} from '../../server/replayParser';
-import { LmuParser } from '../../server/parser';
-import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/types';
-import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../utils/mockVcr';
+} from '../../server/replay/replayParser.js';
+import { LmuParser } from '../../server/sessions/parser.js';
+import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../utils/mockVcr.js';
+
+const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 
 /**
  * Creates a VCR buffer with drivers encoded in the primary binary parser format:
@@ -907,7 +909,7 @@ describe('replayParser', () => {
   const realFile = path.join(steamReplaysDir, 'WeatherTech Raceway Laguna Seca R1 1.Vcr');
   const hasRealFiles = fs.existsSync(realFile);
 
-  describe.skipIf(!hasRealFiles)('real replay file tests', () => {
+  describe.skipIf(!hasRealFiles || !runRealReplayTests)('real replay file tests', () => {
     it('parses real Laguna Seca replay in under 10ms', () => {
         const t0 = performance.now();
         const meta = parseReplayMetadata(realFile);
@@ -952,7 +954,7 @@ describe('replayParser', () => {
 
       const imolaFile = path.join(steamReplaysDir, 'Autodromo Enzo e Dino Ferrari R1 8.Vcr');
       const imolaXmlFile = path.join(process.env.PROGRAMFILES_X86 || 'C:\\Program Files (x86)', 'Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Log\\Results\\2026_09_04_14_15_58-09R1.xml');
-      if (fs.existsSync(imolaFile)) {
+      if (runRealReplayTests && fs.existsSync(imolaFile)) {
         it('detects all 16 laps independently in full 360MB+ race replay without truncation', () => {
           const traj = extractReplayTrajectory(imolaFile, {
             playerName: 'Samuel',
@@ -972,7 +974,7 @@ describe('replayParser', () => {
           expect(lap2.points[0].z).toBeGreaterThan(0);
         });
 
-        if (fs.existsSync(imolaXmlFile)) {
+        if (runRealReplayTests && fs.existsSync(imolaXmlFile)) {
           it('validates VCR extracted lap timings match official XML results for every lap', () => {
             const traj = extractReplayTrajectory(imolaFile, { playerName: 'Samuel' });
             expect(traj.laps?.length).toBe(16);
@@ -1017,7 +1019,7 @@ describe('replayParser', () => {
       }
 
       const daytonaQ1File = path.join(steamReplaysDir, 'Daytona International Speedway Road Course Q1 6.Vcr');
-      if (fs.existsSync(daytonaQ1File)) {
+      if (runRealReplayTests && fs.existsSync(daytonaQ1File)) {
         it('detects multiple distinct ~1:47-1:48 laps on Daytona Q1 replay instead of collapsing into single 11-minute lap', () => {
           // Autonomous extraction without any sessionLaps provided
           const traj = extractReplayTrajectory(daytonaQ1File, { maxPoints: 500 });
@@ -1039,7 +1041,7 @@ describe('replayParser', () => {
       }
 
       const daytonaR1File = path.join(steamReplaysDir, 'Daytona International Speedway Road Course R1 6.Vcr');
-      if (fs.existsSync(daytonaQ1File) && fs.existsSync(daytonaR1File)) {
+      if (runRealReplayTests && fs.existsSync(daytonaQ1File) && fs.existsSync(daytonaR1File)) {
         it('synchronizes lap start position between Race (rolling start) and Qualifying replays within < 2 meters', () => {
           const q1Traj = extractReplayTrajectory(daytonaQ1File, { maxPoints: 0, lapNumber: 2 });
           const r1Traj = extractReplayTrajectory(daytonaR1File, { maxPoints: 0, lapNumber: 2 });
@@ -1063,7 +1065,7 @@ describe('replayParser', () => {
         path.join(steamReplaysDir, 'Bahrain International Circuit R1 1.Vcr'),
         path.join(steamReplaysDir, 'Bahrain International Circuit P1 14.Vcr'),
       ].find(p => fs.existsSync(p));
-      if (fs.existsSync(bahrainPaddockFile) && bahrainGpFile && fs.existsSync(bahrainGpFile)) {
+      if (runRealReplayTests && fs.existsSync(bahrainPaddockFile) && bahrainGpFile && fs.existsSync(bahrainGpFile)) {
         it('uses official simulation timing loop coordinates for Bahrain Paddock vs Grand Prix layouts', () => {
           const paddockTraj = extractReplayTrajectory(bahrainPaddockFile, { maxPoints: 0, lapNumber: 2 });
           const gpTraj = extractReplayTrajectory(bahrainGpFile, { maxPoints: 0, lapNumber: 2 });
@@ -1078,7 +1080,7 @@ describe('replayParser', () => {
       }
 
       const spaR1File = path.join(steamReplaysDir, 'Circuit de Spa-Francorchamps R1 35.Vcr');
-      if (fs.existsSync(spaR1File)) {
+      if (runRealReplayTests && fs.existsSync(spaR1File)) {
         it('detects all 14+ racing laps in Spa race replay instead of collapsing into single 33-minute lap', () => {
           const traj = extractReplayTrajectory(spaR1File, { maxPoints: 500 });
           expect(traj.driverSlot).toBe(32);
@@ -1512,7 +1514,7 @@ describe('replayParser', () => {
       const realP1File = path.join(steamReplays, 'Algarve International Circuit P1 39.Vcr');
       const realQ1File = path.join(steamReplays, 'Algarve International Circuit Q1 10.Vcr');
 
-      if (fs.existsSync(realP1File) && fs.existsSync(realQ1File)) {
+      if (runRealReplayTests && fs.existsSync(realP1File) && fs.existsSync(realQ1File)) {
         it('validates sessionType, modUid, trackPath, and structured drivers on real LMU replay files', () => {
           const p1Meta = parseReplayMetadata(realP1File);
           expect(p1Meta.sessionType).toBe('Practice');
@@ -1640,7 +1642,7 @@ describe('replayParser', () => {
       });
 
       const p1_41_File = path.join(steamReplays, 'Algarve International Circuit P1 41.Vcr');
-      if (fs.existsSync(p1_41_File)) {
+      if (runRealReplayTests && fs.existsSync(p1_41_File)) {
         it('extracts official lap summaries directly from Class 6 Type 6 events on real Algarve P1 41 replay', () => {
           // Driver slot 2 had 19 timing events in our inspection
           const laps = extractReplayLapSummaries(p1_41_File, { driverSlot: 2 });
@@ -1656,7 +1658,7 @@ describe('replayParser', () => {
       }
 
       const daytonaQ1_File = path.join(steamReplays, 'Daytona International Speedway Road Course Q1 6.Vcr');
-      if (fs.existsSync(daytonaQ1_File)) {
+      if (runRealReplayTests && fs.existsSync(daytonaQ1_File)) {
         it('extracts official lap summaries and sector splits on Daytona Q1 replay', () => {
           const laps = extractReplayLapSummaries(daytonaQ1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThanOrEqual(4);
@@ -1671,7 +1673,7 @@ describe('replayParser', () => {
       }
 
       const spaR1_File = path.join(steamReplays, 'Circuit de Spa-Francorchamps R1 35.Vcr');
-      if (fs.existsSync(spaR1_File)) {
+      if (runRealReplayTests && fs.existsSync(spaR1_File)) {
         it('extracts official lap summaries and sector splits on Spa R1 race replay', () => {
           const traj = extractReplayTrajectory(spaR1_File, { playerName: 'Samuel' });
           console.log('Spa driverSlot:', traj.driverSlot, 'driverName:', traj.driverName, 'laps:', traj.laps?.length);
@@ -1691,7 +1693,7 @@ describe('replayParser', () => {
       }
 
       const bahrainR1_File = path.join(steamReplays, 'Bahrain International Circuit R1 1.Vcr');
-      if (fs.existsSync(bahrainR1_File)) {
+      if (runRealReplayTests && fs.existsSync(bahrainR1_File)) {
         it('extracts official lap summaries and sector splits on Bahrain International R1 race replay', () => {
           const laps = extractReplayLapSummaries(bahrainR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
@@ -1705,7 +1707,7 @@ describe('replayParser', () => {
       }
 
       const sebringR1_File = path.join(steamReplays, 'Sebring International Raceway R1 13.Vcr');
-      if (fs.existsSync(sebringR1_File)) {
+      if (runRealReplayTests && fs.existsSync(sebringR1_File)) {
         it('extracts official lap summaries and sector splits on Sebring R1 race replay', () => {
           const laps = extractReplayLapSummaries(sebringR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
@@ -1719,7 +1721,7 @@ describe('replayParser', () => {
       }
 
       const lagunaR1_File = path.join(steamReplays, 'WeatherTech Raceway Laguna Seca R1 4.Vcr');
-      if (fs.existsSync(lagunaR1_File)) {
+      if (runRealReplayTests && fs.existsSync(lagunaR1_File)) {
         it('extracts official lap summaries and sector splits on Laguna Seca R1 race replay', () => {
           const laps = extractReplayLapSummaries(lagunaR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
@@ -1733,7 +1735,7 @@ describe('replayParser', () => {
       }
 
       const imolaR1_File = path.join(steamReplays, 'Autodromo Enzo e Dino Ferrari R1 8.Vcr');
-      if (fs.existsSync(imolaR1_File)) {
+      if (runRealReplayTests && fs.existsSync(imolaR1_File)) {
         it('extracts official lap summaries and sector splits on Imola R1 race replay', () => {
           const laps = extractReplayLapSummaries(imolaR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThanOrEqual(15);
@@ -1748,7 +1750,7 @@ describe('replayParser', () => {
       }
     });
 
-    describe('Cross-track & cross-session validation: official VCR timing vs XML simulation logs', () => {
+    describe.skipIf(!runRealReplayTests)('Cross-track & cross-session validation: official VCR timing vs XML simulation logs', () => {
       const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
       const steamResults = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\LOG\\Results';
       const lmuParser = new LmuParser();
@@ -1817,7 +1819,7 @@ describe('replayParser', () => {
         const vcrPath = path.join(steamReplays, tc.vcr);
         const xmlPath = path.join(steamResults, tc.xml);
 
-        if (fs.existsSync(vcrPath) && fs.existsSync(xmlPath)) {
+        if (runRealReplayTests && fs.existsSync(vcrPath) && fs.existsSync(xmlPath)) {
           it(`validates ${tc.name} against official XML simulation log`, () => {
             const vcrLaps = extractReplayLapSummaries(vcrPath, { playerName: 'Samuel' });
             expect(vcrLaps.length).toBeGreaterThanOrEqual(tc.minLaps);
@@ -1856,7 +1858,7 @@ describe('replayParser', () => {
       const lagunaPractice = path.join(steamReplays, 'WeatherTech Raceway Laguna Seca P1 5.Vcr');
 
       it('extracts full pitstop lifecycle across all drivers in online race replay (Daytona R1 3)', () => {
-        if (!fs.existsSync(daytonaRace)) return;
+        if (!runRealReplayTests || !fs.existsSync(daytonaRace)) return;
 
         const allTraj = extractReplayTrajectory(daytonaRace, { maxPoints: 10 });
         const allPitEvents = allTraj.pitEvents || [];
@@ -1881,7 +1883,7 @@ describe('replayParser', () => {
       });
 
       it('extracts garage exits and returns during practice sessions (Laguna Seca P1 5)', () => {
-        if (!fs.existsSync(lagunaPractice)) return;
+        if (!runRealReplayTests || !fs.existsSync(lagunaPractice)) return;
 
         const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 10 });
         const pitEvents = (traj.pitEvents || []).filter(e => e.driverSlot === 0);
@@ -1897,7 +1899,7 @@ describe('replayParser', () => {
       });
 
       it('correctly sets inGarage and inPit flags on trajectory points based on event intervals', () => {
-        if (!fs.existsSync(lagunaPractice)) return;
+        if (!runRealReplayTests || !fs.existsSync(lagunaPractice)) return;
 
         // Extract full points around the first stint start (time 0 to 40s)
         const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 0 });
@@ -1916,7 +1918,7 @@ describe('replayParser', () => {
       });
 
       it('emits authentic wheel telemetry (brakeTemps) when present and omits unverified tire wear', () => {
-        if (!fs.existsSync(lagunaPractice)) return;
+        if (!runRealReplayTests || !fs.existsSync(lagunaPractice)) return;
 
         const traj = extractReplayTrajectory(lagunaPractice, { driverSlot: 0, maxPoints: 200 });
         expect(traj.wheelTelemetryAvailable).toBe(true);

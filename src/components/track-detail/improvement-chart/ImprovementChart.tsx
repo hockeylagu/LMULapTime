@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { formatTime, matchesSessionType, compareSessions } from '../../../utils/formatters.js';
 import { matchesCarClass, matchesTrack } from '../../../utils/paceCategory.js';
-import { PaceCategory } from '../../../../server/types.js';
+import { PaceCategory } from '../../../../server/core/types';
 import { ImprovementHeader } from './ImprovementHeader.js';
 import { ImprovementStatsBanner } from './ImprovementStatsBanner.js';
 import { ImprovementChartControls, ImprovementMetric } from './ImprovementChartControls.js';

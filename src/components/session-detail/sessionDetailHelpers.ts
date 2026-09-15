@@ -1,4 +1,4 @@
-import { DetailedSession } from '../../../server/types.js';
+import { DetailedSession } from '../../../server/core/types';
 import { parseDateStringToTimestamp, matchesSessionType } from '../../utils/formatters.js';
 import { matchesTrack } from '../../utils/paceCategory.js';
 

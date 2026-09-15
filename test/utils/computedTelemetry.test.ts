@@ -9,7 +9,7 @@ import {
   computeTireSlipAndLockup,
   computeVehicleDynamics,
 } from '../../src/utils/computedTelemetry.js';
-import { ReplayTrajectoryPoint } from '../../server/types.js';
+import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 function makePoint(overrides: Partial<ReplayTrajectoryPoint>): ReplayTrajectoryPoint {
   return {

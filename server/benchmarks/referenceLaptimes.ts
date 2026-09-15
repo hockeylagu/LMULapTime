@@ -1,12 +1,12 @@
-import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from './types.js';
-import { parseTimeStringToSeconds, formatTime } from '../src/utils/formatters.js';
+import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../core/types.js';
+import { parseTimeStringToSeconds, formatTime } from '../../src/utils/formatters.js';
 import {
   normalizeTrackName,
   getPaceCategoryFromPercentage,
   findReferenceEntry,
   normalizeCarClass,
-} from '../src/utils/paceCategory.js';
-import { getSessionDatabase } from './db.js';
+} from '../../src/utils/paceCategory.js';
+import { getSessionDatabase } from '../core/db.js';
 
 export { normalizeTrackName, normalizeCarClass };
 

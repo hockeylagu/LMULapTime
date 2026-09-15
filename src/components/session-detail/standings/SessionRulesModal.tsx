@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { X, Sliders, Shield, Fuel, Flame, Wrench, Clock, Flag, Globe, Gamepad2, Disc } from 'lucide-react';
-import { SessionSettings } from '../../../../server/types.js';
+import { SessionSettings } from '../../../../server/core/types';
 
 export interface SessionRulesModalProps {
   isOpen: boolean;

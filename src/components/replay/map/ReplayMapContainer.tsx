@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CircleDot, Eye, EyeOff, Disc } from 'lucide-react';
-import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/types.js';
+import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/core/types';
 import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';

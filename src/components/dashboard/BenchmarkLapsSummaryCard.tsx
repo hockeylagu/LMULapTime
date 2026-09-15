@@ -2,7 +2,7 @@ import React from 'react';
 import { Zap, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 import { getPaceCategoryStyle } from '../../utils/paceCategory';
-import { PaceCategory } from '../../../server/types';
+import { PaceCategory } from '../../../server/core/types';
 
 export interface BestRefLapInfo {
   sessionId?: string;

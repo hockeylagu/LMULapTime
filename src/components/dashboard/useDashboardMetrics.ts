@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessions } from '../../utils/formatters.js';
 import { matchesSessionCarClass, matchesTrack } from '../../utils/paceCategory.js';
-import { DetailedSession } from '../../../server/types.js';
+import { DetailedSession } from '../../../server/core/types';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
 import { SessionSummary } from './Dashboard.js';

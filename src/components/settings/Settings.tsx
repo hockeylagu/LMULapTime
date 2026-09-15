@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { ReferenceBenchmarkDiff, ReplayScanStatus } from '../../../server/types.js';
+import { ReferenceBenchmarkDiff, ReplayScanStatus } from '../../../server/core/types';
 import { CacheSettingsCard } from './CacheSettingsCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';

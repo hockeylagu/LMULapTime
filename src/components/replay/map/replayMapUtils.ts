@@ -1,4 +1,4 @@
-import { ReplayTelemetryPoint } from '../../../../server/types.js';
+import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';

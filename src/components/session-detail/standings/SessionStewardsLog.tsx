@@ -1,4 +1,4 @@
-import { DriverData } from '../../../../server/types.js';
+import { DriverData } from '../../../../server/core/types';
 import { formatElapsedSeconds } from '../../../utils/formatters.js';
 import {
   getTrackLimitSeverity,

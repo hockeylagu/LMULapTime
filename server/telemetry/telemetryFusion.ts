@@ -1,4 +1,4 @@
-import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from './types.js';
+import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
 
 /**
  * Fuses native 100 Hz DuckDB telemetry channels (pedals, steering, speed, RPM,

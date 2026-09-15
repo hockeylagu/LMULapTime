@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReferenceLaptimeEntry, DriverData } from '../../../../server/types.js';
+import { ReferenceLaptimeEntry, DriverData } from '../../../../server/core/types';
 import { formatTime } from '../../../utils/formatters.js';
 
 export interface SessionReferenceAndSafetyProps {

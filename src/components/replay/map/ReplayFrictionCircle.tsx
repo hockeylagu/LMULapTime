@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReplayTelemetryPoint } from '../../../../server/types.js';
+import { ReplayTelemetryPoint } from '../../../../server/core/types';
 
 export interface ReplayFrictionCircleProps {
   points: ReplayTelemetryPoint[];
