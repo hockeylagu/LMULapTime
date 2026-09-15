@@ -2,7 +2,7 @@ import React from 'react';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { TimeRangeFilter } from './ImprovementChart.js';
 
-export type ImprovementMetric = 'bestLap' | 'sectors' | 'theoretical' | 'consistency';
+export type ImprovementMetric = 'bestLap' | 'sectors' | 'bestPr' | 'consistency';
 
 export interface ImprovementChartControlsProps {
   activeTrack: string;
@@ -12,6 +12,7 @@ export interface ImprovementChartControlsProps {
   setRange: (range: TimeRangeFilter) => void;
   metric: ImprovementMetric;
   setMetric: (metric: ImprovementMetric) => void;
+  personalBestEnabled: boolean;
 }
 
 export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> = ({
@@ -22,6 +23,7 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
   setRange,
   metric,
   setMetric,
+  personalBestEnabled,
 }) => {
   return (
     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
@@ -81,12 +83,18 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
           </button>
           <button
             type="button"
-            onClick={() => setMetric('theoretical')}
+            onClick={() => setMetric('bestPr')}
+            disabled={!personalBestEnabled}
             className={`px-3 py-1.5 rounded-lg transition-all ${
-              metric === 'theoretical' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+              metric === 'bestPr'
+                ? 'bg-lmu-accent text-white font-bold'
+                : personalBestEnabled
+                ? 'text-lmu-muted hover:text-white'
+                : 'text-lmu-muted/40 cursor-not-allowed'
             }`}
+            title={personalBestEnabled ? undefined : 'Select a specific car class to view personal-best progression'}
           >
-            Theoretical Best
+            Personal Best Over Time
           </button>
           <button
             type="button"

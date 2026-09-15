@@ -9,6 +9,24 @@ import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 
 export type TimeRangeFilter = 'all' | 'last-5' | 'last-10' | 'last-20' | 'week' | 'month' | 'year';
 
+export function buildPersonalBestSeries(bestLapTimes: readonly (number | null)[]): (number | null)[] {
+  let personalBest: number | null = null;
+
+  return bestLapTimes.map((bestLapTime) => {
+    if (bestLapTime !== null && bestLapTime > 0 && (personalBest === null || bestLapTime < personalBest)) {
+      personalBest = bestLapTime;
+    }
+    return personalBest;
+  });
+}
+
+export function calculateLapPrDelta(bestLapTime: number | null, previousPersonalBest: number | null): number | null {
+  if (bestLapTime === null || bestLapTime <= 0 || previousPersonalBest === null || previousPersonalBest <= 0) {
+    return null;
+  }
+  return parseFloat((bestLapTime - previousPersonalBest).toFixed(3));
+}
+
 export interface SessionProgressionPoint {
   sessionId: string;
   timestamp: number;
@@ -27,6 +45,8 @@ export interface SessionProgressionPoint {
   bestS2: number | null;
   bestS3: number | null;
   theoreticalBest: number | null;
+  benchmarkCategory?: PaceCategory | null;
+  benchmarkPercentage?: number | null;
   cleanLapsCount: number;
   totalLapsCount: number;
   avgLapTime: number | null;
@@ -77,6 +97,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   onTimeRangeChange,
 }) => {
   const [metric, setMetric] = useState<ImprovementMetric>('bestLap');
+  const personalBestEnabled = selectedCarClass !== 'All';
+  const displayedMetric = !personalBestEnabled && metric === 'bestPr' ? 'bestLap' : metric;
   const [internalTimeRange, setInternalTimeRange] = useState<TimeRangeFilter>('all');
   const activeRange = timeRange !== undefined ? timeRange : internalTimeRange;
   const setRange = onTimeRangeChange || setInternalTimeRange;
@@ -140,6 +162,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   const top3Improvement = firstTop3 !== null && bestTop3 !== null && validTop3.length > 1 ? firstTop3 - bestTop3 : null;
 
   const latestTheoreticalGap = trackData.length > 0 ? trackData[trackData.length - 1].theoreticalGap ?? null : null;
+  const personalBestSeries = buildPersonalBestSeries(trackData.map((p) => p.bestLapTime));
+  let personalBestBenchmarkCategory: PaceCategory | null = null;
 
   const chartData = trackData.map((p, index) => {
     let movingAvg: number | null = null;
@@ -153,6 +177,15 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     const shortSession = p.sessionName || p.sessionType.slice(0, 4);
     const dateFormatted = p.dateString.split(' ')[0] || p.dateString;
     const uniqueKey = `${dateFormatted} ${shortSession} #${index + 1}`;
+    const personalBestImproved =
+      p.bestLapTime !== null &&
+      p.bestLapTime > 0 &&
+      p.bestLapTime === personalBestSeries[index] &&
+      (index === 0 || personalBestSeries[index - 1] !== personalBestSeries[index]);
+
+    if (personalBestImproved && p.benchmarkCategory) {
+      personalBestBenchmarkCategory = p.benchmarkCategory;
+    }
 
     return {
       chartKey: uniqueKey,
@@ -167,6 +200,12 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       top3AvgStr: p.top3AvgLapTime ? formatTime(p.top3AvgLapTime) : null,
       movingAvg,
       avgLap: p.avgLapTime,
+      bestPr: personalBestSeries[index],
+      lapPrDelta: calculateLapPrDelta(p.bestLapTime, index > 0 ? personalBestSeries[index - 1] : null),
+      personalBestImproved,
+      benchmarkCategory: p.benchmarkCategory ?? null,
+      benchmarkPercentage: p.benchmarkPercentage ?? null,
+      personalBestBenchmarkCategory,
       theoretical: p.theoreticalBest,
       theoreticalGap: p.theoreticalGap ?? null,
       consistencyScore: p.consistencyScore ?? null,
@@ -182,17 +221,17 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   });
 
   const validTimes = (
-    metric === 'sectors'
+    displayedMetric === 'sectors'
       ? trackData.flatMap((p) => [p.bestS1, p.bestS2, p.bestS3])
-      : metric === 'theoretical'
-      ? [...trackData.flatMap((p) => [p.bestLapTime, p.theoreticalBest]), ...chartData.map((c) => c.movingAvg)]
-      : metric === 'consistency'
+      : displayedMetric === 'bestPr'
+      ? chartData.map((c) => c.bestPr)
+      : displayedMetric === 'consistency'
       ? chartData.map((c) => c.consistencyScore).filter((c): c is number => c !== null && c > 0)
       : [...trackData.flatMap((p) => [p.bestLapTime, p.avgLapTime, p.top3AvgLapTime]), ...chartData.map((c) => c.movingAvg)]
   ).filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
 
   const minTime =
-    metric === 'consistency'
+    displayedMetric === 'consistency'
       ? validTimes.length > 0
         ? Math.max(70, Math.floor(Math.min(...validTimes) - 2))
         : 80
@@ -201,7 +240,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       : 0;
 
   const maxTime =
-    metric === 'consistency' ? 100 : validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
+    displayedMetric === 'consistency' ? 100 : validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
 
   return (
     <div className="space-y-6">
@@ -237,13 +276,14 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
           totalSessionsCount={allTrackData.length}
           activeRange={activeRange}
           setRange={setRange}
-          metric={metric}
+          metric={displayedMetric}
           setMetric={setMetric}
+          personalBestEnabled={personalBestEnabled}
         />
 
         <ImprovementPaceChart
           chartData={chartData}
-          metric={metric}
+          metric={displayedMetric}
           minTime={minTime}
           maxTime={maxTime}
           activeTrack={activeTrack}

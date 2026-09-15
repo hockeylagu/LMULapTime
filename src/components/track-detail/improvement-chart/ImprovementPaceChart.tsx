@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { PaceCategory } from '../../../../server/core/types.js';
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,7 +13,7 @@ import {
 import { formatTime } from '../../../utils/formatters.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';
-import { ImprovementPaceSeries } from './ImprovementPaceSeries.js';
+import { BENCHMARK_COLORS, ImprovementPaceSeries } from './ImprovementPaceSeries.js';
 
 export interface ImprovementChartPoint {
   chartKey: string;
@@ -27,6 +28,12 @@ export interface ImprovementChartPoint {
   top3AvgStr: string | null;
   movingAvg: number | null;
   avgLap: number | null;
+  bestPr: number | null;
+  lapPrDelta: number | null;
+  personalBestImproved: boolean;
+  benchmarkCategory?: PaceCategory | null;
+  personalBestBenchmarkCategory?: PaceCategory | null;
+  benchmarkPercentage: number | null;
   theoretical: number | null;
   theoreticalGap: number | null;
   consistencyScore: number | null;
@@ -61,6 +68,28 @@ export interface ImprovementPaceChartProps {
   onSelectSession?: (sessionId: string) => void;
 }
 
+interface PersonalBestLegendProps {
+  gradient: string;
+  hidden: boolean;
+  onToggle: () => void;
+}
+
+const PersonalBestLegend: React.FC<PersonalBestLegendProps> = ({ gradient, hidden, onToggle }) => (
+  <div className="flex justify-center pt-3">
+    <button
+      type="button"
+      onClick={onToggle}
+      title="Click to toggle Personal Best Over Time visibility"
+      className={`inline-flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${
+        hidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+      }`}
+    >
+      <span aria-hidden="true" className="w-5 h-[3px] rounded-full" style={{ backgroundImage: gradient }} />
+      <span>Personal Best Over Time</span>
+    </button>
+  </div>
+);
+
 export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
   chartData,
   metric,
@@ -74,6 +103,15 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
   onSelectSession,
 }) => {
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+  const personalBestLegendGradient = `linear-gradient(to right, ${chartData
+    .map((point, index) => {
+      const color = point.personalBestBenchmarkCategory
+        ? BENCHMARK_COLORS[point.personalBestBenchmarkCategory]
+        : BENCHMARK_COLORS.Offline;
+      const offset = chartData.length > 1 ? (index / (chartData.length - 1)) * 100 : 0;
+      return `${color} ${offset}%`;
+    })
+    .join(', ')})`;
 
   const handleLegendClick = (e: LegendPayload) => {
     if (!e || !e.dataKey) return;
@@ -136,9 +174,18 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             tick={{ fill: '#8D99AE', fontSize: 12 }}
             tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
           />
-          <Tooltip content={<ImprovementPaceTooltip onSelectSession={onSelectSession} />} />
+          <Tooltip content={<ImprovementPaceTooltip metric={metric} onSelectSession={onSelectSession} />} />
           <Legend
             onClick={handleLegendClick}
+            content={
+              metric === 'bestPr' ? (
+                <PersonalBestLegend
+                  gradient={personalBestLegendGradient}
+                  hidden={Boolean(hiddenSeries['bestPr'])}
+                  onToggle={() => handleLegendClick({ dataKey: 'bestPr' } as LegendPayload)}
+                />
+              ) : undefined
+            }
             wrapperStyle={{ paddingTop: '15px', fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
             formatter={(value, entry: LegendPayload) => {
               const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey || '');
@@ -157,6 +204,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
           />
           <ImprovementPaceSeries
             metric={metric}
+            chartData={chartData}
             onSelectSession={onSelectSession}
             hiddenSeries={hiddenSeries}
           />
