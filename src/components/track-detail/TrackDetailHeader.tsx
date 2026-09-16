@@ -161,6 +161,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
             No reference benchmarks found for this track. Update reference lap time benchmarks in Settings.
           </div>
         )}
+
       </div>
 
       <CircuitInfoModal

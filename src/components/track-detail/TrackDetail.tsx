@@ -187,6 +187,23 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     bestLapSession?.playerDriver?.carType
   );
 
+  const averagePosition = (sessions: SessionMeta[]): number | null => {
+    const positions = sessions
+      .map((session) => session.playerDriver?.position)
+      .filter((position): position is number => typeof position === 'number' && position > 0);
+    return positions.length > 0
+      ? positions.reduce((total, position) => total + position, 0) / positions.length
+      : null;
+  };
+  const qualifyingSessions = classTrackSessions.filter((session) =>
+    matchesSessionType(session.sessionType, session.sessionName, 'Qualifying')
+  );
+  const raceSessions = classTrackSessions.filter((session) =>
+    matchesSessionType(session.sessionType, session.sessionName, 'Race')
+  );
+  const qualifyingAveragePosition = averagePosition(qualifyingSessions);
+  const finishAveragePosition = averagePosition(raceSessions);
+
   const sortedSessions = [...filteredSessions].sort((a, b) => {
     if (sortBy === 'date-desc' || sortBy === 'date-asc') {
       return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
@@ -277,6 +294,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
           paceCat: currentClassDriverStats.bestPaceCat,
           pacePct: currentClassDriverStats.bestPacePct,
         }}
+        qualifyingAveragePosition={qualifyingAveragePosition}
+        finishAveragePosition={finishAveragePosition}
       />
 
       <TrackSessionsCard
