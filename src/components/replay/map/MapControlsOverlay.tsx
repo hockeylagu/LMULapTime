@@ -22,14 +22,16 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
 }) => {
   return (
     <div
+      data-testid="map-controls-overlay"
       className={`absolute bottom-3 right-3 z-30 flex items-center gap-1.5 bg-[#0a0e17]/90 backdrop-blur-md p-1.5 rounded-xl border border-white/10 shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}
+      onPointerDown={e => e.stopPropagation()}
     >
       <button
         type="button"
         onClick={onZoomIn}
         aria-label="Zoom in"
-        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
         title="Zoom In"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -38,7 +40,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onZoomOut}
         aria-label="Zoom out"
-        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
         title="Zoom Out"
       >
         <Minus className="w-3.5 h-3.5" />
@@ -49,7 +51,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           type="button"
           onClick={onToggleFollowCar}
           aria-label="Follow car"
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             followCar
               ? 'bg-lmu-accent text-white shadow-sm'
               : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
@@ -64,14 +66,14 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onReset}
         aria-label="Reset zoom and pan"
-        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer"
+        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
         title="Reset View"
       >
         <RotateCcw className="w-3.5 h-3.5" />
       </button>
 
       {zoomDisplay && (
-        <span className="text-[10px] font-mono text-lmu-muted px-1.5 font-bold select-none">
+        <span className="w-11 h-7 flex items-center justify-center text-[10px] font-mono text-lmu-muted font-bold select-none tabular-nums shrink-0">
           {zoomDisplay}
         </span>
       )}

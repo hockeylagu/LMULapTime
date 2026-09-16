@@ -72,9 +72,9 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
       </div>
 
       <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+100% R</div>
-        <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0% Center</div>
         <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-100% L</div>
+        <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0% Center</div>
+        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+100% R</div>
       </div>
 
       {chartSvg}

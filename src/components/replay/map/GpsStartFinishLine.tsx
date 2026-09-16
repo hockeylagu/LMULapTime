@@ -6,6 +6,9 @@ export interface GpsStartFinishLineProps {
   zoomLevel?: number;
   cornerMarkers?: DispersedCornerMarker[];
   pedalMarkers?: { sx: number; sy: number }[];
+  /** Canonical gate endpoints spanning the road ribbon width from left to right boundary. */
+  gateLeftSvg?: { sx: number; sy: number } | null;
+  gateRightSvg?: { sx: number; sy: number } | null;
 }
 
 export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
@@ -13,25 +16,17 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
   zoomLevel,
   cornerMarkers,
   pedalMarkers,
+  gateLeftSvg,
+  gateRightSvg,
 }) => {
   const lineData = useMemo(() => {
-    if (svgPoints.length < 2) return null;
-    const p0 = svgPoints[0];
-    const p1 = svgPoints[Math.min(2, svgPoints.length - 1)];
-    const dx = p1.sx - p0.sx;
-    const dy = p1.sy - p0.sy;
-    const len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
+    const useGate = Boolean(gateLeftSvg && gateRightSvg);
+    if (!useGate && (!svgPoints || svgPoints.length < 2)) return null;
 
     const effectiveZoom = zoomLevel && zoomLevel > 0 ? zoomLevel : 1;
-    // Scale line length with zoom so it maintains a clean ~28px screen width across all zoom levels
-    const halfWidth = Math.max(1.5, Number((14 / effectiveZoom).toFixed(2)));
-
-    // Choose side (+1 or -1) for START label to ensure it does not interfere with racing line or indicators
-    const labelDist = halfWidth + 18 / effectiveZoom;
-    const cand1 = { x: p0.sx + nx * labelDist, y: p0.sy + ny * labelDist };
-    const cand2 = { x: p0.sx - nx * labelDist, y: p0.sy - ny * labelDist };
+    let x1: number, y1: number, x2: number, y2: number;
+    let labelPos: { x: number; y: number };
+    let nx: number, ny: number;
 
     const getIndicatorClearance = (pt: { x: number; y: number }) => {
       let minDist = Infinity;
@@ -50,33 +45,59 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
       return minDist;
     };
 
-    const getTrackClearance = (pt: { x: number; y: number }) => {
-      let minDist = Infinity;
-      // Check distance against distant track points (skipping immediate start straight points)
-      for (let i = 5; i < svgPoints.length - 5; i += 3) {
-        const p = svgPoints[i];
-        const d = Math.hypot(pt.x - p.sx, pt.y - p.sy);
-        if (d < minDist) minDist = d;
-      }
-      return minDist;
-    };
+    if (useGate && gateLeftSvg && gateRightSvg) {
+      // Upgraded S/F line: spans the full width of the road ribbon from left to right boundary
+      x1 = gateLeftSvg.sx;
+      y1 = gateLeftSvg.sy;
+      x2 = gateRightSvg.sx;
+      y2 = gateRightSvg.sy;
 
-    const score1 = Math.min(getIndicatorClearance(cand1), 100) * 3 + Math.min(getTrackClearance(cand1), 100);
-    const score2 = Math.min(getIndicatorClearance(cand2), 100) * 3 + Math.min(getTrackClearance(cand2), 100);
-    const side = score1 >= score2 ? 1 : -1;
-    const labelPos = side === 1 ? cand1 : cand2;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy) || 1;
+      nx = dx / len;
+      ny = dy / len;
+
+      // Position START badge outside the road ribbon edge (pit wall / verge)
+      const edgeOffset = 25 / effectiveZoom;
+      const candLeft = { x: x1 - nx * edgeOffset, y: y1 - ny * edgeOffset };
+      const candRight = { x: x2 + nx * edgeOffset, y: y2 + ny * edgeOffset };
+
+      labelPos = getIndicatorClearance(candLeft) >= getIndicatorClearance(candRight) ? candLeft : candRight;
+    } else {
+      if (svgPoints.length < 2) return null;
+      // Fallback for unmapped tracks (no road ribbon boundary): draw across trajectory start point
+      const p0 = svgPoints[0];
+      const p1 = svgPoints[Math.min(2, svgPoints.length - 1)];
+      const dx = p1.sx - p0.sx;
+      const dy = p1.sy - p0.sy;
+      const len = Math.hypot(dx, dy) || 1;
+      nx = -dy / len;
+      ny = dx / len;
+
+      const halfWidth = Math.max(1.5, Number((14 / effectiveZoom).toFixed(2)));
+      x1 = p0.sx - nx * halfWidth;
+      y1 = p0.sy - ny * halfWidth;
+      x2 = p0.sx + nx * halfWidth;
+      y2 = p0.sy + ny * halfWidth;
+
+      const labelDist = halfWidth + 25 / effectiveZoom;
+      const cand1 = { x: p0.sx + nx * labelDist, y: p0.sy + ny * labelDist };
+      const cand2 = { x: p0.sx - nx * labelDist, y: p0.sy - ny * labelDist };
+
+      labelPos = getIndicatorClearance(cand1) >= getIndicatorClearance(cand2) ? cand1 : cand2;
+    }
 
     return {
-      x1: Number((p0.sx - nx * halfWidth).toFixed(1)),
-      y1: Number((p0.sy - ny * halfWidth).toFixed(1)),
-      x2: Number((p0.sx + nx * halfWidth).toFixed(1)),
-      y2: Number((p0.sy + ny * halfWidth).toFixed(1)),
+      x1: Number(x1.toFixed(1)),
+      y1: Number(y1.toFixed(1)),
+      x2: Number(x2.toFixed(1)),
+      y2: Number(y2.toFixed(1)),
       labelX: Number(labelPos.x.toFixed(1)),
       labelY: Number(labelPos.y.toFixed(1)),
       effectiveZoom,
-      side,
     };
-  }, [svgPoints, zoomLevel, cornerMarkers, pedalMarkers]);
+  }, [svgPoints, zoomLevel, cornerMarkers, pedalMarkers, gateLeftSvg, gateRightSvg]);
 
   if (!lineData) return null;
 
@@ -117,7 +138,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
         vectorEffect="non-scaling-stroke"
       />
 
-      {/* START label placed beside the line, scaled to constant screen size */}
+      {/* START badge placed beside the road ribbon edge, scaled to constant screen size */}
       <g
         data-testid="start-finish-label"
         transform={`translate(${lineData.labelX}, ${lineData.labelY}) scale(${1 / lineData.effectiveZoom})`}

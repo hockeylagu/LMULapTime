@@ -105,7 +105,7 @@ export function useCornerConsistency(
         ...(currentLapIsValid ? [{ lapNumber: trajectory.currentLap ?? 0, points: trajectory.points }] : []),
         ...results.filter(r => r.points.length > 0),
       ];
-      const computedStats = computeCornerConsistencyStats(laps, trajectory.points);
+      const computedStats = computeCornerConsistencyStats(laps, trajectory.points, trajectory.trackLengthM);
       storeInCache(cacheKey, { cornerStats: computedStats, lapsSampled: laps.length });
       setLapsSampled(laps.length);
       setCornerStats(computedStats);

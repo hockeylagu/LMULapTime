@@ -114,7 +114,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const lapSegments = useMemo(() => {
     if (!trajectory) return [];
     const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
-    return computeLapSegmentComparisons(trajectory.points, baseline, 6);
+    return computeLapSegmentComparisons(trajectory.points, baseline, 6, trajectory.trackLengthM);
   }, [isCompareMode, trajectory, baselineTrajectory]);
 
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);

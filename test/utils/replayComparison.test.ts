@@ -6,6 +6,11 @@ import {
   findIndexAtDistance,
   filterCompatibleReplays,
   mapVehicleIdToClass,
+  computeStartFinishOffset,
+  getTrajectoryDistances,
+  getMonotonicStations,
+  getNormalizedTrajectoryTimes,
+  interpolateScalarAtDistance,
 } from '../../src/utils/replayComparison.js';
 import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/core/types.js';
 
@@ -166,6 +171,288 @@ describe('replayComparison utility', () => {
       expect(comps).toHaveLength(1);
       expect(comps[0].deltaTimeSec).toBe(0);
       expect(isNaN(comps[0].deltaTimeSec)).toBe(false);
+    });
+  });
+
+  describe('computeStartFinishOffset / getTrajectoryDistances alignment', () => {
+    function withStation(points: ReplayTrajectoryPoint[], stations: number[]): ReplayTrajectoryPoint[] {
+      return points.map((p, i) => ({ ...p, distM: p.x, stationM: stations[i] }));
+    }
+
+    it('returns null when canonical stationM is not available', () => {
+      const points: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 1 },
+      ];
+      expect(computeStartFinishOffset(points)).toBeNull();
+      // getTrajectoryDistances stays unmodified (no stationM to correct against)
+      expect(getTrajectoryDistances(points)).toEqual([0, 10]);
+    });
+
+    it('interpolates a small positive offset when the recording starts just past the line', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 1 },
+        { x: 20, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 2 },
+      ];
+      // Recording actually starts 4m past the true line (stationM=4 at index 0)
+      const points = withStation(raw, [4, 14, 24]);
+
+      const crossing = computeStartFinishOffset(points);
+      expect(crossing).not.toBeNull();
+      expect(crossing!.distMOffset).toBeCloseTo(-4, 5); // true line is 4m before points[0]
+      expect(crossing!.worldX).toBeCloseTo(-4, 5);
+
+      const dists = getTrajectoryDistances(points);
+      expect(dists[0]).toBeCloseTo(4, 5); // now measured from the true line, not from points[0]
+    });
+
+    it('rebases two independently-trimmed recordings of the same lap onto the same reference', () => {
+      // Two recordings of the "same" lap, each trimmed a few meters differently around the
+      // physical line - without correction these would be compared at the wrong track position.
+      const rawA: ReplayTrajectoryPoint[] = [0, 10, 20, 30].map((x, i) => ({
+        x, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: i,
+      }));
+      const rawB: ReplayTrajectoryPoint[] = [0, 10, 20, 30].map((x, i) => ({
+        x, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: i,
+      }));
+      const pointsA = withStation(rawA, [3, 13, 23, 33]); // trimmed 3m late
+      const pointsB = withStation(rawB, [1, 11, 21, 31]); // trimmed 1m late
+
+      const distsA = getTrajectoryDistances(pointsA);
+      const distsB = getTrajectoryDistances(pointsB);
+
+      // Both arrays now read 0 at the same physical crossing, not at their own point[0]
+      expect(distsA[0]).toBeCloseTo(3, 5);
+      expect(distsB[0]).toBeCloseTo(1, 5);
+      // Without alignment, "distance 10" would mean different physical spots for A and B
+      // (each 2m apart from the true line); aligned, both now agree on where 0 actually is.
+      expect(distsA[0] - distsB[0]).toBeCloseTo(2, 5);
+    });
+
+    it('does not "correct" large drift, treating it as a genuinely unrecognized split', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 1 },
+      ];
+      const points = withStation(raw, [500, 510]); // nowhere near the line - not a trim artifact
+      expect(computeStartFinishOffset(points)).toBeNull();
+      expect(getTrajectoryDistances(points)).toEqual([0, 10]);
+    });
+
+    it('normalizes a station near trackLengthM to a small negative drift (wrap-around)', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 1 },
+      ];
+      const trackLengthM = 1000;
+      // The recording includes a couple of samples from just before the line wrapped in
+      const points = withStation(raw, [998, 1008 % trackLengthM || 8]);
+      const crossing = computeStartFinishOffset(points, trackLengthM);
+      expect(crossing).not.toBeNull();
+      // True line is ~2m after points[0]
+      expect(crossing!.distMOffset).toBeCloseTo(2, 1);
+    });
+
+    it('finds crossing when it occurs between index 2 and index 3', () => {
+      const trackLengthM = 1000;
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: -15, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.0 },
+        { x: -10, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.1 },
+        { x: -5, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.2 },
+        { x: 5, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.4 },
+        { x: 10, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.5 },
+      ];
+      // Crossing is between index 2 (station 995 -> -5) and index 3 (station 5)
+      const points = withStation(raw, [985, 990, 995, 5, 10]);
+      const crossing = computeStartFinishOffset(points, trackLengthM);
+      expect(crossing).not.toBeNull();
+      // Crossing is halfway between index 2 (t=10.2, s=-5) and index 3 (t=10.4, s=5) => t=10.3s
+      expect(crossing!.timeSecOffset).toBeCloseTo(10.3, 2);
+      expect(crossing!.distMOffset).toBeCloseTo(0, 1);
+      expect(crossing!.worldX).toBeCloseTo(0, 1);
+    });
+
+    it('extrapolates timeSecOffset backward when lap recording starts after the start/finish line', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 5, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 1.0 },
+        { x: 15, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 1.2 },
+      ];
+      // Car is at station 5m at t=1.0s, and station 15m at t=1.2s (delta_s = 10m in 0.2s = 50m/s)
+      // True start/finish line (s=0) was 5m earlier => 0.1s earlier => t=0.9s
+      const points = withStation(raw, [5, 15]);
+      const crossing = computeStartFinishOffset(points, 1000);
+      expect(crossing).not.toBeNull();
+      expect(crossing!.timeSecOffset).toBeCloseTo(0.9, 2);
+      expect(crossing!.distMOffset).toBeCloseTo(0, 2);
+      expect(crossing!.worldX).toBeCloseTo(0, 2);
+    });
+
+    it('rejects crossing if distMOffset exceeds MAX_START_FINISH_CORRECTION_M even when station wraps', () => {
+      const trackLengthM = 1000;
+      // Station wraps between index 1 and index 2 (from 998 to 2), but distM at index 1 is 50m (> 25m)
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 10, distM: 40 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 11, distM: 50 },
+        { x: 20, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 12, distM: 60 },
+      ];
+      const points = [
+        { ...raw[0], stationM: 995 },
+        { ...raw[1], stationM: 998 },
+        { ...raw[2], stationM: 2 },
+      ];
+      // Crossing is at distM ~53.3m, which exceeds 25m threshold -> must reject
+      expect(computeStartFinishOffset(points, trackLengthM)).toBeNull();
+    });
+  });
+
+  describe('getMonotonicStations and getNormalizedTrajectoryTimes', () => {
+    it('unwraps boundary stations into continuous monotonic values', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0, stationM: 995 },
+        { x: 5, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0.1, stationM: 998 },
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0.2, stationM: 2 },
+        { x: 15, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0.3, stationM: 8 },
+      ];
+      const stations = getMonotonicStations(raw, 1000);
+      expect(stations[0]).toBeCloseTo(-5);
+      expect(stations[1]).toBeCloseTo(-2);
+      expect(stations[2]).toBeCloseTo(2);
+      expect(stations[3]).toBeCloseTo(8);
+    });
+
+    it('normalizes times relative to physical start/finish crossing', () => {
+      const raw: ReplayTrajectoryPoint[] = [
+        { x: 0, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 100.0, stationM: 995 },
+        { x: 10, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 100.2, stationM: 5 },
+      ];
+      // Crossing is at station 0, halfway between 100.0s and 100.2s => t_SF = 100.1s
+      const normTimes = getNormalizedTrajectoryTimes(raw, 1000);
+      expect(normTimes[0]).toBeCloseTo(-0.1, 2);
+      expect(normTimes[1]).toBeCloseTo(0.1, 2);
+    });
+  });
+
+  describe('cross-driver canonical reference matching', () => {
+    it('eliminates delta jump at start/finish line between drivers starting at different trims', () => {
+      const trackLengthM = 2000;
+      // Driver A: starts 5m before line (station 1995 -> -5) at t=10.0s, crosses line at t=10.1s (s=0, speed 50m/s)
+      const primary: ReplayTrajectoryPoint[] = [
+        { x: -5, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.0, stationM: 1995 },
+        { x: 0, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 10.1, stationM: 0 },
+        { x: 50, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 11.1, stationM: 50 },
+        { x: 100, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 12.1, stationM: 100 },
+      ];
+
+      // Driver B (opponent): starts 10m AFTER line (station 10) at t=50.2s, at speed 50m/s (so crossed line at t=50.0s)
+      const baseline: ReplayTrajectoryPoint[] = [
+        { x: 10, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 50.2, stationM: 10 },
+        { x: 60, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 51.2, stationM: 60 },
+        { x: 110, y: 0, z: 0, speedKmh: 180, throttle: 100, brake: 0, steerYaw: 0, timeSec: 52.2, stationM: 110 },
+      ];
+
+      const comparisons = computeLapComparisons(primary, baseline, trackLengthM);
+      expect(comparisons.length).toBe(primary.length);
+
+      // At station 0 (the physical start/finish line, index 1):
+      // Primary crossed at t_norm = 10.1 - 10.1 = 0.0s
+      // Baseline crossed at t_norm = 0.0s (extrapolated backward from 10m @ 50m/s)
+      // Therefore, delta at start/finish line MUST be exactly 0.000s!
+      expect(comparisons[1].deltaTimeSec).toBeCloseTo(0.0, 2);
+
+      // And at all subsequent points, since both drivers are traveling at the identical speed (50 m/s),
+      // the delta remains 0.000s everywhere!
+      for (const comp of comparisons) {
+        expect(comp.deltaTimeSec).toBeCloseTo(0.0, 2);
+      }
+    });
+
+    it('extrapolates position and speed linearly when query distance is beyond bounds', () => {
+      const points: ReplayTrajectoryPoint[] = [
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 50, brake: 0, steerYaw: 0, timeSec: 1.0 },
+        { x: 20, y: 0, z: 0, speedKmh: 120, throttle: 80, brake: 0, steerYaw: 0, timeSec: 1.5 },
+      ];
+      const cumDists = [10, 20];
+
+      // Query before the start (-5m before cumDists[0]=10m) with extrapolateBoundary=true
+      const ptBefore = interpolatePointAtDistance(points, cumDists, 5, 0, true);
+      // Slope for x is (20-10)/(20-10) = 1.0. At dist=5, x = 10 + 1.0 * (5 - 10) = 5
+      expect(ptBefore.x).toBeCloseTo(5);
+      // Slope for speed is (120-100)/10 = 2 km/h per meter. At dist=5, speed = 100 + 2 * (5 - 10) = 90
+      expect(ptBefore.speedKmh).toBeCloseTo(90);
+      // Time: slope is 0.5s / 10m = 0.05 s/m. At dist=5, time = 1.0 + 0.05 * (-5) = 0.75s
+      expect(ptBefore.timeSec).toBeCloseTo(0.75);
+    });
+
+    it('clamps boundary extrapolation to MAX_START_FINISH_CORRECTION_M (25m)', () => {
+      const points: ReplayTrajectoryPoint[] = [
+        { x: 10, y: 0, z: 0, speedKmh: 100, throttle: 50, brake: 0, steerYaw: 0, timeSec: 1.0 },
+        { x: 20, y: 0, z: 0, speedKmh: 120, throttle: 80, brake: 0, steerYaw: 0, timeSec: 1.5 },
+      ];
+      const cumDists = [10, 20];
+
+      // Query way before the start: -200m (cumDists[0] is 10m, so delta is -210m, clamped to 10 - 25 = -15m)
+      const ptBefore = interpolatePointAtDistance(points, cumDists, -200, 0, true);
+      // Clamped targetDist is -15m:
+      // t = (-15 - 10) / 10 = -2.5
+      // x = 10 + (-2.5) * (20 - 10) = -15
+      expect(ptBefore.x).toBeCloseTo(-15);
+      // Speed: 100 + (-2.5) * (120 - 100) = 50 km/h (rather than dropping to 0 or negative)
+      expect(ptBefore.speedKmh).toBeCloseTo(50);
+      // Time: 1.0 + (-2.5) * 0.5 = -0.25s
+      expect(ptBefore.timeSec).toBeCloseTo(-0.25);
+
+      // Scalar interpolation also clamps to 25m
+      const scalarBefore = interpolateScalarAtDistance([100, 120], cumDists, -200, true);
+      expect(scalarBefore).toBeCloseTo(50);
+
+      // Query way past the end: 500m (maxDist is 20m, clamped to 20 + 25 = 45m)
+      // t = (45 - 10) / 10 = 3.5
+      const ptAfter = interpolatePointAtDistance(points, cumDists, 500, 0, true);
+      expect(ptAfter.x).toBeCloseTo(45);
+      const scalarAfter = interpolateScalarAtDistance([100, 120], cumDists, 500, true);
+      expect(scalarAfter).toBeCloseTo(170);
+    });
+
+    it('populates all secondary telemetry channels at lower boundary points', () => {
+      const fullPoint: ReplayTrajectoryPoint = {
+        x: 0, y: 0, z: 0,
+        speedKmh: 150, throttle: 100, brake: 0, steerYaw: 0.1,
+        timeSec: 10.0,
+        engineRpm: 7500,
+        tireTemps: [80, 82, 85, 84],
+        tireWear: [98, 97, 98, 97],
+        brakeTemps: [450, 455, 420, 425],
+        rideHeight: [35, 36, 45, 46],
+        wheelSpeeds: [150, 150, 151, 151],
+        tirePressures: [170, 172, 175, 174],
+        lateralOffsetM: 1.25,
+        accelLonG: 0.8,
+        accelLatG: 1.5,
+        accelTotalG: 1.7,
+        yawRateDeg: 12.5,
+        slipAngleDeg: 2.1,
+        understeerDeg: 0.5,
+        tireSlipPct: 4.2,
+        wheelLockActive: false,
+      };
+      const secondPoint: ReplayTrajectoryPoint = { ...fullPoint, x: 10, timeSec: 10.2 };
+
+      // Non-extrapolated lower boundary (targetDist <= cumDists[0])
+      const ptExact = interpolatePointAtDistance([fullPoint, secondPoint], [0, 10], 0, 10.0, false);
+      expect(ptExact.engineRpm).toBe(7500);
+      expect(ptExact.tireTemps).toEqual([80, 82, 85, 84]);
+      expect(ptExact.lateralOffsetM).toBe(1.25);
+      expect(ptExact.accelLonG).toBe(0.8);
+      expect(ptExact.slipAngleDeg).toBe(2.1);
+
+      // Extrapolated lower boundary (targetDist < cumDists[0])
+      const ptExtrap = interpolatePointAtDistance([fullPoint, secondPoint], [0, 10], -2, 10.0, true);
+      expect(ptExtrap.engineRpm).toBe(7500);
+      expect(ptExtrap.tireTemps).toEqual([80, 82, 85, 84]);
+      expect(ptExtrap.lateralOffsetM).toBe(1.25);
+      expect(ptExtrap.accelLonG).toBe(0.8);
+      expect(ptExtrap.slipAngleDeg).toBe(2.1);
     });
   });
 

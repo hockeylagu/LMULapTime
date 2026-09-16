@@ -113,4 +113,65 @@ describe('GpsStartFinishLine', () => {
     // To avoid the corner marker at x=80, label placed at x > 100
     expect(labelX).toBeGreaterThan(100);
   });
+
+  it('when given a canonical gate, draws the line from gate left/right rather than racing-line heading', () => {
+    // Racing line heads roughly vertically (heading would normally produce a horizontal line),
+    // but the canonical gate here spans horizontally too -> so this alone doesn't disambiguate.
+    // Use a gate that's diagonal instead, to prove the line follows the gate, not the heading.
+    const { container } = render(
+      <svg>
+        <GpsStartFinishLine
+          svgPoints={mockPoints}
+          gateLeftSvg={{ sx: 90, sy: 190 }}
+          gateRightSvg={{ sx: 110, sy: 210 }}
+        />
+      </svg>
+    );
+
+    const group = container.querySelector('[data-testid="start-finish-line"]');
+    const line = group?.querySelector('line');
+    const x1 = Number(line?.getAttribute('x1'));
+    const y1 = Number(line?.getAttribute('y1'));
+    const x2 = Number(line?.getAttribute('x2'));
+    const y2 = Number(line?.getAttribute('y2'));
+
+    // Direction should match the diagonal gate (dx === dy), not the vertical racing-line heading
+    expect(Math.abs(x2 - x1)).toBeCloseTo(Math.abs(y2 - y1), 1);
+    expect(Math.abs(x2 - x1)).toBeGreaterThan(0);
+
+    // Line spans directly between the gate endpoints (90, 190) and (110, 210)
+    expect(x1).toBe(90);
+    expect(y1).toBe(190);
+    expect(x2).toBe(110);
+    expect(y2).toBe(210);
+    expect((x1 + x2) / 2).toBeCloseTo(100, 1);
+    expect((y1 + y2) / 2).toBeCloseTo(200, 1);
+  });
+
+  it('spans the full road ribbon from gateLeftSvg to gateRightSvg rather than centering on the racing line', () => {
+    const { container } = render(
+      <svg>
+        <GpsStartFinishLine
+          svgPoints={mockPoints}
+          gateLeftSvg={{ sx: 80, sy: 200 }}
+          gateRightSvg={{ sx: 120, sy: 200 }}
+        />
+      </svg>
+    );
+
+    const group = container.querySelector('[data-testid="start-finish-line"]');
+    const line = group?.querySelector('line');
+    const x1 = Number(line?.getAttribute('x1'));
+    const x2 = Number(line?.getAttribute('x2'));
+    const y1 = Number(line?.getAttribute('y1'));
+    const y2 = Number(line?.getAttribute('y2'));
+
+    // Spans full road ribbon directly from gateLeft (80, 200) to gateRight (120, 200)
+    expect(x1).toBe(80);
+    expect(y1).toBe(200);
+    expect(x2).toBe(120);
+    expect(y2).toBe(200);
+    expect((x1 + x2) / 2).toBeCloseTo(100, 1);
+    expect((y1 + y2) / 2).toBeCloseTo(200, 1);
+  });
 });

@@ -15,6 +15,7 @@ export interface UseTelemetryStripInteractionArgs {
   onSelectIndex: (index: number) => void;
   zoomRange?: { start: number; end: number } | null;
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
+  trackLengthM?: number;
 }
 
 /**
@@ -27,6 +28,7 @@ export function useTelemetryStripInteraction({
   onSelectIndex,
   zoomRange,
   onZoomRangeChange,
+  trackLengthM,
 }: UseTelemetryStripInteractionArgs) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
@@ -56,7 +58,7 @@ export function useTelemetryStripInteraction({
   const isZoomed = !!(activeZoomRange && totalPoints > 0 && activeZoomRange.end > activeZoomRange.start);
   const viewStart = isZoomed ? Math.max(0, Math.min(activeZoomRange.start, totalPoints - 2)) : 0;
   const viewEnd = isZoomed ? Math.min(totalPoints - 1, Math.max(activeZoomRange.end, viewStart + 1)) : Math.max(0, totalPoints - 1);
-  const cumDists = useMemo(() => getTrajectoryDistances(points), [points]);
+  const cumDists = useMemo(() => getTrajectoryDistances(points, trackLengthM), [points, trackLengthM]);
   const distStart = cumDists[viewStart] ?? 0;
   const distEnd = cumDists[viewEnd] ?? distStart;
   const distSpan = Math.max(1e-6, distEnd - distStart);

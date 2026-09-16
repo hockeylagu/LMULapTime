@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types';
-import { computeLapComparisons } from '../../../utils/replayComparison.js';
+import { computeLapComparisons, computeStartFinishOffset } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
@@ -45,6 +45,7 @@ export interface TelemetryStripChartsProps {
   hasDuckDb?: boolean;
   duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
+  trackLengthM?: number;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
@@ -52,7 +53,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
   rawPointsCount, rawSampleRateHz, vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
-  hasDuckDb, duckdbUnavailableReason, onSelectSource,
+  hasDuckDb, duckdbUnavailableReason, onSelectSource, trackLengthM,
 }) => {
   const {
     containerRef,
@@ -71,7 +72,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
-  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, zoomRange, onZoomRangeChange });
+  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, zoomRange, onZoomRangeChange, trackLengthM });
 
   const [presets, setPresets] = useState<TelemetryPreset[]>(() => loadTelemetryPresets());
   const [activePresetId, setActivePresetId] = useState<string>(() => loadActivePresetId(presets));
@@ -99,12 +100,14 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
 
   const pointComparisons = useMemo(
     () => (baselinePoints && baselinePoints.length > 0 && points.length > 0
-      ? computeLapComparisons(points, baselinePoints)
+      ? computeLapComparisons(points, baselinePoints, trackLengthM)
       : []),
-    [points, baselinePoints]
+    [points, baselinePoints, trackLengthM]
   );
   const currentComparison = pointComparisons[safeIndex] || null;
-  const currentTimeSec = currentPoint && points[0] ? Math.max(0, (currentPoint.timeSec || 0) - (points[0].timeSec || 0)) : 0;
+  const sfCrossing = useMemo(() => computeStartFinishOffset(points, trackLengthM), [points, trackLengthM]);
+  const startTimeSec = sfCrossing?.timeSecOffset ?? (points[0]?.timeSec ?? 0);
+  const currentTimeSec = currentPoint ? Math.max(0, (currentPoint.timeSec || 0) - startTimeSec) : 0;
   const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists), [points, pointComparisons, viewStart, viewEnd, cumDists]);
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
   const cursorPct = pctForIndex(safeIndex);

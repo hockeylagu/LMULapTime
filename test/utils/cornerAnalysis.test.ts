@@ -93,6 +93,41 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.throttleOnDeltaM).toBe(-10); // primary got back to full throttle 10m earlier
   });
 
+  it('keeps brake/throttle deltas correct even when the two recordings are independently mis-trimmed around the line', () => {
+    // Simulates two recordings of literally the same physical lap, but each one's own
+    // odometer (distM) starts at a different offset from the true physical start/finish line -
+    // e.g. one replay's lap-split landed a few meters late. Without re-zeroing both to the
+    // same canonical reference (stationM), matching "distance from point[0]" would compare
+    // the wrong physical spots and produce bogus brake-point deltas.
+    function shiftRecording(points: ReplayTrajectoryPoint[], shiftM: number): ReplayTrajectoryPoint[] {
+      return points.map(p => ({ ...p, distM: p.x + shiftM, stationM: p.x }));
+    }
+
+    const baseline = shiftRecording(withBrakeThrottle(buildLap(100, 0.3), 40, 80), 0);
+    // This recording's own odometer starts 5m late relative to the true line, but is
+    // otherwise the exact same physical lap as the passing "no drift" test above.
+    const primary = shiftRecording(withBrakeThrottle(buildLap(100, 0.3), 50, 70), 5);
+
+    const segments = computeLapSegmentComparisons(primary, baseline);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
+
+    // Corner geometry resolves back to the canonical (drift-free) window...
+    expect(corner.entryDistM).toBe(30);
+    expect(corner.minDistM).toBe(70);
+    expect(corner.exitDistM).toBe(110);
+
+    // ...and the brake/throttle deltas match the drift-free case exactly (10m / -10m),
+    // proving the 5m per-recording trim offset was fully corrected out, not baked into the
+    // comparison.
+    expect(corner.baselineBrakingDistM).toBe(32);
+    expect(corner.primaryBrakingDistM).toBe(42);
+    expect(corner.brakingPointDeltaM).toBe(10);
+    expect(corner.baselineThrottleOnDistM).toBe(80);
+    expect(corner.primaryThrottleOnDistM).toBe(70);
+    expect(corner.throttleOnDeltaM).toBe(-10);
+  });
+
   it('returns an empty array when either lap has no points', () => {
     expect(computeLapSegmentComparisons([], buildLap(100, 0.3))).toEqual([]);
     expect(computeLapSegmentComparisons(buildLap(100, 0.3), [])).toEqual([]);
