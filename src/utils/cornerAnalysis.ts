@@ -215,12 +215,15 @@ function maxSpeedInRangeKmh(points: ReplayTrajectoryPoint[], dists: number[], fr
 export function computeLapSegmentComparisons(
   primaryPoints: ReplayTrajectoryPoint[],
   baselinePoints: ReplayTrajectoryPoint[],
-  minProminenceKmh = 6
+  minProminenceKmh = 6,
+  trackLengthM?: number
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
-  const primaryDists = getTrajectoryDistances(primaryPoints);
-  const baselineDists = getTrajectoryDistances(baselinePoints);
+  // Both laps are re-zeroed to the SAME physical start/finish crossing (not just each
+  // recording's own point[0]) - critical so brake/throttle distances below are comparable.
+  const primaryDists = getTrajectoryDistances(primaryPoints, trackLengthM);
+  const baselineDists = getTrajectoryDistances(baselinePoints, trackLengthM);
   const primaryMinSteerAmplitude = computeMaxAbsSteer(primaryPoints) * STEER_REVERSAL_FRACTION;
   const turningPoints = findSpeedTurningPoints(primaryPoints, primaryDists, minProminenceKmh, primaryMinSteerAmplitude);
   const totalDistM = primaryDists[primaryDists.length - 1] || 0;
@@ -446,11 +449,12 @@ export interface CornerConsistencyLapInput {
  */
 export function computeCornerConsistencyStats(
   laps: CornerConsistencyLapInput[],
-  referencePoints: ReplayTrajectoryPoint[]
+  referencePoints: ReplayTrajectoryPoint[],
+  trackLengthM?: number
 ): CornerConsistencyStat[] {
   if (!referencePoints?.length || !laps?.length) return [];
 
-  const canonicalCorners = computeLapSegmentComparisons(referencePoints, referencePoints)
+  const canonicalCorners = computeLapSegmentComparisons(referencePoints, referencePoints, 6, trackLengthM)
     .filter((s): s is CornerSegmentComparison => s.type === 'corner')
     .sort((a, b) => a.minDistM - b.minDistM);
   if (canonicalCorners.length === 0) return [];
@@ -464,7 +468,7 @@ export function computeCornerConsistencyStats(
 
   for (const lap of laps) {
     if (!lap.points?.length) continue;
-    const lapDists = getTrajectoryDistances(lap.points);
+    const lapDists = getTrajectoryDistances(lap.points, trackLengthM);
 
     for (const corner of canonicalCorners) {
       // Same entry->exit window computeLapSegmentComparisons uses for the "vs Baseline" corner

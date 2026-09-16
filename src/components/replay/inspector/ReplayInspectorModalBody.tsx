@@ -236,6 +236,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
               hasDuckDb={hasDuckDbTelemetry}
               duckdbUnavailableReason={duckdbUnavailableReason}
               onSelectSource={onSelectSource}
+              trackLengthM={trajectory?.trackLengthM}
             />
           </div>
         </div>

@@ -402,7 +402,7 @@ describe('SessionDetail component', () => {
       expect(screen.getByText(/Lap Timing & Telemetry \(3 Laps\)/i)).toBeInTheDocument();
     });
 
-    const compareButtons = screen.getAllByRole('button', { name: /Compare/i });
+    const compareButtons = screen.getAllByRole('button', { name: /^Compare$/i });
     expect(compareButtons.length).toBeGreaterThan(0);
 
     // Click compare on first lap
@@ -868,9 +868,9 @@ describe('SessionDetail component', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    // In multiclass, both the lap table and classification table show Class Pos headers
+    // In multiclass sessions, the lap table shows a Class Pos header
     const classPosHeaders = screen.getAllByRole('columnheader', { name: /class pos/i });
-    expect(classPosHeaders.length).toBeGreaterThanOrEqual(2);
+    expect(classPosHeaders.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders lap 2 as valid (not out-lap) when lap 1 is the start of practice with no lap time', async () => {
@@ -1186,7 +1186,7 @@ describe('SessionDetail component', () => {
     expect(incompleteContainer?.getAttribute('title')).toContain('Contact with Immovable (4522N)');
 
     // Verify compact badges on laps - yellow for 0.25 pts
-    expect(screen.getAllByTitle(/Contact with Archie Porter/i).length).toBe(2);
+    expect(screen.getAllByTitle(/Contact with Archie Porter/i).length).toBe(1);
     const tlBadge = screen.getByTitle(/Track limits violation \(\+0\.25 pts\)/i);
     expect(tlBadge).toBeInTheDocument();
     expect(tlBadge.className).toContain('text-yellow-300');

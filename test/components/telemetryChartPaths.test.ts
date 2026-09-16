@@ -254,4 +254,27 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
 
     expect(result.maxBrakeTemp).toBeGreaterThanOrEqual(500);
   });
+
+  it('inverts steering graph so Left is UP (lower SVG Y) and Right is BOTTOM (higher SVG Y)', () => {
+    const leftPoint: ReplayTrajectoryPoint = { timeSec: 0, x: 0, y: 0, z: 0, speedKmh: 100, steerYaw: -270 };
+    const centerPoint: ReplayTrajectoryPoint = { timeSec: 1, x: 50, y: 0, z: 0, speedKmh: 100, steerYaw: 0 };
+    const rightPoint: ReplayTrajectoryPoint = { timeSec: 2, x: 100, y: 0, z: 0, speedKmh: 100, steerYaw: 270 };
+
+    const comparisons: PointComparison[] = [
+      createMockComparison(leftPoint, 0),
+      createMockComparison(centerPoint, 0),
+      createMockComparison(rightPoint, 0),
+    ];
+
+    const result = computeTelemetryChartPaths([leftPoint, centerPoint, rightPoint], comparisons, 0, 2);
+    // Parse SVG Y coordinates from result.steerPath: "M 0.0 10.0 L 500.0 50.0 L 1000.0 90.0 "
+    const tokens = result.steerPath.trim().split(/\s+/);
+    const y1 = parseFloat(tokens[2]); // left
+    const y2 = parseFloat(tokens[5]); // center
+    const y3 = parseFloat(tokens[8]); // right
+
+    expect(y1).toBeCloseTo(10.0, 1); // Left steer is at the top (Y = 10)
+    expect(y2).toBeCloseTo(50.0, 1); // Center steer is at center (Y = 50)
+    expect(y3).toBeCloseTo(90.0, 1); // Right steer is at the bottom (Y = 90)
+  });
 });

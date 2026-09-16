@@ -7,14 +7,18 @@ export interface UseGpsMapPanZoomOptions {
 
 const MAX_ZOOM = 100;
 
-function getNextZoom(current: number, direction: 1 | -1): number {
-  if (direction > 0) {
-    const step = current >= 30 ? 10 : current >= 15 ? 5 : current >= 7.5 ? 2.5 : current >= 3 ? 1.5 : 1;
-    return Math.min(MAX_ZOOM, Number((current + step).toFixed(1)));
-  } else {
-    const step = current > 30 ? 10 : current > 15 ? 5 : current > 7.5 ? 2.5 : current > 3 ? 1.5 : 1;
-    return Math.max(1, Number((current - step).toFixed(1)));
+function getNextZoom(current: number, direction: 1 | -1, steps = 1): number {
+  let result = current;
+  for (let i = 0; i < steps; i++) {
+    if (direction > 0) {
+      const step = result >= 30 ? 10 : result >= 15 ? 5 : result >= 7.5 ? 2.5 : result >= 3 ? 1.5 : 1;
+      result = Math.min(MAX_ZOOM, Number((result + step).toFixed(1)));
+    } else {
+      const step = result > 30 ? 10 : result > 15 ? 5 : result > 7.5 ? 2.5 : result > 3 ? 1.5 : 1;
+      result = Math.max(1, Number((result - step).toFixed(1)));
+    }
   }
+  return result;
 }
 
 export const BASE_ZOOM = 1.5;
@@ -63,6 +67,75 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     return `${vx.toFixed(1)} ${vy.toFixed(1)} ${visibleSize.toFixed(1)} ${visibleSize.toFixed(1)}`;
   }, [zoomLevel, followCar, currentPos, panOffset, viewBoxSize]);
 
+  const zoomAtCoords = (clientX: number, clientY: number, direction: 1 | -1 = 1, steps = 1) => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const currentZoom = zoomLevelRef.current;
+    const nextZoom = getNextZoom(currentZoom, direction, steps);
+    if (nextZoom === currentZoom) return;
+
+    if (nextZoom === 1) {
+      zoomLevelRef.current = 1;
+      panOffsetRef.current = { x: 0, y: 0 };
+      setZoomLevel(1);
+      setPanOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const W = rect.width || 800;
+    const H = rect.height || 800;
+    const renderedSize = Math.min(W, H);
+    const offsetDomX = (W - renderedSize) / 2;
+    const offsetDomY = (H - renderedSize) / 2;
+
+    const effectiveOld = currentZoom * BASE_ZOOM;
+    const visibleOld = viewBoxSize / effectiveOld;
+    const currentCenterX = (followCarRef.current && currentPosRef.current ? currentPosRef.current.sx : viewBoxSize / 2) + panOffsetRef.current.x;
+    const currentCenterY = (followCarRef.current && currentPosRef.current ? currentPosRef.current.sy : viewBoxSize / 2) + panOffsetRef.current.y;
+    const vxOld = currentCenterX - visibleOld / 2;
+    const vyOld = currentCenterY - visibleOld / 2;
+
+    // Clamp cursor position to rendered SVG box to avoid jumping if cursor is in letterbox margins
+    const clampedX = Math.max(offsetDomX, Math.min(offsetDomX + renderedSize, clientX - rect.left));
+    const clampedY = Math.max(offsetDomY, Math.min(offsetDomY + renderedSize, clientY - rect.top));
+    const cursorRelX = clampedX - offsetDomX;
+    const cursorRelY = clampedY - offsetDomY;
+
+    const scaleOld = renderedSize / visibleOld;
+    const pointSvgX = vxOld + cursorRelX / scaleOld;
+    const pointSvgY = vyOld + cursorRelY / scaleOld;
+
+    const effectiveNew = nextZoom * BASE_ZOOM;
+    const visibleNew = viewBoxSize / effectiveNew;
+    const scaleNew = renderedSize / visibleNew;
+
+    const vxNew = pointSvgX - cursorRelX / scaleNew;
+    const vyNew = pointSvgY - cursorRelY / scaleNew;
+
+    const centerXNew = vxNew + visibleNew / 2;
+    const centerYNew = vyNew + visibleNew / 2;
+
+    // Anchor relative to standard viewBox center because zooming disables car lock
+    const newPanX = Math.max(-1000, Math.min(1000, Number((centerXNew - viewBoxSize / 2).toFixed(1))));
+    const newPanY = Math.max(-1000, Math.min(1000, Number((centerYNew - viewBoxSize / 2).toFixed(1))));
+
+    zoomLevelRef.current = nextZoom;
+    panOffsetRef.current = { x: newPanX, y: newPanY };
+
+    setZoomLevel(nextZoom);
+    setPanOffset({ x: newPanX, y: newPanY });
+    if (followCarRef.current) setFollowCar(false);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"]')) return;
+    e.preventDefault();
+    zoomAtCoords(e.clientX, e.clientY, 1, 2);
+  };
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -90,50 +163,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
         return;
       }
 
-      const rect = el.getBoundingClientRect();
-      const W = rect.width || 800;
-      const H = rect.height || 800;
-      const renderedSize = Math.min(W, H);
-      const offsetDomX = (W - renderedSize) / 2;
-      const offsetDomY = (H - renderedSize) / 2;
-
-      const effectiveOld = currentZoom * BASE_ZOOM;
-      const visibleOld = viewBoxSize / effectiveOld;
-      const currentCenterX = (followCarRef.current && currentPosRef.current ? currentPosRef.current.sx : viewBoxSize / 2) + panOffsetRef.current.x;
-      const currentCenterY = (followCarRef.current && currentPosRef.current ? currentPosRef.current.sy : viewBoxSize / 2) + panOffsetRef.current.y;
-      const vxOld = currentCenterX - visibleOld / 2;
-      const vyOld = currentCenterY - visibleOld / 2;
-
-      // Clamp cursor position to rendered SVG box to avoid jumping if cursor is in letterbox margins
-      const clampedX = Math.max(offsetDomX, Math.min(offsetDomX + renderedSize, e.clientX - rect.left));
-      const clampedY = Math.max(offsetDomY, Math.min(offsetDomY + renderedSize, e.clientY - rect.top));
-      const cursorRelX = clampedX - offsetDomX;
-      const cursorRelY = clampedY - offsetDomY;
-
-      const scaleOld = renderedSize / visibleOld;
-      const pointSvgX = vxOld + cursorRelX / scaleOld;
-      const pointSvgY = vyOld + cursorRelY / scaleOld;
-
-      const effectiveNew = nextZoom * BASE_ZOOM;
-      const visibleNew = viewBoxSize / effectiveNew;
-      const scaleNew = renderedSize / visibleNew;
-
-      const vxNew = pointSvgX - cursorRelX / scaleNew;
-      const vyNew = pointSvgY - cursorRelY / scaleNew;
-
-      const centerXNew = vxNew + visibleNew / 2;
-      const centerYNew = vyNew + visibleNew / 2;
-
-      // Anchor relative to standard viewBox center because zooming disables car lock
-      const newPanX = Math.max(-1000, Math.min(1000, Number((centerXNew - viewBoxSize / 2).toFixed(1))));
-      const newPanY = Math.max(-1000, Math.min(1000, Number((centerYNew - viewBoxSize / 2).toFixed(1))));
-
-      zoomLevelRef.current = nextZoom;
-      panOffsetRef.current = { x: newPanX, y: newPanY };
-
-      setZoomLevel(nextZoom);
-      setPanOffset({ x: newPanX, y: newPanY });
-      if (followCarRef.current) setFollowCar(false);
+      zoomAtCoords(e.clientX, e.clientY, e.deltaY < 0 ? 1 : -1);
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -141,6 +171,8 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   }, [viewBoxSize]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="map-controls-overlay"]')) return;
     isDraggingRef.current = true;
     const el = containerRef.current;
     const rect = el?.getBoundingClientRect();
@@ -193,11 +225,18 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     setFollowCar(false);
   };
 
-  const zoomIn = () => setZoomLevel(z => getNextZoom(z, 1));
+  const zoomIn = () =>
+    setZoomLevel(z => {
+      const next = getNextZoom(z, 1);
+      zoomLevelRef.current = next;
+      return next;
+    });
+
   const zoomOut = () =>
     setZoomLevel(z => {
       const next = getNextZoom(z, -1);
-      if (next === 1) setPanOffset({ x: 0, y: 0 });
+      zoomLevelRef.current = next;
+      if (next === 1 && !followCarRef.current) setPanOffset({ x: 0, y: 0 });
       return next;
     });
 
@@ -213,6 +252,8 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    handleDoubleClick,
+    zoomAtCoords,
     resetPanZoom,
     focusOnPoint,
     zoomIn,

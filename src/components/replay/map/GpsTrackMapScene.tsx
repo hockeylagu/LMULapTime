@@ -12,6 +12,7 @@ import {
   computePedalMarkerPoints,
   computeEffectiveBounds,
   computeBaselineDeltaByIdx,
+  projectStartFinishGate,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -91,21 +92,19 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   const baselineSvgPoints = useMemo(() => projectTrajectoryPoints(baselinePoints || [], effectiveBounds, VIEWBOX_SIZE, PADDING), [baselinePoints, effectiveBounds]);
   const currentPos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
 
-  const leftSvgPoints = useMemo(
-    () => (effectiveGeometry?.leftBoundary ? projectBoundaryPoints(effectiveGeometry.leftBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
-    [effectiveGeometry, effectiveBounds]
-  );
-  const rightSvgPoints = useMemo(
-    () => (effectiveGeometry?.rightBoundary ? projectBoundaryPoints(effectiveGeometry.rightBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
-    [effectiveGeometry, effectiveBounds]
-  );
-  const centerlineSvgPoints = useMemo(
-    () => (effectiveGeometry?.centerline ? projectBoundaryPoints(effectiveGeometry.centerline, effectiveBounds, VIEWBOX_SIZE, PADDING) : []),
-    [effectiveGeometry, effectiveBounds]
-  );
+  const { leftSvgPoints, rightSvgPoints, centerlineSvgPoints } = useMemo(() => ({
+    leftSvgPoints: effectiveGeometry?.leftBoundary ? projectBoundaryPoints(effectiveGeometry.leftBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : [],
+    rightSvgPoints: effectiveGeometry?.rightBoundary ? projectBoundaryPoints(effectiveGeometry.rightBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : [],
+    centerlineSvgPoints: effectiveGeometry?.centerline ? projectBoundaryPoints(effectiveGeometry.centerline, effectiveBounds, VIEWBOX_SIZE, PADDING) : [],
+  }), [effectiveGeometry, effectiveBounds]);
   const trackBoundaryPathD = useMemo(
     () => computeTrackBoundaryPathD(centerlineSvgPoints, leftSvgPoints, rightSvgPoints),
     [centerlineSvgPoints, leftSvgPoints, rightSvgPoints]
+  );
+
+  const { gateLeftSvg, gateRightSvg } = useMemo(
+    () => projectStartFinishGate(effectiveGeometry, effectiveBounds, VIEWBOX_SIZE, PADDING),
+    [effectiveGeometry, effectiveBounds]
   );
 
   const {
@@ -117,6 +116,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    handleDoubleClick,
     resetPanZoom,
     focusOnPoint,
     zoomIn,
@@ -126,16 +126,16 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
-  const primaryDists = useMemo(() => getTrajectoryDistances(points), [points]);
+  const primaryDists = useMemo(() => getTrajectoryDistances(points, effectiveGeometry?.lengthM), [points, effectiveGeometry]);
   const baselineDists = useMemo(
-    () => (baselinePoints ? getTrajectoryDistances(baselinePoints) : []),
-    [baselinePoints]
+    () => (baselinePoints ? getTrajectoryDistances(baselinePoints, effectiveGeometry?.lengthM) : []),
+    [baselinePoints, effectiveGeometry]
   );
 
   const deltaByIdx = useMemo(() => {
     if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
-    return computeLapComparisons(points, baselinePoints).map(c => c.deltaTimeSec);
-  }, [colorBy, points, baselinePoints]);
+    return computeLapComparisons(points, baselinePoints, effectiveGeometry?.lengthM).map(c => c.deltaTimeSec);
+  }, [colorBy, points, baselinePoints, effectiveGeometry]);
 
   const baselineDeltaByIdx = useMemo(
     () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, baselinePoints, primaryDists, baselineDists) : null),
@@ -182,6 +182,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onDoubleClick={handleDoubleClick}
       className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing ${className}`}
     >
       <MapControlsOverlay
@@ -243,6 +244,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
           zoomLevel={zoomLevel}
           cornerMarkers={cornerMarkers}
           pedalMarkers={pedalMarkerPoints}
+          gateLeftSvg={gateLeftSvg}
+          gateRightSvg={gateRightSvg}
         />
 
         <GpsSceneMarkers

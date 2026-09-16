@@ -80,8 +80,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
   );
-  const primaryDists = useMemo(() => (trajectory?.points ? getTrajectoryDistances(trajectory.points) : []), [trajectory]);
-  const baselineDists = useMemo(() => (baselinePoints ? getTrajectoryDistances(baselinePoints) : []), [baselinePoints]);
+  const primaryDists = useMemo(() => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []), [trajectory]);
+  const baselineDists = useMemo(() => (baselinePoints ? getTrajectoryDistances(baselinePoints, baselineTrajectory?.trackLengthM) : []), [baselinePoints, baselineTrajectory]);
 
   if (!trajectory) return null;
 

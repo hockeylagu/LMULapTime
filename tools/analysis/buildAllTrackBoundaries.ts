@@ -67,6 +67,9 @@ export interface TrackConfig {
   replayPattern: string;
   preferredLap?: number;
   nominalWidthM: number;
+  // Flat outward padding (meters) added to this track's own survey/corridor width - opt-in,
+  // only for tracks confirmed (via real clean telemetry) to need it. Never alters the shape.
+  corridorMarginM?: number;
 }
 
 // 21 Track Configurations across all driven tracks and layouts
@@ -109,6 +112,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     replayPattern: 'Circuit de Spa-Francorchamps P1 80.Vcr',
     preferredLap: 1,
     nominalWidthM: 14.0,
+    // TUM's satellite-derived width consistently ran ~3-4m narrower than real clean telemetry
+    // (curbs/run-off the survey doesn't count as track) - see repo memory for how this was
+    // measured and why a flat margin was used instead of a telemetry-derived per-index widen.
+    corridorMarginM: 3.0,
   },
   // 4. Circuit de la Sarthe (24h Le Mans)
   {
@@ -122,6 +129,10 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     replayPattern: 'Circuit de la Sarthe P1 43.Vcr',
     preferredLap: 2,
     nominalWidthM: 12.5,
+    // The uniform nominal-width corridor undersizes long fast straights (Mulsanne etc.) that
+    // are genuinely much wider in-game than a technical corner - real clean telemetry ran a
+    // median ~6.6m wider than the corridor. See repo memory for how this was measured.
+    corridorMarginM: 5.0,
   },
   // 5. Circuit of the Americas
   {
@@ -542,20 +553,42 @@ function loadReplayLap(db: any, filename: string, lapKey: number): Array<{ x: nu
   return data.points.map((p: any) => ({ x: p.x, z: p.z }));
 }
 
+// Everything before "<session><num> <lap>.Vcr" - matching on this full venue name (not a
+// single generic word) avoids pulling in an unrelated track that happens to share a common
+// word like "Circuit" or "Autodromo" (Monza vs Imola, Spa vs Portimão/Barcelona/COTA/Sarthe).
+function getVenuePrefix(replayPattern: string): string {
+  const venueMatch = replayPattern.match(/^(.*?)\s+(?:P|Q|R|FP)\d+\s+\d+\.Vcr$/i);
+  return venueMatch ? venueMatch[1] : replayPattern.replace(/\.Vcr$/i, '');
+}
+
 function extractTrackGateSamples(db: any, layoutKey: string, replayPattern: string): {
   sfSamples: Point2D[];
   s1Samples: Point2D[];
   s2Samples: Point2D[];
 } {
-  const cleanKey = layoutKey.replace(/_(gp|full|short|wec|classic|chicane|outer|paddock|school|curvagrande|road_course)$/i, '');
-  const patternPrefix = replayPattern.split(' ')[0] || cleanKey;
+  const venuePrefix = getVenuePrefix(replayPattern);
 
-  const rows = db.prepare(`
+  let rows = db.prepare(`
     SELECT trajectory_br FROM replay_trajectories 
-    WHERE (filename = ? OR filename LIKE ? OR filename LIKE ?) 
+    WHERE (filename = ? OR filename LIKE ?) 
       AND lap_key >= 1 AND driver_slot = -1 
+    ORDER BY filename, lap_key 
     LIMIT 40
-  `).all(replayPattern, `%${cleanKey}%`, `%${patternPrefix}%`);
+  `).all(replayPattern, `${venuePrefix} %`);
+
+  if (rows.length === 0) {
+    // Defensive fallback for a replayPattern that doesn't match the usual naming convention -
+    // broader, so only used when the precise venue match found nothing at all.
+    const cleanKey = layoutKey.replace(/_(gp|full|short|wec|classic|chicane|outer|paddock|school|curvagrande|road_course)$/i, '');
+    console.warn(`[${layoutKey}] No replays matched venue prefix "${venuePrefix}", falling back to broader "${cleanKey}" match.`);
+    rows = db.prepare(`
+      SELECT trajectory_br FROM replay_trajectories 
+      WHERE filename LIKE ? 
+        AND lap_key >= 1 AND driver_slot = -1 
+      ORDER BY filename, lap_key 
+      LIMIT 40
+    `).all(`%${cleanKey}%`);
+  }
 
   const sfSamples: Point2D[] = [];
   const s1Samples: Point2D[] = [];
@@ -589,6 +622,49 @@ function extractTrackGateSamples(db: any, layoutKey: string, replayPattern: stri
 
   return { sfSamples, s1Samples, s2Samples };
 }
+
+// Only widens a boundary, never narrows it below what the source/corridor already provides.
+// A naive per-index running max is dangerously sensitive to a single contaminated sample (e.g.
+// a car taking the pit entry right next to a corner apex - spatially close to the track, but a
+// different physical lane entirely) - one such lap can spike a single index's "observed width"
+// far beyond reality, cutting a sharp spike straight across the ribbon. So instead: aggregate
+// per-index samples with a robust percentile + minimum sample count (outvotes rare outliers),
+// cap how much wider than survey we'll ever go, then smooth with an averaging window and clamp
+// the index-to-index rate of change - both of which suppress an isolated spike instead of
+// spreading/preserving it.
+//
+// ABANDONED: even with all of the above, a hairpin (e.g. Spa's La Source) still produced a
+// straight-line artefact cutting across the loop - the nearest-centerline-index search matches
+// a telemetry sample to whichever index is spatially closest, but at a hairpin the entry and
+// exit straights run right past each other; a sample on one side can nearest-match an index on
+// the OTHER side of the gap, and that one wrong index then gets pushed outward towards a point
+// that's actually across the corner, not along its own local edge. No amount of per-sample
+// smoothing fixes a per-INDEX assignment error. Do not resurrect per-index telemetry-derived
+// widening - see applyUniformCorridorMargin below for the safe replacement (opt-in per track,
+// a single flat margin added to the existing survey width, so it can never redirect a boundary
+// point towards a different part of the track).
+
+/**
+ * Pushes `left[i]`/`right[i]` outward by a single flat `marginM`, along the direction each
+ * point already has from the centerline - i.e. every boundary point moves further along its own
+ * existing edge, never towards some other index. This can't produce the hairpin cross-track
+ * artefact per-index telemetry widening did, at the cost of being a blunter instrument (a flat
+ * amount everywhere, not shaped to where curbs/run-off actually are).
+ */
+function applyUniformCorridorMargin(center: Point2D[], left: Point2D[], right: Point2D[], marginM: number): void {
+  if (marginM <= 0) return;
+  for (let i = 0; i < center.length; i++) {
+    const c = center[i];
+    const dl = { x: left[i].x - c.x, y: left[i].y - c.y };
+    const lenL = Math.hypot(dl.x, dl.y) || 1e-6;
+    left[i] = { x: Number((c.x + (dl.x / lenL) * (lenL + marginM)).toFixed(2)), y: Number((c.y + (dl.y / lenL) * (lenL + marginM)).toFixed(2)) };
+
+    const dr = { x: right[i].x - c.x, y: right[i].y - c.y };
+    const lenR = Math.hypot(dr.x, dr.y) || 1e-6;
+    right[i] = { x: Number((c.x + (dr.x / lenR) * (lenR + marginM)).toFixed(2)), y: Number((c.y + (dr.y / lenR) * (lenR + marginM)).toFixed(2)) };
+  }
+}
+
 
 function fitGateLine(
   samples: Point2D[],
@@ -681,6 +757,21 @@ function findClosestOnPolyline(target: Point2D, polyline: Point2D[]): { point: P
     }
   }
   return { point: polyline[bestIdx], index: bestIdx };
+}
+
+/**
+ * Finds the largest group of mutually-nearby samples (each within radiusM of some seed sample),
+ * i.e. the point independent replay laps agree on most - a robust stand-in for "the real gate
+ * location" that doesn't get dragged off by a handful of outliers the way a plain mean would.
+ * Returns null if no group reaches minCount (not enough agreement to trust).
+ */
+function findConsensusCluster(samples: Point2D[], radiusM: number, minCount: number): Point2D[] | null {
+  let best: Point2D[] = [];
+  for (const seed of samples) {
+    const cluster = samples.filter(p => Math.hypot(p.x - seed.x, p.y - seed.y) <= radiusM);
+    if (cluster.length > best.length) best = cluster;
+  }
+  return best.length >= minCount ? best : null;
 }
 
 function rollPolyline(polyline: Point2D[], shift: number, exactPoint0?: Point2D): Point2D[] {
@@ -981,6 +1072,11 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
   let finalLeft: Point2D[] = [];
   let finalRight: Point2D[] = [];
   let transformInfo: any = undefined;
+  // For sources with an authoritative s=0 convention (TUM's published database always starts
+  // each CSV at the real start/finish line), this is that point transformed into LMU space -
+  // used to anchor and sanity-check the telemetry-derived gate fit below, since replay-derived
+  // S/F samples have been found to cluster at the wrong point on the track for every TUM track.
+  let surveyAnchor: Point2D | null = null;
 
   if (cfg.sourceType === 'TUM') {
     const tumPath = await ensureSourceFile(cfg);
@@ -1070,6 +1166,10 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     };
 
     console.log(`TUM Alignment: scale=${transformInfo.scale}, rot=${transformInfo.rotationDeg}°, rmse=${transformInfo.rmse}m`);
+
+    // TUM's row 0 (before any reversal/orientation choice) is the survey's own documented
+    // start/finish point - the authoritative anchor for this track's S/F gate.
+    surveyAnchor = applyTransform(tumCenter[0]);
 
   } else if (cfg.sourceType === 'atlas' || cfg.sourceType === 'osm') {
     const atlasPath = await ensureSourceFile(cfg);
@@ -1191,16 +1291,65 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     console.log(`Telemetry Corridor: direct 1:1 LMU native space with ${cfg.nominalWidthM}m width profile`);
   }
 
+  // Flat, opt-in padding only - see applyUniformCorridorMargin's docs for why a telemetry-
+  // derived per-index widen was tried and reverted (hairpin cross-track artefact). A per-track
+  // self-correction splice (synthesizeHybridTrack against this track's own telemetry) was also
+  // tried for La Sarthe and reverted - raw distance-to-centerline isn't a valid divergence
+  // metric (a car legitimately sitting near one edge of a wide track reads the same as a real
+  // shape mismatch), and it spliced in telemetry for 40% of the lap instead of just the one
+  // chicane. Don't reuse that approach without a metric that accounts for normal track width.
+  applyUniformCorridorMargin(finalCenter, finalLeft, finalRight, cfg.corridorMarginM ?? 0);
+
   // Multi-replay Timing Gate Fitting and Polyline Alignment
   const gateSamples = extractTrackGateSamples(db, cfg.layoutKey, cfg.replayPattern);
 
-  // Fallback anchor for S/F is replayLap[0] or first point of centerline
-  const sfFallback: Point2D = replayLap[0] ? { x: replayLap[0].x, y: replayLap[0].z } : finalCenter[0];
+  // Fallback anchor for S/F: prefer the source survey's own authoritative start point when one
+  // exists, over replayLap[0] - a replay's first recorded telemetry sample is not guaranteed to
+  // be at the physical line (out-laps, mid-session joins, DB row splits unrelated to the gate).
+  const sfFallback: Point2D = surveyAnchor ?? (replayLap[0] ? { x: replayLap[0].x, y: replayLap[0].z } : finalCenter[0]);
   const sfTangent: Point2D = {
     x: finalCenter[1].x - finalCenter[0].x,
     y: finalCenter[1].y - finalCenter[0].y,
   };
-  const sfGate = fitGateLine(gateSamples.sfSamples, sfFallback, sfTangent);
+
+  // Telemetry-derived S/F samples have been found (across every TUM-sourced track) to cluster
+  // tens to hundreds of meters from the real line when replays from an unrelated track slip
+  // into the match (now fixed in extractTrackGateSamples) - but independent replay laps that
+  // genuinely agree with each other are better ground truth than the survey anchor, which is
+  // an external real-world reference that doesn't always land exactly on LMU's own modeled
+  // line. So: prefer a well-supported consensus cluster among the samples themselves; fall
+  // back to the survey anchor only when the samples don't agree with each other, and treat a
+  // consensus that's wildly far from the survey anchor as leftover contamination, not signal.
+  const CONSENSUS_RADIUS_M = 20;
+  const MIN_CONSENSUS_SIZE = 3;
+  const SANITY_MAX_DISTANCE_M = 200;
+
+  const consensusCluster = findConsensusCluster(gateSamples.sfSamples, CONSENSUS_RADIUS_M, MIN_CONSENSUS_SIZE);
+  let trustedSfSamples: Point2D[];
+  if (consensusCluster) {
+    const centroid = {
+      x: consensusCluster.reduce((a, p) => a + p.x, 0) / consensusCluster.length,
+      y: consensusCluster.reduce((a, p) => a + p.y, 0) / consensusCluster.length,
+    };
+    const distFromAnchor = surveyAnchor ? Math.hypot(centroid.x - surveyAnchor.x, centroid.y - surveyAnchor.y) : 0;
+    if (surveyAnchor && distFromAnchor > SANITY_MAX_DISTANCE_M) {
+      console.warn(`[${cfg.layoutKey}] Discarding a ${consensusCluster.length}-sample telemetry consensus ${distFromAnchor.toFixed(0)}m from the survey anchor - likely still contamination.`);
+      trustedSfSamples = [];
+    } else {
+      trustedSfSamples = consensusCluster;
+    }
+  } else if (surveyAnchor) {
+    const SURVEY_TRUST_RADIUS_M = 40;
+    trustedSfSamples = gateSamples.sfSamples.filter(p => Math.hypot(p.x - surveyAnchor!.x, p.y - surveyAnchor!.y) <= SURVEY_TRUST_RADIUS_M);
+    if (trustedSfSamples.length < gateSamples.sfSamples.length) {
+      console.warn(`[${cfg.layoutKey}] No telemetry consensus; rejected ${gateSamples.sfSamples.length - trustedSfSamples.length}/${gateSamples.sfSamples.length} S/F samples > ${SURVEY_TRUST_RADIUS_M}m from the survey anchor.`);
+    }
+  } else {
+    trustedSfSamples = gateSamples.sfSamples;
+  }
+
+  const sfGate = fitGateLine(trustedSfSamples, sfFallback, sfTangent);
+
 
   const sfCenterInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalCenter, 35) || findClosestOnPolyline(sfGate.point, finalCenter);
   const sfLeftInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalLeft, 35) || findClosestOnPolyline(sfCenterInter.point, finalLeft);
@@ -1211,6 +1360,21 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
   const rolledLeft = rollPolyline(finalLeft, sfCenterInter.index, sfLeftInter.point);
   const rolledRight = rollPolyline(finalRight, sfCenterInter.index, sfRightInter.point);
 
+  // Calculate circuit length along rolled centerline (needed below to sanity-check sector gates).
+  // Must include the closing segment back to index 0 (same closed-loop convention used by the
+  // runtime's buildCenterlineSpatialIndex/projectTrajectoryToCenterline) - summing only
+  // index 1..length-1 silently drops that final segment, under-reporting lengthM by a few
+  // meters relative to the actual station space real telemetry gets projected into, which
+  // breaks start/finish wraparound math for laps trimmed right at the line (see repo memory).
+  const lengthM = computeStationAlongPolyline(rolledCenter, rolledCenter.length);
+
+  // A real sector split is never this close to the start/finish line - telemetry-derived S1/S2
+  // samples have been observed clustering right next to a wrongly-anchored S/F point, producing
+  // "sector 1 at 10m" nonsense. Reject anything implausibly close to either lap boundary rather
+  // than emit a gate that isn't a real sector split.
+  const MIN_SECTOR_MARGIN_M = 150;
+  const isPlausibleSectorStation = (stationM: number) => stationM >= MIN_SECTOR_MARGIN_M && stationM <= lengthM - MIN_SECTOR_MARGIN_M;
+
   // On the rolled centerline (where index 0 is s=0.0m), detect Sector 1 and Sector 2 timing gates
   let sector1Gate: TimingGateGeometry | undefined = undefined;
   if (gateSamples.s1Samples.length > 0) {
@@ -1220,13 +1384,17 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     const s1Left = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s1Center.point, rolledLeft);
     const s1Right = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s1Center.point, rolledRight);
     const s1StationM = computeStationAlongPolyline(rolledCenter, s1Center.index);
-    sector1Gate = {
-      name: 'Sector 1',
-      center: [s1Center.point.x, s1Center.point.y],
-      left: [s1Left.point.x, s1Left.point.y],
-      right: [s1Right.point.x, s1Right.point.y],
-      stationM: Number(s1StationM.toFixed(1)),
-    };
+    if (isPlausibleSectorStation(s1StationM)) {
+      sector1Gate = {
+        name: 'Sector 1',
+        center: [s1Center.point.x, s1Center.point.y],
+        left: [s1Left.point.x, s1Left.point.y],
+        right: [s1Right.point.x, s1Right.point.y],
+        stationM: Number(s1StationM.toFixed(1)),
+      };
+    } else {
+      console.warn(`[${cfg.layoutKey}] Rejected implausible Sector 1 gate at stationM=${s1StationM.toFixed(1)} (lengthM=${lengthM.toFixed(1)}).`);
+    }
   }
 
   let sector2Gate: TimingGateGeometry | undefined = undefined;
@@ -1237,13 +1405,17 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     const s2Left = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s2Center.point, rolledLeft);
     const s2Right = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s2Center.point, rolledRight);
     const s2StationM = computeStationAlongPolyline(rolledCenter, s2Center.index);
-    sector2Gate = {
-      name: 'Sector 2',
-      center: [s2Center.point.x, s2Center.point.y],
-      left: [s2Left.point.x, s2Left.point.y],
-      right: [s2Right.point.x, s2Right.point.y],
-      stationM: Number(s2StationM.toFixed(1)),
-    };
+    if (isPlausibleSectorStation(s2StationM) && (!sector1Gate || s2StationM > sector1Gate.stationM)) {
+      sector2Gate = {
+        name: 'Sector 2',
+        center: [s2Center.point.x, s2Center.point.y],
+        left: [s2Left.point.x, s2Left.point.y],
+        right: [s2Right.point.x, s2Right.point.y],
+        stationM: Number(s2StationM.toFixed(1)),
+      };
+    } else {
+      console.warn(`[${cfg.layoutKey}] Rejected implausible Sector 2 gate at stationM=${s2StationM.toFixed(1)} (lengthM=${lengthM.toFixed(1)}).`);
+    }
   }
 
   const timingGates = {
@@ -1257,12 +1429,6 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     sector1: sector1Gate,
     sector2: sector2Gate,
   };
-
-  // Calculate circuit length along rolled centerline
-  let lengthM = 0;
-  for (let i = 1; i < rolledCenter.length; i++) {
-    lengthM += Math.hypot(rolledCenter[i].x - rolledCenter[i - 1].x, rolledCenter[i].y - rolledCenter[i - 1].y);
-  }
 
   // Calculate bounding box
   const allX = [...rolledLeft.map(p => p.x), ...rolledRight.map(p => p.x)];
@@ -1302,7 +1468,7 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     createdAt: new Date().toISOString(),
   };
 
-  console.log(`Completed [${geometry.layoutKey}]: ${geometry.lengthM}m length, S/F=[${geometry.startFinish[0]}, ${geometry.startFinish[1]}], S1=${sector1Gate?.stationM}m, S2=${sector2Gate?.stationM}m`);
+  console.log(`Completed [${geometry.layoutKey}]: ${geometry.lengthM}m length, S/F=[${sfCenterInter.point.x}, ${sfCenterInter.point.y}], S1=${sector1Gate?.stationM}m, S2=${sector2Gate?.stationM}m`);
   return geometry;
 }
 

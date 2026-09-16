@@ -1,5 +1,6 @@
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
+import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -220,12 +221,12 @@ export function computeGhostPosition(
   const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
-  const totalPrimary = Math.max(1, primaryDists[primaryDists.length - 1]);
   const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
 
   const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
-  const fraction = primaryDists[safeIdx] / totalPrimary;
-  const targetDist = fraction * totalBase;
+  const currentDist = primaryDists[safeIdx];
+  // Match on the same absolute track distance/station, clamped to baseline's available bounds
+  const targetDist = Math.max(baseDists[0], Math.min(totalBase, currentDist));
   const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
 
   return {
@@ -523,5 +524,41 @@ export function computeBaselineDeltaByIdx(
     const idx = findIndexAtDistance(primaryDists, targetDist);
     return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
   });
+}
+
+export interface GpsStartFinishGateProjection {
+  gateLeftSvg: { sx: number; sy: number } | null;
+  gateRightSvg: { sx: number; sy: number } | null;
+}
+
+export interface TrackSceneBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  spanX: number;
+  spanZ: number;
+}
+
+/**
+ * Projects canonical start/finish gate geometry into SVG coordinates.
+ */
+export function projectStartFinishGate(
+  geometry: TrackBoundaryGeometry | null | undefined,
+  bounds: { minX: number; spanX: number; minZ: number; spanZ: number } | null | undefined,
+  viewBoxSize: number,
+  padding: number
+): GpsStartFinishGateProjection {
+  const gate = geometry?.timingGates?.startFinish;
+  let gateLeftSvg: { sx: number; sy: number } | null = null;
+  let gateRightSvg: { sx: number; sy: number } | null = null;
+
+  if (bounds && gate && (gate.left[0] !== gate.right[0] || gate.left[1] !== gate.right[1])) {
+    const [left, right] = projectBoundaryPoints([gate.left, gate.right], bounds, viewBoxSize, padding);
+    gateLeftSvg = left;
+    gateRightSvg = right;
+  }
+
+  return { gateLeftSvg, gateRightSvg };
 }
 

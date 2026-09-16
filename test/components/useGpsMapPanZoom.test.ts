@@ -112,4 +112,111 @@ describe('useGpsMapPanZoom', () => {
     expect(vx + vw / 2).toBeCloseTo(carPos.sx, 0);
     expect(vy + vh / 2).toBeCloseTo(carPos.sy, 0);
   });
+
+  it('zooms in centered at the cursor coordinates with zoomAtCoords / handleDoubleClick', () => {
+    const { result } = renderHook(() =>
+      useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })
+    );
+
+    // Mock DOM container
+    const mockContainer = document.createElement('div');
+    Object.defineProperty(mockContainer, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 800,
+        right: 800,
+        bottom: 800,
+      }),
+    });
+    result.current.containerRef.current = mockContainer;
+
+    // Simulate double click at (200, 300)
+    act(() => {
+      const mockEvent = {
+        button: 0,
+        clientX: 200,
+        clientY: 300,
+        preventDefault: () => {},
+        target: mockContainer,
+      } as unknown as React.MouseEvent<HTMLDivElement>;
+      result.current.handleDoubleClick(mockEvent);
+    });
+
+    expect(result.current.zoomLevel).toBe(3);
+    // When zooming towards (200, 300) from default center (400, 400), pan shifts towards (200, 300)
+    expect(result.current.panOffset.x).toBeLessThan(0);
+    expect(result.current.panOffset.y).toBeLessThan(0);
+
+    // Consecutive double click zooms 2 more steps (3 -> 6)
+    act(() => {
+      const mockEvent = {
+        button: 0,
+        clientX: 200,
+        clientY: 300,
+        preventDefault: () => {},
+        target: mockContainer,
+      } as unknown as React.MouseEvent<HTMLDivElement>;
+      result.current.handleDoubleClick(mockEvent);
+    });
+    expect(result.current.zoomLevel).toBe(6);
+  });
+
+  it('preserves followCar mode when zoomIn and zoomOut are clicked', () => {
+    const carPos = { sx: 500, sy: 300 };
+    const { result } = renderHook(() =>
+      useGpsMapPanZoom({ viewBoxSize: 800, currentPos: carPos })
+    );
+
+    act(() => {
+      result.current.setFollowCar(true);
+    });
+    expect(result.current.followCar).toBe(true);
+
+    // Zoom in with + button
+    act(() => {
+      result.current.zoomIn();
+    });
+    expect(result.current.zoomLevel).toBe(2);
+    expect(result.current.followCar).toBe(true);
+    const [vx1, vy1, vw1, vh1] = result.current.currentViewBox.split(' ').map(Number);
+    expect(vx1 + vw1 / 2).toBeCloseTo(carPos.sx, 0);
+    expect(vy1 + vh1 / 2).toBeCloseTo(carPos.sy, 0);
+
+    // Zoom out with - button
+    act(() => {
+      result.current.zoomOut();
+    });
+    expect(result.current.zoomLevel).toBe(1);
+    expect(result.current.followCar).toBe(true);
+    const [vx2, vy2, vw2, vh2] = result.current.currentViewBox.split(' ').map(Number);
+    expect(vx2 + vw2 / 2).toBeCloseTo(carPos.sx, 0);
+    expect(vy2 + vh2 / 2).toBeCloseTo(carPos.sy, 0);
+  });
+
+  it('does not start panning or cancel followCar when pointer down occurs on a button or controls overlay', () => {
+    const carPos = { sx: 500, sy: 300 };
+    const { result } = renderHook(() =>
+      useGpsMapPanZoom({ viewBoxSize: 800, currentPos: carPos })
+    );
+
+    act(() => {
+      result.current.setFollowCar(true);
+    });
+
+    const mockButton = document.createElement('button');
+    act(() => {
+      const mockEvent = {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        target: mockButton,
+      } as unknown as React.PointerEvent<HTMLDivElement>;
+      result.current.handlePointerDown(mockEvent);
+    });
+
+    // followCar must still be true
+    expect(result.current.followCar).toBe(true);
+  });
 });
