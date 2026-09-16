@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, Ban, ShieldAlert, ShieldCheck, Trophy } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/core/types';
-import { formatElapsedSeconds } from '../../../utils/formatters.js';
+import { formatElapsedSeconds, formatTime } from '../../../utils/formatters.js';
 import {
   getWorstTrackLimitSeverity,
   getTrackLimitStandingsPillClasses,
@@ -212,13 +212,13 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                     <div className="font-bold text-white">{d.bestLapTimeString}</div>
                   </td>
                   <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS1 ? 'text-lmu-gold font-bold' : 'text-lmu-muted'}`} title={isBestS1 ? 'Session best S1' : undefined}>
-                    {bestLap?.s1 !== null && bestLap?.s1 !== undefined ? formatElapsedSeconds(bestLap.s1) : '-'}
+                    {bestLap?.s1 !== null && bestLap?.s1 !== undefined ? formatTime(bestLap.s1) : '-'}
                   </td>
                   <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS2 ? 'text-lmu-blue font-bold' : 'text-lmu-muted'}`} title={isBestS2 ? 'Session best S2' : undefined}>
-                    {bestLap?.s2 !== null && bestLap?.s2 !== undefined ? formatElapsedSeconds(bestLap.s2) : '-'}
+                    {bestLap?.s2 !== null && bestLap?.s2 !== undefined ? formatTime(bestLap.s2) : '-'}
                   </td>
                   <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS3 ? 'text-lmu-green font-bold' : 'text-lmu-muted'}`} title={isBestS3 ? 'Session best S3' : undefined}>
-                    {bestLap?.s3 !== null && bestLap?.s3 !== undefined ? formatElapsedSeconds(bestLap.s3) : '-'}
+                    {bestLap?.s3 !== null && bestLap?.s3 !== undefined ? formatTime(bestLap.s3) : '-'}
                   </td>
                   <td className={`px-3.5 py-2.5 text-right font-mono font-semibold ${isNonFinisher ? 'text-rose-300' : 'text-white'}`}>
                     {timeOrGap}

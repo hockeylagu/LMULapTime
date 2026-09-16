@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Trophy, Zap, Activity } from 'lucide-react';
+import { Clock, Trophy, Zap, Activity, Flag } from 'lucide-react';
 import { formatTime } from '../../../utils/formatters.js';
 import { PaceBadge } from '../../common/index.js';
 import { PaceCategory } from '../../../../server/core/types';
@@ -20,6 +20,13 @@ export interface ImprovementStatsBannerProps {
   top3Improvement: number | null;
   bestTop3: number | null;
   latestTheoreticalGap: number | null;
+  qualifyingAveragePosition?: number | null;
+  finishAveragePosition?: number | null;
+}
+
+function formatAveragePosition(position: number | null | undefined): string {
+  if (position === null || position === undefined) return '--';
+  return `P${Number.isInteger(position) ? position : position.toFixed(1)}`;
 }
 
 export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
@@ -34,18 +41,41 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
   top3Improvement,
   bestTop3,
   latestTheoreticalGap,
+  qualifyingAveragePosition,
+  finishAveragePosition,
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
         <div>
-          <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions Parsed</p>
+          <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions</p>
           <h4 className="text-2xl font-extrabold text-white mt-0.5">{trackDataCount}</h4>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {selectedCarModel !== 'All' ? `${selectedCarModel}` : `${selectedCarClass === 'All' ? 'All Classes' : selectedCarClass}`}
           </p>
         </div>
         <Clock className="w-8 h-8 text-lmu-blue opacity-50 shrink-0" />
+      </div>
+
+      <div className="glass-panel p-4 rounded-xl flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-lmu-muted uppercase font-semibold">Positions</p>
+          <div className="grid grid-cols-2 gap-3 mt-1">
+            <div>
+              <p className="text-[10px] text-lmu-muted uppercase font-semibold">Quali Avg Pos</p>
+              <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
+                {formatAveragePosition(qualifyingAveragePosition)}
+              </h4>
+            </div>
+            <div>
+              <p className="text-[10px] text-lmu-muted uppercase font-semibold">Finish Avg Pos</p>
+              <h4 className="text-xl font-extrabold text-lmu-accent font-mono">
+                {formatAveragePosition(finishAveragePosition)}
+              </h4>
+            </div>
+          </div>
+        </div>
+        <Flag className="w-8 h-8 text-lmu-accent opacity-50 shrink-0" />
       </div>
 
       <div className="glass-panel p-4 rounded-xl flex items-center justify-between">

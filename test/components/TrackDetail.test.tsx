@@ -164,6 +164,55 @@ describe('TrackDetail component', () => {
     }
   });
 
+  it('renders average qualifying and finish positions for the selected class', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockTrackDataWithMultipleClasses,
+        sessions: [
+          {
+            ...mockTrackDataWithMultipleClasses.sessions[0],
+            sessionType: 'Qualifying',
+            sessionName: 'Q1',
+            playerDriver: {
+              ...mockTrackDataWithMultipleClasses.sessions[0].playerDriver,
+              position: 9,
+            },
+          },
+          {
+            ...mockTrackDataWithMultipleClasses.sessions[0],
+            id: 'sess-hypercar-race-1',
+            filename: 'spa_hypercar_race.xml',
+            sessionType: 'Race',
+            sessionName: 'R1',
+            playerDriver: {
+              ...mockTrackDataWithMultipleClasses.sessions[0].playerDriver,
+              position: 5,
+            },
+          },
+        ],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Quali Avg Pos')).toBeInTheDocument();
+      expect(screen.getByText('Finish Avg Pos')).toBeInTheDocument();
+      expect(screen.getAllByText('P5').length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByText('P9').length).toBeGreaterThan(0);
+  });
+
   it('opens replay telemetry from the track sessions list', async () => {
     const onOpenReplay = vi.fn();
     render(

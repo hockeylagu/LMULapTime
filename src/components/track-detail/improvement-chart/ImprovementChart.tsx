@@ -74,6 +74,8 @@ export interface ImprovementChartProps {
     paceCat?: PaceCategory | null;
     pacePct?: number | null;
   };
+  qualifyingAveragePosition?: number | null;
+  finishAveragePosition?: number | null;
   onSelectSession?: (sessionId: string) => void;
   timeRange?: TimeRangeFilter;
   onTimeRangeChange?: (range: TimeRangeFilter) => void;
@@ -92,6 +94,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   hideEmpty = true,
   embedded = false,
   yourBest,
+  qualifyingAveragePosition,
+  finishAveragePosition,
   onSelectSession,
   timeRange,
   onTimeRangeChange,
@@ -266,6 +270,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
           top3Improvement={top3Improvement}
           bestTop3={bestTop3}
           latestTheoreticalGap={latestTheoreticalGap}
+          qualifyingAveragePosition={qualifyingAveragePosition}
+          finishAveragePosition={finishAveragePosition}
         />
       )}
 

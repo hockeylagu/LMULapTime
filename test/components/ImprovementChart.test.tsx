@@ -71,7 +71,7 @@ describe('ImprovementChart component', () => {
     );
 
     expect(screen.getByText('Lap & Sector Improvement Over Time')).toBeInTheDocument();
-    expect(screen.getByText('Total Sessions Parsed')).toBeInTheDocument();
+    expect(screen.getByText('Total Sessions')).toBeInTheDocument();
     expect(screen.getByText(/Your Best/i)).toBeInTheDocument();
     expect(screen.getByText('Top 3 Lap True Pace')).toBeInTheDocument();
 
