@@ -11,7 +11,7 @@ import {
   ReplayInspectorPage,
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
-import type { AppStatus, DetailedSession, ReplayScanStatus, SessionProgressionPoint, TrackSummary } from '../server/core/types';
+import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint, TrackSummary } from '../server/core/types';
 
 interface SessionRouteProps {
   onBack: () => void;
@@ -112,7 +112,7 @@ export default function App() {
   const [tracksMap, setTracksMap] = useState<Record<string, TrackSummary>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [replayScanStatus, setReplayScanStatus] = useState<ReplayScanStatus | null>(null);
+  const [replayScanStatus, setReplayScanStatus] = useState<ScanStatus | null>(null);
 
   // Poll replay scan progress only while a scan is actively running.
   // Once the scan finishes (running === false), polling stops completely,
@@ -128,10 +128,9 @@ export default function App() {
       scanAbortRef.current = new AbortController();
       fetch('/api/scan/status', { signal: scanAbortRef.current.signal })
         .then((res) => res.json())
-        .then((data: ReplayScanStatus) => {
+        .then((data: ScanStatus) => {
           setReplayScanStatus(data);
-          // Only continue polling if a scan is actively in progress
-          if (data.running) {
+          if (data.running || data.sessionScan?.running) {
             pollTimerRef.current = setTimeout(poll, 1000);
           }
         })
@@ -191,6 +190,17 @@ export default function App() {
       setIsRefreshing(false);
     }
   }, []);
+
+  const scanStateRef = useRef({ replay: false, sessions: false });
+  useEffect(() => {
+    const replayRunning = !!replayScanStatus?.running;
+    const sessionsRunning = !!replayScanStatus?.sessionScan?.running;
+    const previous = scanStateRef.current;
+    if ((previous.replay && !replayRunning) || (previous.sessions && !sessionsRunning)) {
+      void fetchData();
+    }
+    scanStateRef.current = { replay: replayRunning, sessions: sessionsRunning };
+  }, [fetchData, replayScanStatus?.running, replayScanStatus?.sessionScan?.running]);
 
   useEffect(() => {
     fetchData();

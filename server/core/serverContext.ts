@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { LmuParser } from '../sessions/parser.js';
-import { DetailedSession, ReplayScanStatus } from './types.js';
+import { DetailedSession, ReplayScanStatus, ScanStatus, SessionScanStatus } from './types.js';
 import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
@@ -26,6 +26,13 @@ export class ServerContext {
     processed: 0,
     total: 0,
     currentFile: null,
+    startedAt: null,
+    finishedAt: null,
+    result: null,
+    error: null,
+  };
+  private sessionScanStatus: SessionScanStatus = {
+    running: false,
     startedAt: null,
     finishedAt: null,
     result: null,
@@ -159,5 +166,38 @@ export class ServerContext {
     setImmediate(step);
   }
 
+  public runInitialSessionSyncInBackground(): void {
+    if (this.sessionScanStatus.running) return;
+    this.sessionScanStatus = {
+      running: true,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      result: null,
+      error: null,
+    };
+
+    setImmediate(() => {
+      try {
+        const result = this.sessionDb.syncSessionsFromDir(this.currentResultsDir, this.parser);
+        this.sessionScanStatus.result = result;
+        console.log(`[SQLite Cache] Loaded ${result.total} sessions (${result.added} new, ${result.updated} updated) from ${this.currentResultsDir}`);
+      } catch (error: unknown) {
+        this.sessionScanStatus.error = error instanceof Error ? error.message : String(error);
+        console.warn('[SQLite Cache] Initial sync warning:', error);
+      } finally {
+        this.sessionScanStatus.running = false;
+        this.sessionScanStatus.finishedAt = new Date().toISOString();
+        this.runReplaySyncInBackground();
+      }
+    });
+  }
+
   public getReplayScanStatus(): ReplayScanStatus { return this.replayScanStatus; }
+
+  public getScanStatus(): ScanStatus {
+    return {
+      ...this.replayScanStatus,
+      sessionScan: this.sessionScanStatus,
+    };
+  }
 }

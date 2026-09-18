@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import path from 'path';
 import fs from 'fs';
@@ -7,6 +7,15 @@ import * as refModule from '../../server/benchmarks/referenceLaptimes.js';
 import { createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 describe('Server API routes', () => {
+  beforeAll(async () => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const status = await request(app).get('/api/scan/status');
+      if (!status.body.sessionScan?.running) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error('Initial session scan did not finish during the test setup window');
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -23,6 +32,14 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('sqliteCache');
     expect(res.body.sqliteCache).toHaveProperty('enabled', true);
     expect(typeof res.body.sqliteCache.sessionsCount).toBe('number');
+  });
+
+  it('GET /api/scan/status reports the session and replay scan states', async () => {
+    const res = await request(app).get('/api/scan/status');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('running');
+    expect(res.body).toHaveProperty('sessionScan');
+    expect(res.body.sessionScan).toHaveProperty('running', false);
   });
 
   it('POST /api/cache/clear clears the SQLite cache', async () => {

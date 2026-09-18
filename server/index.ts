@@ -43,20 +43,17 @@ const serverContext = new ServerContext({
   replayCache,
 });
 
-try {
-  const syncResult = sessionDb.syncSessionsFromDir(serverContext.resultsDir, serverContext.currentParser);
-  console.log(`[SQLite Cache] Loaded ${syncResult.total} sessions (${syncResult.added} new, ${syncResult.updated} updated) from ${serverContext.resultsDir}`);
+const startTelemetryCatalogRefresh = (): void => {
   void telemetryCatalog.refresh(serverContext.telemetryDir).then((count) => {
     console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${serverContext.telemetryDir}`);
   }).catch((error: unknown) => {
     sessionDb.recordIngestError('duckdb-directory', serverContext.telemetryDir, error);
     console.warn('[SQLite Cache] Initial telemetry sync warning:', error);
   });
-} catch (error) {
-  console.warn('[SQLite Cache] Initial sync warning:', error);
-}
+};
 
-serverContext.runReplaySyncInBackground();
+serverContext.runInitialSessionSyncInBackground();
+setImmediate(startTelemetryCatalogRefresh);
 
 void (async () => {
   if (loadReferenceLaptimesFromCache()) return;

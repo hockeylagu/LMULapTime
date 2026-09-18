@@ -86,7 +86,7 @@ export function createSystemRouter(context: ServerContext): Router {
   });
 
   router.get('/scan/status', (_req, res) => {
-    res.json(context.getReplayScanStatus());
+    res.json(context.getScanStatus());
   });
 
   return router;
