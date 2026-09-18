@@ -484,6 +484,18 @@ export interface ReplayScanStatus {
   error: string | null;
 }
 
+export interface SessionScanStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: { added: number; updated: number; total: number; lastSyncedAt: string } | null;
+  error: string | null;
+}
+
+export interface ScanStatus extends ReplayScanStatus {
+  sessionScan: SessionScanStatus;
+}
+
 export interface FuelStrategyData {
   avgFuel: number;
   estFuelLaps: number | null;

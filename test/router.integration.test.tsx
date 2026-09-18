@@ -19,7 +19,13 @@ function mockApi() {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     }
     if (url.includes('/api/scan/status')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ running: false }) });
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          running: false,
+          sessionScan: { running: false },
+        }),
+      });
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
   });
