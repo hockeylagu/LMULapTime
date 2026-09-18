@@ -40,6 +40,8 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('running');
     expect(res.body).toHaveProperty('sessionScan');
     expect(res.body.sessionScan).toHaveProperty('running', false);
+    expect(res.body).toHaveProperty('referenceLaptimes');
+    expect(res.body.referenceLaptimes).toMatchObject({ started: false, checked: false, running: false });
   });
 
   it('POST /api/cache/clear clears the SQLite cache', async () => {

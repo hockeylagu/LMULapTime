@@ -9,6 +9,7 @@ import {
   Settings,
   CompareLaps,
   ReplayInspectorPage,
+  ReferenceLaptimeUpdateToast,
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
 import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint, TrackSummary } from '../server/core/types';
@@ -113,6 +114,7 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [replayScanStatus, setReplayScanStatus] = useState<ScanStatus | null>(null);
+  const [referenceUpdateCount, setReferenceUpdateCount] = useState<number | null>(null);
 
   // Poll replay scan progress only while a scan is actively running.
   // Once the scan finishes (running === false), polling stops completely,
@@ -130,8 +132,24 @@ export default function App() {
         .then((res) => res.json())
         .then((data: ScanStatus) => {
           setReplayScanStatus(data);
-          if (data.running || data.sessionScan?.running) {
+          const referenceCheckPending = !!data.referenceLaptimes && !data.referenceLaptimes.checked;
+          if (
+            data.running ||
+            data.sessionScan?.running ||
+            referenceCheckPending
+          ) {
             pollTimerRef.current = setTimeout(poll, 1000);
+          }
+
+          const referenceRefresh = data.referenceLaptimes;
+          if (
+            referenceRefresh?.checked &&
+            referenceRefresh.completedAt &&
+            referenceRefresh.updatedCount > 0 &&
+            referenceRefresh.completedAt !== referenceRefreshHandledRef.current
+          ) {
+            referenceRefreshHandledRef.current = referenceRefresh.completedAt;
+            setReferenceUpdateCount(referenceRefresh.updatedCount);
           }
         })
         .catch((err) => {
@@ -140,6 +158,8 @@ export default function App() {
     };
     poll();
   }, []);
+
+  const referenceRefreshHandledRef = useRef<string | null>(null);
 
   const refreshReplayScanStatus = useCallback(() => {
     startScanPolling();
@@ -284,6 +304,13 @@ export default function App() {
         <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted glass-panel">
           <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
         </footer>
+      )}
+
+      {referenceUpdateCount !== null && (
+        <ReferenceLaptimeUpdateToast
+          updatedCount={referenceUpdateCount}
+          onDismiss={() => setReferenceUpdateCount(null)}
+        />
       )}
     </div>
   );

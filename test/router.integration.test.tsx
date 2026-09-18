@@ -24,6 +24,7 @@ function mockApi() {
         json: () => Promise.resolve({
           running: false,
           sessionScan: { running: false },
+          referenceLaptimes: { started: true, running: false, checked: true, updatedCount: 0 },
         }),
       });
     }

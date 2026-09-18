@@ -9,3 +9,4 @@ export * from './ReplayIndicator';
 export * from './BenchmarkTargetsGrid';
 export * from './LapStatusBadge';
 export * from './lapStatus';
+export * from './ReferenceLaptimeUpdateToast';

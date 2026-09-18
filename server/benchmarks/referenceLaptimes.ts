@@ -178,6 +178,16 @@ export function resetCachedReferenceLaptimes(): void {
   cachedData = null;
 }
 
+export function isReferenceLaptimesCacheFresh(
+  cache: ReferenceLaptimesCache | null,
+  nowMs = Date.now(),
+  maxAgeMs = 24 * 60 * 60 * 1000
+): boolean {
+  if (!cache?.lastUpdated) return false;
+  const lastUpdatedMs = Date.parse(cache.lastUpdated);
+  return Number.isFinite(lastUpdatedMs) && nowMs - lastUpdatedMs <= maxAgeMs;
+}
+
 export function loadReferenceLaptimesFromCache(): ReferenceLaptimesCache | null {
   if (cachedData) return cachedData;
 
