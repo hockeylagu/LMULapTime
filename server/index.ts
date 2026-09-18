@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { LmuParser } from './sessions/parser.js';
-import { fetchAndCacheReferenceLaptimes, loadReferenceLaptimesFromCache } from './benchmarks/referenceLaptimes.js';
+import { fetchAndCacheReferenceLaptimes, isReferenceLaptimesCacheFresh, loadReferenceLaptimesFromCache } from './benchmarks/referenceLaptimes.js';
 import { getSessionDatabase } from './core/db.js';
 import { TelemetryCatalog } from './telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from './replay/replayCacheService.js';
@@ -52,18 +52,26 @@ const startTelemetryCatalogRefresh = (): void => {
   });
 };
 
+const startReferenceLaptimeRefresh = (): void => {
+  serverContext.runReferenceLaptimeRefreshInBackground(async () => {
+    const currentCache = loadReferenceLaptimesFromCache();
+    const hasUsablePreviousEntries = !!currentCache && currentCache.entriesCount > 0;
+
+    if (isReferenceLaptimesCacheFresh(currentCache)) {
+      return { refreshed: false, diff: null };
+    }
+
+    console.log(currentCache ? 'Refreshing stale reference laptimes from Google Sheets...' : 'Initializing reference laptimes cache from Google Sheets...');
+    const refreshedCache = await fetchAndCacheReferenceLaptimes();
+    return {
+      refreshed: true,
+      diff: hasUsablePreviousEntries ? refreshedCache.lastUpdateDiff || null : null,
+    };
+  });
+};
+
 serverContext.runInitialSessionSyncInBackground();
 setImmediate(startTelemetryCatalogRefresh);
-
-void (async () => {
-  if (loadReferenceLaptimesFromCache()) return;
-  try {
-    console.log('Initializing reference laptimes cache from Google Sheets...');
-    await fetchAndCacheReferenceLaptimes();
-  } catch (error) {
-    console.warn('Initial fetch of reference laptimes failed:', error);
-  }
-})();
 
 app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
@@ -74,6 +82,7 @@ app.use('/api', createReplayRouter(serverContext));
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
+    startReferenceLaptimeRefresh();
   });
 }
 

@@ -5,6 +5,7 @@ import {
   normalizeCarClass,
   calculatePaceCategory,
   loadReferenceLaptimesFromCache,
+  isReferenceLaptimesCacheFresh,
   fetchAndCacheReferenceLaptimes,
   computeReferenceBenchmarkDiff,
   resetCachedReferenceLaptimes,
@@ -166,6 +167,25 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       });
 
       await expect(fetchAndCacheReferenceLaptimes()).rejects.toThrow('Failed to fetch spreadsheet CSV');
+    });
+  });
+
+  describe('isReferenceLaptimesCacheFresh', () => {
+    const nowMs = Date.parse('2026-09-18T12:00:00.000Z');
+
+    it('treats a missing or invalid timestamp as stale', () => {
+      expect(isReferenceLaptimesCacheFresh(null, nowMs)).toBe(false);
+      expect(isReferenceLaptimesCacheFresh({ ...parseReferenceCsv(sampleCsv), lastUpdated: '' }, nowMs)).toBe(false);
+      expect(isReferenceLaptimesCacheFresh({ ...parseReferenceCsv(sampleCsv), lastUpdated: 'not-a-date' }, nowMs)).toBe(false);
+    });
+
+    it('treats a cache at or under one day old as fresh', () => {
+      expect(isReferenceLaptimesCacheFresh({ ...parseReferenceCsv(sampleCsv), lastUpdated: '2026-09-17T12:00:00.000Z' }, nowMs)).toBe(true);
+      expect(isReferenceLaptimesCacheFresh({ ...parseReferenceCsv(sampleCsv), lastUpdated: '2026-09-18T11:59:59.000Z' }, nowMs)).toBe(true);
+    });
+
+    it('treats a cache older than one day as stale', () => {
+      expect(isReferenceLaptimesCacheFresh({ ...parseReferenceCsv(sampleCsv), lastUpdated: '2026-09-17T11:59:59.000Z' }, nowMs)).toBe(false);
     });
   });
 

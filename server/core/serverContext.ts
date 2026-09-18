@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { LmuParser } from '../sessions/parser.js';
-import { DetailedSession, ReplayScanStatus, ScanStatus, SessionScanStatus } from './types.js';
+import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus } from './types.js';
 import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
@@ -36,6 +36,16 @@ export class ServerContext {
     startedAt: null,
     finishedAt: null,
     result: null,
+    error: null,
+  };
+  private referenceLaptimeRefreshStatus: ReferenceLaptimeRefreshStatus = {
+    started: false,
+    running: false,
+    checked: false,
+    completedAt: null,
+    refreshed: false,
+    updatedCount: 0,
+    diff: null,
     error: null,
   };
 
@@ -192,12 +202,47 @@ export class ServerContext {
     });
   }
 
+  public runReferenceLaptimeRefreshInBackground(
+    refresh: () => Promise<{ refreshed: boolean; diff: ReferenceBenchmarkDiff | null }>
+  ): void {
+    if (this.referenceLaptimeRefreshStatus.started) return;
+    this.referenceLaptimeRefreshStatus = {
+      started: true,
+      running: true,
+      checked: false,
+      completedAt: null,
+      refreshed: false,
+      updatedCount: 0,
+      diff: null,
+      error: null,
+    };
+
+    setImmediate(() => {
+      void refresh()
+        .then((result) => {
+          this.referenceLaptimeRefreshStatus.refreshed = result.refreshed;
+          this.referenceLaptimeRefreshStatus.diff = result.diff;
+          this.referenceLaptimeRefreshStatus.updatedCount = result.diff?.updatedCount || 0;
+        })
+        .catch((error: unknown) => {
+          this.referenceLaptimeRefreshStatus.error = error instanceof Error ? error.message : String(error);
+          console.warn('[Reference Laptimes] Startup refresh warning:', error);
+        })
+        .finally(() => {
+          this.referenceLaptimeRefreshStatus.running = false;
+          this.referenceLaptimeRefreshStatus.checked = true;
+          this.referenceLaptimeRefreshStatus.completedAt = new Date().toISOString();
+        });
+    });
+  }
+
   public getReplayScanStatus(): ReplayScanStatus { return this.replayScanStatus; }
 
   public getScanStatus(): ScanStatus {
     return {
       ...this.replayScanStatus,
       sessionScan: this.sessionScanStatus,
+      referenceLaptimes: this.referenceLaptimeRefreshStatus,
     };
   }
 }

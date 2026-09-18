@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../src/App.js';
 
 describe('App component', () => {
+  let startupScanStatus: Record<string, unknown>;
+
   const mockStatus = {
     resultsDir: 'C:\\LMU\\Results',
     resultsExist: true,
@@ -61,6 +63,11 @@ describe('App component', () => {
 
   beforeEach(() => {
     window.location.hash = '#dashboard';
+    startupScanStatus = {
+      running: false,
+      sessionScan: { running: false },
+      referenceLaptimes: { started: true, running: false, checked: true, updatedCount: 0 },
+    };
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/status')) {
         return Promise.resolve({ json: () => Promise.resolve(mockStatus) });
@@ -85,6 +92,9 @@ describe('App component', () => {
               benchmarks: [],
             }),
         });
+      }
+      if (url.includes('/api/scan/status')) {
+        return Promise.resolve({ json: () => Promise.resolve(startupScanStatus) });
       }
       if (url.includes('/api/session/')) {
         return Promise.resolve({
@@ -214,5 +224,30 @@ describe('App component', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true');
       expect(screen.getByText('Driving Overview')).toBeInTheDocument();
     });
+  });
+
+  it('shows and dismisses the startup benchmark update toast', async () => {
+    startupScanStatus = {
+      running: false,
+      sessionScan: { running: false },
+      referenceLaptimes: {
+        started: true,
+        running: false,
+        checked: true,
+        completedAt: '2026-09-18T12:00:00.000Z',
+        refreshed: true,
+        updatedCount: 3,
+      },
+    };
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('3 existing benchmarks changed.');
+    });
+
+    expect(screen.getByRole('link', { name: /Review in Settings/i })).toHaveAttribute('href', '/settings');
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss reference lap time update notification/i }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

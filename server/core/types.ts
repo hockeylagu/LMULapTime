@@ -492,8 +492,20 @@ export interface SessionScanStatus {
   error: string | null;
 }
 
+export interface ReferenceLaptimeRefreshStatus {
+  started: boolean;
+  running: boolean;
+  checked: boolean;
+  completedAt: string | null;
+  refreshed: boolean;
+  updatedCount: number;
+  diff: ReferenceBenchmarkDiff | null;
+  error: string | null;
+}
+
 export interface ScanStatus extends ReplayScanStatus {
   sessionScan: SessionScanStatus;
+  referenceLaptimes: ReferenceLaptimeRefreshStatus;
 }
 
 export interface FuelStrategyData {
