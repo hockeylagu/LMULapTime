@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import {
   TelemetryRpmChannel,
   TelemetryLateralOffsetChannel,
@@ -96,6 +96,184 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getByText(/STEERING/i)).toBeInTheDocument();
     expect(screen.getByText(/4\.6%/i)).toBeInTheDocument();
     expect(screen.getByText(/RIGHT/i)).toBeInTheDocument();
+  });
+
+  it('renders understeer and oversteer overlay and toggles overlay visibility', () => {
+    // Generate synthetic lap with an understeer section
+    const testPoints: ReplayTrajectoryPoint[] = [];
+    for (let i = 0; i < 20; i++) {
+      testPoints.push({
+        x: 0,
+        y: 0,
+        z: i * 20,
+        speedKmh: 130,
+        timeSec: i * 0.1,
+        steerYaw: 20,
+        yawRateDeg: 8,
+        accelLatG: 1.2,
+        understeerDeg: i >= 5 && i <= 12 ? 5.0 : 0, // US event
+      });
+    }
+    const cumDists = testPoints.map((_, i) => i * 20);
+
+    const { container } = render(
+      <TelemetrySteerChannel
+        steerPath="M 0 50 L 1000 50"
+        currentPoint={testPoints[8]}
+        isCursorInView={true}
+        cursorPct={40}
+        points={testPoints}
+        cumDists={cumDists}
+        viewStart={0}
+        viewEnd={19}
+      />
+    );
+
+    // Toggle button is present
+    const toggleBtn = screen.getByTitle(/Understeer \/ Oversteer Overlay/i);
+    expect(toggleBtn).toBeInTheDocument();
+
+    // With overlay enabled by default, US badge is rendered
+    expect(screen.getAllByText(/US/i).length).toBeGreaterThanOrEqual(1);
+
+    // SVG rect with understeer fill is present
+    const rects = container.querySelectorAll('rect');
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    expect(hasUSFill).toBe(true);
+
+    // Click toggle button to disable overlay
+    fireEvent.click(toggleBtn);
+
+    // After disabling, SVG rects for US/OS should be hidden
+    const updatedRects = container.querySelectorAll('rect');
+    const hasUSFillAfter = Array.from(updatedRects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    expect(hasUSFillAfter).toBe(false);
+
+    // Click again to re-enable
+    fireEvent.click(toggleBtn);
+    const reenabledRects = container.querySelectorAll('rect');
+    expect(Array.from(reenabledRects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'))).toBe(true);
+  });
+
+  it('renders tire scrub (SCRUB) overlay with rose/red shaded regions and badges', () => {
+    // Generate synthetic lap with excessive tire scrub (steering gain collapse)
+    const testPoints: ReplayTrajectoryPoint[] = [];
+    for (let i = 0; i < 20; i++) {
+      testPoints.push({
+        x: 0,
+        y: 0,
+        z: i * 20,
+        speedKmh: 110,
+        timeSec: i * 0.1,
+        steerYaw: i >= 5 && i <= 12 ? 15 + (i - 5) * 4 : 5, // steer increases 15° to 43°
+        yawRateDeg: i >= 5 && i <= 12 ? 18 - (i - 5) * 1.5 : 5, // yaw rate collapses
+        accelLatG: 1.1,
+        understeerDeg: i >= 5 && i <= 12 ? 5.5 : 0, // severe push
+      });
+    }
+    const cumDists = testPoints.map((_, i) => i * 20);
+
+    const { container } = render(
+      <TelemetrySteerChannel
+        steerPath="M 0 50 L 1000 50"
+        currentPoint={testPoints[8]}
+        isCursorInView={true}
+        cursorPct={40}
+        points={testPoints}
+        cumDists={cumDists}
+        viewStart={0}
+        viewEnd={19}
+      />
+    );
+
+    // SCRUB badge is rendered
+    expect(screen.getAllByText(/SCRUB/i).length).toBeGreaterThanOrEqual(1);
+
+    // SVG rect with rose tire scrub fill (244, 63, 94) is present
+    let rects = container.querySelectorAll('rect');
+    let hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    expect(hasScrubFill).toBe(true);
+
+    // Click + SCRUB button to toggle scrub mode off (switching to pure US / OS mode)
+    const scrubToggleBtn = screen.getByTitle(/Remove Tire Scrub Zones/i);
+    fireEvent.click(scrubToggleBtn);
+
+    // Scrub fill should now be gone, converted to clean sky blue understeer
+    rects = container.querySelectorAll('rect');
+    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    expect(hasScrubFill).toBe(false);
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    expect(hasUSFill).toBe(true);
+
+    // Click + SCRUB again to restore scrub zones
+    const addScrubBtn = screen.getByTitle(/Add Tire Scrub Zones/i);
+    fireEvent.click(addScrubBtn);
+    rects = container.querySelectorAll('rect');
+    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    expect(hasScrubFill).toBe(true);
+  });
+
+  it('allows tire scrub overlay to be enabled independently without US / OS', () => {
+    const testPoints: ReplayTrajectoryPoint[] = [];
+    for (let i = 0; i < 20; i++) {
+      testPoints.push({
+        x: 0,
+        y: 0,
+        z: i * 20,
+        speedKmh: 110,
+        timeSec: i * 0.1,
+        steerYaw: i >= 5 && i <= 12 ? 15 + (i - 5) * 4 : 5,
+        yawRateDeg: i >= 5 && i <= 12 ? 18 - (i - 5) * 1.5 : 5,
+        accelLatG: 1.1,
+        understeerDeg: i >= 5 && i <= 12 ? 5.5 : 0,
+      });
+    }
+    const cumDists = testPoints.map((_, i) => i * 20);
+
+    const { container } = render(
+      <TelemetrySteerChannel
+        steerPath="M 0 50 L 1000 50"
+        currentPoint={testPoints[8]}
+        isCursorInView={true}
+        cursorPct={40}
+        points={testPoints}
+        cumDists={cumDists}
+        viewStart={0}
+        viewEnd={19}
+      />
+    );
+
+    const balanceToggleBtn = screen.getByTitle(/Understeer \/ Oversteer Overlay/i);
+    const scrubToggleBtn = screen.getByRole('button', { name: /Tire Push Overlay/i });
+
+    // Both start enabled
+    expect(screen.getAllByText(/SCRUB/i).length).toBeGreaterThanOrEqual(1);
+
+    // Disable US / OS balance overlay while leaving SCRUB enabled
+    fireEvent.click(balanceToggleBtn);
+
+    // Rose scrub rects should still exist!
+    let rects = container.querySelectorAll('rect');
+    const hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    expect(hasScrubFill).toBe(true);
+
+    // Sky blue normal US rects should NOT exist
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    expect(hasUSFill).toBe(false);
+
+    // Top badge still displays SCRUB
+    expect(screen.getAllByText(/SCRUB/i).length).toBeGreaterThanOrEqual(1);
+
+    // Disable scrub as well -> all rects hidden
+    fireEvent.click(scrubToggleBtn);
+    rects = container.querySelectorAll('rect');
+    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'))).toBe(false);
+
+    // Re-enable SCRUB only
+    fireEvent.click(scrubToggleBtn);
+    rects = container.querySelectorAll('rect');
+    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'))).toBe(true);
+    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'))).toBe(false);
   });
 
   it('renders TelemetryRpmChannel with engine RPM value and violet/purple styling', () => {

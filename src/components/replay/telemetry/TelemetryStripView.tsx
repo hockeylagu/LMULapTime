@@ -32,6 +32,7 @@ export interface TelemetryStripViewProps {
   setInteractionMode: (mode: 'scrub' | 'zoom') => void;
   isZoomed: boolean;
   onResetZoom: () => void;
+  onStepIndex?: (delta: number) => void;
   hasBaseline: boolean;
   telemetryResolution?: number;
   onChangeResolution?: (res: number) => void;
@@ -70,7 +71,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, onJumpToDistance, cumDists, currentDistM,
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
-  hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
+  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
   isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
@@ -89,6 +90,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         viewEnd={viewEnd}
         spanTimeSec={points[viewStart]?.timeSec !== undefined && points[viewEnd]?.timeSec !== undefined ? (points[viewEnd].timeSec || 0) - (points[viewStart].timeSec || 0) : undefined}
         onResetZoom={onResetZoom}
+        onStepIndex={onStepIndex}
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}
         pointsCount={points.length}
@@ -127,22 +129,13 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
             isCursorInView={isCursorInView}
             cursorPct={cursorPct}
             source={source}
+            points={points}
+            cornerSegments={cornerSegments}
+            cumDists={cumDists}
+            viewStart={viewStart}
+            viewEnd={viewEnd}
           />
         ))}
-
-        {((cornerSegments && cornerSegments.length > 0) || Boolean(initialStraight)) && (
-          <TelemetryCornerStrip
-            corners={cornerSegments || []}
-            initialStraight={initialStraight}
-            selectedCornerNumber={selectedCornerNumber}
-            onSelectCorner={onSelectCorner}
-            onJumpToDistance={onJumpToDistance}
-            isCompareMode={hasBaseline}
-            currentDistM={currentDistM}
-            sectors={sectors}
-            cumDists={cumDists}
-          />
-        )}
 
         {cornerEntryPct !== null && (
           <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-cyan-400/60 pointer-events-none z-10 border-l border-dashed border-cyan-400/60">
@@ -200,6 +193,20 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
           <div style={{ left: `${cursorPct}%` }} className="absolute inset-y-0 w-[1.5px] bg-white pointer-events-none z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
         )}
       </div>
+
+      {((cornerSegments && cornerSegments.length > 0) || Boolean(initialStraight)) && (
+        <TelemetryCornerStrip
+          corners={cornerSegments || []}
+          initialStraight={initialStraight}
+          selectedCornerNumber={selectedCornerNumber}
+          onSelectCorner={onSelectCorner}
+          onJumpToDistance={onJumpToDistance}
+          isCompareMode={hasBaseline}
+          currentDistM={currentDistM}
+          sectors={sectors}
+          cumDists={cumDists}
+        />
+      )}
     </>
   );
 };
