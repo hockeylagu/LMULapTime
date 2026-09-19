@@ -1,6 +1,25 @@
 import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
 
 /**
+ * Normalizes an angle difference in radians to the range [-pi, pi].
+ */
+export function unwrapAngle(rad: number): number {
+  let diff = rad;
+  while (diff > Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  return diff;
+}
+
+/**
+ * Shortest-arc linear interpolation of angles in radians.
+ * Prevents swinging 180 degrees through zero when crossing the [-pi, pi] wrap boundary.
+ */
+export function interpolateAngle(a0: number, a1: number, alpha: number): number {
+  const diff = unwrapAngle(a1 - a0);
+  return unwrapAngle(a0 + alpha * diff);
+}
+
+/**
  * Fuses native 100 Hz DuckDB telemetry channels (pedals, steering, speed, RPM,
  * gear, 4-wheel dynamics) with the VCR replay trajectory's 2D world coordinates
  * (x, y, z, yaw) to provide pristine driving inputs with an intact GPS track map.
@@ -70,9 +89,9 @@ export function fuseDuckDbWithVcrTrajectory(
     const x = p0.x + alpha * (p1.x - p0.x);
     const y = p0.y + alpha * (p1.y - p0.y);
     const z = p0.z + alpha * (p1.z - p0.z);
-    const rotX = p0.rotX !== undefined && p1.rotX !== undefined ? p0.rotX + alpha * (p1.rotX - p0.rotX) : p0.rotX;
-    const rotY = p0.rotY !== undefined && p1.rotY !== undefined ? p0.rotY + alpha * (p1.rotY - p0.rotY) : p0.rotY;
-    const rotZ = p0.rotZ !== undefined && p1.rotZ !== undefined ? p0.rotZ + alpha * (p1.rotZ - p0.rotZ) : p0.rotZ;
+    const rotX = p0.rotX !== undefined && p1.rotX !== undefined ? interpolateAngle(p0.rotX, p1.rotX, alpha) : p0.rotX;
+    const rotY = p0.rotY !== undefined && p1.rotY !== undefined ? interpolateAngle(p0.rotY, p1.rotY, alpha) : p0.rotY;
+    const rotZ = p0.rotZ !== undefined && p1.rotZ !== undefined ? interpolateAngle(p0.rotZ, p1.rotZ, alpha) : p0.rotZ;
 
     fusedPoints.push({
       ...dp,
