@@ -66,6 +66,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     cumDists,
     safeIndex,
     pctForIndex,
+    onStepIndex,
     onJumpToDistance,
     handleResetZoom,
     handlePointerDown,
@@ -182,6 +183,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         setInteractionMode={setInteractionMode}
         isZoomed={isZoomed}
         onResetZoom={handleResetZoom}
+        onStepIndex={onStepIndex}
         hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}

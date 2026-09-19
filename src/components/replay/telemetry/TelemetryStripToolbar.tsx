@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, ZoomIn, Activity } from 'lucide-react';
+import { Play, ZoomIn, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './telemetryPresets.js';
 import { TelemetryPresetSelector } from './TelemetryPresetSelector.js';
@@ -12,6 +12,7 @@ export interface TelemetryStripToolbarProps {
   viewEnd: number;
   spanTimeSec?: number;
   onResetZoom: () => void;
+  onStepIndex?: (delta: number) => void;
   telemetryResolution?: number;
   onChangeResolution?: (res: number) => void;
   pointsCount?: number;
@@ -45,6 +46,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   viewEnd,
   spanTimeSec,
   onResetZoom,
+  onStepIndex,
   telemetryResolution,
   onChangeResolution,
   pointsCount,
@@ -220,11 +222,37 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           </div>
         )}
 
-        <div className="flex items-center gap-3 text-[10px] font-mono text-lmu-muted pl-2 border-l border-white/10">
+        <div className="flex items-center gap-1.5 text-[10px] font-mono text-lmu-muted pl-2 border-l border-white/10">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStepIndex?.(-1);
+            }}
+            disabled={currentFrame !== undefined && currentFrame <= 1}
+            className="p-1 rounded bg-black/40 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            title="Move scrub line backward (Left Arrow, Shift for 10 frames)"
+            aria-label="Step backward (Left Arrow)"
+          >
+            <ChevronLeft className="w-3 h-3" />
+          </button>
           <span className="text-white font-bold">{formatElapsed(currentTimeSec)}</span>
-          <span>
+          <span className="hidden sm:inline">
             Frame {currentFrame ?? 1} / {totalFrames ?? 1}
           </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStepIndex?.(1);
+            }}
+            disabled={currentFrame !== undefined && totalFrames !== undefined && currentFrame >= totalFrames}
+            className="p-1 rounded bg-black/40 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            title="Move scrub line forward (Right Arrow, Shift for 10 frames)"
+            aria-label="Step forward (Right Arrow)"
+          >
+            <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </div>

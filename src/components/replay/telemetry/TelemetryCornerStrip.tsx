@@ -36,6 +36,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
   return (
     <div
       data-testid="telemetry-corner-strip"
+      onPointerDown={(e) => e.stopPropagation()}
       className={`telemetry-corner-strip relative z-20 shrink-0 bg-[#080c14] border-t border-lmu-border/50 select-none px-2 py-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth ${className}`}
     >
       {initialStraight && (() => {

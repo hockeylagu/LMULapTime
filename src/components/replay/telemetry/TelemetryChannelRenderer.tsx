@@ -1,6 +1,7 @@
 import React from 'react';
-import { ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryChannelId } from './telemetryPresets.js';
 import {
@@ -39,6 +40,11 @@ export interface TelemetryChannelRendererProps {
   isCursorInView: boolean;
   cursorPct: number;
   source?: 'vcr' | 'duckdb';
+  points?: ReplayTrajectoryPoint[];
+  cornerSegments?: CornerSegmentComparison[];
+  cumDists?: number[];
+  viewStart?: number;
+  viewEnd?: number;
 }
 
 export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> = React.memo(({
@@ -50,6 +56,11 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
   isCursorInView,
   cursorPct,
   source,
+  points,
+  cornerSegments,
+  cumDists,
+  viewStart,
+  viewEnd,
 }) => {
   const cursorProps = { currentPoint, currentComparison, isCursorInView, cursorPct, source };
 
@@ -75,7 +86,19 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
     case 'gear':
       return <TelemetryGearChannel gearPath={paths.gearPath} baselineGearPath={paths.baselineGearPath} {...cursorProps} />;
     case 'steer':
-      return <TelemetrySteerChannel steerPath={paths.steerPath} baselineSteerPath={paths.baselineSteerPath} {...cursorProps} />;
+      return (
+        <TelemetrySteerChannel
+          steerPath={paths.steerPath}
+          baselineSteerPath={paths.baselineSteerPath}
+          points={points}
+          cornerSegments={cornerSegments}
+          pointComparisons={pointComparisons}
+          cumDists={cumDists}
+          viewStart={viewStart}
+          viewEnd={viewEnd}
+          {...cursorProps}
+        />
+      );
     case 'rpm':
       return <TelemetryRpmChannel rpmPath={paths.rpmPath} rpmArea={paths.rpmArea} baselineRpmPath={paths.baselineRpmPath} maxRpm={paths.maxRpm} {...cursorProps} />;
     case 'brake-temps':

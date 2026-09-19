@@ -140,6 +140,39 @@ export function useTelemetryStripInteraction({
     isDraggingRef.current = false;
   };
 
+  const onStepIndex = useCallback((delta: number) => {
+    if (totalPoints === 0) return;
+    const newIdx = Math.max(0, Math.min(totalPoints - 1, safeIndex + delta));
+    onSelectIndex(newIdx);
+  }, [totalPoints, safeIndex, onSelectIndex]);
+
+  // Keyboard navigation for Left and Right arrow keys to move the scrub line
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        onStepIndex(e.shiftKey ? -10 : -1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        onStepIndex(e.shiftKey ? 10 : 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onStepIndex]);
+
   return {
     containerRef,
     interactionMode,
@@ -151,6 +184,7 @@ export function useTelemetryStripInteraction({
     cumDists,
     safeIndex,
     pctForIndex,
+    onStepIndex,
     onJumpToDistance: useCallback((distM: number) => {
       if (cumDists.length === 0) return;
       onSelectIndex(findIndexAtDistance(cumDists, distM));

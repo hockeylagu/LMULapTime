@@ -106,4 +106,33 @@ describe('TelemetryStripToolbar', () => {
     fireEvent.click(duckBtn);
     expect(handleSelectSource).toHaveBeenCalledWith('duckdb');
   });
+
+  it('renders left and right arrows to move the scrub line and triggers onStepIndex', () => {
+    const handleStepIndex = vi.fn();
+    render(
+      <TelemetryStripToolbar
+        interactionMode="scrub"
+        onChangeInteractionMode={vi.fn()}
+        isZoomed={false}
+        viewStart={0}
+        viewEnd={100}
+        onResetZoom={vi.fn()}
+        onStepIndex={handleStepIndex}
+        currentFrame={50}
+        totalFrames={100}
+      />
+    );
+
+    const leftBtn = screen.getByRole('button', { name: /Step backward \(Left Arrow\)/i });
+    const rightBtn = screen.getByRole('button', { name: /Step forward \(Right Arrow\)/i });
+
+    expect(leftBtn).toBeInTheDocument();
+    expect(rightBtn).toBeInTheDocument();
+
+    fireEvent.click(leftBtn);
+    expect(handleStepIndex).toHaveBeenCalledWith(-1);
+
+    fireEvent.click(rightBtn);
+    expect(handleStepIndex).toHaveBeenCalledWith(1);
+  });
 });
