@@ -45,6 +45,10 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
           <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold text-[8px] tracking-wider shrink-0">
             WHEEL / TIRE
           </span>
+        ) : channel.category === 'energy' ? (
+          <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[8px] tracking-wider shrink-0">
+            ENERGY / FUEL
+          </span>
         ) : (
           <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-bold text-[8px] tracking-wider shrink-0">
             DIRECT

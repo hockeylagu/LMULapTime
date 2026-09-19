@@ -414,6 +414,7 @@ interface RawPoint {
   engineRpm?: number;
   wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
+  fuel?: number;
 }
 
 function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
@@ -541,6 +542,7 @@ export function extractReplayTrajectory(
         driverNameMap.set(d.slot, d.name);
       }
     }
+    const driverFuel = new Map<number, number>();
 
     while (filePos < frameStreamEnd) {
       const bytesToRead = Math.min(CHUNK_SIZE - carryoverLen, frameStreamEnd - filePos);
@@ -662,6 +664,7 @@ export function extractReplayTrajectory(
                 engineRpm,
                 wheelSpeeds: latestWheel?.wheelSpeeds ? [...latestWheel.wheelSpeeds] : undefined,
                 brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
+                fuel: driverFuel.get(drv),
               };
 
               if (targetSlot !== undefined) {
@@ -815,6 +818,15 @@ export function extractReplayTrajectory(
               Math.round(brakeTempC * 0.88),
               Math.round(brakeTempC * 0.88),
             ];
+          } else if (evType === 51 && sz === 3 && eventSp + 5 + sz <= activeLen) {
+            // Type 51: Onboard Fuel Quantity Packet (Class 0 Type 51, size 3)
+            // Byte 0: fuel tank level fraction (0..255). Byte 1 bit 1/2: status indicator (0 = active stint)
+            const b0 = buf[eventSp + 5];
+            const b1 = buf[eventSp + 5 + 1];
+            if (b0 > 0 || b1 === 0) {
+              const fuelPct = Number(((b0 / 255) * 100).toFixed(1));
+              driverFuel.set(drv, fuelPct);
+            }
           }
           eventSp += 4 + 1 + sz;
         }
@@ -1236,6 +1248,7 @@ export function extractReplayTrajectory(
           engineRpm: cur.engineRpm,
           wheelSpeeds: cur.wheelSpeeds,
           brakeTemps: cur.brakeTemps,
+          fuel: cur.fuel,
         });
       }
 
@@ -1282,6 +1295,7 @@ export function extractReplayTrajectory(
         standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
         sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
         wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined || p.tireTemps !== undefined)),
+        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.fuel !== undefined || p.virtualEnergy !== undefined || p.soc !== undefined || p.regenRate !== undefined)),
       };
     }
 

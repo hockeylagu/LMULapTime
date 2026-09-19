@@ -101,6 +101,29 @@ export interface TelemetryChartPathsResult {
   baselineTireSlipPath: string;
   yawRatePath: string;
   baselineYawRatePath: string;
+
+  // Energy & Fuel channels
+  fuelPath: string;
+  fuelArea: string;
+  baselineFuelPath: string;
+  hasFuel: boolean;
+  maxFuel: number;
+
+  virtualEnergyPath: string;
+  virtualEnergyArea: string;
+  baselineVirtualEnergyPath: string;
+  hasVirtualEnergy: boolean;
+
+  socPath: string;
+  socArea: string;
+  baselineSocPath: string;
+  hasSoc: boolean;
+
+  regenRatePath: string;
+  regenRateArea: string;
+  baselineRegenRatePath: string;
+  hasRegenRate: boolean;
+  maxRegen: number;
 }
 
 export function computeTelemetryChartPaths(
@@ -182,6 +205,24 @@ export function computeTelemetryChartPaths(
       baselineTireSlipPath: '',
       yawRatePath: '',
       baselineYawRatePath: '',
+      fuelPath: '',
+      fuelArea: '',
+      baselineFuelPath: '',
+      hasFuel: false,
+      maxFuel: 100,
+      virtualEnergyPath: '',
+      virtualEnergyArea: '',
+      baselineVirtualEnergyPath: '',
+      hasVirtualEnergy: false,
+      socPath: '',
+      socArea: '',
+      baselineSocPath: '',
+      hasSoc: false,
+      regenRatePath: '',
+      regenRateArea: '',
+      baselineRegenRatePath: '',
+      hasRegenRate: false,
+      maxRegen: 300,
     };
   }
 
@@ -285,6 +326,26 @@ export function computeTelemetryChartPaths(
 
   const hasLateralOffset = points.some(p => p.lateralOffsetM !== undefined);
 
+  // Energy & Fuel Channel Bounds
+  const rawMaxFuel = Math.max(
+    50,
+    ...points.map(p => p.fuel || 0),
+    ...(pointComparisons.map(c => c.baseline.fuel || 0))
+  );
+  const maxFuel = Math.ceil(rawMaxFuel / 10) * 10;
+  const hasFuel = points.some(p => p.fuel !== undefined);
+
+  const hasVirtualEnergy = points.some(p => p.virtualEnergy !== undefined);
+  const hasSoc = points.some(p => p.soc !== undefined);
+
+  const rawMaxRegen = Math.max(
+    150,
+    ...points.map(p => p.regenRate || 0),
+    ...(pointComparisons.map(c => c.baseline.regenRate || 0))
+  );
+  const maxRegen = Math.ceil(rawMaxRegen / 50) * 50;
+  const hasRegenRate = points.some(p => p.regenRate !== undefined);
+
   const cumDists = distances && distances.length === points.length
     ? distances
     : getTrajectoryDistances(points);
@@ -338,6 +399,15 @@ export function computeTelemetryChartPaths(
   let bTireSlp = '';
   let yawRt = '';
   let bYawRt = '';
+
+  let fuel = '';
+  let bFuel = '';
+  let ve = '';
+  let bVe = '';
+  let soc = '';
+  let bSoc = '';
+  let regen = '';
+  let bRegen = '';
 
   let maxDelta = 1.0;
   const rates = new Map<number, number>();
@@ -556,6 +626,34 @@ export function computeTelemetryChartPaths(
       yawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
     }
 
+    // Fuel Level: 0 to maxFuel L -> 95 to 10 in SVG Y
+    if (p.fuel !== undefined) {
+      const fuelNorm = Math.min(1, Math.max(0, p.fuel / maxFuel));
+      const fy = 95 - fuelNorm * 85;
+      fuel += `${fuel ? 'L' : 'M'} ${x.toFixed(1)} ${fy.toFixed(1)} `;
+    }
+
+    // Virtual Energy: 0% to 100% -> 95 to 10 in SVG Y
+    if (p.virtualEnergy !== undefined) {
+      const veNorm = Math.min(1, Math.max(0, p.virtualEnergy / 100));
+      const veY = 95 - veNorm * 85;
+      ve += `${ve ? 'L' : 'M'} ${x.toFixed(1)} ${veY.toFixed(1)} `;
+    }
+
+    // Battery State of Charge: 0% to 100% -> 95 to 10 in SVG Y
+    if (p.soc !== undefined) {
+      const socNorm = Math.min(1, Math.max(0, p.soc / 100));
+      const socY = 95 - socNorm * 85;
+      soc += `${soc ? 'L' : 'M'} ${x.toFixed(1)} ${socY.toFixed(1)} `;
+    }
+
+    // Regen Rate: 0 to maxRegen kW -> 95 to 10 in SVG Y
+    if (p.regenRate !== undefined) {
+      const rNorm = Math.min(1, Math.max(0, p.regenRate / maxRegen));
+      const ry = 95 - rNorm * 85;
+      regen += `${regen ? 'L' : 'M'} ${x.toFixed(1)} ${ry.toFixed(1)} `;
+    }
+
     // Baseline comparisons
     if (pointComparisons[i]) {
       const comp = pointComparisons[i];
@@ -717,6 +815,30 @@ export function computeTelemetryChartPaths(
         bYawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
       }
 
+      if (bp.fuel !== undefined) {
+        const fuelNorm = Math.min(1, Math.max(0, bp.fuel / maxFuel));
+        const bfy = 95 - fuelNorm * 85;
+        bFuel += `${bFuel ? 'L' : 'M'} ${x.toFixed(1)} ${bfy.toFixed(1)} `;
+      }
+
+      if (bp.virtualEnergy !== undefined) {
+        const veNorm = Math.min(1, Math.max(0, bp.virtualEnergy / 100));
+        const bveY = 95 - veNorm * 85;
+        bVe += `${bVe ? 'L' : 'M'} ${x.toFixed(1)} ${bveY.toFixed(1)} `;
+      }
+
+      if (bp.soc !== undefined) {
+        const socNorm = Math.min(1, Math.max(0, bp.soc / 100));
+        const bsocY = 95 - socNorm * 85;
+        bSoc += `${bSoc ? 'L' : 'M'} ${x.toFixed(1)} ${bsocY.toFixed(1)} `;
+      }
+
+      if (bp.regenRate !== undefined) {
+        const rNorm = Math.min(1, Math.max(0, bp.regenRate / maxRegen));
+        const bry = 95 - rNorm * 85;
+        bRegen += `${bRegen ? 'L' : 'M'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
+      }
+
       // Delta time: negative is faster (above zero line, Y < 50), positive is slower (below, Y > 50)
       const dtNorm = Math.max(-1, Math.min(1, comp.deltaTimeSec / maxDelta));
       const dty = 50 + dtNorm * 40;
@@ -867,5 +989,23 @@ export function computeTelemetryChartPaths(
     baselineTireSlipPath: bTireSlp,
     yawRatePath: yawRt,
     baselineYawRatePath: bYawRt,
+    fuelPath: fuel,
+    fuelArea: fuel ? `${fuel} L 1000 95 L 0 95 Z` : '',
+    baselineFuelPath: bFuel,
+    hasFuel,
+    maxFuel,
+    virtualEnergyPath: ve,
+    virtualEnergyArea: ve ? `${ve} L 1000 95 L 0 95 Z` : '',
+    baselineVirtualEnergyPath: bVe,
+    hasVirtualEnergy,
+    socPath: soc,
+    socArea: soc ? `${soc} L 1000 95 L 0 95 Z` : '',
+    baselineSocPath: bSoc,
+    hasSoc,
+    regenRatePath: regen,
+    regenRateArea: regen ? `${regen} L 1000 95 L 0 95 Z` : '',
+    baselineRegenRatePath: bRegen,
+    hasRegenRate,
+    maxRegen,
   };
 }

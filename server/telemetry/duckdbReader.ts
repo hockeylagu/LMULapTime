@@ -372,6 +372,34 @@ export class DuckDbReader {
       ? 'Tire Temp'
       : null;
 
+    const fuelTable = (await this.hasTable('Fuel Level'))
+      ? 'Fuel Level'
+      : (await this.hasTable('FuelLevel'))
+      ? 'FuelLevel'
+      : (await this.hasTable('Fuel'))
+      ? 'Fuel'
+      : null;
+
+    const virtualEnergyTable = (await this.hasTable('Virtual Energy'))
+      ? 'Virtual Energy'
+      : (await this.hasTable('VirtualEnergy'))
+      ? 'VirtualEnergy'
+      : null;
+
+    const socTable = (await this.hasTable('SoC'))
+      ? 'SoC'
+      : (await this.hasTable('SOC'))
+      ? 'SOC'
+      : (await this.hasTable('State of Charge'))
+      ? 'State of Charge'
+      : null;
+
+    const regenRateTable = (await this.hasTable('Regen Rate'))
+      ? 'Regen Rate'
+      : (await this.hasTable('RegenRate'))
+      ? 'RegenRate'
+      : null;
+
     // Check discrete vs continuous for ABS, TC, Gear
     const hasTc = await this.hasTable('TC');
     const tcHasTs = hasTc ? await this.hasColumn('TC', 'ts') : false;
@@ -420,6 +448,10 @@ export class DuckDbReader {
       gearEvents,
       absEvents,
       tcEvents,
+      fuelData,
+      virtualEnergyData,
+      socData,
+      regenRateData,
     ] = await Promise.all([
       fetchContinuousChannel<{ value: number }>(speedTable, 'value', declaredHz),
       fetchContinuousChannel<{ value: number }>(throttleTable, 'value', 50),
@@ -487,6 +519,10 @@ export class DuckDbReader {
             [startTs - 1, endTs + 1]
           )
         : Promise.resolve([]),
+      fetchContinuousChannel<{ value: number }>(fuelTable, 'value', 20),
+      fetchContinuousChannel<{ value: number }>(virtualEnergyTable, 'value', 20),
+      fetchContinuousChannel<{ value: number }>(socTable, 'value', 20),
+      fetchContinuousChannel<{ value: number }>(regenRateTable, 'value', declaredHz),
     ]);
 
     const getChannelRow = <T>(channelData: { rows: T[]; hz: number }, i: number): T | undefined => {
@@ -659,6 +695,18 @@ export class DuckDbReader {
           ]
         : undefined;
 
+      const fuelRow = getChannelRow(fuelData, i);
+      const fuel = fuelRow?.value !== undefined ? parseFloat(fuelRow.value.toFixed(2)) : undefined;
+
+      const veRow = getChannelRow(virtualEnergyData, i);
+      const virtualEnergy = veRow?.value !== undefined ? parseFloat(veRow.value.toFixed(1)) : undefined;
+
+      const socRow = getChannelRow(socData, i);
+      const soc = socRow?.value !== undefined ? parseFloat(socRow.value.toFixed(1)) : undefined;
+
+      const regenRow = getChannelRow(regenRateData, i);
+      const regenRate = regenRow?.value !== undefined ? parseFloat(regenRow.value.toFixed(1)) : undefined;
+
       points.push({
         x: 0,
         y: 0,
@@ -680,6 +728,10 @@ export class DuckDbReader {
         brakeTemps,
         tireWear,
         tireTemps,
+        fuel,
+        virtualEnergy,
+        soc,
+        regenRate,
       });
     }
 

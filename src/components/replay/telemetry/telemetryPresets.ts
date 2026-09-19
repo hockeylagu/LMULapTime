@@ -18,14 +18,18 @@ export type TelemetryChannelId =
   | 'accel-total'
   | 'slip-angle'
   | 'under-over-steer'
-  | 'yaw-rate';
+  | 'yaw-rate'
+  | 'fuel'
+  | 'virtual-energy'
+  | 'soc'
+  | 'regen-rate';
 
 export interface TelemetryChannelInfo {
   id: TelemetryChannelId;
   name: string;
   shortName: string;
   unit: string;
-  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics' | 'forces' | 'wheels';
+  category: 'speed' | 'delta' | 'inputs' | 'engine' | 'dynamics' | 'forces' | 'wheels' | 'energy';
   isComputed: boolean;
   description: string;
   badgeColor: string;
@@ -260,6 +264,50 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     badgeColor: 'text-cyan-400 bg-cyan-500/20',
     lineColor: '#22d3ee',
   },
+  {
+    id: 'fuel',
+    name: 'Fuel Level',
+    shortName: 'FUEL',
+    unit: 'L',
+    category: 'energy',
+    isComputed: false,
+    description: 'Onboard fuel quantity remaining in tank (L)',
+    badgeColor: 'text-emerald-400 bg-emerald-500/20',
+    lineColor: '#10b981',
+  },
+  {
+    id: 'virtual-energy',
+    name: 'Virtual Energy',
+    shortName: 'V-ENERGY',
+    unit: '%',
+    category: 'energy',
+    isComputed: false,
+    description: 'WEC Hypercar stint virtual energy allocation remaining (%)',
+    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    lineColor: '#06b6d4',
+  },
+  {
+    id: 'soc',
+    name: 'Battery State of Charge',
+    shortName: 'SOC',
+    unit: '%',
+    category: 'energy',
+    isComputed: false,
+    description: 'Hybrid powertrain battery state of charge (%)',
+    badgeColor: 'text-amber-400 bg-amber-500/20',
+    lineColor: '#f59e0b',
+  },
+  {
+    id: 'regen-rate',
+    name: 'Regen Recovery Rate',
+    shortName: 'REGEN',
+    unit: 'kW',
+    category: 'energy',
+    isComputed: false,
+    description: 'Hybrid kinetic regenerative braking energy recovery (kW)',
+    badgeColor: 'text-purple-400 bg-purple-500/20',
+    lineColor: '#c084fc',
+  },
 ];
 
 export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
@@ -294,6 +342,12 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     channels: ['speed', 'delta', 'steer', 'lateral-offset', 'accel-lat', 'under-over-steer', 'slip-angle', 'throttle', 'brake'],
   },
   {
+    id: 'energy-fuel',
+    name: 'Energy & Fuel',
+    isBuiltIn: true,
+    channels: ['speed', 'delta', 'fuel', 'virtual-energy', 'soc', 'regen-rate', 'throttle', 'brake'],
+  },
+  {
     id: 'all-channels',
     name: 'All Telemetry Channels',
     isBuiltIn: true,
@@ -318,14 +372,18 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'slip-angle',
       'under-over-steer',
       'yaw-rate',
+      'fuel',
+      'virtual-energy',
+      'soc',
+      'regen-rate',
     ],
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v7';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v7';
-const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v6';
-const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v6';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v8';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v8';
+const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v7';
+const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v7';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {
