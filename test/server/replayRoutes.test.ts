@@ -72,6 +72,11 @@ describe('Replay routes', () => {
 
     fs.rmSync(replayPath);
 
+    const listAfterDeletion = await request(app).get('/api/replays');
+    expect(listAfterDeletion.status).toBe(200);
+    expect(listAfterDeletion.body).toHaveLength(1);
+    expect(listAfterDeletion.body[0].name).toBe('Route_Test_P1.Vcr');
+
     const cachedMetadataResponse = await request(app).get('/api/replays/Route_Test_P1.Vcr/metadata');
     expect(cachedMetadataResponse.status).toBe(200);
     expect(cachedMetadataResponse.body.drivers[0].name).toBe('Route Driver');
@@ -80,6 +85,12 @@ describe('Replay routes', () => {
       .get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr');
     expect(cachedTrajectoryResponse.status).toBe(200);
     expect(cachedTrajectoryResponse.body.points.length).toBeGreaterThan(0);
+
+    // Trajectory with DuckDB allowed should not throw ENOENT when file is missing from disk
+    const cachedTrajectoryWithDuckDb = await request(app)
+      .get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');
+    expect(cachedTrajectoryWithDuckDb.status).toBe(200);
+    expect(cachedTrajectoryWithDuckDb.body.points.length).toBeGreaterThan(0);
   });
 
   it('rejects unsafe replay names and bounded trajectory parameters', async () => {

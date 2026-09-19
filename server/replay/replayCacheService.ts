@@ -59,6 +59,15 @@ export class ReplayCacheService {
     if (!fs.existsSync(filePath)) {
       const stored = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey);
       if (stored) return stored;
+      if (lapKey !== -1) {
+        const storedFallback = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, -1);
+        if (storedFallback) return storedFallback;
+      }
+      if (driverSlotKey !== -1) {
+        const storedFallbackSlot = this.sessionDb.getStoredReplayTrajectory(replayName, -1, lapKey)
+          || this.sessionDb.getStoredReplayTrajectory(replayName, -1, -1);
+        if (storedFallbackSlot) return storedFallbackSlot;
+      }
       throw new Error(`Replay file and cached trajectory not found: ${replayName}`);
     }
 

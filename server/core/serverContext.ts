@@ -54,6 +54,7 @@ export class ServerContext {
     this.currentReplaysDir = options.replaysDir;
     this.currentTelemetryDir = options.telemetryDir;
     this.parser = options.parser;
+    this.populateReplayIndexFromDb();
   }
 
   public get sessionDb(): SessionDatabase { return this.options.sessionDb; }
@@ -76,10 +77,79 @@ export class ServerContext {
     if (typeof values.playerName === 'string' && values.playerName.trim()) {
       this.parser.configuredPlayerName = values.playerName.trim();
     }
+    this.populateReplayIndexFromDb();
+  }
+
+  public populateReplayIndexFromDb(): void {
+    try {
+      const stored = this.sessionDb.getAllStoredReplayFiles();
+      for (const r of stored) {
+        const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
+        const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
+        const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
+        this.parser.addReplayEntry({
+          name: r.filename,
+          path: r.file_path,
+          sizeBytes: r.file_size,
+          trackName,
+          sessionCode,
+          mtime: r.file_mtime,
+          eventTitle: r.metadata.eventInfo?.eventTitle,
+          splitNo: r.metadata.eventInfo?.splitNo,
+          eventType: r.metadata.eventInfo?.eventType,
+          durationSec: r.metadata.durationSec,
+        });
+      }
+    } catch (err) {
+      console.warn('[ServerContext] Error populating replay index from DB:', err);
+    }
   }
 
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
     try {
+      this.populateReplayIndexFromDb();
+
+      for (const session of sessions) {
+        if (!session.matchingReplayFile) {
+          let estimatedEndMs = session.timestamp;
+          if (session.drivers && session.drivers.length > 0) {
+            let maxElapsed = 0;
+            for (const d of session.drivers) {
+              if (d.laps) {
+                for (const l of d.laps) {
+                  if (typeof l.elapsedSeconds === 'number' && l.elapsedSeconds > maxElapsed) {
+                    maxElapsed = l.elapsedSeconds;
+                  }
+                }
+              }
+            }
+            if (maxElapsed > 0) {
+              estimatedEndMs = session.timestamp + Math.round(maxElapsed * 1000);
+            }
+          }
+
+          const matchedReplay = this.parser.findMatchingReplay(
+            session.trackVenue,
+            session.trackCourse,
+            session.sessionName || session.sessionType,
+            session.timestamp,
+            estimatedEndMs
+          );
+          if (matchedReplay) {
+            session.matchingReplayFile = {
+              name: matchedReplay.name,
+              path: matchedReplay.path,
+              sizeBytes: matchedReplay.sizeBytes,
+              eventTitle: matchedReplay.eventTitle,
+              splitNo: matchedReplay.splitNo,
+              eventType: matchedReplay.eventType,
+              durationSec: matchedReplay.durationSec,
+            };
+            this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+          }
+        }
+      }
+
       const duckFiles = this.telemetryCatalog.getFiles();
       const telemetryMeta = this.sessionDb.getTelemetryMetadata();
       const telemetryBySessionId = new Map<string, string>();
@@ -107,6 +177,7 @@ export class ServerContext {
           if (session.matchingReplayFile) {
             session.matchingReplayFile.hasDuckDbTelemetry = true;
             session.matchingReplayFile.duckdbFilename = matchedDuckFilename;
+            this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
           }
         }
       }

@@ -215,29 +215,43 @@ export class LmuParser {
     }
   }
 
+  public addReplayEntry(entry: ReplayFileEntry) {
+    const existingIndex = this.replaysMap.findIndex(r => r.name === entry.name);
+    if (existingIndex >= 0) {
+      this.replaysMap[existingIndex] = entry;
+    } else {
+      this.replaysMap.push(entry);
+    }
+  }
+
+  public addReplayEntries(entries: ReplayFileEntry[]) {
+    for (const e of entries) {
+      this.addReplayEntry(e);
+    }
+  }
+
   public indexReplays(replaysDir: string) {
     try {
+      if (!fs.existsSync(replaysDir)) return;
       const files = fs.readdirSync(replaysDir);
-      this.replaysMap = files
-        .filter(f => f.toLowerCase().endsWith('.vcr'))
-        .map(f => {
-          const filePath = path.join(replaysDir, f);
+      for (const f of files.filter(file => file.toLowerCase().endsWith('.vcr'))) {
+        const filePath = path.join(replaysDir, f);
+        try {
           const stat = fs.statSync(filePath);
-
-          // Match e.g. "Circuit de Spa-Francorchamps P1 78.Vcr"
           const match = f.match(/^(.+?)\s+([PQR]\d+)\b/i);
           const trackName = match ? match[1].trim() : f.replace(/\.vcr$/i, '');
           const sessionCode = match ? match[2].toUpperCase() : '';
 
-          return {
+          this.addReplayEntry({
             name: f,
             path: filePath,
             sizeBytes: stat.size,
             trackName,
             sessionCode,
             mtime: stat.mtime.getTime(),
-          };
-        });
+          });
+        } catch { /* Ignore unreadable file. */ }
+      }
     } catch (err) {
       console.warn('Error indexing replays directory:', err);
     }
@@ -398,7 +412,10 @@ export class LmuParser {
       const weather = this.parseWeather(timeString, rawWeather ? String(rawWeather) : undefined);
 
       // Match replay file
-      const xmlFileMtime = fs.statSync(filePath).mtime.getTime();
+      let xmlFileMtime = timestamp;
+      if (fs.existsSync(filePath)) {
+        try { xmlFileMtime = fs.statSync(filePath).mtime.getTime(); } catch { /* ignore */ }
+      }
       const matchingReplay = this.findMatchingReplay(trackVenue, trackCourse, sessionName, timestamp, xmlFileMtime);
 
       // Parse Session Settings & Server Rules
@@ -475,13 +492,15 @@ export class LmuParser {
         matchingReplayFile: matchingReplay ? (() => {
           if (!matchingReplay.eventTitle && !matchingReplay.durationSec) {
             try {
-              const rMeta = parseReplayMetadata(matchingReplay.path);
-              if (rMeta?.eventInfo) {
-                matchingReplay.eventTitle = rMeta.eventInfo.eventTitle;
-                matchingReplay.splitNo = rMeta.eventInfo.splitNo;
-                matchingReplay.eventType = rMeta.eventInfo.eventType;
+              if (fs.existsSync(matchingReplay.path)) {
+                const rMeta = parseReplayMetadata(matchingReplay.path);
+                if (rMeta?.eventInfo) {
+                  matchingReplay.eventTitle = rMeta.eventInfo.eventTitle;
+                  matchingReplay.splitNo = rMeta.eventInfo.splitNo;
+                  matchingReplay.eventType = rMeta.eventInfo.eventType;
+                }
+                matchingReplay.durationSec = rMeta.durationSec;
               }
-              matchingReplay.durationSec = rMeta.durationSec;
             } catch {
               // ignore
             }
@@ -849,7 +868,7 @@ export class LmuParser {
     };
   }
 
-  private findMatchingReplay(
+  public findMatchingReplay(
     trackVenue: string,
     trackCourse: string,
     sessionCode: string,
@@ -860,17 +879,37 @@ export class LmuParser {
 
     const normSession = (sessionCode || '').toLowerCase();
 
-    const getMinDiff = (v: ReplayFileEntry) =>
-      Math.min(Math.abs(v.mtime - sessionTimestampMs), Math.abs(v.mtime - xmlFileMtimeMs));
+    const matchesSessionCode = (vCodeRaw: string, sCodeRaw: string): boolean => {
+      const vCode = vCodeRaw.toLowerCase();
+      const sCode = sCodeRaw.toLowerCase();
+      if (vCode === sCode) return true;
+      if ((sCode === 'practice' || sCode.startsWith('p')) && vCode.startsWith('p')) return true;
+      if ((sCode === 'qualifying' || sCode.startsWith('q')) && vCode.startsWith('q')) return true;
+      if ((sCode === 'race' || sCode.startsWith('r')) && vCode.startsWith('r')) return true;
+      return false;
+    };
+
+    const getMinDiff = (v: ReplayFileEntry) => {
+      const replayStart = v.durationSec ? v.mtime - Math.round(v.durationSec * 1000) : v.mtime;
+      const diffStart = Math.abs(replayStart - sessionTimestampMs);
+      const diffEnd = Math.abs(v.mtime - xmlFileMtimeMs);
+      const diffDirect = Math.abs(v.mtime - sessionTimestampMs);
+      return Math.min(diffStart, diffEnd, diffDirect);
+    };
 
     // A replay from a different session type (e.g. R1) must never match a session of another
     // type (e.g. P1), no matter how close the timestamps are (back-to-back sessions are common).
-    const sessionScoped = this.replaysMap.filter(v => v.sessionCode.toLowerCase() === normSession && getMinDiff(v) <= 600000);
+    const sessionScoped = this.replaysMap.filter(v => matchesSessionCode(v.sessionCode, normSession) && getMinDiff(v) <= 600000);
 
     // 1. Exact track/layout match takes priority whenever one exists.
     const exactCandidates = sessionScoped.filter(v => matchesTrack(v.trackName, trackVenue, trackCourse));
     if (exactCandidates.length > 0) {
-      exactCandidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
+      exactCandidates.sort((a, b) => {
+        const aExactCode = a.sessionCode.toLowerCase() === normSession ? 0 : 1;
+        const bExactCode = b.sessionCode.toLowerCase() === normSession ? 0 : 1;
+        if (aExactCode !== bExactCode) return aExactCode - bExactCode;
+        return getMinDiff(a) - getMinDiff(b);
+      });
       return exactCandidates[0];
     }
 
