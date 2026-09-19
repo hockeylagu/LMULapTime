@@ -90,8 +90,14 @@ export function getAiCacheKey(evidence: AiLapEvidence): string {
   return createHash('sha256').update(canonical).digest('hex');
 }
 
-function error(code: AiErrorCode, message: string): Error & { code: AiErrorCode } {
-  return Object.assign(new Error(message), { code });
+export type AiError = Error & {
+  code: AiErrorCode;
+  rawResponse?: string;
+  finishReason?: string;
+};
+
+function error(code: AiErrorCode, message: string, extra?: { rawResponse?: string; finishReason?: string }): AiError {
+  return Object.assign(new Error(message), { code, ...extra });
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -188,19 +194,51 @@ async function generateReport(evidence: AiLapEvidence): Promise<AiAnalyzeRespons
         systemInstruction: SYSTEM_PROMPT,
         responseMimeType: 'application/json',
         responseJsonSchema: RESPONSE_SCHEMA,
-        maxOutputTokens: 700,
+        maxOutputTokens: 2048,
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       },
     });
     const content = response.text;
+    const finishReason = response.candidates?.[0]?.finishReason;
     if (!content) {
-      const finishReason = response.candidates?.[0]?.finishReason;
       const blockReason = response.promptFeedback?.blockReason;
       const detail = [finishReason && `finish reason: ${finishReason}`, blockReason && `block reason: ${blockReason}`].filter(Boolean).join(', ');
+      console.error(`[AI] Model returned no JSON content (model: ${sessionModel}${detail ? `, ${detail}` : ''}).`);
       throw new SyntaxError(`Gemini returned no JSON content${detail ? ` (${detail})` : ''}.`);
     }
-    const parsed = parseAiJsonContent(content);
-    const report = validateReport(parsed, evidence);
+    let parsed: unknown;
+    try {
+      parsed = parseAiJsonContent(content);
+    } catch (parseErr) {
+      const isMaxTokens = finishReason === 'MAX_TOKENS';
+      console.error(
+        `[AI] Invalid JSON from model (model: ${sessionModel}, finishReason: ${finishReason || 'unknown'}, length: ${content.length}):\n${content}`
+      );
+      if (isMaxTokens) {
+        console.error(
+          `[AI] Model response was truncated because it reached maxOutputTokens limit (${sessionModel}, finishReason: MAX_TOKENS).`
+        );
+      }
+      throw error(
+        'malformed_model_response',
+        `${parseErr instanceof Error ? parseErr.message : String(parseErr)} The report was not cached.`,
+        { rawResponse: content, finishReason }
+      );
+    }
+
+    let report: AiLapReport;
+    try {
+      report = validateReport(parsed, evidence);
+    } catch (valErr) {
+      console.error(
+        `[AI] Model JSON response failed schema validation (model: ${sessionModel}, error: ${valErr instanceof Error ? valErr.message : String(valErr)}):\n${content}`
+      );
+      if (valErr && typeof valErr === 'object') {
+        throw Object.assign(valErr, { rawResponse: content, finishReason });
+      }
+      throw valErr;
+    }
+
     const usageMetadata = response.usageMetadata;
     const usage = usageMetadata && {
       prompt: usageMetadata.promptTokenCount ?? 0,
@@ -229,8 +267,15 @@ export async function analyzeLap(request: AiAnalyzeRequest): Promise<AiAnalyzeRe
   return promise;
 }
 
-export function toAiError(cause: unknown): { code: AiErrorCode; message: string } {
-  if (cause && typeof cause === 'object' && 'code' in cause) return { code: (cause as { code: AiErrorCode }).code, message: cause instanceof Error ? cause.message : 'AI request failed.' };
+export function toAiError(cause: unknown): { code: AiErrorCode; message: string; rawResponse?: string } {
+  if (cause && typeof cause === 'object' && 'code' in cause) {
+    const err = cause as { code: AiErrorCode; message?: string; rawResponse?: string };
+    return {
+      code: err.code,
+      message: cause instanceof Error ? cause.message : (err.message || 'AI request failed.'),
+      rawResponse: typeof err.rawResponse === 'string' ? err.rawResponse : undefined,
+    };
+  }
   return { code: 'upstream_error', message: cause instanceof Error ? cause.message : 'AI request failed.' };
 }
 

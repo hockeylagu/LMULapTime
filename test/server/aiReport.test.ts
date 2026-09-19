@@ -71,16 +71,41 @@ describe('Gemini AI adapter', () => {
   });
 
   it('reports when Gemini returns no text', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     generateContentMock.mockResolvedValue({ candidates: [{ finishReason: 'MAX_TOKENS' }] });
     await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
       code: 'malformed_model_response',
       message: expect.stringContaining('finish reason: MAX_TOKENS'),
     });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Model returned no JSON content'));
+    consoleErrorSpy.mockRestore();
   });
 
   it('rejects malformed improvement structure', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     generateContentMock.mockResolvedValue({ text: JSON.stringify({ overallSummary: 'Bad', improvements: [{ title: 'Bad', action: 42, why: 'Bad', executionCue: 'Bad', verify: 'Bad', evidence: [] }] }) });
-    await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({ code: 'malformed_model_response' });
+    await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
+      code: 'malformed_model_response',
+      rawResponse: expect.stringContaining('"overallSummary":"Bad"'),
+    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Model JSON response failed schema validation'));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('logs and rejects when Gemini returns invalid JSON syntax', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    generateContentMock.mockResolvedValue({
+      text: '{"overallSummary": "Incomplete json...',
+      candidates: [{ finishReason: 'MAX_TOKENS' }],
+    });
+    await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
+      code: 'malformed_model_response',
+      rawResponse: '{"overallSummary": "Incomplete json...',
+      finishReason: 'MAX_TOKENS',
+    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON from model'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('maxOutputTokens limit'));
+    consoleErrorSpy.mockRestore();
   });
 
   it('maps a final 503 to upstream_unavailable with provider detail', async () => {

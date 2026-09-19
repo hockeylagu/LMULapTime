@@ -108,6 +108,21 @@ describe('AI routes', () => {
     expect(response.body).toMatchObject({ errorCode: code, requestId: expect.any(String) });
   });
 
+  it('logs raw model response when malformed_model_response includes rawResponse', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    aiReport.setSessionApiKey('session-key');
+    vi.spyOn(aiReport, 'analyzeLap').mockRejectedValue(
+      Object.assign(new Error('SyntaxError: Unterminated string in JSON'), {
+        code: 'malformed_model_response',
+        rawResponse: '{"incomplete": true',
+      })
+    );
+    const response = await request(app).post('/api/ai/analyze-lap').send({ evidence, forceRegenerate: true });
+    expect(response.status).toBe(502);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Raw invalid AI response (19 chars)'));
+    consoleWarnSpy.mockRestore();
+  });
+
   it('returns report history and maps database failures', async () => {
     const history = await request(app).get('/api/ai/reports?limit=5');
     expect(history.status).toBe(200);
