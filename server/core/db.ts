@@ -355,13 +355,41 @@ export class SessionDatabase {
     return decompressJson<ReplayMetadata>(row.metadata_br);
   }
 
-  /** Returns the latest parser-versioned metadata even when LMU has deleted the source .Vcr. */
+  /** Returns stored metadata even when LMU has deleted the source .Vcr. */
   public getStoredReplayMetadata(filename: string): ReplayMetadata | null {
     const row = this.db.prepare(
       'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
     ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row || row.parser_version !== REPLAY_CACHE_VERSION) return null;
+    if (!row) return null;
     return decompressJson<ReplayMetadata>(row.metadata_br);
+  }
+
+  /** Returns stored file attributes and metadata for a cached replay file. */
+  public getStoredReplayFileInfo(filename: string): { file_mtime: number; file_size: number; file_path: string; metadata: ReplayMetadata } | null {
+    const row = this.db.prepare(
+      'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
+    ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
+    if (!row) return null;
+    return {
+      file_path: row.file_path,
+      file_mtime: row.file_mtime,
+      file_size: row.file_size,
+      metadata: decompressJson<ReplayMetadata>(row.metadata_br),
+    };
+  }
+
+  /** Returns all cached replay metadata and disk properties stored in the database. */
+  public getAllStoredReplayFiles(): Array<{ filename: string; file_path: string; file_mtime: number; file_size: number; metadata: ReplayMetadata }> {
+    const rows = this.db.prepare(
+      'SELECT filename, file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata ORDER BY file_mtime DESC'
+    ).all() as Array<{ filename: string; file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer }>;
+    return rows.map(row => ({
+      filename: row.filename,
+      file_path: row.file_path,
+      file_mtime: row.file_mtime,
+      file_size: row.file_size,
+      metadata: decompressJson<ReplayMetadata>(row.metadata_br),
+    }));
   }
 
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
@@ -401,7 +429,7 @@ export class SessionDatabase {
     const row = this.db.prepare(
       'SELECT parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
     ).get(filename, driverSlot, lapKey) as { parser_version: string; trajectory_br: Buffer } | undefined;
-    if (!row || row.parser_version !== REPLAY_CACHE_VERSION) return null;
+    if (!row) return null;
     return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
   }
 
@@ -925,6 +953,25 @@ export class SessionDatabase {
     this.allSessionsCache = null;
   }
 
+  public updateSessionMatchingReplay(sessionId: string, matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>): void {
+    const row = this.db.prepare('SELECT metadata_json, data_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string; data_json: string } | undefined;
+    if (!row) return;
+    try {
+      const meta = JSON.parse(row.metadata_json) as SessionMetadata;
+      const data = JSON.parse(row.data_json) as DetailedSession;
+      meta.matchingReplayFile = matchingReplayFile;
+      data.matchingReplayFile = matchingReplayFile;
+      this.db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?')
+        .run(JSON.stringify(meta), JSON.stringify(data), Date.now(), sessionId);
+      if (this.allSessionsCache) {
+        const cached = this.allSessionsCache.find(s => s.id === sessionId);
+        if (cached) cached.matchingReplayFile = matchingReplayFile;
+      }
+    } catch (err) {
+      console.warn('[SessionDb] Failed to update session matching replay:', err);
+    }
+  }
+
   public syncSessionsFromDir(resultsDir: string, parser: LmuParser, forceReparse = false): SyncResult {
     if (!fs.existsSync(resultsDir)) {
       return {
@@ -954,6 +1001,26 @@ export class SessionDatabase {
     const cacheMap = new Map<string, { id: string; file_mtime: number; file_size: number }>();
     for (const row of existingRows) {
       cacheMap.set(path.normalize(row.file_path).toLowerCase(), row);
+    }
+
+    // Seed parser's replay index with stored DB replays so deleted VCR files still match
+    const storedReplays = this.getAllStoredReplayFiles();
+    for (const r of storedReplays) {
+      const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
+      const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
+      const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
+      parser.addReplayEntry({
+        name: r.filename,
+        path: r.file_path,
+        sizeBytes: r.file_size,
+        trackName,
+        sessionCode,
+        mtime: r.file_mtime,
+        eventTitle: r.metadata.eventInfo?.eventTitle,
+        splitNo: r.metadata.eventInfo?.splitNo,
+        eventType: r.metadata.eventInfo?.eventType,
+        durationSec: r.metadata.durationSec,
+      });
     }
 
     const files = fs.readdirSync(resultsDir).filter(f => f.endsWith('.xml'));

@@ -36,42 +36,69 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/replays', (_req, res) => {
     try {
-      if (!fs.existsSync(context.replaysDir)) return res.json([]);
-      const files = fs.readdirSync(context.replaysDir);
+      const diskFiles = (fs.existsSync(context.replaysDir) ? fs.readdirSync(context.replaysDir) : [])
+        .filter(file => file.toLowerCase().endsWith('.vcr'));
+      const storedReplays = context.sessionDb.getAllStoredReplayFiles();
+      const storedMap = new Map(storedReplays.map(r => [r.filename, r]));
+
+      const allFilenames = Array.from(new Set([...diskFiles, ...storedMap.keys()]));
       const sessions = context.loadSessions();
       const duckFiles = context.telemetryCatalog.getFiles();
       const telemetryMeta = context.sessionDb.getTelemetryMetadata();
       const summaries: ReplaySummary[] = [];
 
-      for (const filename of files.filter(file => file.toLowerCase().endsWith('.vcr'))) {
-        const filePath = path.join(context.replaysDir, filename);
+      for (const filename of allFilenames) {
+        const stored = storedMap.get(filename);
+        const filePath = (stored?.file_path && fs.existsSync(stored.file_path))
+          ? stored.file_path
+          : path.join(context.replaysDir, filename);
+
         try {
-          const stat = fs.statSync(filePath);
-          let metadata: ReplayMetadata | null = null;
-          try { metadata = context.replayCache.getMetadata(filePath, filename); } catch { /* Ignore active or invalid recordings. */ }
+          let mtime = stored?.file_mtime || 0;
+          let sizeBytes = stored?.file_size || 0;
+          let fileOnDisk = false;
+
+          if (fs.existsSync(filePath)) {
+            try {
+              const stat = fs.statSync(filePath);
+              mtime = stat.mtime.getTime();
+              sizeBytes = stat.size;
+              fileOnDisk = true;
+            } catch { /* Ignore stat error. */ }
+          }
+
+          let metadata: ReplayMetadata | null = stored?.metadata || null;
+          if (!metadata && fileOnDisk) {
+            try { metadata = context.replayCache.getMetadata(filePath, filename); } catch { /* Ignore active or invalid recordings. */ }
+          }
+          if (!metadata && stored?.metadata) {
+            metadata = stored.metadata;
+          }
+          if (!metadata) continue;
+
           const matched = sessions.find(session => session.matchingReplayFile?.name === filename);
-          const playerDriver = metadata?.drivers?.find((driver: ReplayDriverEntry) => driver.isPlayer) || metadata?.drivers?.[0];
-          const carClass = matched?.playerDriver?.carClass || playerDriver?.carClass || metadata?.carClass;
-          const carModel = matched?.playerDriver?.carType || playerDriver?.carModel || metadata?.carModel;
+          const playerDriver = metadata.drivers?.find((driver: ReplayDriverEntry) => driver.isPlayer) || metadata.drivers?.[0];
+          const carClass = matched?.playerDriver?.carClass || playerDriver?.carClass || metadata.carClass;
+          const carModel = matched?.playerDriver?.carType || playerDriver?.carModel || metadata.carModel;
           const carClasses = Array.from(new Set([
-            ...(metadata?.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
+            ...(metadata.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
             ...(matched?.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
             ...(carClass ? [carClass] : []),
           ]));
           const filenameMatch = filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
           const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
-          const displayTrack = matched ? getDisplayTrackName(matched.trackVenue, matched.trackCourse) : (metadata?.displayTrack || filenameTrack || metadata?.trackName);
+          const displayTrack = matched ? getDisplayTrackName(matched.trackVenue, matched.trackCourse) : (metadata.displayTrack || filenameTrack || metadata.trackName);
           const matchedDuckFilename = telemetryMeta.find(item => item.matchedReplayFilename === filename)?.filename ||
             (matched ? telemetryMeta.find(item => item.matchedSessionId === matched.id)?.filename : undefined) ||
-            (metadata ? matchDuckDbToReplay(duckFiles, metadata, stat.mtime.getTime())?.filename : undefined) ||
+            matchDuckDbToReplay(duckFiles, metadata, mtime)?.filename ||
             (matched ? matchDuckDbToSession(duckFiles, matched)?.filename : undefined);
 
           summaries.push({
-            name: filename, path: filePath, sizeBytes: stat.size, mtime: stat.mtime.getTime(), trackName: displayTrack,
-            trackVenue: matched?.trackVenue || metadata?.trackVenue,
-            trackCourse: matched?.trackCourse || metadata?.trackCourse || filenameTrack || undefined,
-            displayTrack, durationSec: metadata?.durationSec, eventTitle: metadata?.eventInfo?.eventTitle,
-            splitNo: metadata?.eventInfo?.splitNo, eventType: metadata?.eventInfo?.eventType, driversCount: metadata?.drivers?.length,
+            name: filename, path: filePath, sizeBytes, mtime, trackName: displayTrack,
+            trackVenue: matched?.trackVenue || metadata.trackVenue,
+            trackCourse: matched?.trackCourse || metadata.trackCourse || filenameTrack || undefined,
+            displayTrack, durationSec: metadata.durationSec, eventTitle: metadata.eventInfo?.eventTitle,
+            splitNo: metadata.eventInfo?.splitNo, eventType: metadata.eventInfo?.eventType, driversCount: metadata.drivers?.length,
             matchedSessionId: matched?.id, carClass: carClass || undefined, carModel: carModel || undefined,
             carClasses: carClasses.length > 0 ? carClasses : undefined, hasDuckDbTelemetry: Boolean(matchedDuckFilename), duckdbFilename: matchedDuckFilename,
           });
@@ -133,9 +160,15 @@ export function createReplayRouter(context: ServerContext): Router {
       }
 
       try {
-        const stat = fs.statSync(filePath);
+        let fileMtime: number | undefined;
+        if (fs.existsSync(filePath)) {
+          try { fileMtime = fs.statSync(filePath).mtime.getTime(); } catch { /* Ignore */ }
+        }
+        if (fileMtime === undefined) {
+          fileMtime = context.sessionDb.getStoredReplayFileInfo(replayName)?.file_mtime;
+        }
         const telemetryMeta = context.sessionDb.getTelemetryMetadata();
-        const matchedDuckFilename = matchDuckDbToReplay(context.telemetryCatalog.getFiles(), metadata, stat.mtime.getTime())?.filename ||
+        const matchedDuckFilename = matchDuckDbToReplay(context.telemetryCatalog.getFiles(), metadata, fileMtime)?.filename ||
           (matchedSession ? matchDuckDbToSession(context.telemetryCatalog.getFiles(), matchedSession)?.filename : undefined) ||
           telemetryMeta.find(item => item.matchedReplayFilename === replayName)?.filename ||
           (matchedSession ? telemetryMeta.find(item => item.matchedSessionId === matchedSession.id)?.filename : undefined);
@@ -175,7 +208,11 @@ export function createReplayRouter(context: ServerContext): Router {
       } catch (error: unknown) {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
       }
-      if (!fs.existsSync(filePath) && !context.sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey)) return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+      if (!fs.existsSync(filePath) &&
+          !context.sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey) &&
+          !context.sessionDb.getStoredReplayMetadata(replayName)) {
+        return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+      }
 
       let driverSlot = requestedDriverSlot >= 0 ? requestedDriverSlot : undefined;
       const driverName = (req.query.driverName as string | undefined) || (!req.query.driverSlot ? context.currentParser.configuredPlayerName : undefined);
@@ -210,8 +247,14 @@ export function createReplayRouter(context: ServerContext): Router {
           (driverName && driverName.toLowerCase().includes(context.currentParser.configuredPlayerName.toLowerCase())) ||
           (typeof driverSlot === 'number' && metadata.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer);
         if (isPlayer && allowDuckDb) {
-          const stat = fs.statSync(filePath);
-          const matchedDuck = matchDuckDbToReplay(context.telemetryCatalog.getFiles(), metadata, stat.mtime.getTime()) || (matchedSession ? matchDuckDbToSession(context.telemetryCatalog.getFiles(), matchedSession) : null);
+          let fileMtime: number | undefined;
+          if (fs.existsSync(filePath)) {
+            try { fileMtime = fs.statSync(filePath).mtime.getTime(); } catch { /* Ignore */ }
+          }
+          if (fileMtime === undefined) {
+            fileMtime = context.sessionDb.getStoredReplayFileInfo(replayName)?.file_mtime;
+          }
+          const matchedDuck = matchDuckDbToReplay(context.telemetryCatalog.getFiles(), metadata, fileMtime) || (matchedSession ? matchDuckDbToSession(context.telemetryCatalog.getFiles(), matchedSession) : null);
           if (matchedDuck) {
             context.sessionDb.upsertTelemetryMetadata(matchedDuck, matchedSession?.id, replayName);
             trajectory.duckdbFilename = matchedDuck.filename;
