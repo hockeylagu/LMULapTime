@@ -74,6 +74,9 @@ export function createAiRouter(sessionDb: SessionDatabase): Router {
       const mapped = toAiError(cause);
       const status = mapped.code === 'invalid_key' ? 401 : mapped.code === 'rate_limited' ? 429 : mapped.code === 'payload_too_large' ? 413 : mapped.code === 'invalid_request' || mapped.code === 'not_configured' || mapped.code === 'invalid_model' ? 400 : mapped.code === 'upstream_unavailable' ? 503 : 502;
       console.warn(`[AI ${requestId}] ${mapped.code}: ${mapped.message}`);
+      if (mapped.rawResponse) {
+        console.warn(`[AI ${requestId}] Raw invalid AI response (${mapped.rawResponse.length} chars):\n${mapped.rawResponse}`);
+      }
       return res.status(status).json({ error: mapped.message, errorCode: mapped.code, requestId });
     }
   });
