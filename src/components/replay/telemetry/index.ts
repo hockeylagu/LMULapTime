@@ -29,3 +29,7 @@ export * from './TelemetryWheelSpeedsChannel.js';
 export * from './TelemetryTirePressuresChannel.js';
 export * from './TelemetryTireWearChannel.js';
 export * from './TelemetryTireTempsChannel.js';
+export * from './TelemetryFuelChannel.js';
+export * from './TelemetryVirtualEnergyChannel.js';
+export * from './TelemetrySocChannel.js';
+export * from './TelemetryRegenRateChannel.js';

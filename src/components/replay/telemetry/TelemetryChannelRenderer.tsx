@@ -24,6 +24,10 @@ import {
   TelemetryTirePressuresChannel,
   TelemetryTireWearChannel,
   TelemetryTireTempsChannel,
+  TelemetryFuelChannel,
+  TelemetryVirtualEnergyChannel,
+  TelemetrySocChannel,
+  TelemetryRegenRateChannel,
 } from './index.js';
 
 export interface TelemetryChannelRendererProps {
@@ -100,6 +104,14 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
       return <TelemetryUndersteerChannel understeerPath={paths.understeerPath} baselineUndersteerPath={paths.baselineUndersteerPath} {...cursorProps} />;
     case 'yaw-rate':
       return <TelemetryYawRateChannel yawRatePath={paths.yawRatePath} baselineYawRatePath={paths.baselineYawRatePath} {...cursorProps} />;
+    case 'fuel':
+      return <TelemetryFuelChannel fuelPath={paths.fuelPath} fuelArea={paths.fuelArea} baselineFuelPath={paths.baselineFuelPath} maxFuel={paths.maxFuel} {...cursorProps} />;
+    case 'virtual-energy':
+      return <TelemetryVirtualEnergyChannel virtualEnergyPath={paths.virtualEnergyPath} virtualEnergyArea={paths.virtualEnergyArea} baselineVirtualEnergyPath={paths.baselineVirtualEnergyPath} {...cursorProps} />;
+    case 'soc':
+      return <TelemetrySocChannel socPath={paths.socPath} socArea={paths.socArea} baselineSocPath={paths.baselineSocPath} {...cursorProps} />;
+    case 'regen-rate':
+      return <TelemetryRegenRateChannel regenRatePath={paths.regenRatePath} regenRateArea={paths.regenRateArea} baselineRegenRatePath={paths.baselineRegenRatePath} maxRegen={paths.maxRegen} {...cursorProps} />;
     default:
       return null;
   }

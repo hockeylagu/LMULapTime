@@ -681,6 +681,10 @@ export interface ReplayTrajectoryPoint {
   understeerDeg?: number;
   tireSlipPct?: number;
   wheelLockActive?: boolean;
+  fuel?: number;
+  virtualEnergy?: number;
+  soc?: number;
+  regenRate?: number;
 }
 
 export interface ReplayPenaltyEvent {
@@ -788,6 +792,7 @@ export interface ReplayTrajectoryData {
   standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
+  energyTelemetryAvailable?: boolean;
   layoutKey?: string;
   trackLengthM?: number;
   lapDistMeters?: number;

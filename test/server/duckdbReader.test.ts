@@ -49,7 +49,11 @@ describe('DuckDbReader', () => {
           ('TyresWear', 100, '%'),
           ('TyresTemp', 100, 'C'),
           ('Brakes Temp', 100, 'C'),
-          ('Wheel Speed', 100, 'm/s');
+          ('Wheel Speed', 100, 'm/s'),
+          ('Fuel Level', 20, 'L'),
+          ('Virtual Energy', 20, '%'),
+          ('SoC', 20, '%'),
+          ('Regen Rate', 100, 'kW');
 
         CREATE TABLE eventsList (eventName VARCHAR NOT NULL, unit VARCHAR);
         INSERT INTO eventsList VALUES
@@ -73,6 +77,10 @@ describe('DuckDbReader', () => {
         CREATE TABLE "TyresTemp" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "Brakes Temp" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
         CREATE TABLE "Wheel Speed" (value1 FLOAT, value2 FLOAT, value3 FLOAT, value4 FLOAT);
+        CREATE TABLE "Fuel Level" (value FLOAT);
+        CREATE TABLE "Virtual Energy" (value FLOAT);
+        CREATE TABLE "SoC" (value FLOAT);
+        CREATE TABLE "Regen Rate" (value FLOAT);
 
         CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
         CREATE TABLE "Current Sector" (ts DOUBLE, value INTEGER);
@@ -101,6 +109,10 @@ describe('DuckDbReader', () => {
         INSERT INTO "TyresTemp" SELECT 85.0::FLOAT, 86.0::FLOAT, 92.0::FLOAT, 93.0::FLOAT FROM range(1200) t(i);
         INSERT INTO "Brakes Temp" SELECT 450.0::FLOAT, 440.0::FLOAT, 380.0::FLOAT, 370.0::FLOAT FROM range(1200) t(i);
         INSERT INTO "Wheel Speed" SELECT (50.0 + 20.0 * sin(i / 50.0))::FLOAT, (50.0 + 20.0 * sin(i / 50.0))::FLOAT, (51.0 + 20.4 * sin(i / 50.0))::FLOAT, (51.0 + 20.4 * sin(i / 50.0))::FLOAT FROM range(1200) t(i);
+        INSERT INTO "Fuel Level" SELECT (75.5 - (i * 0.01))::FLOAT FROM range(240) t(i);
+        INSERT INTO "Virtual Energy" SELECT (95.0 - (i * 0.02))::FLOAT FROM range(240) t(i);
+        INSERT INTO "SoC" SELECT (88.0)::FLOAT FROM range(240) t(i);
+        INSERT INTO "Regen Rate" SELECT (120.0)::FLOAT FROM range(1200) t(i);
       `, (err) => {
         if (err) reject(err);
         else resolve();
@@ -125,7 +137,7 @@ describe('DuckDbReader', () => {
     expect(metadata.car).toBe('Ferrari 499P');
 
     const channels = await reader.getChannelsList();
-    expect(channels.length).toBe(14);
+    expect(channels.length).toBe(18);
     expect(channels.find(c => c.channelName === 'Ground Speed')?.frequency).toBe(100);
     expect(channels.find(c => c.channelName === 'TyresWear')?.frequency).toBe(100);
 
@@ -166,6 +178,10 @@ describe('DuckDbReader', () => {
     expect(p0.tireTemps![0]).toBeCloseTo(85.0, 1);
     expect(p0.brakeTemps).toBeDefined();
     expect(p0.brakeTemps![0]).toBeCloseTo(450.0, 1);
+    expect(p0.fuel).toBeCloseTo(75.3, 1);
+    expect(p0.virtualEnergy).toBeCloseTo(94.6, 1);
+    expect(p0.soc).toBeCloseTo(88.0, 1);
+    expect(p0.regenRate).toBeCloseTo(120.0, 1);
 
     await reader.close();
   });

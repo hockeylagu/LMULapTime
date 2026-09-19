@@ -97,6 +97,10 @@ export function fuseDuckDbWithVcrTrajectory(
       ...dp,
       brakeTemps: dp.brakeTemps ?? p0.brakeTemps,
       rideHeight: dp.rideHeight,
+      fuel: dp.fuel ?? p0.fuel,
+      virtualEnergy: dp.virtualEnergy ?? p0.virtualEnergy,
+      soc: dp.soc ?? p0.soc,
+      regenRate: dp.regenRate ?? p0.regenRate,
       x: parseFloat(x.toFixed(3)),
       y: parseFloat(y.toFixed(3)),
       z: parseFloat(z.toFixed(3)),
@@ -116,6 +120,14 @@ export function fuseDuckDbWithVcrTrajectory(
       p.tireTemps !== undefined
   );
 
+  const hasEnergyData = fusedPoints.some(
+    (p) =>
+      p.fuel !== undefined ||
+      p.virtualEnergy !== undefined ||
+      p.soc !== undefined ||
+      p.regenRate !== undefined
+  );
+
   return {
     ...vcrTrajectory,
     source: 'duckdb',
@@ -126,6 +138,7 @@ export function fuseDuckDbWithVcrTrajectory(
     rawSampleRateHz: duckLap.sampleRateHz,
     isFullResolution: true,
     wheelTelemetryAvailable: Boolean(vcrTrajectory.wheelTelemetryAvailable || hasWheelData),
+    energyTelemetryAvailable: Boolean(vcrTrajectory.energyTelemetryAvailable || hasEnergyData),
     sectors: vcrTrajectory.sectors
       ? {
           s1Frame: mapVcrFrameToDuckIndex(vcrTrajectory.sectors.s1Frame),

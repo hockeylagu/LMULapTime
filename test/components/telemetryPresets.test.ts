@@ -68,8 +68,9 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(presetIds).toContain('g-forces');
     expect(presetIds).toContain('handling');
     expect(presetIds).toContain('wheels-suspension');
+    expect(presetIds).toContain('energy-fuel');
     expect(presetIds).toContain('all-channels');
-    expect(DEFAULT_TELEMETRY_PRESETS).toHaveLength(6);
+    expect(DEFAULT_TELEMETRY_PRESETS).toHaveLength(7);
   });
 
   it('loads default presets when localStorage is empty', () => {

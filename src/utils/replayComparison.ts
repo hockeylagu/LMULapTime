@@ -34,6 +34,10 @@ export interface InterpolatedPoint {
   understeerDeg?: number;
   tireSlipPct?: number;
   wheelLockActive?: boolean;
+  fuel?: number;
+  virtualEnergy?: number;
+  soc?: number;
+  regenRate?: number;
 }
 
 export interface PointComparison {
@@ -585,6 +589,22 @@ export function interpolatePointAtDistance(
 
   const wheelLockActive = Boolean(p0.wheelLockActive || p1.wheelLockActive);
 
+  const fuel = p0.fuel !== undefined && p1.fuel !== undefined
+    ? Number((p0.fuel + t * (p1.fuel - p0.fuel)).toFixed(2))
+    : (p0.fuel ?? p1.fuel);
+
+  const virtualEnergy = p0.virtualEnergy !== undefined && p1.virtualEnergy !== undefined
+    ? Number((p0.virtualEnergy + t * (p1.virtualEnergy - p0.virtualEnergy)).toFixed(1))
+    : (p0.virtualEnergy ?? p1.virtualEnergy);
+
+  const soc = p0.soc !== undefined && p1.soc !== undefined
+    ? Number((p0.soc + t * (p1.soc - p0.soc)).toFixed(1))
+    : (p0.soc ?? p1.soc);
+
+  const regenRate = p0.regenRate !== undefined && p1.regenRate !== undefined
+    ? Number((p0.regenRate + t * (p1.regenRate - p0.regenRate)).toFixed(1))
+    : (p0.regenRate ?? p1.regenRate);
+
   return {
     timeSec: relativeTime,
     speedKmh: Math.round(spd),
@@ -613,6 +633,10 @@ export function interpolatePointAtDistance(
     understeerDeg,
     tireSlipPct,
     wheelLockActive,
+    fuel,
+    virtualEnergy,
+    soc,
+    regenRate,
   };
 }
 

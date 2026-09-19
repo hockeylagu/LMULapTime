@@ -436,4 +436,98 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     expect(screen.getByText(/WHEEL \/ TIRE/i)).toBeInTheDocument();
     expect(screen.getByText(rideHeightChannel.name)).toBeInTheDocument();
   });
+
+  it('renders ENERGY / FUEL badge in TelemetryPresetChannelRow for energy category channels', async () => {
+    const { TelemetryPresetChannelRow } = await import('../../src/components/replay/telemetry/TelemetryPresetChannelRow.js');
+    const { AVAILABLE_TELEMETRY_CHANNELS, DEFAULT_TELEMETRY_PRESETS } = await import('../../src/components/replay/telemetry/telemetryPresets.js');
+
+    const fuelChannel = AVAILABLE_TELEMETRY_CHANNELS.find(c => c.id === 'fuel')!;
+    render(
+      <TelemetryPresetChannelRow
+        channel={fuelChannel}
+        isActive={true}
+        isFirst={false}
+        isLast={false}
+        onToggle={() => {}}
+        onMove={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/ENERGY \/ FUEL/i)).toBeInTheDocument();
+    expect(screen.getByText(fuelChannel.name)).toBeInTheDocument();
+
+    const energyPreset = DEFAULT_TELEMETRY_PRESETS.find(p => p.id === 'energy-fuel');
+    expect(energyPreset).toBeDefined();
+    expect(energyPreset?.channels).toContain('fuel');
+    expect(energyPreset?.channels).toContain('virtual-energy');
+    expect(energyPreset?.channels).toContain('soc');
+    expect(energyPreset?.channels).toContain('regen-rate');
+  });
+
+  it('renders TelemetryFuelChannel, TelemetryVirtualEnergyChannel, TelemetrySocChannel, TelemetryRegenRateChannel via TelemetryChannelRenderer', () => {
+    const energyPoint: ReplayTrajectoryPoint = {
+      ...mockPoint,
+      fuel: 62.4,
+      virtualEnergy: 78.5,
+      soc: 85.0,
+      regenRate: 180.5,
+    };
+    const energyPaths = computeTelemetryChartPaths([energyPoint], [], 0, 0);
+
+    const { rerender } = render(
+      <TelemetryChannelRenderer
+        channelId="fuel"
+        currentPoint={energyPoint}
+        currentComparison={null}
+        pointComparisons={[]}
+        paths={energyPaths}
+        isCursorInView={true}
+        cursorPct={50}
+      />
+    );
+    expect(screen.getByText(/FUEL LEVEL/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/62.4/i).length).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <TelemetryChannelRenderer
+        channelId="virtual-energy"
+        currentPoint={energyPoint}
+        currentComparison={null}
+        pointComparisons={[]}
+        paths={energyPaths}
+        isCursorInView={true}
+        cursorPct={50}
+      />
+    );
+    expect(screen.getByText(/VIRTUAL ENERGY/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/78.5/i).length).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <TelemetryChannelRenderer
+        channelId="soc"
+        currentPoint={energyPoint}
+        currentComparison={null}
+        pointComparisons={[]}
+        paths={energyPaths}
+        isCursorInView={true}
+        cursorPct={50}
+      />
+    );
+    expect(screen.getByText(/BATTERY SOC/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/85.0/i).length).toBeGreaterThanOrEqual(1);
+
+    rerender(
+      <TelemetryChannelRenderer
+        channelId="regen-rate"
+        currentPoint={energyPoint}
+        currentComparison={null}
+        pointComparisons={[]}
+        paths={energyPaths}
+        isCursorInView={true}
+        cursorPct={50}
+      />
+    );
+    expect(screen.getByText(/REGEN RATE/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/180.5/i).length).toBeGreaterThanOrEqual(1);
+  });
 });
