@@ -5,6 +5,7 @@ import { ComparableLap } from '../../../utils/lapComparison.js';
 import { mapVehicleIdToClass } from '../../../utils/replayComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
+import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ export function useReplayInspectorData({
   const [baselineMetadata, setBaselineMetadata] = useState<ReplayMetadata | null>(null);
   const [isBaselineLoading, setIsBaselineLoading] = useState<boolean>(false);
   const [availableCompareLaps, setAvailableCompareLaps] = useState<ComparableLap[]>([]);
-  const [compareLapFilter, setCompareLapFilter] = useState<'player' | 'all'>('player');
+  const [compareLapFilter, setCompareLapFilter] = useState<CompareLapFilter>('player');
   const [isCompareLapsLoading, setIsCompareLapsLoading] = useState(false);
   const [baselineDriverName, setBaselineDriverName] = useState<string | null>(null);
   const [pendingDriverName, setPendingDriverName] = useState<string | null>(null);
@@ -156,9 +157,10 @@ export function useReplayInspectorData({
     setIsCompareLapsLoading(true);
     const activeDriver = metadata?.drivers?.find(d => d.slot === selectedDriverSlot) || metadata?.drivers?.find(d => d.isPlayer) || metadata?.drivers?.[0];
     const carClass = metadata?.carClass || activeDriver?.carClass || (activeDriver ? mapVehicleIdToClass(activeDriver.vehicleId, activeDriver.carModel) : undefined);
+    const needsAllDrivers = compareLapFilter === 'all' || compareLapFilter === 'same-sessions';
     const query = new URLSearchParams({
       track: trackToQuery,
-      playerOnly: String(compareLapFilter === 'player'),
+      playerOnly: String(!needsAllDrivers),
     });
     if (carClass) query.set('carClass', carClass);
 
