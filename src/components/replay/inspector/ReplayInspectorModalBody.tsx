@@ -3,6 +3,7 @@ import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryDa
 import { ComparableLap } from '../../../utils/lapComparison.js';
 import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
+import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { TelemetryStripCharts } from '../telemetry/TelemetryStripCharts.js';
@@ -29,9 +30,9 @@ export interface ReplayInspectorModalBodyProps {
   isComparePickerOpen: boolean;
   handleCloseComparePicker: () => void;
   availableCompareLaps: ComparableLap[];
-  compareLapFilter: 'player' | 'all';
+  compareLapFilter: CompareLapFilter;
   isCompareLapsLoading: boolean;
-  setCompareLapFilter: (filter: 'player' | 'all') => void;
+  setCompareLapFilter: (filter: CompareLapFilter) => void;
   handleSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
   setCurrentIndex: (index: number) => void;

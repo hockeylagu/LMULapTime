@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/core/types';
 import { ComparableLap } from '../../../utils/lapComparison.js';
-import { ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
+import { CompareLapFilter, ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -26,9 +26,9 @@ export interface ReplayInspectorHeaderProps {
   isComparePickerOpen: boolean;
   onCloseComparePicker: () => void;
   availableCompareLaps: ComparableLap[];
-  compareLapFilter: 'player' | 'all';
+  compareLapFilter: CompareLapFilter;
   isCompareLapsLoading: boolean;
-  onChangeCompareLapFilter: (filter: 'player' | 'all') => void;
+  onChangeCompareLapFilter: (filter: CompareLapFilter) => void;
   onSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
   isStationary: boolean;
@@ -215,6 +215,9 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             selectedReplayName={baselineReplayName}
             selectedLapNumber={baselineLapNumber}
             selectedDriverName={baselineDriverName}
+            currentReplayName={replayName || metadata?.filename || null}
+            currentLapNumber={trajectory?.currentLap ?? null}
+            currentDriverName={drivers.find(d => d.slot === selectedDriverSlot)?.name || trajectory?.driverName || null}
             filter={compareLapFilter}
             isLoading={isCompareLapsLoading || isBaselineLoading}
             onChangeFilter={onChangeCompareLapFilter}
