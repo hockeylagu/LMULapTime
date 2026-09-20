@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsSceneMarkers } from '../../src/components/replay/map/GpsSceneMarkers.js';
 import type { CornerMarkerPoint, PedalMarkerPoint } from '../../src/components/replay/map/GpsSceneMarkers.js';
 
@@ -177,5 +177,97 @@ describe('GpsSceneMarkers', () => {
     expect(x1).toBeLessThan(130);
     expect(x1).toBeGreaterThan(105);
   });
+
+  it('filters out non-selected corner and pedal markers when dimNonSelectedTrack is true', () => {
+    const corners: CornerMarkerPoint[] = [
+      { cornerNumber: 1, sx: 50, sy: 50, idx: 5, actualSx: 50, actualSy: 50 },
+      { cornerNumber: 2, sx: 100, sy: 100, idx: 10, actualSx: 100, actualSy: 100 },
+    ];
+    const pedals: PedalMarkerPoint[] = [
+      { cornerNumber: 1, kind: 'brake', sx: 45, sy: 45 },
+      { cornerNumber: 2, kind: 'brake', sx: 95, sy: 95 },
+    ];
+
+    const { container } = render(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={corners}
+          pedalMarkers={pedals}
+          selectedCornerNumber={2}
+          dimNonSelectedTrack={true}
+        />
+      </svg>
+    );
+
+    // Only Corner 2 should be rendered
+    expect(container.querySelector('[data-testid="pedal-marker-brake-2"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="pedal-marker-brake-1"]')).not.toBeInTheDocument();
+    expect(screen.getByText('T2')).toBeInTheDocument();
+    expect(screen.queryByText('T1')).not.toBeInTheDocument();
+  });
+
+  it('renders dedicated APEX identification badge and guide line when showCornerFlags is false', () => {
+    const corner: CornerMarkerPoint = {
+      cornerNumber: 4,
+      sx: 120,
+      sy: 80,
+      idx: 12,
+      actualSx: 100,
+      actualSy: 100,
+    };
+
+    const { container } = render(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={[corner]}
+          pedalMarkers={[]}
+          showCornerFlags={false}
+        />
+      </svg>
+    );
+
+    // Should NOT render balloon flag with T4
+    expect(container.querySelector('[data-testid="corner-flag-4"]')).not.toBeInTheDocument();
+    expect(screen.queryByText('T4')).not.toBeInTheDocument();
+
+    // Should render APEX identification marker
+    const apexGroup = container.querySelector('[data-testid="apex-marker-4"]');
+    expect(apexGroup).toBeInTheDocument();
+    expect(screen.getByText('APEX')).toBeInTheDocument();
+
+    // Should have apex circle on track scaled to constant screen size (zoom agnostic)
+    const apexCircle = apexGroup?.querySelector('circle[fill="#f43f5e"]');
+    expect(apexCircle).toBeInTheDocument();
+    expect(apexCircle?.parentElement).toHaveAttribute('transform', expect.stringContaining('scale(1)'));
+    const tether = apexGroup?.querySelector('line[stroke-dasharray="2.5 2"]');
+    expect(tether).toBeInTheDocument();
+  });
+
+  it('renders zoom-agnostic apex red dot scaled by markerScale', () => {
+    const corner: CornerMarkerPoint = {
+      cornerNumber: 3,
+      sx: 100,
+      sy: 100,
+      idx: 5,
+      actualSx: 100,
+      actualSy: 100,
+    };
+
+    const { container } = render(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={[corner]}
+          pedalMarkers={[]}
+          showCornerFlags={false}
+          markerScale={0.25}
+        />
+      </svg>
+    );
+
+    const apexGroup = container.querySelector('[data-testid="apex-marker-3"]');
+    const apexCircle = apexGroup?.querySelector('circle[fill="#f43f5e"]');
+    expect(apexCircle?.parentElement).toHaveAttribute('transform', 'translate(100, 100) scale(0.25)');
+  });
 });
+
 

@@ -15,7 +15,8 @@ export const ReplayInspectorPage: React.FC = () => {
   if (!replayName) return null;
 
   const lap = searchParams.get('lap');
-  const baselineLap = searchParams.get('compareLapNum');
+  const baselineLap = searchParams.get('compareLapNum') || searchParams.get('baselineLap');
+  const baselineReplay = searchParams.get('baselineReplay');
 
   return (
     <ReplayInspectorContent
@@ -25,8 +26,8 @@ export const ReplayInspectorPage: React.FC = () => {
       initialLapNumber={lap ? parseInt(lap, 10) : undefined}
       initialDriverName={searchParams.get('driverName')}
       onLapChange={(lapNumber) => updateSearchParams(searchParams, setSearchParams, { lap: String(lapNumber) })}
-      initialCompareMode={Boolean(searchParams.get('baselineReplay'))}
-      initialBaselineReplayName={searchParams.get('baselineReplay')}
+      initialCompareMode={Boolean(baselineReplay)}
+      initialBaselineReplayName={baselineReplay}
       initialBaselineLapNumber={baselineLap ? parseInt(baselineLap, 10) : undefined}
       initialBaselineDriverName={searchParams.get('compareDriver')}
     />

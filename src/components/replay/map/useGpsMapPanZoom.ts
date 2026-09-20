@@ -46,6 +46,29 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   const currentPosRef = useRef<{ sx: number; sy: number } | undefined>(currentPos);
   currentPosRef.current = currentPos;
 
+  const [renderedSize, setRenderedSize] = useState<number>(800);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const s = Math.min(rect.width || 800, rect.height || 800);
+      if (s > 0) setRenderedSize(s);
+    };
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, []);
+
+  const markerScale = useMemo(() => {
+    const effectiveZoom = zoomLevel * BASE_ZOOM;
+    const visibleSize = viewBoxSize / effectiveZoom;
+    const scale = visibleSize / Math.max(80, renderedSize);
+    return Number(scale.toFixed(4));
+  }, [zoomLevel, viewBoxSize, renderedSize]);
+
   const handleSetFollowCar: React.Dispatch<React.SetStateAction<boolean>> = valueOrUpdater => {
     setFollowCar(prev => {
       const next = typeof valueOrUpdater === 'function' ? valueOrUpdater(prev) : valueOrUpdater;
@@ -258,5 +281,6 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     focusOnPoint,
     zoomIn,
     zoomOut,
+    markerScale,
   };
 }

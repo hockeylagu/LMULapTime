@@ -8,6 +8,7 @@ export interface MapControlsOverlayProps {
   zoomDisplay?: string;
   followCar?: boolean;
   onToggleFollowCar?: () => void;
+  orientation?: 'vertical' | 'horizontal';
   className?: string;
 }
 
@@ -18,12 +19,17 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
   zoomDisplay,
   followCar,
   onToggleFollowCar,
+  orientation = 'horizontal',
   className = '',
 }) => {
+  const isVert = orientation === 'vertical';
+
   return (
     <div
       data-testid="map-controls-overlay"
-      className={`absolute bottom-3 right-3 z-30 flex items-center gap-1.5 bg-[#0a0e17]/90 backdrop-blur-md p-1.5 rounded-xl border border-white/10 shadow-xl ${className}`}
+      className={`absolute bottom-3 right-3 z-30 flex ${
+        isVert ? 'flex-col items-center gap-1 p-1' : 'items-center gap-1.5 p-1.5'
+      } bg-[#0a0e17]/90 backdrop-blur-md rounded-xl border border-white/10 shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >
@@ -73,10 +79,15 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       </button>
 
       {zoomDisplay && (
-        <span className="w-11 h-7 flex items-center justify-center text-[10px] font-mono text-lmu-muted font-bold select-none tabular-nums shrink-0">
+        <span
+          className={`${
+            isVert ? 'w-7 h-4.5 text-[9px]' : 'w-11 h-7 text-[10px]'
+          } flex items-center justify-center font-mono text-slate-400 font-bold select-none tabular-nums shrink-0`}
+        >
           {zoomDisplay}
         </span>
       )}
     </div>
   );
 };
+

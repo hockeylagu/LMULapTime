@@ -118,4 +118,29 @@ describe('useReplayInspectorData', () => {
     expect(result.current.isCompareMode).toBe(false);
     expect(result.current.baselineReplayName).toBeNull();
   });
+
+  it('initializes baseline replay, lap, and driver directly from comparison props', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('&lap=5')) return response({ ...trajectory, currentLap: 5 });
+      return response(trajectory);
+    });
+
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true,
+      replayName: metadata.filename,
+      initialCompareMode: true,
+      initialBaselineReplayName: 'Daytona_Q1.Vcr',
+      initialBaselineLapNumber: 5,
+      initialBaselineDriverName: 'Samuel Lague',
+    }), { wrapper });
+
+    expect(result.current.isCompareMode).toBe(true);
+    expect(result.current.baselineReplayName).toBe('Daytona_Q1.Vcr');
+    expect(result.current.baselineLapNumber).toBe(5);
+    expect(result.current.baselineDriverName).toBe('Samuel Lague');
+    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
+  });
 });

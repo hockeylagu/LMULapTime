@@ -3,9 +3,7 @@ import { CircleDot, Eye, EyeOff, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../server/core/types';
 import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
-import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { MapColorMode } from './replayMapUtils.js';
-import { getTrajectoryDistances } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
@@ -26,6 +24,7 @@ export interface ReplayMapContainerProps {
   trackCourse?: string;
   layoutKey?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
+  onOpenCornersTab?: () => void;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -80,23 +79,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
   );
-  const primaryDists = useMemo(() => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []), [trajectory]);
-  const baselineDists = useMemo(() => (baselinePoints ? getTrajectoryDistances(baselinePoints, baselineTrajectory?.trackLengthM) : []), [baselinePoints, baselineTrajectory]);
 
   if (!trajectory) return null;
-
-  const apexChart = selectedCorner ? (
-    <CornerApexChart
-      corner={selectedCorner}
-      primaryPoints={trajectory.points}
-      primaryDists={primaryDists}
-      baselinePoints={baselinePoints}
-      baselineDists={baselineDists}
-      isCompareMode={Boolean(isCompareMode && baselinePoints && baselinePoints.length > 0)}
-      onClose={() => onSelectCornerNumber?.(null)}
-      className="shrink-0"
-    />
-  ) : null;
 
   return (
     <>
@@ -201,6 +185,12 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             baselineOpacity={baselineOpacity}
             pedalMarkers={pedalMarkers}
             showPedalMarkers={showPedalMarkers}
+            dimNonSelectedTrack={Boolean(selectedCorner)}
+            highlightDistRange={
+              selectedCorner
+                ? { startDistM: selectedCorner.entryDistM, endDistM: selectedCorner.exitDistM }
+                : null
+            }
             trackVenue={trackVenue}
             trackCourse={trackCourse}
             layoutKey={layoutKey}
@@ -208,7 +198,6 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             trackGeometry={trackGeometry}
           />
         </div>
-        {apexChart}
       </div>
 
       {showFrictionCircle && <ReplayFrictionCircle points={trajectory.points} currentIndex={currentIndex} />}

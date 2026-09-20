@@ -194,7 +194,12 @@ export function useReplayInspectorData({
     setPendingLapNumber(null);
     setBaselineTrajectory(null);
     setBaselineMetadata(null);
-    updateSearchParams(searchParams, setSearchParams, { compareSessionId: null, compareDriver: null, compareLapNum: null });
+    updateSearchParams(searchParams, setSearchParams, {
+      baselineReplay: null,
+      compareSessionId: null,
+      compareDriver: null,
+      compareLapNum: null,
+    });
   };
 
   // Swap primary lap and baseline lap
@@ -231,6 +236,14 @@ export function useReplayInspectorData({
       setCurrentIndex(0);
       setChartZoomRange(null);
     }
+    updateSearchParams(searchParams, setSearchParams, {
+      replayName: curBaseReplay,
+      lap: String(curBaseLap),
+      driverName: curBaseDriver,
+      baselineReplay: curPrimaryReplay,
+      compareDriver: curPrimaryDriver,
+      compareLapNum: String(curPrimaryLap),
+    });
   };
 
   // Load baseline trajectory
@@ -336,6 +349,7 @@ export function useReplayInspectorData({
     setBaselineDriverName(lap.driverName || null);
     setIsComparePickerOpen(false);
     updateSearchParams(searchParams, setSearchParams, {
+      baselineReplay: lap.matchingReplayFile,
       compareSessionId: lap.sessionId ? String(lap.sessionId) : null,
       compareDriver: lap.driverName || null,
       compareLapNum: lap.lapNum === undefined ? null : String(lap.lapNum),
@@ -352,6 +366,7 @@ export function useReplayInspectorData({
     setBaselineLapNumber(lapNumber);
     setBaselineDriverName(driverName);
     updateSearchParams(searchParams, setSearchParams, {
+      baselineReplay: activeReplayName,
       compareSessionId: null,
       compareDriver: driverName,
       compareLapNum: String(lapNumber),

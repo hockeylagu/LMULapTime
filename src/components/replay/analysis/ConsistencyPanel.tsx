@@ -180,6 +180,16 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
+                    {c.turnInDistM && (
+                      <MetricRow
+                        label="Turn-In Pt" stat={c.turnInDistM} unit="m" decimals={0}
+                        isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'turnIn'}
+                        onToggle={() => toggleMetric(c.cornerNumber, 'turnIn')}
+                        currentLapNumber={currentLapNumber}
+                        bestLapNumber={bestLapNumber}
+                        onSelectBaselineLap={onSelectBaselineLap}
+                      />
+                    )}
                     <MetricRow
                       label="Throttle Pt" stat={c.throttleOnDistM} unit="m" decimals={0}
                       isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'throttle'}
@@ -188,6 +198,16 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
+                    {c.rotationAtThrottlePct && (
+                      <MetricRow
+                        label="Rot% @ Gas" stat={c.rotationAtThrottlePct} unit="%" decimals={0}
+                        isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'rotation'}
+                        onToggle={() => toggleMetric(c.cornerNumber, 'rotation')}
+                        currentLapNumber={currentLapNumber}
+                        bestLapNumber={bestLapNumber}
+                        onSelectBaselineLap={onSelectBaselineLap}
+                      />
+                    )}
                     <MetricRow
                       label="Entry" stat={c.entrySpeedKmh} unit=" km/h" decimals={0}
                       isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'entry'}

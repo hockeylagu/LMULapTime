@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
-import { X, Flag } from 'lucide-react';
+import React from 'react';
+import { X } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types';
-import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerTechniqueDeck } from './CornerTechniqueDeck.js';
+import { CornerSpeedGraph } from './CornerSpeedGraph.js';
+import { TrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
 
 export interface CornerApexChartProps {
   corner: CornerSegmentComparison;
@@ -11,46 +13,21 @@ export interface CornerApexChartProps {
   baselinePoints?: ReplayTrajectoryPoint[] | null;
   baselineDists?: number[];
   isCompareMode?: boolean;
+  compact?: boolean;
+  currentIndex?: number;
+  onSelectIndex?: (index: number) => void;
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey?: string;
+  replayName?: string;
+  trackGeometry?: TrackBoundaryGeometry | null;
+  onOpenCornersTab?: () => void;
   onClose?: () => void;
   className?: string;
 }
 
-const SAMPLES = 48;
-
-function speedDeltaClass(delta: number): string {
-  if (Math.abs(delta) < 1) return 'text-slate-400';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
-}
-
-function timeDeltaClass(delta: number): string {
-  if (Math.abs(delta) < 0.02) return 'text-slate-400';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
-}
-
-function formatSpeedDelta(delta: number): string {
-  if (Math.abs(delta) < 1) return '±0';
-  return delta > 0 ? `+${delta}` : `${delta}`;
-}
-
-function formatTimeDelta(delta: number): string {
-  if (Math.abs(delta) < 0.02) return '±0.000s';
-  return delta < 0 ? `${delta.toFixed(3)}s` : `+${delta.toFixed(3)}s`;
-}
-
-function formatBrakingDelta(delta: number | null): string {
-  if (delta === null) return '--';
-  if (Math.abs(delta) < 1) return '±0m';
-  return delta > 0 ? `+${delta}m` : `${delta}m`;
-}
-
-function brakingDeltaClass(delta: number | null): string {
-  if (delta === null || Math.abs(delta) < 1) return 'text-slate-400';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
-}
-
-function throttleDeltaClass(delta: number | null): string {
-  if (delta === null || Math.abs(delta) < 1) return 'text-slate-400';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
+function formatCornerType(type: string): string {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export const CornerApexChart: React.FC<CornerApexChartProps> = ({
@@ -60,158 +37,125 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
   baselinePoints,
   baselineDists,
   isCompareMode = false,
+  compact = false,
+  currentIndex,
+  onSelectIndex,
+  onOpenCornersTab,
   onClose,
   className = '',
 }) => {
-  const { primaryPath, baselinePath, minPct } = useMemo(() => {
-    const span = Math.max(1, corner.exitDistM - corner.entryDistM);
-    const primarySpeeds: number[] = [];
-    const baselineSpeeds: number[] = [];
-    for (let i = 0; i <= SAMPLES; i++) {
-      const d = corner.entryDistM + (i / SAMPLES) * span;
-      primarySpeeds.push(interpolatePointAtDistance(primaryPoints, primaryDists, d).speedKmh);
-      if (baselinePoints && baselinePoints.length > 0 && baselineDists && baselineDists.length > 0) {
-        baselineSpeeds.push(interpolatePointAtDistance(baselinePoints, baselineDists, d).speedKmh);
-      }
-    }
-    const maxSpd = Math.max(50, ...primarySpeeds, ...baselineSpeeds);
-    const toPath = (speeds: number[]) => speeds
-      .map((s, i) => {
-        const x = (i / SAMPLES) * 1000;
-        const y = 95 - Math.min(1, Math.max(0, s / maxSpd)) * 85;
-        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(' ');
-    return {
-      primaryPath: toPath(primarySpeeds),
-      baselinePath: baselineSpeeds.length > 0 ? toPath(baselineSpeeds) : '',
-      minPct: Math.min(97, Math.max(3, ((corner.minDistM - corner.entryDistM) / span) * 100)),
-    };
-  }, [corner, primaryPoints, primaryDists, baselinePoints, baselineDists]);
+  const currentDistM = currentIndex !== undefined && currentIndex >= 0 && currentIndex < primaryDists.length
+    ? primaryDists[currentIndex]
+    : undefined;
+
+  if (compact) {
+    return (
+      <div className={`flex flex-col bg-[#060910] rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg p-2 gap-1.5 shrink-0 ${className}`}>
+        <div className="flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="inline-flex items-center h-5 px-1.5 rounded bg-sky-500/20 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap">
+              Turn {corner.cornerNumber}
+            </span>
+            {corner.cornerType && <span className="inline-flex items-center h-5 text-xs font-medium text-slate-300 shrink-0 whitespace-nowrap">{formatCornerType(corner.cornerType)}</span>}
+            {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
+              <span className="inline-flex items-center h-5 text-xs text-lmu-muted font-mono shrink-0 whitespace-nowrap">{corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? '↰' : '↱'}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {onOpenCornersTab && (
+              <button
+                type="button"
+                onClick={onOpenCornersTab}
+                className="inline-flex items-center h-5 px-2 rounded bg-sky-600/35 hover:bg-sky-600/50 border border-sky-500/40 text-sky-300 text-[10px] font-medium transition-colors"
+                title="View in Corners Tab"
+                aria-label="View corner technique in Corners tab"
+              >
+                Full Analysis →
+              </button>
+            )}
+            {onClose && (
+              <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-5 h-5 text-slate-400 hover:text-white rounded hover:bg-slate-800">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Speed Trend Micro-Line with scrub */}
+        <CornerSpeedGraph
+          corner={corner}
+          primaryPoints={primaryPoints}
+          primaryDists={primaryDists}
+          baselinePoints={baselinePoints ?? undefined}
+          baselineDists={baselineDists}
+          currentIndex={currentIndex}
+          currentDistM={currentDistM}
+          onSelectIndex={onSelectIndex}
+          compact={true}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex flex-col bg-[#060910] rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg ${className}`}>
-      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-lmu-border/50 shrink-0 bg-[#080c14]">
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-[11px] font-bold text-white">
-            <Flag className="w-3 h-3 text-lmu-accent" />
-            Turn {corner.cornerNumber} Apex Chart
+    <div className={`flex flex-col bg-[#060910] overflow-hidden ${className}`}>
+      {/* Master Unified Header */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[#0a0f1d] border-b border-lmu-border/60 gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
+          <span className="inline-flex items-center h-6 px-2 rounded bg-sky-500/20 border border-sky-500/40 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
+            Turn {corner.cornerNumber}
           </span>
-          <span className="text-[10px] font-mono text-slate-400">
-            {corner.lengthM}m
+          {corner.cornerType && (
+            <span className="inline-flex items-center h-6 text-xs font-semibold text-white shrink-0 whitespace-nowrap">{formatCornerType(corner.cornerType)}</span>
+          )}
+          {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
+            <span
+              className="inline-flex items-center h-6 text-xs text-slate-300 font-mono capitalize shrink-0 whitespace-nowrap"
+              title={`Angle: ${corner.cornerAngleDeg}°, Direction: ${corner.turnDirection}${corner.effectiveRadiusM ? `, Radius: ~${corner.effectiveRadiusM}m` : ''}`}
+            >
+              {corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? 'left ↰' : 'right ↱'}
+              {corner.effectiveRadiusM ? ` (R≈${corner.effectiveRadiusM}m)` : ''}
+            </span>
+          )}
+          <span className="inline-flex items-center h-6 px-2 rounded bg-slate-800 border border-slate-700/60 text-xs font-mono text-slate-300 shrink-0 whitespace-nowrap" title={`Corner length: ${corner.exitDistM - corner.entryDistM}m`}>
+            {corner.exitDistM - corner.entryDistM}m
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {isCompareMode && (
-            <span className={`text-[10px] font-mono font-bold ${timeDeltaClass(corner.timeDeltaSec)}`}>
-              Δ {formatTimeDelta(corner.timeDeltaSec)}
+
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {corner.cornerQualityScore !== undefined && (
+            <span className={`inline-flex items-center h-6 px-2.5 rounded text-xs font-mono font-bold border whitespace-nowrap ${
+              corner.cornerQualityScore >= 80 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+              corner.cornerQualityScore >= 60 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+              'bg-rose-500/10 border-rose-500/30 text-rose-400'
+            }`}>
+              Score {corner.cornerQualityScore}/100
             </span>
           )}
           {onClose && (
-            <button
-              onClick={onClose}
-              aria-label="Close corner detail"
-              className="p-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
+            <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-6 h-6 text-slate-400 hover:text-white rounded hover:bg-slate-800/60 transition-colors shrink-0">
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
 
-      <div className="relative h-[68px] shrink-0 bg-[#060910]">
-        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
-          {baselinePath && (
-            <path d={baselinePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
-          )}
-          <path d={primaryPath} fill="none" stroke="#38bdf8" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-
-        <div className="absolute top-0.5 left-1.5 px-1 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">
-          ENTRY {corner.primaryEntrySpeedKmh}
-        </div>
-        <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-rose-400/70 pointer-events-none -translate-x-1/2">
-          <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-rose-500/20 text-rose-300 text-[9px] font-mono font-bold whitespace-nowrap">
-            MIN {corner.primaryMinSpeedKmh}
-          </span>
-        </div>
-        <div className="absolute top-0.5 right-1.5 px-1 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">
-          EXIT {corner.primaryExitSpeedKmh}
-        </div>
+      {/* Speed & Handling Profile Chart with Understeer / Scrub / Oversteer overlay */}
+      <div className="p-2 bg-[#060910]">
+        <CornerSpeedGraph
+          corner={corner}
+          primaryPoints={primaryPoints}
+          primaryDists={primaryDists}
+          baselinePoints={baselinePoints ?? undefined}
+          baselineDists={baselineDists}
+          currentIndex={currentIndex}
+          currentDistM={currentDistM}
+          onSelectIndex={onSelectIndex}
+        />
       </div>
 
-      <div className="grid grid-cols-6 gap-1 px-2.5 py-1.5 bg-[#04070e] border-t border-lmu-border/50 text-[10px] font-mono shrink-0">
-        <div className="flex flex-col">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">Entry</span>
-          <span className="text-white font-bold">
-            {corner.primaryEntrySpeedKmh}
-            {isCompareMode && (
-              <span className={`ml-1 ${speedDeltaClass(corner.entrySpeedDeltaKmh)}`}>
-                {formatSpeedDelta(corner.entrySpeedDeltaKmh)}
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">Min</span>
-          <span className="text-white font-bold">
-            {corner.primaryMinSpeedKmh}
-            {isCompareMode && (
-              <span className={`ml-1 ${speedDeltaClass(corner.minSpeedDeltaKmh)}`}>
-                {formatSpeedDelta(corner.minSpeedDeltaKmh)}
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">Exit</span>
-          <span className="text-white font-bold">
-            {corner.primaryExitSpeedKmh}
-            {isCompareMode && (
-              <span className={`ml-1 ${speedDeltaClass(corner.exitSpeedDeltaKmh)}`}>
-                {formatSpeedDelta(corner.exitSpeedDeltaKmh)}
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">
-            {isCompareMode ? 'Brake Δ' : 'Brake'}
-          </span>
-          <span className={isCompareMode ? brakingDeltaClass(corner.brakingPointDeltaM) : 'text-white font-bold'}>
-            {isCompareMode
-              ? formatBrakingDelta(corner.brakingPointDeltaM)
-              : corner.primaryBrakingDistM !== null
-              ? `${corner.minDistM - corner.primaryBrakingDistM}m`
-              : '--'}
-          </span>
-        </div>
-
-        <div className="flex flex-col">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">
-            {isCompareMode ? 'Thr Δ' : 'Throttle'}
-          </span>
-          <span className={isCompareMode ? throttleDeltaClass(corner.throttleOnDeltaM) : 'text-white font-bold'}>
-            {isCompareMode
-              ? formatBrakingDelta(corner.throttleOnDeltaM)
-              : corner.primaryThrottleOnDistM !== null
-              ? `${corner.primaryThrottleOnDistM - corner.minDistM}m`
-              : '--'}
-          </span>
-        </div>
-
-        <div className="flex flex-col text-right">
-          <span className="text-lmu-muted uppercase tracking-wider text-[9px]">
-            {isCompareMode ? 'Δ Time' : 'Length'}
-          </span>
-          <span className={isCompareMode ? timeDeltaClass(corner.timeDeltaSec) : 'text-white font-bold'}>
-            {isCompareMode ? formatTimeDelta(corner.timeDeltaSec) : `${corner.primaryTimeSec.toFixed(3)}s`}
-          </span>
-        </div>
-      </div>
+      {/* Comprehensive Phase-Based Telemetry & Technique Deck */}
+      <CornerTechniqueDeck corner={corner} isCompareMode={isCompareMode} />
     </div>
   );
 };

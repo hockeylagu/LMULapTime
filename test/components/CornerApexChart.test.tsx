@@ -57,10 +57,13 @@ describe('CornerApexChart', () => {
       />
     );
 
-    expect(screen.getByText(/Turn 3 Apex Chart/i)).toBeInTheDocument();
-    expect(screen.getByText(/ENTRY 180/i)).toBeInTheDocument();
-    expect(screen.getByText(/MIN 85/i)).toBeInTheDocument();
-    expect(screen.getByText(/EXIT 150/i)).toBeInTheDocument();
+    expect(screen.getByText(/Turn 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/Entry Phase/i)).toBeInTheDocument();
+    expect(screen.getByText('180')).toBeInTheDocument();
+    expect(screen.getByText(/Apex Phase/i)).toBeInTheDocument();
+    expect(screen.getByText('85')).toBeInTheDocument();
+    expect(screen.getByText(/Exit Phase/i)).toBeInTheDocument();
+    expect(screen.getByText('150')).toBeInTheDocument();
   });
 
   it('does not render a close button when onClose is omitted', () => {
@@ -104,7 +107,7 @@ describe('CornerApexChart', () => {
       />
     );
 
-    const chartSvg = Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
+    const chartSvg = container.querySelector('[data-chart="speed-profile"] svg') ?? Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
     const paths = chartSvg?.querySelectorAll('path') ?? [];
     expect(paths.length).toBe(2);
     expect(paths[0].getAttribute('stroke')).toBe('#f59e0b');
@@ -119,7 +122,7 @@ describe('CornerApexChart', () => {
       />
     );
 
-    const chartSvg = Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
+    const chartSvg = container.querySelector('[data-chart="speed-profile"] svg') ?? Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
     const paths = chartSvg?.querySelectorAll('path') ?? [];
     expect(paths.length).toBe(1);
     expect(paths[0].getAttribute('stroke')).toBe('#38bdf8');
@@ -156,4 +159,197 @@ describe('CornerApexChart', () => {
     expect(screen.getByText('Δ Time')).toBeInTheDocument();
     expect(screen.getByText('-0.100s')).toBeInTheDocument();
   });
+
+  it('renders technique deck with rotation complete, turn-in point, and chicane complex details', () => {
+    const chicaneCorner: CornerSegmentComparison = {
+      ...corner,
+      cornerType: 'chicane',
+      cornerAngleDeg: 92,
+      turnDirection: 'right',
+      primaryTurnInDistM: 10,
+      primaryRotationAtThrottlePct: 82,
+      cornerQualityScore: 88,
+      chicaneDetails: {
+        isChicane: true,
+        role: 'entry',
+        linkedCornerNumber: 4,
+        apexSpeedRatio: 1.05,
+        transitionDistM: 25,
+      },
+      primaryTrackUsage: {
+        entryOffsetM: 3.2,
+        apexMarginM: 0.3,
+        exitWidthM: 4.1,
+        totalSweepM: 6.7,
+      },
+    };
+
+    render(
+      <CornerApexChart
+        corner={chicaneCorner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        isCompareMode={true}
+      />
+    );
+
+    expect(screen.getByText('Chicane')).toBeInTheDocument();
+    expect(screen.getByText(/92° right/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rotation @ Throttle/i)).toBeInTheDocument();
+    expect(screen.getByText('82%')).toBeInTheDocument();
+    expect(screen.getByText(/Optimal \(Rotated\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chicane Complex \[T3 ⇄ T4\]/i)).toBeInTheDocument();
+    expect(screen.getByText(/1.05x/i)).toBeInTheDocument();
+    expect(screen.getByText(/88\/100/i)).toBeInTheDocument();
+    expect(screen.getByText(/6.7m sweep/i)).toBeInTheDocument();
+  });
+
+  it('renders hairpin V-line profile and exit slip diagnostic highlights', () => {
+    const hairpinCorner: CornerSegmentComparison = {
+      ...corner,
+      cornerType: 'hairpin',
+      cornerAngleDeg: 145,
+      turnDirection: 'left',
+      typeSpecificDetails: {
+        vShapeIndex: 85,
+        exitWheelSlipActive: true,
+      },
+    };
+
+    render(
+      <CornerApexChart
+        corner={hairpinCorner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+      />
+    );
+
+    expect(screen.getByText(/Hairpin V-Line Profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/85\/100/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sharp V/i)).toBeInTheDocument();
+    expect(screen.getByText(/TC\/Slip Active/i)).toBeInTheDocument();
+  });
+
+  it('renders high-speed sweeper throttle commitment and lateral load highlights', () => {
+    const sweeperCorner: CornerSegmentComparison = {
+      ...corner,
+      cornerType: 'high_speed',
+      cornerAngleDeg: 42,
+      turnDirection: 'right',
+      typeSpecificDetails: {
+        throttleLiftPct: 0,
+        sustainedLatG: 2.85,
+        steeringScrubDeg: 1.2,
+      },
+    };
+
+    render(
+      <CornerApexChart
+        corner={sweeperCorner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+      />
+    );
+
+    expect(screen.getByText(/High-Speed Aero Dynamics/i)).toBeInTheDocument();
+    expect(screen.getByText(/100% Flat-Out/i)).toBeInTheDocument();
+    expect(screen.getByText(/2.85G/i)).toBeInTheDocument();
+    expect(screen.getByText(/1.2°/i)).toBeInTheDocument();
+  });
+
+  it('renders compact micro-bar without the technique deck and triggers onOpenCornersTab', () => {
+    const onOpenCornersTab = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        compact={true}
+        onOpenCornersTab={onOpenCornersTab}
+        onClose={onClose}
+      />
+    );
+
+    // Micro-bar elements are present
+    expect(screen.getByText(/Turn 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/ENTRY 180/i)).toBeInTheDocument();
+    expect(screen.getByText(/MIN 85/i)).toBeInTheDocument();
+    expect(screen.getByText(/EXIT 150/i)).toBeInTheDocument();
+
+    // The heavy technique deck should NOT be rendered in compact mode
+    expect(screen.queryByText(/Apex Geometry & Track Usage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Technique Dynamics/i)).not.toBeInTheDocument();
+
+    // Clicking Technique triggers onOpenCornersTab
+    const techniqueBtn = screen.getByRole('button', { name: /Technique/i });
+    techniqueBtn.click();
+    expect(onOpenCornersTab).toHaveBeenCalledTimes(1);
+
+    // Clicking Close triggers onClose
+    screen.getByLabelText(/Close corner detail/i).click();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders synchronized scrub line with current vehicle speed when currentIndex is within corner', () => {
+    // index 2 is at distance 20m (within corner 0m..40m), speed 120 km/h
+    render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        currentIndex={2}
+      />
+    );
+
+    expect(screen.getByText('120 km/h')).toBeInTheDocument();
+  });
+
+  it('triggers onSelectIndex when clicking the speed profile chart to seek', () => {
+    const onSelectIndex = vi.fn();
+    const { container } = render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        onSelectIndex={onSelectIndex}
+      />
+    );
+
+    const scrubArea = container.querySelector('[title="Click or drag to scrub replay at this corner"]') as HTMLElement;
+    expect(scrubArea).toBeInTheDocument();
+
+    // Mock getBoundingClientRect
+    vi.spyOn(scrubArea, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 95,
+      right: 100,
+      bottom: 95,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Click at 50% across (x: 50) -> target dist 20m -> index 2
+    scrubArea.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true }));
+    expect(onSelectIndex).toHaveBeenCalledTimes(1);
+    expect(onSelectIndex).toHaveBeenCalledWith(2);
+  });
+
+  it('does not render the mini gps map', () => {
+    const { container } = render(
+      <CornerApexChart
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /toggle pedal markers/i })).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="gps-track-map"]')).not.toBeInTheDocument();
+  });
 });
+

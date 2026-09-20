@@ -35,6 +35,8 @@ export interface GpsSceneMarkersProps {
   zoomLevel?: number;
   primaryOpacity?: number;
   baselineOpacity?: number;
+  dimNonSelectedTrack?: boolean;
+  showCornerFlags?: boolean;
 }
 
 export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
@@ -48,8 +50,16 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
   zoomLevel,
   primaryOpacity = 1,
   baselineOpacity = 1,
+  dimNonSelectedTrack = false,
+  showCornerFlags = true,
 }) => {
-  const cornersToRender = cornerMarkers ?? markers ?? [];
+  const cornersToRender = useMemo(() => {
+    const all = cornerMarkers ?? markers ?? [];
+    if (dimNonSelectedTrack && selectedCornerNumber != null) {
+      return all.filter(m => m.cornerNumber === selectedCornerNumber);
+    }
+    return all;
+  }, [cornerMarkers, markers, dimNonSelectedTrack, selectedCornerNumber]);
 
   const cornerPositions = useMemo(() => {
     const effectiveZoom = zoomLevel ?? (markerScale > 0 ? 1 / markerScale : 1);
@@ -85,9 +95,49 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
     });
   }, [cornersToRender, selectedCornerNumber, zoomLevel, markerScale]);
 
+  const visiblePedalMarkers = useMemo(() => {
+    if (!dimNonSelectedTrack || selectedCornerNumber == null) return pedalMarkers;
+    return pedalMarkers.filter(p => p.cornerNumber === selectedCornerNumber);
+  }, [pedalMarkers, dimNonSelectedTrack, selectedCornerNumber]);
+
   return (
     <>
-      {cornerPositions.map(m => (
+      {!showCornerFlags && cornerPositions.map(m => {
+        const dirX = m.sx - m.actualSx;
+        const dirY = m.sy - m.actualSy;
+        const distWorld = Math.hypot(dirX, dirY);
+        const uX = distWorld > 1e-4 ? dirX / distWorld : 0;
+        const uY = distWorld > 1e-4 ? dirY / distWorld : -1;
+        const labelDist = 22 * markerScale;
+        const labelX = Number((m.actualSx + uX * labelDist).toFixed(1));
+        const labelY = Number((m.actualSy + uY * labelDist).toFixed(1));
+
+        return (
+          <g
+            key={`apex-${m.cornerNumber}`}
+            data-testid={`apex-marker-${m.cornerNumber}`}
+            className="cursor-pointer group"
+            onClick={e => {
+              e.stopPropagation();
+              onSelectIndex?.(m.idx);
+            }}
+          >
+            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke="#f43f5e" strokeWidth="1.2" strokeDasharray="2.5 2" opacity={0.8} vectorEffect="non-scaling-stroke" />
+            {/* Zoom-agnostic apex red dot anchored at trajectory point */}
+            <g transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`} pointerEvents="none">
+              <circle r="4" fill="#f43f5e" stroke="#ffffff" strokeWidth="1.5" />
+            </g>
+            <g transform={`translate(${labelX}, ${labelY}) scale(${markerScale})`}>
+              <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity="0.95" className="transition-transform group-hover:scale-110" />
+              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill="#fb7185" fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
+                APEX
+              </text>
+            </g>
+          </g>
+        );
+      })}
+
+      {showCornerFlags && cornerPositions.map(m => (
         <g
           key={`corner-${m.cornerNumber}`}
           data-testid={`corner-flag-${m.cornerNumber}`}
@@ -111,6 +161,23 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
           />
+          {/* Zoom-agnostic apex dot and APEX pill on trajectory for selected corner */}
+          {m.isSelected && (
+            <g
+              data-testid={`apex-marker-${m.cornerNumber}`}
+              transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`}
+              pointerEvents="none"
+            >
+              <circle r="8" fill="#f43f5e" opacity="0.3" className="animate-ping" />
+              <circle r="4.5" fill="#f43f5e" stroke="#ffffff" strokeWidth="1.5" />
+              <g transform="translate(0, 14)">
+                <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity="0.95" />
+                <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill="#fb7185" fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
+                  APEX
+                </text>
+              </g>
+            </g>
+          )}
           {/* Badge anchored at (posX, posY), scaled to constant screen size */}
           <g transform={`translate(${m.posX}, ${m.posY}) scale(${markerScale})`}>
             <circle
@@ -135,7 +202,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
         </g>
       ))}
 
-      {pedalMarkers.map((m, i) => {
+      {visiblePedalMarkers.map((m, i) => {
         const isBrake = m.kind === 'brake';
         const isBase = Boolean(m.isBaseline);
         const opacity = (isBase ? baselineOpacity : primaryOpacity) ?? 1;
@@ -151,34 +218,21 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
         const nx = m.nx ?? 0;
         const ny = m.ny ?? 1;
 
-        // Line extending perpendicular across the track (enlarged for better readability)
+        // Line extending perpendicular across the track
         const lineHalfLen = PEDAL_MARKER_LINE_HALF_LEN;
-        const x1 = m.sx - nx * lineHalfLen;
-        const y1 = m.sy - ny * lineHalfLen;
-        const x2 = m.sx + nx * lineHalfLen;
-        const y2 = m.sy + ny * lineHalfLen;
-
-        // Overlap staggering: if baseline is close to primary, place at tier 2
+        const x1 = m.sx - nx * lineHalfLen, y1 = m.sy - ny * lineHalfLen;
+        const x2 = m.sx + nx * lineHalfLen, y2 = m.sy + ny * lineHalfLen;
         const tagDist = lineHalfLen + (m.isStaggered ? PEDAL_MARKER_TAG_STAGGER_OFFSET : PEDAL_MARKER_TAG_BASE_OFFSET);
 
-        // Check if placing badge on default side (+nx, +ny) collides with any corner marker badge
         const defTagX = m.sx + nx * tagDist;
         const defTagY = m.sy + ny * tagDist;
-        const distToCornerDef = cornerPositions.reduce(
-          (minD, c) => Math.min(minD, Math.hypot(defTagX - c.posX, defTagY - c.posY)),
-          Infinity
-        );
-
-        // If default side is within 34px of a corner marker, flip badge to opposite side (-nx, -ny)
+        const distToCornerDef = cornerPositions.reduce((minD, c) => Math.min(minD, Math.hypot(defTagX - c.posX, defTagY - c.posY)), Infinity);
         const side = distToCornerDef < 34 ? -1 : 1;
         const tagX = m.sx + nx * side * tagDist;
         const tagY = m.sy + ny * side * tagDist;
 
-        // Extension stem connecting the baseline badge to the track when staggered
-        const stemX1 = m.sx + nx * side * (lineHalfLen + 1);
-        const stemY1 = m.sy + ny * side * (lineHalfLen + 1);
-        const stemX2 = m.sx + nx * side * (tagDist - 9.5);
-        const stemY2 = m.sy + ny * side * (tagDist - 9.5);
+        const stemX1 = m.sx + nx * side * (lineHalfLen + 1), stemY1 = m.sy + ny * side * (lineHalfLen + 1);
+        const stemX2 = m.sx + nx * side * (tagDist - 9.5), stemY2 = m.sy + ny * side * (tagDist - 9.5);
 
         return (
           <g
@@ -193,30 +247,10 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
               {m.distM !== undefined ? ` (${m.distM.toFixed(0)}m)` : ''}
             </title>
 
-            {/* Subtle outer glow line */}
-            <line
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={strokeColor}
-              strokeWidth="3.6"
-              strokeLinecap="round"
-              opacity="0.25"
-            />
-
-            {/* Connecting dashed guide stem for staggered tier 2 badge */}
+            {/* Outer glow & guide stems */}
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth="3.6" strokeLinecap="round" opacity="0.25" />
             {m.isStaggered && (
-              <line
-                x1={stemX1}
-                y1={stemY1}
-                x2={stemX2}
-                y2={stemY2}
-                stroke={strokeColor}
-                strokeWidth="1.5"
-                strokeDasharray="2 2"
-                opacity="0.85"
-              />
+              <line x1={stemX1} y1={stemY1} x2={stemX2} y2={stemY2} stroke={strokeColor} strokeWidth="1.5" strokeDasharray="2 2" opacity="0.85" />
             )}
 
             {/* Perpendicular marker line across racing line */}
@@ -232,39 +266,15 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
               opacity={isBase ? '0.9' : '0.95'}
             />
 
-            {/* Outer tips */}
+            {/* Outer tips & in-line intersection dot */}
             <circle cx={x1} cy={y1} r="2" fill={strokeColor} />
             <circle cx={x2} cy={y2} r="2" fill={strokeColor} />
-
-            {/* In-line intersection dot on racing line */}
-            <circle
-              cx={m.sx}
-              cy={m.sy}
-              r={isBase ? 2.8 : 2.4}
-              fill={isBase ? '#060912' : primaryColor}
-              stroke={isBase ? strokeColor : '#000'}
-              strokeWidth={isBase ? 1.6 : 0.9}
-            />
+            <circle cx={m.sx} cy={m.sy} r={isBase ? 2.8 : 2.4} fill={isBase ? '#060912' : primaryColor} stroke={isBase ? strokeColor : '#000'} strokeWidth={isBase ? 1.6 : 0.9} />
 
             {/* Indicator badge outside racing line */}
             <g transform={`translate(${tagX.toFixed(1)}, ${tagY.toFixed(1)})`}>
-              <circle
-                r="9.5"
-                fill="#060912"
-                stroke={strokeColor}
-                strokeWidth="1.8"
-                strokeDasharray={isBase ? '3.5 2.5' : undefined}
-              />
-              <text
-                x="0"
-                y="0"
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={textColor}
-                fontSize="10.5"
-                fontFamily="monospace"
-                fontWeight="bold"
-              >
+              <circle r="9.5" fill="#060912" stroke={strokeColor} strokeWidth="1.8" strokeDasharray={isBase ? '3.5 2.5' : undefined} />
+              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={textColor} fontSize="10.5" fontFamily="monospace" fontWeight="bold">
                 {label}
               </text>
             </g>
