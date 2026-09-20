@@ -1,8 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { getTrajectoryDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
 import {
-  MapColorMode,
   projectTrajectoryPoints,
   projectBoundaryPoints,
   computeTrackBoundaryPathD,
@@ -23,32 +21,11 @@ import { GpsCircuitMinimap } from './GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
-import { useTrackBoundaryGeometry, TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 
-import type { GpsTrackMapCorner, GpsTrackMapPedalMarker } from './GpsTrackMap.js';
+import type { GpsTrackMapProps } from './GpsTrackMap.js';
 
-export interface GpsTrackMapSceneProps {
-  points: ReplayTrajectoryPoint[];
-  bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
-  currentIndex: number;
-  onSelectIndex?: (index: number) => void;
-  colorBy?: MapColorMode;
-  className?: string;
-  baselinePoints?: ReplayTrajectoryPoint[];
-  corners?: GpsTrackMapCorner[];
-  selectedCornerNumber?: number | null;
-  onSelectCornerNumber?: (cornerNumber: number) => void;
-  primaryOpacity?: number;
-  baselineOpacity?: number;
-  pedalMarkers?: GpsTrackMapPedalMarker[];
-  showPedalMarkers?: boolean;
-  showMinimap?: boolean;
-  trackVenue?: string;
-  trackCourse?: string;
-  layoutKey?: string;
-  replayName?: string;
-  trackGeometry?: TrackBoundaryGeometry | null;
-}
+export type GpsTrackMapSceneProps = GpsTrackMapProps;
 
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   points,
@@ -66,6 +43,12 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   pedalMarkers,
   showPedalMarkers = false,
   showMinimap = true,
+  showLegend = true,
+  showControls = true,
+  controlsOrientation,
+  highlightDistRange,
+  dimNonSelectedTrack = false,
+  showCornerFlags = true,
   trackVenue,
   trackCourse,
   layoutKey,
@@ -121,6 +104,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     focusOnPoint,
     zoomIn,
     zoomOut,
+    markerScale,
   } = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
 
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
@@ -141,7 +125,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
     () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, baselinePoints, primaryDists, baselineDists) : null),
     [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]
   );
-  const markerScale = Number((1 / zoomLevel).toFixed(4));
   const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, effectiveBounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, effectiveBounds]);
 
 
@@ -185,15 +168,18 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       onDoubleClick={handleDoubleClick}
       className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing ${className}`}
     >
-      <MapControlsOverlay
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onReset={resetPanZoom}
-        zoomDisplay={`${zoomLevel}x`}
-        followCar={followCar}
-        onToggleFollowCar={() => setFollowCar(f => !f)}
-        className="top-2 right-2 bottom-auto"
-      />
+      {showControls && (
+        <MapControlsOverlay
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onReset={resetPanZoom}
+          zoomDisplay={`${zoomLevel}x`}
+          followCar={followCar}
+          onToggleFollowCar={() => setFollowCar(f => !f)}
+          orientation={controlsOrientation ?? (dimNonSelectedTrack ? 'vertical' : 'horizontal')}
+          className="top-2 right-2 bottom-auto"
+        />
+      )}
 
       {showMinimap && (
         <GpsCircuitMinimap
@@ -237,11 +223,16 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
           primaryOpacity={primaryOpacity}
           baselineOpacity={baselineOpacity}
           onSelectIndex={onSelectIndex}
+          highlightDistRange={highlightDistRange}
+          primaryDists={primaryDists}
+          baselineDists={baselineDists}
+          dimNonSelectedTrack={dimNonSelectedTrack}
         />
 
         <GpsStartFinishLine
           svgPoints={svgPoints}
           zoomLevel={zoomLevel}
+          markerScale={markerScale}
           cornerMarkers={cornerMarkers}
           pedalMarkers={pedalMarkerPoints}
           gateLeftSvg={gateLeftSvg}
@@ -258,6 +249,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
           zoomLevel={zoomLevel}
           primaryOpacity={primaryOpacity}
           baselineOpacity={baselineOpacity}
+          dimNonSelectedTrack={dimNonSelectedTrack}
+          showCornerFlags={showCornerFlags}
         />
 
         {currentPos && baselineGhostPos && (
@@ -290,7 +283,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
 
       <GpsSceneHudOverlay isStationary={isStationary} />
 
-      <HeatmapLegendBar colorBy={colorBy} />
+      {showLegend && <HeatmapLegendBar colorBy={colorBy} />}
     </div>
   );
 };

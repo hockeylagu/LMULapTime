@@ -75,4 +75,35 @@ describe('GpsTrackSegments', () => {
     const lines = container.querySelectorAll('line[data-track-line="primary"]');
     expect(lines).toHaveLength(0);
   });
+
+  it('dims non-selected track segments outside highlightDistRange', () => {
+    const multiPoints: ProjectedPoint[] = [
+      { sx: 10, sy: 10, idx: 0, x: 0, y: 0, z: 0, speedKmh: 100, throttle: 100, brake: 0, timeSec: 0 },
+      { sx: 20, sy: 20, idx: 1, x: 10, y: 0, z: 10, speedKmh: 100, throttle: 100, brake: 0, timeSec: 1 },
+      { sx: 30, sy: 30, idx: 2, x: 20, y: 0, z: 20, speedKmh: 80, throttle: 0, brake: 100, timeSec: 2 },
+    ];
+    const primaryDists = [50, 150, 250];
+
+    const { container } = render(
+      <svg>
+        <GpsTrackSegments
+          svgPoints={multiPoints}
+          colorBy="pedal"
+          primaryDists={primaryDists}
+          highlightDistRange={{ startDistM: 100, endDistM: 200 }}
+          dimNonSelectedTrack={true}
+        />
+      </svg>
+    );
+
+    const lines = container.querySelectorAll('line[data-track-line="primary"]');
+    expect(lines).toHaveLength(2);
+    // Line 0->1 is at dist 150 (inside 100..200 range): highlighted with bold stroke & width 3.2
+    expect(lines[0]).toHaveAttribute('stroke-width', '3.2');
+    expect(Number(lines[0].getAttribute('stroke-opacity'))).toBe(1);
+    // Line 1->2 is at dist 250 (outside 100..200 range): dimmed racing line with width 1.4 and opacity 0.45
+    expect(lines[1]).toHaveAttribute('stroke-width', '1.4');
+    expect(Number(lines[1].getAttribute('stroke-opacity'))).toBeCloseTo(0.45);
+    expect(lines[1].getAttribute('stroke')).not.toBe('#334155');
+  });
 });

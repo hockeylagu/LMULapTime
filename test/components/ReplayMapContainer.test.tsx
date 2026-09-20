@@ -77,36 +77,14 @@ describe('ReplayMapContainer', () => {
     trackGeometry: mockTrackGeometry,
   };
 
-  it('does not render an apex chart when no corner is selected', () => {
+  it('renders the map with corner flags when corners exist', () => {
     render(<ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={null} />);
-    expect(screen.queryByText(/Apex Chart/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
   });
 
-  it('renders the apex chart for the selected corner', () => {
-    render(<ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={1} />);
-    expect(screen.getByText(/Turn 1 Apex Chart/i)).toBeInTheDocument();
-  });
-
-  it('closing the apex chart deselects the corner', () => {
-    const onSelectCornerNumber = vi.fn();
-    render(
-      <ReplayMapContainer
-        {...baseProps}
-        corners={corners}
-        selectedCornerNumber={1}
-        onSelectCornerNumber={onSelectCornerNumber}
-      />
-    );
-
-    screen.getByLabelText(/Close corner detail/i).click();
-    expect(onSelectCornerNumber).toHaveBeenCalledWith(null);
-  });
-
-  it('renders the apex chart when a corner is selected in the single pane layout', () => {
-    render(
-      <ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={1} />
-    );
-    expect(screen.getByText(/Turn 1 Apex Chart/i)).toBeInTheDocument();
+  it('highlights the selected corner and renders the apex marker on the map', () => {
+    const { container } = render(<ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={1} />);
+    expect(container.querySelector('[data-testid="apex-marker-1"]')).toBeInTheDocument();
     expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
   });
 

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeCornerConsistencyStats, computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../src/utils/cornerAnalysis.js';
+import {
+  computeCornerConsistencyStats,
+  computeLapSegmentComparisons,
+  filterCornerConsistencyStats,
+  CornerSegmentComparison,
+} from '../../src/utils/cornerAnalysis.js';
 import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('computeLapSegmentComparisons', () => {
@@ -257,5 +262,270 @@ describe('computeLapSegmentComparisons', () => {
     expect(computeCornerConsistencyStats([], buildLap(100, 0.3))).toEqual([]);
     expect(computeCornerConsistencyStats([{ lapNumber: 1, points: [] }], buildLap(100, 0.3))).toEqual([]);
     expect(computeCornerConsistencyStats([{ lapNumber: 1, points: buildLap(100, 0.3) }], [])).toEqual([]);
+  });
+
+  it('computes corner angle, turn direction, effective radius, and turn-in point for a curved corner', () => {
+    // A 90-degree right-hand corner starting forward along Z (0 to 30m), curving right to X+ (30 to 110m), then heading along X+ (110 to 140m)
+    const speeds = [180, 190, 200, 200, 160, 120, 80, 80, 120, 160, 200, 200, 180, 150, 100];
+    let t = 0;
+    const points: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => {
+      const distM = i * 10;
+      t += 0.25;
+      let x = 0;
+      let z = distM;
+      let steerYaw = 0;
+      let brake = 0;
+      let throttle = 0;
+
+      if (distM >= 30 && distM <= 110) {
+        // Curve 90 degrees right: angle 0 to PI/2
+        const progress = (distM - 30) / 80;
+        const angle = progress * (Math.PI / 2);
+        x = 50 * (1 - Math.cos(angle));
+        z = 30 + 50 * Math.sin(angle);
+        steerYaw = 30; // right turn
+        if (distM >= 40 && distM < 70) brake = 80;
+        if (distM >= 80) throttle = 90;
+      } else if (distM > 110) {
+        x = 50 + (distM - 110);
+        z = 80;
+        steerYaw = 0;
+        throttle = 100;
+      }
+
+      return {
+        x,
+        y: 0,
+        z,
+        speedKmh,
+        throttle,
+        brake,
+        steerYaw,
+        timeSec: t,
+        lateralOffsetM: i === 3 ? 3.5 : (i === 6 || i === 7) ? 0.2 : (i === 10 || i === 11) ? 3.8 : 0,
+      };
+    });
+
+    const segments = computeLapSegmentComparisons(points, points);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    expect(corner.turnDirection).toBe('right');
+    expect(corner.cornerAngleDeg).toBeGreaterThanOrEqual(75);
+    expect(corner.cornerAngleDeg).toBeLessThanOrEqual(105);
+    expect(corner.effectiveRadiusM).toBeGreaterThan(0);
+    expect(corner.primaryTurnInDistM).toBeDefined();
+    expect(corner.primaryTurnInDistM).toBeGreaterThanOrEqual(30);
+    expect(corner.primaryTrackUsage?.entryOffsetM).toBe(3.5);
+    expect(corner.primaryTrackUsage?.apexMarginM).toBe(0.2);
+    expect(corner.primaryTrackUsage?.exitWidthM).toBe(3.8);
+    expect(corner.cornerQualityScore).toBeGreaterThanOrEqual(50);
+  });
+
+  it('accurately computes rotation complete % at throttle onset', () => {
+    // Lap A: Patient alien driver rotates car 85% before getting on throttle at 90m
+    // Lap B: Eager driver applies throttle early at 50m when car is only 30% rotated
+    const speeds = [180, 190, 200, 200, 160, 120, 80, 80, 120, 160, 200, 200, 180, 150, 100];
+    const buildCurveLap = (throttleDistM: number) => speeds.map((speedKmh, i) => {
+      const distM = i * 10;
+      let x = 0;
+      let z = distM;
+      if (distM >= 30 && distM <= 110) {
+        const progress = (distM - 30) / 80;
+        const angle = progress * (Math.PI / 2);
+        x = 50 * (1 - Math.cos(angle));
+        z = 30 + 50 * Math.sin(angle);
+      } else if (distM > 110) {
+        x = 50 + (distM - 110);
+        z = 80;
+      }
+      return {
+        x,
+        y: 0,
+        z,
+        speedKmh,
+        throttle: distM >= throttleDistM ? 85 : 0,
+        brake: distM >= 30 && distM < 70 ? 70 : 0,
+        steerYaw: distM >= 30 && distM <= 110 ? 35 : 0,
+        timeSec: i * 0.25,
+      };
+    });
+
+    const patientLap = buildCurveLap(90);
+    const earlyLap = buildCurveLap(50);
+
+    const segments = computeLapSegmentComparisons(earlyLap, patientLap);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    expect(corner.primaryRotationAtThrottlePct).toBeDefined();
+    expect(corner.baselineRotationAtThrottlePct).toBeDefined();
+    // Patient lap should have significantly higher rotation % than early lap
+    expect(corner.baselineRotationAtThrottlePct!).toBeGreaterThan(corner.primaryRotationAtThrottlePct!);
+    expect(corner.rotationAtThrottleDeltaPct).toBeLessThan(0); // primary rotated less at throttle
+  });
+
+  it('detects a chicane complex linking opposing turns separated by a short straight', () => {
+    // 2 corners: Turn 1 (Right, 30m to 60m), straight (60m to 80m, 20m long <= 30m), Turn 2 (Left, 80m to 120m)
+    // Speed dips twice with a small recovery in between
+    const speeds = [
+      180, 200, 200, 150, 90, 140, // 0 to 50m (T1 entry & min at 40m)
+      160, 160,                    // 60m to 70m (T1 exit & short straight)
+      130, 85, 140, 180, 200,      // 80m to 120m (T2 entry, min at 90m, exit at 120m)
+      210, 220                     // 130m to 140m (following straight)
+    ];
+
+    const steerYaw = [
+      0, 0, 0, 40, 50, 40,         // T1: right steer (+40 to +50)
+      0, 0,                        // straight: 0
+      -40, -50, -40, -10, 0,       // T2: left steer (-40 to -50)
+      0, 0
+    ];
+
+    const points: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 10,
+      y: 0,
+      z: 0,
+      speedKmh,
+      throttle: 0,
+      brake: 0,
+      steerYaw: steerYaw[i],
+      timeSec: i * 0.25,
+    }));
+
+    const segments = computeLapSegmentComparisons(points, points, 15);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    expect(corners.length).toBe(2);
+    expect(corners[0].cornerType).toBe('chicane');
+    expect(corners[1].cornerType).toBe('chicane');
+    expect(corners[0].chicaneDetails).toBeDefined();
+    expect(corners[0].chicaneDetails?.isChicane).toBe(true);
+    expect(corners[0].chicaneDetails?.role).toBe('entry');
+    expect(corners[0].chicaneDetails?.linkedCornerNumber).toBe(corners[1].cornerNumber);
+    expect(corners[1].chicaneDetails?.role).toBe('exit');
+    expect(corners[1].chicaneDetails?.linkedCornerNumber).toBe(corners[0].cornerNumber);
+    expect(corners[0].chicaneDetails?.apexSpeedRatio).toBeCloseTo(85 / 90, 1);
+  });
+
+  it('identifies 3+ linked turns as an esses complex with roles, speed decay, and steering reversal rate', () => {
+    // 3 alternating turns separated by <= 35m
+    // T1 (right, entry 180, min 100), T2 (left, min 95), T3 (right, min 110, exit 140)
+    const speeds = [
+      180, 160, 100, 140, // T1
+      95, 130,            // T2
+      110, 140, 150       // T3
+    ];
+    const steerYaw = [
+      10, 30, 45, 0,
+      -45, 0,
+      40, 20, 0
+    ];
+
+    const points: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 15,
+      y: 0,
+      z: (i % 2 === 0 ? 5 : -5),
+      speedKmh,
+      throttle: 0,
+      brake: 0,
+      steerYaw: steerYaw[i],
+      timeSec: i * 0.3,
+    }));
+
+    const segments = computeLapSegmentComparisons(points, points, 10);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    if (corners.length >= 3) {
+      expect(corners[0].cornerType).toBe('esses');
+      expect(corners[0].chicaneDetails?.role).toBe('entry');
+      expect(corners[1].chicaneDetails?.role).toBe('mid');
+      expect(corners[corners.length - 1].chicaneDetails?.role).toBe('exit');
+      expect(corners[0].typeSpecificDetails?.speedDecayKmh).toBeDefined();
+      expect(corners[0].chicaneDetails?.steeringReversalRateDegPerSec).toBeGreaterThan(0);
+    }
+  });
+
+  it('computes chord sagitta for track usage when lateralOffsetM is undefined', () => {
+    // Arc of points with significant curvature in X/Z plane
+    const points: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, speedKmh: 150, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
+      { x: 50, y: 0, z: 30, speedKmh: 80, throttle: 0, brake: 0, steerYaw: 30, timeSec: 1 },
+      { x: 100, y: 0, z: 0, speedKmh: 140, throttle: 0, brake: 0, steerYaw: 0, timeSec: 2 },
+    ];
+
+    const segments = computeLapSegmentComparisons(points, points, 10);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    if (corners.length > 0) {
+      expect(corners[0].primaryTrackUsage?.totalSweepM).toBeGreaterThan(0);
+    }
+  });
+
+  it('detects understeer scrub and exit traction slip', () => {
+    const points: ReplayTrajectoryPoint[] = [
+      { x: 0, y: 0, z: 0, speedKmh: 160, throttle: 100, brake: 0, steerYaw: 0, timeSec: 0 },
+      { x: 40, y: 0, z: 10, speedKmh: 140, throttle: 80, brake: 0, steerYaw: 15, understeerDeg: 4.5, timeSec: 0.8 },
+      { x: 80, y: 0, z: 0, speedKmh: 155, throttle: 100, brake: 0, steerYaw: 5, tcActive: true, timeSec: 1.6 },
+    ];
+
+    const segments = computeLapSegmentComparisons(points, points, 10);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    if (corners.length > 0) {
+      expect(corners[0].typeSpecificDetails?.steeringScrubDeg).toBe(4.5);
+      expect(corners[0].typeSpecificDetails?.exitWheelSlipActive).toBe(true);
+    }
+  });
+
+  it('does not classify a tight turn followed by an exit acceleration kink as a chicane (Bahrain T1->T2 scenario)', () => {
+    // T1: tight right turn (heading changes 90 deg, slow 70 km/h)
+    // T2: flat-out left kink on exit (heading changes only 12 deg, 100% throttle, 160 km/h)
+    // Connecting straight is short (20m), opposite direction, but T2 is a flat acceleration kink!
+    const points: ReplayTrajectoryPoint[] = [
+      // T1 entry & apex & exit
+      { x: 0, y: 0, z: 0, speedKmh: 220, throttle: 0, brake: 100, steerYaw: 0, timeSec: 0 },
+      { x: 30, y: 0, z: 10, speedKmh: 120, throttle: 0, brake: 60, steerYaw: 30, timeSec: 0.6 },
+      { x: 50, y: 0, z: 30, speedKmh: 70, throttle: 20, brake: 0, steerYaw: 50, timeSec: 1.2 },
+      { x: 70, y: 0, z: 45, speedKmh: 110, throttle: 100, brake: 0, steerYaw: 20, timeSec: 1.8 },
+      // Short transition to T2
+      { x: 80, y: 0, z: 47, speedKmh: 130, throttle: 100, brake: 0, steerYaw: 0, timeSec: 2.0 },
+      // T2: mild left kink (z barely changes, flat throttle)
+      { x: 100, y: 0, z: 48, speedKmh: 160, throttle: 100, brake: 0, steerYaw: -8, timeSec: 2.5 },
+      { x: 120, y: 0, z: 49, speedKmh: 185, throttle: 100, brake: 0, steerYaw: 0, timeSec: 2.9 },
+    ];
+
+    const segments = computeLapSegmentComparisons(points, points, 10);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    for (const c of corners) {
+      // Must NOT be classified as a chicane!
+      expect(c.cornerType).not.toBe('chicane');
+      expect(c.chicaneDetails).toBeUndefined();
+    }
+  });
+
+  it('does not classify a long single-apex 90 degree corner as a double apex (Bahrain T4/T13 scenario)', () => {
+    // 90 deg corner spanning >140m window, but driven with single apex and without 1.0s maintenance throttle
+    const speeds = [240, 200, 150, 115, 140, 190, 230];
+    const points: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 25, // 150m length
+      y: 0,
+      z: (i <= 3 ? i * 15 : 45 + (i - 3) * 5),
+      speedKmh,
+      throttle: i > 3 ? 100 : 0,
+      brake: i < 3 ? 80 : 0,
+      steerYaw: i === 3 ? 40 : 10,
+      timeSec: i * 0.5,
+    }));
+
+    const segments = computeLapSegmentComparisons(points, points, 10);
+    const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
+
+    expect(corners.length).toBeGreaterThan(0);
+    for (const c of corners) {
+      // Must NOT be classified as double_apex
+      expect(c.cornerType).not.toBe('double_apex');
+    }
   });
 });

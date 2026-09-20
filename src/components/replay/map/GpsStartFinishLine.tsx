@@ -4,6 +4,7 @@ import type { ProjectedPoint, DispersedCornerMarker } from './replayMapUtils.js'
 export interface GpsStartFinishLineProps {
   svgPoints: ProjectedPoint[];
   zoomLevel?: number;
+  markerScale?: number;
   cornerMarkers?: DispersedCornerMarker[];
   pedalMarkers?: { sx: number; sy: number }[];
   /** Canonical gate endpoints spanning the road ribbon width from left to right boundary. */
@@ -14,6 +15,7 @@ export interface GpsStartFinishLineProps {
 export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
   svgPoints,
   zoomLevel,
+  markerScale,
   cornerMarkers,
   pedalMarkers,
   gateLeftSvg,
@@ -141,7 +143,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
       {/* START badge placed beside the road ribbon edge, scaled to constant screen size */}
       <g
         data-testid="start-finish-label"
-        transform={`translate(${lineData.labelX}, ${lineData.labelY}) scale(${1 / lineData.effectiveZoom})`}
+        transform={`translate(${lineData.labelX}, ${lineData.labelY}) scale(${markerScale ?? (1 / lineData.effectiveZoom)})`}
       >
         <rect
           x="-17"

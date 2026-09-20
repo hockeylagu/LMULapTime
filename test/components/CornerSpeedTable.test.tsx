@@ -143,4 +143,52 @@ describe('CornerSpeedTable', () => {
     expect(screen.getByText(/T2 \+0.120s/i)).toBeInTheDocument();
     expect(screen.getByText(/T3 \+0.210s/i)).toBeInTheDocument();
   });
+
+  it('switches to Technique view mode and displays angle, turn-in, rotation %, and quality score', async () => {
+    const user = userEvent.setup();
+    const techniqueCorner: LapSegmentComparison = {
+      ...cornerSegment,
+      cornerType: 'chicane',
+      cornerAngleDeg: 88,
+      turnDirection: 'right',
+      primaryTurnInDistM: 38,
+      primaryRotationAtThrottlePct: 84,
+      trailBrakeDistM: 12,
+      cornerQualityScore: 91,
+      chicaneDetails: {
+        isChicane: true,
+        role: 'entry',
+        linkedCornerNumber: 2,
+      },
+    };
+
+    render(<CornerSpeedTable segments={[techniqueCorner, straightSegment]} />);
+
+    // In speed mode by default:
+    expect(screen.getByText('Entry')).toBeInTheDocument();
+    expect(screen.getByText('⇄ T2')).toBeInTheDocument();
+
+    // Click Technique button:
+    await user.click(screen.getByRole('button', { name: /Technique/i }));
+
+    expect(screen.getByText('Arc / Dir')).toBeInTheDocument();
+    expect(screen.getByText('Rot% @ Gas')).toBeInTheDocument();
+    expect(screen.getByText('↱ 88°')).toBeInTheDocument();
+    expect(screen.getAllByText('12m')).toHaveLength(2); // Turn-in 12m, Trail-brake 12m
+    expect(screen.getByText('84%')).toBeInTheDocument();
+    expect(screen.getByText('91')).toBeInTheDocument(); // Quality score
+  });
+
+  it('renders selectedCornerChart flowing naturally below table inside scrollable container', () => {
+    render(
+      <CornerSpeedTable
+        segments={[cornerSegment, straightSegment]}
+        selectedCornerNumber={1}
+        selectedCornerChart={<div data-testid="test-apex-chart">Turn 1 Apex Details</div>}
+      />
+    );
+
+    expect(screen.getByTestId('test-apex-chart')).toBeInTheDocument();
+    expect(screen.getByText('Turn 1 Apex Details')).toBeInTheDocument();
+  });
 });

@@ -32,6 +32,12 @@ export interface GpsTrackMapProps {
   pedalMarkers?: GpsTrackMapPedalMarker[];
   showPedalMarkers?: boolean;
   showMinimap?: boolean;
+  showLegend?: boolean;
+  showControls?: boolean;
+  controlsOrientation?: 'vertical' | 'horizontal';
+  highlightDistRange?: { startDistM: number; endDistM: number } | null;
+  dimNonSelectedTrack?: boolean;
+  showCornerFlags?: boolean;
   trackVenue?: string;
   trackCourse?: string;
   layoutKey?: string;
