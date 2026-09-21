@@ -26,10 +26,6 @@ export interface CornerApexChartProps {
   className?: string;
 }
 
-function formatCornerType(type: string): string {
-  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
 export const CornerApexChart: React.FC<CornerApexChartProps> = ({
   corner,
   primaryPoints,
@@ -56,7 +52,6 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
             <span className="inline-flex items-center h-5 px-1.5 rounded bg-sky-500/20 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap">
               Turn {corner.cornerNumber}
             </span>
-            {corner.cornerType && <span className="inline-flex items-center h-5 text-xs font-medium text-slate-300 shrink-0 whitespace-nowrap">{formatCornerType(corner.cornerType)}</span>}
             {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
               <span className="inline-flex items-center h-5 text-xs text-lmu-muted font-mono shrink-0 whitespace-nowrap">{corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? '↰' : '↱'}</span>
             )}
@@ -105,9 +100,6 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
           <span className="inline-flex items-center h-6 px-2 rounded bg-sky-500/20 border border-sky-500/40 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
             Turn {corner.cornerNumber}
           </span>
-          {corner.cornerType && (
-            <span className="inline-flex items-center h-6 text-xs font-semibold text-white shrink-0 whitespace-nowrap">{formatCornerType(corner.cornerType)}</span>
-          )}
           {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
             <span
               className="inline-flex items-center h-6 text-xs text-slate-300 font-mono capitalize shrink-0 whitespace-nowrap"

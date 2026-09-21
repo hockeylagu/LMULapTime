@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TelemetryCornerStrip } from '../../src/components/replay/telemetry/TelemetryCornerStrip.js';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis.js';
+import { PointComparison } from '../../src/utils/replayComparison.js';
 
 const mockCorners: CornerSegmentComparison[] = [
   {
@@ -223,5 +224,44 @@ describe('TelemetryCornerStrip', () => {
     const deltaSpan = screen.getByText('-0.05');
     expect(deltaSpan).toBeInTheDocument();
     expect(deltaSpan).toHaveClass('text-emerald-400');
+  });
+
+  it('displays running delta in corner tooltip when pointComparisons and cumDists are provided in compare mode', () => {
+    const mockPointComparisons: PointComparison[] = [
+      {
+        primary: { x: 300, y: 0, z: 0, speedKmh: 180, timeSec: 10.05 },
+        baseline: { x: 300, y: 0, z: 0, speedKmh: 185, timeSec: 10.0, throttle: 0, brake: 0, steerYaw: 0, gear: 1 },
+        deltaTimeSec: 0.05,
+        deltaSpeedKmh: -5,
+        deltaThrottle: 0,
+        deltaBrake: 0,
+        deltaSteer: 0,
+      },
+      {
+        primary: { x: 600, y: 0, z: 0, speedKmh: 140, timeSec: 13.74 },
+        baseline: { x: 600, y: 0, z: 0, speedKmh: 142, timeSec: 13.57, throttle: 0, brake: 0, steerYaw: 0, gear: 1 },
+        deltaTimeSec: 0.17,
+        deltaSpeedKmh: -2,
+        deltaThrottle: 0,
+        deltaBrake: 0,
+        deltaSteer: 0,
+      },
+    ];
+    const mockCumDists = [300, 600];
+
+    render(
+      <TelemetryCornerStrip
+        corners={mockCorners}
+        isCompareMode={true}
+        cumDists={mockCumDists}
+        pointComparisons={mockPointComparisons}
+      />
+    );
+
+    const t1Btn = screen.getByRole('button', { name: 'Turn 1' });
+    expect(t1Btn).toHaveAttribute(
+      'title',
+      'Turn 1: Delta +0.12s (Running: +0.05s → +0.17s)'
+    );
   });
 });

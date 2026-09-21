@@ -156,14 +156,6 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                       <span className={`inline-flex items-center gap-1.5 flex-wrap ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : ''}`}>
                         <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : 'text-lmu-muted'}`} />
                         <span>T{s.cornerNumber}</span>
-                        {s.chicaneDetails?.isChicane && (
-                          <span className="px-1 rounded bg-purple-500/20 text-purple-300 text-[9px] font-normal" title={`Linked with T${s.chicaneDetails.linkedCornerNumber}`}>
-                            ⇄ T{s.chicaneDetails.linkedCornerNumber}
-                          </span>
-                        )}
-                        {s.cornerType === 'hairpin' && (
-                          <span className="px-1 rounded bg-amber-500/20 text-amber-300 text-[9px] font-normal">Hairpin</span>
-                        )}
                       </span>
                     </td>
                     {tableMode === 'speed' ? (

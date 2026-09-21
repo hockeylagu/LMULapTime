@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCw, GitFork, ArrowDownRight, CircleDot, ArrowUpRight } from 'lucide-react';
+import { RotateCw, ArrowDownRight, CircleDot, ArrowUpRight } from 'lucide-react';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import {
   speedDeltaClass,
@@ -30,7 +30,6 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
   className = '',
 }) => {
   const rotInfo = rotationQuality(corner.primaryRotationAtThrottlePct ?? null);
-  const chicane = corner.chicaneDetails;
 
   return (
     <div className={`flex flex-col gap-2 p-2 pt-0 text-[11px] font-mono ${className}`}>
@@ -126,8 +125,8 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
               </div>
             ) : (
               <div className="flex flex-col">
-                <span className="text-lmu-muted text-[9px] uppercase">Apex Quality</span>
-                <span className="text-white font-bold capitalize">{corner.apexType ?? 'Geometric'} Apex</span>
+                <span className="text-lmu-muted text-[9px] uppercase">Apex Location</span>
+                <span className="text-white font-bold">{corner.apexRatioPct !== undefined ? `${corner.apexRatioPct}%` : '--'}</span>
               </div>
             )}
 
@@ -192,57 +191,6 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Chicane / Esses Complex Banner */}
-      {chicane?.isChicane && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-lg text-[10px]">
-          <span className="flex items-center gap-1 text-purple-300 font-semibold">
-            <GitFork className="w-3.5 h-3.5" />
-            Chicane Complex [T{corner.cornerNumber} ⇄ T{chicane.linkedCornerNumber}]
-          </span>
-          <div className="flex items-center gap-2">
-            {chicane.apexSpeedRatio !== undefined && (
-              <span className="text-slate-300">Compromise: <b className="text-emerald-400">{chicane.apexSpeedRatio}x</b></span>
-            )}
-            {chicane.transitionDistM !== undefined && <span className="text-slate-400">Trans: {chicane.transitionDistM}m</span>}
-          </div>
-        </div>
-      )}
-
-      {/* Type-Specific Diagnostic Highlights */}
-      {corner.cornerType === 'hairpin' && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[10px]">
-          <span className="text-amber-300 font-medium">Hairpin V-Line Profile</span>
-          <div className="flex items-center gap-2">
-            <span>Shape: <b className="text-white">{((corner.typeSpecificDetails?.vShapeIndex ?? 75) >= 70) ? 'Sharp V' : 'Rolling U'} ({corner.typeSpecificDetails?.vShapeIndex ?? 75}/100)</b></span>
-            {corner.typeSpecificDetails?.exitWheelSlipActive ? (
-              <span className="text-rose-400 font-bold">⚠️ TC/Slip Active</span>
-            ) : (
-              <span className="text-emerald-400">Clean Traction</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {corner.cornerType === 'high_speed' && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-lg text-[10px]">
-          <span className="text-sky-300 font-medium">High-Speed Aero Dynamics</span>
-          <div className="flex items-center gap-2">
-            <span>Throttle: <b className="text-emerald-400">{(corner.typeSpecificDetails?.throttleLiftPct ?? 0) === 0 ? '100% Flat-Out' : `${corner.typeSpecificDetails?.throttleLiftPct}% Lift`}</b></span>
-            {corner.typeSpecificDetails?.sustainedLatG !== undefined && <span className="text-slate-300">Load: <b>{corner.typeSpecificDetails.sustainedLatG}G</b></span>}
-            {corner.typeSpecificDetails?.steeringScrubDeg !== undefined && <span className="text-slate-400">Scrub: {corner.typeSpecificDetails.steeringScrubDeg}°</span>}
-          </div>
-        </div>
-      )}
-
-      {corner.cornerType === 'double_apex' && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-lg text-[10px]">
-          <span className="text-teal-300 font-medium">Double-Apex Radius Management</span>
-          <div className="flex items-center gap-2">
-            <span>Radius: <b className="text-white capitalize">{corner.typeSpecificDetails?.radiusProgression ?? 'Constant'}</b></span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

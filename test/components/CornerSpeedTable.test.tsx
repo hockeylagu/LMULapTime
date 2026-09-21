@@ -148,25 +148,18 @@ describe('CornerSpeedTable', () => {
     const user = userEvent.setup();
     const techniqueCorner: LapSegmentComparison = {
       ...cornerSegment,
-      cornerType: 'chicane',
       cornerAngleDeg: 88,
       turnDirection: 'right',
       primaryTurnInDistM: 38,
       primaryRotationAtThrottlePct: 84,
       trailBrakeDistM: 12,
       cornerQualityScore: 91,
-      chicaneDetails: {
-        isChicane: true,
-        role: 'entry',
-        linkedCornerNumber: 2,
-      },
     };
 
     render(<CornerSpeedTable segments={[techniqueCorner, straightSegment]} />);
 
     // In speed mode by default:
     expect(screen.getByText('Entry')).toBeInTheDocument();
-    expect(screen.getByText('⇄ T2')).toBeInTheDocument();
 
     // Click Technique button:
     await user.click(screen.getByRole('button', { name: /Technique/i }));
