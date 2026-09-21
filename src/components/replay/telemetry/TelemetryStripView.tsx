@@ -205,6 +205,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
           currentDistM={currentDistM}
           sectors={sectors}
           cumDists={cumDists}
+          pointComparisons={pointComparisons}
         />
       )}
     </>

@@ -160,22 +160,14 @@ describe('CornerApexChart', () => {
     expect(screen.getByText('-0.100s')).toBeInTheDocument();
   });
 
-  it('renders technique deck with rotation complete, turn-in point, and chicane complex details', () => {
-    const chicaneCorner: CornerSegmentComparison = {
+  it('renders technique deck with rotation complete, turn-in point, and track usage', () => {
+    const techniqueCorner: CornerSegmentComparison = {
       ...corner,
-      cornerType: 'chicane',
       cornerAngleDeg: 92,
       turnDirection: 'right',
       primaryTurnInDistM: 10,
       primaryRotationAtThrottlePct: 82,
       cornerQualityScore: 88,
-      chicaneDetails: {
-        isChicane: true,
-        role: 'entry',
-        linkedCornerNumber: 4,
-        apexSpeedRatio: 1.05,
-        transitionDistM: 25,
-      },
       primaryTrackUsage: {
         entryOffsetM: 3.2,
         apexMarginM: 0.3,
@@ -186,75 +178,19 @@ describe('CornerApexChart', () => {
 
     render(
       <CornerApexChart
-        corner={chicaneCorner}
+        corner={techniqueCorner}
         primaryPoints={primaryPoints}
         primaryDists={primaryDists}
         isCompareMode={true}
       />
     );
 
-    expect(screen.getByText('Chicane')).toBeInTheDocument();
     expect(screen.getByText(/92° right/i)).toBeInTheDocument();
     expect(screen.getByText(/Rotation @ Throttle/i)).toBeInTheDocument();
     expect(screen.getByText('82%')).toBeInTheDocument();
     expect(screen.getByText(/Optimal \(Rotated\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Chicane Complex \[T3 ⇄ T4\]/i)).toBeInTheDocument();
-    expect(screen.getByText(/1.05x/i)).toBeInTheDocument();
     expect(screen.getByText(/88\/100/i)).toBeInTheDocument();
     expect(screen.getByText(/6.7m sweep/i)).toBeInTheDocument();
-  });
-
-  it('renders hairpin V-line profile and exit slip diagnostic highlights', () => {
-    const hairpinCorner: CornerSegmentComparison = {
-      ...corner,
-      cornerType: 'hairpin',
-      cornerAngleDeg: 145,
-      turnDirection: 'left',
-      typeSpecificDetails: {
-        vShapeIndex: 85,
-        exitWheelSlipActive: true,
-      },
-    };
-
-    render(
-      <CornerApexChart
-        corner={hairpinCorner}
-        primaryPoints={primaryPoints}
-        primaryDists={primaryDists}
-      />
-    );
-
-    expect(screen.getByText(/Hairpin V-Line Profile/i)).toBeInTheDocument();
-    expect(screen.getByText(/85\/100/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sharp V/i)).toBeInTheDocument();
-    expect(screen.getByText(/TC\/Slip Active/i)).toBeInTheDocument();
-  });
-
-  it('renders high-speed sweeper throttle commitment and lateral load highlights', () => {
-    const sweeperCorner: CornerSegmentComparison = {
-      ...corner,
-      cornerType: 'high_speed',
-      cornerAngleDeg: 42,
-      turnDirection: 'right',
-      typeSpecificDetails: {
-        throttleLiftPct: 0,
-        sustainedLatG: 2.85,
-        steeringScrubDeg: 1.2,
-      },
-    };
-
-    render(
-      <CornerApexChart
-        corner={sweeperCorner}
-        primaryPoints={primaryPoints}
-        primaryDists={primaryDists}
-      />
-    );
-
-    expect(screen.getByText(/High-Speed Aero Dynamics/i)).toBeInTheDocument();
-    expect(screen.getByText(/100% Flat-Out/i)).toBeInTheDocument();
-    expect(screen.getByText(/2.85G/i)).toBeInTheDocument();
-    expect(screen.getByText(/1.2°/i)).toBeInTheDocument();
   });
 
   it('renders compact micro-bar without the technique deck and triggers onOpenCornersTab', () => {

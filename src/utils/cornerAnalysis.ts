@@ -3,6 +3,7 @@ import {
   InterpolatedPoint,
   interpolatePointAtDistance,
   getTrajectoryDistances,
+  getMonotonicStations,
 } from './replayComparison.js';
 import { unwrapAngle } from './computedTelemetry.js';
 
@@ -15,16 +16,6 @@ interface BaseSegmentComparison {
   timeDeltaSec: number;
 }
 
-export type CornerType =
-  | 'hairpin'
-  | 'medium_90'
-  | 'high_speed'
-  | 'chicane'
-  | 'double_apex'
-  | 'esses';
-
-export type ApexType = 'early' | 'geometric' | 'late';
-
 export interface CornerTrackUsage {
   entryOffsetM?: number;
   apexMarginM?: number;
@@ -32,36 +23,9 @@ export interface CornerTrackUsage {
   totalSweepM?: number;
 }
 
-export interface ChicaneDetails {
-  isChicane: boolean;
-  role: 'entry' | 'exit' | 'mid';
-  linkedCornerNumber: number;
-  transitionTimeSec?: number;
-  transitionDistM?: number;
-  apexSpeedRatio?: number;
-  totalChicaneTimeDeltaSec?: number;
-  steeringReversalRateDegPerSec?: number;
-}
-
 export interface CornerTypeSpecificDetails {
-  // Hairpin
-  vShapeIndex?: number;
-  lowSpeedYawRateDeg?: number;
   exitWheelSlipActive?: boolean;
-
-  // High-Speed Sweeper
-  throttleLiftPct?: number;
   steeringScrubDeg?: number;
-  sustainedLatG?: number;
-
-  // Double-Apex / Long-Radius
-  maintenanceThrottleSec?: number;
-  radiusProgression?: 'tightening' | 'opening' | 'constant';
-
-  // Esses / Flowing
-  steeringReversalRateDegPerSec?: number;
-  yawLagSec?: number;
-  speedDecayKmh?: number;
 }
 
 export interface CornerSegmentComparison extends BaseSegmentComparison {
@@ -87,11 +51,9 @@ export interface CornerSegmentComparison extends BaseSegmentComparison {
   throttleOnDeltaM: number | null;
 
   // --- Enhanced Corner Quality & Technique Metrics ---
-  cornerType?: CornerType;
   turnDirection?: 'left' | 'right';
   cornerAngleDeg?: number;
   effectiveRadiusM?: number;
-  apexType?: ApexType;
   apexRatioPct?: number;
 
   // Turn-In Point
@@ -118,14 +80,10 @@ export interface CornerSegmentComparison extends BaseSegmentComparison {
   primaryTrackUsage?: CornerTrackUsage;
   baselineTrackUsage?: CornerTrackUsage;
 
-  // Chicane / Linked Complex
-  chicaneDetails?: ChicaneDetails;
-
-  // Type Specific Details
-  typeSpecificDetails?: CornerTypeSpecificDetails;
-
   // Corner Quality Score (0-100)
   cornerQualityScore?: number;
+
+  typeSpecificDetails?: CornerTypeSpecificDetails;
 }
 
 export interface StraightSegmentComparison extends BaseSegmentComparison {
@@ -369,16 +327,37 @@ export function computeLapSegmentComparisons(
     turningPoints[turningPoints.length - 1].type === 'min' &&
     totalDistM - turningPoints[turningPoints.length - 1].distM >= MIN_STRAIGHT_LENGTH_M
   ) {
-    turningPoints.push({ index: baselinePoints.length - 1, distM: totalDistM, type: 'max' });
+    turningPoints.push({ index: primaryPoints.length - 1, distM: totalDistM, type: 'max' });
   }
 
-  const deltaAt = (distM: number): number => {
-    const p = interpolatePointAtDistance(primaryPoints, primaryDists, distM);
-    const b = interpolatePointAtDistance(baselinePoints, baselineDists, distM);
+  const canMatchByStation =
+    Boolean(trackLengthM && trackLengthM > 0) &&
+    primaryPoints[0]?.stationM !== undefined &&
+    baselinePoints[0]?.stationM !== undefined;
+
+  let primaryRefCoords: number[];
+  let baselineRefCoords: number[];
+
+  if (canMatchByStation && trackLengthM) {
+    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
+    baselineRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
+  } else {
+    primaryRefCoords = primaryDists;
+    baselineRefCoords = baselineDists;
+  }
+
+  const deltaAt = (stationOrDistM: number): number => {
+    const p = interpolatePointAtDistance(primaryPoints, primaryRefCoords, stationOrDistM);
+    const b = interpolatePointAtDistance(baselinePoints, baselineRefCoords, stationOrDistM);
     return p.timeSec - b.timeSec;
   };
 
-  const buildStraight = (fromDist: number, toDist: number): StraightSegmentComparison | null => {
+  const buildStraight = (
+    fromDist: number,
+    toDist: number,
+    fromCoord: number,
+    toCoord: number
+  ): StraightSegmentComparison | null => {
     if (toDist - fromDist < MIN_STRAIGHT_LENGTH_M) return null;
     const primaryAtEntry = interpolatePointAtDistance(primaryPoints, primaryDists, fromDist);
     const primaryAtExit = interpolatePointAtDistance(primaryPoints, primaryDists, toDist);
@@ -398,7 +377,7 @@ export function computeLapSegmentComparisons(
       primaryExitSpeedKmh: Math.round(primaryAtExit.speedKmh),
       baselineExitSpeedKmh: Math.round(baselineAtExit),
       exitSpeedDeltaKmh: Math.round(primaryAtExit.speedKmh - baselineAtExit),
-      timeDeltaSec: Number((deltaAt(toDist) - deltaAt(fromDist)).toFixed(3)),
+      timeDeltaSec: Number((deltaAt(toCoord) - deltaAt(fromCoord)).toFixed(3)),
     };
   };
 
@@ -426,9 +405,6 @@ export function computeLapSegmentComparisons(
     let primaryPeakYawRateDeg = 0;
     let baselinePeakYawRateDeg = 0;
     let trailBrakeSteps = 0;
-    let minThrottleInRange = 100;
-    let maintenanceThrottleSteps = 0;
-    let latGSum = 0;
     let maxUndersteerDeg = 0;
     let exitWheelSlipActive = false;
 
@@ -441,15 +417,6 @@ export function computeLapSegmentComparisons(
       }
       if ((p.brake || 0) >= 5 && Math.abs(p.steerYaw || 0) >= 5) {
         trailBrakeSteps++;
-      }
-      if (p.throttle !== undefined) {
-        minThrottleInRange = Math.min(minThrottleInRange, p.throttle);
-        if (p.throttle >= 20 && p.throttle <= 75) {
-          maintenanceThrottleSteps++;
-        }
-      }
-      if (p.accelLatG !== undefined) {
-        latGSum += Math.abs(p.accelLatG);
       }
       if (p.understeerDeg !== undefined) {
         maxUndersteerDeg = Math.max(maxUndersteerDeg, Math.abs(p.understeerDeg));
@@ -482,7 +449,6 @@ export function computeLapSegmentComparisons(
 
     const apexSpan = exit.distM - entry.distM;
     const apexRatioPct = apexSpan > 0 ? Math.round(((min.distM - entry.distM) / apexSpan) * 100) : 50;
-    const apexType: ApexType = apexRatioPct < 45 ? 'early' : apexRatioPct > 55 ? 'late' : 'geometric';
 
     // Turn-In Point
     const primaryTurnInDistM = findThresholdCrossingDistM(
@@ -589,35 +555,19 @@ export function computeLapSegmentComparisons(
         : bchordSagittaM,
     };
 
-    // Initial Corner Type Classification (non-chicane, chicane/esses pass comes after)
-    let cornerType: CornerType = 'medium_90';
-    const effectiveAngle = cornerAngleDeg > 0 ? cornerAngleDeg : (steerCount > 0 ? Math.round(Math.abs(steerSum / steerCount)) : 0);
-
-    const isHairpin = effectiveAngle >= 115 && primaryAtMin.speedKmh < 105;
-    const isHighSpeed = (effectiveAngle < 45 && effectiveAngle > 0) || primaryAtMin.speedKmh >= 170 || minThrottleInRange >= 90;
-    const isDoubleApex = !isHairpin && effectiveAngle >= 115 && lengthM >= 140 && primaryAtMin.speedKmh >= 105;
-
-    if (isHairpin) {
-      cornerType = 'hairpin';
-    } else if (isDoubleApex) {
-      cornerType = 'double_apex';
-    } else if (isHighSpeed) {
-      cornerType = 'high_speed';
-    }
-
-    const timeDeltaSec = Number((deltaAt(exit.distM) - deltaAt(entry.distM)).toFixed(3));
+    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
+      ? primaryRefCoords[entry.index]
+      : entry.distM;
+    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
+      ? primaryRefCoords[exit.index]
+      : exit.distM;
+    const timeDeltaSec = Number((deltaAt(exitCoord) - deltaAt(entryCoord)).toFixed(3));
     const isSelf = primaryPoints === baselinePoints;
     const cornerQualityScore = computeCornerQualityScore(timeDeltaSec, primaryRotationAtThrottlePct, trailBrakeDistM, lengthM, apexRatioPct, isSelf);
 
     const typeSpecificDetails: CornerTypeSpecificDetails = {
-      vShapeIndex: cornerType === 'hairpin' ? Math.max(10, Math.min(95, Math.round(95 - (primaryAtExit.timeSec - primaryAtEntry.timeSec) * 15))) : undefined,
-      lowSpeedYawRateDeg: primaryAtMin.speedKmh < 95 ? primaryPeakYawRateDeg : undefined,
-      exitWheelSlipActive: exitWheelSlipActive ? true : undefined,
-      throttleLiftPct: cornerType === 'high_speed' ? Math.max(0, Math.round(100 - minThrottleInRange)) : undefined,
       steeringScrubDeg: maxUndersteerDeg > 0 ? Number(maxUndersteerDeg.toFixed(1)) : undefined,
-      sustainedLatG: steerCount > 0 ? Number((latGSum / steerCount).toFixed(2)) : undefined,
-      maintenanceThrottleSec: maintenanceThrottleSteps > 0 ? Number((maintenanceThrottleSteps * 0.05).toFixed(2)) : undefined,
-      radiusProgression: primaryAtExit.speedKmh > primaryAtEntry.speedKmh + 10 ? 'opening' : primaryAtEntry.speedKmh > primaryAtExit.speedKmh + 10 ? 'tightening' : 'constant',
+      exitWheelSlipActive: exitWheelSlipActive ? true : undefined,
     };
 
     return {
@@ -645,11 +595,9 @@ export function computeLapSegmentComparisons(
       baselineThrottleOnDistM,
       throttleOnDeltaM: primaryThrottleOnDistM !== null && baselineThrottleOnDistM !== null ? Math.round(primaryThrottleOnDistM - baselineThrottleOnDistM) : null,
       timeDeltaSec,
-      cornerType,
       turnDirection,
       cornerAngleDeg,
       effectiveRadiusM,
-      apexType,
       apexRatioPct,
       primaryTurnInDistM,
       baselineTurnInDistM,
@@ -665,14 +613,15 @@ export function computeLapSegmentComparisons(
       rotationAtThrottleDeltaPct,
       primaryTrackUsage,
       baselineTrackUsage,
-      typeSpecificDetails,
       cornerQualityScore,
+      typeSpecificDetails,
     };
   };
 
   const segments: LapSegmentComparison[] = [];
   let cornerNumber = 0;
   let prevBoundaryDist = startDistM;
+  let prevBoundaryCoord = canMatchByStation && primaryRefCoords[0] !== undefined ? primaryRefCoords[0] : startDistM;
 
   for (let i = 1; i < turningPoints.length - 1; i++) {
     const min = turningPoints[i];
@@ -680,147 +629,27 @@ export function computeLapSegmentComparisons(
     const exit = turningPoints[i + 1];
     if (min.type !== 'min' || entry.type !== 'max' || exit.type !== 'max') continue;
 
-    const straight = buildStraight(prevBoundaryDist, entry.distM);
+    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
+      ? primaryRefCoords[entry.index]
+      : entry.distM;
+    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
+      ? primaryRefCoords[exit.index]
+      : exit.distM;
+
+    const straight = buildStraight(prevBoundaryDist, entry.distM, prevBoundaryCoord, entryCoord);
     if (straight) segments.push(straight);
 
     cornerNumber++;
     segments.push(buildCorner(cornerNumber, entry, min, exit));
     prevBoundaryDist = exit.distM;
+    prevBoundaryCoord = exitCoord;
   }
 
-  const trailing = buildStraight(prevBoundaryDist, totalDistM);
+  const trailingCoord = canMatchByStation && primaryRefCoords[primaryRefCoords.length - 1] !== undefined
+    ? primaryRefCoords[primaryRefCoords.length - 1]
+    : totalDistM;
+  const trailing = buildStraight(prevBoundaryDist, totalDistM, prevBoundaryCoord, trailingCoord);
   if (trailing) segments.push(trailing);
-
-  // Chicane & Linked Esses Complex Detection and Post-Processing Pass
-  const cornerIndices: number[] = [];
-  segments.forEach((s, idx) => {
-    if (s.type === 'corner') cornerIndices.push(idx);
-  });
-
-  const getEffectiveCornerAngle = (c: CornerSegmentComparison): number => {
-    if (c.cornerAngleDeg && c.cornerAngleDeg > 0) return c.cornerAngleDeg;
-    if (c.primaryPeakYawRateDeg && c.primaryPeakYawRateDeg > 0) return Math.min(180, c.primaryPeakYawRateDeg * 2);
-    return 35; // Fallback for 1D flat coordinate unit tests
-  };
-
-  const chains: number[][] = [];
-  let currentChain: number[] = [];
-
-  for (let cIdx = 0; cIdx < cornerIndices.length; cIdx++) {
-    if (currentChain.length === 0) {
-      currentChain.push(cIdx);
-    } else {
-      const prevIdx = currentChain[currentChain.length - 1];
-      const s1 = segments[cornerIndices[prevIdx]] as CornerSegmentComparison;
-      const s2 = segments[cornerIndices[cIdx]] as CornerSegmentComparison;
-      const straightDist = s2.entryDistM - s1.exitDistM;
-      const angle1 = getEffectiveCornerAngle(s1);
-      const angle2 = getEffectiveCornerAngle(s2);
-
-      const isHairpin1 = s1.cornerType === 'hairpin' || angle1 >= 115;
-      const isHairpin2 = s2.cornerType === 'hairpin' || angle2 >= 115;
-      const isFlatKink1 = s1.cornerType === 'high_speed' && s1.primaryMinSpeedKmh >= 180;
-      const isFlatKink2 = s2.cornerType === 'high_speed' && s2.primaryMinSpeedKmh >= 180;
-      const speedCompatible = Math.abs(s1.primaryMinSpeedKmh - s2.primaryMinSpeedKmh) <= 90;
-
-      // Both turns must be meaningful direction changes, speed-compatible, and NOT a hairpin or flat straight kink
-      const hasSignificantAngle = angle1 >= 25 && angle2 >= 25;
-      const isOpposing = s1.turnDirection && s2.turnDirection && s1.turnDirection !== s2.turnDirection;
-      const isClose = straightDist <= 35;
-
-      const canLink = isClose && isOpposing && hasSignificantAngle && !isHairpin1 && !isHairpin2 && !isFlatKink1 && !isFlatKink2 && speedCompatible;
-
-      if (canLink) {
-        currentChain.push(cIdx);
-      } else {
-        if (currentChain.length >= 2) {
-          chains.push(currentChain);
-        }
-        currentChain = [cIdx];
-      }
-    }
-  }
-  if (currentChain.length >= 2) {
-    chains.push(currentChain);
-  }
-
-  for (const chain of chains) {
-    const chainCorners = chain.map(idx => segments[cornerIndices[idx]] as CornerSegmentComparison);
-
-    // Strict validation for 2-turn Chicanes:
-    // A genuine chicane is an artificial slow-down obstacle (e.g. Monza Prima Variante, Spa Bus Stop)
-    // where both turns have substantial angle (>= 30 deg), both require decelerating (< 170 km/h),
-    // the turns are balanced in angle, and the straight connection between apexes is very short (<= 28m).
-    if (chain.length === 2) {
-      const [c1, c2] = chainCorners;
-      const straightDist = c2.entryDistM - c1.exitDistM;
-      const angle1 = getEffectiveCornerAngle(c1);
-      const angle2 = getEffectiveCornerAngle(c2);
-      const minAngle = Math.min(angle1, angle2);
-      const maxAngle = Math.max(angle1, angle2);
-      const isBalanced = minAngle >= 30 && maxAngle <= minAngle * 2.2;
-
-      const isTrueChicane = isBalanced &&
-                           c1.primaryMinSpeedKmh < 170 &&
-                           c2.primaryMinSpeedKmh < 170 &&
-                           straightDist <= 28 &&
-                           Math.abs(c1.primaryMinSpeedKmh - c2.primaryMinSpeedKmh) <= 50;
-      if (!isTrueChicane) {
-        continue; // Retain natural classifications (hairpin, medium_90, high_speed)
-      }
-    }
-
-    const complexType: CornerType = chain.length === 2 ? 'chicane' : 'esses';
-    const firstCorner = chainCorners[0];
-    const lastCorner = chainCorners[chainCorners.length - 1];
-    const totalDelta = Number(chainCorners.reduce((sum, c) => sum + c.timeDeltaSec, 0).toFixed(3));
-    const speedDecayKmh = Math.round(firstCorner.primaryEntrySpeedKmh - lastCorner.primaryExitSpeedKmh);
-
-    for (let k = 0; k < chainCorners.length; k++) {
-      const corner = chainCorners[k];
-      corner.cornerType = complexType;
-      const role: 'entry' | 'exit' | 'mid' = k === 0 ? 'entry' : k === chainCorners.length - 1 ? 'exit' : 'mid';
-      const neighbor = k < chainCorners.length - 1 ? chainCorners[k + 1] : chainCorners[k - 1];
-
-      const transDistM = Math.round(Math.abs(neighbor.minDistM - corner.minDistM));
-      const transTimeSec = Number(Math.abs(neighbor.primaryTimeSec).toFixed(2));
-      const apexRatio = corner.primaryMinSpeedKmh > 0
-        ? Number((neighbor.primaryMinSpeedKmh / corner.primaryMinSpeedKmh).toFixed(2))
-        : 1;
-
-      // Compute peak steering reversal rate (deg/s) between apexes
-      let maxSteerRate = 0;
-      const dStart = Math.min(corner.minDistM, neighbor.minDistM);
-      const dEnd = Math.max(corner.minDistM, neighbor.minDistM);
-      for (let d = dStart; d < dEnd - 2; d += 2) {
-        const p1 = interpolatePointAtDistance(primaryPoints, primaryDists, d);
-        const p2 = interpolatePointAtDistance(primaryPoints, primaryDists, d + 2);
-        const dt = Math.abs(p2.timeSec - p1.timeSec);
-        if (dt > 0.005) {
-          const rate = Math.abs((p2.steerYaw || 0) - (p1.steerYaw || 0)) / dt;
-          if (rate > maxSteerRate) maxSteerRate = rate;
-        }
-      }
-      const steeringReversalRateDegPerSec = Math.round(maxSteerRate);
-
-      corner.chicaneDetails = {
-        isChicane: true,
-        role,
-        linkedCornerNumber: neighbor.cornerNumber,
-        transitionDistM: transDistM,
-        transitionTimeSec: transTimeSec,
-        apexSpeedRatio: apexRatio,
-        totalChicaneTimeDeltaSec: totalDelta,
-        steeringReversalRateDegPerSec,
-      };
-
-      corner.typeSpecificDetails = {
-        ...corner.typeSpecificDetails,
-        steeringReversalRateDegPerSec,
-        speedDecayKmh: complexType === 'esses' ? speedDecayKmh : undefined,
-      };
-    }
-  }
 
   segments.forEach((s, idx) => { s.segmentIndex = idx; });
   return segments;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { findIndexAtDistance, PointComparison } from '../../../utils/replayComparison.js';
 
 export interface TelemetryCornerStripProps {
   corners: CornerSegmentComparison[];
@@ -11,6 +12,7 @@ export interface TelemetryCornerStripProps {
   currentDistM?: number;
   sectors?: { s1Frame: number; s2Frame: number };
   cumDists?: number[];
+  pointComparisons?: PointComparison[];
   className?: string;
 }
 
@@ -22,6 +24,8 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
   onJumpToDistance,
   isCompareMode = false,
   currentDistM,
+  pointComparisons,
+  cumDists,
   className = '',
 }) => {
   if ((!corners || corners.length === 0) && !initialStraight) {
@@ -85,6 +89,20 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
             'border-slate-800/90 bg-slate-900/50 hover:border-sky-500/60 hover:bg-slate-800/60';
         }
 
+        const stEntryIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, initialStraight.entryDistM) : -1;
+        const stExitIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, initialStraight.exitDistM) : -1;
+        const stEntryDelta = stEntryIdx >= 0 && pointComparisons ? pointComparisons[stEntryIdx]?.deltaTimeSec : undefined;
+        const stExitDelta = stExitIdx >= 0 && pointComparisons ? pointComparisons[stExitIdx]?.deltaTimeSec : undefined;
+        const stTooltip = `Main Straight (Start/Finish): ${initialStraight.lengthM}m, Top Speed ${initialStraight.primaryTopSpeedKmh} km/h, Time ${initialStraight.primaryTimeSec}s${
+          isCompareMode
+            ? `, Delta ${initialStraight.timeDeltaSec > 0 ? '+' : ''}${initialStraight.timeDeltaSec.toFixed(3)}s${
+                stEntryDelta !== undefined && stExitDelta !== undefined
+                  ? ` (Running: ${stEntryDelta >= 0 ? '+' : ''}${stEntryDelta.toFixed(2)}s → ${stExitDelta >= 0 ? '+' : ''}${stExitDelta.toFixed(2)}s)`
+                  : ''
+              }`
+            : ''
+        }`;
+
         return (
           <button
             key="initial-straight"
@@ -94,9 +112,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
               onSelectCorner?.(null);
               onJumpToDistance?.(Math.round(initialStraight.entryDistM + initialStraight.lengthM / 2));
             }}
-            title={`Main Straight (Start/Finish): ${initialStraight.lengthM}m, Top Speed ${initialStraight.primaryTopSpeedKmh} km/h, Time ${initialStraight.primaryTimeSec}s${
-              isCompareMode ? `, Delta ${initialStraight.timeDeltaSec > 0 ? '+' : ''}${initialStraight.timeDeltaSec.toFixed(3)}s` : ''
-            }`}
+            title={stTooltip}
             className={`flex-1 min-w-[58px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass}`}
           >
             <span className="text-[10px] font-mono font-bold tracking-wider text-amber-400">
@@ -160,15 +176,24 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
             'border-slate-800/90 bg-slate-900/50 hover:border-sky-500/60 hover:bg-slate-800/60';
         }
 
+        const entryIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, c.entryDistM) : -1;
+        const exitIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, c.exitDistM) : -1;
+        const entryDelta = entryIdx >= 0 && pointComparisons ? pointComparisons[entryIdx]?.deltaTimeSec : undefined;
+        const exitDelta = exitIdx >= 0 && pointComparisons ? pointComparisons[exitIdx]?.deltaTimeSec : undefined;
+
+        const cornerTooltip = isCompareMode
+          ? entryDelta !== undefined && exitDelta !== undefined
+            ? `Turn ${c.cornerNumber}: Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(2)}s (Running: ${entryDelta >= 0 ? '+' : ''}${entryDelta.toFixed(2)}s → ${exitDelta >= 0 ? '+' : ''}${exitDelta.toFixed(2)}s)`
+            : `Corner ${c.cornerNumber}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s, Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(3)}s`
+          : `Corner ${c.cornerNumber}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s`;
+
         return (
           <button
             key={c.cornerNumber}
             type="button"
             aria-label={`Turn ${c.cornerNumber}`}
             onClick={() => handleCornerClick(c.cornerNumber, c.minDistM)}
-            title={`Corner ${c.cornerNumber}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s${
-              isCompareMode ? `, Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(3)}s` : ''
-            }`}
+            title={cornerTooltip}
             className={`flex-1 min-w-[62px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass}`}
           >
             <span
