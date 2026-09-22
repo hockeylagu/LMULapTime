@@ -31,7 +31,8 @@ import {
 } from '../../src/utils/formatters.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../src/utils/lapComparison.js';
 import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
-import { matchesTrack, matchesCarClass, getTrackAndLayout, CIRCUIT_DEFINITIONS } from '../../src/utils/paceCategory.js';
+import { matchesTrack, matchesCarClass } from '../../src/utils/paceCategory.js';
+import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
 
 export { getDisplayTrackName };
 
@@ -324,7 +325,7 @@ export class LmuParser {
       drivers.forEach(driver => {
         driver.laps.forEach(lap => {
           if (lap.isValid && lap.lapTime) {
-            const paceInfo = calculatePaceCategory(lap.lapTime, trackVenue, trackCourse, driver.carClass, driver.carType);
+            const paceInfo = calculatePaceCategory(lap.lapTime, trackVenue, trackCourse, driver.carClass, driver.carType, trackLengthMeters);
             if (paceInfo) {
               lap.paceCategory = paceInfo.category;
               lap.pacePercentage = paceInfo.percentage;
@@ -334,7 +335,7 @@ export class LmuParser {
         });
 
         if (driver.bestLapTime) {
-          const bestPaceInfo = calculatePaceCategory(driver.bestLapTime, trackVenue, trackCourse, driver.carClass, driver.carType);
+          const bestPaceInfo = calculatePaceCategory(driver.bestLapTime, trackVenue, trackCourse, driver.carClass, driver.carType, trackLengthMeters);
           if (bestPaceInfo) {
             driver.bestLapPaceCategory = bestPaceInfo.category;
             driver.bestLapPacePercentage = bestPaceInfo.percentage;
@@ -917,17 +918,15 @@ export class LmuParser {
     // replay is available (e.g. a session logged under the bare circuit name with only a
     // named-layout replay on disk, or vice versa).
     const fallbackCandidates = sessionScoped.filter(v => {
-      const qInfo = getTrackAndLayout(v.trackName, '');
-      const sInfo = getTrackAndLayout(trackVenue, trackCourse);
+      const qSpec = getCircuitSpecification(v.trackName);
+      const sSpec = getCircuitSpecification(trackVenue, trackCourse);
 
-      if (qInfo.isKnown && sInfo.isKnown) {
-        if (qInfo.circuit !== sInfo.circuit) return false;
-        const circuitDef = CIRCUIT_DEFINITIONS.find(c => c.circuitId === qInfo.circuit);
-        const defaultLayout = circuitDef?.defaultLayout;
-        return Boolean(defaultLayout && (qInfo.layout === defaultLayout || sInfo.layout === defaultLayout));
+      if (qSpec.layoutKey !== 'unknown' && sSpec.layoutKey !== 'unknown') {
+        if (qSpec.circuitId !== sSpec.circuitId) return false;
+        return Boolean(qSpec.isDefaultLayout || sSpec.isDefaultLayout);
       }
 
-      if (!qInfo.isKnown && !sInfo.isKnown) {
+      if (qSpec.layoutKey === 'unknown' && sSpec.layoutKey === 'unknown') {
         const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const normXmlCourse = (trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const normXmlVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');

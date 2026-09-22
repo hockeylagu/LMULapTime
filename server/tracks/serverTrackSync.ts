@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
-import { resolveTrackLayoutKey } from '../../src/utils/trackLayout.js';
+import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
 import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
 
 interface CachedTrackDefinition {
@@ -78,13 +78,16 @@ export function enrichTrajectoryWithTrackGeometry(
   trajectory: ReplayTrajectoryData,
   venue?: string | null,
   course?: string | null,
-  replayName?: string | null
+  replayName?: string | null,
+  sceneDesc?: string | null,
+  trackLengthMeters?: number | null
 ): ReplayTrajectoryData {
   if (!trajectory || !trajectory.points || trajectory.points.length === 0) {
     return trajectory;
   }
 
-  const resolvedKey = resolveTrackLayoutKey(venue, course, replayName);
+  const spec = getCircuitSpecification(venue, course, sceneDesc, replayName, null, trackLengthMeters);
+  const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
   const trackDef = resolvedKey ? getTrackDefinition(resolvedKey) : null;
 
   if (trackDef) {

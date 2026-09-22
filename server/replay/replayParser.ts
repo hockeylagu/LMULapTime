@@ -371,6 +371,7 @@ export function parseReplayMetadata(
       sessionType,
       privateSession,
       scn: scn || undefined,
+      sceneDesc: scn ? scn.replace(/\.scn$/i, '').trim() : undefined,
       aiw: aiw || undefined,
       trackName: trackName || undefined,
       trackCourse: filenameTrack || undefined,
