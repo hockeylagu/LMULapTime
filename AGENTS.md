@@ -49,6 +49,7 @@ LMULapTime/
 │   ├── XML_FORMAT.md               # LMU XML Results log schema specification
 │   ├── VCR_FORMAT.md               # Binary VCR header and stream packet layout
 │   ├── VCR_ANALYSIS.md             # Technical deep-dive on binary decoding
+│   └── LMU_REST_API.md             # Embedded REST API (:6397) & Swagger reference
 ├── server/                         # Express backend & ingestion pipeline
 │   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index
 │   ├── index.ts                    # API routes and server entry

@@ -1,0 +1,2629 @@
+{
+   "definitions": {
+      "GarageVal": {
+         "properties": {
+            "value": {
+               "type": "integer"
+            }
+         },
+         "type": "object"
+      },
+      "SessionID": {
+         "enum": [
+            "SESSSET_pract1",
+            "SESSSET_pract2",
+            "SESSSET_pract3",
+            "SESSSET_pract4",
+            "SESSSET_num_qual_sessions",
+            "SESSSET_run_warmup",
+            "SESSSET_num_race_sessions",
+            "SESSSET_race_timer",
+            "SESSSET_recon_pit_open",
+            "SESSSET_recon_pit_closed",
+            "SESSSET_recon_timer",
+            "SESSSET_reconnaissance",
+            "SESSSET_walkthrough",
+            "SESSSET_formation",
+            "SESSSET_force_formation",
+            "SESSSET_unsportsmanlike",
+            "SESSSET_safetycarcollision",
+            "SESSSET_safetycar_thresh",
+            "SESSSET_adjust_frozen",
+            "SESSSET_flag_rules",
+            "SESSSET_blue_flags",
+            "SESSSET_cuts_allowed",
+            "SESSSET_cut_rules",
+            "SESSSET_weather",
+            "SESSSET_timescaled_weather",
+            "SESSSET_realroad_timescale_practice",
+            "SESSSET_realroad_timescale_qualify",
+            "SESSSET_realroad_timescale_race",
+            "SESSSET_practice1_starting_time",
+            "SESSSET_warmup_starting_time",
+            "SESSSET_qualify_starting_time",
+            "SESSSET_race_starting_time",
+            "SESSSET_race_timescale",
+            "SESSSET_private_qual",
+            "SESSSET_private_prac",
+            "SESSSET_parc_ferme",
+            "SESSSET_Practice_Length",
+            "SESSSET_Qualify_Length",
+            "SESSSET_WarmUp_Length",
+            "SESSSET_Race_Laps",
+            "SESSSET_Fuel_Usage",
+            "SESSSET_Tire_Wear",
+            "SESSSET_Mech_Failures",
+            "SESSSET_Num_Opponents",
+            "SESSSET_Damage_Multi",
+            "SESSSET_AI_Strength",
+            "SESSSET_AI_Aggression",
+            "SESSSET_Finish_Criteria",
+            "SESSSET_Grid_Position",
+            "SESSSET_pract1_realroad_init",
+            "SESSSET_qual1_realroad_init",
+            "SESSSET_race_realroad_init",
+            "SESSSET_pract1_realroad_wet",
+            "SESSSET_qual1_realroad_wet",
+            "SESSSET_race_realroad_wet",
+            "SESSSET_pract1_realroad_temperatures",
+            "SESSSET_qual1_realroad_temperatures",
+            "SESSSET_race_realroad_temperatures",
+            "SESSSET_race_time",
+            "SESSSET_keep_tire_inv_on_track_change",
+            "SESSSET_tires_available_in_garage",
+            "SESSSET_tire_warmers"
+         ],
+         "type": "string"
+      },
+      "SessionValue": {
+         "properties": {
+            "sessionSetting": {
+               "$ref": "#/definitions/SessionID"
+            },
+            "value": {
+               "type": "integer"
+            }
+         },
+         "type": "object"
+      },
+      "saveFileJSONFromFileName": {
+         "properties": {
+            "category": {
+               "type": "string"
+            },
+            "filename": {
+               "type": "string"
+            }
+         },
+         "type": "object"
+      }
+   },
+   "info": {
+      "title": "LMU",
+      "version": "1.0"
+   },
+   "paths": {
+      "/navigation/GetLoadingScreen": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/action/{action}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "action",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/getReferrer": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/openLiveryEditor": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/sendToLog": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/setReferrer": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/navigation/state": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/cancelSteamAuth": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/chat/": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/(VM_.*)": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "mod",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "$ref": "#/definitions/GarageVal"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "GarageVal"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/(WM_.*)-(.*)": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "mod",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "wheel",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "$ref": "#/definitions/GarageVal"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "GarageVal"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/PitMenu/loadPitMenu": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/PitMenu/receivePitMenu": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/SetCurrentVehicle": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/SetPreviewSaveFile": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/CarSetupOverview": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/CoopOverview": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/DriverHandOffStintEnd": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/DriverHandOffStintStart": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/PitCarReview": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/RepairAndRefuel": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/SessionSetup": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/UIScreen/TireManagement": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/brakeinfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/drive": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/getPlayerGarageData": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/getVehicleCondition": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/isRefreshInProgress": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/refreshSetups": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         },
+         "put": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup/(.*)": {
+         "delete": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "setup",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup/compare": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup/default": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup/notes": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/setup/notes/(.*)": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "setup",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/showOnlyRelevantSetups": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/summary": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/tireinfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/garage/toRaceMenu": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/hud": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/hud/toggle/{component}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "component",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/hud/toggleAllComponents/{visible}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "visible",
+                  "type": "boolean"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/liveryeditor/setCamera/{camera}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "camera",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/liveryeditor/showRegionTexture/{active}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "active",
+                  "type": "boolean"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/liveryeditor/submitCustomSkin": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/download/{materialGuid}": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/liveryeditor/getCustomSkinInfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/liveryeditor/reloadCustomSkin": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/{materialGuid}": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/{materialGuid}/persist": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/{materialGuid}/shader": {
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/materialeditor/{materialGuid}/{map}": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "materialGuid",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "map",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "thumbSize",
+                  "type": "integer"
+               },
+               {
+                  "in": "query",
+                  "name": "R",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/cancelJoinRequest": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/exitVehicle": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/join": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "query",
+                  "name": "host",
+                  "type": "string"
+               },
+               {
+                  "in": "query",
+                  "name": "port",
+                  "type": "integer"
+               },
+               {
+                  "in": "path",
+                  "name": "password",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "authentication",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "teamName",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "vehicleNumber",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "paintBlobId",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/join/state": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/steam/status": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/takeControlOfVehicle": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/multiplayer/teams": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/ApplyVideoOptions": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/UIScreen/Controls": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/assign/cancel": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/assign/changestatus": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/assign/confirm": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/commandline": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/display": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/float": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/getAllHapticsDevices": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/getAllResolutions": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/getAllSoundDevices": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/getLanguage": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/graphics/confirmgraphics": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/graphics/resetgraphics": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/liveInputs": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/long": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/occlusionCullingSupported": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/resetVRView": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setConfigControl": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setControls": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setHapticsDevice": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "query",
+                  "name": "Name",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setInMenuGfxEffects": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setInputAxisProperties": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/setSoundDevice": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "query",
+                  "name": "Name",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/settings": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/options/unsetConfigControl": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/DLC/viewDLC": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/eacActive": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/firstRun": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/getAuthSessionTicket": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/inDevMode": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/profileInfo/getProfileInfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/profile/profileInfo/setProfileInfo": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/car": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/car/{id}/image": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "id",
+                  "type": "string"
+               },
+               {
+                  "in": "query",
+                  "name": "type",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/getAllowedToStartRacing": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/startRace": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/track": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": "[a-fA-F0-9]*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#[a-fA-F0-9]*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/race/track/{id}/trackmap": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "id",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/replay/CameraController/getCameraInfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/replay/CameraController/setCamera": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/replay/CameraController/setCameraByName/{cameraName}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "cameraName",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/replay/isActive": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/replay/toggleactive": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/?": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/Championship/getCurrentChampTemplate": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/Championship/getGrid": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/Championship/setCurrentChampionshipTemplate": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/Coop/setCoopDriverID": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/FFtoRaceEnd": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/GetGameState": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/GetSessionsInfoForEvent": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/MultiStintRace/Drive": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/MultiStintRace/UnPause": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/MultiStintRace/setDriverInfo": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/compressSaveFile": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/decompressSaveFile": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/deleteSaveFile": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/doesBackupExistForThisSession": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/generateSaveFileFromSessionPreset": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/getEveryLocalSave": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/getNumSaves": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/getSaveJSON": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/isSaveNameValid": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "$ref": "#/definitions/saveFileJSONFromFileName"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "saveFileJSONFromFileName"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/loadGame": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/saveGame": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/saveLastBackup": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SaveLoad/saveTemplateToFile": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SessionPresets/applyPreset": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SessionPresets/getDefaultPresetForTrack": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/SessionPresets/requestPreset": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/ai/TakeDriverControl": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/ai/forcePlayerVehAiPit": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/amount": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/clearEventNotification": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/continueGame": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/getAllAvailableVehicles": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/getAllVehicles": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/getTracksAll": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/getTracksInSeries": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/notifyInPauseSettings": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/opponents": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/opponents/all": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/playVOTrigger": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/playerSettings/backupPlayerSettings": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/playerSettings/restorePlayerSettingsFromBackup": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/raceControlVerification": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/restartStintAvailable": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/resumePitStop": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/returnToMonitor": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/saveload/getSaveFileJSONFromFilename": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "$ref": "#/definitions/saveFileJSONFromFileName"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "saveFileJSONFromFileName"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/setEventNotification": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/setHudOnWatchScreen": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/settings": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "$ref": "#/definitions/SessionValue"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "SessionValue"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/weather": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/weather/{session}/{node}/{setting}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "session",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "node",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "setting",
+                  "type": "string"
+               },
+               {
+                  "in": "body",
+                  "name": "body",
+                  "schema": {
+                     "pattern": ".*",
+                     "type": "string"
+                  }
+               }
+            ],
+            "responses": {
+               "200": {
+                  "content": {
+                     "application/json": {
+                        "schema": "#.*"
+                     }
+                  },
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/weather/{session}/{preset}": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "session",
+                  "type": "string"
+               },
+               {
+                  "in": "path",
+                  "name": "preset",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/sessions/{session}/sessions": {
+         "post": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "session",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/start/openExternalBrowserToURL": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/strategy/overall": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/strategy/pitstop-estimate": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/strategy/usage": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/focus": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/focus/{cameraType}/{trackSideGroup}/{shouldAdvance}": {
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "cameraType",
+                  "type": "integer"
+               },
+               {
+                  "in": "path",
+                  "name": "trackSideGroup",
+                  "type": "integer"
+               },
+               {
+                  "in": "path",
+                  "name": "shouldAdvance",
+                  "type": "boolean"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/focus/{slotid}": {
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "slotid",
+                  "type": "integer"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/focusBackward": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/focusForward": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/getBookmarkedTimestamps": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/getIncidentsList/{minTimeBetweenContacts}": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "minTimeBetweenContacts",
+                  "type": "number"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/play/{id}": {
+         "get": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "id",
+                  "type": "integer"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replay/getReplayFolder": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replay/setCurrentMetadata": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replay/setReplayFolder": {
+         "put": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replay/setReplayUIVisible": {
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replayCommand/{command}": {
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "command",
+                  "type": "string"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replays": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/replaytime/{time}": {
+         "put": {
+            "parameters": [
+               {
+                  "in": "path",
+                  "name": "time",
+                  "type": "number"
+               }
+            ],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/sessionInfo": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/standings": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/standings/history": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/rest/watch/trackmap": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      },
+      "/webdata/.*": {
+         "get": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         },
+         "post": {
+            "parameters": [],
+            "responses": {
+               "200": {
+                  "description": "OK"
+               }
+            }
+         }
+      }
+   },
+   "swagger": "2.0"
+}
