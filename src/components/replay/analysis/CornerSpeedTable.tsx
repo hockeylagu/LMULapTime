@@ -112,7 +112,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
         </div>
       )}
 
-      <div className={`min-h-0 overflow-y-auto ${selectedCornerChart ? 'flex-[0_1_240px] max-h-[260px]' : 'flex-1'}`}>
+      <div className={selectedCornerChart ? 'shrink-0' : 'min-h-0 overflow-y-auto flex-1'}>
         <table className="w-full text-[11px] font-mono border-collapse">
           <thead className="sticky top-0 bg-lmu-card border-b border-lmu-border z-10">
             <tr className="text-lmu-muted uppercase tracking-wider text-[10px]">
@@ -130,9 +130,9 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                 <>
                   <th className="px-2 py-1.5 text-right">Arc / Dir</th>
                   <th className="px-2 py-1.5 text-right">Turn-In</th>
-                  <th className="px-2 py-1.5 text-right">Rot% @ Gas</th>
+                  <th className="px-2 py-1.5 text-right">Head @ 15%</th>
                   <th className="px-2 py-1.5 text-right">Trail Brk</th>
-                  <th className="px-2 py-1.5 text-right">Score</th>
+                  <th className="px-2 py-1.5 text-right">Rot Δ</th>
                   <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Time' : 'Δ Time'}</th>
                 </>
               )}
@@ -204,7 +204,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           {s.primaryRotationAtThrottlePct !== null && s.primaryRotationAtThrottlePct !== undefined ? (
-                            <span className={s.primaryRotationAtThrottlePct >= 80 ? 'text-emerald-400 font-bold' : s.primaryRotationAtThrottlePct >= 60 ? 'text-amber-400' : 'text-rose-400'}>
+                            <span className="text-white">
                               {s.primaryRotationAtThrottlePct}%
                             </span>
                           ) : '--'}
@@ -212,15 +212,8 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                         <td className="px-2 py-1.5 text-right text-white">
                           {s.trailBrakeDistM ? `${s.trailBrakeDistM}m` : '--'}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
-                          {s.cornerQualityScore !== undefined ? (
-                            <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${
-                              s.cornerQualityScore >= 80 ? 'text-emerald-300 bg-emerald-500/20' :
-                              s.cornerQualityScore >= 60 ? 'text-amber-300 bg-amber-500/20' : 'text-rose-300 bg-rose-500/20'
-                            }`}>
-                              {s.cornerQualityScore}
-                            </span>
-                          ) : '--'}
+                        <td className={`px-2 py-1.5 text-right ${timeDeltaClass(s.phaseTiming?.rotation.timeDeltaSec ?? 0)}`}>
+                          {s.phaseTiming ? formatTimeDelta(s.phaseTiming.rotation.timeDeltaSec) : '--'}
                         </td>
                       </>
                     )}

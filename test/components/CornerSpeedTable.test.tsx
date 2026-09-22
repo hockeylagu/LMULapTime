@@ -48,6 +48,20 @@ describe('CornerSpeedTable', () => {
     timeDeltaSec: 0.1,
   };
 
+  it('keeps the corner list unscrolled above selected corner data', () => {
+    const { container } = render(
+      <CornerSpeedTable
+        segments={[cornerSegment, straightSegment]}
+        selectedCornerChart={<div>Selected corner data</div>}
+      />
+    );
+
+    const tableContainer = container.querySelector('table')?.parentElement;
+    expect(tableContainer).toHaveClass('shrink-0');
+    expect(tableContainer).not.toHaveClass('overflow-y-auto');
+    expect(screen.getByText('Selected corner data')).toBeInTheDocument();
+  });
+
   it('shows an empty-state message when there are no segments', () => {
     render(<CornerSpeedTable segments={[]} />);
     expect(screen.getByText(/Not enough distinct braking\/apex events/i)).toBeInTheDocument();
@@ -144,7 +158,7 @@ describe('CornerSpeedTable', () => {
     expect(screen.getByText(/T3 \+0.210s/i)).toBeInTheDocument();
   });
 
-  it('switches to Technique view mode and displays angle, turn-in, rotation %, and quality score', async () => {
+  it('switches to Technique view mode and displays measured corner observations', async () => {
     const user = userEvent.setup();
     const techniqueCorner: LapSegmentComparison = {
       ...cornerSegment,
@@ -153,7 +167,10 @@ describe('CornerSpeedTable', () => {
       primaryTurnInDistM: 38,
       primaryRotationAtThrottlePct: 84,
       trailBrakeDistM: 12,
-      cornerQualityScore: 91,
+      phaseTiming: {
+        rotation: { startDistM: 40, endDistM: 50, timeDeltaSec: 0.091 },
+        exit: { startDistM: 50, endDistM: 70, timeDeltaSec: 0.109 },
+      },
     };
 
     render(<CornerSpeedTable segments={[techniqueCorner, straightSegment]} />);
@@ -165,11 +182,12 @@ describe('CornerSpeedTable', () => {
     await user.click(screen.getByRole('button', { name: /Technique/i }));
 
     expect(screen.getByText('Arc / Dir')).toBeInTheDocument();
-    expect(screen.getByText('Rot% @ Gas')).toBeInTheDocument();
+    expect(screen.getByText('Head @ 15%')).toBeInTheDocument();
     expect(screen.getByText('↱ 88°')).toBeInTheDocument();
     expect(screen.getAllByText('12m')).toHaveLength(2); // Turn-in 12m, Trail-brake 12m
     expect(screen.getByText('84%')).toBeInTheDocument();
-    expect(screen.getByText('91')).toBeInTheDocument(); // Quality score
+    expect(screen.getByText('Head @ 15%')).toBeInTheDocument();
+    expect(screen.getByText('+0.091s')).toBeInTheDocument();
   });
 
   it('renders selectedCornerChart flowing naturally below table inside scrollable container', () => {

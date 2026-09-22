@@ -118,7 +118,7 @@ describe('ReplayInspectorSidebar', () => {
     // Corner details rendered
     expect(screen.getByText(/Turn 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Entry Phase/i)).toBeInTheDocument();
-    expect(screen.getByText(/Apex Phase/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rotation Phase/i)).toBeInTheDocument();
   });
 
   it('toggles corners panel closed (back to map) when active corners toggle is clicked', () => {

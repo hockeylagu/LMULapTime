@@ -23,6 +23,12 @@ export interface CornerTrackUsage {
   totalSweepM?: number;
 }
 
+export interface CornerPhaseTiming {
+  entry?: { startDistM: number; endDistM: number; timeDeltaSec: number };
+  rotation: { startDistM: number; endDistM: number; timeDeltaSec: number };
+  exit: { startDistM: number; endDistM: number; timeDeltaSec: number };
+}
+
 export interface CornerTypeSpecificDetails {
   exitWheelSlipActive?: boolean;
   steeringScrubDeg?: number;
@@ -49,6 +55,9 @@ export interface CornerSegmentComparison extends BaseSegmentComparison {
   primaryThrottleOnDistM: number | null;
   baselineThrottleOnDistM: number | null;
   throttleOnDeltaM: number | null;
+  primaryInitialThrottleDistM?: number | null;
+  baselineInitialThrottleDistM?: number | null;
+  initialThrottleDeltaM?: number | null;
 
   // --- Enhanced Corner Quality & Technique Metrics ---
   turnDirection?: 'left' | 'right';
@@ -80,8 +89,9 @@ export interface CornerSegmentComparison extends BaseSegmentComparison {
   primaryTrackUsage?: CornerTrackUsage;
   baselineTrackUsage?: CornerTrackUsage;
 
-  // Corner Quality Score (0-100)
-  cornerQualityScore?: number;
+  // Isolated time deltas for physical corner phases. Entry is unavailable when turn-in
+  // cannot be measured; rotation then begins at the detected corner entry.
+  phaseTiming?: CornerPhaseTiming;
 
   typeSpecificDetails?: CornerTypeSpecificDetails;
 }
@@ -251,29 +261,21 @@ function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: number[], 
   return Math.atan2(dx, dz);
 }
 
-function computeCornerQualityScore(
-  timeDeltaSec: number,
-  rotationAtThrottlePct: number | null,
-  trailBrakeDistM: number,
-  cornerLengthM: number,
-  apexRatioPct: number,
-  selfAnalysis: boolean
-): number {
-  let score = 75;
-  if (!selfAnalysis) {
-    score += Math.max(-25, Math.min(15, -timeDeltaSec * 100));
+function interpolateCoordinateAtDistance(dists: number[], coordinates: number[], targetDistM: number): number {
+  if (dists.length === 0 || coordinates.length === 0) return targetDistM;
+  if (targetDistM <= dists[0]) return coordinates[0];
+  const lastIndex = dists.length - 1;
+  if (targetDistM >= dists[lastIndex]) return coordinates[lastIndex];
+
+  for (let index = 1; index < dists.length; index++) {
+    if (dists[index] < targetDistM) continue;
+    const distanceSpan = dists[index] - dists[index - 1];
+    if (distanceSpan <= 0) return coordinates[index];
+    const ratio = (targetDistM - dists[index - 1]) / distanceSpan;
+    return coordinates[index - 1] + ratio * (coordinates[index] - coordinates[index - 1]);
   }
-  if (rotationAtThrottlePct !== null) {
-    if (rotationAtThrottlePct >= 80) score += 10;
-    else if (rotationAtThrottlePct >= 70) score += 5;
-    else if (rotationAtThrottlePct < 60) score -= Math.min(15, Math.round((60 - rotationAtThrottlePct) * 0.5));
-  }
-  if (trailBrakeDistM > 5 && cornerLengthM > 0) {
-    const trailRatio = trailBrakeDistM / cornerLengthM;
-    if (trailRatio >= 0.1 && trailRatio <= 0.4) score += 5;
-  }
-  if (apexRatioPct < 35) score -= 8;
-  return Math.max(10, Math.min(99, Math.round(score)));
+
+  return coordinates[lastIndex];
 }
 
 /**
@@ -404,7 +406,10 @@ export function computeLapSegmentComparisons(
     let steerCount = 0;
     let primaryPeakYawRateDeg = 0;
     let baselinePeakYawRateDeg = 0;
-    let trailBrakeSteps = 0;
+    let trailBrakeDistM = 0;
+    let trailBrakeDurationSec = 0;
+    let previousTrailBrakeSample: InterpolatedPoint | null = null;
+    let previousTrailBrakeDistM: number | null = null;
     let maxUndersteerDeg = 0;
     let exitWheelSlipActive = false;
 
@@ -416,7 +421,15 @@ export function computeLapSegmentComparisons(
         primaryPeakYawRateDeg = Math.max(primaryPeakYawRateDeg, Math.abs(p.yawRateDeg));
       }
       if ((p.brake || 0) >= 5 && Math.abs(p.steerYaw || 0) >= 5) {
-        trailBrakeSteps++;
+        if (previousTrailBrakeSample && previousTrailBrakeDistM !== null) {
+          trailBrakeDistM += d - previousTrailBrakeDistM;
+          trailBrakeDurationSec += Math.max(0, p.timeSec - previousTrailBrakeSample.timeSec);
+        }
+        previousTrailBrakeSample = p;
+        previousTrailBrakeDistM = d;
+      } else {
+        previousTrailBrakeSample = null;
+        previousTrailBrakeDistM = null;
       }
       if (p.understeerDeg !== undefined) {
         maxUndersteerDeg = Math.max(maxUndersteerDeg, Math.abs(p.understeerDeg));
@@ -474,10 +487,37 @@ export function computeLapSegmentComparisons(
       ? primaryTurnInDistM - primaryBrakingDistM
       : null;
 
+    const coordinateAtDistance = (distanceM: number): number =>
+      canMatchByStation
+        ? interpolateCoordinateAtDistance(primaryDists, primaryRefCoords, distanceM)
+        : distanceM;
+    const phaseDelta = (startDistM: number, endDistM: number): number =>
+      Number((deltaAt(coordinateAtDistance(endDistM)) - deltaAt(coordinateAtDistance(startDistM))).toFixed(3));
+    const rotationStartDistM = primaryTurnInDistM ?? entry.distM;
+    const phaseTiming: CornerPhaseTiming = {
+      entry: primaryTurnInDistM !== null
+        ? {
+            startDistM: Math.round(entry.distM),
+            endDistM: primaryTurnInDistM,
+            timeDeltaSec: phaseDelta(entry.distM, primaryTurnInDistM),
+          }
+        : undefined,
+      rotation: {
+        startDistM: Math.round(rotationStartDistM),
+        endDistM: Math.round(min.distM),
+        timeDeltaSec: phaseDelta(rotationStartDistM, min.distM),
+      },
+      exit: {
+        startDistM: Math.round(min.distM),
+        endDistM: Math.round(exit.distM),
+        timeDeltaSec: phaseDelta(min.distM, exit.distM),
+      },
+    };
+
     // Trail-Braking
-    const trailBrakeDistM = trailBrakeSteps * SEGMENT_SCAN_STEP_M;
-    const trailBrakeDurationSec = primaryBrakingDistM !== null
-      ? Number(Math.max(0, primaryAtMin.timeSec - interpolatePointAtDistance(primaryPoints, primaryDists, primaryBrakingDistM).timeSec).toFixed(2))
+    const roundedTrailBrakeDistM = Math.round(trailBrakeDistM);
+    const roundedTrailBrakeDurationSec = trailBrakeDistM > 0
+      ? Number(trailBrakeDurationSec.toFixed(2))
       : undefined;
 
     // Rotation Complete at Throttle
@@ -562,8 +602,6 @@ export function computeLapSegmentComparisons(
       ? primaryRefCoords[exit.index]
       : exit.distM;
     const timeDeltaSec = Number((deltaAt(exitCoord) - deltaAt(entryCoord)).toFixed(3));
-    const isSelf = primaryPoints === baselinePoints;
-    const cornerQualityScore = computeCornerQualityScore(timeDeltaSec, primaryRotationAtThrottlePct, trailBrakeDistM, lengthM, apexRatioPct, isSelf);
 
     const typeSpecificDetails: CornerTypeSpecificDetails = {
       steeringScrubDeg: maxUndersteerDeg > 0 ? Number(maxUndersteerDeg.toFixed(1)) : undefined,
@@ -594,6 +632,11 @@ export function computeLapSegmentComparisons(
       primaryThrottleOnDistM,
       baselineThrottleOnDistM,
       throttleOnDeltaM: primaryThrottleOnDistM !== null && baselineThrottleOnDistM !== null ? Math.round(primaryThrottleOnDistM - baselineThrottleOnDistM) : null,
+      primaryInitialThrottleDistM: initialPrimaryThrottleDistM,
+      baselineInitialThrottleDistM: initialBaselineThrottleDistM,
+      initialThrottleDeltaM: initialPrimaryThrottleDistM !== null && initialBaselineThrottleDistM !== null
+        ? Math.round(initialPrimaryThrottleDistM - initialBaselineThrottleDistM)
+        : null,
       timeDeltaSec,
       turnDirection,
       cornerAngleDeg,
@@ -603,8 +646,8 @@ export function computeLapSegmentComparisons(
       baselineTurnInDistM,
       turnInDeltaM,
       straightBrakingDistM,
-      trailBrakeDistM,
-      trailBrakeDurationSec,
+      trailBrakeDistM: roundedTrailBrakeDistM,
+      trailBrakeDurationSec: roundedTrailBrakeDurationSec,
       primaryPeakYawRateDeg: Number(primaryPeakYawRateDeg.toFixed(1)),
       baselinePeakYawRateDeg: Number(baselinePeakYawRateDeg.toFixed(1)),
       peakYawRateDeltaDeg: Number((primaryPeakYawRateDeg - baselinePeakYawRateDeg).toFixed(1)),
@@ -613,7 +656,7 @@ export function computeLapSegmentComparisons(
       rotationAtThrottleDeltaPct,
       primaryTrackUsage,
       baselineTrackUsage,
-      cornerQualityScore,
+      phaseTiming,
       typeSpecificDetails,
     };
   };
