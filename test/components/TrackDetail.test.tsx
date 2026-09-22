@@ -545,7 +545,7 @@ describe('TrackDetail component', () => {
     fireEvent.click(infoBtn);
 
     expect(screen.getByRole('dialog', { name: /Circuit Information/i })).toBeInTheDocument();
-    expect(screen.getByText('19 Turns')).toBeInTheDocument();
+    expect(screen.getByText('20 Turns')).toBeInTheDocument();
     expect(screen.getByText(/Belgium/i)).toBeInTheDocument();
 
     const closeBtn = screen.getByTitle('Close');

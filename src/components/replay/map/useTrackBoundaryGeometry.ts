@@ -35,8 +35,7 @@ export interface TrackBoundaryGeometry {
   };
 }
 
-import { resolveTrackLayoutKey } from '../../../utils/trackLayout.js';
-export { resolveTrackLayoutKey };
+import { getCircuitSpecification } from '../../../utils/circuitSpecs.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
 // Capped with LRU eviction to keep memory low across 21 track geometries.
@@ -60,12 +59,14 @@ export interface UseTrackBoundaryGeometryOptions {
 }
 
 export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOptions) {
-  const resolvedKey = resolveTrackLayoutKey(
+  const spec = getCircuitSpecification(
     options.trackVenue,
     options.trackCourse,
+    null,
     options.replayName,
     options.layoutKey
   );
+  const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
 
   const [trackGeometry, setTrackGeometry] = useState<TrackBoundaryGeometry | null>(
     resolvedKey ? geometryCache.get(resolvedKey) || null : null

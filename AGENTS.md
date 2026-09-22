@@ -11,8 +11,8 @@ This document provides architectural standards, domain rules, coding conventions
 ### Key Capabilities:
 - **XML Session Log Parsing**: Extracts timing, lap splits (S1/S2/S3), sector speeds, tire degradation, fuel consumption, driver classifications, and penalties from LMU's `UserData/LOG/Results/*.xml`.
 - **Binary Replay (`.Vcr`) Parsing**: Custom reverse-engineered parser for native `gMb1.002f` binary replay files, extracting high-frequency 2D racing lines, yaw, throttle/brake inputs, steering, gear, and 4-wheel corner telemetry (tire carcass/inner temps, rotor temps, dynamic wear).
-- **Physical Track Boundaries & Limit Corridors**: Automated extraction, synthesis, and 1-step Procrustes alignment of physical road boundaries (`leftBoundary`, `rightBoundary`, `centerline`) in LMU world space across all 21 driven layouts using TUM survey data, Track-Atlas/OSM GPS, and native telemetry corridors.
-- **Track Layout Matching**: Disambiguates circuit variations (e.g. Monza GP vs. Curva Grande, Bahrain GP vs. Outer vs. Paddock, Paul Ricard Full vs. Short, Sebring Full vs. School).
+- **Physical Track Boundaries & Limit Corridors**: Automated extraction, synthesis, and 1-step Procrustes alignment of physical road boundaries (`leftBoundary`, `rightBoundary`, `centerline`) in LMU world space across all 32 driven layouts using TUM survey data, Track-Atlas/OSM GPS, and native telemetry corridors.
+- **Unified Circuit Specifications & Layout Disambiguation**: Centralized single source of truth in `src/utils/circuitSpecs.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`). Directly maps all 32 circuits to their canonical `circuitId`, `layoutId`, `isDefaultLayout`, `sceneDescs`, and official `benchmarkName` targets without intermediate shims.
 - **Community Benchmark Tracking**: Synchronizes alien reference targets from Google Sheets with automated diff calculation (new, updated, deprecated targets).
 - **Deterministic Coaching Engine**: Ranks driving technique deficits (braking points, trail braking release, throttle application, apex speeds) using deterministic evidence (`priority = estimatedTimeLoss * repeatability * confidence`).
 - **AI Race Engineer Reports**: Optional natural language coaching analysis powered by Google Gemini (`@google/genai`).
@@ -77,15 +77,16 @@ LMULapTime/
 │   │   ├── track-detail/   # Track layout telemetry, progression, benchmarks
 │   │   └── track-summaries/# Multi-track summary grid
 │   ├── utils/              # Data processing, formatters, math & physics
+│   │   ├── circuitSpecs.ts # Single canonical source of truth for all 32 circuits & layouts
 │   │   ├── cornerAnalysis.ts
 │   │   ├── formatters.ts   # Lap time formatters (m:ss.sss, deltas)
 │   │   ├── lapComparison.ts# Delta interpolations and sector calculations
-│   │   ├── paceCategory.ts # Alien to Offline benchmark classifications
+│   │   ├── paceCategory.ts # Pace percentages, styling, and vehicle class mapping
 │   │   ├── replayComparison.ts
 │   │   ├── telemetryPostProcessing.ts
 │   │   └── urlParams.ts    # Hash-based navigation utilities
 │   └── index.css           # Tailwind CSS imports & theme utilities
-├── test/                   # Vitest automated test suite (530+ tests)
+├── test/                   # Vitest automated test suite (820+ tests across 79 files)
 │   ├── components/         # React component tests
 │   ├── fixtures/           # Mock XML logs and binary VCR samples
 │   ├── server/             # Express routes, parser, and DB tests
@@ -103,10 +104,10 @@ LMULapTime/
 
 When adding features, fixing bugs, or refactoring code, adhere strictly to these domain invariants:
 
-### A. Strict Circuit Layout Disambiguation
-- LMU tracks frequently share a venue name but have drastically distinct layouts (e.g. Monza GP vs. Curva Grande; Bahrain GP vs. Outer vs. Paddock; Paul Ricard 1A-V2 vs. Short; Sebring International vs. School).
-- **Rule**: Never cross-pollinate benchmarks, records, or lap comparisons across differing layouts of the same facility.
-- Use layout normalization helpers (`normalizeTrackName`, `getTrackLayoutKey`) to ensure layout integrity.
+### A. Strict Circuit Layout Disambiguation & Single Source of Truth
+- **Single Source of Truth**: All 32 circuit and layout definitions, benchmark targets, and native engine scene descriptors (`sceneDescs`) are centralized in `src/utils/circuitSpecs.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`).
+- **Rule**: Never cross-pollinate benchmarks, records, or lap comparisons across differing layouts of the same facility (e.g. Monza GP vs. Curva Grande; Bahrain GP vs. Outer/Endurance; Sebring Full vs. School; Silverstone GP vs. National).
+- **Direct Resolution (No Shims)**: Always call `getCircuitSpecification(venueOrKey, course, sceneDesc, replayName, explicitKey, trackLengthMeters)` directly. Access `.layoutKey`, `.benchmarkName`, `.circuitId`, or `.layoutId` from the returned specification. Do not introduce intermediate wrappers, duplicate lookup tables, or shims.
 
 ### B. Lap Classification & Timing Integrity
 - Laps are categorized into:
@@ -167,7 +168,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with over 628 tests across 53 test files. Any change must preserve this coverage and run with zero warnings.
+The repository maintains an extensive automated test suite with over 820 tests across 79 test files. Any change must preserve this coverage and run with zero warnings.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`
@@ -188,6 +189,6 @@ The repository maintains an extensive automated test suite with over 628 tests a
 1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/parser.ts`), replay decoding (`server/replayParser.ts`), database cache (`server/db.ts`), track boundaries (`tools/analysis/buildAllTrackBoundaries.ts`), or UI views (`src/components/`).
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
-   - Run `npm test` to verify no regressions across the 579+ unit/integration tests.
+   - Run `npm test` to verify no regressions across the 820+ unit/integration tests.
    - Run `npm run build` to verify clean TypeScript compilation and bundle generation.
 4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants.

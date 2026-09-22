@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   parseReferenceCsv,
-  normalizeTrackName,
   normalizeCarClass,
   calculatePaceCategory,
   loadReferenceLaptimesFromCache,
@@ -43,13 +42,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
     });
   });
 
-  describe('normalizeTrackName and normalizeCarClass', () => {
-    it('normalizes tracks properly', () => {
-      expect(normalizeTrackName('Circuit de Spa-Francorchamps')).toBe('Spa');
-      expect(normalizeTrackName('Autodromo Nazionale Monza')).toBe('Monza');
-      expect(normalizeTrackName('Circuit Paul Ricard', '1A v2')).toBe('Paul Ricard (1A v2)');
-    });
-
+  describe('normalizeCarClass', () => {
     it('normalizes car classes properly', () => {
       expect(normalizeCarClass('Hypercar')).toBe('LMH');
       expect(normalizeCarClass('LMGT3')).toBe('LMGT3');
