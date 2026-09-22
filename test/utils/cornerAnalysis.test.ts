@@ -96,6 +96,31 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.baselineThrottleOnDistM).toBe(80);
     expect(corner.primaryThrottleOnDistM).toBe(70);
     expect(corner.throttleOnDeltaM).toBe(-10); // primary got back to full throttle 10m earlier
+    expect(corner.baselineInitialThrottleDistM).toBe(72);
+    expect(corner.primaryInitialThrottleDistM).toBe(70);
+    expect(corner.initialThrottleDeltaM).toBe(-2);
+  });
+
+  it('splits the isolated corner delta into measurable phase deltas', () => {
+    const baseline = withBrakeThrottle(buildLap(100, 0.3), 40, 80).map(point => ({
+      ...point,
+      steerYaw: point.x >= 50 && point.x <= 70 ? 20 : 0,
+    }));
+    const primary = withBrakeThrottle(buildLap(100, 0.5), 40, 80).map(point => ({
+      ...point,
+      steerYaw: point.x >= 50 && point.x <= 70 ? 20 : 0,
+    }));
+
+    const corner = computeLapSegmentComparisons(primary, baseline).find(segment => segment.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
+
+    expect(corner.phaseTiming?.entry).toMatchObject({ startDistM: 30, endDistM: 44 });
+    expect(corner.phaseTiming?.rotation).toMatchObject({ startDistM: 44, endDistM: 70 });
+    expect(corner.phaseTiming?.exit).toMatchObject({ startDistM: 70, endDistM: 110 });
+    const phaseTotal = (corner.phaseTiming?.entry?.timeDeltaSec ?? 0) +
+      corner.phaseTiming!.rotation.timeDeltaSec +
+      corner.phaseTiming!.exit.timeDeltaSec;
+    expect(phaseTotal).toBeCloseTo(corner.timeDeltaSec, 3);
   });
 
   it('keeps brake/throttle deltas correct even when the two recordings are independently mis-trimmed around the line', () => {
@@ -343,7 +368,9 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.primaryTrackUsage?.entryOffsetM).toBe(3.5);
     expect(corner.primaryTrackUsage?.apexMarginM).toBe(0.2);
     expect(corner.primaryTrackUsage?.exitWidthM).toBe(3.8);
-    expect(corner.cornerQualityScore).toBeGreaterThanOrEqual(50);
+    expect(corner.trailBrakeDistM).toBeGreaterThan(0);
+    expect(corner.trailBrakeDurationSec).toBeCloseTo(0.92, 2);
+    expect(corner.phaseTiming?.rotation).toBeDefined();
   });
 
   it('accurately computes rotation complete % at throttle onset', () => {

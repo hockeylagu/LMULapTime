@@ -115,15 +115,6 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-          {corner.cornerQualityScore !== undefined && (
-            <span className={`inline-flex items-center h-6 px-2.5 rounded text-xs font-mono font-bold border whitespace-nowrap ${
-              corner.cornerQualityScore >= 80 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
-              corner.cornerQualityScore >= 60 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
-              'bg-rose-500/10 border-rose-500/30 text-rose-400'
-            }`}>
-              Score {corner.cornerQualityScore}/100
-            </span>
-          )}
           {onClose && (
             <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-6 h-6 text-slate-400 hover:text-white rounded hover:bg-slate-800/60 transition-colors shrink-0">
               <X className="w-4 h-4" />

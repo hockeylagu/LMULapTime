@@ -60,7 +60,7 @@ describe('CornerApexChart', () => {
     expect(screen.getByText(/Turn 3/i)).toBeInTheDocument();
     expect(screen.getByText(/Entry Phase/i)).toBeInTheDocument();
     expect(screen.getByText('180')).toBeInTheDocument();
-    expect(screen.getByText(/Apex Phase/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rotation Phase/i)).toBeInTheDocument();
     expect(screen.getByText('85')).toBeInTheDocument();
     expect(screen.getByText(/Exit Phase/i)).toBeInTheDocument();
     expect(screen.getByText('150')).toBeInTheDocument();
@@ -155,7 +155,8 @@ describe('CornerApexChart', () => {
     );
 
     expect(screen.getByText('Brake Δ')).toBeInTheDocument();
-    expect(screen.getByText('Thr Δ')).toBeInTheDocument();
+    expect(screen.getByText('Thr 15% Δ')).toBeInTheDocument();
+    expect(screen.getByText('Thr 90% Δ')).toBeInTheDocument();
     expect(screen.getByText('Δ Time')).toBeInTheDocument();
     expect(screen.getByText('-0.100s')).toBeInTheDocument();
   });
@@ -167,7 +168,9 @@ describe('CornerApexChart', () => {
       turnDirection: 'right',
       primaryTurnInDistM: 10,
       primaryRotationAtThrottlePct: 82,
-      cornerQualityScore: 88,
+      primaryInitialThrottleDistM: 26,
+      baselineInitialThrottleDistM: 28,
+      initialThrottleDeltaM: -2,
       primaryTrackUsage: {
         entryOffsetM: 3.2,
         apexMarginM: 0.3,
@@ -186,11 +189,15 @@ describe('CornerApexChart', () => {
     );
 
     expect(screen.getByText(/92° right/i)).toBeInTheDocument();
-    expect(screen.getByText(/Rotation @ Throttle/i)).toBeInTheDocument();
+    expect(screen.getByText(/Heading @ 15% throttle/i)).toBeInTheDocument();
     expect(screen.getByText('82%')).toBeInTheDocument();
-    expect(screen.getByText(/Optimal \(Rotated\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/88\/100/i)).toBeInTheDocument();
-    expect(screen.getByText(/6.7m sweep/i)).toBeInTheDocument();
+    expect(screen.getByText('Thr 15% Δ')).toBeInTheDocument();
+    expect(screen.getByText('-2m')).toBeInTheDocument();
+    expect(screen.getByText('Thr 90% Δ')).toBeInTheDocument();
+    expect(screen.queryByText(/Optimal \(Rotated\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/88\/100/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/6.7m total change/i)).toBeInTheDocument();
+    expect(screen.getByText(/4.1m exit/i)).toBeInTheDocument();
   });
 
   it('renders compact micro-bar without the technique deck and triggers onOpenCornersTab', () => {

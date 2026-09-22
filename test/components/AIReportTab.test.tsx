@@ -23,6 +23,7 @@ const reportResponse = {
       why: 'The current release costs exit speed.',
       executionCue: 'Keep a light brake trace to the apex.',
       verify: 'Compare minimum speed next lap.',
+      evidence: ['Corner 3 rotation phase: +0.084s', 'Minimum speed: 62 km/h vs 67 km/h baseline'],
       estimatedGainSec: 0.245,
     }],
   },
@@ -107,6 +108,7 @@ describe('AIReportTab', () => {
     await waitFor(() => {
       expect(screen.getByText(/brake later and carry more speed/i)).toBeInTheDocument();
       expect(screen.getByText(/potential lap-time gain: 0\.245s/i)).toBeInTheDocument();
+      expect(screen.getByText(/corner 3 rotation phase: \+0\.084s/i)).toBeInTheDocument();
       expect(screen.getByText(/150 tokens/i)).toBeInTheDocument();
     });
 

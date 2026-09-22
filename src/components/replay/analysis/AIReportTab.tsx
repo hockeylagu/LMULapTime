@@ -150,6 +150,14 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
               <p><strong className="text-lmu-accent">Next lap:</strong> <span className="text-lmu-muted">{item.executionCue}</span></p>
               <p><strong className="text-lmu-accent">Verify:</strong> <span className="text-lmu-muted">{item.verify}</span></p>
             </div>
+            {item.evidence && item.evidence.length > 0 && (
+              <div className="mt-3 border-t border-lmu-border/60 pt-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted">Measured evidence</p>
+                <ul className="mt-1 space-y-1 text-xs text-slate-300">
+                  {item.evidence.map((evidence, evidenceIndex) => <li key={`${index}-${evidenceIndex}`}>• {evidence}</li>)}
+                </ul>
+              </div>
+            )}
             {item.estimatedGainSec !== undefined && <span className="mt-2 inline-block text-xs font-semibold text-emerald-300">Potential lap-time gain: {item.estimatedGainSec.toFixed(3)}s</span>}
           </article>)}
         </section>
