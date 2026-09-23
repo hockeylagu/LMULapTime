@@ -383,7 +383,7 @@ describe('SessionDetail component', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('C:\\LMU\\UserData\\Replays\\spa_replay.vcr');
   });
 
-  it('navigates to track detail when clicking track heading', async () => {
+  it('navigates to track detail when clicking track heading, carrying the session car class', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
@@ -392,7 +392,7 @@ describe('SessionDetail component', () => {
 
     const trackHeading = screen.getByRole('heading', { level: 2, name: /Spa/i });
     fireEvent.click(trackHeading);
-    expect(window.location.hash).toBe('#/track/Spa');
+    expect(window.location.hash).toBe('#/track/Spa?carClass=LMH');
   });
 
   it('opens the full comparison studio when clicking compare buttons', async () => {

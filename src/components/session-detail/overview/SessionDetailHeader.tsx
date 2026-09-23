@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/core/types';
 import { getDisplayTrackName } from '../../../utils/formatters.js';
+import { normalizeCarClass } from '../../../utils/paceCategory.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
@@ -177,7 +178,12 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                   <span className="text-xs text-lmu-muted">{session.timeString}</span>
                 </div>
                 <h2
-                  onClick={() => navigate(`/track/${encodeURIComponent(getDisplayTrackName(session.trackVenue, session.trackCourse))}`)}
+                  onClick={() => {
+                    const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+                    const carClass = normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType);
+                    const suffix = carClass ? `?carClass=${encodeURIComponent(carClass)}` : '';
+                    navigate(`/track/${encodeURIComponent(trackName)}${suffix}`);
+                  }}
                   className="text-2xl font-extrabold text-white cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
                   title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
                 >

@@ -164,7 +164,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     totalDrivingSeconds,
     maxTopSpeed,
     maxTopSpeedTrack,
-    averageSpeedKmh,
+    averageBenchmarkPacePercentage,
+    averageBenchmarkPaceCategory,
     practiceSessionsCount,
     qualifyingSessionsCount,
     raceSessionsCount,
@@ -220,7 +221,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             totalDrivingSeconds={totalDrivingSeconds}
             maxTopSpeed={maxTopSpeed}
             maxTopSpeedTrack={maxTopSpeedTrack}
-            averageSpeedKmh={averageSpeedKmh}
+            averageBenchmarkPacePercentage={averageBenchmarkPacePercentage}
+            averageBenchmarkPaceCategory={averageBenchmarkPaceCategory}
             practiceSessionsCount={practiceSessionsCount}
             qualifyingSessionsCount={qualifyingSessionsCount}
             raceSessionsCount={raceSessionsCount}

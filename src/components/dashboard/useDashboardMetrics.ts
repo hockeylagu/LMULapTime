@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessions } from '../../utils/formatters.js';
-import { matchesSessionCarClass, matchesTrack } from '../../utils/paceCategory.js';
+import { isSessionEmpty, getDisplayTrackName, matchesSessionType, getSessionTypeSortRank, compareSessions } from '../../utils/formatters.js';
+import { matchesSessionCarClass, matchesTrack, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
 import { DetailedSession } from '../../../server/core/types';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
@@ -66,6 +66,9 @@ export function useDashboardMetrics({
         return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
       }
       if (sortBy === 'pos-asc') {
+        const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
+        const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
+        if (typeRankA !== typeRankB) return typeRankA - typeRankB;
         const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
         const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
         if (posA !== posB) return posA - posB;
@@ -93,8 +96,12 @@ export function useDashboardMetrics({
     let raceWinsCount = 0;
     let racePodiumsCount = 0;
     let totalPitStops = 0;
+    let benchmarkPaceSum = 0;
+    let benchmarkPaceCount = 0;
     const trackLapsMap: Record<string, number> = {};
+    const trackKmMap: Record<string, number> = {};
     const carLapsMap: Record<string, number> = {};
+    const carKmMap: Record<string, number> = {};
     const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
 
     for (const s of sessions) {
@@ -147,15 +154,22 @@ export function useDashboardMetrics({
         cleanLaps += completedLapsCount;
       }
 
+      const sessionDistanceKm = (trackMeters / 1000) * completedLapsCount;
+
       if (displayTrack && completedLapsCount > 0) {
         trackLapsMap[displayTrack] = (trackLapsMap[displayTrack] || 0) + completedLapsCount;
+        trackKmMap[displayTrack] = (trackKmMap[displayTrack] || 0) + sessionDistanceKm;
       }
 
       if (p.carType && completedLapsCount > 0) {
         carLapsMap[p.carType] = (carLapsMap[p.carType] || 0) + completedLapsCount;
+        carKmMap[p.carType] = (carKmMap[p.carType] || 0) + sessionDistanceKm;
       }
 
       if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
+        benchmarkPaceSum += p.bestLapPacePercentage;
+        benchmarkPaceCount++;
+
         const currentBest = uniqueTrackRefLapsMap[displayTrack];
         if (!currentBest || p.bestLapPacePercentage < currentBest.percentage) {
           uniqueTrackRefLapsMap[displayTrack] = {
@@ -171,14 +185,19 @@ export function useDashboardMetrics({
     }
 
     const cleanLapsPercentage = totalLaps > 0 ? Math.round((cleanLaps / totalLaps) * 1000) / 10 : 0;
-    const averageSpeedKmh = totalDrivingSeconds > 0 ? Math.round(totalDistanceKm / (totalDrivingSeconds / 3600)) : 0;
+    const averageBenchmarkPacePercentage = benchmarkPaceCount > 0
+      ? Math.round((benchmarkPaceSum / benchmarkPaceCount) * 10) / 10
+      : null;
+    const averageBenchmarkPaceCategory = averageBenchmarkPacePercentage !== null
+      ? getPaceCategoryFromPercentage(averageBenchmarkPacePercentage)
+      : null;
 
     const rankedTracks = Object.entries(trackLapsMap)
-      .map(([track, laps]) => ({ track, laps }))
+      .map(([track, laps]) => ({ track, laps, km: trackKmMap[track] || 0 }))
       .sort((a, b) => b.laps - a.laps);
 
     const rankedCars = Object.entries(carLapsMap)
-      .map(([car, laps]) => ({ car, laps }))
+      .map(([car, laps]) => ({ car, laps, km: carKmMap[car] || 0 }))
       .sort((a, b) => b.laps - a.laps);
 
     const bestTrackRefLaps = Object.values(uniqueTrackRefLapsMap).sort((a, b) => a.percentage - b.percentage);
@@ -191,7 +210,8 @@ export function useDashboardMetrics({
       totalDrivingSeconds,
       maxTopSpeed,
       maxTopSpeedTrack,
-      averageSpeedKmh,
+      averageBenchmarkPacePercentage,
+      averageBenchmarkPaceCategory,
       practiceSessionsCount,
       qualifyingSessionsCount,
       raceSessionsCount,
