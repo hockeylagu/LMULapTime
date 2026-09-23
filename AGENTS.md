@@ -144,6 +144,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - No chunk-size or rollup warnings (keep manual chunking configured in `vite.config.ts`).
   - No unhandled React test warnings (e.g., `act(...)` or uncaught async state updates; ensure components fetching geometry or data support optional injected props for deterministic testing or are cleanly awaited via `waitFor`).
   - No unused variables or parameters (`noUnusedLocals` and `noUnusedParameters` strictly enforced in `tsconfig.json`).
+- **Strict File Size Limit**: All `.ts` and `.tsx` source and test files (`src/`, `server/`, `tools/`, `test/`) **must not exceed 1,000 lines**. If any module or test suite approaches or exceeds this limit, decompose it into focused submodules, dedicated data/definition files, cohesive helpers, or separate domain test suites.
 
 ### Database Patterns (`server/db.ts`)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
