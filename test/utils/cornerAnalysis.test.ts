@@ -447,4 +447,179 @@ describe('computeLapSegmentComparisons', () => {
       expect(corners[0].typeSpecificDetails?.exitWheelSlipActive).toBe(true);
     }
   });
+
+  it('accurately computes exit track-out offset and remaining space left on track', () => {
+    // Lap A (wide clean track-out): car drifts to -5.5m (nominal width 12m, half-width 6m -> 0.5m left)
+    // Lap B (pinched exit): car only drifts to -4.0m (2.0m left)
+    const speeds = [200, 160, 100, 70, 70, 100, 140, 180, 200];
+    const buildLapWithOffsets = (exitOffset: number): ReplayTrajectoryPoint[] =>
+      speeds.map((speedKmh, i) => ({
+        x: i * 10,
+        y: 0,
+          z: i * 5,
+          speedKmh,
+          throttle: i >= 4 ? 95 : 0,
+          brake: i < 4 ? 60 : 0,
+          steerYaw: i >= 2 && i <= 6 ? 25 : 0, // right turn
+          lateralOffsetM: i <= 2 ? 3.0 : i === 3 || i === 4 ? 2.5 : i === 6 ? exitOffset : 0,
+          timeSec: i * 0.4,
+        }));
+
+    const wideLap = buildLapWithOffsets(-5.5);
+    const pinchedLap = buildLapWithOffsets(-4.0);
+
+    const segments = computeLapSegmentComparisons(wideLap, pinchedLap, 10, 150, 12.0);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    expect(corner.turnDirection).toBe('right');
+    expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBe(3.0);
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(3.5);
+    expect(corner.primaryTrackUsage?.exitTrackOutOffsetM).toBe(-5.5);
+    expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(0.5); // 6.0 - 5.5 = 0.5m space left
+    expect(corner.baselineTrackUsage?.exitTrackOutOffsetM).toBe(-4.0);
+    expect(corner.baselineTrackUsage?.exitSpaceLeftM).toBe(2.0); // 6.0 - 4.0 = 2.0m space left
+    expect(corner.exitSpaceDeltaM).toBe(-1.5); // 0.5 - 2.0 = -1.5m (wide lap used 1.5m more track)
+  });
+
+  it('accurately computes apex margin on realistic real-world corner (Algarve Turn 9)', async () => {
+    const Database = (await import('better-sqlite3')).default;
+    const zlib = (await import('zlib')).default;
+    const db = new Database('server/lmu_cache.db');
+    const row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? AND lap_key = ?').get('Algarve International Circuit R1 19.Vcr', 5) as { trajectory_br: Buffer } | undefined;
+    if (!row) return;
+    const traj = JSON.parse(zlib.brotliDecompressSync(row.trajectory_br).toString('utf8'));
+    const { enrichTrajectoryWithTrackGeometry } = await import('../../server/tracks/serverTrackSync.js');
+    enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', 'Algarve International Circuit R1 19.Vcr');
+
+    const segments = computeLapSegmentComparisons(traj.points, traj.points, 6, traj.trackLengthM, 14.0);
+    const corners = segments.filter(s => s.type === 'corner');
+    const c9 = corners.find(c => c.cornerNumber === 9);
+    expect(c9).toBeDefined();
+    expect(c9?.turnDirection).toBe('right');
+    // Car is in realistic proximity to inside curb (2.3m at min speed, down from corrupted 8.8m)
+    expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeLessThanOrEqual(3.0);
+    expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeGreaterThanOrEqual(0.0);
+  });
+
+  it('prevents wide entry straightaway excursion from corrupting apex and exit space left (decoupled per-phase half-widths)', () => {
+    // 14m wide track (nominal half-width 7.0m).
+    // Entry has an apron / wide straight where car sits at 13.2m offset.
+    // At apex, car hugs inside curb at 6.8m (0.2m from inside curb).
+    // At exit, car tracks out to -5.8m (1.2m space left).
+    const speeds = [210, 180, 120, 80, 80, 110, 160, 200];
+    const lapWithWideEntry: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 15,
+      y: 0,
+      z: i * 8,
+      speedKmh,
+      throttle: i >= 4 ? 100 : 0,
+      brake: i < 3 ? 80 : 0,
+      steerYaw: i >= 2 && i <= 5 ? 20 : 0, // right turn
+      lateralOffsetM: i === 0 ? 13.2 : i === 1 ? 10.0 : i === 3 || i === 4 ? 6.8 : i === 6 ? -5.8 : 0,
+      timeSec: i * 0.5,
+    }));
+
+    const segments = computeLapSegmentComparisons(lapWithWideEntry, lapWithWideEntry, 10, 200, 14.0);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    expect(corner.turnDirection).toBe('right');
+    // Entry adapts locally to the 13.5m wide corridor: 13.5 - 13.2 = 0.3m
+    expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBe(0.3);
+    // Apex is NOT corrupted to 13.5 - 6.8 = 6.7m! It correctly measures against nominal 7.0m: 7.0 - 6.8 = 0.2m
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(0.2);
+    // Exit is NOT corrupted to 13.5 - 5.8 = 7.7m! It correctly measures against nominal 7.0m: 7.0 - 5.8 = 1.2m
+    expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(1.2);
+  });
+
+  it('correctly reports negative space left on off-track corner cuts without inflating boundary', () => {
+    // 12m wide track (nominal half-width 6.0m).
+    // Clean Lap: hugs curb at 5.8m (0.2m space left).
+    // Off-track Lap: cuts inside curb at 7.2m with isOffTrack flag set.
+    const speeds = [190, 140, 90, 65, 65, 95, 140, 185];
+    const buildLap = (apexOffset: number, isOffTrack: boolean): ReplayTrajectoryPoint[] =>
+      speeds.map((speedKmh, i) => ({
+        x: i * 12,
+        y: 0,
+        z: i * 6,
+        speedKmh,
+        throttle: i >= 4 ? 90 : 0,
+        brake: i < 3 ? 70 : 0,
+        steerYaw: i >= 2 && i <= 5 ? 18 : 0,
+        lateralOffsetM: i <= 1 ? -4.5 : i === 3 || i === 4 ? apexOffset : i === 6 ? -5.0 : 0,
+        isOffTrack: (i === 3 || i === 4) && isOffTrack,
+        timeSec: i * 0.45,
+      }));
+
+    const cleanLap = buildLap(5.8, false);
+    const cutLap = buildLap(7.2, true);
+
+    const segments = computeLapSegmentComparisons(cutLap, cleanLap, 10, 180, 12.0);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    // Clean baseline: 6.0 - 5.8 = 0.2m space left
+    expect(corner.baselineTrackUsage?.apexSpaceLeftM).toBe(0.2);
+    // Off-track cut: should NOT expand boundary to 7.5m (which would hide the cut as 0.3m left).
+    // It must strictly preserve nominal 6.0m boundary, yielding 6.0 - 7.2 = -1.2m
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(-1.2);
+    // Delta: -1.2 - 0.2 = -1.4m
+    expect(corner.apexSpaceDeltaM).toBe(-1.4);
+  });
+
+  it('accurately computes head-to-head phase space deltas in comparison mode', () => {
+    // Both laps on 14m track (nominal half-width 7.0m).
+    // Lap A maximizes track usage across all three phases:
+    // - Entry: sits right on the line (-6.8m -> 0.2m left)
+    // - Apex: clips inside curb (6.9m -> 0.1m left)
+    // - Exit: maximizes track-out (-6.7m -> 0.3m left)
+    // Lap B pinches or leaves space:
+    // - Entry: leaves space (-5.0m -> 2.0m left)
+    // - Apex: misses apex (5.2m -> 1.8m left)
+    // - Exit: pinches exit (-4.5m -> 2.5m left)
+    const speeds = [200, 150, 100, 75, 75, 110, 150, 195];
+    const lapA: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 15,
+      y: 0,
+      z: i * 7,
+      speedKmh,
+      throttle: i >= 4 ? 90 : 0,
+      brake: i < 3 ? 75 : 0,
+      steerYaw: i >= 2 && i <= 5 ? 22 : 0,
+      lateralOffsetM: i <= 1 ? -6.8 : i === 3 || i === 4 ? 6.9 : i === 6 ? -6.7 : 0,
+      timeSec: i * 0.4,
+    }));
+
+    const lapB: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 15,
+      y: 0,
+      z: i * 7,
+      speedKmh,
+      throttle: i >= 4 ? 90 : 0,
+      brake: i < 3 ? 75 : 0,
+      steerYaw: i >= 2 && i <= 5 ? 22 : 0,
+      lateralOffsetM: i <= 1 ? -5.0 : i === 3 || i === 4 ? 5.2 : i === 6 ? -4.5 : 0,
+      timeSec: i * 0.42,
+    }));
+
+    const segments = computeLapSegmentComparisons(lapA, lapB, 10, 200, 14.0);
+    const corner = segments.find(s => s.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    // Lap A space left:
+    expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBe(0.2);
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(0.1);
+    expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(0.3);
+
+    // Lap B space left:
+    expect(corner.baselineTrackUsage?.entrySpaceLeftM).toBe(2.0);
+    expect(corner.baselineTrackUsage?.apexSpaceLeftM).toBe(1.8);
+    expect(corner.baselineTrackUsage?.exitSpaceLeftM).toBe(2.5);
+
+    // Deltas (primary - baseline): negative means primary used more track (closer to edge)
+    expect(corner.entrySpaceDeltaM).toBe(-1.8); // 0.2 - 2.0 = -1.8m
+    expect(corner.apexSpaceDeltaM).toBe(-1.7);  // 0.1 - 1.8 = -1.7m
+    expect(corner.exitSpaceDeltaM).toBe(-2.2);  // 0.3 - 2.5 = -2.2m
+  });
 });

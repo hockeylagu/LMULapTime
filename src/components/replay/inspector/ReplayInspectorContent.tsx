@@ -6,6 +6,7 @@ import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/repl
 import { computeLapSegmentComparisons, filterCornerConsistencyStats } from '../../../utils/cornerAnalysis.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../utils/formatters.js';
+import { getCircuitSpecification } from '../../../utils/circuitSpecs.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 
 export interface ReplayInspectorContentProps {
@@ -114,7 +115,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const lapSegments = useMemo(() => {
     if (!trajectory) return [];
     const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
-    return computeLapSegmentComparisons(trajectory.points, baseline, 6, trajectory.trackLengthM);
+    const spec = trajectory.layoutKey ? getCircuitSpecification(trajectory.layoutKey) : undefined;
+    return computeLapSegmentComparisons(trajectory.points, baseline, 6, trajectory.trackLengthM, spec?.nominalWidthM);
   }, [isCompareMode, trajectory, baselineTrajectory]);
 
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);

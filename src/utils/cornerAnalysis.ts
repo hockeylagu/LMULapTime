@@ -18,8 +18,12 @@ interface BaseSegmentComparison {
 
 export interface CornerTrackUsage {
   entryOffsetM?: number;
+  entrySpaceLeftM?: number;
   apexMarginM?: number;
+  apexSpaceLeftM?: number;
   exitWidthM?: number;
+  exitTrackOutOffsetM?: number;
+  exitSpaceLeftM?: number;
   totalSweepM?: number;
 }
 
@@ -88,6 +92,9 @@ export interface CornerSegmentComparison extends BaseSegmentComparison {
   // Track Usage
   primaryTrackUsage?: CornerTrackUsage;
   baselineTrackUsage?: CornerTrackUsage;
+  entrySpaceDeltaM?: number | null;
+  apexSpaceDeltaM?: number | null;
+  exitSpaceDeltaM?: number | null;
 
   // Isolated time deltas for physical corner phases. Entry is unavailable when turn-in
   // cannot be measured; rotation then begins at the detected corner entry.
@@ -303,7 +310,8 @@ export function computeLapSegmentComparisons(
   primaryPoints: ReplayTrajectoryPoint[],
   baselinePoints: ReplayTrajectoryPoint[],
   minProminenceKmh = 6,
-  trackLengthM?: number
+  trackLengthM?: number,
+  nominalWidthM?: number
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
@@ -577,10 +585,126 @@ export function computeLapSegmentComparisons(
       ? Number((Math.abs(bdzChord * baselineAtMin.x - bdxChord * baselineAtMin.z + baselineAtExit.x * baselineAtEntry.z - baselineAtExit.z * baselineAtEntry.x) / bchordLen).toFixed(1))
       : undefined;
 
+    // Corner Exit Track-Out & Space Left
+    // Scan from apex (min.distM) up to the end of corner exit (min.distM + 120m or exit.distM)
+    const exitScanEndM = Math.min(exit.distM, min.distM + 120);
+    let primaryTrackOutOffsetM: number | undefined;
+    let baselineTrackOutOffsetM: number | undefined;
+
+    if (primaryAtMin.lateralOffsetM !== undefined) {
+      let extremeOffset = primaryAtMin.lateralOffsetM;
+      for (let d = min.distM; d <= exitScanEndM; d += SEGMENT_SCAN_STEP_M) {
+        const pt = interpolatePointAtDistance(primaryPoints, primaryDists, d);
+        if (pt.lateralOffsetM !== undefined) {
+          if (turnDirection === 'right') {
+            if (pt.lateralOffsetM < extremeOffset) extremeOffset = pt.lateralOffsetM;
+          } else {
+            if (pt.lateralOffsetM > extremeOffset) extremeOffset = pt.lateralOffsetM;
+          }
+        }
+      }
+      for (let i = 0; i < primaryPoints.length; i++) {
+        const d = primaryDists[i];
+        if (d >= min.distM && d <= exitScanEndM) {
+          const off = primaryPoints[i].lateralOffsetM;
+          if (off !== undefined) {
+            if (turnDirection === 'right') {
+              if (off < extremeOffset) extremeOffset = off;
+            } else {
+              if (off > extremeOffset) extremeOffset = off;
+            }
+          }
+        }
+      }
+      primaryTrackOutOffsetM = Number(extremeOffset.toFixed(2));
+    }
+
+    if (baselinePoints && baselinePoints.length > 0 && baselineAtMin.lateralOffsetM !== undefined) {
+      let bExtremeOffset = baselineAtMin.lateralOffsetM;
+      for (let d = min.distM; d <= exitScanEndM; d += SEGMENT_SCAN_STEP_M) {
+        const bpt = interpolatePointAtDistance(baselinePoints, baselineDists, d);
+        if (bpt.lateralOffsetM !== undefined) {
+          if (turnDirection === 'right') {
+            if (bpt.lateralOffsetM < bExtremeOffset) bExtremeOffset = bpt.lateralOffsetM;
+          } else {
+            if (bpt.lateralOffsetM > bExtremeOffset) bExtremeOffset = bpt.lateralOffsetM;
+          }
+        }
+      }
+      for (let i = 0; i < baselinePoints.length; i++) {
+        const d = baselineDists[i];
+        if (d >= min.distM && d <= exitScanEndM) {
+          const off = baselinePoints[i].lateralOffsetM;
+          if (off !== undefined) {
+            if (turnDirection === 'right') {
+              if (off < bExtremeOffset) bExtremeOffset = off;
+            } else {
+              if (off > bExtremeOffset) bExtremeOffset = off;
+            }
+          }
+        }
+      }
+      baselineTrackOutOffsetM = Number(bExtremeOffset.toFixed(2));
+    }
+
+    // Physical corner half-widths decoupled per phase:
+    // Uses circuit nominal width (or 12.0m fallback). Each phase adapts to clean track limits / curbing
+    // locally rather than allowing an entry apron or straightaway excursion to distort the apex or exit road width.
+    const nominalHalfWidthM = (nominalWidthM ?? 12.0) / 2;
+
+    // 1) Entry Space Left: distance to outside entry track edge
+    const entryHalfWidthM = Math.max(
+      nominalHalfWidthM,
+      primaryAtEntry.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtEntry.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
+    );
+    const primaryEntrySpaceLeftM = primaryAtEntry.lateralOffsetM !== undefined
+      ? Number((entryHalfWidthM - Math.abs(primaryAtEntry.lateralOffsetM)).toFixed(1))
+      : undefined;
+    const baselineEntrySpaceLeftM = baselineAtEntry.lateralOffsetM !== undefined
+      ? Number((entryHalfWidthM - Math.abs(baselineAtEntry.lateralOffsetM)).toFixed(1))
+      : undefined;
+    const entrySpaceDeltaM = primaryEntrySpaceLeftM !== undefined && baselineEntrySpaceLeftM !== undefined
+      ? Number((primaryEntrySpaceLeftM - baselineEntrySpaceLeftM).toFixed(1))
+      : null;
+
+    // 2) Apex Space Left: distance to inside apex curb
+    const apexHalfWidthM = Math.max(
+      nominalHalfWidthM,
+      primaryAtMin.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtMin.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
+    );
+    const primaryApexSpaceLeftM = primaryAtMin.lateralOffsetM !== undefined
+      ? Number((apexHalfWidthM - Math.abs(primaryAtMin.lateralOffsetM)).toFixed(1))
+      : undefined;
+    const baselineApexSpaceLeftM = baselineAtMin.lateralOffsetM !== undefined
+      ? Number((apexHalfWidthM - Math.abs(baselineAtMin.lateralOffsetM)).toFixed(1))
+      : undefined;
+    const apexSpaceDeltaM = primaryApexSpaceLeftM !== undefined && baselineApexSpaceLeftM !== undefined
+      ? Number((primaryApexSpaceLeftM - baselineApexSpaceLeftM).toFixed(1))
+      : null;
+
+    // 3) Exit Space Left: distance to outside exit track edge at track-out
+    const exitHalfWidthM = Math.max(
+      nominalHalfWidthM,
+      primaryAtExit.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryTrackOutOffsetM ?? 0) * 2) / 2).toFixed(1))
+    );
+    const primaryExitSpaceLeftM = primaryTrackOutOffsetM !== undefined
+      ? Number((exitHalfWidthM - Math.abs(primaryTrackOutOffsetM)).toFixed(1))
+      : undefined;
+    const baselineExitSpaceLeftM = baselineTrackOutOffsetM !== undefined
+      ? Number((exitHalfWidthM - Math.abs(baselineTrackOutOffsetM)).toFixed(1))
+      : undefined;
+    const exitSpaceDeltaM = primaryExitSpaceLeftM !== undefined && baselineExitSpaceLeftM !== undefined
+      ? Number((primaryExitSpaceLeftM - baselineExitSpaceLeftM).toFixed(1))
+      : null;
+
     const primaryTrackUsage: CornerTrackUsage = {
       entryOffsetM: primaryAtEntry.lateralOffsetM,
+      entrySpaceLeftM: primaryEntrySpaceLeftM,
       apexMarginM: primaryAtMin.lateralOffsetM,
+      apexSpaceLeftM: primaryApexSpaceLeftM,
       exitWidthM: primaryAtExit.lateralOffsetM,
+      exitTrackOutOffsetM: primaryTrackOutOffsetM,
+      exitSpaceLeftM: primaryExitSpaceLeftM,
       totalSweepM: primaryAtEntry.lateralOffsetM !== undefined && primaryAtExit.lateralOffsetM !== undefined && primaryAtMin.lateralOffsetM !== undefined
         ? Number((Math.abs(primaryAtEntry.lateralOffsetM - primaryAtMin.lateralOffsetM) + Math.abs(primaryAtExit.lateralOffsetM - primaryAtMin.lateralOffsetM)).toFixed(1))
         : chordSagittaM,
@@ -588,8 +712,12 @@ export function computeLapSegmentComparisons(
 
     const baselineTrackUsage: CornerTrackUsage = {
       entryOffsetM: baselineAtEntry.lateralOffsetM,
+      entrySpaceLeftM: baselineEntrySpaceLeftM,
       apexMarginM: baselineAtMin.lateralOffsetM,
+      apexSpaceLeftM: baselineApexSpaceLeftM,
       exitWidthM: baselineAtExit.lateralOffsetM,
+      exitTrackOutOffsetM: baselineTrackOutOffsetM,
+      exitSpaceLeftM: baselineExitSpaceLeftM,
       totalSweepM: baselineAtEntry.lateralOffsetM !== undefined && baselineAtExit.lateralOffsetM !== undefined && baselineAtMin.lateralOffsetM !== undefined
         ? Number((Math.abs(baselineAtEntry.lateralOffsetM - baselineAtMin.lateralOffsetM) + Math.abs(baselineAtExit.lateralOffsetM - baselineAtMin.lateralOffsetM)).toFixed(1))
         : bchordSagittaM,
@@ -656,6 +784,9 @@ export function computeLapSegmentComparisons(
       rotationAtThrottleDeltaPct,
       primaryTrackUsage,
       baselineTrackUsage,
+      entrySpaceDeltaM,
+      apexSpaceDeltaM,
+      exitSpaceDeltaM,
       phaseTiming,
       typeSpecificDetails,
     };

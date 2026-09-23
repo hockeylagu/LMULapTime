@@ -17,6 +17,7 @@ export interface CircuitSpecification {
   turnCount: number;
   direction: 'Clockwise' | 'Counter-Clockwise';
   elevationChangeMeters?: number;
+  nominalWidthM?: number;
   famousCorners: string[];
   geometryKind: 'Geometry';
   geometryDescription: string;
@@ -569,6 +570,7 @@ export const CIRCUIT_SPECIFICATIONS: Record<string, CircuitSpecification> = {
     geometryKind: 'Geometry',
     geometryDescription: 'Road geometry for this layout.',
     parsedFrom: 'LMU Results XML (TrackVenue="Algarve International Circuit", TrackCourse="Algarve International Circuit") & Binary .Vcr Replay Stream',
+    nominalWidthM: 14.0,
     fiaGrade: 'FIA Grade 1',
     openedYear: 2008,
   },

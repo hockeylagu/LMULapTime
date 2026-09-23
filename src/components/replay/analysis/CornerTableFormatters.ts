@@ -37,3 +37,10 @@ export function throttleDeltaClass(delta: number | null): string {
 export function formatDistPoint(distM: number | null): string {
   return distM === null ? '--' : `${distM}m`;
 }
+
+export function timeDeltaBadgeClass(delta: number): string {
+  if (Math.abs(delta) < 0.02) return 'bg-slate-800 text-slate-300 border-slate-700/60';
+  return delta < 0
+    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+    : 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+}

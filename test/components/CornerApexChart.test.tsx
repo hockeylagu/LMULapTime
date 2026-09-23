@@ -189,15 +189,53 @@ describe('CornerApexChart', () => {
     );
 
     expect(screen.getByText(/92° right/i)).toBeInTheDocument();
-    expect(screen.getByText(/Heading @ 15% throttle/i)).toBeInTheDocument();
+    expect(screen.getByText('Rotation')).toBeInTheDocument();
     expect(screen.getByText('82%')).toBeInTheDocument();
     expect(screen.getByText('Thr 15% Δ')).toBeInTheDocument();
     expect(screen.getByText('-2m')).toBeInTheDocument();
     expect(screen.getByText('Thr 90% Δ')).toBeInTheDocument();
     expect(screen.queryByText(/Optimal \(Rotated\)/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/88\/100/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/6.7m total change/i)).toBeInTheDocument();
-    expect(screen.getByText(/4.1m exit/i)).toBeInTheDocument();
+    expect(screen.getByText('Exit Space Δ')).toBeInTheDocument();
+    expect(screen.getByText('6.7m')).toBeInTheDocument();
+  });
+
+  it('renders exit space left and exit space delta correctly', () => {
+    const exitSpaceCorner: CornerSegmentComparison = {
+      ...corner,
+      exitSpaceDeltaM: -0.8,
+      primaryTrackUsage: {
+        entryOffsetM: 3.2,
+        apexMarginM: 0.3,
+        exitWidthM: 5.5,
+        exitSpaceLeftM: 0.5,
+      },
+    };
+
+    const { rerender } = render(
+      <CornerApexChart
+        corner={exitSpaceCorner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        isCompareMode={false}
+      />
+    );
+
+    expect(screen.getByText('Exit Space')).toBeInTheDocument();
+    expect(screen.getByText('0.5m')).toBeInTheDocument();
+    expect(screen.getByText('left')).toBeInTheDocument();
+
+    rerender(
+      <CornerApexChart
+        corner={exitSpaceCorner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        isCompareMode={true}
+      />
+    );
+
+    expect(screen.getByText('Exit Space Δ')).toBeInTheDocument();
+    expect(screen.getByText('-0.8m')).toBeInTheDocument();
   });
 
   it('renders compact micro-bar without the technique deck and triggers onOpenCornersTab', () => {

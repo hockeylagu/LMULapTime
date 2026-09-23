@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import React from 'react';
 import { formatTime, matchesSessionType, getSessionTypeSortRank, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
-import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
+import { useTrackDetailState } from './useTrackDetailState.js';
 
 export type { TrackDetailSortOption };
 
@@ -31,86 +30,24 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
-  const [selectedCarModel, setSelectedCarModelState] = useState<string>(searchParams.get('model') || 'All');
-  const [filterType, setFilterTypeState] = useState<string>(searchParams.get('type') || 'All');
-  const [searchQuery, setSearchQueryState] = useState<string>(searchParams.get('q') || '');
-  const [sortBy, setSortByState] = useState<TrackDetailSortOption>(
-    (searchParams.get('sort') as TrackDetailSortOption) || 'date-desc'
-  );
-  const [data, setData] = useState<{
-    trackName: string;
-    normalizedTrackName: string;
-    sessionsCount: number;
-    sessions: SessionMeta[];
-    benchmarks: ReferenceLaptimeEntry[];
-  } | null>(null);
+  const {
+    loading,
+    data,
+    hideEmpty,
+    setHideEmpty,
+    selectedCarModel,
+    setSelectedCarModel,
+    filterType,
+    setFilterType,
+    searchQuery,
+    setSearchQuery,
+    sortBy,
+    setSortBy,
+    handleOpenReplay,
+  } = useTrackDetailState(trackName, selectedCarClass);
 
   const selectedClass = selectedCarClass;
   const setSelectedClass = setSelectedCarClass;
-  const handleOpenReplay = (sessionId: string) => {
-    const session = data?.sessions.find(item => item.id === sessionId);
-    if (!session?.matchingReplayFile) return;
-    const replayParams = new URLSearchParams(searchParams);
-    replayParams.set('replayName', session.matchingReplayFile.name);
-    replayParams.set('lap', '1');
-    navigate(`/telemetry?${replayParams.toString()}`);
-  };
-
-  const setSortBy = (val: TrackDetailSortOption) => {
-    setSortByState(val);
-    updateSearchParams(searchParams, setSearchParams, { sort: val });
-  };
-
-  const setSelectedCarModel = (model: string) => {
-    setSelectedCarModelState(model);
-    updateSearchParams(searchParams, setSearchParams, { model });
-  };
-
-  const setFilterType = (type: string) => {
-    setFilterTypeState(type);
-    updateSearchParams(searchParams, setSearchParams, { type });
-  };
-
-  const setSearchQuery = (q: string) => {
-    setSearchQueryState(q);
-    updateSearchParams(searchParams, setSearchParams, { q });
-  };
-
-  const setHideEmpty = (hide: boolean) => {
-    setHideEmptyState(hide);
-    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
-  };
-
-  useEffect(() => {
-    // Skip the no-op reset so this doesn't race with the carClass URL update happening the same tick.
-    if (selectedCarModel !== 'All') setSelectedCarModel('All');
-  }, [selectedClass]);
-
-  useEffect(() => {
-    let isCurrent = true;
-    const controller = new AbortController();
-    setLoading(true);
-    fetch(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
-      .then((res) => res.json())
-      .then((resData) => {
-        if (!isCurrent) return;
-        setData(resData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!isCurrent || err?.name === 'AbortError') return;
-        console.error('Failed to fetch track details:', err);
-        setLoading(false);
-      });
-    return () => {
-      isCurrent = false;
-      controller.abort();
-    };
-  }, [trackName]);
 
   if (loading) {
     return (
