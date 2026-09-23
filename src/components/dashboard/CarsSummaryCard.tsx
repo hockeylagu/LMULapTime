@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Award, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
 export interface CarsSummaryCardProps {
-  rankedCars: { car: string; laps: number }[];
-  visibleCars: { car: string; laps: number }[];
+  rankedCars: { car: string; laps: number; km: number }[];
+  visibleCars: { car: string; laps: number; km: number }[];
   showMoreCars: boolean;
   setShowMoreCars: (val: boolean | ((prev: boolean) => boolean)) => void;
   onSelectCar: (car: string) => void;
@@ -17,6 +17,8 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
   setShowMoreCars,
   onSelectCar,
 }) => {
+  const [unit, setUnit] = useState<'laps' | 'km'>('laps');
+  const sortedVisibleCars = [...visibleCars].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
   return (
     <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
@@ -24,11 +26,27 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
           <Award className="w-4 h-4 text-lmu-cyan" />
           <span>Cars {rankedCars.length > 3 && `(${visibleCars.length}/${rankedCars.length})`}</span>
         </p>
+        <div className="flex items-center gap-0.5 bg-lmu-card/60 rounded-full p-0.5 border border-lmu-border/50">
+          <button
+            type="button"
+            onClick={() => setUnit('laps')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'laps' ? 'bg-lmu-cyan text-black' : 'text-lmu-muted hover:text-white'}`}
+          >
+            Laps
+          </button>
+          <button
+            type="button"
+            onClick={() => setUnit('km')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'km' ? 'bg-lmu-cyan text-black' : 'text-lmu-muted hover:text-white'}`}
+          >
+            Km
+          </button>
+        </div>
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreCars ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
-        {visibleCars.length > 0 ? (
-          visibleCars.map((item, idx) => (
+        {sortedVisibleCars.length > 0 ? (
+          sortedVisibleCars.map((item, idx) => (
             <div
               key={item.car}
               onClick={() => onSelectCar(item.car.split(' ')[0] || item.car)}
@@ -41,7 +59,9 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
                   {item.car}
                 </span>
               </div>
-              <span className="text-lmu-muted font-mono shrink-0 text-[11px]">{item.laps} laps</span>
+              <span className="text-lmu-muted font-mono shrink-0 text-[11px]">
+                {unit === 'km' ? `${item.km.toFixed(0)} km` : `${item.laps} laps`}
+              </span>
             </div>
           ))
         ) : (

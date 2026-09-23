@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { MapPin, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
 export interface CircuitsSummaryCardProps {
-  rankedTracks: { track: string; laps: number }[];
-  visibleTracks: { track: string; laps: number }[];
+  rankedTracks: { track: string; laps: number; km: number }[];
+  visibleTracks: { track: string; laps: number; km: number }[];
   showMoreTracks: boolean;
   setShowMoreTracks: (val: boolean | ((prev: boolean) => boolean)) => void;
   selectedCarClass?: string;
@@ -19,6 +19,8 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
   selectedCarClass = 'All',
 }) => {
   const navigate = useNavigate();
+  const [unit, setUnit] = useState<'laps' | 'km'>('laps');
+  const sortedVisibleTracks = [...visibleTracks].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
   return (
     <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
@@ -26,11 +28,27 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
           <MapPin className="w-4 h-4 text-lmu-gold" />
           <span>Circuits {rankedTracks.length > 3 && `(${visibleTracks.length}/${rankedTracks.length})`}</span>
         </p>
+        <div className="flex items-center gap-0.5 bg-lmu-card/60 rounded-full p-0.5 border border-lmu-border/50">
+          <button
+            type="button"
+            onClick={() => setUnit('laps')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'laps' ? 'bg-lmu-gold text-black' : 'text-lmu-muted hover:text-white'}`}
+          >
+            Laps
+          </button>
+          <button
+            type="button"
+            onClick={() => setUnit('km')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'km' ? 'bg-lmu-gold text-black' : 'text-lmu-muted hover:text-white'}`}
+          >
+            Km
+          </button>
+        </div>
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreTracks ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
-        {visibleTracks.length > 0 ? (
-          visibleTracks.map((item, idx) => (
+        {sortedVisibleTracks.length > 0 ? (
+          sortedVisibleTracks.map((item, idx) => (
             <div
               key={item.track}
               onClick={() => {
@@ -46,7 +64,9 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
                   {item.track}
                 </span>
               </div>
-              <span className="text-lmu-muted font-mono shrink-0 text-[11px]">{item.laps} laps</span>
+              <span className="text-lmu-muted font-mono shrink-0 text-[11px]">
+                {unit === 'km' ? `${item.km.toFixed(0)} km` : `${item.laps} laps`}
+              </span>
             </div>
           ))
         ) : (

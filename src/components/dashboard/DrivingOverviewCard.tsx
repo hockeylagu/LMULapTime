@@ -1,6 +1,8 @@
 import React from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
+import { getPaceCategoryStyle } from '../../utils/paceCategory';
+import { PaceCategory } from '../../../server/core/types';
 
 export interface DrivingOverviewCardProps {
   sessionsCount: number;
@@ -12,7 +14,8 @@ export interface DrivingOverviewCardProps {
   cleanLapsPercentage?: number;
   maxTopSpeed?: number;
   maxTopSpeedTrack?: string;
-  averageSpeedKmh?: number;
+  averageBenchmarkPacePercentage?: number | null;
+  averageBenchmarkPaceCategory?: PaceCategory | null;
   practiceSessionsCount?: number;
   qualifyingSessionsCount?: number;
   raceSessionsCount?: number;
@@ -32,7 +35,8 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
   cleanLapsPercentage,
   maxTopSpeed,
   maxTopSpeedTrack,
-  averageSpeedKmh,
+  averageBenchmarkPacePercentage,
+  averageBenchmarkPaceCategory,
   practiceSessionsCount,
   qualifyingSessionsCount,
   raceSessionsCount,
@@ -141,20 +145,24 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
               </span>
             </div>
 
-            {/* #6 Average Speed */}
+            {/* #6 Average Benchmark Pace */}
             <div
               className="flex items-center justify-between text-xs hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
-              title="Average speed across all logged laps"
+              title="Average benchmark pace percentage across your best laps"
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={6} />
                 <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
-                  Average Speed
+                  Avg Benchmark Pace
                 </span>
               </div>
-              <span className="text-slate-300 font-mono text-[11px] shrink-0">
-                {averageSpeedKmh && averageSpeedKmh > 0 ? `${averageSpeedKmh} km/h` : 'N/A'}
-              </span>
+              {averageBenchmarkPacePercentage ? (
+                <span className={`${getPaceCategoryStyle(averageBenchmarkPaceCategory).textClass} font-mono text-[11px] shrink-0 font-semibold`}>
+                  {averageBenchmarkPacePercentage.toFixed(1)}% {getPaceCategoryStyle(averageBenchmarkPaceCategory).emoji}
+                </span>
+              ) : (
+                <span className="text-slate-300 font-mono text-[11px] shrink-0">N/A</span>
+              )}
             </div>
 
             {/* #7 Race Podiums & Wins */}
