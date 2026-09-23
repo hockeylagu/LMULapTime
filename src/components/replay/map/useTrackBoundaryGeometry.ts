@@ -33,6 +33,21 @@ export interface TrackBoundaryGeometry {
     sector1?: TimingGateGeometry;
     sector2?: TimingGateGeometry;
   };
+  elevationProfile?: number[];
+  pitLane?: {
+    centerline: Array<[number, number]>;
+    elevation?: number[];
+  };
+  pitStalls?: Array<{
+    id: number;
+    center: [number, number];
+    widthM: number;
+    angleDeg?: number;
+  }>;
+  gridSlots?: Array<{
+    slot: number;
+    center: [number, number];
+  }>;
 }
 
 import { getCircuitSpecification } from '../../../utils/circuitSpecs.js';

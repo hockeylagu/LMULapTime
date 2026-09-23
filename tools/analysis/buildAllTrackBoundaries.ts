@@ -9,6 +9,87 @@ export interface Point2D {
   y: number;
 }
 
+interface NativeTrackPoint {
+  type: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface PitLaneData {
+  centerline: Array<[number, number]>;
+  elevation?: number[];
+}
+
+interface PitStallData {
+  id: number;
+  center: [number, number];
+  widthM: number;
+  angleDeg?: number;
+}
+
+interface GridSlotData {
+  slot: number;
+  center: [number, number];
+}
+
+const LMU_API_BASE_URL = process.env.LMU_API_BASE_URL ?? 'http://localhost:6397';
+const NATIVE_TRACKMAP_CACHE = path.resolve('tools/analysis/cache/lmu_all_trackmaps.json');
+
+function parseNativeTrackmap(value: unknown): NativeTrackPoint[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const points: NativeTrackPoint[] = [];
+  for (const point of value) {
+    if (typeof point !== 'object' || point === null) return null;
+    const candidate = point as Record<string, unknown>;
+    if (
+      typeof candidate.type !== 'number' || !Number.isInteger(candidate.type) ||
+      typeof candidate.x !== 'number' || !Number.isFinite(candidate.x) ||
+      typeof candidate.y !== 'number' || !Number.isFinite(candidate.y) ||
+      typeof candidate.z !== 'number' || !Number.isFinite(candidate.z)
+    ) {
+      return null;
+    }
+    points.push({ type: candidate.type, x: candidate.x, y: candidate.y, z: candidate.z });
+  }
+
+  return points.length > 0 ? points : null;
+}
+
+async function loadNativeTrackmap(trackId: string): Promise<NativeTrackPoint[]> {
+  if (fs.existsSync(NATIVE_TRACKMAP_CACHE)) {
+    try {
+      const cachedMaps: unknown = JSON.parse(fs.readFileSync(NATIVE_TRACKMAP_CACHE, 'utf8'));
+      if (typeof cachedMaps === 'object' && cachedMaps !== null) {
+        const cachedTrackmap = parseNativeTrackmap((cachedMaps as Record<string, unknown>)[trackId]);
+        if (cachedTrackmap) {
+          console.log(`Loaded cached LMU trackmap for ${trackId} from ${NATIVE_TRACKMAP_CACHE}`);
+          return cachedTrackmap;
+        }
+      }
+      console.warn(`Cache has no valid trackmap for ${trackId}; trying LMU API`);
+    } catch (error) {
+      console.warn(`Could not read LMU trackmap cache; trying LMU API:`, error);
+    }
+  }
+
+  const apiUrl = `${LMU_API_BASE_URL}/rest/race/track/${trackId}/trackmap`;
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    const trackmap = parseNativeTrackmap(await response.json() as unknown);
+    if (!trackmap) throw new Error('response did not contain valid track points');
+    console.log(`Loaded LMU API trackmap for ${trackId} from ${apiUrl}`);
+    return trackmap;
+  } catch (error) {
+    throw new Error(
+      `Could not load LMU trackmap for ${trackId} from cache or running LMU API (${apiUrl})`,
+      { cause: error }
+    );
+  }
+}
+
 export interface TimingGateGeometry {
   name: string;
   center: [number, number];
@@ -50,8 +131,30 @@ export interface TrackBoundaryGeometry {
     sector1?: TimingGateGeometry;
     sector2?: TimingGateGeometry;
   };
+  elevationProfile?: number[];
+  pitLane?: {
+    centerline: Array<[number, number]>;
+    elevation?: number[];
+  };
+  pitStalls?: Array<{
+    id: number;
+    center: [number, number];
+    widthM: number;
+    angleDeg?: number;
+  }>;
+  gridSlots?: Array<{
+    slot: number;
+    center: [number, number];
+  }>;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface TrackSectionWidth {
+  startM: number;
+  endM: number;
+  widthM: number;
+  description?: string;
 }
 
 export interface TrackConfig {
@@ -60,7 +163,8 @@ export interface TrackConfig {
   layoutId: string;
   trackVenue: string;
   trackCourse: string;
-  sourceType: 'TUM' | 'atlas' | 'telemetry' | 'osm' | 'hybrid';
+  sourceType: 'TUM' | 'atlas' | 'telemetry' | 'osm' | 'hybrid' | 'lmu_api';
+  lmuTrackId?: string;
   sourceFile?: string;
   osmRelationId?: number;
   parentLayoutKey?: string;
@@ -70,6 +174,10 @@ export interface TrackConfig {
   // Flat outward padding (meters) added to this track's own survey/corridor width - opt-in,
   // only for tracks confirmed (via real clean telemetry) to need it. Never alters the shape.
   corridorMarginM?: number;
+  // Optional section-by-section width profile (stationM -> widthM) for authentic road ribbons
+  sectionWidths?: TrackSectionWidth[];
+  // Optional index along native centerline for authoritative S/F anchor
+  sfCenterIndex?: number;
 }
 
 // 21 Track Configurations across all driven tracks and layouts
@@ -83,6 +191,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackCourse: 'Autodromo Nazionale Monza',
     sourceType: 'TUM',
     sourceFile: 'Monza.csv',
+    lmuTrackId: '6c01c2bba8c97798950b12756de021f34bcf7ba9',
     replayPattern: 'Autodromo Nazionale Monza P1 18.Vcr',
     preferredLap: 1,
     nominalWidthM: 12.0,
@@ -95,6 +204,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackVenue: 'Autodromo Nazionale Monza',
     trackCourse: 'Monza Curva Grande Circuit',
     sourceType: 'hybrid',
+    lmuTrackId: '3bc64b0a74e68af07f03c41be6b30166cd699e21',
     parentLayoutKey: 'monza_gp',
     replayPattern: 'Monza Curva Grande Circuit Q1 5.Vcr',
     preferredLap: 2,
@@ -124,15 +234,31 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     layoutId: 'full',
     trackVenue: 'Circuit de la Sarthe',
     trackCourse: 'Circuit de la Sarthe',
-    sourceType: 'atlas',
-    sourceFile: 'circuit-de-la-sarthe_24h.geojson',
+    sourceType: 'lmu_api',
+    lmuTrackId: '4cdc72fe3acb2c912fd6cbd6828095625ba2d5a7',
+    sfCenterIndex: 206,
     replayPattern: 'Circuit de la Sarthe P1 43.Vcr',
     preferredLap: 2,
-    nominalWidthM: 12.5,
-    // The uniform nominal-width corridor undersizes long fast straights (Mulsanne etc.) that
-    // are genuinely much wider in-game than a technical corner - real clean telemetry ran a
-    // median ~6.6m wider than the corridor. See repo memory for how this was measured.
-    corridorMarginM: 5.0,
+    nominalWidthM: 13.5,
+    corridorMarginM: 0,
+    sectionWidths: [
+      { startM: 0, endM: 650, widthM: 15.5, description: 'Pit / Start-Finish straight' },
+      { startM: 650, endM: 1150, widthM: 13.5, description: 'Dunlop Curve & Chicane' },
+      { startM: 1150, endM: 2050, widthM: 14.0, description: 'Esses & Tertre Rouge' },
+      { startM: 2050, endM: 4000, widthM: 15.0, description: 'Mulsanne Straight Part 1 (D338 full road width)' },
+      { startM: 4000, endM: 4350, widthM: 13.5, description: 'First Mulsanne Chicane (Forza)' },
+      { startM: 4350, endM: 6000, widthM: 15.0, description: 'Mulsanne Straight Part 2 (D338 full road width)' },
+      { startM: 6000, endM: 6350, widthM: 13.5, description: 'Second Mulsanne Chicane (Michelin)' },
+      { startM: 6350, endM: 7650, widthM: 15.0, description: 'Mulsanne Straight Part 3 (D338 full road width)' },
+      { startM: 7650, endM: 8050, widthM: 14.0, description: 'Mulsanne Corner 90-degree right' },
+      { startM: 8050, endM: 9400, widthM: 14.0, description: 'Kink to Indianapolis' },
+      { startM: 9400, endM: 9850, widthM: 14.0, description: 'Indianapolis curve' },
+      { startM: 9850, endM: 10250, widthM: 11.5, description: 'Arnage hairpin (narrow road)' },
+      { startM: 10250, endM: 11100, widthM: 13.5, description: 'Straight to Porsche curves' },
+      { startM: 11100, endM: 12500, widthM: 13.5, description: 'Porsche Curves' },
+      { startM: 12500, endM: 13200, widthM: 13.5, description: 'Maison Blanche & Karting' },
+      { startM: 13200, endM: 13650, widthM: 13.5, description: 'Ford Chicanes' },
+    ],
   },
   // 5. Circuit of the Americas
   {
@@ -207,6 +333,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackVenue: 'Bahrain International Circuit',
     trackCourse: 'Bahrain Outer Circuit',
     sourceType: 'hybrid',
+    lmuTrackId: '2aafcc7f60619a5426d1e03ce3e2161d1e11e92e',
     parentLayoutKey: 'bahrain_wec',
     replayPattern: 'Bahrain Outer Circuit P1 20.Vcr',
     preferredLap: 2,
@@ -220,6 +347,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackVenue: 'Bahrain International Circuit',
     trackCourse: 'Bahrain Paddock Circuit',
     sourceType: 'hybrid',
+    lmuTrackId: '16845c4c1e9a97b4616f413449b931a26cb7a978',
     parentLayoutKey: 'bahrain_wec',
     replayPattern: 'Bahrain Paddock Circuit P1 18.Vcr',
     preferredLap: 2,
@@ -273,6 +401,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackVenue: 'Fuji Speedway',
     trackCourse: 'Fuji Speedway Classic',
     sourceType: 'hybrid',
+    lmuTrackId: '26e5f7934fde68f653f0036c8992f3215b744df4',
     parentLayoutKey: 'fuji_chicane',
     replayPattern: 'Fuji Speedway Classic P1 10.Vcr',
     preferredLap: 2,
@@ -313,6 +442,7 @@ export const TRACK_CONFIGS: TrackConfig[] = [
     trackVenue: 'Sebring International Raceway',
     trackCourse: 'Sebring School Circuit',
     sourceType: 'hybrid',
+    lmuTrackId: 'be032d2eac22f32a2110e1eaa6a779d95046bb91',
     parentLayoutKey: 'sebring_full',
     replayPattern: 'Sebring School Circuit P1 1.Vcr',
     preferredLap: 3,
@@ -787,6 +917,16 @@ function rollPolyline(polyline: Point2D[], shift: number, exactPoint0?: Point2D)
   return rolled;
 }
 
+function rollNumberArray(arr: number[], shift: number): number[] {
+  const m = arr.length;
+  const k = ((Math.round(shift) % m) + m) % m;
+  const rolled: number[] = [];
+  for (let i = 0; i < m; i++) {
+    rolled.push(arr[(i + k) % m]);
+  }
+  return rolled;
+}
+
 function computeStationAlongPolyline(polyline: Point2D[], targetIndex: number): number {
   const m = polyline.length;
   let dist = 0;
@@ -884,14 +1024,22 @@ export function synthesizeHybridTrack(
   parentGeom: any,
   telem2D: Point2D[],
   nominalWidthM: number,
-  divThresholdM: number = 12.0
-): { centerline: Point2D[]; left: Point2D[]; right: Point2D[]; sharedPct: number } {
+  divThresholdM: number = 12.0,
+  parentElevation?: number[],
+  telemElevation?: number[]
+): {
+  centerline: Point2D[];
+  left: Point2D[];
+  right: Point2D[];
+  elevation?: number[];
+  sharedPct: number;
+} {
   const P_center: Point2D[] = parentGeom.centerline.map(([x, y]: [number, number]) => ({ x, y }));
   const P_left: Point2D[] = parentGeom.leftBoundary.map(([x, y]: [number, number]) => ({ x, y }));
   const P_right: Point2D[] = parentGeom.rightBoundary.map(([x, y]: [number, number]) => ({ x, y }));
   const N_parent = P_center.length;
 
-  const T = smoothPolyline(resampleStep(telem2D, 2.5), 5);
+  const T = telem2D.length > 500 ? telem2D : smoothPolyline(resampleStep(telem2D, 2.5), 5);
   const N_telem = T.length;
 
   // Closest parent search
@@ -938,6 +1086,7 @@ export function synthesizeHybridTrack(
       centerline: P_center,
       left: P_left,
       right: P_right,
+      elevation: parentElevation,
       sharedPct: 100,
     };
   }
@@ -954,28 +1103,41 @@ export function synthesizeHybridTrack(
 
   const splicedRuns: SplicedRun[] = [];
   for (const r of majorRuns) {
-    const divStartT = Math.max(0, r.start - 3);
-    const divEndT = Math.min(N_telem - 1, r.end + 3);
-    const kExit = closestParent[divStartT].k;
-    const kEntry = closestParent[divEndT].k;
-    splicedRuns.push({ divStartT, divEndT, kExit, kEntry });
+    let startT = r.start;
+    while (startT > 0 && closestParent[startT].minD > 1.0) {
+      if (closestParent[startT - 1].minD > closestParent[startT].minD && closestParent[startT].minD <= 2.5) {
+        break;
+      }
+      startT--;
+    }
+    let endT = r.end;
+    while (endT < N_telem - 1 && closestParent[endT].minD > 1.0) {
+      if (closestParent[endT + 1].minD > closestParent[endT].minD && closestParent[endT].minD <= 2.5) {
+        break;
+      }
+      endT++;
+    }
+    const kExit = closestParent[startT].k;
+    const kEntry = closestParent[endT].k;
+    splicedRuns.push({ divStartT: startT, divEndT: endT, kExit, kEntry });
   }
 
-  // Helper to slice circular parent
-  function sliceParentRange(P: Point2D[], kFrom: number, kTo: number): Point2D[] {
-    const res: Point2D[] = [];
+  // Helper to slice circular parent array
+  function sliceParentRange<TItem>(arr: TItem[], kFrom: number, kTo: number): TItem[] {
+    const res: TItem[] = [];
     let curr = kFrom;
     while (curr !== kTo) {
-      res.push(P[curr]);
-      curr = (curr + 1) % P.length;
+      res.push(arr[curr]);
+      curr = (curr + 1) % arr.length;
     }
-    res.push(P[kTo]);
+    res.push(arr[kTo]);
     return res;
   }
 
   const finalCenter: Point2D[] = [];
   const finalLeft: Point2D[] = [];
   const finalRight: Point2D[] = [];
+  const finalElevation: number[] = [];
   let totalParentPoints = 0;
 
   const M = splicedRuns.length;
@@ -992,60 +1154,156 @@ export function synthesizeHybridTrack(
     const parentSegRight = sliceParentRange(P_right, parentKFrom, parentKTo);
     totalParentPoints += parentSegCenter.length;
 
-    // Divergent connector (using open boundary computation)
-    const divCenter = T.slice(curRun.divStartT, curRun.divEndT + 1);
-    const divCorridor = computeCorridorBoundaries(divCenter, nominalWidthM / 2, false);
-
-    // Transition Blending (C1 Hermite / cosine weighting over B points)
-    const B = Math.min(6, Math.floor(divCenter.length / 3));
-    if (B > 0 && parentSegCenter.length > B) {
-      // Blend at exit junction (from parent to connector)
-      for (let b = 0; b < B; b++) {
-        const u = 0.5 * (1 - Math.cos((Math.PI * b) / B));
-        const targetL = divCorridor.left[b];
-        const targetR = divCorridor.right[b];
-        const sourceL = parentSegLeft[parentSegLeft.length - B + b];
-        const sourceR = parentSegRight[parentSegRight.length - B + b];
-        if (targetL && sourceL) {
-          divCorridor.left[b] = {
-            x: Number((sourceL.x * (1 - u) + targetL.x * u).toFixed(2)),
-            y: Number((sourceL.y * (1 - u) + targetL.y * u).toFixed(2)),
-          };
-        }
-        if (targetR && sourceR) {
-          divCorridor.right[b] = {
-            x: Number((sourceR.x * (1 - u) + targetR.x * u).toFixed(2)),
-            y: Number((sourceR.y * (1 - u) + targetR.y * u).toFixed(2)),
-          };
-        }
-      }
-
-      // Blend at entry junction (from connector back to next parent entry)
-      const nextParentL = P_left[curRun.kEntry];
-      const nextParentR = P_right[curRun.kEntry];
-      for (let b = 0; b < B; b++) {
-        const u = 0.5 * (1 - Math.cos((Math.PI * b) / B));
-        const idx = divCenter.length - B + b;
-        const sourceL = divCorridor.left[idx];
-        const sourceR = divCorridor.right[idx];
-        if (sourceL && nextParentL) {
-          divCorridor.left[idx] = {
-            x: Number((sourceL.x * (1 - u) + nextParentL.x * u).toFixed(2)),
-            y: Number((sourceL.y * (1 - u) + nextParentL.y * u).toFixed(2)),
-          };
-        }
-        if (sourceR && nextParentR) {
-          divCorridor.right[idx] = {
-            x: Number((sourceR.x * (1 - u) + nextParentR.x * u).toFixed(2)),
-            y: Number((sourceR.y * (1 - u) + nextParentR.y * u).toFixed(2)),
-          };
-        }
-      }
+    let parentSegElev: number[] | undefined;
+    if (parentElevation && parentElevation.length === N_parent) {
+      parentSegElev = sliceParentRange(parentElevation, parentKFrom, parentKTo);
     }
 
-    finalCenter.push(...parentSegCenter, ...divCenter);
-    finalLeft.push(...parentSegLeft, ...divCorridor.left);
-    finalRight.push(...parentSegRight, ...divCorridor.right);
+    // Divergent connector points
+    const rawDiv = T.slice(curRun.divStartT, curRun.divEndT + 1);
+    const L = rawDiv.length;
+
+    // Linearly distribute endpoint offsets so connector lands with exact 0.00m error at parent junctions
+    const dStart = { x: P_center[curRun.kExit].x - rawDiv[0].x, y: P_center[curRun.kExit].y - rawDiv[0].y };
+    const dEnd = { x: P_center[curRun.kEntry].x - rawDiv[L - 1].x, y: P_center[curRun.kEntry].y - rawDiv[L - 1].y };
+
+    const divCenter: Point2D[] = [];
+    for (let i = 0; i < L; i++) {
+      const w = i / (L - 1 || 1);
+      divCenter.push({
+        x: rawDiv[i].x + (1 - w) * dStart.x + w * dEnd.x,
+        y: rawDiv[i].y + (1 - w) * dStart.y + w * dEnd.y,
+      });
+    }
+
+    // Measure parent boundary widths at exit and entry junctions
+    const hwExit = Math.hypot(P_left[curRun.kExit].x - P_right[curRun.kExit].x, P_left[curRun.kExit].y - P_right[curRun.kExit].y) / 2;
+    const hwEntry = Math.hypot(P_left[curRun.kEntry].x - P_right[curRun.kEntry].x, P_left[curRun.kEntry].y - P_right[curRun.kEntry].y) / 2;
+    const hwNom = nominalWidthM / 2;
+
+    // Smooth width profile across connector
+    const hwProfile: number[] = [];
+    const BLEND_ZONE = Math.max(4, Math.floor(L / 4));
+    for (let i = 0; i < L; i++) {
+      let w = hwNom;
+      if (i < BLEND_ZONE) {
+        const u = 0.5 * (1 - Math.cos((Math.PI * i) / BLEND_ZONE));
+        w = hwExit * (1 - u) + hwNom * u;
+      } else if (i >= L - BLEND_ZONE) {
+        const u = 0.5 * (1 - Math.cos((Math.PI * (L - 1 - i)) / BLEND_ZONE));
+        w = hwEntry * (1 - u) + hwNom * u;
+      }
+      hwProfile.push(w);
+    }
+
+    // Curvature-driven road centerline reconstruction on the connector
+    const divOffsets: number[] = [];
+    for (let i = 0; i < L; i++) {
+      const prev = divCenter[Math.max(0, i - 2)];
+      const cur = divCenter[i];
+      const next = divCenter[Math.min(L - 1, i + 2)];
+      const dx1 = cur.x - prev.x, dy1 = cur.y - prev.y;
+      const dx2 = next.x - cur.x, dy2 = next.y - cur.y;
+      const a1 = Math.atan2(dy1, dx1), a2 = Math.atan2(dy2, dx2);
+      let diff = a2 - a1;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      const ds = (Math.hypot(dx1, dy1) + Math.hypot(dx2, dy2)) / 2;
+      const k = diff / (ds || 1);
+
+      const maxShift = Math.max(0, hwProfile[i] - 2.8);
+      const shift = -Math.tanh(k * 80) * maxShift;
+      divOffsets.push(shift);
+    }
+
+    // Smooth offsets with moving-average window and taper to 0 at junction endpoints
+    const smoothOffsets: number[] = [];
+    const W = Math.min(5, Math.floor(L / 4));
+    for (let i = 0; i < L; i++) {
+      let sum = 0, count = 0;
+      for (let w = -W; w <= W; w++) {
+        const idx = i + w;
+        if (idx >= 0 && idx < L) {
+          sum += divOffsets[idx];
+          count++;
+        }
+      }
+      const taper = Math.sin((Math.PI * i) / (L - 1 || 1));
+      smoothOffsets.push((sum / count) * taper);
+    }
+
+    // Extrude connector road center, left, and right
+    const divRoadCenter: Point2D[] = [];
+    const divLeft: Point2D[] = [];
+    const divRight: Point2D[] = [];
+    for (let i = 0; i < L; i++) {
+      const prev = divCenter[Math.max(0, i - 1)];
+      const next = divCenter[Math.min(L - 1, i + 1)];
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+
+      const offset = smoothOffsets[i];
+      const cx = divCenter[i].x + nx * offset;
+      const cy = divCenter[i].y + ny * offset;
+      divRoadCenter.push({ x: Number(cx.toFixed(2)), y: Number(cy.toFixed(2)) });
+      divLeft.push({ x: Number((cx + nx * hwProfile[i]).toFixed(2)), y: Number((cy + ny * hwProfile[i]).toFixed(2)) });
+      divRight.push({ x: Number((cx - nx * hwProfile[i]).toFixed(2)), y: Number((cy - ny * hwProfile[i]).toFixed(2)) });
+    }
+
+    // Smooth C1 blend of boundaries into parent boundaries at both junctions
+    const deltaL_start = { x: P_left[curRun.kExit].x - divLeft[0].x, y: P_left[curRun.kExit].y - divLeft[0].y };
+    const deltaR_start = { x: P_right[curRun.kExit].x - divRight[0].x, y: P_right[curRun.kExit].y - divRight[0].y };
+    const deltaL_end = { x: P_left[curRun.kEntry].x - divLeft[L - 1].x, y: P_left[curRun.kEntry].y - divLeft[L - 1].y };
+    const deltaR_end = { x: P_right[curRun.kEntry].x - divRight[L - 1].x, y: P_right[curRun.kEntry].y - divRight[L - 1].y };
+
+    for (let b = 0; b < BLEND_ZONE; b++) {
+      const u = 0.5 * (1 + Math.cos((Math.PI * b) / BLEND_ZONE));
+      divLeft[b] = {
+        x: Number((divLeft[b].x + deltaL_start.x * u).toFixed(2)),
+        y: Number((divLeft[b].y + deltaL_start.y * u).toFixed(2)),
+      };
+      divRight[b] = {
+        x: Number((divRight[b].x + deltaR_start.x * u).toFixed(2)),
+        y: Number((divRight[b].y + deltaR_start.y * u).toFixed(2)),
+      };
+
+      const idx = L - 1 - b;
+      divLeft[idx] = {
+        x: Number((divLeft[idx].x + deltaL_end.x * u).toFixed(2)),
+        y: Number((divLeft[idx].y + deltaL_end.y * u).toFixed(2)),
+      };
+      divRight[idx] = {
+        x: Number((divRight[idx].x + deltaR_end.x * u).toFixed(2)),
+        y: Number((divRight[idx].y + deltaR_end.y * u).toFixed(2)),
+      };
+    }
+
+    // Connector elevation
+    const divElevation: number[] = [];
+    if (parentSegElev && parentElevation) {
+      finalElevation.push(...parentSegElev);
+      const elevExit = parentElevation[curRun.kExit];
+      const elevEntry = parentElevation[curRun.kEntry];
+      const dElevStart = telemElevation && telemElevation.length === N_telem ? elevExit - telemElevation[curRun.divStartT] : 0;
+      const dElevEnd = telemElevation && telemElevation.length === N_telem ? elevEntry - telemElevation[curRun.divEndT] : 0;
+      for (let i = 0; i < L; i++) {
+        const frac = i / (L - 1 || 1);
+        if (telemElevation && telemElevation.length === N_telem) {
+          const rawElev = telemElevation[curRun.divStartT + i];
+          divElevation.push(Number((rawElev + (1 - frac) * dElevStart + frac * dElevEnd).toFixed(3)));
+        } else {
+          divElevation.push(Number((elevExit * (1 - frac) + elevEntry * frac).toFixed(3)));
+        }
+      }
+      finalElevation.push(...divElevation.slice(1, L - 1));
+    }
+
+    finalCenter.push(...parentSegCenter, ...divRoadCenter.slice(1, L - 1));
+    finalLeft.push(...parentSegLeft, ...divLeft.slice(1, L - 1));
+    finalRight.push(...parentSegRight, ...divRight.slice(1, L - 1));
   }
 
   const sharedPct = Number(((totalParentPoints / finalCenter.length) * 100).toFixed(1));
@@ -1054,6 +1312,7 @@ export function synthesizeHybridTrack(
     centerline: finalCenter,
     left: finalLeft,
     right: finalRight,
+    elevation: finalElevation.length === finalCenter.length ? finalElevation : undefined,
     sharedPct,
   };
 }
@@ -1077,8 +1336,199 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
   // used to anchor and sanity-check the telemetry-derived gate fit below, since replay-derived
   // S/F samples have been found to cluster at the wrong point on the track for every TUM track.
   let surveyAnchor: Point2D | null = null;
+  let elevationProfile: number[] | undefined = undefined;
+  let pitLaneData: PitLaneData | undefined = undefined;
+  let pitStallsData: PitStallData[] | undefined = undefined;
+  let gridSlotsData: GridSlotData[] | undefined = undefined;
 
-  if (cfg.sourceType === 'TUM') {
+  if (cfg.sourceType === 'lmu_api') {
+    const trackId = cfg.lmuTrackId || '4cdc72fe3acb2c912fd6cbd6828095625ba2d5a7';
+    const trackmap = await loadNativeTrackmap(trackId);
+
+    const t0 = trackmap.filter(p => p.type === 0);
+    const t1 = trackmap.filter(p => p.type === 1);
+    const rawStalls = trackmap.filter(p => p.type >= 2 && p.type < 100);
+    const rawGrid = trackmap.filter(p => p.type >= 100);
+
+    const nativeCenter: Point2D[] = t0.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.z.toFixed(2)) }));
+    const rawElevation: number[] = t0.map(p => Number(p.y.toFixed(3)));
+
+    transformInfo = {
+      scale: 1.0,
+      rotationDeg: 0.0,
+      tx: 0.0,
+      tz: 0.0,
+      rmse: 0.0,
+    };
+
+    // Calculate cumulative station distance along nativeCenter
+    const m = nativeCenter.length;
+    const cumDist: number[] = [0];
+    for (let i = 0; i < m - 1; i++) {
+      cumDist.push(cumDist[i] + Math.hypot(nativeCenter[i + 1].x - nativeCenter[i].x, nativeCenter[i + 1].y - nativeCenter[i].y));
+    }
+
+    // Helper to get variable half-width for station s
+    const getHalfWidth = (s: number): number => {
+      if (!cfg.sectionWidths || cfg.sectionWidths.length === 0) {
+        return cfg.nominalWidthM / 2;
+      }
+      for (const sec of cfg.sectionWidths) {
+        if (s >= sec.startM && s <= sec.endM) {
+          return sec.widthM / 2;
+        }
+      }
+      return cfg.nominalWidthM / 2;
+    };
+
+    // Pre-calculate target widths and apply smoothing so adjacent sections blend with C1 continuity
+    const targetHalfWidths: number[] = [];
+    for (let i = 0; i < m; i++) {
+      targetHalfWidths.push(getHalfWidth(cumDist[i]));
+    }
+    const smoothHalfWidths: number[] = [];
+    const HW_WINDOW = 8;
+    for (let i = 0; i < m; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let w = -HW_WINDOW; w <= HW_WINDOW; w++) {
+        const idx = (i + w + m) % m;
+        sum += targetHalfWidths[idx];
+        count++;
+      }
+      smoothHalfWidths.push(sum / count);
+    }
+
+    // Compute signed curvature along nativeCenter to reconstruct physical road centerline
+    // (A racing line cuts inside toward the apex; the physical road centerline sits further outside
+    // around curves. Offsetting the road centerline toward the outside of turns allows the car
+    // to realistically hug inside apex kerbs and track out to exit limits instead of sitting dead-center).
+    const rawOffsets: number[] = [];
+    for (let i = 0; i < m; i++) {
+      const prev = nativeCenter[(i - 2 + m) % m];
+      const cur = nativeCenter[i];
+      const next = nativeCenter[(i + 2) % m];
+      const dx1 = cur.x - prev.x, dy1 = cur.y - prev.y;
+      const dx2 = next.x - cur.x, dy2 = next.y - cur.y;
+      const a1 = Math.atan2(dy1, dx1), a2 = Math.atan2(dy2, dx2);
+      let diff = a2 - a1;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      const ds = (Math.hypot(dx1, dy1) + Math.hypot(dx2, dy2)) / 2;
+      const k = diff / (ds || 1);
+
+      // Max lateral apex shift: up to (hw - 2.8m) to ensure curb edge safety
+      const maxShift = Math.max(0, smoothHalfWidths[i] - 2.8);
+      const shift = -Math.tanh(k * 80) * maxShift;
+      rawOffsets.push(shift);
+    }
+
+    // Smooth offsets with moving average window (window = 5 points ~ 25m) for C1 continuity
+    const smoothOffsets: number[] = [];
+    const SHIFT_WINDOW = 5;
+    for (let i = 0; i < m; i++) {
+      let sum = 0, count = 0;
+      for (let w = -SHIFT_WINDOW; w <= SHIFT_WINDOW; w++) {
+        sum += rawOffsets[(i + w + m) % m];
+        count++;
+      }
+      smoothOffsets.push(sum / count);
+    }
+
+    const roadCenter: Point2D[] = [];
+    const lmuLeft: Point2D[] = [];
+    const lmuRight: Point2D[] = [];
+    for (let i = 0; i < m; i++) {
+      const prev = nativeCenter[(i - 1 + m) % m];
+      const next = nativeCenter[(i + 1) % m];
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+
+      const offset = smoothOffsets[i];
+      const cx = nativeCenter[i].x + nx * offset;
+      const cy = nativeCenter[i].y + ny * offset;
+      roadCenter.push({
+        x: Number(cx.toFixed(2)),
+        y: Number(cy.toFixed(2)),
+      });
+
+      const hw = smoothHalfWidths[i];
+      lmuLeft.push({
+        x: Number((cx + nx * hw).toFixed(2)),
+        y: Number((cy + ny * hw).toFixed(2)),
+      });
+      lmuRight.push({
+        x: Number((cx - nx * hw).toFixed(2)),
+        y: Number((cy - ny * hw).toFixed(2)),
+      });
+    }
+
+    finalCenter = roadCenter;
+    finalLeft = lmuLeft;
+    finalRight = lmuRight;
+    elevationProfile = rawElevation;
+
+    // Pit lane polyline
+    if (t1.length > 0) {
+      pitLaneData = {
+        centerline: t1.map(p => [Number(p.x.toFixed(2)), Number(p.z.toFixed(2))]),
+        elevation: t1.map(p => Number(p.y.toFixed(3))),
+      };
+    }
+
+    // Pit stalls
+    if (rawStalls.length > 0) {
+      const stallsByType = new Map<number, NativeTrackPoint[]>();
+      for (const p of rawStalls) {
+        if (!stallsByType.has(p.type)) stallsByType.set(p.type, []);
+        stallsByType.get(p.type)!.push(p);
+      }
+      pitStallsData = [];
+      for (const [typeId, pts] of stallsByType.entries()) {
+        if (pts.length >= 2) {
+          const cx = (pts[0].x + pts[1].x) / 2;
+          const cz = (pts[0].z + pts[1].z) / 2;
+          const w = Math.hypot(pts[1].x - pts[0].x, pts[1].z - pts[0].z);
+          const angle = Math.atan2(pts[1].z - pts[0].z, pts[1].x - pts[0].x) * 180 / Math.PI;
+          pitStallsData.push({
+            id: typeId,
+            center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+            widthM: Number(w.toFixed(2)),
+            angleDeg: Number(angle.toFixed(1)),
+          });
+        }
+      }
+    }
+
+    // Grid slots
+    if (rawGrid.length > 0) {
+      const gridByType = new Map<number, NativeTrackPoint[]>();
+      for (const p of rawGrid) {
+        if (!gridByType.has(p.type)) gridByType.set(p.type, []);
+        gridByType.get(p.type)!.push(p);
+      }
+      gridSlotsData = [];
+      for (const [typeId, pts] of gridByType.entries()) {
+        if (pts.length >= 2) {
+          const cx = (pts[0].x + pts[1].x) / 2;
+          const cz = (pts[0].z + pts[1].z) / 2;
+          gridSlotsData.push({
+            slot: typeId,
+            center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+          });
+        }
+      }
+    }
+
+    // Authoritative S/F anchor
+    const anchorIdx = cfg.sfCenterIndex !== undefined ? cfg.sfCenterIndex : (cfg.layoutKey === 'sarthe_full' ? 206 : 0);
+    surveyAnchor = nativeCenter[anchorIdx] || nativeCenter[0];
+    console.log(`LMU API native ground truth: ${finalCenter.length} center pts, S/F anchor index ${anchorIdx}, pit lane: ${t1.length} pts, stalls: ${pitStallsData?.length || 0}, grid: ${gridSlotsData?.length || 0}`);
+
+  } else if (cfg.sourceType === 'TUM') {
     const tumPath = await ensureSourceFile(cfg);
     const tumPts = parseTumCsv(fs.readFileSync(tumPath, 'utf8'));
 
@@ -1171,6 +1621,82 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     // start/finish point - the authoritative anchor for this track's S/F gate.
     surveyAnchor = applyTransform(tumCenter[0]);
 
+    // Enrich with cached native trackmap data, falling back to the running LMU API.
+    if (cfg.lmuTrackId) {
+      try {
+        const lmuMap = await loadNativeTrackmap(cfg.lmuTrackId);
+        const t0 = lmuMap.filter(p => p.type === 0);
+        const t1 = lmuMap.filter(p => p.type === 1);
+        const rawStalls = lmuMap.filter(p => p.type >= 2 && p.type < 100);
+        const rawGrid = lmuMap.filter(p => p.type >= 100);
+
+        if (t1.length > 0) {
+          pitLaneData = {
+            centerline: t1.map(p => [Number(p.x.toFixed(2)), Number(p.z.toFixed(2))]),
+            elevation: t1.map(p => Number(p.y.toFixed(3))),
+          };
+        }
+
+        if (rawStalls.length > 0) {
+          const stallsByType = new Map<number, NativeTrackPoint[]>();
+          for (const p of rawStalls) {
+            if (!stallsByType.has(p.type)) stallsByType.set(p.type, []);
+            stallsByType.get(p.type)!.push(p);
+          }
+          pitStallsData = [];
+          for (const [typeId, pts] of stallsByType.entries()) {
+            if (pts.length >= 2) {
+              const cx = (pts[0].x + pts[1].x) / 2;
+              const cz = (pts[0].z + pts[1].z) / 2;
+              const w = Math.hypot(pts[1].x - pts[0].x, pts[1].z - pts[0].z);
+              const angle = Math.atan2(pts[1].z - pts[0].z, pts[1].x - pts[0].x) * 180 / Math.PI;
+              pitStallsData.push({
+                id: typeId,
+                center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+                widthM: Number(w.toFixed(2)),
+                angleDeg: Number(angle.toFixed(1)),
+              });
+            }
+          }
+        }
+
+        if (rawGrid.length > 0) {
+          const gridByType = new Map<number, NativeTrackPoint[]>();
+          for (const p of rawGrid) {
+            if (!gridByType.has(p.type)) gridByType.set(p.type, []);
+            gridByType.get(p.type)!.push(p);
+          }
+          gridSlotsData = [];
+          for (const [typeId, pts] of gridByType.entries()) {
+            if (pts.length >= 2) {
+              const cx = (pts[0].x + pts[1].x) / 2;
+              const cz = (pts[0].z + pts[1].z) / 2;
+              gridSlotsData.push({
+                slot: typeId,
+                center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+              });
+            }
+          }
+        }
+
+        if (t0.length > 0) {
+          elevationProfile = [];
+          for (let i = 0; i < finalCenter.length; i++) {
+            let minD = Infinity, bestY = 0;
+            for (const p of t0) {
+              const d = Math.hypot(finalCenter[i].x - p.x, finalCenter[i].y - p.z);
+              if (d < minD) { minD = d; bestY = p.y; }
+            }
+            elevationProfile.push(Number(bestY.toFixed(3)));
+          }
+        }
+
+        console.log(`[${cfg.layoutKey}] Enriched TUM survey with native trackmap pit infrastructure (pit: ${t1.length} pts, stalls: ${pitStallsData?.length || 0}, grid: ${gridSlotsData?.length || 0}) and 3D elevation`);
+      } catch (err) {
+        console.warn(`[${cfg.layoutKey}] Could not load native trackmap infrastructure for TUM layout:`, err);
+      }
+    }
+
   } else if (cfg.sourceType === 'atlas' || cfg.sourceType === 'osm') {
     const atlasPath = await ensureSourceFile(cfg);
     const geojson = JSON.parse(fs.readFileSync(atlasPath, 'utf8'));
@@ -1255,10 +1781,101 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     }
     const parentGeom = JSON.parse(fs.readFileSync(parentFile, 'utf8'));
 
-    const hybrid = synthesizeHybridTrack(parentGeom, lmu2D, cfg.nominalWidthM, 12.0);
+    // Use cached native child geometry first, then query the running LMU API.
+    let hybridInput2D = lmu2D;
+    let telemElevation: number[] | undefined = undefined;
+    let childPitLane: PitLaneData | undefined = undefined;
+    let childStalls: PitStallData[] | undefined = undefined;
+    let childGrid: GridSlotData[] | undefined = undefined;
+
+    if (cfg.lmuTrackId) {
+      try {
+        const childMap = await loadNativeTrackmap(cfg.lmuTrackId);
+        const t0 = childMap.filter(p => p.type === 0);
+          if (t0.length > 0) {
+            hybridInput2D = t0.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.z.toFixed(2)) }));
+            telemElevation = t0.map(p => Number(p.y.toFixed(3)));
+            console.log(`[${cfg.layoutKey}] Sourced child divergent trajectory from native LMU API ground truth (${t0.length} pts)`);
+          }
+          const t1 = childMap.filter(p => p.type === 1);
+          if (t1.length > 0) {
+            childPitLane = {
+              centerline: t1.map(p => [Number(p.x.toFixed(2)), Number(p.z.toFixed(2))]),
+              elevation: t1.map(p => Number(p.y.toFixed(3))),
+            };
+          }
+          const rawStalls = childMap.filter(p => p.type >= 2 && p.type < 100);
+          if (rawStalls.length > 0) {
+            const stallsByType = new Map<number, NativeTrackPoint[]>();
+            for (const p of rawStalls) {
+              if (!stallsByType.has(p.type)) stallsByType.set(p.type, []);
+              stallsByType.get(p.type)!.push(p);
+            }
+            childStalls = [];
+            for (const [typeId, pts] of stallsByType.entries()) {
+              if (pts.length >= 2) {
+                const cx = (pts[0].x + pts[1].x) / 2;
+                const cz = (pts[0].z + pts[1].z) / 2;
+                const w = Math.hypot(pts[1].x - pts[0].x, pts[1].z - pts[0].z);
+                const angle = Math.atan2(pts[1].z - pts[0].z, pts[1].x - pts[0].x) * 180 / Math.PI;
+                childStalls.push({
+                  id: typeId,
+                  center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+                  widthM: Number(w.toFixed(2)),
+                  angleDeg: Number(angle.toFixed(1)),
+                });
+              }
+            }
+          }
+          const rawGrid = childMap.filter(p => p.type >= 100);
+          if (rawGrid.length > 0) {
+            const gridByType = new Map<number, NativeTrackPoint[]>();
+            for (const p of rawGrid) {
+              if (!gridByType.has(p.type)) gridByType.set(p.type, []);
+              gridByType.get(p.type)!.push(p);
+            }
+            childGrid = [];
+            for (const [typeId, pts] of gridByType.entries()) {
+              if (pts.length >= 2) {
+                const cx = (pts[0].x + pts[1].x) / 2;
+                const cz = (pts[0].z + pts[1].z) / 2;
+                childGrid.push({
+                  slot: typeId,
+                  center: [Number(cx.toFixed(2)), Number(cz.toFixed(2))],
+                });
+              }
+            }
+          }
+      } catch (err) {
+        console.warn(`[${cfg.layoutKey}] Could not load LMU API map for child layout:`, err);
+      }
+    }
+
+    const hybrid = synthesizeHybridTrack(
+      parentGeom,
+      hybridInput2D,
+      cfg.nominalWidthM,
+      12.0,
+      parentGeom.elevationProfile,
+      telemElevation
+    );
+
     finalCenter = hybrid.centerline.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
     finalLeft = hybrid.left.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
     finalRight = hybrid.right.map(p => ({ x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)) }));
+    elevationProfile = hybrid.elevation ?? parentGeom.elevationProfile;
+
+    // Inherit pit lane & infrastructure from child map if present, else inherit from parent
+    pitLaneData = childPitLane ?? parentGeom.pitLane;
+    pitStallsData = childStalls ?? parentGeom.pitStalls;
+    gridSlotsData = childGrid ?? parentGeom.gridSlots;
+
+    // Inherit authoritative survey anchor from parent S/F line
+    if (parentGeom.startFinish) {
+      surveyAnchor = { x: parentGeom.startFinish[0], y: parentGeom.startFinish[1] };
+    } else if (parentGeom.timingGates?.startFinish?.center) {
+      surveyAnchor = { x: parentGeom.timingGates.startFinish.center[0], y: parentGeom.timingGates.startFinish.center[1] };
+    }
 
     transformInfo = {
       scale: 1.0,
@@ -1350,15 +1967,26 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
 
   const sfGate = fitGateLine(trustedSfSamples, sfFallback, sfTangent);
 
-
   const sfCenterInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalCenter, 35) || findClosestOnPolyline(sfGate.point, finalCenter);
-  const sfLeftInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalLeft, 35) || findClosestOnPolyline(sfCenterInter.point, finalLeft);
-  const sfRightInter = intersectLineWithPolyline(sfGate.point, sfGate.dir, finalRight, 35) || findClosestOnPolyline(sfCenterInter.point, finalRight);
+
+  // Gate line across track must be strictly perpendicular to the track centerline tangent
+  const mCenter = finalCenter.length;
+  const sfIdx = Math.floor(sfCenterInter.index);
+  const pSfPrev = finalCenter[(sfIdx - 1 + mCenter) % mCenter];
+  const pSfNext = finalCenter[(sfIdx + 1) % mCenter];
+  const sfTdx = pSfNext.x - pSfPrev.x;
+  const sfTdy = pSfNext.y - pSfPrev.y;
+  const sfTLen = Math.hypot(sfTdx, sfTdy) || 1;
+  const sfNormal = { x: -sfTdy / sfTLen, y: sfTdx / sfTLen };
+
+  const sfLeftInter = intersectLineWithPolyline(sfCenterInter.point, sfNormal, finalLeft, 35) || findClosestOnPolyline(sfCenterInter.point, finalLeft);
+  const sfRightInter = intersectLineWithPolyline(sfCenterInter.point, { x: -sfNormal.x, y: -sfNormal.y }, finalRight, 35) || findClosestOnPolyline(sfCenterInter.point, finalRight);
 
   // Roll closed polylines so that index 0 is strictly at the Start/Finish gate
   const rolledCenter = rollPolyline(finalCenter, sfCenterInter.index, sfCenterInter.point);
   const rolledLeft = rollPolyline(finalLeft, sfCenterInter.index, sfLeftInter.point);
   const rolledRight = rollPolyline(finalRight, sfCenterInter.index, sfRightInter.point);
+  const rolledElevation = elevationProfile ? rollNumberArray(elevationProfile, sfCenterInter.index) : undefined;
 
   // Calculate circuit length along rolled centerline (needed below to sanity-check sector gates).
   // Must include the closing segment back to index 0 (same closed-loop convention used by the
@@ -1381,8 +2009,18 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     const s1Fallback = gateSamples.s1Samples[0];
     const s1GateLine = fitGateLine(gateSamples.s1Samples, s1Fallback, { x: 1, y: 0 });
     const s1Center = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledCenter, 35) || findClosestOnPolyline(s1GateLine.point, rolledCenter);
-    const s1Left = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s1Center.point, rolledLeft);
-    const s1Right = intersectLineWithPolyline(s1GateLine.point, s1GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s1Center.point, rolledRight);
+
+    const mRolled = rolledCenter.length;
+    const s1Idx = Math.floor(s1Center.index);
+    const pS1Prev = rolledCenter[(s1Idx - 1 + mRolled) % mRolled];
+    const pS1Next = rolledCenter[(s1Idx + 1) % mRolled];
+    const s1Tdx = pS1Next.x - pS1Prev.x;
+    const s1Tdy = pS1Next.y - pS1Prev.y;
+    const s1TLen = Math.hypot(s1Tdx, s1Tdy) || 1;
+    const s1Normal = { x: -s1Tdy / s1TLen, y: s1Tdx / s1TLen };
+
+    const s1Left = intersectLineWithPolyline(s1Center.point, s1Normal, rolledLeft, 35) || findClosestOnPolyline(s1Center.point, rolledLeft);
+    const s1Right = intersectLineWithPolyline(s1Center.point, { x: -s1Normal.x, y: -s1Normal.y }, rolledRight, 35) || findClosestOnPolyline(s1Center.point, rolledRight);
     const s1StationM = computeStationAlongPolyline(rolledCenter, s1Center.index);
     if (isPlausibleSectorStation(s1StationM)) {
       sector1Gate = {
@@ -1402,8 +2040,18 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     const s2Fallback = gateSamples.s2Samples[0];
     const s2GateLine = fitGateLine(gateSamples.s2Samples, s2Fallback, { x: 1, y: 0 });
     const s2Center = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledCenter, 35) || findClosestOnPolyline(s2GateLine.point, rolledCenter);
-    const s2Left = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledLeft, 35) || findClosestOnPolyline(s2Center.point, rolledLeft);
-    const s2Right = intersectLineWithPolyline(s2GateLine.point, s2GateLine.dir, rolledRight, 35) || findClosestOnPolyline(s2Center.point, rolledRight);
+
+    const mRolled = rolledCenter.length;
+    const s2Idx = Math.floor(s2Center.index);
+    const pS2Prev = rolledCenter[(s2Idx - 1 + mRolled) % mRolled];
+    const pS2Next = rolledCenter[(s2Idx + 1) % mRolled];
+    const s2Tdx = pS2Next.x - pS2Prev.x;
+    const s2Tdy = pS2Next.y - pS2Prev.y;
+    const s2TLen = Math.hypot(s2Tdx, s2Tdy) || 1;
+    const s2Normal = { x: -s2Tdy / s2TLen, y: s2Tdx / s2TLen };
+
+    const s2Left = intersectLineWithPolyline(s2Center.point, s2Normal, rolledLeft, 35) || findClosestOnPolyline(s2Center.point, rolledLeft);
+    const s2Right = intersectLineWithPolyline(s2Center.point, { x: -s2Normal.x, y: -s2Normal.y }, rolledRight, 35) || findClosestOnPolyline(s2Center.point, rolledRight);
     const s2StationM = computeStationAlongPolyline(rolledCenter, s2Center.index);
     if (isPlausibleSectorStation(s2StationM) && (!sector1Gate || s2StationM > sector1Gate.stationM)) {
       sector2Gate = {
@@ -1445,7 +2093,8 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     trackVenue: cfg.trackVenue,
     trackCourse: cfg.trackCourse,
     lengthM: Number(lengthM.toFixed(1)),
-    source: cfg.sourceType === 'TUM' ? 'TUM-survey'
+    source: cfg.sourceType === 'lmu_api' ? 'LMU-API+Telemetry'
+      : cfg.sourceType === 'TUM' ? 'TUM-survey'
       : cfg.sourceType === 'osm' ? 'OpenStreetMap'
       : cfg.sourceType === 'atlas' ? 'track-atlas'
       : cfg.sourceType === 'hybrid' ? `hybrid (${cfg.parentLayoutKey})`
@@ -1465,6 +2114,10 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
     nominalWidthM: cfg.nominalWidthM,
     startFinish: [sfCenterInter.point.x, sfCenterInter.point.y],
     timingGates,
+    elevationProfile: rolledElevation,
+    pitLane: pitLaneData,
+    pitStalls: pitStallsData,
+    gridSlots: gridSlotsData,
     createdAt: new Date().toISOString(),
   };
 
@@ -1474,6 +2127,38 @@ export async function processTrack(cfg: TrackConfig, db: any): Promise<TrackBoun
 
 function hasGeometryChanged(existing: TrackBoundaryGeometry, current: TrackBoundaryGeometry): boolean {
   if (!existing.timingGates || !existing.startFinish) {
+    return true;
+  }
+  if (
+    Boolean(existing.elevationProfile) !== Boolean(current.elevationProfile) ||
+    Boolean(existing.pitLane) !== Boolean(current.pitLane) ||
+    Boolean(existing.pitStalls) !== Boolean(current.pitStalls) ||
+    Boolean(existing.gridSlots) !== Boolean(current.gridSlots)
+  ) {
+    return true;
+  }
+  if (
+    existing.elevationProfile && current.elevationProfile &&
+    JSON.stringify(existing.elevationProfile) !== JSON.stringify(current.elevationProfile)
+  ) {
+    return true;
+  }
+  if (
+    existing.pitLane && current.pitLane &&
+    JSON.stringify(existing.pitLane) !== JSON.stringify(current.pitLane)
+  ) {
+    return true;
+  }
+  if (
+    existing.pitStalls && current.pitStalls &&
+    JSON.stringify(existing.pitStalls) !== JSON.stringify(current.pitStalls)
+  ) {
+    return true;
+  }
+  if (
+    existing.gridSlots && current.gridSlots &&
+    JSON.stringify(existing.gridSlots) !== JSON.stringify(current.gridSlots)
+  ) {
     return true;
   }
   if (
@@ -1547,7 +2232,21 @@ async function main() {
   fs.mkdirSync(serverDir, { recursive: true });
   fs.mkdirSync(publicDir, { recursive: true });
 
-  const indexManifest: Array<{
+  const targetLayoutArg = process.argv.find(arg => arg.startsWith('--layout='))?.split('=')[1];
+  const targetLayouts = targetLayoutArg ? targetLayoutArg.split(/[,\s]+/).map(s => s.trim()).filter(Boolean) : null;
+  const configsToProcess = targetLayouts
+    ? TRACK_CONFIGS.filter(c => targetLayouts.includes(c.layoutKey))
+    : TRACK_CONFIGS;
+
+  if (targetLayouts && configsToProcess.length === 0) {
+    console.error(`Layout "${targetLayoutArg}" not found in TRACK_CONFIGS.`);
+    process.exit(1);
+  }
+
+  const serverIndexFile = path.join(serverDir, 'index.json');
+  const publicIndexFile = path.join(publicDir, 'index.json');
+
+  let indexManifest: Array<{
     layoutKey: string;
     circuitId: string;
     layoutId: string;
@@ -1559,12 +2258,20 @@ async function main() {
     pointsCount: number;
     startFinish?: [number, number];
     timingGates?: any;
+    hasElevation?: boolean;
+    hasPitLane?: boolean;
   }> = [];
+
+  if (fs.existsSync(serverIndexFile)) {
+    try {
+      indexManifest = JSON.parse(fs.readFileSync(serverIndexFile, 'utf8'));
+    } catch {}
+  }
 
   let updatedCount = 0;
   let unchangedCount = 0;
 
-  for (const cfg of TRACK_CONFIGS) {
+  for (const cfg of configsToProcess) {
     try {
       const geom = await processTrack(cfg, db);
       const serverFile = path.join(serverDir, `${cfg.layoutKey}.json`);
@@ -1598,7 +2305,7 @@ async function main() {
         console.log(`💾 [${cfg.layoutKey}] Geometry updated; wrote new version (updatedAt: ${geom.updatedAt}).`);
       }
 
-      indexManifest.push({
+      const manifestEntry = {
         layoutKey: geom.layoutKey,
         circuitId: geom.circuitId,
         layoutId: geom.layoutId,
@@ -1610,15 +2317,22 @@ async function main() {
         pointsCount: geom.centerline.length,
         startFinish: geom.startFinish,
         timingGates: geom.timingGates,
-      });
+        hasElevation: Boolean(geom.elevationProfile),
+        hasPitLane: Boolean(geom.pitLane),
+      };
+
+      const existingManifestIdx = indexManifest.findIndex(m => m.layoutKey === geom.layoutKey);
+      if (existingManifestIdx >= 0) {
+        indexManifest[existingManifestIdx] = manifestEntry;
+      } else {
+        indexManifest.push(manifestEntry);
+      }
     } catch (err: any) {
       console.error(`❌ Failed processing ${cfg.layoutKey}:`, err.message);
     }
   }
 
   // Save index.json only if changed
-  const serverIndexFile = path.join(serverDir, 'index.json');
-  const publicIndexFile = path.join(publicDir, 'index.json');
   let existingIndexStr = '';
   if (fs.existsSync(serverIndexFile)) {
     try {
