@@ -17,6 +17,7 @@ export interface CircuitSpecification {
   turnCount: number;
   direction: 'Clockwise' | 'Counter-Clockwise';
   elevationChangeMeters?: number;
+  nominalWidthM?: number;
   famousCorners: string[];
   boundarySource: 'TUM-survey' | 'Track-Atlas' | 'OpenStreetMap' | 'Hybrid' | 'Telemetry-Corridor';
   boundarySourceDescription: string;
@@ -569,6 +570,7 @@ export const CIRCUIT_SPECIFICATIONS: Record<string, CircuitSpecification> = {
     boundarySource: 'OpenStreetMap',
     boundarySourceDescription: 'OpenStreetMap high-resolution geometry (OSM Relation 7509968) resampled at 2.5m intervals and aligned to LMU replay telemetry.',
     parsedFrom: 'LMU Results XML (TrackVenue="Algarve International Circuit", TrackCourse="Algarve International Circuit") & Binary .Vcr Replay Stream',
+    nominalWidthM: 14.0,
     fiaGrade: 'FIA Grade 1',
     openedYear: 2008,
   },

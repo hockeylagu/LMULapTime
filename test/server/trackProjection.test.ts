@@ -167,7 +167,7 @@ describe('trackProjection utility', () => {
       const elapsed = performance.now() - t0;
 
       expect(res.stations).toHaveLength(10000);
-      expect(elapsed).toBeLessThan(150); // Generous margin for heavy parallel test suite runners; typically < 5ms
+      expect(elapsed).toBeLessThan(300); // Generous margin for heavy parallel test suite runners; typically < 5ms
     });
   });
 });

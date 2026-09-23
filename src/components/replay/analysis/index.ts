@@ -4,6 +4,7 @@ export * from './LapSelectorDropdown.js';
 export * from './CornerApexChart.js';
 export * from './CornerSpeedGraph.js';
 export * from './CornerTechniqueDeck.js';
+export * from './CornerPhaseCards.js';
 export * from './CornerSpeedTable.js';
 export * from './useCornerConsistency.js';
 export * from './AIReportTab.js';
