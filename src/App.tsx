@@ -89,7 +89,7 @@ function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass, pr
   return (
     <TrackDetail
       trackName={trackName}
-      onBack={() => navigate('/tracks', { replace: true })}
+      onBack={() => navigate(selectedCarClass !== 'All' ? `/tracks?carClass=${encodeURIComponent(selectedCarClass)}` : '/tracks', { replace: true })}
       onSelectSession={onSelectSession}
       selectedCarClass={selectedCarClass}
       setSelectedCarClass={setSelectedCarClass}
@@ -235,7 +235,8 @@ export default function App() {
   };
 
   const handleSelectTrack = (trackName: string) => {
-    navigate(`/track/${encodeURIComponent(trackName)}`);
+    const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
+    navigate(`/track/${encodeURIComponent(trackName)}${suffix}`);
   };
 
   return (

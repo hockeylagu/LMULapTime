@@ -195,6 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             visibleTracks={visibleTracks}
             showMoreTracks={isExpanded}
             setShowMoreTracks={toggleExpanded}
+            selectedCarClass={selectedCarClass}
           />
           <CarsSummaryCard
             rankedCars={rankedCars}

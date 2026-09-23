@@ -8,6 +8,7 @@ export interface CircuitsSummaryCardProps {
   visibleTracks: { track: string; laps: number }[];
   showMoreTracks: boolean;
   setShowMoreTracks: (val: boolean | ((prev: boolean) => boolean)) => void;
+  selectedCarClass?: string;
 }
 
 export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
@@ -15,6 +16,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
   visibleTracks,
   showMoreTracks,
   setShowMoreTracks,
+  selectedCarClass = 'All',
 }) => {
   const navigate = useNavigate();
   return (
@@ -32,7 +34,8 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
             <div
               key={item.track}
               onClick={() => {
-                navigate(`/track/${encodeURIComponent(item.track)}`);
+                const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
+                navigate(`/track/${encodeURIComponent(item.track)}${suffix}`);
               }}
               className="flex items-center justify-between text-xs cursor-pointer hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
               title={`View ${item.track} Track Details`}
