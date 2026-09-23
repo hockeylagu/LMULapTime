@@ -68,7 +68,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
                   {formatTime(t.bestLapTime)}
                 </h4>
                 {paceInfo && (
-                  <PaceBadge category={paceInfo.category} />
+                  <PaceBadge category={paceInfo.category} percentage={paceInfo.pct} showPercentage />
                 )}
               </div>
               <p className="text-[11px] text-lmu-muted mt-1 truncate">

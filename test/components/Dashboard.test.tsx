@@ -634,7 +634,7 @@ describe('Dashboard component', () => {
     expect(screen.getByText('Clean Flying Laps')).toBeInTheDocument();
     expect(screen.getByText('Top Speed Recorded')).toBeInTheDocument();
     expect(screen.getByText('312.5 km/h')).toBeInTheDocument();
-    expect(screen.getByText('Average Speed')).toBeInTheDocument();
+    expect(screen.getByText('Avg Benchmark Pace')).toBeInTheDocument();
     expect(screen.getByText('Race Podiums & Wins')).toBeInTheDocument();
     expect(screen.getByText('Session Breakdown')).toBeInTheDocument();
     expect(screen.getByText('Pit Stops Serviced')).toBeInTheDocument();

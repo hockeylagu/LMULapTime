@@ -28,12 +28,12 @@
           -462.2
         ],
         "left": [
-          -312.63,
-          -461.51
+          -312.64,
+          -461.62
         ],
         "right": [
-          -301.12,
-          -462.87
+          -301.11,
+          -462.77
         ],
         "stationM": 0
       },
@@ -48,7 +48,7 @@
           1088.36
         ],
         "right": [
-          308.65,
+          308.64,
           1079.54
         ],
         "stationM": 1939.4
@@ -60,16 +60,18 @@
           328.27
         ],
         "left": [
-          152.69,
-          316.42
+          162.72,
+          325.18
         ],
         "right": [
-          167.78,
-          340.82
+          157.15,
+          331.56
         ],
         "stationM": 3867.1
       }
-    }
+    },
+    "hasElevation": true,
+    "hasPitLane": true
   },
   {
     "layoutKey": "monza_curvagrande",
@@ -77,7 +79,7 @@
     "layoutId": "curvagrande",
     "trackVenue": "Autodromo Nazionale Monza",
     "trackCourse": "Monza Curva Grande Circuit",
-    "lengthM": 5771.3,
+    "lengthM": 5756.6,
     "source": "hybrid (monza_gp)",
     "bounds": {
       "minX": -317.79,
@@ -87,7 +89,7 @@
       "spanX": 1268.33,
       "spanZ": 2179.95
     },
-    "pointsCount": 1184,
+    "pointsCount": 1159,
     "startFinish": [
       -306.83,
       -462.51
@@ -101,11 +103,11 @@
         ],
         "left": [
           -312.67,
-          -461.99
+          -461.93
         ],
         "right": [
-          -301.13,
-          -463.01
+          -301.14,
+          -463.08
         ],
         "stationM": 0
       },
@@ -123,7 +125,7 @@
           288.72,
           1077.86
         ],
-        "stationM": 1898.3
+        "stationM": 1883.7
       },
       "sector2": {
         "name": "Sector 2",
@@ -132,16 +134,18 @@
           344.17
         ],
         "left": [
-          168.11,
-          329.89
+          180.92,
+          341.08
         ],
         "right": [
-          188.82,
-          359.15
+          175.37,
+          347.43
         ],
-        "stationM": 3821.8
+        "stationM": 3807.2
       }
-    }
+    },
+    "hasElevation": true,
+    "hasPitLane": true
   },
   {
     "layoutKey": "spa_gp",
@@ -221,71 +225,73 @@
     "layoutId": "full",
     "trackVenue": "Circuit de la Sarthe",
     "trackCourse": "Circuit de la Sarthe",
-    "lengthM": 13624.2,
-    "source": "track-atlas",
+    "lengthM": 13624.6,
+    "source": "LMU-API+Telemetry",
     "bounds": {
-      "minX": -191.65,
-      "maxX": 2386.18,
-      "minZ": -3107.17,
-      "maxZ": 2372.76,
-      "spanX": 2577.83,
-      "spanZ": 5479.93
+      "minX": -205.39,
+      "maxX": 2403.15,
+      "minZ": -3089.4,
+      "maxZ": 2366.37,
+      "spanX": 2608.54,
+      "spanZ": 5455.77
     },
-    "pointsCount": 5450,
+    "pointsCount": 2724,
     "startFinish": [
-      -168.93,
-      1043.88
+      -186.24,
+      1062.59
     ],
     "timingGates": {
       "startFinish": {
         "name": "Start / Finish",
         "center": [
-          -168.93,
-          1043.88
+          -186.24,
+          1062.59
         ],
         "left": [
-          -179.42,
-          1055.22
+          -192.97,
+          1063.09
         ],
         "right": [
-          -157.7,
-          1043.27
+          -179.51,
+          1062.09
         ],
         "stationM": 0
       },
       "sector1": {
         "name": "Sector 1",
         "center": [
-          743.6,
-          2300.65
+          745.94,
+          2313.64
         ],
         "left": [
-          738.44,
-          2310.66
+          742.97,
+          2320.52
         ],
         "right": [
-          748.73,
-          2290.65
+          748.91,
+          2306.75
         ],
-        "stationM": 1749.3
+        "stationM": 1751.2
       },
       "sector2": {
         "name": "Sector 2",
         "center": [
-          2370.17,
-          -2493.03
+          2389.43,
+          -2490.32
         ],
         "left": [
-          2381.42,
-          -2492.83
+          2396.43,
+          -2490.15
         ],
         "right": [
-          2358.92,
-          -2493.23
+          2382.43,
+          -2490.49
         ],
-        "stationM": 7159
+        "stationM": 7143.8
       }
-    }
+    },
+    "hasElevation": true,
+    "hasPitLane": true
   },
   {
     "layoutKey": "cota_gp",

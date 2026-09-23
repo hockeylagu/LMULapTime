@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { formatTime, matchesSessionType, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
+import { formatTime, matchesSessionType, getSessionTypeSortRank, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types';
@@ -86,7 +86,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   };
 
   useEffect(() => {
-    setSelectedCarModel('All');
+    // Skip the no-op reset so this doesn't race with the carClass URL update happening the same tick.
+    if (selectedCarModel !== 'All') setSelectedCarModel('All');
   }, [selectedClass]);
 
   useEffect(() => {
@@ -209,6 +210,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
     }
     if (sortBy === 'pos-asc') {
+      const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
+      const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
+      if (typeRankA !== typeRankB) return typeRankA - typeRankB;
       const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
       const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
       if (posA !== posB) return posA - posB;

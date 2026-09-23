@@ -85,9 +85,10 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
   - Automatically generates and pre-aligns physical left and right boundary polygons (`leftBoundary`, `rightBoundary`, `centerline`) in exact LMU simulation coordinates ($x, z$).
   - Evaluates track limit respect and racing line placement relative to actual kerb limits and road margins.
 - **Multi-Source Ingestion & 1-Step Procrustes Alignment**:
+  - **LMU Native API 3D Trackmaps**: In-game 1:1 ground truth extraction with curvature-driven physical road reconstruction, variable width profiling, 3D elevation, pit lane routing, pit stalls, and grid slots (Le Mans 24h).
   - **TUM Racetrack Database**: Surveyed boundaries for Monza GP, Spa, COTA, Barcelona, Interlagos, Silverstone, and Bahrain GP.
-  - **Track-Atlas & OpenStreetMap GPS**: Curvature-adaptive centerlines with FIA/ACO homologation road width profiling for Le Mans 24h, Imola, Daytona Road Course, Fuji, Laguna Seca, and Sebring Full.
-  - **LMU Telemetry Corridors**: Native high-frequency physics extraction for circuit layout variants (Monza Curva Grande, Fuji Classic, Bahrain Outer, Bahrain Paddock, Sebring School, Lusail Short, Paul Ricard Short, Portimão WEC).
+  - **Track-Atlas & OpenStreetMap GPS**: Curvature-adaptive centerlines with FIA/ACO homologation road width profiling for Imola, Daytona Road Course, Fuji, Laguna Seca, and Sebring Full.
+  - **LMU Telemetry Corridors & Hybrid Synthesis**: Native high-frequency physics extraction for circuit layout variants (Monza Curva Grande, Fuji Classic, Bahrain Outer, Bahrain Paddock, Sebring School, Lusail Short, Paul Ricard Short, Portimão WEC).
 - **Fast 60fps Client-Side Rendering**: Pre-calculated coordinates stored in `server/data/tracks/` and mirrored to `public/tracks/` for zero-overhead client rendering in `GpsTrackMapScene`.
 - **Pipeline Architecture & Adding New Tracks**: Fully automated via `npx tsx tools/analysis/buildAllTrackBoundaries.ts` and documented in [`docs/TRACK_BOUNDARIES_PIPELINE.md`](docs/TRACK_BOUNDARIES_PIPELINE.md).
 

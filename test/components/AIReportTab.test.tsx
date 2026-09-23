@@ -45,7 +45,7 @@ describe('AIReportTab', () => {
     vi.unstubAllGlobals();
   });
 
-  it('prompts the user when no completed trajectory is selected', () => {
+  it('prompts the user when no completed trajectory is selected', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ configured: false }),
@@ -61,6 +61,7 @@ describe('AIReportTab', () => {
     );
 
     expect(screen.getByText(/select a completed lap to generate an ai report/i)).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ai/settings'));
   });
 
   it('shows the unconfigured state and keeps generation disabled', async () => {

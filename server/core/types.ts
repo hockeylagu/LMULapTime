@@ -635,6 +635,7 @@ export interface ReplayMetadata {
   sessionType?: string;
   privateSession?: boolean;
   scn?: string;
+  sceneDesc?: string;
   aiw?: string;
   trackName?: string;
   trackVenue?: string;

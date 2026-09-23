@@ -4,7 +4,8 @@ import { Router } from 'express';
 import { computeProgression, computeTrackSummaries, extractComparableLaps } from '../sessions/parser.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty } from '../../src/utils/formatters.js';
-import { loadReferenceLaptimesFromCache, normalizeTrackName } from '../benchmarks/referenceLaptimes.js';
+import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
+import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
 
 export function createSessionRouter(context: ServerContext): Router {
@@ -91,7 +92,7 @@ export function createSessionRouter(context: ServerContext): Router {
 
     res.json({
       trackName: decoded,
-      normalizedTrackName: normalizeTrackName(decoded, sampleCourse),
+      normalizedTrackName: getCircuitSpecification(decoded, sampleCourse).benchmarkName,
       sessionsCount: trackSessions.length,
       sessions: trackSessions.map(session => {
         const { drivers, ...metadata } = session;

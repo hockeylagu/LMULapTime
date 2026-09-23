@@ -241,8 +241,9 @@ export function createReplayRouter(context: ServerContext): Router {
       trajectory.vcrRawPointsCount = fullTrajectory.rawPointsCount ?? fullTrajectory.points.length;
       trajectory.vcrRawSampleRateHz = fullTrajectory.rawSampleRateHz;
 
+      let metadata: ReplayMetadata | undefined;
       try {
-        const metadata = context.replayCache.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
+        metadata = context.replayCache.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
         const isPlayer = (driverSlot === undefined && !driverName) ||
           (driverName && driverName.toLowerCase().includes(context.currentParser.configuredPlayerName.toLowerCase())) ||
           (typeof driverSlot === 'number' && metadata.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer);
@@ -309,7 +310,18 @@ export function createReplayRouter(context: ServerContext): Router {
         }
         trajectory.validation = { matchedSessionId: matchedSession.id, sessionType: matchedSession.sessionType, trackName: getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse), driverName: matchedDriver.driverName || matchedDriver.name, totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length, officialBestLapTime: matchedDriver.bestLapTime, officialLaps };
       }
-      try { enrichTrajectoryWithTrackGeometry(trajectory, matchedSession?.trackVenue, matchedSession?.trackCourse, replayName); } catch (error) { console.warn(`[serverTrackSync] Failed to enrich trajectory for ${replayName}:`, error); }
+      try {
+        enrichTrajectoryWithTrackGeometry(
+          trajectory,
+          matchedSession?.trackVenue || metadata?.trackVenue,
+          matchedSession?.trackCourse || metadata?.trackCourse,
+          replayName,
+          metadata?.sceneDesc,
+          matchedSession?.trackLengthMeters
+        );
+      } catch (error) {
+        console.warn(`[serverTrackSync] Failed to enrich trajectory for ${replayName}:`, error);
+      }
       res.json(trajectory);
     } catch (error: unknown) {
       console.error(`Failed to extract replay trajectory for ${req.params.name}:`, error);

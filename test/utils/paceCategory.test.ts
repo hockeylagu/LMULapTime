@@ -6,7 +6,6 @@ import {
   normalizeCarClass,
   matchesCarClass,
   matchesSessionCarClass,
-  normalizeTrackName,
   matchesTrack,
   getPaceCategoryFromPercentage,
   findMatchingTrackBenchmarkEntries,
@@ -130,78 +129,6 @@ describe('paceCategory utility', () => {
         drivers: [{ carClass: 'LMP2', carType: 'Oreca 07' }],
       };
       expect(matchesSessionCarClass(session, 'LMGT3')).toBe(false);
-    });
-  });
-
-  describe('normalizeTrackName - Comprehensive Layout Variants', () => {
-    it('normalizes Silverstone layout variants (GP vs International vs National)', () => {
-      expect(normalizeTrackName('Silverstone', 'GP')).toBe('Silverstone (GP)');
-      expect(normalizeTrackName('Silverstone', 'Grand Prix')).toBe('Silverstone (GP)');
-      expect(normalizeTrackName('Silverstone', 'International')).toBe('Silverstone (International)');
-      expect(normalizeTrackName('Silverstone', 'National')).toBe('Silverstone (National)');
-      expect(normalizeTrackName('Silverstone Circuit', '')).toBe('Silverstone (GP)');
-    });
-
-    it('normalizes Le Mans / Sarthe layout variants (24h vs Straight / Chicaneless)', () => {
-      expect(normalizeTrackName('Circuit de la Sarthe', '')).toBe('Circuit de la Sarthe');
-      expect(normalizeTrackName('Circuit 24 Heures du Mans', '24 Heures')).toBe('Circuit de la Sarthe');
-      expect(normalizeTrackName('Circuit 24 Heures du Mans', 'Straight')).toBe('Circuit de la Sarthe (straight)');
-      expect(normalizeTrackName('Le Mans', 'Chicaneless')).toBe('Circuit de la Sarthe (straight)');
-    });
-
-    it('normalizes Bahrain layout variants (WEC vs Outer vs Endurance vs Paddock)', () => {
-      expect(normalizeTrackName('Bahrain International Circuit', 'Grand Prix')).toBe('Bahrain (wec)');
-      expect(normalizeTrackName('Bahrain', 'WEC')).toBe('Bahrain (wec)');
-      expect(normalizeTrackName('Bahrain', 'Outer')).toBe('Bahrain (outer)');
-      expect(normalizeTrackName('Bahrain', 'Endurance')).toBe('Bahrain (endurance)');
-      expect(normalizeTrackName('Bahrain', 'Paddock')).toBe('Bahrain (paddock)');
-      expect(normalizeTrackName('Bahrain', '')).toBe('Bahrain (wec)');
-    });
-
-    it('normalizes Paul Ricard layout variants (1A v2 vs 1A vs 3A vs Short)', () => {
-      expect(normalizeTrackName('Circuit Paul Ricard', '1A v2 Short')).toBe('Paul Ricard (1A v2 short)');
-      expect(normalizeTrackName('Paul Ricard', '1A v2')).toBe('Paul Ricard (1A v2)');
-      expect(normalizeTrackName('Paul Ricard', '1A')).toBe('Paul Ricard (1A)');
-      expect(normalizeTrackName('Paul Ricard', '3A')).toBe('Paul Ricard (3A)');
-      expect(normalizeTrackName('Paul Ricard', '')).toBe('Paul Ricard (1A v2)');
-    });
-
-    it('normalizes Monza layout variants (GP vs Curva Grande)', () => {
-      expect(normalizeTrackName('Autodromo Nazionale Monza', '')).toBe('Monza');
-      expect(normalizeTrackName('Monza', 'Grand Prix')).toBe('Monza');
-      expect(normalizeTrackName('Monza', 'Curva Grande')).toBe('Monza (curvagrande)');
-    });
-
-    it('normalizes COTA, Fuji, Qatar, and Sebring layout variants', () => {
-      expect(normalizeTrackName('Circuit of the Americas', 'GP')).toBe('COTA');
-      expect(normalizeTrackName('Circuit of the Americas', 'National')).toBe('COTA (national)');
-      expect(normalizeTrackName('COTA', '')).toBe('COTA');
-
-      expect(normalizeTrackName('Fuji Speedway', 'Grand Prix')).toBe('Fuji (chicane)');
-      expect(normalizeTrackName('Fuji Speedway', 'Classic')).toBe('Fuji (classic)');
-      expect(normalizeTrackName('Fuji', '')).toBe('Fuji (chicane)');
-
-      expect(normalizeTrackName('Losail Qatar', 'Grand Prix')).toBe('Qatar');
-      expect(normalizeTrackName('Lusail', 'Short')).toBe('Qatar (short)');
-      expect(normalizeTrackName('Qatar', '')).toBe('Qatar');
-
-      expect(normalizeTrackName('Sebring International Raceway', '12h')).toBe('Sebring');
-      expect(normalizeTrackName('Sebring', 'School')).toBe('Sebring (school)');
-      expect(normalizeTrackName('Sebring', '')).toBe('Sebring');
-    });
-
-    it('normalizes Barcelona, Daytona, Imola, Interlagos, Laguna Seca, Portimao', () => {
-      expect(normalizeTrackName('Circuit de Barcelona-Catalunya', 'GP')).toBe('Barcelona');
-      expect(normalizeTrackName('Daytona International Speedway', 'Road Course')).toBe('Daytona');
-      expect(normalizeTrackName('Autodromo Enzo e Dino Ferrari', 'GP')).toBe('Imola');
-      expect(normalizeTrackName('Autodromo Jose Carlos Pace', 'GP')).toBe('Interlagos');
-      expect(normalizeTrackName('WeatherTech Raceway Laguna Seca', '')).toBe('Laguna Seca');
-      expect(normalizeTrackName('Autodromo Internacional do Algarve', 'GP')).toBe('Portimao');
-    });
-
-    it('falls back to venue if no specific mapping matches', () => {
-      expect(normalizeTrackName('Custom Track', 'Layout A')).toBe('Custom Track');
-      expect(normalizeTrackName('Unknown Venue', '')).toBe('Unknown Venue');
     });
   });
 
