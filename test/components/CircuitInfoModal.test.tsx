@@ -39,7 +39,7 @@ describe('CircuitInfoModal', () => {
     expect(screen.getByText(/Belgium/i)).toBeInTheDocument();
 
     // Turn count & Direction
-    expect(screen.getByText('19 Turns')).toBeInTheDocument();
+    expect(screen.getByText('20 Turns')).toBeInTheDocument();
     expect(screen.getByText('Clockwise')).toBeInTheDocument();
 
     // Length

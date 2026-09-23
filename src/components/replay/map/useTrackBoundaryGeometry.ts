@@ -33,10 +33,24 @@ export interface TrackBoundaryGeometry {
     sector1?: TimingGateGeometry;
     sector2?: TimingGateGeometry;
   };
+  elevationProfile?: number[];
+  pitLane?: {
+    centerline: Array<[number, number]>;
+    elevation?: number[];
+  };
+  pitStalls?: Array<{
+    id: number;
+    center: [number, number];
+    widthM: number;
+    angleDeg?: number;
+  }>;
+  gridSlots?: Array<{
+    slot: number;
+    center: [number, number];
+  }>;
 }
 
-import { resolveTrackLayoutKey } from '../../../utils/trackLayout.js';
-export { resolveTrackLayoutKey };
+import { getCircuitSpecification } from '../../../utils/circuitSpecs.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
 // Capped with LRU eviction to keep memory low across 21 track geometries.
@@ -60,12 +74,14 @@ export interface UseTrackBoundaryGeometryOptions {
 }
 
 export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOptions) {
-  const resolvedKey = resolveTrackLayoutKey(
+  const spec = getCircuitSpecification(
     options.trackVenue,
     options.trackCourse,
+    null,
     options.replayName,
     options.layoutKey
   );
+  const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
 
   const [trackGeometry, setTrackGeometry] = useState<TrackBoundaryGeometry | null>(
     resolvedKey ? geometryCache.get(resolvedKey) || null : null

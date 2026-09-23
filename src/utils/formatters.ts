@@ -138,6 +138,13 @@ export function matchesSessionType(sessionType: string = '', sessionName: string
   }
 }
 
+// Priority order for sorts that group by session importance: Race, then Qualifying, then Practice.
+export function getSessionTypeSortRank(sessionType: string = '', sessionName: string = ''): number {
+  if (matchesSessionType(sessionType, sessionName, 'Race')) return 0;
+  if (matchesSessionType(sessionType, sessionName, 'Qualifying')) return 1;
+  return 2;
+}
+
 export function parseDateStringToTimestamp(dateStr?: string): number {
   if (!dateStr) return 0;
   const time = new Date(dateStr.replace(/\//g, '-')).getTime();

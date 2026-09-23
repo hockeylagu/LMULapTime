@@ -1,14 +1,13 @@
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../core/types.js';
 import { parseTimeStringToSeconds, formatTime } from '../../src/utils/formatters.js';
 import {
-  normalizeTrackName,
   getPaceCategoryFromPercentage,
   findReferenceEntry,
   normalizeCarClass,
 } from '../../src/utils/paceCategory.js';
 import { getSessionDatabase } from '../core/db.js';
 
-export { normalizeTrackName, normalizeCarClass };
+export { normalizeCarClass };
 
 const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
@@ -240,13 +239,14 @@ function getReferenceEntry(
   venue: string,
   course: string,
   carClass: string,
-  carType: string
+  carType: string,
+  trackLengthMeters?: number | null
 ): ReferenceLaptimeEntry | null {
   const cache = loadReferenceLaptimesFromCache();
   if (!cache) return null;
 
   const normClass = normalizeCarClass(carClass, carType);
-  return findReferenceEntry(cache.entries, venue, course, normClass, carType);
+  return findReferenceEntry(cache.entries, venue, course, normClass, carType, trackLengthMeters);
 }
 
 // Calculate Pace Category for a Lap Time
@@ -255,11 +255,12 @@ export function calculatePaceCategory(
   venue: string,
   course: string,
   carClass: string,
-  carType: string
+  carType: string,
+  trackLengthMeters?: number | null
 ): PaceCategoryInfo | null {
   if (!lapTimeSec || lapTimeSec <= 0) return null;
 
-  const ref = getReferenceEntry(venue, course, carClass, carType);
+  const ref = getReferenceEntry(venue, course, carClass, carType, trackLengthMeters);
   if (!ref || !ref.target100Sec) return null;
 
   const percentage = parseFloat(((lapTimeSec / ref.target100Sec) * 100).toFixed(2));

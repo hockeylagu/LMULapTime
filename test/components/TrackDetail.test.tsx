@@ -498,6 +498,60 @@ describe('TrackDetail component', () => {
     expect(sortSelect).toHaveValue('pos-asc');
   });
 
+  it('prioritizes Race, then Qualifying, then Practice sessions when sorting by Best Position', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        trackName: 'Spa',
+        normalizedTrackName: 'Spa',
+        sessionsCount: 3,
+        sessions: [
+          {
+            id: 'sess-practice-p1', filename: 'practice.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/28 14:00', sessionType: 'Practice', sessionName: 'P1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 122.0, bestLapTimeString: '2:02.000', bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122.0, lapsCount: 5, position: 1 },
+          },
+          {
+            id: 'sess-qualifying-p2', filename: 'qualifying.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/29 14:00', sessionType: 'Qualifying', sessionName: 'Q1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 121.0, bestLapTimeString: '2:01.000', bestS1: 35, bestS2: 41, bestS3: 45, theoreticalBest: 121.0, lapsCount: 4, position: 2 },
+          },
+          {
+            id: 'sess-race-p5', filename: 'race.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/30 14:00', sessionType: 'Race', sessionName: 'R1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 120.0, bestLapTimeString: '2:00.000', bestS1: 34, bestS2: 41, bestS3: 45, theoreticalBest: 120.0, lapsCount: 20, position: 5 },
+          },
+        ],
+        benchmarks: [],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[comboboxes.length - 1];
+    fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Table view/i }));
+    const table = screen.getByRole('table');
+    const rowTimestamps = within(table).getAllByText(/2026\/05\/(28|29|30) 14:00/).map((el) => el.textContent);
+
+    // Race (worst raw position) sorts first, then Qualifying, then Practice (best raw position) last.
+    expect(rowTimestamps).toEqual(['2026/05/30 14:00', '2026/05/29 14:00', '2026/05/28 14:00']);
+  });
+
   it('renders interactive chart legend in TrackDetail and allows toggling series visibility', async () => {
     render(
       <TrackDetail
@@ -545,7 +599,7 @@ describe('TrackDetail component', () => {
     fireEvent.click(infoBtn);
 
     expect(screen.getByRole('dialog', { name: /Circuit Information/i })).toBeInTheDocument();
-    expect(screen.getByText('19 Turns')).toBeInTheDocument();
+    expect(screen.getByText('20 Turns')).toBeInTheDocument();
     expect(screen.getByText(/Belgium/i)).toBeInTheDocument();
 
     const closeBtn = screen.getByTitle('Close');

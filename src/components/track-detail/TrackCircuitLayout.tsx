@@ -3,9 +3,9 @@ import {
   useTrackBoundaryGeometry,
   projectBoundaryPoints,
   computeTrackBoundaryPathD,
-  resolveTrackLayoutKey,
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
+import { getCircuitSpecification } from '../../utils/circuitSpecs.js';
 
 export interface TrackCircuitLayoutProps {
   trackName: string;
@@ -58,7 +58,8 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   size = 'detail',
   onClick,
 }) => {
-  const resolvedKey = resolveTrackLayoutKey(trackName, trackCourse, undefined, layoutKey);
+  const spec = getCircuitSpecification(trackName, trackCourse, null, null, layoutKey);
+  const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
   const cachedD =
     (resolvedKey ? pathDCache.get(resolvedKey) : undefined) ||
     (propGeometry ? getOrComputePathD(propGeometry, resolvedKey || undefined) : undefined);
