@@ -86,7 +86,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   };
 
   useEffect(() => {
-    setSelectedCarModel('All');
+    // Skip the no-op reset so this doesn't race with the carClass URL update happening the same tick.
+    if (selectedCarModel !== 'All') setSelectedCarModel('All');
   }, [selectedClass]);
 
   useEffect(() => {
