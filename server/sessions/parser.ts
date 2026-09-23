@@ -5,16 +5,10 @@ import {
   DetailedSession,
   DriverData,
   LapData,
-  LapIncident,
-  LapPenalty,
-  LapTrackLimit,
   SessionMetadata,
-  SessionProgressionPoint,
   SessionSettings,
   SessionWeather,
   TireWear,
-  TrackSummary,
-  ComparableLap,
 } from '../core/types.js';
 import { parseReplayMetadata, detectPlayerName } from '../replay/replayParser.js';
 import {
@@ -23,145 +17,54 @@ import {
   parseTimeStringToSeconds,
   getDisplayTrackName,
   computeTheoreticalBest,
-  computeTheoreticalGap,
   parseDateStringToTimestamp,
   getSessionTypeWeight,
-  compareSessions,
   minValidTime,
 } from '../../src/utils/formatters.js';
-import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../src/utils/lapComparison.js';
 import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
-import { matchesTrack, matchesCarClass } from '../../src/utils/paceCategory.js';
+import { matchesTrack } from '../../src/utils/paceCategory.js';
 import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
+import {
+  RawLapXmlNode,
+  RawDriverXmlNode,
+  RawStreamIncidentNode,
+  RawStreamSectorNode,
+  RawStreamTrackLimitNode,
+  RawStreamPenaltyNode,
+  RawStreamXmlNode,
+  RawSessionXmlNode,
+  ReplayFileEntry,
+} from './sessionXmlTypes.js';
+import { parseStreamEvents } from './sessionXmlStream.js';
+import {
+  computeAverageLapTime,
+  computeProgression,
+  computeTrackSummaries,
+  extractComparableLaps,
+  ComparableLapsResult,
+} from './sessionAnalytics.js';
 
-export { getDisplayTrackName };
+export {
+  getDisplayTrackName,
+  parseStreamEvents,
+  computeAverageLapTime,
+  computeProgression,
+  computeTrackSummaries,
+  extractComparableLaps,
+};
 
-export interface RawLapXmlNode {
-  '@_num'?: string | number;
-  '@_p'?: string | number;
-  '@_s1'?: string;
-  '@_s2'?: string;
-  '@_s3'?: string;
-  '@_topspeed'?: string | number;
-  '@_fcompound'?: string;
-  '@_rcompound'?: string;
-  '@_FL'?: string;
-  '@_fl'?: string;
-  '@_FR'?: string;
-  '@_fr'?: string;
-  '@_RL'?: string;
-  '@_rl'?: string;
-  '@_RR'?: string;
-  '@_rr'?: string;
-  '@_pit'?: string | number;
-  '@_et'?: string;
-  '@_twfl'?: string | number;
-  '@_twfr'?: string | number;
-  '@_twrl'?: string | number;
-  '@_twrr'?: string | number;
-  '@_fuel'?: string | number;
-  '@_fuelUsed'?: string | number;
-  '@_fuelused'?: string | number;
-  '@_fused'?: string | number;
-  '@_ve'?: string | number;
-  '@_veUsed'?: string | number;
-  '@_veused'?: string | number;
-  '@_nrg'?: string | number;
-  '@_nrgused'?: string | number;
-  '#text'?: string;
-  [key: string]: unknown;
-}
-
-export interface RawDriverXmlNode {
-  Name?: string;
-  CarType?: string;
-  VehName?: string;
-  CarClass?: string;
-  CarNumber?: string | number;
-  TeamName?: string;
-  isPlayer?: string | number | boolean;
-  Position?: string | number;
-  ClassPosition?: string | number;
-  Lap?: RawLapXmlNode | RawLapXmlNode[];
-  GridPos?: string | number;
-  GridPosition?: string | number;
-  QualPosition?: string | number;
-  Grid?: string | number;
-  ClassGridPos?: string | number;
-  ClassGridPosition?: string | number;
-  ClassGrid?: string | number;
-  FinishStatus?: string;
-  Reason?: string;
-  Pitstops?: string | number;
-  PitStops?: string | number;
-  NumPitstops?: string | number;
-  [key: string]: unknown;
-}
-
-export interface RawStreamIncidentNode {
-  '@_et'?: string | number;
-  '#text'?: string;
-  [key: string]: unknown;
-}
-
-export interface RawStreamSectorNode {
-  '@_et'?: string | number;
-  '#text'?: string;
-  [key: string]: unknown;
-}
-
-export interface RawStreamTrackLimitNode {
-  '@_Driver'?: string;
-  '@_driver'?: string;
-  '@_et'?: string | number;
-  '@_Lap'?: string | number;
-  '@_WarningPoints'?: string | number;
-  '@_warningpoints'?: string | number;
-  '@_CurrentPoints'?: string | number;
-  '@_currentpoints'?: string | number;
-  '#text'?: string;
-  [key: string]: unknown;
-}
-
-export interface RawStreamPenaltyNode {
-  '@_Driver'?: string;
-  '@_driver'?: string;
-  '@_et'?: string | number;
-  '@_Penalty'?: string;
-  '@_penalty'?: string;
-  '@_Reason'?: string;
-  '@_reason'?: string;
-  '#text'?: string;
-  [key: string]: unknown;
-}
-
-export interface RawStreamXmlNode {
-  Incident?: RawStreamIncidentNode | RawStreamIncidentNode[];
-  Sector?: RawStreamSectorNode | RawStreamSectorNode[];
-  TrackLimits?: RawStreamTrackLimitNode | RawStreamTrackLimitNode[];
-  Penalty?: RawStreamPenaltyNode | RawStreamPenaltyNode[];
-  [key: string]: unknown;
-}
-
-export interface RawSessionXmlNode {
-  Driver?: RawDriverXmlNode | RawDriverXmlNode[];
-  Stream?: RawStreamXmlNode;
-  Setting?: unknown;
-  ServerName?: unknown;
-  DamageMult?: unknown;
-  FuelMult?: unknown;
-  TireMult?: unknown;
-  TireWarmers?: unknown;
-  FixedSetups?: unknown;
-  FixedUpgrades?: unknown;
-  ParcFerme?: unknown;
-  MechFailRate?: unknown;
-  Minutes?: unknown;
-  RaceTime?: unknown;
-  RaceLaps?: unknown;
-  VehiclesAllowed?: unknown;
-  [key: string]: unknown;
-}
+export type {
+  RawLapXmlNode,
+  RawDriverXmlNode,
+  RawStreamIncidentNode,
+  RawStreamSectorNode,
+  RawStreamTrackLimitNode,
+  RawStreamPenaltyNode,
+  RawStreamXmlNode,
+  RawSessionXmlNode,
+  ReplayFileEntry,
+  ComparableLapsResult,
+};
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -171,27 +74,7 @@ const xmlParser = new XMLParser({
   trimValues: true,
 });
 
-export interface ReplayFileEntry {
-  name: string;
-  path: string;
-  sizeBytes: number;
-  trackName: string;
-  sessionCode: string; // e.g. P1, Q1, R1
-  mtime: number;
-  eventTitle?: string;
-  splitNo?: number;
-  eventType?: string;
-  durationSec?: number;
-}
-
 const updateMinTime = minValidTime;
-
-const computeAverageLapTime = (laps: LapData[]): number | null => {
-  const candidates = selectCleanLapCandidates(laps);
-  if (candidates.length === 0) return null;
-  const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-  return parseFloat((sum / candidates.length).toFixed(3));
-};
 
 export class LmuParser {
   private replaysMap: ReplayFileEntry[] = [];
@@ -640,7 +523,6 @@ export class LmuParser {
           curLap.lapTime = inferredTime;
           curLap.lapTimeString = formatTime(inferredTime);
           curLap.isInferred = true;
-          // curLap.isValid remains false to keep official leaderboards and records uncorrupted
         }
       }
     }
@@ -898,8 +780,6 @@ export class LmuParser {
       return Math.min(diffStart, diffEnd, diffDirect);
     };
 
-    // A replay from a different session type (e.g. R1) must never match a session of another
-    // type (e.g. P1), no matter how close the timestamps are (back-to-back sessions are common).
     const sessionScoped = this.replaysMap.filter(v => matchesSessionCode(v.sessionCode, normSession) && getMinDiff(v) <= 600000);
 
     // 1. Exact track/layout match takes priority whenever one exists.
@@ -915,8 +795,7 @@ export class LmuParser {
     }
 
     // 2. Fall back to generic-vs-specific same-circuit matches only when no exact-layout
-    // replay is available (e.g. a session logged under the bare circuit name with only a
-    // named-layout replay on disk, or vice versa).
+    // replay is available
     const fallbackCandidates = sessionScoped.filter(v => {
       const qSpec = getCircuitSpecification(v.trackName);
       const sSpec = getCircuitSpecification(trackVenue, trackCourse);
@@ -946,639 +825,6 @@ export class LmuParser {
   }
 
   private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {
-    if (!streamNode || !drivers || drivers.length === 0) return;
-
-    const cleanDriverName = (raw?: string): string => {
-      if (!raw) return '';
-      return String(raw)
-        .replace(/#\d+/g, '')
-        .replace(/\(\d+\)/g, '')
-        .trim()
-        .toLowerCase();
-    };
-
-    const driversWithClean = drivers.map(d => ({
-      driver: d,
-      clean: cleanDriverName(d.name),
-    }));
-
-    const matchDriver = (rawName?: string): DriverData | undefined => {
-      const clean = cleanDriverName(rawName);
-      if (!clean) return undefined;
-      const found = driversWithClean.find(({ clean: dClean }) =>
-        dClean === clean || dClean.includes(clean) || clean.includes(dClean)
-      );
-      return found?.driver;
-    };
-
-    const matchLapForDriver = (driver: DriverData, et?: number, explicitLapNum?: number): LapData | undefined => {
-      if (!driver.laps || driver.laps.length === 0) return undefined;
-
-      if (explicitLapNum !== undefined && explicitLapNum > 0) {
-        const explicitLap = driver.laps.find(l => l.lapNum === explicitLapNum);
-        if (explicitLap) return explicitLap;
-      }
-
-      if (et === undefined || isNaN(et)) {
-        return driver.laps[0];
-      }
-
-      for (let i = 0; i < driver.laps.length; i++) {
-        const lap = driver.laps[i];
-        const nextLap = i + 1 < driver.laps.length ? driver.laps[i + 1] : undefined;
-        const isLastLap = i === driver.laps.length - 1;
-
-        const startEt = lap.elapsedSeconds !== null && lap.elapsedSeconds !== undefined && lap.elapsedSeconds > 0
-          ? lap.elapsedSeconds
-          : (i > 0 && driver.laps[i - 1].elapsedSeconds ? driver.laps[i - 1].elapsedSeconds! : 0);
-
-        let endEt: number;
-        if (nextLap && nextLap.elapsedSeconds !== null && nextLap.elapsedSeconds !== undefined && nextLap.elapsedSeconds > 0) {
-          endEt = nextLap.elapsedSeconds;
-        } else if (lap.lapTime !== null && lap.lapTime > 0) {
-          endEt = startEt + lap.lapTime;
-        } else {
-          endEt = Infinity;
-        }
-
-        if (et >= startEt && (et < endEt || (isLastLap && et <= endEt + 120))) {
-          return lap;
-        }
-      }
-
-      if (driver.laps.length > 0) {
-        const firstLap = driver.laps[0];
-        if (firstLap.elapsedSeconds && et < firstLap.elapsedSeconds) {
-          return firstLap;
-        }
-        return driver.laps[driver.laps.length - 1];
-      }
-
-      return undefined;
-    };
-
-    // 1. Process Incidents
-    const rawIncidents = streamNode.Incident ? (Array.isArray(streamNode.Incident) ? streamNode.Incident : [streamNode.Incident]) : [];
-    rawIncidents.forEach((inc: RawStreamIncidentNode) => {
-      const et = inc['@_et'] !== undefined ? parseFloat(String(inc['@_et'])) : undefined;
-      const text = typeof inc === 'object' && inc['#text'] ? String(inc['#text']) : (typeof inc === 'string' ? inc : '');
-      if (!text) return;
-
-      const match = text.match(/^(.+?)(?:#\d+)?\(\d+\)\s+reported contact\s+\(([0-9.]+)\)\s+with\s+(.+)$/i);
-      if (!match) return;
-
-      const rawDriver = match[1].trim();
-      const force = parseFloat(match[2]);
-      const target = match[3].trim();
-      const driver = matchDriver(rawDriver);
-      if (!driver) return;
-
-      const isOtherVehicle = /^another vehicle/i.test(target);
-      const otherVehicle = isOtherVehicle
-        ? target.replace(/^another vehicle\s+/i, '').replace(/(?:#\d+)?\(\d+\)$/, '').trim()
-        : undefined;
-      const isWallImpact = !isOtherVehicle;
-
-      const forceStr = !isNaN(force) && force > 0 ? ` (${force.toFixed(0)}N)` : '';
-      const description = isOtherVehicle
-        ? `Contact with ${otherVehicle || 'vehicle'}${forceStr}`
-        : `Contact with ${target || 'barrier'}${forceStr}`;
-
-      const lap = matchLapForDriver(driver, et);
-
-      const incident: LapIncident = {
-        type: 'contact',
-        description,
-        details: description,
-        lapNum: lap ? lap.lapNum : undefined,
-        elapsedSeconds: et,
-        force: !isNaN(force) ? force : undefined,
-        otherVehicle,
-        isWallImpact,
-      };
-
-      if (!driver.incidents) driver.incidents = [];
-      driver.incidents.push(incident);
-
-      if (lap) {
-        if (!lap.incidents) lap.incidents = [];
-        lap.incidents.push(incident);
-        lap.incidentCount = lap.incidents.length;
-      }
-    });
-
-    // 2. Process Sector Damage
-    const rawSectors = streamNode.Sector ? (Array.isArray(streamNode.Sector) ? streamNode.Sector : [streamNode.Sector]) : [];
-    rawSectors.forEach((sec: RawStreamSectorNode) => {
-      const et = sec['@_et'] !== undefined ? parseFloat(String(sec['@_et'])) : undefined;
-      const text = typeof sec === 'object' && sec['#text'] ? String(sec['#text']) : (typeof sec === 'string' ? sec : '');
-      if (!text) return;
-
-      const match = text.match(/^(.+?)(?:#\d+)?\(\d+\)\s+reports new\s+(.+)$/i);
-      if (!match) return;
-
-      const rawDriver = match[1].trim();
-      const damageType = match[2].trim();
-      const driver = matchDriver(rawDriver);
-      if (!driver) return;
-
-      const lap = matchLapForDriver(driver, et);
-
-      const incident: LapIncident = {
-        type: 'damage',
-        description: `New ${damageType} reported`,
-        details: `New ${damageType} reported`,
-        lapNum: lap ? lap.lapNum : undefined,
-        elapsedSeconds: et,
-      };
-
-      if (!driver.incidents) driver.incidents = [];
-      driver.incidents.push(incident);
-
-      if (lap) {
-        if (!lap.incidents) lap.incidents = [];
-        lap.incidents.push(incident);
-        lap.incidentCount = lap.incidents.length;
-      }
-    });
-
-    // 3. Process TrackLimits
-    const rawTrackLimits = streamNode.TrackLimits ? (Array.isArray(streamNode.TrackLimits) ? streamNode.TrackLimits : [streamNode.TrackLimits]) : [];
-    rawTrackLimits.forEach((tl: RawStreamTrackLimitNode) => {
-      const rawDriver = tl['@_Driver'] || tl['@_driver'];
-      const driver = matchDriver(rawDriver);
-      if (!driver) return;
-
-      const et = tl['@_et'] !== undefined ? parseFloat(String(tl['@_et'])) : undefined;
-      const lapAttr = tl['@_Lap'] !== undefined ? parseInt(String(tl['@_Lap']), 10) : undefined;
-      const explicitLapNum = lapAttr !== undefined && !isNaN(lapAttr) ? lapAttr + 1 : undefined;
-
-      const warnPts = parseFloat(String(tl['@_WarningPoints'] ?? tl['@_warningpoints'] ?? 0));
-      const curPts = parseFloat(String(tl['@_CurrentPoints'] ?? tl['@_currentpoints'] ?? 0));
-      const action = typeof tl === 'object' && tl['#text'] ? String(tl['#text']).trim() : (typeof tl === 'string' ? tl : 'Warning');
-
-      const isWarning = action.toLowerCase().includes('warning') || warnPts > 0;
-      const desc = isWarning
-        ? `Track limits violation (+${warnPts || 0.25} pts)`
-        : `Track limits review (${action || 'No Further Action'})`;
-
-      const lap = matchLapForDriver(driver, et, explicitLapNum);
-
-      const trackLimit: LapTrackLimit = {
-        description: desc,
-        lapNum: lap ? lap.lapNum : explicitLapNum,
-        elapsedSeconds: et,
-        warningPoints: !isNaN(warnPts) ? warnPts : undefined,
-        currentPoints: !isNaN(curPts) ? curPts : undefined,
-        action,
-      };
-
-      if (!driver.trackLimits) driver.trackLimits = [];
-      driver.trackLimits.push(trackLimit);
-
-      if (lap) {
-        if (!lap.trackLimits) lap.trackLimits = [];
-        lap.trackLimits.push(trackLimit);
-        lap.trackLimitCount = lap.trackLimits.length;
-      }
-    });
-
-    // 4. Process Penalties
-    const rawPenalties = streamNode.Penalty ? (Array.isArray(streamNode.Penalty) ? streamNode.Penalty : [streamNode.Penalty]) : [];
-    rawPenalties.forEach((p: RawStreamPenaltyNode) => {
-      const rawDriver = p['@_Driver'] || p['@_driver'];
-      const driver = matchDriver(rawDriver);
-      if (!driver) return;
-
-      const et = p['@_et'] !== undefined ? parseFloat(String(p['@_et'])) : undefined;
-      const penalty = String(p['@_Penalty'] || p['@_penalty'] || 'Penalty');
-      const reason = String(p['@_Reason'] || p['@_reason'] || 'Infraction');
-      const text = typeof p === 'object' && p['#text'] ? String(p['#text']).trim() : `${penalty}: ${reason}`;
-
-      const lap = matchLapForDriver(driver, et);
-
-      const item: LapPenalty = {
-        penalty,
-        reason,
-        lapNum: lap ? lap.lapNum : undefined,
-        elapsedSeconds: et,
-        description: text,
-      };
-
-      if (!driver.penalties) driver.penalties = [];
-      driver.penalties.push(item);
-
-      if (lap) {
-        if (!lap.penalties) lap.penalties = [];
-        lap.penalties.push(item);
-        lap.penaltyCount = lap.penalties.length;
-      }
-    });
-
-    drivers.forEach(d => {
-      d.totalIncidents = d.incidents ? d.incidents.length : 0;
-      d.totalTrackLimits = d.trackLimits ? d.trackLimits.length : 0;
-      d.totalPenalties = d.penalties ? d.penalties.length : 0;
-    });
+    parseStreamEvents(streamNode, drivers);
   }
 }
-
-/**
- * Computes chronological session-over-session improvement points for a driver or overall.
- */
-export function computeProgression(sessions: DetailedSession[], targetDriverName?: string): SessionProgressionPoint[] {
-  const sorted = [...sessions].sort((a, b) => compareSessions(a, b, 'asc'));
-
-  return sorted.map(s => {
-    let driver = targetDriverName
-      ? s.drivers.find(d => d.name.toLowerCase() === targetDriverName.toLowerCase())
-      : s.playerDriver || s.drivers[0];
-
-    if (!driver && s.drivers.length > 0) {
-      driver = s.drivers[0];
-    }
-
-    const cleanLaps = (driver?.laps || []).filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
-    const cleanLapsCount = cleanLaps.length;
-    const totalLapsCount = driver?.lapsCount || 0;
-    const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
-
-    // Top 3 Clean Lap Average (filters out lap 1, pit stops, and out-laps after valid pit stops)
-    const top3AvgLapTime = computeTopNLapAverage(driver?.laps || [], 3);
-
-    // Theoretical Gap (Execution gap: Actual Best - Theoretical Best)
-    const theoreticalGap = computeTheoreticalGap(driver?.bestLapTime, driver?.theoreticalBest);
-
-    // Consistency score (%) based on standard deviation of clean flying laps
-    const consistencyRating = computeConsistencyRating(driver?.laps || []);
-    const consistencyScore = consistencyRating.consistencyScore;
-
-    return {
-      sessionId: s.id,
-      timestamp: s.timestamp,
-      dateString: s.timeString,
-      sessionType: s.sessionType,
-      sessionName: s.sessionName,
-      trackVenue: s.trackVenue,
-      trackCourse: s.trackCourse,
-      displayTrack: getDisplayTrackName(s.trackVenue, s.trackCourse),
-      weatherInfo: s.weatherInfo,
-      carType: driver?.carType || 'Unknown Car',
-      carClass: driver?.carClass || 'General',
-      driverName: driver?.name || 'Unknown',
-      bestLapTime: driver?.bestLapTime || null,
-      bestS1: driver?.bestS1 || null,
-      bestS2: driver?.bestS2 || null,
-      bestS3: driver?.bestS3 || null,
-      theoreticalBest: driver?.theoreticalBest || null,
-      cleanLapsCount,
-      totalLapsCount,
-      avgLapTime,
-      top3AvgLapTime,
-      theoreticalGap,
-      consistencyScore,
-      matchingReplayFile: s.matchingReplayFile?.name,
-    };
-  });
-}
-
-/**
- * Aggregates summary statistics per track.
- */
-export function computeTrackSummaries(sessions: DetailedSession[]): Record<string, TrackSummary> {
-  const map: Record<string, TrackSummary> = {};
-
-  sessions.forEach(s => {
-    const track = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    if (!map[track]) {
-      map[track] = {
-        trackVenue: track,
-        sessionsCount: 0,
-        totalLaps: 0,
-        bestLapTime: null,
-        bestLapDriver: '',
-        bestLapCar: '',
-        bestS1: null,
-        bestS2: null,
-        bestS3: null,
-        theoreticalBest: null,
-        carsUsed: [],
-      };
-    }
-
-    const summary = map[track];
-    summary.sessionsCount += 1;
-
-    const p = s.playerDriver || s.drivers.find(d => d.isPlayer);
-    if (p) {
-      summary.totalLaps += p.lapsCount || 0;
-      if (p.carType && !summary.carsUsed.includes(p.carType)) {
-        summary.carsUsed.push(p.carType);
-      }
-
-      if (p.bestLapTime && (summary.bestLapTime === null || p.bestLapTime < summary.bestLapTime)) {
-        summary.bestLapTime = p.bestLapTime;
-        summary.bestLapDriver = p.name;
-        summary.bestLapCar = p.carType;
-      }
-      summary.bestS1 = updateMinTime(summary.bestS1, p.bestS1);
-      summary.bestS2 = updateMinTime(summary.bestS2, p.bestS2);
-      summary.bestS3 = updateMinTime(summary.bestS3, p.bestS3);
-    }
-
-    summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);
-  });
-
-  return map;
-}
-
-export interface ComparableLapsResult {
-  laps: ComparableLap[];
-  allTimeBestLap: ComparableLap | null;
-  playerBestLap?: ComparableLap | null;
-  overallTrackBestLap: ComparableLap | null;
-  bestS1: number | null;
-  bestS2: number | null;
-  bestS3: number | null;
-  bestS1String: string;
-  bestS2String: string;
-  bestS3String: string;
-  theoreticalBestSec: number | null;
-  theoreticalBestString: string;
-  sessionsCount: number;
-}
-
-/**
- * Extracts and aggregates comparable laps across sessions matching a specific track and optional filters.
- */
-export function extractComparableLaps(
-  sessions: DetailedSession[],
-  filters: {
-    trackName?: string;
-    carClass?: string;
-    carModel?: string;
-    driverName?: string;
-    sessionId?: string;
-    playerOnly?: boolean;
-  }
-): ComparableLapsResult {
-  const normTrack = (filters.trackName || '').toLowerCase().trim();
-  const targetClass = (filters.carClass || '').trim();
-  const targetModel = (filters.carModel || '').toLowerCase().trim();
-  const targetDriver = (filters.driverName || '').toLowerCase().trim();
-
-  const matchingSessions = sessions.filter(s => {
-    if (!normTrack || normTrack === 'all') return true;
-    return matchesTrack(filters.trackName, s.trackVenue, s.trackCourse);
-  });
-
-  const laps: ComparableLap[] = [];
-  let allTimeBestLap: ComparableLap | null = null;
-  let playerBestLap: ComparableLap | null = null;
-  let overallTrackBestLap: ComparableLap | null = null;
-  let bestS1: number | null = null;
-  let bestS2: number | null = null;
-  let bestS3: number | null = null;
-
-  matchingSessions.forEach(s => {
-    if (filters.sessionId && s.id !== filters.sessionId) {
-      // If a specific session is requested for isolation, but we still search all matching sessions for all-time stats
-    }
-
-    // Check all drivers in matching sessions to determine overall track record without driver restriction
-    (s.drivers || []).forEach(d => {
-      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
-        return;
-      }
-
-      if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
-        return;
-      }
-
-      (d.laps || []).forEach(l => {
-        if (l.isValid && l.lapTime && l.lapTime > 0) {
-          if (!overallTrackBestLap || overallTrackBestLap.lapTime === null || l.lapTime < overallTrackBestLap.lapTime) {
-            overallTrackBestLap = {
-              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-              sessionId: s.id,
-              sessionName: s.sessionName,
-              sessionType: s.sessionType,
-              dateString: s.timeString,
-              timestamp: s.timestamp,
-              driverName: d.name,
-              carType: d.carType,
-              carClass: d.carClass || 'General',
-              lapNum: l.lapNum,
-              lapTime: l.lapTime,
-              lapTimeString: l.lapTimeString,
-              s1: l.s1,
-              s2: l.s2,
-              s3: l.s3,
-              s1String: formatTime(l.s1),
-              s2String: formatTime(l.s2),
-              s3String: formatTime(l.s3),
-              topSpeed: l.topSpeed,
-              fCompound: l.fCompound,
-              rCompound: l.rCompound,
-              flCompound: l.flCompound,
-              frCompound: l.frCompound,
-              rlCompound: l.rlCompound,
-              rrCompound: l.rrCompound,
-              tireWear: l.tireWear,
-              fuel: l.fuel,
-              fuelUsed: l.fuelUsed,
-              virtualEnergy: l.virtualEnergy,
-              virtualEnergyUsed: l.virtualEnergyUsed,
-              elapsedSeconds: l.elapsedSeconds,
-              elapsedTimeString: l.elapsedTimeString,
-              pitStopDurationString: l.pitStopDurationString,
-              gapToLeaderString: l.gapToLeaderString,
-              isPitStop: l.isPitStop,
-              isValid: l.isValid,
-              paceCategory: l.paceCategory || null,
-              pacePercentage: l.pacePercentage || null,
-              isOverallTrackBest: true,
-              tag: `🏆 All-Time Best (${d.name})`,
-              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-            };
-          }
-
-          const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
-          if (isPlayerDriver && (!playerBestLap || playerBestLap.lapTime === null || l.lapTime < playerBestLap.lapTime)) {
-            playerBestLap = {
-              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-              sessionId: s.id,
-              sessionName: s.sessionName,
-              sessionType: s.sessionType,
-              dateString: s.timeString,
-              timestamp: s.timestamp,
-              driverName: d.name,
-              carType: d.carType,
-              carClass: d.carClass || 'General',
-              lapNum: l.lapNum,
-              lapTime: l.lapTime,
-              lapTimeString: l.lapTimeString,
-              s1: l.s1,
-              s2: l.s2,
-              s3: l.s3,
-              s1String: formatTime(l.s1),
-              s2String: formatTime(l.s2),
-              s3String: formatTime(l.s3),
-              topSpeed: l.topSpeed,
-              fCompound: l.fCompound,
-              rCompound: l.rCompound,
-              flCompound: l.flCompound,
-              frCompound: l.frCompound,
-              rlCompound: l.rlCompound,
-              rrCompound: l.rrCompound,
-              tireWear: l.tireWear,
-              fuel: l.fuel,
-              fuelUsed: l.fuelUsed,
-              virtualEnergy: l.virtualEnergy,
-              virtualEnergyUsed: l.virtualEnergyUsed,
-              elapsedSeconds: l.elapsedSeconds,
-              elapsedTimeString: l.elapsedTimeString,
-              pitStopDurationString: l.pitStopDurationString,
-              gapToLeaderString: l.gapToLeaderString,
-              isPitStop: l.isPitStop,
-              isValid: l.isValid,
-              paceCategory: l.paceCategory || null,
-              pacePercentage: l.pacePercentage || null,
-              isAllTimePB: true,
-              isPlayer: true,
-              tag: '⭐ Personal Best',
-              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-            };
-          }
-        }
-      });
-    });
-
-    const driversToProcess = filters.playerOnly
-      ? (s.playerDriver ? [s.playerDriver] : s.drivers.filter(d => d.isPlayer))
-      : s.drivers;
-
-    driversToProcess.forEach(d => {
-      if (targetDriver && targetDriver !== 'all' && !d.name.toLowerCase().includes(targetDriver)) {
-        return;
-      }
-
-      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
-        return;
-      }
-
-      if (targetModel && targetModel !== 'all' && d.carType.toLowerCase().trim() !== targetModel) {
-        return;
-      }
-
-      const sessionBestTime = d.bestLapTime;
-
-      (d.laps || []).forEach(l => {
-        const isSessionBest = l.lapTime !== null && sessionBestTime !== null && Math.abs(l.lapTime - sessionBestTime) < 0.0005;
-        const isPlayer = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
-        // isAllTimePB is corrected in a final pass below (keyed by array index, not lapNum,
-        // since duplicate lapNum values in the source data can otherwise flag more than one
-        // lap per driver as their personal best).
-        const isAllTimePB = false;
-
-        const lapItem = {
-          id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-          sessionId: s.id,
-          sessionName: s.sessionName,
-          sessionType: s.sessionType,
-          dateString: s.timeString,
-          timestamp: s.timestamp,
-          driverName: d.name,
-          carType: d.carType,
-          carClass: d.carClass || 'General',
-          lapNum: l.lapNum,
-          lapTime: l.lapTime,
-          lapTimeString: l.lapTimeString,
-          s1: l.s1,
-          s2: l.s2,
-          s3: l.s3,
-          s1String: formatTime(l.s1),
-          s2String: formatTime(l.s2),
-          s3String: formatTime(l.s3),
-          topSpeed: l.topSpeed,
-          fCompound: l.fCompound,
-          rCompound: l.rCompound,
-          flCompound: l.flCompound,
-          frCompound: l.frCompound,
-          rlCompound: l.rlCompound,
-          rrCompound: l.rrCompound,
-          tireWear: l.tireWear,
-          fuel: l.fuel,
-          fuelUsed: l.fuelUsed,
-          virtualEnergy: l.virtualEnergy,
-          virtualEnergyUsed: l.virtualEnergyUsed,
-          elapsedSeconds: l.elapsedSeconds,
-          elapsedTimeString: l.elapsedTimeString,
-          pitStopDurationString: l.pitStopDurationString,
-          gapToLeaderString: l.gapToLeaderString,
-          isPitStop: l.isPitStop,
-          isOutLap: l.isOutLap || false,
-          isValid: l.isValid,
-          isInferred: l.isInferred || false,
-          paceCategory: l.paceCategory || null,
-          pacePercentage: l.pacePercentage || null,
-          isSessionBest,
-          isAllTimePB,
-          isPlayer,
-          matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-        };
-
-        if (l.isValid && l.lapTime && l.lapTime > 0) {
-          if (!allTimeBestLap || allTimeBestLap.lapTime === null || l.lapTime < allTimeBestLap.lapTime) {
-            allTimeBestLap = { ...lapItem, isAllTimePB: true, tag: '⭐ All-Time Best Lap' };
-          }
-          if (l.s1 && (bestS1 === null || l.s1 < bestS1)) bestS1 = l.s1;
-          if (l.s2 && (bestS2 === null || l.s2 < bestS2)) bestS2 = l.s2;
-          if (l.s3 && (bestS3 === null || l.s3 < bestS3)) bestS3 = l.s3;
-        }
-
-        if (!filters.sessionId || s.id === filters.sessionId) {
-          laps.push(lapItem);
-        }
-      });
-    });
-  });
-
-  // Flag exactly one lap per driver as isAllTimePB (their fastest valid lap in this result
-  // set), keyed by array index so duplicate lapNum values in the source data can never cause
-  // two different laps to both win.
-  const bestLapIndexByDriver = new Map<string, number>();
-  laps.forEach((item, idx) => {
-    if (!item.isValid || item.lapTime === null || item.lapTime <= 0) return;
-    const key = item.driverName.toLowerCase().trim();
-    const bestIdx = bestLapIndexByDriver.get(key);
-    if (bestIdx === undefined || (laps[bestIdx].lapTime ?? Infinity) > item.lapTime) {
-      bestLapIndexByDriver.set(key, idx);
-    }
-  });
-  const bestLapIndices = new Set(bestLapIndexByDriver.values());
-  laps.forEach((item, idx) => {
-    item.isAllTimePB = bestLapIndices.has(idx);
-  });
-
-  const theoreticalBestSec = bestS1 !== null && bestS2 !== null && bestS3 !== null
-    ? parseFloat((bestS1 + bestS2 + bestS3).toFixed(3))
-    : null;
-
-  return {
-    laps,
-    allTimeBestLap,
-    playerBestLap,
-    overallTrackBestLap,
-    bestS1,
-    bestS2,
-    bestS3,
-    bestS1String: formatTime(bestS1),
-    bestS2String: formatTime(bestS2),
-    bestS3String: formatTime(bestS3),
-    theoreticalBestSec,
-    theoreticalBestString: formatTime(theoreticalBestSec),
-    sessionsCount: matchingSessions.length,
-  };
-}
-
