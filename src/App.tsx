@@ -136,6 +136,7 @@ export default function App() {
           if (
             data.running ||
             data.sessionScan?.running ||
+            data.telemetryScan?.running ||
             referenceCheckPending
           ) {
             pollTimerRef.current = setTimeout(poll, 1000);
@@ -211,16 +212,21 @@ export default function App() {
     }
   }, []);
 
-  const scanStateRef = useRef({ replay: false, sessions: false });
+  const scanStateRef = useRef({ replay: false, sessions: false, telemetry: false });
   useEffect(() => {
     const replayRunning = !!replayScanStatus?.running;
     const sessionsRunning = !!replayScanStatus?.sessionScan?.running;
+    const telemetryRunning = !!replayScanStatus?.telemetryScan?.running;
     const previous = scanStateRef.current;
-    if ((previous.replay && !replayRunning) || (previous.sessions && !sessionsRunning)) {
+    if (
+      (previous.replay && !replayRunning) ||
+      (previous.sessions && !sessionsRunning) ||
+      (previous.telemetry && !telemetryRunning)
+    ) {
       void fetchData();
     }
-    scanStateRef.current = { replay: replayRunning, sessions: sessionsRunning };
-  }, [fetchData, replayScanStatus?.running, replayScanStatus?.sessionScan?.running]);
+    scanStateRef.current = { replay: replayRunning, sessions: sessionsRunning, telemetry: telemetryRunning };
+  }, [fetchData, replayScanStatus?.running, replayScanStatus?.sessionScan?.running, replayScanStatus?.telemetryScan?.running]);
 
   useEffect(() => {
     fetchData();

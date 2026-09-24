@@ -46,6 +46,11 @@ const serverContext = new ServerContext({
 const startTelemetryCatalogRefresh = (): void => {
   void telemetryCatalog.refresh(serverContext.telemetryDir).then((count) => {
     console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${serverContext.telemetryDir}`);
+    try {
+      serverContext.enrichSessionsWithTelemetry(sessionDb.getAllSessions());
+    } catch (err) {
+      console.warn('[SQLite Cache] Error enriching sessions after telemetry refresh:', err);
+    }
   }).catch((error: unknown) => {
     sessionDb.recordIngestError('duckdb-directory', serverContext.telemetryDir, error);
     console.warn('[SQLite Cache] Initial telemetry sync warning:', error);

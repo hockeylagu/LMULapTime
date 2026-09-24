@@ -327,7 +327,35 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
   }
 }
 
-export async function enrichDuckDbDirectory(telemetryDir: string): Promise<DuckDbFileInfo[]> {
+export async function enrichDuckDbDirectory(
+  telemetryDir: string,
+  options?: {
+    cachedFiles?: Map<string, DuckDbFileInfo>;
+    onProgress?: (progress: { processed: number; total: number; currentFile: string; cached: boolean }) => void;
+  }
+): Promise<DuckDbFileInfo[]> {
   const files = scanDuckDbDirectory(telemetryDir);
-  return Promise.all(files.map((file) => enrichDuckDbFileInfo(file)));
+  const cachedMap = options?.cachedFiles;
+  const results: DuckDbFileInfo[] = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const cached = cachedMap?.get(file.filePath);
+    // If cached and file mtime & size match without error, reuse cached metadata immediately!
+    if (
+      cached &&
+      cached.fileMtimeMs === file.fileMtimeMs &&
+      cached.fileSizeBytes === file.fileSizeBytes &&
+      !cached.enrichmentError
+    ) {
+      options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: true });
+      results.push(cached);
+    } else {
+      options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: false });
+      const enriched = await enrichDuckDbFileInfo(file);
+      results.push(enriched);
+    }
+  }
+
+  return results;
 }

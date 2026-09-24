@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Award, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
 export interface CarsSummaryCardProps {
   rankedCars: { car: string; laps: number; km: number }[];
-  visibleCars: { car: string; laps: number; km: number }[];
+  visibleCars?: { car: string; laps: number; km: number }[];
   showMoreCars: boolean;
   setShowMoreCars: (val: boolean | ((prev: boolean) => boolean)) => void;
   onSelectCar: (car: string) => void;
@@ -18,13 +18,21 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
   onSelectCar,
 }) => {
   const [unit, setUnit] = useState<'laps' | 'km'>('laps');
-  const sortedVisibleCars = [...visibleCars].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
+
+  const sourceCars = rankedCars && rankedCars.length > 0 ? rankedCars : (visibleCars || []);
+
+  const sortedCars = useMemo(() => {
+    return [...sourceCars].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
+  }, [sourceCars, unit]);
+
+  const displayCars = showMoreCars ? sortedCars : sortedCars.slice(0, 3);
+
   return (
     <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
         <p className="text-xs font-bold text-lmu-cyan uppercase tracking-wider flex items-center gap-1.5">
           <Award className="w-4 h-4 text-lmu-cyan" />
-          <span>Cars {rankedCars.length > 3 && `(${visibleCars.length}/${rankedCars.length})`}</span>
+          <span>Cars {sourceCars.length > 3 && `(${displayCars.length}/${sourceCars.length})`}</span>
         </p>
         <div className="flex items-center gap-0.5 bg-lmu-card/60 rounded-full p-0.5 border border-lmu-border/50">
           <button
@@ -45,8 +53,8 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreCars ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
-        {sortedVisibleCars.length > 0 ? (
-          sortedVisibleCars.map((item, idx) => (
+        {displayCars.length > 0 ? (
+          displayCars.map((item, idx) => (
             <div
               key={item.car}
               onClick={() => onSelectCar(item.car.split(' ')[0] || item.car)}
@@ -69,13 +77,13 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
         )}
       </div>
 
-      {rankedCars.length > 3 && (
+      {sourceCars.length > 3 && (
         <button
           type="button"
           onClick={() => setShowMoreCars(!showMoreCars)}
           className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-cyan font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
         >
-          <span>{showMoreCars ? 'Show Top 3 Only' : `Show All ${rankedCars.length} Cars`}</span>
+          <span>{showMoreCars ? 'Show Top 3 Only' : `Show All ${sourceCars.length} Cars`}</span>
           <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreCars ? 'rotate-180' : ''}`} />
         </button>
       )}

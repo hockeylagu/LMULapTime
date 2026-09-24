@@ -4,6 +4,7 @@ import {
   normalizeSessionType,
   matchDuckDbToSession,
   matchDuckDbToReplay,
+  enrichDuckDbDirectory,
   DuckDbFileInfo,
 } from '../../server/telemetry/telemetryMatcher.js';
 import { DetailedSession, ReplayMetadata } from '../../server/core/types.js';
@@ -290,4 +291,16 @@ describe('telemetryMatcher', () => {
     const distant = makeCandidate('distant.duckdb', 120_000);
     expect(matchDuckDbToReplay([distant, nearest], replay, 100_000)?.filename).toBe('nearest.duckdb');
   });
+
+  describe('enrichDuckDbDirectory', () => {
+    it('returns an empty array when directory does not exist', async () => {
+      const progressUpdates: unknown[] = [];
+      const results = await enrichDuckDbDirectory('C:\\non_existent_telemetry_directory_xyz', {
+        onProgress: (p) => progressUpdates.push(p),
+      });
+      expect(results).toEqual([]);
+      expect(progressUpdates).toHaveLength(0);
+    });
+  });
 });
+

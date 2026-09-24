@@ -201,7 +201,8 @@ describe('App component', () => {
     fireEvent.change(searchInput, { target: { value: 'Ferrari' } });
 
     // Select session card
-    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.glass-panel');
+    const dateMatches = screen.getAllByText('2026/05/28 14:00');
+    const sessionCard = dateMatches[dateMatches.length - 1].closest('div.glass-panel') || dateMatches[0].closest('div.glass-panel');
     if (sessionCard) {
       fireEvent.click(sessionCard);
       await waitFor(() => {

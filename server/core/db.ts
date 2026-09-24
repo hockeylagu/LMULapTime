@@ -645,7 +645,12 @@ export class SessionDatabase {
     }
   }
 
-  public syncSessionsFromDir(resultsDir: string, parser: LmuParser, forceReparse = false): SyncResult {
+  public syncSessionsFromDir(
+    resultsDir: string,
+    parser: LmuParser,
+    forceReparse = false,
+    onProgress?: (progress: { processed: number; total: number; currentFile: string }) => void
+  ): SyncResult {
     if (!fs.existsSync(resultsDir)) {
       return {
         added: 0,
@@ -709,7 +714,11 @@ export class SessionDatabase {
 
     const pendingInserts: { session: DetailedSession; filePath: string; mtime: number; size: number }[] = [];
 
-    for (const f of files) {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (onProgress && (i % 25 === 0 || i === files.length - 1)) {
+        onProgress({ processed: i + 1, total: files.length, currentFile: f });
+      }
       const filePath = path.join(resultsDir, f);
       try {
         const stats = fs.statSync(filePath);

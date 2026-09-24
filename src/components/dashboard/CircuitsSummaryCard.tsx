@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { MapPin, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
 
 export interface CircuitsSummaryCardProps {
   rankedTracks: { track: string; laps: number; km: number }[];
-  visibleTracks: { track: string; laps: number; km: number }[];
+  visibleTracks?: { track: string; laps: number; km: number }[];
   showMoreTracks: boolean;
   setShowMoreTracks: (val: boolean | ((prev: boolean) => boolean)) => void;
   selectedCarClass?: string;
@@ -20,13 +20,21 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const [unit, setUnit] = useState<'laps' | 'km'>('laps');
-  const sortedVisibleTracks = [...visibleTracks].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
+
+  const sourceTracks = rankedTracks && rankedTracks.length > 0 ? rankedTracks : (visibleTracks || []);
+
+  const sortedTracks = useMemo(() => {
+    return [...sourceTracks].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
+  }, [sourceTracks, unit]);
+
+  const displayTracks = showMoreTracks ? sortedTracks : sortedTracks.slice(0, 3);
+
   return (
     <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
         <p className="text-xs font-bold text-lmu-gold uppercase tracking-wider flex items-center gap-1.5">
           <MapPin className="w-4 h-4 text-lmu-gold" />
-          <span>Circuits {rankedTracks.length > 3 && `(${visibleTracks.length}/${rankedTracks.length})`}</span>
+          <span>Circuits {sourceTracks.length > 3 && `(${displayTracks.length}/${sourceTracks.length})`}</span>
         </p>
         <div className="flex items-center gap-0.5 bg-lmu-card/60 rounded-full p-0.5 border border-lmu-border/50">
           <button
@@ -47,8 +55,8 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
       </div>
 
       <div className={`space-y-1.5 flex-1 ${showMoreTracks ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
-        {sortedVisibleTracks.length > 0 ? (
-          sortedVisibleTracks.map((item, idx) => (
+        {displayTracks.length > 0 ? (
+          displayTracks.map((item, idx) => (
             <div
               key={item.track}
               onClick={() => {
@@ -74,13 +82,13 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
         )}
       </div>
 
-      {rankedTracks.length > 3 && (
+      {sourceTracks.length > 3 && (
         <button
           type="button"
           onClick={() => setShowMoreTracks(!showMoreTracks)}
           className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-accent font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
         >
-          <span>{showMoreTracks ? 'Show Top 3 Only' : `Show All ${rankedTracks.length} Circuits`}</span>
+          <span>{showMoreTracks ? 'Show Top 3 Only' : `Show All ${sourceTracks.length} Circuits`}</span>
           <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreTracks ? 'rotate-180' : ''}`} />
         </button>
       )}

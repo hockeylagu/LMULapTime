@@ -350,7 +350,7 @@ describe('Dashboard component', () => {
     const lapBadges = screen.getAllByText('2 laps');
     expect(lapBadges.length).toBeGreaterThanOrEqual(1);
     // Distance driven: (7004 / 1000) * 2 = 14.008 km -> 14 km
-    expect(screen.getByText('14 km')).toBeInTheDocument();
+    expect(screen.getAllByText(/14\s*km/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Total Laps Driven')).toBeInTheDocument();
   });
 
@@ -436,10 +436,10 @@ describe('Dashboard component', () => {
     // Check table headers
     const table = screen.getByRole('table');
     expect(table).toBeInTheDocument();
-    expect(screen.getByText('Track / Layout')).toBeInTheDocument();
-    expect(screen.getByText('Date & Time')).toBeInTheDocument();
-    expect(screen.getByText('Car / Class')).toBeInTheDocument();
-    expect(screen.getByText('Benchmark Pace')).toBeInTheDocument();
+    expect(within(table).getByText('Track / Layout')).toBeInTheDocument();
+    expect(within(table).getByText('Date & Time')).toBeInTheDocument();
+    expect(within(table).getByText('Car / Class')).toBeInTheDocument();
+    expect(within(table).getByText('Benchmark Pace')).toBeInTheDocument();
 
     // Click on a table row
     const tableRow = within(table).getByText('2026/05/28 14:00').closest('tr');
@@ -537,8 +537,8 @@ describe('Dashboard component', () => {
     // Both alternate layouts should be listed separately in the ranked tracks
     expect(screen.getByTitle('View Paul Ricard (1A V2 Short) Track Details')).toBeInTheDocument();
     expect(screen.getByTitle('View Paul Ricard (1A) Track Details')).toBeInTheDocument();
-    expect(screen.getByText('8 laps')).toBeInTheDocument();
-    expect(screen.getByText('12 laps')).toBeInTheDocument();
+    expect(screen.getAllByText('8 laps').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('12 laps').length).toBeGreaterThanOrEqual(1);
     // And total laps across both layouts in overview and cars card
     expect(screen.getAllByText('20 laps').length).toBe(2);
   });

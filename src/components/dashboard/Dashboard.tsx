@@ -8,8 +8,10 @@ import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';
 import { DrivingOverviewCard } from './DrivingOverviewCard.js';
+import { DashboardHero } from './DashboardHero.js';
 import { DashboardFilterBar, DashboardSortOption } from './DashboardFilterBar.js';
 import { useDashboardMetrics } from './useDashboardMetrics.js';
+
 
 export type { DashboardSortOption };
 
@@ -20,6 +22,7 @@ export interface SessionSummary {
   trackCourse?: string;
   trackLengthMeters?: number | null;
   timeString: string;
+  timestamp?: number;
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string;
   weatherInfo?: string;
@@ -40,6 +43,8 @@ export interface SessionSummary {
     avgLapTime?: number | null;
     top3LapsCount?: number;
     position?: number;
+    gridPosition?: number | null;
+    positionGain?: number | null;
     lapsCount: number;
     laps?: LapData[];
   };
@@ -49,9 +54,13 @@ export interface SessionSummary {
     lapTime: number;
     lapTimeString: string;
   };
+  hasDuckDbTelemetry?: boolean;
+  duckdbFilename?: string;
   matchingReplayFile?: {
     name: string;
     path: string;
+    hasDuckDbTelemetry?: boolean;
+    duckdbFilename?: string;
   };
 }
 
@@ -188,49 +197,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Driver Command Center: Welcome & Latest Outing Spotlight */}
+      <DashboardHero
+        sessions={sessions}
+        onSelectSession={onSelectSession}
+        onOpenReplay={handleOpenReplay}
+      />
+
       {/* Top Aggregations & Overview Section (4 cards in the same row) */}
       {sessions.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <CircuitsSummaryCard
-            rankedTracks={rankedTracks}
-            visibleTracks={visibleTracks}
-            showMoreTracks={isExpanded}
-            setShowMoreTracks={toggleExpanded}
+            rankedTracks={rankedTracks} visibleTracks={visibleTracks}
+            showMoreTracks={isExpanded} setShowMoreTracks={toggleExpanded}
             selectedCarClass={selectedCarClass}
           />
           <CarsSummaryCard
-            rankedCars={rankedCars}
-            visibleCars={visibleCars}
-            showMoreCars={isExpanded}
-            setShowMoreCars={toggleExpanded}
+            rankedCars={rankedCars} visibleCars={visibleCars}
+            showMoreCars={isExpanded} setShowMoreCars={toggleExpanded}
             onSelectCar={(car) => setSearchQuery(car)}
           />
           <BenchmarkLapsSummaryCard
-            rankedRefLaps={bestTrackRefLaps}
-            visibleRefLaps={visibleRefLaps}
-            showMoreBenchmarks={isExpanded}
-            setShowMoreBenchmarks={toggleExpanded}
+            rankedRefLaps={bestTrackRefLaps} visibleRefLaps={visibleRefLaps}
+            showMoreBenchmarks={isExpanded} setShowMoreBenchmarks={toggleExpanded}
             onSelectSession={onSelectSession}
           />
           <DrivingOverviewCard
-            sessionsCount={sessions.length}
-            totalLaps={totalLaps}
-            cleanLaps={cleanLaps}
-            cleanLapsPercentage={cleanLapsPercentage}
-            totalDistanceKm={totalDistanceKm}
-            totalDrivingSeconds={totalDrivingSeconds}
-            maxTopSpeed={maxTopSpeed}
-            maxTopSpeedTrack={maxTopSpeedTrack}
+            sessionsCount={sessions.length} totalLaps={totalLaps}
+            cleanLaps={cleanLaps} cleanLapsPercentage={cleanLapsPercentage}
+            totalDistanceKm={totalDistanceKm} totalDrivingSeconds={totalDrivingSeconds}
+            maxTopSpeed={maxTopSpeed} maxTopSpeedTrack={maxTopSpeedTrack}
             averageBenchmarkPacePercentage={averageBenchmarkPacePercentage}
             averageBenchmarkPaceCategory={averageBenchmarkPaceCategory}
-            practiceSessionsCount={practiceSessionsCount}
-            qualifyingSessionsCount={qualifyingSessionsCount}
-            raceSessionsCount={raceSessionsCount}
-            raceWinsCount={raceWinsCount}
-            racePodiumsCount={racePodiumsCount}
-            totalPitStops={totalPitStops}
-            showMore={isExpanded}
-            setShowMore={toggleExpanded}
+            practiceSessionsCount={practiceSessionsCount} qualifyingSessionsCount={qualifyingSessionsCount}
+            raceSessionsCount={raceSessionsCount} raceWinsCount={raceWinsCount}
+            racePodiumsCount={racePodiumsCount} totalPitStops={totalPitStops}
+            showMore={isExpanded} setShowMore={toggleExpanded}
           />
         </div>
       )}
