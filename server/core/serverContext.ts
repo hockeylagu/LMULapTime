@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { LmuParser } from '../sessions/parser.js';
-import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus } from './types.js';
+import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
+
 import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
@@ -223,19 +224,38 @@ export class ServerContext {
     };
 
     const iterator = this.sessionDb.syncReplaysIterator(this.currentReplaysDir, { playerName: this.parser.configuredPlayerName });
+    const BATCH_SIZE = 15;
     const step = (): void => {
       try {
-        const { value, done } = iterator.next();
-        if (done) {
-          this.replayScanStatus.result = value;
-          console.log(`[SQLite Cache] Cached ${value.total} replays (${value.added} new, ${value.updated} updated, ${value.skipped} skipped) from ${this.currentReplaysDir}`);
-          this.replayScanStatus.running = false;
-          this.replayScanStatus.finishedAt = new Date().toISOString();
-          return;
+        let iterations = 0;
+        let lastValue: { processed: number; total: number; currentFile: string } | undefined;
+        while (iterations < BATCH_SIZE) {
+          const { value, done } = iterator.next();
+          if (done) {
+            this.replayScanStatus.result = value;
+            console.log(`[SQLite Cache] Cached ${value.total} replays (${value.added} new, ${value.updated} updated, ${value.skipped} skipped) from ${this.currentReplaysDir}`);
+            this.replayScanStatus.running = false;
+            this.replayScanStatus.finishedAt = new Date().toISOString();
+            try {
+              if (typeof this.sessionDb?.getAllSessions === 'function') {
+                this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
+              }
+            } catch (err) {
+              console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
+            }
+            return;
+          }
+          lastValue = value;
+          iterations++;
+          if (value.currentFile && (this.replayScanStatus.processed === 0 || value.processed % BATCH_SIZE === 0)) {
+            break;
+          }
         }
-        this.replayScanStatus.processed = value.processed;
-        this.replayScanStatus.total = value.total;
-        this.replayScanStatus.currentFile = value.currentFile || null;
+        if (lastValue) {
+          this.replayScanStatus.processed = lastValue.processed;
+          this.replayScanStatus.total = lastValue.total;
+          this.replayScanStatus.currentFile = lastValue.currentFile || null;
+        }
         setImmediate(step);
       } catch (error) {
         this.replayScanStatus.error = error instanceof Error ? error.message : String(error);
@@ -251,6 +271,9 @@ export class ServerContext {
     if (this.sessionScanStatus.running) return;
     this.sessionScanStatus = {
       running: true,
+      processed: 0,
+      total: 0,
+      currentFile: null,
       startedAt: new Date().toISOString(),
       finishedAt: null,
       result: null,
@@ -259,8 +282,14 @@ export class ServerContext {
 
     setImmediate(() => {
       try {
-        const result = this.sessionDb.syncSessionsFromDir(this.currentResultsDir, this.parser);
+        const result = this.sessionDb.syncSessionsFromDir(this.currentResultsDir, this.parser, false, (progress) => {
+          this.sessionScanStatus.processed = progress.processed;
+          this.sessionScanStatus.total = progress.total;
+          this.sessionScanStatus.currentFile = progress.currentFile;
+        });
         this.sessionScanStatus.result = result;
+        this.sessionScanStatus.processed = result.total;
+        this.sessionScanStatus.total = result.total;
         console.log(`[SQLite Cache] Loaded ${result.total} sessions (${result.added} new, ${result.updated} updated) from ${this.currentResultsDir}`);
       } catch (error: unknown) {
         this.sessionScanStatus.error = error instanceof Error ? error.message : String(error);
@@ -310,10 +339,33 @@ export class ServerContext {
   public getReplayScanStatus(): ReplayScanStatus { return this.replayScanStatus; }
 
   public getScanStatus(): ScanStatus {
+    const defaultTelemetryScan: TelemetryScanStatus = {
+      running: false,
+      processed: 0,
+      total: 0,
+      currentFile: null,
+      startedAt: null,
+      finishedAt: null,
+      result: null,
+      error: null,
+    };
+    const telemetryScan = typeof this.telemetryCatalog?.getScanStatus === 'function'
+      ? this.telemetryCatalog.getScanStatus()
+      : defaultTelemetryScan;
+    const allComplete = !this.replayScanStatus.running && !this.sessionScanStatus.running && !telemetryScan.running;
+    const allCached = Boolean(
+      allComplete &&
+      (this.replayScanStatus.result?.added === 0 && this.replayScanStatus.result?.updated === 0) &&
+      (this.sessionScanStatus.result?.added === 0 && this.sessionScanStatus.result?.updated === 0)
+    );
+
     return {
       ...this.replayScanStatus,
       sessionScan: this.sessionScanStatus,
+      telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
+      allComplete,
+      allCached,
     };
   }
 }

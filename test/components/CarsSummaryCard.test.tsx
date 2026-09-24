@@ -83,4 +83,35 @@ describe('CarsSummaryCard', () => {
     rowNames = screen.getAllByTitle(/Filter by .*/).map((el) => el.textContent);
     expect(rowNames[1]).toContain('Lexus RCF LMGT3');
   });
+
+  it('re-ranks full car dataset by km when switching from laps to km so true top distance cars appear', () => {
+    const multiCars = [
+      { car: 'BMW M4 LMGT3', laps: 100, km: 500.0 },
+      { car: 'Porsche 911 GT3 R', laps: 90, km: 450.0 },
+      { car: 'Ferrari 296 GT3', laps: 80, km: 400.0 },
+      { car: 'Chevrolet Corvette Z06 LMGT3.R', laps: 70, km: 950.0 },
+    ];
+
+    const onSelectCar = vi.fn();
+    render(
+      <CarsSummaryCard
+        rankedCars={multiCars}
+        visibleCars={multiCars.slice(0, 3)}
+        showMoreCars={false}
+        setShowMoreCars={vi.fn()}
+        onSelectCar={onSelectCar}
+      />
+    );
+
+    let rowNames = screen.getAllByTitle(/Filter by .*/).map((el) => el.textContent);
+    expect(rowNames[0]).toContain('BMW M4 LMGT3');
+    expect(screen.queryByText('Chevrolet Corvette Z06 LMGT3.R')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Km' }));
+
+    rowNames = screen.getAllByTitle(/Filter by .*/).map((el) => el.textContent);
+    expect(rowNames[0]).toContain('Chevrolet Corvette Z06 LMGT3.R');
+    expect(screen.getByText('950 km')).toBeInTheDocument();
+  });
 });
+

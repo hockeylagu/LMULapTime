@@ -514,9 +514,23 @@ export interface ReplayScanStatus {
 
 export interface SessionScanStatus {
   running: boolean;
+  processed?: number;
+  total?: number;
+  currentFile?: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   result: { added: number; updated: number; total: number; lastSyncedAt: string } | null;
+  error: string | null;
+}
+
+export interface TelemetryScanStatus {
+  running: boolean;
+  processed: number;
+  total: number;
+  currentFile: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: { added: number; updated: number; cached: number; total: number } | null;
   error: string | null;
 }
 
@@ -533,7 +547,10 @@ export interface ReferenceLaptimeRefreshStatus {
 
 export interface ScanStatus extends ReplayScanStatus {
   sessionScan: SessionScanStatus;
+  telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;
+  allComplete?: boolean;
+  allCached?: boolean;
 }
 
 export interface FuelStrategyData {

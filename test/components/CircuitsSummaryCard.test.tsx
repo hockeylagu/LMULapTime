@@ -97,5 +97,34 @@ describe('CircuitsSummaryCard', () => {
     rowNames = screen.getAllByTitle(/View .* Track Details/).map((el) => el.textContent);
     expect(rowNames[0]).toContain('Circuit de Spa-Francorchamps');
   });
+
+  it('re-ranks full track dataset by km when switching from laps to km so true top distance tracks appear', () => {
+    const multiTracks = [
+      { track: 'Brands Hatch', laps: 100, km: 390.0 },
+      { track: 'Monza', laps: 90, km: 520.0 },
+      { track: 'Fuji', laps: 80, km: 360.0 },
+      { track: 'Circuit de la Sarthe', laps: 70, km: 953.8 },
+    ];
+
+    render(
+      <CircuitsSummaryCard
+        rankedTracks={multiTracks}
+        visibleTracks={multiTracks.slice(0, 3)}
+        showMoreTracks={false}
+        setShowMoreTracks={vi.fn()}
+      />
+    );
+
+    let rowNames = screen.getAllByTitle(/View .* Track Details/).map((el) => el.textContent);
+    expect(rowNames[0]).toContain('Brands Hatch');
+    expect(screen.queryByText('Circuit de la Sarthe')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Km' }));
+
+    rowNames = screen.getAllByTitle(/View .* Track Details/).map((el) => el.textContent);
+    expect(rowNames[0]).toContain('Circuit de la Sarthe');
+    expect(screen.getByText('954 km')).toBeInTheDocument();
+  });
 });
+
 
