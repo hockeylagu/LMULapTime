@@ -113,4 +113,53 @@ describe('useTelemetryStripInteraction', () => {
     });
     expect(onSelectIndex).toHaveBeenCalledWith(10);
   });
+
+  it('creates a zoom range from a pointer drag and resets it when the data becomes invalid', () => {
+    const points = makePoints(20);
+    const onSelectIndex = vi.fn();
+    const onZoomRangeChange = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ hookPoints }) => useTelemetryStripInteraction({
+        points: hookPoints,
+        currentIndex: 0,
+        onSelectIndex,
+        onZoomRangeChange,
+      }),
+      { initialProps: { hookPoints: points } }
+    );
+    result.current.containerRef.current = {
+      getBoundingClientRect: () => ({ left: 0, width: 100 }),
+    } as unknown as HTMLDivElement;
+
+    act(() => {
+      result.current.setInteractionMode('zoom');
+    });
+    act(() => {
+      result.current.handlePointerDown({ target: document.createElement('div'), clientX: 10, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    act(() => {
+      result.current.handlePointerMove({ clientX: 90 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    act(() => {
+      result.current.handlePointerUp({ target: document.createElement('div'), pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+
+    expect(onZoomRangeChange).toHaveBeenCalledWith({ start: 2, end: 17 });
+    expect(onSelectIndex).toHaveBeenCalledWith(2);
+
+    rerender({ hookPoints: makePoints(2) });
+    expect(onZoomRangeChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it('does not move the scrub line for keyboard events from editable elements', () => {
+    const onSelectIndex = vi.fn();
+    renderHook(() => useTelemetryStripInteraction({ points: makePoints(10), currentIndex: 5, onSelectIndex }));
+    const input = document.createElement('input');
+
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+
+    expect(onSelectIndex).not.toHaveBeenCalled();
+  });
 });

@@ -101,6 +101,24 @@ describe('CornerSpeedGraph', () => {
     expect(screen.getByText('120 km/h')).toBeInTheDocument();
   });
 
+  it('renders a baseline trace and live understeer state at the scrub position', () => {
+    render(
+      <CornerSpeedGraph
+        corner={corner}
+        primaryPoints={primaryPoints}
+        primaryDists={primaryDists}
+        baselinePoints={primaryPoints.map(point => ({ ...point, speedKmh: (point.speedKmh ?? 0) + 5 }))}
+        baselineDists={primaryDists}
+        currentIndex={1}
+        currentDistM={110}
+      />
+    );
+
+    expect(screen.getByText('180 km/h')).toBeInTheDocument();
+    expect(screen.getByText(/US \+2\.8°/)).toBeInTheDocument();
+    expect(document.querySelectorAll('path')).toHaveLength(2);
+  });
+
   it('triggers onSelectIndex when clicking the speed profile chart', () => {
     const onSelectIndex = vi.fn();
     render(
