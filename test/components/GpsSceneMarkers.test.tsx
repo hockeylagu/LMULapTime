@@ -178,7 +178,9 @@ describe('GpsSceneMarkers', () => {
     expect(x1).toBeGreaterThan(105);
   });
 
-  it('filters out non-selected corner and pedal markers when dimNonSelectedTrack is true', () => {
+  it('dims non-selected corners instead of removing them when a corner is selected', () => {
+    const onSelectCornerNumber = vi.fn();
+    const onSelectIndex = vi.fn();
     const corners: CornerMarkerPoint[] = [
       { cornerNumber: 1, sx: 50, sy: 50, idx: 5, actualSx: 50, actualSy: 50 },
       { cornerNumber: 2, sx: 100, sy: 100, idx: 10, actualSx: 100, actualSy: 100 },
@@ -195,15 +197,55 @@ describe('GpsSceneMarkers', () => {
           pedalMarkers={pedals}
           selectedCornerNumber={2}
           dimNonSelectedTrack={true}
+          onSelectCornerNumber={onSelectCornerNumber}
+          onSelectIndex={onSelectIndex}
         />
       </svg>
     );
 
-    // Only Corner 2 should be rendered
+    // Selected corner 2 has full opacity 1, non-selected corner 1 is dimmed (opacity 0.6) but not removed
+    const corner1 = container.querySelector('[data-testid="corner-flag-1"]');
+    const corner2 = container.querySelector('[data-testid="corner-flag-2"]');
+    expect(corner1).toBeInTheDocument();
+    expect(corner2).toBeInTheDocument();
+    expect(corner1).toHaveAttribute('opacity', '0.6');
+    expect(corner2).toHaveAttribute('opacity', '1');
+    expect(screen.getByText('T1')).toBeInTheDocument();
+    expect(screen.getByText('T2')).toBeInTheDocument();
+
+    // Dimmed corner is still clickable
+    fireEvent.click(corner1!);
+    expect(onSelectCornerNumber).toHaveBeenCalledWith(1);
+    expect(onSelectIndex).toHaveBeenCalledWith(5);
+
+    // Pedal markers for non-selected corners remain filtered to keep corner analysis uncluttered
     expect(container.querySelector('[data-testid="pedal-marker-brake-2"]')).toBeInTheDocument();
     expect(container.querySelector('[data-testid="pedal-marker-brake-1"]')).not.toBeInTheDocument();
-    expect(screen.getByText('T2')).toBeInTheDocument();
-    expect(screen.queryByText('T1')).not.toBeInTheDocument();
+  });
+
+  it('dims non-selected apex markers when showCornerFlags is false and a corner is selected', () => {
+    const corners: CornerMarkerPoint[] = [
+      { cornerNumber: 1, sx: 50, sy: 50, idx: 5, actualSx: 50, actualSy: 50 },
+      { cornerNumber: 2, sx: 100, sy: 100, idx: 10, actualSx: 100, actualSy: 100 },
+    ];
+
+    const { container } = render(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={corners}
+          pedalMarkers={[]}
+          showCornerFlags={false}
+          selectedCornerNumber={2}
+        />
+      </svg>
+    );
+
+    const apex1 = container.querySelector('[data-testid="apex-marker-1"]');
+    const apex2 = container.querySelector('[data-testid="apex-marker-2"]');
+    expect(apex1).toBeInTheDocument();
+    expect(apex2).toBeInTheDocument();
+    expect(apex1).toHaveAttribute('opacity', '0.6');
+    expect(apex2).toHaveAttribute('opacity', '1');
   });
 
   it('renders dedicated APEX identification badge and guide line when showCornerFlags is false', () => {
