@@ -473,6 +473,73 @@ describe('CompareLaps component', () => {
       expect(window.location.hash).toContain('compareLapNum=');
     });
   });
+
+  it('displays error banner when replay files cannot be located for telemetry comparison', async () => {
+    // Sessions without matching replay file and /api/replays returns empty list
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/replays')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCompareData) });
+    });
+
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa GP"
+        initialCarClass="LMGT3"
+        initialSessionId="sess1"
+        initialLapNum={1}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+    });
+
+    const compareBtn = screen.getByRole('button', { name: /Compare Telemetry/i });
+    fireEvent.click(compareBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Unable to locate replay recording \(\.vcr\) for:/i)).toBeInTheDocument();
+    });
+  });
+
+  it('locates replay recordings dynamically via /api/replays when session does not have matchingReplayFile', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/replays')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve([
+              { name: 'dyn_spa.vcr', matchedSessionId: 'sess1' },
+            ]),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCompareData) });
+    });
+
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa GP"
+        initialCarClass="LMGT3"
+        initialSessionId="sess1"
+        initialLapNum={1}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+    });
+
+    const compareBtn = screen.getByRole('button', { name: /Compare Telemetry/i });
+    fireEvent.click(compareBtn);
+
+    await waitFor(() => {
+      expect(window.location.hash).toContain('replayName=dyn_spa.vcr');
+    });
+  });
 });
 
 

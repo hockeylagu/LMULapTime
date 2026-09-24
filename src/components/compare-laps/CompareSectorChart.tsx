@@ -36,6 +36,94 @@ export interface CompareSectorChartProps {
   onCompareTelemetry?: () => void;
 }
 
+export interface CompareSectorTooltipProps {
+  active?: boolean;
+  payload?: SectorTooltipPayloadItem[];
+  label?: string;
+  chartData?: CompareSectorChartDataItem[];
+  selectedLaps?: ComparableLap[];
+  baselineLap?: ComparableLap | null;
+}
+
+export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
+  active,
+  payload,
+  label,
+  chartData = [],
+  selectedLaps = [],
+  baselineLap,
+}) => {
+  if (!active || !payload || !payload.length || !baselineLap) return null;
+  const metricItem = chartData.find((d) => d.metric === label);
+  const metricKey = metricItem?.metricKey as 's1' | 's2' | 's3' | 'lapTime' | undefined;
+
+  const seen = new Set<string>();
+  const uniquePayload = payload.filter((p) => {
+    const key = String(p.dataKey || '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return (
+    <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1.5 font-mono">
+      <div className="flex items-center justify-between gap-4 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
+        <p className="font-bold text-white">{label} Delta vs Baseline</p>
+        <span className="text-[10px] text-lmu-gold">
+          Base: {baselineLap.tag || `Lap ${baselineLap.lapNum || '-'}`}
+        </span>
+      </div>
+      {uniquePayload.map((p) => {
+        const key = String(p.dataKey || '');
+        const lap = selectedLaps.find((l) => l.id === key);
+        const isBase = lap?.id === baselineLap.id;
+        const rawSecVal = metricKey && lap ? lap[metricKey] : null;
+        const deltaVal = Number(p.value) || 0;
+
+        const deltaColor = isBase
+          ? '#ECC94B'
+          : deltaVal < 0
+          ? '#48BB78'
+          : deltaVal > 0
+          ? '#F56565'
+          : '#A0AEC0';
+
+        const formattedDelta = isBase
+          ? '±0.000s (Baseline)'
+          : deltaVal > 0
+          ? `+${deltaVal.toFixed(3)}s`
+          : deltaVal < 0
+          ? `${deltaVal.toFixed(3)}s`
+          : '0.000s';
+
+        return (
+          <div key={key} className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 font-sans">
+              <span
+                className="w-2.5 h-2.5 rounded-sm inline-block shrink-0"
+                style={{ backgroundColor: p.color || deltaColor }}
+              />
+              <span className="text-white font-medium">
+                {lap?.tag || p.name || key}
+              </span>
+            </span>
+            <div className="flex items-center gap-2">
+              <span style={{ color: deltaColor }} className="font-bold">
+                {formattedDelta}
+              </span>
+              {rawSecVal !== null && rawSecVal !== undefined && (
+                <span className="text-lmu-muted text-[11px] font-mono">
+                  ({formatTime(rawSecVal)})
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
   selectedLaps,
   comparedLaps,
@@ -44,80 +132,6 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
   onCompareTelemetry,
 }) => {
   if (selectedLaps.length <= 1 || !baselineLap) return null;
-
-  const CompareSectorTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: SectorTooltipPayloadItem[];
-    label?: string;
-  }) => {
-    if (!active || !payload || !payload.length) return null;
-    const metricItem = chartData.find((d) => d.metric === label);
-    const metricKey = metricItem?.metricKey as 's1' | 's2' | 's3' | 'lapTime' | undefined;
-
-    const seen = new Set<string>();
-    const uniquePayload = payload.filter((p) => {
-      const key = String(p.dataKey || '');
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    return (
-      <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1.5 font-mono">
-        <div className="flex items-center justify-between gap-4 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
-          <p className="font-bold text-white">{label} Delta vs Baseline</p>
-          <span className="text-[10px] text-lmu-gold">
-            Base: {baselineLap.tag || `Lap ${baselineLap.lapNum || '-'}`}
-          </span>
-        </div>
-        {uniquePayload.map((p) => {
-          const key = String(p.dataKey || '');
-          const lap = selectedLaps.find((l) => l.id === key);
-          const isBase = lap?.id === baselineLap.id;
-          const rawSecVal = metricKey && lap ? lap[metricKey] : null;
-          const deltaVal = Number(p.value) || 0;
-
-          const deltaColor = isBase
-            ? '#ECC94B'
-            : deltaVal < 0
-            ? '#48BB78'
-            : deltaVal > 0
-            ? '#F56565'
-            : '#A0AEC0';
-
-          const formattedDelta = isBase
-            ? '±0.000s (Baseline)'
-            : deltaVal > 0
-            ? `+${deltaVal.toFixed(3)}s`
-            : deltaVal < 0
-            ? `${deltaVal.toFixed(3)}s`
-            : '0.000s';
-
-          return (
-            <div key={key} className="flex items-center justify-between gap-4 py-0.5">
-              <span style={{ color: p.color }} className="font-semibold truncate max-w-[140px]">
-                {lap?.tag || `Lap ${lap?.lapNum || '-'}`}:
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="font-bold font-mono" style={{ color: deltaColor }}>
-                  {formattedDelta}
-                </span>
-                {rawSecVal !== null && rawSecVal !== undefined && (
-                  <span className="text-lmu-muted text-[11px] font-mono">
-                    ({formatTime(rawSecVal)})
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   return (
     <div className="pt-4 border-t border-lmu-border/60">
@@ -172,7 +186,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
                 val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(3)}s` : `${val.toFixed(3)}s`
               }
             />
-            <Tooltip content={<CompareSectorTooltip />} />
+            <Tooltip content={<CompareSectorTooltip chartData={chartData} selectedLaps={selectedLaps} baselineLap={baselineLap} />} />
             <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
             {comparedLaps.map((lap) => (
               <Bar key={lap.id} dataKey={lap.id} name={lap.tag || `Lap ${lap.lapNum || '-'}`} radius={[4, 4, 0, 0]}>
