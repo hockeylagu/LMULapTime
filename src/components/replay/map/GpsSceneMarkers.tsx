@@ -54,17 +54,15 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
   showCornerFlags = true,
 }) => {
   const cornersToRender = useMemo(() => {
-    const all = cornerMarkers ?? markers ?? [];
-    if (dimNonSelectedTrack && selectedCornerNumber != null) {
-      return all.filter(m => m.cornerNumber === selectedCornerNumber);
-    }
-    return all;
-  }, [cornerMarkers, markers, dimNonSelectedTrack, selectedCornerNumber]);
+    return cornerMarkers ?? markers ?? [];
+  }, [cornerMarkers, markers]);
 
   const cornerPositions = useMemo(() => {
     const effectiveZoom = zoomLevel ?? (markerScale > 0 ? 1 / markerScale : 1);
+    const hasSelection = selectedCornerNumber != null;
     return cornersToRender.map(m => {
       const isSelected = m.cornerNumber === selectedCornerNumber;
+      const isDimmed = hasSelection && !isSelected;
       const dirX = m.sx - m.actualSx;
       const dirY = m.sy - m.actualSy;
       const distWorld = Math.hypot(dirX, dirY) || 1;
@@ -76,6 +74,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
         return {
           ...m,
           isSelected,
+          isDimmed,
           posX: m.sx,
           posY: m.sy,
         };
@@ -89,6 +88,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
       return {
         ...m,
         isSelected,
+        isDimmed,
         posX: Number((m.actualSx + uX * dSvg).toFixed(1)),
         posY: Number((m.actualSy + uY * dSvg).toFixed(1)),
       };
@@ -116,19 +116,21 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
           <g
             key={`apex-${m.cornerNumber}`}
             data-testid={`apex-marker-${m.cornerNumber}`}
-            className="cursor-pointer group"
+            opacity={m.isDimmed ? 0.6 : 1}
+            className={`cursor-pointer group transition-opacity duration-150 ${m.isDimmed ? 'hover:opacity-100' : ''}`}
             onClick={e => {
               e.stopPropagation();
+              onSelectCornerNumber?.(m.cornerNumber);
               onSelectIndex?.(m.idx);
             }}
           >
-            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke="#f43f5e" strokeWidth="1.2" strokeDasharray="2.5 2" opacity={0.8} vectorEffect="non-scaling-stroke" />
+            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke="#f43f5e" strokeWidth="1.2" strokeDasharray="2.5 2" opacity={m.isDimmed ? 0.5 : 0.8} vectorEffect="non-scaling-stroke" />
             {/* Zoom-agnostic apex red dot anchored at trajectory point */}
             <g transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`} pointerEvents="none">
               <circle r="4" fill="#f43f5e" stroke="#ffffff" strokeWidth="1.5" />
             </g>
             <g transform={`translate(${labelX}, ${labelY}) scale(${markerScale})`}>
-              <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity="0.95" className="transition-transform group-hover:scale-110" />
+              <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity={m.isDimmed ? 0.75 : 0.95} className="transition-transform group-hover:scale-110" />
               <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill="#fb7185" fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
                 APEX
               </text>
@@ -141,7 +143,8 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
         <g
           key={`corner-${m.cornerNumber}`}
           data-testid={`corner-flag-${m.cornerNumber}`}
-          className="cursor-pointer group"
+          opacity={m.isDimmed ? 0.6 : 1}
+          className={`cursor-pointer group transition-opacity duration-150 ${m.isDimmed ? 'hover:opacity-100' : ''}`}
           onClick={e => {
             e.stopPropagation();
             onSelectCornerNumber?.(m.cornerNumber);
@@ -157,7 +160,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
             stroke={m.isSelected ? '#f43f5e' : '#94a3b8'}
             strokeWidth={m.isSelected ? '2' : '1.3'}
             strokeDasharray={m.isSelected ? undefined : '3 3'}
-            opacity={m.isSelected ? 0.9 : 0.6}
+            opacity={m.isSelected ? 0.9 : m.isDimmed ? 0.45 : 0.6}
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
           />
@@ -183,7 +186,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
             <circle
               r={m.isSelected ? 16.5 : 13.5}
               fill={m.isSelected ? '#f43f5e' : '#0f172a'}
-              stroke={m.isSelected ? '#ffffff' : '#94a3b8'}
+              stroke={m.isSelected ? '#ffffff' : m.isDimmed ? '#64748b' : '#94a3b8'}
               strokeWidth={m.isSelected ? 2.2 : 1.6}
               className={m.isSelected ? 'animate-pulse' : 'transition-transform group-hover:scale-110'}
             />
@@ -193,7 +196,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
               textAnchor="middle"
               dominantBaseline="central"
               className={`font-mono font-bold select-none pointer-events-none ${
-                m.isSelected ? 'fill-white text-[13.5px]' : 'fill-slate-100 text-[12px]'
+                m.isSelected ? 'fill-white text-[13.5px]' : m.isDimmed ? 'fill-slate-200 text-[12px]' : 'fill-slate-100 text-[12px]'
               }`}
             >
               T{m.cornerNumber}
