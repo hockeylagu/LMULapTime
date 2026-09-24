@@ -8,6 +8,9 @@ import { SessionDatabase } from '../../server/core/db.js';
 import { createReplayRouter } from '../../server/routes/replayRoutes.js';
 import { ServerContext } from '../../server/core/serverContext.js';
 import { TelemetryCatalog } from '../../server/telemetry/telemetryCatalog.js';
+import * as telemetryMatcher from '../../server/telemetry/telemetryMatcher.js';
+import type { DuckDbFileInfo } from '../../server/telemetry/telemetryMatcher.js';
+import type { DuckDbLapTelemetry } from '../../server/core/types.js';
 import { createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 describe('Replay routes', () => {
@@ -16,6 +19,7 @@ describe('Replay routes', () => {
   let replayPath: string;
   let app: express.Express;
   let sessions: unknown[];
+  let telemetryCatalog: TelemetryCatalog;
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
@@ -29,7 +33,7 @@ describe('Replay routes', () => {
       ],
     }));
 
-    const telemetryCatalog = new TelemetryCatalog(db);
+    telemetryCatalog = new TelemetryCatalog(db);
     const replayCache = new ReplayCacheService(db);
     sessions = [];
     const context = {
@@ -126,6 +130,45 @@ describe('Replay routes', () => {
     const cache = await request(app).get('/api/replays/cache');
     expect(cache.status).toBe(200);
     expect(Array.isArray(cache.body)).toBe(true);
+  });
+
+  it('fuses a cached DuckDB lap with VCR coordinates for the player trajectory', async () => {
+    const duckFile: DuckDbFileInfo = {
+      filename: 'Route_Test_P1.duckdb',
+      filePath: path.join(tempDir, 'Route_Test_P1.duckdb'),
+      fileMtimeMs: Date.now(),
+      fileSizeBytes: 1024,
+      trackName: 'Route Test',
+      sessionType: 'P1',
+      timestampStr: '2026-09-23T00:00:00Z',
+      timestampEpochMs: Date.now(),
+    };
+    const duckLap: DuckDbLapTelemetry = {
+      lapNumber: 1,
+      lapTimeSec: 2,
+      pointsCount: 3,
+      sampleRateHz: 100,
+      points: [
+        { x: 0, y: 0, z: 0, timeSec: 0, speedKmh: 101, throttle: 20 },
+        { x: 0, y: 0, z: 0, timeSec: 0.5, speedKmh: 111, throttle: 60 },
+        { x: 0, y: 0, z: 0, timeSec: 1, speedKmh: 121, throttle: 100 },
+      ],
+    };
+    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
+    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    db.upsertTelemetryLapCache(duckFile.filename, 1, duckLap);
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      source: 'duckdb',
+      duckdbFilename: duckFile.filename,
+      duckdbRawPointsCount: 3,
+      duckdbRawSampleRateHz: 100,
+    });
+    expect(response.body.points).toHaveLength(3);
+    expect(response.body.points[1]).toMatchObject({ throttle: 60, speedKmh: 111 });
   });
 
   it('returns an empty replay list when the replay directory does not exist', async () => {
