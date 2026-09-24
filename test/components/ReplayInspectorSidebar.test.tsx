@@ -172,4 +172,39 @@ describe('ReplayInspectorSidebar', () => {
     fireEvent.click(closeBtn);
     expect(setActiveTab).toHaveBeenCalledWith('map');
   });
+
+  it('switches between vs Baseline and Consistency subviews in corners tab', () => {
+    const setCornerSubView = vi.fn();
+    render(<ReplayInspectorSidebar {...baseProps} setCornerSubView={setCornerSubView} />);
+
+    const consistencyBtn = screen.getByRole('button', { name: /Consistency/i });
+    fireEvent.click(consistencyBtn);
+    expect(setCornerSubView).toHaveBeenCalledWith('consistency');
+
+    const vsBaselineBtn = screen.getByRole('button', { name: /vs Baseline/i });
+    fireEvent.click(vsBaselineBtn);
+    expect(setCornerSubView).toHaveBeenCalledWith('compare');
+  });
+
+  it('toggles AI Report tab back to map when AI Report button is clicked while active', () => {
+    const setActiveTab = vi.fn();
+    render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
+
+    const aiBtn = screen.getByRole('button', { name: /AI Report/i });
+    fireEvent.click(aiBtn);
+    expect(setActiveTab).toHaveBeenCalledWith('map');
+  });
+
+  it('renders ConsistencyPanel when cornerSubView is consistency', () => {
+    render(
+      <ReplayInspectorSidebar
+        {...baseProps}
+        cornerSubView="consistency"
+        consistencyStats={{ lapCount: 3, stats: [], leastConsistent: null }}
+        cornerConsistencyStats={[]}
+      />
+    );
+
+    expect(screen.getByText(/3 valid laps analyzed/i)).toBeInTheDocument();
+  });
 });
