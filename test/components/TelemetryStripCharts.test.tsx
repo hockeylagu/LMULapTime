@@ -148,7 +148,7 @@ describe('TelemetryStripCharts', () => {
     expect(container.querySelector('linearGradient#lossDeltaGrad')).toBeInTheDocument();
 
     // Dashed amber curves should be rendered in the SVGs
-    const dashedLines = container.querySelectorAll('path[stroke="#f59e0b"]');
+    const dashedLines = container.querySelectorAll('path[stroke="#F59E0B"]');
     expect(dashedLines.length).toBeGreaterThanOrEqual(4);
   });
 

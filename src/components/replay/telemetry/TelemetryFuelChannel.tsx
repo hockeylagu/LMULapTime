@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Fuel } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryFuelChannelProps {
   fuelPath: string;
@@ -28,8 +29,8 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.fuel} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.fuel} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       {fuelArea && <path d={fuelArea} fill="url(#fuelGrad)" opacity="0.3" />}
@@ -37,7 +38,7 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
         <path
           d={baselineFuelPath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -48,7 +49,7 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
         <path
           d={fuelPath}
           fill="none"
-          stroke="#10b981"
+          stroke={TELEMETRY_COLORS.fuel}
           strokeWidth="1.3"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -62,7 +63,7 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
   const hasFuelData = currentFuel !== undefined || Boolean(fuelPath);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-[#061811]/50">
+    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-emerald-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-emerald-500/20 text-emerald-300 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Fuel className="w-3 h-3" />

@@ -138,7 +138,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-[#090d16] border border-lmu-border rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        className="w-full max-w-3xl bg-lmu-dark border border-lmu-border rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
         data-testid="telemetry-preset-modal"
       >
@@ -176,7 +176,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
 
           {/* Preset Editor Main Panel */}
           {currentPreset && (
-            <div className="flex-1 flex flex-col min-h-0 bg-[#080c14] overflow-hidden p-4 gap-4">
+            <div className="flex-1 flex flex-col min-h-0 bg-lmu-surface overflow-hidden p-4 gap-4">
               {/* Preset Rename / Actions Toolbar */}
               <div className="flex items-center justify-between gap-2 pb-3 border-b border-lmu-border/60 shrink-0">
                 <div className="flex-1 min-w-0">

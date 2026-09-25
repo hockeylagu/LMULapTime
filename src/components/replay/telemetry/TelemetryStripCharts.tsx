@@ -140,7 +140,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onDoubleClick={handleResetZoom}
-      className={`relative select-none flex flex-col justify-between h-full bg-[#0a0e17] rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
+      className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
         <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[8px] sm:text-[9px] font-mono font-bold tracking-wider overflow-hidden">

@@ -3,6 +3,7 @@ import { Flame } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerPaths } from './telemetryChartPaths.js';
+import { WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryTireTempsChannelProps {
   tireTempsPaths: CornerPaths;
@@ -29,23 +30,23 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       {/* Baseline dashed lines */}
       {baselineTireTempsPaths?.fl && (
-        <path d={baselineTireTempsPaths.fl} fill="none" stroke="#06b6d4" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineTireTempsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineTireTempsPaths?.fr && (
-        <path d={baselineTireTempsPaths.fr} fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineTireTempsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineTireTempsPaths?.rl && (
-        <path d={baselineTireTempsPaths.rl} fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineTireTempsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineTireTempsPaths?.rr && (
-        <path d={baselineTireTempsPaths.rr} fill="none" stroke="#f43f5e" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineTireTempsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
 
       {/* Primary solid lines */}
-      {tireTempsPaths.fl && <path d={tireTempsPaths.fl} fill="none" stroke="#06b6d4" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.fr && <path d={tireTempsPaths.fr} fill="none" stroke="#3b82f6" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.rl && <path d={tireTempsPaths.rl} fill="none" stroke="#f59e0b" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.rr && <path d={tireTempsPaths.rr} fill="none" stroke="#f43f5e" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {tireTempsPaths.fl && <path d={tireTempsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {tireTempsPaths.fr && <path d={tireTempsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {tireTempsPaths.rl && <path d={tireTempsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {tireTempsPaths.rr && <path d={tireTempsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
     </svg>
   ), [tireTempsPaths, baselineTireTempsPaths]);
 
@@ -54,7 +55,7 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
   const midTemp = Math.round((minTireTemp + maxTireTemp) / 2);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-[#160a0d]/60">
+    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-rose-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
         <span className="p-1 rounded bg-rose-500/20 text-rose-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Flame className="w-3 h-3" />
@@ -94,7 +95,7 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-[#070c18] border border-rose-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-rose-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
             <span className="text-cyan-300">FL:{tt[0]}°</span>
             <span className="text-blue-300">FR:{tt[1]}°</span>
             <span className="text-amber-300">RL:{tt[2]}°</span>

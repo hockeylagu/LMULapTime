@@ -25,14 +25,14 @@ describe('GpsCircuitMinimap', () => {
     const minimap = container.querySelector('[data-testid="gps-circuit-minimap"]');
     expect(minimap).toBeInTheDocument();
 
-    // Primary car dot is cyan (#38bdf8)
-    const cyanDot = container.querySelector('circle[fill="#38bdf8"]');
+    // Primary car dot is cyan (#38BDF8)
+    const cyanDot = container.querySelector('circle[fill="#38BDF8"]');
     expect(cyanDot).toBeInTheDocument();
     expect(cyanDot).toHaveAttribute('cx', '150');
     expect(cyanDot).toHaveAttribute('cy', '150');
 
-    // Ghost car dot is amber (#f59e0b)
-    const amberDot = container.querySelector('circle[fill="#f59e0b"]');
+    // Ghost car dot is amber (#F59E0B)
+    const amberDot = container.querySelector('circle[fill="#F59E0B"]');
     expect(amberDot).toBeInTheDocument();
     expect(amberDot).toHaveAttribute('cx', '160');
     expect(amberDot).toHaveAttribute('cy', '160');

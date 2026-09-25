@@ -45,7 +45,7 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
   onToggleLap,
 }) => {
   return (
-    <div className="glass-panel p-5 rounded-2xl space-y-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">

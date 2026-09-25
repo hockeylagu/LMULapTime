@@ -90,7 +90,7 @@ describe('SessionList component', () => {
     expect(screen.getByText('P2')).toBeInTheDocument();
     expect(screen.getByText('P3')).toBeInTheDocument();
 
-    const card = screen.getByText('Spa-Francorchamps').closest('div.glass-panel');
+    const card = screen.getByText('Spa-Francorchamps').closest('div.backdrop-blur-md');
     expect(card).not.toBeNull();
     if (card) {
       fireEvent.click(card);

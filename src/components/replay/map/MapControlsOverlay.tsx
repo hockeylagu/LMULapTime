@@ -29,7 +29,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       data-testid="map-controls-overlay"
       className={`absolute bottom-3 right-3 z-30 flex ${
         isVert ? 'flex-col items-center gap-1 p-1' : 'items-center gap-1.5 p-1.5'
-      } bg-[#0a0e17]/90 backdrop-blur-md rounded-xl border border-white/10 shadow-xl ${className}`}
+      } bg-lmu-strip/90 backdrop-blur-md rounded-xl border border-white/10 shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >

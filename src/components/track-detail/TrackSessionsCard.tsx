@@ -42,7 +42,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   onResetFilters,
 }) => {
   return (
-    <div className="glass-panel p-6 rounded-2xl">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
       <SessionList
         sessions={sortedSessions}
         onSelectSession={onSelectSession}

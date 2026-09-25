@@ -181,7 +181,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Page Header */}
-      <div className="flex items-center gap-3 glass-panel p-6 rounded-2xl">
+      <div className="flex items-center gap-3 bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
         <div className="p-3 rounded-xl bg-lmu-accent/10 text-lmu-accent border border-lmu-accent/20">
           <SettingsIcon className="w-6 h-6" />
         </div>

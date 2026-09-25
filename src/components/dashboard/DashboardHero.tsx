@@ -45,7 +45,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
   return (
     <div
       data-testid="dashboard-hero-command-center"
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1322] via-[#090f1c] to-[#060a14] border border-sky-500/20 shadow-xl shadow-black/50 p-5 ${className}`}
+      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-lmu-card via-lmu-surface to-lmu-deep border border-sky-500/20 shadow-xl shadow-black/50 p-5 ${className}`}
     >
       {/* Background motorsport telemetry glow accents */}
       <div className="absolute top-0 right-1/4 w-96 h-32 bg-sky-500/5 blur-3xl pointer-events-none rounded-full" />

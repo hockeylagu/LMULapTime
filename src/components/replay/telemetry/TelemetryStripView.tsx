@@ -117,7 +117,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
       />
 
       <div className="relative flex-1 min-h-0 h-full">
-        <div className="telemetry-channel-stack relative h-full overflow-y-auto overflow-x-hidden bg-[#0a0e17] flex flex-col">
+        <div className="relative h-full overflow-y-auto overflow-x-hidden bg-lmu-strip flex flex-col [&>*:not(.telemetry-corner-strip)]:flex-1 [&>*:not(.telemetry-corner-strip)]:min-h-[84px]">
         {activeChannels.map(channelId => (
           <TelemetryChannelRenderer
             key={channelId}

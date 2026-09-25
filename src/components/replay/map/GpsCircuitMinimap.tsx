@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface GpsCircuitMinimapProps {
   layoutPathD?: string;
@@ -33,12 +34,12 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
   return (
     <div
       data-testid="gps-circuit-minimap"
-      className={`absolute top-2.5 left-2.5 z-20 w-28 h-28 sm:w-32 sm:h-32 bg-[#060910]/85 border border-lmu-border/70 backdrop-blur-md rounded-xl p-1 shadow-lg pointer-events-none select-none flex items-center justify-center ${className}`}
+      className={`absolute top-2.5 left-2.5 z-20 w-28 h-28 sm:w-32 sm:h-32 bg-lmu-deep/85 border border-lmu-border/70 backdrop-blur-md rounded-xl p-1 shadow-lg pointer-events-none select-none flex items-center justify-center ${className}`}
     >
       <svg viewBox="0 0 800 800" className="w-full h-full drop-shadow-sm">
         <path
           d={activePathD}
-          stroke="#1e293b"
+          stroke={MAP_COLORS.minimapBorder}
           strokeWidth="16"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -46,7 +47,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
         />
         <path
           d={activePathD}
-          stroke="#475569"
+          stroke={MAP_COLORS.trackBoundary}
           strokeWidth="8"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -59,9 +60,9 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
             y={viewportBox.vy}
             width={viewportBox.vw}
             height={viewportBox.vh}
-            fill="#38bdf8"
+            fill={TELEMETRY_COLORS.primary}
             fillOpacity="0.08"
-            stroke="#38bdf8"
+            stroke={TELEMETRY_COLORS.primary}
             strokeWidth="5"
             strokeDasharray="14 10"
             rx="16"
@@ -73,8 +74,8 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
             cx={baselineGhostPos.sx}
             cy={baselineGhostPos.sy}
             r="16"
-            fill="#f59e0b"
-            stroke="#ffffff"
+            fill={TELEMETRY_COLORS.baseline}
+            stroke={CHART_COLORS.white}
             strokeWidth="3.5"
           />
         )}
@@ -84,8 +85,8 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
             cx={currentPos.sx}
             cy={currentPos.sy}
             r="18"
-            fill="#38bdf8"
-            stroke="#ffffff"
+            fill={TELEMETRY_COLORS.primary}
+            stroke={CHART_COLORS.white}
             strokeWidth="4"
           />
         )}

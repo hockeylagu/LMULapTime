@@ -1,5 +1,5 @@
 import React from 'react';
-import { Car, ChevronRight, AlertCircle, MapPin } from 'lucide-react';
+import { ChevronRight, AlertCircle, MapPin } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../utils/formatters';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './SessionList.js';
@@ -97,7 +97,6 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
       {/* Car & Class */}
       <td className="px-3.5 py-3">
         <div className="flex items-center gap-1.5">
-          <Car className="w-3.5 h-3.5 text-lmu-cyan shrink-0" />
           <span className="text-white font-medium truncate max-w-[180px]" title={p?.carType || 'N/A'}>
             {p?.carType || 'N/A'}
           </span>

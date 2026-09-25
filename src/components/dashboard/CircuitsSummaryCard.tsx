@@ -30,7 +30,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
   const displayTracks = showMoreTracks ? sortedTracks : sortedTracks.slice(0, 3);
 
   return (
-    <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
         <p className="text-xs font-bold text-lmu-gold uppercase tracking-wider flex items-center gap-1.5">
           <MapPin className="w-4 h-4 text-lmu-gold" />

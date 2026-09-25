@@ -127,7 +127,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 pt-12 sm:pt-16 animate-fadeIn">
-      <div className="w-full max-w-[1040px] border border-lmu-border bg-[#0a0e17] shadow-2xl rounded-xl overflow-hidden">
+      <div className="w-full max-w-[1040px] border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-lmu-border/60 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">

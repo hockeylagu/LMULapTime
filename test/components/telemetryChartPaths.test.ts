@@ -62,7 +62,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     const activeStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity > 0.4);
     expect(activeStops.length).toBeGreaterThan(0);
     activeStops.forEach((s: DeltaGradientStop) => {
-      expect(s.color).toBe('#10b981');
+      expect(s.color).toBe('#10B981');
       expect(s.opacity).toBeGreaterThanOrEqual(0.4);
     });
   });
@@ -85,7 +85,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     const activeStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity > 0.4);
     expect(activeStops.length).toBeGreaterThan(0);
     activeStops.forEach((s: DeltaGradientStop) => {
-      expect(s.color).toBe('#ef4444');
+      expect(s.color).toBe('#EF4444');
       expect(s.opacity).toBeGreaterThanOrEqual(0.4);
     });
   });
@@ -131,8 +131,8 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Verify there are both green stops (during gain) and red stops (during loss)
-    const hasGreen = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#10b981' && s.opacity > 0.1);
-    const hasRed = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#ef4444' && s.opacity > 0.1);
+    const hasGreen = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#10B981' && s.opacity > 0.1);
+    const hasRed = result.deltaGradientStops.some((s: DeltaGradientStop) => s.color === '#EF4444' && s.opacity > 0.1);
     expect(hasGreen).toBe(true);
     expect(hasRed).toBe(true);
 

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { PEDAL_MARKER_LINE_HALF_LEN, PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from './replayMapUtils.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface CornerMarkerPoint {
   cornerNumber: number;
@@ -124,14 +125,14 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
               onSelectIndex?.(m.idx);
             }}
           >
-            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke="#f43f5e" strokeWidth="1.2" strokeDasharray="2.5 2" opacity={m.isDimmed ? 0.5 : 0.8} vectorEffect="non-scaling-stroke" />
+            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke={MAP_COLORS.apex} strokeWidth="1.2" strokeDasharray="2.5 2" opacity={m.isDimmed ? 0.5 : 0.8} vectorEffect="non-scaling-stroke" />
             {/* Zoom-agnostic apex red dot anchored at trajectory point */}
             <g transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`} pointerEvents="none">
-              <circle r="4" fill="#f43f5e" stroke="#ffffff" strokeWidth="1.5" />
+              <circle r="4" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
             </g>
             <g transform={`translate(${labelX}, ${labelY}) scale(${markerScale})`}>
-              <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity={m.isDimmed ? 0.75 : 0.95} className="transition-transform group-hover:scale-110" />
-              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill="#fb7185" fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
+              <rect x="-16" y="-7" width="32" height="14" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity={m.isDimmed ? 0.75 : 0.95} className="transition-transform group-hover:scale-110" />
+              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
                 APEX
               </text>
             </g>
@@ -157,7 +158,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
             y1={m.posY}
             x2={m.actualSx}
             y2={m.actualSy}
-            stroke={m.isSelected ? '#f43f5e' : '#94a3b8'}
+            stroke={m.isSelected ? MAP_COLORS.apex : MAP_COLORS.markerMuted}
             strokeWidth={m.isSelected ? '2' : '1.3'}
             strokeDasharray={m.isSelected ? undefined : '3 3'}
             opacity={m.isSelected ? 0.9 : m.isDimmed ? 0.45 : 0.6}
@@ -171,11 +172,11 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
               transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`}
               pointerEvents="none"
             >
-              <circle r="8" fill="#f43f5e" opacity="0.3" className="animate-ping" />
-              <circle r="4.5" fill="#f43f5e" stroke="#ffffff" strokeWidth="1.5" />
+              <circle r="8" fill={MAP_COLORS.apex} opacity="0.3" className="animate-ping" />
+              <circle r="4.5" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
               <g transform="translate(0, 14)">
-                <rect x="-16" y="-7" width="32" height="14" rx="3" fill="#090d16" stroke="#f43f5e" strokeWidth="1.2" opacity="0.95" />
-                <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill="#fb7185" fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
+                <rect x="-16" y="-7" width="32" height="14" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity="0.95" />
+                <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
                   APEX
                 </text>
               </g>
@@ -185,8 +186,8 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
           <g transform={`translate(${m.posX}, ${m.posY}) scale(${markerScale})`}>
             <circle
               r={m.isSelected ? 16.5 : 13.5}
-              fill={m.isSelected ? '#f43f5e' : '#0f172a'}
-              stroke={m.isSelected ? '#ffffff' : m.isDimmed ? '#64748b' : '#94a3b8'}
+              fill={m.isSelected ? MAP_COLORS.apex : MAP_COLORS.markerUnselected}
+              stroke={m.isSelected ? CHART_COLORS.white : m.isDimmed ? MAP_COLORS.markerDimmed : MAP_COLORS.markerMuted}
               strokeWidth={m.isSelected ? 2.2 : 1.6}
               className={m.isSelected ? 'animate-pulse' : 'transition-transform group-hover:scale-110'}
             />
@@ -211,8 +212,8 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
         const opacity = (isBase ? baselineOpacity : primaryOpacity) ?? 1;
 
         // Colors: primary uses solid red/green, baseline uses distinct tinted red/green styling
-        const primaryColor = isBrake ? '#f43f5e' : '#10b981';
-        const baselineColor = isBrake ? '#f87171' : '#4ade80';
+        const primaryColor = isBrake ? MAP_COLORS.apex : TELEMETRY_COLORS.throttle;
+        const baselineColor = isBrake ? MAP_COLORS.baselineBrake : MAP_COLORS.baselineThrottle;
         const strokeColor = isBase ? baselineColor : primaryColor;
         const textColor = isBase ? baselineColor : primaryColor;
         const label = isBrake ? 'B' : 'T';
@@ -272,11 +273,11 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
             {/* Outer tips & in-line intersection dot */}
             <circle cx={x1} cy={y1} r="2" fill={strokeColor} />
             <circle cx={x2} cy={y2} r="2" fill={strokeColor} />
-            <circle cx={m.sx} cy={m.sy} r={isBase ? 2.8 : 2.4} fill={isBase ? '#060912' : primaryColor} stroke={isBase ? strokeColor : '#000'} strokeWidth={isBase ? 1.6 : 0.9} />
+            <circle cx={m.sx} cy={m.sy} r={isBase ? 2.8 : 2.4} fill={isBase ? MAP_COLORS.markerDotBase : primaryColor} stroke={isBase ? strokeColor : CHART_COLORS.black} strokeWidth={isBase ? 1.6 : 0.9} />
 
             {/* Indicator badge outside racing line */}
             <g transform={`translate(${tagX.toFixed(1)}, ${tagY.toFixed(1)})`}>
-              <circle r="9.5" fill="#060912" stroke={strokeColor} strokeWidth="1.8" strokeDasharray={isBase ? '3.5 2.5' : undefined} />
+              <circle r="9.5" fill={MAP_COLORS.markerDotBase} stroke={strokeColor} strokeWidth="1.8" strokeDasharray={isBase ? '3.5 2.5' : undefined} />
               <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={textColor} fontSize="10.5" fontFamily="monospace" fontWeight="bold">
                 {label}
               </text>

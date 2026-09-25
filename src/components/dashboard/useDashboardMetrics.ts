@@ -15,6 +15,7 @@ export interface UseDashboardMetricsParams {
   filterType: string;
   searchQuery: string;
   hideEmpty: boolean;
+  hasReplay?: boolean;
   sortBy: DashboardSortOption;
   showMoreTracks?: boolean;
   showMoreCars?: boolean;
@@ -29,6 +30,7 @@ export function useDashboardMetrics({
   filterType,
   searchQuery,
   hideEmpty,
+  hasReplay = false,
   sortBy,
   showMoreTracks = false,
   showMoreCars = false,
@@ -42,6 +44,7 @@ export function useDashboardMetrics({
   }, [sessions]);
 
   const emptyCount = useMemo(() => sessions.filter((s) => isSessionEmpty(s)).length, [sessions]);
+  const replayCount = useMemo(() => sessions.filter((s) => Boolean(s.matchingReplayFile)).length, [sessions]);
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
@@ -56,9 +59,10 @@ export function useDashboardMetrics({
         s.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.filename.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
-      return isTrackMatch && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty;
+      const matchesReplay = !hasReplay || Boolean(s.matchingReplayFile);
+      return isTrackMatch && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty && matchesReplay;
     });
-  }, [sessions, selectedTrack, filterType, selectedCarClass, searchQuery, hideEmpty]);
+  }, [sessions, selectedTrack, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
 
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => {
@@ -246,6 +250,7 @@ export function useDashboardMetrics({
   return {
     tracks,
     emptyCount,
+    replayCount,
     sortedSessions,
     visibleTracks,
     visibleCars,

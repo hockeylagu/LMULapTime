@@ -260,7 +260,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
         />
       )}
 
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <ImprovementChartControls
           activeTrack={activeTrack}
           displayedSessionsCount={trackData.length}

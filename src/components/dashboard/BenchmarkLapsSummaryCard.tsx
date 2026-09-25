@@ -29,7 +29,7 @@ export const BenchmarkLapsSummaryCard: React.FC<BenchmarkLapsSummaryCardProps> =
   onSelectSession,
 }) => {
   return (
-    <div className="glass-panel p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
         <p className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
           <Zap className="w-4 h-4 text-purple-400" />

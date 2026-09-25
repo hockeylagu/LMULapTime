@@ -45,7 +45,7 @@ describe('GpsStartFinishLine', () => {
     expect(lines?.[0].getAttribute('vector-effect')).toBe('non-scaling-stroke');
 
     // White solid line
-    expect(lines?.[1].getAttribute('stroke')).toBe('#ffffff');
+    expect(lines?.[1].getAttribute('stroke')).toBe('#FFFFFF');
     expect(lines?.[1].getAttribute('stroke-width')).toBe('2.2');
     expect(lines?.[1].getAttribute('vector-effect')).toBe('non-scaling-stroke');
 

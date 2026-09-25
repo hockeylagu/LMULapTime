@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryRpmChannelProps {
   rpmPath: string;
@@ -28,8 +29,8 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="rpmGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#c084fc" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#c084fc" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.rpm} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.rpm} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       {rpmArea && <path d={rpmArea} fill="url(#rpmGrad)" opacity="0.25" />}
@@ -37,7 +38,7 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
         <path
           d={baselineRpmPath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -48,7 +49,7 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
         <path
           d={rpmPath}
           fill="none"
-          stroke="#c084fc"
+          stroke={TELEMETRY_COLORS.rpm}
           strokeWidth="1.2"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -62,7 +63,7 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
   const hasRpmData = currentRpm !== undefined || Boolean(rpmPath);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-[#130b1e]/50">
+    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-purple-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-purple-500/20 text-purple-300 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Gauge className="w-3 h-3" />
@@ -100,11 +101,11 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-purple-400/80 font-mono font-bold text-[11px] text-purple-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-purple-400/80 font-mono font-bold text-[11px] text-purple-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {currentRpm?.toLocaleString() ?? 0} <span className="text-[9px] font-normal text-purple-400/70">rpm</span>
           </span>
           {currentComparison?.baseline.engineRpm !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {currentComparison.baseline.engineRpm.toLocaleString()}
             </span>
           )}

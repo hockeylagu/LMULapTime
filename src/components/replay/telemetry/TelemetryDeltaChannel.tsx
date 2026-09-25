@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Timer } from 'lucide-react';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { DeltaGradientStop } from './telemetryChartPaths.js';
+import { CHART_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryDeltaChannelProps {
   deltaTimePath: string;
@@ -42,20 +43,20 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
           </linearGradient>
         )}
         <linearGradient id="gainDeltaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10b981" stopOpacity="0.55" />
-          <stop offset="50%" stopColor="#10b981" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#10b981" stopOpacity="0.55" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.55" />
+          <stop offset="50%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.55" />
         </linearGradient>
         <linearGradient id="lossDeltaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.55" />
-          <stop offset="50%" stopColor="#ef4444" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.55" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.55" />
+          <stop offset="50%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.55" />
         </linearGradient>
         <linearGradient id="deltaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
-          <stop offset="50%" stopColor="#10b981" stopOpacity="0.05" />
-          <stop offset="50%" stopColor="#ef4444" stopOpacity="0.05" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.45" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.45" />
+          <stop offset="50%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.05" />
+          <stop offset="50%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.05" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.45" />
         </linearGradient>
       </defs>
       {deltaGradientStops && deltaGradientStops.length > 0 && deltaTimeArea ? (
@@ -69,11 +70,11 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
           )}
         </>
       )}
-      <line x1="0" y1="50" x2="1000" y2="50" stroke="#ffffff" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
+      <line x1="0" y1="50" x2="1000" y2="50" stroke={CHART_COLORS.white} strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
       <path
         d={deltaTimePath}
         fill="none"
-        stroke="#c084fc"
+        stroke={TELEMETRY_COLORS.rpm}
         strokeWidth="1.5"
         vectorEffect="non-scaling-stroke"
         strokeLinecap="round"
@@ -83,7 +84,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
   ), [deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#110d1c]/60">
+    <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-purple-950/20">
       <div className="absolute top-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2">
           <span className="p-1 rounded bg-purple-500/20 text-purple-300 font-black text-[10px] tracking-wider flex items-center gap-1">
@@ -151,7 +152,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
             (currentComparison?.deltaTimeSec ?? 0) <= 0 ? 'border-emerald-400/80 text-emerald-300' : 'border-rose-400/80 text-rose-300'
           }`}>
             Δt: {(currentComparison?.deltaTimeSec ?? 0) <= 0 ? '' : '+'}

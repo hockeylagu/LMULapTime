@@ -35,7 +35,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
   return (
     <div
       onClick={() => onSelectTrack(t.trackVenue)}
-      className="glass-panel glass-panel-hover p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between"
+      className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] transition-all duration-200 ease-in-out hover:bg-lmu-cardHover/85 hover:border-lmu-accent/30 hover:-translate-y-0.5 p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between"
     >
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -72,7 +72,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-1 truncate">
-                <span className="text-[11px] text-lmu-muted truncate">{t.bestLapCar || 'Car'}</span>
+                <span className="text-[11px] text-white font-medium truncate">{t.bestLapCar || 'Car'}</span>
                 {t.bestLapClass && (
                   <CarClassBadge carClass={t.bestLapClass} carType={t.bestLapCar} size="xs" />
                 )}

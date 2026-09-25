@@ -104,7 +104,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
   allEvents.sort((a, b) => (a.et ?? 0) - (b.et ?? 0));
 
   return (
-    <div className="glass-panel p-4 rounded-2xl space-y-3">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl space-y-3">
       <div
         onClick={() => setShowIncidentsLog((prev) => !prev)}
         className="flex items-center justify-between cursor-pointer group select-none"

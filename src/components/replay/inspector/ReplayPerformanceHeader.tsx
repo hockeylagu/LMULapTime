@@ -37,7 +37,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
   const isS3Best = Boolean(currentLapSummary.s3Sec && bestS3Sec && Math.abs(currentLapSummary.s3Sec - bestS3Sec) < 0.0005);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 rounded-xl bg-[#090d16] border border-lmu-border/60 shrink-0">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 rounded-xl bg-lmu-dark border border-lmu-border/60 shrink-0">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5 pl-1">
           <Flag className="w-3.5 h-3.5 text-lmu-accent" />
@@ -62,7 +62,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
 
         {/* Overall Lap Delta Pill against Baseline */}
         {isCompareMode && baselineTrajectory && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#131024] border border-amber-500/40 text-[11px] font-mono shadow-sm">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-950/20 border border-amber-500/40 text-[11px] font-mono shadow-sm">
             {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
               <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})

@@ -81,7 +81,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   };
 
   return (
-    <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-[#080c14] border-b border-lmu-border/40 shrink-0 select-none z-[60]">
+    <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-lmu-surface border-b border-lmu-border/40 shrink-0 select-none z-[60]">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         {headerContent && (
           <div className="min-w-0 flex items-center shrink-0">

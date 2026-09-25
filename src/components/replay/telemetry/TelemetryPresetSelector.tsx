@@ -70,7 +70,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
 
       {isOpen && (
         <div
-          className="absolute left-0 mt-1 w-64 rounded-xl bg-[#080c14] border border-lmu-border shadow-2xl z-50 py-1.5 backdrop-blur-md animate-fadeIn text-[11px] font-mono"
+          className="absolute left-0 mt-1 w-64 rounded-xl bg-lmu-surface border border-lmu-border shadow-2xl z-50 py-1.5 backdrop-blur-md animate-fadeIn text-[11px] font-mono"
           data-testid="telemetry-preset-menu"
         >
           <div className="px-3 py-1 text-[9px] font-bold text-lmu-muted uppercase tracking-wider border-b border-white/5 flex items-center justify-between">

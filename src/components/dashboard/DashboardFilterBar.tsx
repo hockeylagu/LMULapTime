@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { MapPin, Search, X, ChevronDown } from 'lucide-react';
-import { VehicleClassPills, SessionTypePills, HideEmptyToggle, SortDropdown } from '../common';
+import { VehicleClassPills, SessionTypePills, HideEmptyToggle, HasReplayToggle, SortDropdown } from '../common';
 import { DASHBOARD_SORT_OPTIONS } from './dashboardSortOptions.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';
 
@@ -19,6 +19,9 @@ export interface DashboardFilterBarProps {
   hideEmpty: boolean;
   setHideEmpty: (hide: boolean) => void;
   emptyCount: number;
+  hasReplay?: boolean;
+  setHasReplay?: (hasReplay: boolean) => void;
+  replayCount?: number;
   sortBy: DashboardSortOption;
   setSortBy: (sort: DashboardSortOption) => void;
 }
@@ -36,6 +39,9 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   hideEmpty,
   setHideEmpty,
   emptyCount,
+  hasReplay,
+  setHasReplay,
+  replayCount,
   sortBy,
   setSortBy,
 }) => {
@@ -50,7 +56,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   };
 
   return (
-    <div className="glass-panel p-4 rounded-2xl space-y-3">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl space-y-2">
       {/* Row 1: Content Scope (Track, Car Class, Session Type) */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Track Filter */}
@@ -108,7 +114,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
       </div>
 
       {/* Row 2: Search, Refinements & Sorting */}
-      <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-lmu-border/40">
+      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-lmu-border/40">
         {/* Expanded Search Bar */}
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-3.5 h-3.5 text-lmu-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -136,8 +142,24 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
           hideEmpty={hideEmpty}
           onToggle={setHideEmpty}
           emptyCount={emptyCount}
-          label="Hide Empty Sessions"
+          label="Hide Empty"
+          ariaLabel="Hide Empty Sessions"
+          titleHiding="Hiding empty sessions (0 laps). Click to show all."
+          titleShowing="Showing all sessions including empty results. Click to filter out empty results."
         />
+
+        {/* Has Replay Results Filter Toggle */}
+        {setHasReplay && (
+          <HasReplayToggle
+            hasReplayOnly={Boolean(hasReplay)}
+            onToggle={setHasReplay}
+            replayCount={replayCount}
+            label="Has Replay"
+            ariaLabel="Filter sessions with replay"
+            titleActive="Showing only sessions with recorded replay (.Vcr). Click to show all."
+            titleInactive="Filter to sessions with recorded replay (.Vcr) telemetry."
+          />
+        )}
 
         {/* Sort Dropdown (Date / Benchmark Pace) */}
         <SortDropdown

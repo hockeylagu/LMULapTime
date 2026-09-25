@@ -11,3 +11,4 @@ export * from './LapStatusBadge';
 export * from './lapStatus';
 export * from './ReferenceLaptimeUpdateToast';
 export * from './CarClassBadge.js';
+export * from './HasReplayToggle.js';

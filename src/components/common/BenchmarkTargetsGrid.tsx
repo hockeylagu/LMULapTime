@@ -42,7 +42,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 ${className}`}>
       {/* Alien ~100% */}
-      <div className="glass-panel p-3.5 rounded-xl border-purple-500/30 bg-purple-950/20 text-center space-y-1">
+      <div className="backdrop-blur-md border border-purple-500/30 bg-purple-950/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-500/40">
           👾 Alien (~100%)
         </span>
@@ -53,7 +53,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Competitive 101% */}
-      <div className="glass-panel p-3.5 rounded-xl border-amber-500/30 bg-amber-950/20 text-center space-y-1">
+      <div className="backdrop-blur-md border border-amber-500/30 bg-amber-950/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
           🏆 Competitive (101%)
         </span>
@@ -64,7 +64,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Good 102% */}
-      <div className="glass-panel p-3.5 rounded-xl border-emerald-500/30 bg-emerald-950/20 text-center space-y-1">
+      <div className="backdrop-blur-md border border-emerald-500/30 bg-emerald-950/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
           ⭐ Good (102%)
         </span>
@@ -75,7 +75,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Midpack 104% */}
-      <div className="glass-panel p-3.5 rounded-xl border-sky-500/30 bg-sky-950/20 text-center space-y-1">
+      <div className="backdrop-blur-md border border-sky-500/30 bg-sky-950/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-300 border border-sky-500/40">
           🏎️ Midpack (104%)
         </span>
@@ -86,7 +86,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Tail-ender 106% */}
-      <div className="glass-panel p-3.5 rounded-xl border-orange-500/30 bg-orange-950/20 text-center space-y-1">
+      <div className="backdrop-blur-md border border-orange-500/30 bg-orange-950/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-950 text-orange-300 border border-orange-500/40">
           🐢 Tail-ender (106%)
         </span>
@@ -97,7 +97,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Offline 107% */}
-      <div className="glass-panel p-3.5 rounded-xl border-zinc-700/40 bg-zinc-900/30 text-center space-y-1">
+      <div className="backdrop-blur-md border border-zinc-700/40 bg-zinc-900/30 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-400 border border-zinc-700">
           💤 Offline (&gt;107%)
         </span>

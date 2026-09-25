@@ -35,6 +35,6 @@ describe('MiniCornerMap component', () => {
 
     const circle = container.querySelector('circle');
     expect(circle).toBeInTheDocument();
-    expect(circle).toHaveAttribute('fill', '#f43f5e');
+    expect(circle).toHaveAttribute('fill', '#F43F5E');
   });
 });

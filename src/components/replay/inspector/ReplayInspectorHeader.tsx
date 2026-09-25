@@ -55,7 +55,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   const baselineSummary = baselineTrajectory?.laps?.find(l => l.lapNumber === (baselineTrajectory.currentLap ?? baselineLapNumber)) || baselineTrajectory?.laps?.[0];
 
   return (
-    <header className="relative h-14 px-4 bg-[#0a0e17] border-b border-lmu-border grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center shrink-0 z-[80]">
+    <header className="relative h-14 px-4 bg-lmu-strip border-b border-lmu-border grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center shrink-0 z-[80]">
       {/* Left: Back button + Title & Info */}
       <div className="flex items-center gap-3 min-w-0">
         <button
@@ -120,7 +120,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               className="bg-transparent text-[11px] font-bold text-white focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] truncate py-0.5"
             >
               {drivers.filter(driver => typeof driver.slot === 'number').map(driver => (
-                <option key={driver.slot} value={driver.slot} className="bg-[#0b101d] text-white">
+                <option key={driver.slot} value={driver.slot} className="bg-lmu-bg text-white">
                   {driver.carNumber ? `#${driver.carNumber} ` : ''}{driver.name}{driver.isPlayer ? ' (You)' : ''}
                 </option>
               ))}
@@ -149,7 +149,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate py-0.5"
             >
               {trajectory.laps.map(l => (
-                <option key={l.lapNumber} value={l.lapNumber} className="bg-[#0b101d] text-white">
+                <option key={l.lapNumber} value={l.lapNumber} className="bg-lmu-bg text-white">
                   Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : l.isOutlap ? ' • Out' : ''}
                 </option>
               ))}

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryBrakeChannelProps {
   brakePath: string;
@@ -26,8 +27,8 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="brakeStandaloneGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.75" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.75" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       {brakeArea && <path d={brakeArea} fill="url(#brakeStandaloneGrad)" opacity="0.3" />}
@@ -35,7 +36,7 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
         <path
           d={baselineBrakePath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -46,7 +47,7 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
         <path
           d={brakePath}
           fill="none"
-          stroke="#ef4444"
+          stroke={TELEMETRY_COLORS.brake}
           strokeWidth="1.2"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -57,7 +58,7 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
   ), [brakeArea, baselineBrakePath, brakePath]);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-[#150a0e]/60">
+    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-rose-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-rose-500/20 text-rose-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Zap className="w-3 h-3" />
@@ -98,13 +99,13 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
             currentPoint?.absActive ? 'border-cyan-400 text-cyan-300' : 'border-rose-400/80 text-rose-300'
           }`}>
             {(currentPoint?.brake ?? 0).toFixed(0)}%
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {currentComparison.baseline.brake.toFixed(0)}%
             </span>
           )}

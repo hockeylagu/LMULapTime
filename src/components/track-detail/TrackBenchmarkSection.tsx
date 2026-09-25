@@ -9,7 +9,7 @@ export interface TrackBenchmarkSectionProps {
 
 export const TrackBenchmarkSection: React.FC<TrackBenchmarkSectionProps> = ({ currentBenchmark }) => {
   return (
-    <div className="glass-panel p-6 rounded-2xl space-y-6">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-6">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-4">
         <div>
           <h3 className="text-lg font-extrabold text-white uppercase tracking-wider flex items-center gap-2">

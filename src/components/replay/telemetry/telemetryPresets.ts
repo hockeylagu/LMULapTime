@@ -1,3 +1,5 @@
+import { CHART_COLORS, TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
+
 export type TelemetryChannelId =
   | 'speed'
   | 'delta'
@@ -53,7 +55,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Vehicle GPS speed with baseline comparison trace',
     badgeColor: 'text-sky-400 bg-sky-500/20',
-    lineColor: '#38bdf8',
+    lineColor: TELEMETRY_COLORS.primary,
   },
   {
     id: 'delta',
@@ -64,7 +66,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Running time gain / loss relative to reference baseline lap',
     badgeColor: 'text-amber-400 bg-amber-500/20',
-    lineColor: '#f59e0b',
+    lineColor: TELEMETRY_COLORS.baseline,
   },
   {
     id: 'throttle',
@@ -75,7 +77,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Driver throttle pedal position and traction control events',
     badgeColor: 'text-emerald-400 bg-emerald-500/20',
-    lineColor: '#10b981',
+    lineColor: TELEMETRY_COLORS.throttle,
   },
   {
     id: 'brake',
@@ -86,7 +88,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Driver brake pedal pressure, ABS activation, and wheel lockup',
     badgeColor: 'text-rose-400 bg-rose-500/20',
-    lineColor: '#ef4444',
+    lineColor: TELEMETRY_COLORS.brake,
   },
   {
     id: 'gear',
@@ -97,7 +99,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Selected forward gear step trace and shift points',
     badgeColor: 'text-amber-400 bg-amber-500/20',
-    lineColor: '#f59e0b',
+    lineColor: TELEMETRY_COLORS.gear,
   },
   {
     id: 'steer',
@@ -108,7 +110,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Signed steering input percentage with center zero reference line',
     badgeColor: 'text-indigo-400 bg-indigo-500/20',
-    lineColor: '#818cf8',
+    lineColor: TELEMETRY_COLORS.steer,
   },
   {
     id: 'rpm',
@@ -119,7 +121,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Internal combustion engine revs decoded from binary replay stream',
     badgeColor: 'text-purple-300 bg-purple-500/20',
-    lineColor: '#c084fc',
+    lineColor: TELEMETRY_COLORS.rpm,
   },
   {
     id: 'brake-temps',
@@ -130,7 +132,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Carbon / steel brake disc temperatures across all 4 corners',
     badgeColor: 'text-orange-400 bg-orange-500/20',
-    lineColor: '#fb923c',
+    lineColor: TELEMETRY_COLORS.brakeTemp,
   },
   {
     id: 'ride-height',
@@ -141,7 +143,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Measured ride height in millimetres across all 4 corners',
     badgeColor: 'text-emerald-400 bg-emerald-500/20',
-    lineColor: '#10b981',
+    lineColor: TELEMETRY_COLORS.gain,
   },
   {
     id: 'wheel-speeds',
@@ -152,7 +154,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Individual 4-wheel rotation linear velocity (FL, FR, RL, RR)',
     badgeColor: 'text-cyan-400 bg-cyan-500/20',
-    lineColor: '#06b6d4',
+    lineColor: WHEEL_CORNER_COLORS.fl,
   },
   {
     id: 'tire-pressures',
@@ -163,7 +165,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Dynamic tire air inflation pressures across all 4 wheels',
     badgeColor: 'text-sky-400 bg-sky-500/20',
-    lineColor: '#38bdf8',
+    lineColor: TELEMETRY_COLORS.primary,
   },
   {
     id: 'tire-wear',
@@ -174,7 +176,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Corner tire tread condition and remaining life (100% = new)',
     badgeColor: 'text-amber-400 bg-amber-500/20',
-    lineColor: '#f59e0b',
+    lineColor: TELEMETRY_COLORS.baseline,
   },
   {
     id: 'tire-temps',
@@ -185,7 +187,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Tire carcass and inner rubber bulk temperatures across all 4 wheels',
     badgeColor: 'text-rose-400 bg-rose-500/20',
-    lineColor: '#f43f5e',
+    lineColor: TELEMETRY_COLORS.tireScrub,
   },
   {
     id: 'lateral-offset',
@@ -196,7 +198,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Lateral displacement from reference racing line / track centerline',
     badgeColor: 'text-teal-400 bg-teal-500/20',
-    lineColor: '#2dd4bf',
+    lineColor: TELEMETRY_COLORS.lateralOffset,
   },
   {
     id: 'accel-lat',
@@ -207,7 +209,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Computed cornering centripetal load with center zero line (+Right / -Left)',
     badgeColor: 'text-sky-400 bg-sky-500/20',
-    lineColor: '#38bdf8',
+    lineColor: TELEMETRY_COLORS.primary,
   },
   {
     id: 'accel-lon',
@@ -218,7 +220,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Computed acceleration and braking deceleration rate (-Braking / +Power)',
     badgeColor: 'text-amber-400 bg-amber-500/20',
-    lineColor: '#f59e0b',
+    lineColor: TELEMETRY_COLORS.baseline,
   },
   {
     id: 'accel-total',
@@ -229,7 +231,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Resultant friction circle acceleration vector magnitude (grip utilization)',
     badgeColor: 'text-rose-400 bg-rose-500/20',
-    lineColor: '#f43f5e',
+    lineColor: TELEMETRY_COLORS.tireScrub,
   },
   {
     id: 'slip-angle',
@@ -240,7 +242,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Computed vehicle attitude angle relative to path velocity vector',
     badgeColor: 'text-violet-400 bg-violet-500/20',
-    lineColor: '#a78bfa',
+    lineColor: TELEMETRY_COLORS.slipAngle,
   },
   {
     id: 'under-over-steer',
@@ -251,7 +253,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Dynamic steering angle deviation: +Understeer (push) / -Oversteer (loose)',
     badgeColor: 'text-amber-300 bg-amber-500/20',
-    lineColor: '#fbbf24',
+    lineColor: CHART_COLORS.playerHighlight,
   },
   {
     id: 'yaw-rate',
@@ -262,7 +264,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: true,
     description: 'Computed vehicle rotation rate showing corner entry agility and rotation',
     badgeColor: 'text-cyan-400 bg-cyan-500/20',
-    lineColor: '#22d3ee',
+    lineColor: TELEMETRY_COLORS.yawRate,
   },
   {
     id: 'fuel',
@@ -273,7 +275,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Onboard fuel quantity remaining in tank (L)',
     badgeColor: 'text-emerald-400 bg-emerald-500/20',
-    lineColor: '#10b981',
+    lineColor: TELEMETRY_COLORS.throttle,
   },
   {
     id: 'virtual-energy',
@@ -284,7 +286,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'WEC Hypercar stint virtual energy allocation remaining (%)',
     badgeColor: 'text-cyan-400 bg-cyan-500/20',
-    lineColor: '#06b6d4',
+    lineColor: WHEEL_CORNER_COLORS.fl,
   },
   {
     id: 'soc',
@@ -295,7 +297,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Hybrid powertrain battery state of charge (%)',
     badgeColor: 'text-amber-400 bg-amber-500/20',
-    lineColor: '#f59e0b',
+    lineColor: TELEMETRY_COLORS.baseline,
   },
   {
     id: 'regen-rate',
@@ -306,7 +308,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Hybrid kinetic regenerative braking energy recovery (kW)',
     badgeColor: 'text-purple-400 bg-purple-500/20',
-    lineColor: '#c084fc',
+    lineColor: TELEMETRY_COLORS.rpm,
   },
 ];
 

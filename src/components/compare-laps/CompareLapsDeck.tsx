@@ -17,7 +17,7 @@ export interface CompareLapsDeckProps {
   benchmarks: ReferenceLaptimeEntry[];
   allLaps: ComparableLap[];
   selectedCarClass: string;
-  lapColors: string[];
+  lapColors: readonly string[];
 }
 
 export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
@@ -36,7 +36,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
 }) => {
   if (selectedLaps.length === 0) {
     return (
-      <div className="glass-panel p-12 rounded-2xl text-center space-y-3">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-12 rounded-2xl text-center space-y-3">
         <ArrowLeftRight className="w-12 h-12 text-lmu-muted mx-auto opacity-40" />
         <h3 className="text-lg font-bold text-white">No Laps Selected for Comparison</h3>
         <p className="text-xs text-lmu-muted max-w-md mx-auto">
@@ -48,7 +48,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
   }
 
   return (
-    <div className="glass-panel p-6 rounded-2xl space-y-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
       {/* Header & Baseline Lap Indicator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-lmu-border/50">
         <div>

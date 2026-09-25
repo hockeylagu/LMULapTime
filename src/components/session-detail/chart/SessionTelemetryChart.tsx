@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { DetailedSession, DriverData, FuelStrategyData } from '../../../../server/core/types';
 import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
+import { LMU_COLORS } from '../../../utils/themeColors.js';
 import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
@@ -80,7 +81,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   };
 
   return (
-    <div className="glass-panel p-5 rounded-2xl relative space-y-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl relative space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -200,8 +201,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={handleChartClick}
             className="cursor-pointer"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.6} />
-            <XAxis dataKey="lapNum" stroke="#718096" fontSize={11} tickLine={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={LMU_COLORS.border} opacity={0.6} />
+            <XAxis dataKey="lapNum" stroke={LMU_COLORS.muted} fontSize={11} tickLine={false} />
             <YAxis
               reversed={activeChartMetric === 'positions'}
               domain={
@@ -213,7 +214,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
                   ? [0, 100]
                   : ['auto', 'auto']
               }
-              stroke="#718096"
+              stroke={LMU_COLORS.muted}
               fontSize={11}
               tickLine={false}
               tickFormatter={(val) => {

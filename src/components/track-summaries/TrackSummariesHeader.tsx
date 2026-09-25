@@ -22,7 +22,7 @@ export const TrackSummariesHeader: React.FC<TrackSummariesHeaderProps> = ({
   onSelectCarClass,
 }) => {
   return (
-    <div className="glass-panel p-5 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
           <Flag className="w-6 h-6 text-lmu-gold" />

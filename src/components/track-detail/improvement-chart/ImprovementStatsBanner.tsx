@@ -46,7 +46,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
 }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions</p>
           <h4 className="text-2xl font-extrabold text-white mt-0.5">{trackDataCount}</h4>
@@ -57,7 +57,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
         <Clock className="w-8 h-8 text-lmu-blue opacity-50 shrink-0" />
       </div>
 
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between gap-3">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-lmu-muted uppercase font-semibold">Positions</p>
           <div className="grid grid-cols-2 gap-3 mt-1">
@@ -78,7 +78,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
         <Flag className="w-8 h-8 text-lmu-accent opacity-50 shrink-0" />
       </div>
 
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-xs text-lmu-muted uppercase font-semibold">
             Your Best ({selectedCarModel !== 'All' ? selectedCarModel : selectedCarClass === 'All' ? 'Overall' : selectedCarClass})
@@ -102,7 +102,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
         <Trophy className="w-8 h-8 text-lmu-gold opacity-50 shrink-0" />
       </div>
 
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-xs text-lmu-muted uppercase font-semibold">Overall Pace Improvement</p>
           <h4
@@ -127,7 +127,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
         <Zap className="w-8 h-8 text-lmu-green opacity-50 shrink-0" />
       </div>
 
-      <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-xs text-lmu-muted uppercase font-semibold">Top 3 Lap True Pace</p>
           <h4

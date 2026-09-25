@@ -67,7 +67,7 @@ describe('TrackCircuitLayout', () => {
     // Check only the white circuit outline path is rendered
     const paths = svg?.querySelectorAll('path');
     expect(paths).toHaveLength(1);
-    expect(paths?.[0].getAttribute('stroke')).toBe('#ffffff');
+    expect(paths?.[0].getAttribute('stroke')).toBe('#FFFFFF');
     expect(paths?.[0].getAttribute('fill')).toBe('none');
 
     // Check no extra circles/dots exist

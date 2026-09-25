@@ -3,6 +3,7 @@ import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerPaths } from './telemetryChartPaths.js';
+import { WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryWheelSpeedsChannelProps {
   wheelSpeedsPaths: CornerPaths;
@@ -27,23 +28,23 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       {/* Baseline dashed lines */}
       {baselineWheelSpeedsPaths?.fl && (
-        <path d={baselineWheelSpeedsPaths.fl} fill="none" stroke="#06b6d4" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineWheelSpeedsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineWheelSpeedsPaths?.fr && (
-        <path d={baselineWheelSpeedsPaths.fr} fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineWheelSpeedsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineWheelSpeedsPaths?.rl && (
-        <path d={baselineWheelSpeedsPaths.rl} fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineWheelSpeedsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
       {baselineWheelSpeedsPaths?.rr && (
-        <path d={baselineWheelSpeedsPaths.rr} fill="none" stroke="#f43f5e" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
+        <path d={baselineWheelSpeedsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
       )}
 
       {/* Primary solid lines */}
-      {wheelSpeedsPaths.fl && <path d={wheelSpeedsPaths.fl} fill="none" stroke="#06b6d4" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {wheelSpeedsPaths.fr && <path d={wheelSpeedsPaths.fr} fill="none" stroke="#3b82f6" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {wheelSpeedsPaths.rl && <path d={wheelSpeedsPaths.rl} fill="none" stroke="#f59e0b" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {wheelSpeedsPaths.rr && <path d={wheelSpeedsPaths.rr} fill="none" stroke="#f43f5e" strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {wheelSpeedsPaths.fl && <path d={wheelSpeedsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {wheelSpeedsPaths.fr && <path d={wheelSpeedsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {wheelSpeedsPaths.rl && <path d={wheelSpeedsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
+      {wheelSpeedsPaths.rr && <path d={wheelSpeedsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
     </svg>
   ), [wheelSpeedsPaths, baselineWheelSpeedsPaths]);
 
@@ -51,7 +52,7 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
   const hasData = ws !== undefined || Boolean(wheelSpeedsPaths.fl);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-[#07131a]/60">
+    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-cyan-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
         <span className="p-1 rounded bg-cyan-500/20 text-cyan-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Gauge className="w-3 h-3" />
@@ -91,7 +92,7 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-[#070c18] border border-cyan-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-cyan-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
             <span className="text-cyan-300">FL:{ws[0].toFixed(0)}</span>
             <span className="text-blue-300">FR:{ws[1].toFixed(0)}</span>
             <span className="text-amber-300">RL:{ws[2].toFixed(0)}</span>

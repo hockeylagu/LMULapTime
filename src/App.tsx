@@ -261,7 +261,7 @@ export default function App() {
       <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6'}>
 
         {loading ? (
-          <div className="py-24 text-center glass-panel rounded-2xl">
+          <div className="py-24 text-center bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
             <div className="inline-block animate-spin w-10 h-10 border-4 border-lmu-accent border-t-transparent rounded-full mb-4" />
             <h3 className="text-lg font-bold text-white uppercase tracking-wider">Loading LMU Replay & Timing Database</h3>
             <p className="text-xs text-lmu-muted mt-1">Scanning UserData\LOG\Results and UserData\Replays...</p>
@@ -308,7 +308,7 @@ export default function App() {
       </main>
 
       {!isTelemetryRoute && (
-        <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted glass-panel">
+        <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07]">
           <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
         </footer>
       )}

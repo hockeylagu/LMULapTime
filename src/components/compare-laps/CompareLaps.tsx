@@ -9,6 +9,7 @@ import { CompareLapsTable } from './CompareLapsTable.js';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
 import { ReplaySummary } from '../../../server/core/types';
 import { matchesTrack } from '../../utils/paceCategory.js';
+import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };
 
@@ -23,8 +24,6 @@ export interface CompareLapsProps {
   initialCompareLapNum?: number;
   onSelectSession?: (sessionId: string) => void;
 }
-
-const LAP_COLORS = ['#FFB703', '#219EBC', '#2A9D8F', '#E63946', '#8B5CF6'];
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
   sessions = [],
@@ -156,7 +155,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <CompareLapsHeader
           selectedTrack={selectedTrack}
           allTimePBObject={allTimePBObject}
@@ -185,7 +184,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       </div>
 
       {telemetryError && (
-        <div className="glass-panel p-4 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
+        <div className="backdrop-blur-md p-4 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{telemetryError}</span>
@@ -214,11 +213,11 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         benchmarks={apiData.benchmarks}
         allLaps={apiData.laps}
         selectedCarClass={selectedCarClass}
-        lapColors={LAP_COLORS}
+        lapColors={COMPARE_LAP_COLORS}
       />
 
       {selectedLaps.length > 1 && baselineLap && (
-        <div className="glass-panel p-6 rounded-2xl">
+        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
           <CompareSectorChart
             selectedLaps={selectedLaps}
             comparedLaps={comparedLaps}

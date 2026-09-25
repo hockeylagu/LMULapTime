@@ -199,7 +199,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
           viewBox="0 0 10 10"
           aria-hidden="true"
         >
-          <polygon points="0,0 10,0 10,10" fill="#f59e0b" />
+          <polygon points="0,0 10,0 10,10" className="fill-amber-500" />
         </svg>
       )}
     </>

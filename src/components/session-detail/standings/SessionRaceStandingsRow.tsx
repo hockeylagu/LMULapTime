@@ -88,7 +88,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       </td>
       <td className="px-3.5 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-300 font-medium truncate" title={d.carType}>{d.carType}</span>
+          <span className="text-slate-400 font-medium truncate" title={d.carType}>{d.carType}</span>
           <CarClassBadge carClass={d.carClass} carType={d.carType} size="xs" />
         </div>
       </td>

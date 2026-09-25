@@ -62,8 +62,8 @@ describe('GpsSceneMarkers', () => {
     const brakeGroup = container.querySelector('[data-testid="pedal-marker-brake-1"]');
     const throttleGroup = container.querySelector('[data-testid="pedal-marker-throttle-1"]');
 
-    const brakeLine = brakeGroup?.querySelector('line[stroke="#f43f5e"]');
-    const throttleLine = throttleGroup?.querySelector('line[stroke="#10b981"]');
+    const brakeLine = brakeGroup?.querySelector('line[stroke="#F43F5E"]');
+    const throttleLine = throttleGroup?.querySelector('line[stroke="#10B981"]');
 
     expect(brakeLine).toBeInTheDocument();
     expect(throttleLine).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe('GpsSceneMarkers', () => {
     expect(throttleGroup?.querySelector('text')?.textContent).toBe('T');
   });
 
-  it('renders baseline pedal markers with red tint (#f87171) for brake and green tint (#4ade80) for throttle with enlarged r=9.5 badge', () => {
+  it('renders baseline pedal markers with red tint (#F87171) for brake and green tint (#4ADE80) for throttle with enlarged r=9.5 badge', () => {
     const baselinePedals: PedalMarkerPoint[] = [
       { cornerNumber: 1, kind: 'brake', sx: 80, sy: 80, nx: 0, ny: 1, isBaseline: true },
       { cornerNumber: 1, kind: 'throttle', sx: 110, sy: 110, nx: 0, ny: 1, isBaseline: true },
@@ -89,12 +89,12 @@ describe('GpsSceneMarkers', () => {
     const baseBrake = container.querySelector('[data-testid="pedal-marker-baseline-brake-1"]');
     const baseThrottle = container.querySelector('[data-testid="pedal-marker-baseline-throttle-1"]');
 
-    // Baseline Brake uses soft coral-red tint #f87171 with dashed styling
-    const brakeLine = baseBrake?.querySelector('line[stroke="#f87171"][stroke-dasharray="4 3"]');
+    // Baseline Brake uses soft coral-red tint #F87171 with dashed styling
+    const brakeLine = baseBrake?.querySelector('line[stroke="#F87171"][stroke-dasharray="4 3"]');
     expect(brakeLine).toBeInTheDocument();
 
-    // Baseline Throttle uses spring-green tint #4ade80 with dashed styling
-    const throttleLine = baseThrottle?.querySelector('line[stroke="#4ade80"][stroke-dasharray="4 3"]');
+    // Baseline Throttle uses spring-green tint #4ADE80 with dashed styling
+    const throttleLine = baseThrottle?.querySelector('line[stroke="#4ADE80"][stroke-dasharray="4 3"]');
     expect(throttleLine).toBeInTheDocument();
 
     // Badges use enlarged r=9.5 and font-size 10.5
@@ -278,7 +278,7 @@ describe('GpsSceneMarkers', () => {
     expect(screen.getByText('APEX')).toBeInTheDocument();
 
     // Should have apex circle on track scaled to constant screen size (zoom agnostic)
-    const apexCircle = apexGroup?.querySelector('circle[fill="#f43f5e"]');
+    const apexCircle = apexGroup?.querySelector('circle[fill="#F43F5E"]');
     expect(apexCircle).toBeInTheDocument();
     expect(apexCircle?.parentElement).toHaveAttribute('transform', expect.stringContaining('scale(1)'));
     const tether = apexGroup?.querySelector('line[stroke-dasharray="2.5 2"]');
@@ -307,7 +307,7 @@ describe('GpsSceneMarkers', () => {
     );
 
     const apexGroup = container.querySelector('[data-testid="apex-marker-3"]');
-    const apexCircle = apexGroup?.querySelector('circle[fill="#f43f5e"]');
+    const apexCircle = apexGroup?.querySelector('circle[fill="#F43F5E"]');
     expect(apexCircle?.parentElement).toHaveAttribute('transform', 'translate(100, 100) scale(0.25)');
   });
 });

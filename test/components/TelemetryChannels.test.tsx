@@ -56,7 +56,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getAllByText(/G4/i).length).toBeGreaterThanOrEqual(1);
     // Verify yellow/amber stroke color is used for gear
     const paths = container.querySelectorAll('path');
-    const hasYellowStroke = Array.from(paths).some((p) => p.getAttribute('stroke') === '#f59e0b');
+    const hasYellowStroke = Array.from(paths).some((p) => p.getAttribute('stroke') === '#F59E0B');
     expect(hasYellowStroke).toBe(true);
   });
 
@@ -292,7 +292,7 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getAllByText(/7,850/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/9000 rpm/i)).toBeInTheDocument();
     const paths = container.querySelectorAll('path');
-    const hasPurpleStroke = Array.from(paths).some((p) => p.getAttribute('stroke') === '#c084fc');
+    const hasPurpleStroke = Array.from(paths).some((p) => p.getAttribute('stroke')?.toUpperCase() === '#C084FC');
     expect(hasPurpleStroke).toBe(true);
   });
 

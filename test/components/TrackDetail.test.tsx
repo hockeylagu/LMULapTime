@@ -156,7 +156,7 @@ describe('TrackDetail component', () => {
       expect(screen.getAllByText('Ferrari 499P').length).toBeGreaterThan(0);
     });
 
-    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.glass-panel');
+    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.backdrop-blur-md');
     expect(sessionCard).not.toBeNull();
     if (sessionCard) {
       fireEvent.click(sessionCard);

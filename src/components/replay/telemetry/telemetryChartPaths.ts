@@ -1,5 +1,6 @@
 import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { PointComparison, getTrajectoryDistances } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
 // forward gears 1-7.
@@ -652,7 +653,7 @@ export function computeTelemetryChartPaths(
       const absRate = Math.abs(rate);
 
       let opacity = 0;
-      const color = rate < 0 ? '#10b981' : '#ef4444';
+      const color = rate < 0 ? TELEMETRY_COLORS.gain : TELEMETRY_COLORS.loss;
 
       if (absRate >= 0.015) {
         // High delta rate of change -> rich vibrant color (opacity up to 0.75)
