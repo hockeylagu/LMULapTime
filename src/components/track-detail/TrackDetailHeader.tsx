@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
-import { VEHICLE_CLASS_OPTIONS } from '../../utils/paceCategory.js';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
+import { VehicleClassPills } from '../common/VehicleClassPills.js';
 import { BenchmarkTargetsGrid } from '../common/BenchmarkTargetsGrid.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types';
@@ -99,21 +99,10 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
           </div>
 
           {/* Vehicle Class Filter Buttons (Beside Circuit Title) */}
-          <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto shrink-0">
-            {VEHICLE_CLASS_OPTIONS.map((cls) => (
-              <button
-                key={cls.id}
-                type="button"
-                onClick={() => setSelectedClass(cls.id)}
-                className={`px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${selectedClass === cls.id
-                  ? 'bg-lmu-accent text-white shadow-md font-bold'
-                  : 'text-lmu-muted hover:text-white'
-                  }`}
-              >
-                {cls.label}
-              </button>
-            ))}
-          </div>
+          <VehicleClassPills
+            selectedClass={selectedClass}
+            onSelectClass={setSelectedClass}
+          />
         </div>
 
         {/* Specific Car Model Sub-Filter Row */}

@@ -24,7 +24,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
     <button
       type="button"
       onClick={() => onToggle(!hideEmpty)}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+      className={`h-9 inline-flex items-center gap-2 px-3 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
         hideEmpty
           ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'

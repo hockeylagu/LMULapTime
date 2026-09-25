@@ -1,7 +1,7 @@
 import React from 'react';
 import { Car, ChevronRight, AlertCircle, MapPin } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../utils/formatters';
-import { PaceBadge, ReplayIndicator } from '../common';
+import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './SessionList.js';
 import { PaceCategory } from '../../../server/core/types';
 
@@ -102,9 +102,11 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
             {p?.carType || 'N/A'}
           </span>
           {p?.carClass && (
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-lmu-bg border border-lmu-border text-lmu-muted">
-              {p.carClass}
-            </span>
+            <CarClassBadge
+              carClass={p.carClass}
+              carType={p.carType}
+              size="xs"
+            />
           )}
         </div>
       </td>

@@ -115,6 +115,7 @@ export interface RawSessionXmlNode {
   TireMult?: unknown;
   TireWarmers?: unknown;
   FixedSetups?: unknown;
+  FreeSettings?: unknown;
   FixedUpgrades?: unknown;
   ParcFerme?: unknown;
   MechFailRate?: unknown;

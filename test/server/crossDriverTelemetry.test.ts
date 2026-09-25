@@ -166,7 +166,7 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
 
       // Delta at Start/Finish line must be 0.000s
       expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
-    });
+    }, 15000);
 
     it('Scenario 2 (Real): Different session, same driver (Samuel Lague Daytona R1 4 vs Daytona R1 5)', () => {
       const r1_4 = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 2);

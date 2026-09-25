@@ -47,7 +47,8 @@ describe('SessionTableRow', () => {
     expect(screen.getByText(/P1/)).toBeInTheDocument();
     expect(screen.getByText(/\(\+2\)/)).toBeInTheDocument();
     expect(screen.getByText('Porsche 963')).toBeInTheDocument();
-    expect(screen.getByText('Hypercar')).toBeInTheDocument();
+    expect(screen.getByTestId('car-class-badge')).toBeInTheDocument();
+    expect(screen.getByText('HY')).toBeInTheDocument();
     expect(screen.getByText('1:35.123')).toBeInTheDocument();
     expect(screen.getByText('Alien')).toBeInTheDocument();
 

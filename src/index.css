@@ -3,13 +3,11 @@
 
 @layer base {
   body {
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0B0E14;
-    color: #F8F9FA;
+    @apply bg-lmu-bg text-lmu-text font-sans;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    @apply font-mono;
   }
 
   a,
@@ -32,36 +30,34 @@
 }
 
 .glass-panel {
-  background: rgba(21, 26, 35, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  @apply bg-lmu-card/75 backdrop-blur-md border border-white/[0.07];
 }
 
 .glass-panel-hover {
-  transition: all 0.2s ease-in-out;
+  @apply transition-all duration-200 ease-in-out hover:bg-[#1A202C]/85 hover:border-lmu-accent/30 hover:-translate-y-0.5;
 }
-.glass-panel-hover:hover {
-  background: rgba(26, 32, 44, 0.85);
-  border-color: rgba(230, 57, 70, 0.3);
-  transform: translateY(-2px);
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-lmu-border, #232A36) var(--color-lmu-bg, #0B0E14);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  @apply w-1.5 h-1.5;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0B0E14;
+  @apply bg-lmu-bg;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #232A36;
-  border-radius: 3px;
+  @apply bg-lmu-border rounded-[3px];
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #E63946;
+  @apply bg-lmu-accent;
 }
 
 .telemetry-channel-stack > :not(.telemetry-corner-strip) {
-  flex: 1 1 0%;
-  min-height: 84px;
+  @apply flex-1 min-h-[84px];
 }

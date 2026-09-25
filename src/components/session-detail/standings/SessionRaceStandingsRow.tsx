@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ban, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { formatElapsedSeconds, formatTime } from '../../../utils/formatters.js';
 import {
   getWorstTrackLimitSeverity,
@@ -86,8 +87,10 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
         </div>
       </td>
       <td className="px-3.5 py-2.5">
-        <div className="text-slate-400 font-medium">{d.carType}</div>
-        <div className="text-lmu-muted text-[11px]">{d.carClass || 'General'}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-slate-300 font-medium truncate" title={d.carType}>{d.carType}</span>
+          <CarClassBadge carClass={d.carClass} carType={d.carType} size="xs" />
+        </div>
       </td>
       <td className="px-3.5 py-2.5 text-center font-mono text-white">{d.lapsCount}</td>
       <td className="px-3.5 py-2.5 font-mono">

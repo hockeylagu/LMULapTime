@@ -22,7 +22,7 @@ export function SortDropdown<T extends string = string>({
   className = '',
 }: SortDropdownProps<T>): React.ReactElement {
   return (
-    <div className={`flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0 ${className}`}>
+    <div className={`h-9 inline-flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 text-xs text-white shrink-0 ${className}`}>
       <ArrowUpDown className="w-3.5 h-3.5 text-lmu-accent" />
       {label && <span className="text-lmu-muted font-medium">{label}</span>}
       <select

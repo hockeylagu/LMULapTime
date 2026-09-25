@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Sliders, Shield, Fuel, Flame, Wrench, Clock, Flag, Globe, Gamepad2, Disc } from 'lucide-react';
+import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc } from 'lucide-react';
 import { SessionSettings } from '../../../../server/core/types';
 
 export interface SessionRulesModalProps {
@@ -116,11 +116,15 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
 
           {settings.tireWarmers !== undefined && (
             <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-              <Flame className="w-4 h-4 text-orange-400 shrink-0" />
+              {settings.tireWarmers ? (
+                <Flame className="w-4 h-4 text-orange-400 shrink-0" />
+              ) : (
+                <Snowflake className="w-4 h-4 text-sky-400 shrink-0" />
+              )}
               <div>
                 <div className="text-[10px] uppercase font-semibold text-slate-400">Tire Blankets</div>
                 <div className="text-xs font-bold text-white">
-                  {settings.tireWarmers ? 'Warm Tires' : 'Cold Tires'}
+                  {settings.tireWarmers ? 'Warm Tires' : 'Cold Tires (No Warmers)'}
                 </div>
               </div>
             </div>

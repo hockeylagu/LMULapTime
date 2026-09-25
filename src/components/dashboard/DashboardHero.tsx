@@ -5,6 +5,7 @@ import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
 import { PACE_CATEGORY_STYLES } from '../../utils/paceCategory.js';
+import { CarClassBadge } from '../common/CarClassBadge.js';
 import type { SessionSummary } from './Dashboard.js';
 
 export interface DashboardHeroProps {
@@ -108,16 +109,28 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-white tracking-wide truncate">{latestOuting.trackName}</h3>
-                    <span className="px-2 py-0.5 rounded text-[10.5px] font-mono font-bold bg-slate-800 text-slate-200 border border-slate-700 shrink-0">
+                    <span
+                      data-testid="hero-session-type-badge"
+                      className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-bold shrink-0 ${
+                        latestOuting.sessionType === 'Race'
+                          ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                          : latestOuting.sessionType === 'Qualifying'
+                          ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
+                          : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                      }`}
+                    >
                       {latestOuting.sessionType}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-1 truncate">
-                    {latestOuting.carName}
+                  <div className="flex items-center text-xs text-slate-400 mt-1 truncate">
+                    <span className="truncate">{latestOuting.carName}</span>
                     {latestOuting.carClass && (
-                      <span className="ml-2 px-1.5 py-0.2 rounded text-[10px] font-mono bg-sky-950/60 text-sky-300 border border-sky-500/30">
-                        {latestOuting.carClass}
-                      </span>
+                      <CarClassBadge
+                        carClass={latestOuting.carClass}
+                        carType={latestOuting.carName}
+                        size="xs"
+                        className="ml-2"
+                      />
                     )}
                   </div>
                 </div>

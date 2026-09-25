@@ -378,8 +378,9 @@ export interface SessionSettings {
   damageMultiplier?: number;  // e.g. 50 (%) or 100 (%)
   fuelMultiplier?: number;    // e.g. 1 (1x)
   tireMultiplier?: number;    // e.g. 1 (1x)
-  tireWarmers?: boolean;      // true if TireWarmers === 1
-  fixedSetups?: boolean;      // true if FixedSetups === 1
+  tireWarmers?: boolean;      // true if tire warmers / tire blankets are enabled (false if cold tires)
+  fixedSetups?: boolean;      // true if fixed setups enforced (via FixedSetups=1 or FreeSettings bitmask)
+  freeSettings?: number;      // raw FreeSettings bitmask (e.g. 63, 2147483647, 11, 0)
   fixedUpgrades?: boolean;    // true if FixedUpgrades === 1
   parcFerme?: number;         // e.g. 3
   mechFailRate?: number;      // e.g. 1

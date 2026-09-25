@@ -19,11 +19,11 @@ export const SessionListHeader: React.FC<SessionListHeaderProps> = ({
   const hasHeaderContent = Boolean(headerTitle || headerSubtitle || headerActions);
 
   const toggleButtons = (
-    <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold shrink-0">
+    <div className="h-9 inline-flex items-center gap-1.5 bg-lmu-bg px-1.5 rounded-xl border border-lmu-border text-xs font-semibold shrink-0 box-border">
       <button
         type="button"
         onClick={() => onViewModeChange('grid')}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+        className={`h-[24px] inline-flex items-center gap-1.5 px-3 rounded-[5px] transition-all cursor-pointer box-border ${
           viewMode === 'grid'
             ? 'bg-lmu-accent text-white shadow-sm font-bold'
             : 'text-lmu-muted hover:text-white'
@@ -37,7 +37,7 @@ export const SessionListHeader: React.FC<SessionListHeaderProps> = ({
       <button
         type="button"
         onClick={() => onViewModeChange('table')}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+        className={`h-[24px] inline-flex items-center gap-1.5 px-3 rounded-[5px] transition-all cursor-pointer box-border ${
           viewMode === 'table'
             ? 'bg-lmu-accent text-white shadow-sm font-bold'
             : 'text-lmu-muted hover:text-white'

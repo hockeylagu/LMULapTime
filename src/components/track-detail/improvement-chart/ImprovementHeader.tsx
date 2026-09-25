@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
-import { VEHICLE_CLASS_OPTIONS } from '../../../utils/paceCategory.js';
+import { VehicleClassPills } from '../../common/VehicleClassPills.js';
 
 export interface ImprovementHeaderProps {
   embedded?: boolean;
@@ -48,22 +48,10 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
         </select>
 
         {/* Vehicle Class Filter Buttons */}
-        <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold overflow-x-auto">
-          {VEHICLE_CLASS_OPTIONS.map((cls) => (
-            <button
-              key={cls.id}
-              type="button"
-              onClick={() => setSelectedCarClass(cls.id)}
-              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                selectedCarClass === cls.id
-                  ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                  : 'text-lmu-muted hover:text-white'
-              }`}
-            >
-              {cls.label}
-            </button>
-          ))}
-        </div>
+        <VehicleClassPills
+          selectedClass={selectedCarClass}
+          onSelectClass={setSelectedCarClass}
+        />
       </div>
     </div>
   );
