@@ -32,7 +32,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   pathMessage,
 }) => {
   return (
-    <div className="glass-panel p-6 rounded-2xl space-y-6">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-6">
       <div className="border-b border-lmu-border/50 pb-3">
         <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <HardDrive className="w-5 h-5 text-lmu-accent" />

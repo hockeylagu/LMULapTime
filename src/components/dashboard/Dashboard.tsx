@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { FileText } from 'lucide-react';
 import { SessionList } from '../session-list/SessionList.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { LapData, PaceCategory } from '../../../server/core/types';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';
@@ -11,58 +10,9 @@ import { DrivingOverviewCard } from './DrivingOverviewCard.js';
 import { DashboardHero } from './DashboardHero.js';
 import { DashboardFilterBar, DashboardSortOption } from './DashboardFilterBar.js';
 import { useDashboardMetrics } from './useDashboardMetrics.js';
+import { SessionSummary } from './dashboardTypes.js';
 
-
-export type { DashboardSortOption };
-
-export interface SessionSummary {
-  id: string;
-  filename: string;
-  trackVenue: string;
-  trackCourse?: string;
-  trackLengthMeters?: number | null;
-  timeString: string;
-  timestamp?: number;
-  sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
-  sessionName: string;
-  weatherInfo?: string;
-  driversCount: number;
-  playerDriver?: {
-    name: string;
-    carType: string;
-    carClass?: string;
-    bestLapTime: number | null;
-    bestLapTimeString: string;
-    bestS1: number | null;
-    bestS2: number | null;
-    bestS3: number | null;
-    theoreticalBest: number | null;
-    theoreticalBestString: string;
-    bestLapPaceCategory?: PaceCategory | null;
-    bestLapPacePercentage?: number | null;
-    avgLapTime?: number | null;
-    top3LapsCount?: number;
-    position?: number;
-    gridPosition?: number | null;
-    positionGain?: number | null;
-    lapsCount: number;
-    laps?: LapData[];
-  };
-  bestSessionLap?: {
-    driverName: string;
-    carType: string;
-    lapTime: number;
-    lapTimeString: string;
-  };
-  hasDuckDbTelemetry?: boolean;
-  duckdbFilename?: string;
-  matchingReplayFile?: {
-    name: string;
-    path: string;
-    hasDuckDbTelemetry?: boolean;
-    duckdbFilename?: string;
-  };
-}
+export type { DashboardSortOption, SessionSummary };
 
 export interface DashboardProps {
   sessions: SessionSummary[];
@@ -145,6 +95,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
+  const [hasReplay, setHasReplayState] = useState<boolean>(searchParams.get('hasReplay') === 'true');
   const [sortBy, setSortByState] = useState<DashboardSortOption>(
     (searchParams.get('sort') as DashboardSortOption) || 'date-desc'
   );
@@ -159,9 +110,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
+  const setHasReplay = (replayOnly: boolean) => {
+    setHasReplayState(replayOnly);
+    updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null });
+  };
+
   const {
     tracks,
     emptyCount,
+    replayCount,
     sortedSessions,
     visibleTracks,
     visibleCars,
@@ -191,6 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     filterType,
     searchQuery,
     hideEmpty,
+    hasReplay,
     sortBy,
     isExpanded,
   });
@@ -252,11 +210,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           hideEmpty={hideEmpty}
           setHideEmpty={setHideEmpty}
           emptyCount={emptyCount}
+          hasReplay={hasReplay}
+          setHasReplay={setHasReplay}
+          replayCount={replayCount}
           sortBy={sortBy}
           setSortBy={setSortBy}
         />
 
-        <div className="glass-panel rounded-2xl p-5">
+        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl p-5">
           <SessionList
             sessions={sortedSessions}
             onSelectSession={onSelectSession}

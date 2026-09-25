@@ -2,14 +2,6 @@
 @config "../tailwind.config.js";
 
 @layer base {
-  body {
-    @apply bg-lmu-bg text-lmu-text font-sans;
-  }
-
-  code, pre, .font-mono {
-    @apply font-mono;
-  }
-
   a,
   button:not(:disabled),
   [role="button"],
@@ -20,44 +12,34 @@
   input[type="radio"],
   input[type="button"],
   input[type="submit"] {
-    @apply cursor-pointer;
+    cursor: pointer;
   }
 
   button:disabled,
   [disabled] {
-    @apply cursor-not-allowed;
+    cursor: not-allowed;
   }
-}
-
-.glass-panel {
-  @apply bg-lmu-card/75 backdrop-blur-md border border-white/[0.07];
-}
-
-.glass-panel-hover {
-  @apply transition-all duration-200 ease-in-out hover:bg-[#1A202C]/85 hover:border-lmu-accent/30 hover:-translate-y-0.5;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-lmu-border, #232A36) var(--color-lmu-bg, #0B0E14);
+  scrollbar-color: #232A36 #0B0E14;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  @apply w-1.5 h-1.5;
+  width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-lmu-bg;
+  background: #0B0E14;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-lmu-border rounded-[3px];
+  background: #232A36;
+  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  @apply bg-lmu-accent;
-}
-
-.telemetry-channel-stack > :not(.telemetry-corner-strip) {
-  @apply flex-1 min-h-[84px];
+  background: #E63946;
 }

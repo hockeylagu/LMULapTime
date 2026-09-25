@@ -22,7 +22,7 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
   if (embedded) return null;
 
   return (
-    <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
       <div>
         <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
           <TrendingUp className="w-6 h-6 text-lmu-accent" />

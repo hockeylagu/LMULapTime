@@ -169,7 +169,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
       {/* SINGLE UNIFIED MAP PANE */}
       <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
-        <div className="flex-1 min-h-0 rounded-xl bg-[#060910] border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
+        <div className="flex-1 min-h-0 rounded-xl bg-lmu-deep border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
           <GpsTrackMap
             points={trajectory.points}
             bounds={trajectory.bounds}

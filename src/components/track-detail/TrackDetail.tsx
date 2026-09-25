@@ -51,7 +51,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-lmu-muted glass-panel rounded-2xl">
+      <div className="py-20 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
         <div className="inline-block animate-spin w-8 h-8 border-4 border-lmu-accent border-t-transparent rounded-full mb-3" />
         <p className="text-sm font-medium">Loading circuit telemetry and benchmark targets...</p>
       </div>
@@ -60,7 +60,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   if (!data) {
     return (
-      <div className="py-12 text-center text-lmu-muted glass-panel rounded-2xl">
+      <div className="py-12 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
         <p className="text-lg font-bold text-white mb-3">Track Not Found</p>
         <button
           onClick={onBack}

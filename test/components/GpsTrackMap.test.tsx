@@ -233,7 +233,7 @@ describe('GpsTrackMap', () => {
 
     const markerText = screen.getByText('T1');
     const markerGroup = markerText.closest('g');
-    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#f43f5e');
+    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#F43F5E');
     expect(markerGroup?.querySelector('circle')?.getAttribute('r')).toBe('16.5');
 
     fireEvent.click(markerText);
@@ -253,7 +253,7 @@ describe('GpsTrackMap', () => {
     );
 
     const markerGroup = screen.getByText('T1').closest('g');
-    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#0f172a');
+    expect(markerGroup?.querySelector('circle')?.getAttribute('fill')).toBe('#0F172A');
     expect(markerGroup?.querySelector('circle')?.getAttribute('r')).toBe('13.5');
   });
 
@@ -486,7 +486,7 @@ describe('GpsTrackMap', () => {
     const baseLines = baselineBrake?.querySelectorAll('line');
     const dashedLine = Array.from(baseLines || []).find(l => l.getAttribute('stroke-dasharray') === '4 3');
     expect(dashedLine).toBeTruthy();
-    expect(dashedLine?.getAttribute('stroke')).toBe('#f87171');
+    expect(dashedLine?.getAttribute('stroke')).toBe('#F87171');
 
     // Baseline group has opacity from baselineOpacity
     expect(baselineBrake).toHaveAttribute('opacity', '0.8');
@@ -517,12 +517,12 @@ describe('GpsTrackMap', () => {
     const baseLines = baselineThrottle?.querySelectorAll('line');
     const dashedLine = Array.from(baseLines || []).find(l => l.getAttribute('stroke-dasharray') === '4 3');
     expect(dashedLine).toBeTruthy();
-    expect(dashedLine?.getAttribute('stroke')).toBe('#4ade80');
+    expect(dashedLine?.getAttribute('stroke')).toBe('#4ADE80');
 
     // Badge circle is enlarged to r=9.5
     const badgeCircle = baselineThrottle?.querySelector('circle[r="9.5"]');
     expect(badgeCircle).toBeInTheDocument();
-    expect(badgeCircle?.getAttribute('stroke')).toBe('#4ade80');
+    expect(badgeCircle?.getAttribute('stroke')).toBe('#4ADE80');
   });
 
   it('centers the corner marker text inside the indicator circle', () => {
@@ -802,7 +802,7 @@ describe('GpsTrackMap', () => {
 
     const paths = roadRibbon.querySelectorAll('path');
     expect(paths.length).toBeGreaterThanOrEqual(3); // Asphalt surface + 2 boundary limits
-    expect(paths[0].getAttribute('fill')).toBe('#0c121e');
+    expect(paths[0].getAttribute('fill')).toBe('#0C121E');
   });
 
   it('renders circuit minimap using track layout geometry when available', () => {

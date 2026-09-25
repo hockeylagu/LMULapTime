@@ -63,7 +63,7 @@ describe('TrackSummaries component', () => {
     expect(screen.getByText('Spa')).toBeInTheDocument();
     expect(screen.getByText('Monza')).toBeInTheDocument();
 
-    const spaCard = screen.getByText('Spa').closest('div.glass-panel');
+    const spaCard = screen.getByText('Spa').closest('div.backdrop-blur-md');
     expect(spaCard).not.toBeNull();
     if (spaCard) {
       fireEvent.click(spaCard);

@@ -6,6 +6,7 @@ export interface HideEmptyToggleProps {
   onToggle: (hideEmpty: boolean) => void;
   emptyCount?: number;
   label?: string;
+  ariaLabel?: string;
   titleHiding?: string;
   titleShowing?: string;
   className?: string;
@@ -15,7 +16,8 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
   hideEmpty,
   onToggle,
   emptyCount = 0,
-  label = 'Hide Empty Sessions',
+  label = 'Hide Empty',
+  ariaLabel = 'Hide Empty Sessions',
   titleHiding = 'Hiding empty sessions (0 laps). Click to show all.',
   titleShowing = 'Showing all sessions including empty results. Click to filter out empty results.',
   className = '',
@@ -24,14 +26,15 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
     <button
       type="button"
       onClick={() => onToggle(!hideEmpty)}
-      className={`h-9 inline-flex items-center gap-2 px-3 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+      aria-label={ariaLabel}
+      className={`h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
         hideEmpty
           ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
       } ${className}`}
       title={hideEmpty ? titleHiding : titleShowing}
     >
-      <FilterX className="w-3.5 h-3.5" />
+      <FilterX className="w-3.5 h-3.5 shrink-0" />
       <span>{label}</span>
       {emptyCount > 0 && (
         <span
@@ -45,3 +48,4 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
     </button>
   );
 };
+

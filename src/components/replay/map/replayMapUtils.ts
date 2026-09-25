@@ -1,6 +1,7 @@
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -34,8 +35,8 @@ function sampleGradient(stops: Array<[number, [number, number, number]]>, t: num
 }
 
 const MAX_SPEED_KMH = 280;
-const COAST_COLOR = '#475569'; // slate-600, neither pedal is applied
-const DELTA_NEUTRAL_COLOR = '#475569';
+const COAST_COLOR = TELEMETRY_COLORS.neutral; // slate-600, neither pedal is applied
+const DELTA_NEUTRAL_COLOR = TELEMETRY_COLORS.neutral;
 
 /**
  * Returns a color string for a telemetry point based on the selected heatmap metric.
@@ -48,7 +49,7 @@ export function getHeatmapColor(
   deltaTimeSec?: number
 ): string {
   if (colorBy === 'default') {
-    return '#38bdf8';
+    return TELEMETRY_COLORS.primary;
   }
 
   if (colorBy === 'pedal') {

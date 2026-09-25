@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Disc, AlertTriangle, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryTireSlipChannelProps {
   tireSlipPath: string;
@@ -26,13 +27,13 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="tireSlipGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.4" />
-          <stop offset="60%" stopColor="#f59e0b" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#10b981" stopOpacity="0.03" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.4" />
+          <stop offset="60%" stopColor={TELEMETRY_COLORS.baseline} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.throttle} stopOpacity="0.03" />
         </linearGradient>
       </defs>
       {/* 80% critical slip threshold line */}
-      <line x1="0" y1="27" x2="1000" y2="27" stroke="#ef4444" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.3" />
+      <line x1="0" y1="27" x2="1000" y2="27" stroke={TELEMETRY_COLORS.brake} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.3" />
       {tireSlipArea && (
         <path d={tireSlipArea} fill="url(#tireSlipGradient)" />
       )}
@@ -40,7 +41,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
         <path
           d={baselineTireSlipPath}
           fill="none"
-          stroke="#38bdf8"
+          stroke={TELEMETRY_COLORS.primary}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -51,7 +52,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
         <path
           d={tireSlipPath}
           fill="none"
-          stroke="#ef4444"
+          stroke={TELEMETRY_COLORS.brake}
           strokeWidth="1.3"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -70,7 +71,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
   const isTc = Boolean(currentPoint?.tcActive);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-[#180b0c]/50">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-rose-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-red-500/20 text-red-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Disc className="w-3 h-3" />
@@ -125,12 +126,12 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-red-400/80 font-mono font-bold text-[11px] text-red-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-red-400/80 font-mono font-bold text-[11px] text-red-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {slipPct !== undefined ? `${slipPct}%` : '0%'}
             {isLockup && ' (LOCKUP)'}
           </span>
           {baseSlip !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-sky-500/80 font-mono font-bold text-[10px] text-sky-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-sky-500/80 font-mono font-bold text-[10px] text-sky-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {baseSlip}%
             </span>
           )}

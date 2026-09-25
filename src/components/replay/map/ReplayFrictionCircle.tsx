@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface ReplayFrictionCircleProps {
   points: ReplayTelemetryPoint[];
@@ -17,18 +18,18 @@ function getGripState(point?: ReplayTelemetryPoint) {
   const slip = point?.tireSlipPct ?? 0;
 
   if (point?.wheelLockActive || point?.isOffTrack || slip >= 92) {
-    return { label: 'LOST GRIP', detail: 'Reduce demand', color: '#fb7185', utilization };
+    return { label: 'LOST GRIP', detail: 'Reduce demand', color: MAP_COLORS.gripLost, utilization };
   }
   if (utilization > 100 || slip >= 80) {
-    return { label: 'OVER LIMIT', detail: 'Excess slip', color: '#f59e0b', utilization };
+    return { label: 'OVER LIMIT', detail: 'Excess slip', color: TELEMETRY_COLORS.baseline, utilization };
   }
   if (utilization >= 90) {
-    return { label: 'AT LIMIT', detail: 'Balanced grip', color: '#34d399', utilization };
+    return { label: 'AT LIMIT', detail: 'Balanced grip', color: MAP_COLORS.gripLimit, utilization };
   }
   if (utilization >= 75) {
-    return { label: 'BUILDING', detail: 'Near the limit', color: '#22d3ee', utilization };
+    return { label: 'BUILDING', detail: 'Near the limit', color: MAP_COLORS.gripBuilding, utilization };
   }
-  return { label: 'RESERVE', detail: 'Grip available', color: '#94a3b8', utilization };
+  return { label: 'RESERVE', detail: 'Grip available', color: MAP_COLORS.markerMuted, utilization };
 }
 
 function projectPoint(point: ReplayTelemetryPoint): { x: number; y: number } {
@@ -65,18 +66,18 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
   }, [currentIndex, currentPoint?.timeSec, points]);
 
   return (
-    <div className="h-[132px] shrink-0 rounded-lg border border-lmu-border bg-[#080c13] px-3 py-2 flex items-center gap-3" aria-label="Estimated friction circle">
+    <div className="h-[132px] shrink-0 rounded-lg border border-lmu-border bg-lmu-surface px-3 py-2 flex items-center gap-3" aria-label="Estimated friction circle">
       <svg viewBox="0 0 128 128" className="h-[116px] w-[116px] shrink-0" role="img" aria-label="Lateral and longitudinal grip plot">
-        <circle cx={CENTER} cy={CENTER} r={ENVELOPE_RADIUS} fill="#0f172a" stroke="#475569" strokeWidth="1.5" />
-        <circle cx={CENTER} cy={CENTER} r={ENVELOPE_RADIUS * 0.75} fill="none" stroke="#334155" strokeDasharray="3 3" />
-        <line x1="8" y1={CENTER} x2="120" y2={CENTER} stroke="#334155" />
-        <line x1={CENTER} y1="8" x2={CENTER} y2="120" stroke="#334155" />
-        {trail && <polyline points={trail} fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />}
-        <circle cx={current.x} cy={current.y} r="5" fill={gripState.color} stroke="#ffffff" strokeWidth="1.5" />
-        <text x="4" y="61" fill="#64748b" fontSize="7">L</text>
-        <text x="119" y="61" fill="#64748b" fontSize="7">R</text>
-        <text x="68" y="10" fill="#64748b" fontSize="7">DRIVE</text>
-        <text x="68" y="124" fill="#64748b" fontSize="7">BRAKE</text>
+        <circle cx={CENTER} cy={CENTER} r={ENVELOPE_RADIUS} fill={MAP_COLORS.markerUnselected} stroke={MAP_COLORS.trackBoundary} strokeWidth="1.5" />
+        <circle cx={CENTER} cy={CENTER} r={ENVELOPE_RADIUS * 0.75} fill="none" stroke={MAP_COLORS.centerline} strokeDasharray="3 3" />
+        <line x1="8" y1={CENTER} x2="120" y2={CENTER} stroke={MAP_COLORS.centerline} />
+        <line x1={CENTER} y1="8" x2={CENTER} y2="120" stroke={MAP_COLORS.centerline} />
+        {trail && <polyline points={trail} fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />}
+        <circle cx={current.x} cy={current.y} r="5" fill={gripState.color} stroke={CHART_COLORS.white} strokeWidth="1.5" />
+        <text x="4" y="61" fill={MAP_COLORS.markerDimmed} fontSize="7">L</text>
+        <text x="119" y="61" fill={MAP_COLORS.markerDimmed} fontSize="7">R</text>
+        <text x="68" y="10" fill={MAP_COLORS.markerDimmed} fontSize="7">DRIVE</text>
+        <text x="68" y="124" fill={MAP_COLORS.markerDimmed} fontSize="7">BRAKE</text>
       </svg>
 
       <div className="min-w-0 flex-1">

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { MAP_COLORS } from '../../../utils/themeColors.js';
 import { buildRoadRibbonSvgPath, buildClosedSvgPath } from './replayMapUtils.js';
 
 export interface GpsTrackRoadRibbonProps {
@@ -41,9 +42,9 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
       {/* Dark motorsport asphalt road surface */}
       <path
         d={ribbonD}
-        fill="#0c121e"
+        fill={MAP_COLORS.roadSurface}
         fillOpacity="0.88"
-        stroke="#1a2234"
+        stroke={MAP_COLORS.roadBorder}
         strokeWidth="1"
         vectorEffect="non-scaling-stroke"
       />
@@ -53,7 +54,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
         <path
           d={centerlineD}
           fill="none"
-          stroke="#334155"
+          stroke={MAP_COLORS.centerline}
           strokeWidth="1"
           strokeDasharray="8 12"
           vectorEffect="non-scaling-stroke"
@@ -65,7 +66,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
       <path
         d={leftEdgeD}
         fill="none"
-        stroke="#475569"
+        stroke={MAP_COLORS.trackBoundary}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -77,7 +78,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
       <path
         d={rightEdgeD}
         fill="none"
-        stroke="#475569"
+        stroke={MAP_COLORS.trackBoundary}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"

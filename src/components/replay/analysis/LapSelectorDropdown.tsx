@@ -44,7 +44,7 @@ export function LapSelectorDropdown({
         <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen && (
-        <div className="absolute top-8 left-0 z-30 w-52 max-h-64 overflow-y-auto rounded-lg bg-[#0c101d] border border-lmu-border shadow-2xl py-1">
+        <div className="absolute top-8 left-0 z-30 w-52 max-h-64 overflow-y-auto rounded-lg bg-lmu-card border border-lmu-border shadow-2xl py-1">
           {availableLaps.map(({ lapNumber, lapTimeSec, isValid }) => {
             const isExcluded = excludedLaps.has(lapNumber);
             return (

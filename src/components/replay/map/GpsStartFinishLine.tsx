@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { ProjectedPoint, DispersedCornerMarker } from './replayMapUtils.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface GpsStartFinishLineProps {
   svgPoints: ProjectedPoint[];
@@ -111,7 +112,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
         y1={lineData.y1}
         x2={lineData.x2}
         y2={lineData.y2}
-        stroke="#000000"
+        stroke={CHART_COLORS.black}
         strokeWidth="4.5"
         strokeLinecap="butt"
         vectorEffect="non-scaling-stroke"
@@ -122,7 +123,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
         y1={lineData.y1}
         x2={lineData.x2}
         y2={lineData.y2}
-        stroke="#ffffff"
+        stroke={CHART_COLORS.white}
         strokeWidth="2.2"
         strokeLinecap="butt"
         vectorEffect="non-scaling-stroke"
@@ -133,7 +134,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
         y1={lineData.y1}
         x2={lineData.x2}
         y2={lineData.y2}
-        stroke="#000000"
+        stroke={CHART_COLORS.black}
         strokeWidth="2.2"
         strokeDasharray="4 4"
         strokeLinecap="butt"
@@ -151,8 +152,8 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
           width="34"
           height="15"
           rx="3"
-          fill="#090d16"
-          stroke="#38bdf8"
+          fill={MAP_COLORS.markerBg}
+          stroke={TELEMETRY_COLORS.primary}
           strokeWidth="1.2"
           opacity="0.95"
         />
@@ -161,7 +162,7 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
           y="0"
           textAnchor="middle"
           dominantBaseline="central"
-          fill="#38bdf8"
+          fill={TELEMETRY_COLORS.primary}
           fontSize="8"
           fontFamily="monospace"
           fontWeight="bold"

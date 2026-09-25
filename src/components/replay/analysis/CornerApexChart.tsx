@@ -46,7 +46,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
 
   if (compact) {
     return (
-      <div className={`flex flex-col bg-[#060910] rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg p-2 gap-1.5 shrink-0 ${className}`}>
+      <div className={`flex flex-col bg-lmu-deep rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg p-2 gap-1.5 shrink-0 ${className}`}>
         <div className="flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="inline-flex items-center h-5 px-1.5 rounded bg-sky-500/20 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap">
@@ -93,9 +93,9 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
   }
 
   return (
-    <div className={`flex flex-col bg-[#060910] overflow-hidden ${className}`}>
+    <div className={`flex flex-col bg-lmu-deep overflow-hidden ${className}`}>
       {/* Master Unified Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#0a0f1d] border-b border-lmu-border/60 gap-2 min-w-0">
+      <div className="flex items-center justify-between px-3 py-2 bg-lmu-card border-b border-lmu-border/60 gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
           <span className="inline-flex items-center h-6 px-2 rounded bg-sky-500/20 border border-sky-500/40 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
             Turn {corner.cornerNumber}
@@ -124,7 +124,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
       </div>
 
       {/* Speed & Handling Profile Chart with Understeer / Scrub / Oversteer overlay */}
-      <div className="p-2 bg-[#060910]">
+      <div className="p-2 bg-lmu-deep">
         <CornerSpeedGraph
           corner={corner}
           primaryPoints={primaryPoints}

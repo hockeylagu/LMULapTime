@@ -69,7 +69,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
       </div>
 
       {/* Track Title Card */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
+      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3.5">

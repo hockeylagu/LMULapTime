@@ -10,6 +10,7 @@ export default {
         lmu: {
           bg: '#0B0E14',
           card: '#151A23',
+          cardHover: '#1A202C',
           border: '#232A36',
           accent: '#E63946',
           gold: '#FFB703',
@@ -18,7 +19,11 @@ export default {
           green: '#2A9D8F',
           text: '#F8F9FA',
           muted: '#8D99AE',
-          dark: '#080A0F'
+          dark: '#080A0F',
+          surface: '#080C14',
+          strip: '#0A0E17',
+          badge: '#070C18',
+          deep: '#060910'
         }
       },
       fontFamily: {

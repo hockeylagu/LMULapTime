@@ -38,7 +38,7 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
   return (
     <div className={`flex flex-col gap-2 p-2 pt-0 font-mono text-[11px] ${className}`}>
       {/* Milestone / Phase Delta Summary Strip */}
-      <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#050810] border border-lmu-border/50 text-[10px] text-slate-300 gap-1.5">
+      <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 rounded-lg bg-lmu-deep border border-lmu-border/50 text-[10px] text-slate-300 gap-1.5">
         <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
           {isCompareMode ? 'Phase Deltas' : 'Corner Flow'}
         </span>

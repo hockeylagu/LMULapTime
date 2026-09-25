@@ -22,6 +22,7 @@ import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
 import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 import type { GpsTrackMapProps } from './GpsTrackMap.js';
 
@@ -194,10 +195,10 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
       <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md">
         <defs>
           <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#38bdf8" floodOpacity="0.9" />
+            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor={TELEMETRY_COLORS.primary} floodOpacity="0.9" />
           </filter>
           <filter id="ghostGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f59e0b" floodOpacity="0.9" />
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={TELEMETRY_COLORS.baseline} floodOpacity="0.9" />
           </filter>
         </defs>
 
@@ -209,8 +210,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
           />
         ) : (
           <>
-            <path d={pathD} fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            <path d={pathD} fill="none" stroke="#334155" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           </>
         )}
 
@@ -259,7 +260,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
             y1={currentPos.sy}
             x2={baselineGhostPos.sx}
             y2={baselineGhostPos.sy}
-            stroke="#f59e0b"
+            stroke={TELEMETRY_COLORS.baseline}
             strokeWidth="1.5"
             strokeDasharray="4 4"
             opacity={0.75 * baselineOpacity}
@@ -268,15 +269,15 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
         )}
         {baselineGhostPos && (
           <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)}) scale(${markerScale})`} opacity={baselineOpacity}>
-            <circle r="11" fill="none" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
-            <circle r="6" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" filter="url(#ghostGlow)" />
+            <circle r="11" fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
+            <circle r="6" fill={TELEMETRY_COLORS.baseline} stroke={CHART_COLORS.white} strokeWidth="2" filter="url(#ghostGlow)" />
           </g>
         )}
 
         {currentPos && (
           <g transform={`translate(${currentPos.sx}, ${currentPos.sy}) scale(${markerScale})`} opacity={primaryOpacity}>
-            <circle r="12" fill="none" stroke="#38bdf8" strokeWidth="2" className="animate-ping opacity-50" />
-            <circle r="6.5" fill="#38bdf8" stroke="#ffffff" strokeWidth="2.2" filter="url(#carGlow)" />
+            <circle r="12" fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" className="animate-ping opacity-50" />
+            <circle r="6.5" fill={TELEMETRY_COLORS.primary} stroke={CHART_COLORS.white} strokeWidth="2.2" filter="url(#carGlow)" />
           </g>
         )}
       </svg>

@@ -14,6 +14,7 @@ import {
 import { Clock, Activity } from 'lucide-react';
 import { ComparableLap } from '../../utils/lapComparison';
 import { formatTime } from '../../utils/formatters';
+import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
 
 export interface CompareSectorChartDataItem {
   metric: string;
@@ -81,12 +82,12 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
         const deltaVal = Number(p.value) || 0;
 
         const deltaColor = isBase
-          ? '#ECC94B'
+          ? LMU_COLORS.gold
           : deltaVal < 0
-          ? '#48BB78'
+          ? TELEMETRY_COLORS.gain
           : deltaVal > 0
-          ? '#F56565'
-          : '#A0AEC0';
+          ? TELEMETRY_COLORS.loss
+          : LMU_COLORS.muted;
 
         const formattedDelta = isBase
           ? '±0.000s (Baseline)'
@@ -176,12 +177,12 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
       <div className="h-64 min-h-[250px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2D3748" opacity={0.5} />
-            <ReferenceLine y={0} stroke="#718096" strokeDasharray="3 3" />
-            <XAxis dataKey="metric" stroke="#718096" tick={{ fill: '#A0AEC0', fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} opacity={0.5} />
+            <ReferenceLine y={0} stroke={CHART_COLORS.axis} strokeDasharray="3 3" />
+            <XAxis dataKey="metric" stroke={CHART_COLORS.axis} tick={{ fill: LMU_COLORS.muted, fontSize: 11 }} />
             <YAxis
-              stroke="#718096"
-              tick={{ fill: '#A0AEC0', fontSize: 11 }}
+              stroke={CHART_COLORS.axis}
+              tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
               tickFormatter={(val) =>
                 val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(3)}s` : `${val.toFixed(3)}s`
               }
@@ -194,10 +195,10 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
                   const val = Number(entry[lap.id] || 0);
                   const cellColor =
                     val < 0
-                      ? '#10B981' // Green for faster / time gained
+                      ? TELEMETRY_COLORS.gain // Green for faster / time gained
                       : val > 0
-                      ? '#EF4444' // Red for slower / time lost
-                      : '#718096'; // Neutral for 0
+                      ? TELEMETRY_COLORS.loss // Red for slower / time lost
+                      : LMU_COLORS.muted; // Neutral for 0
                   return <Cell key={`cell-${lap.id}-${entryIndex}`} fill={cellColor} />;
                 })}
               </Bar>

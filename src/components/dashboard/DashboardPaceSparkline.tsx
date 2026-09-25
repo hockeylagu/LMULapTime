@@ -1,5 +1,6 @@
 import React from 'react';
 import type { RecentPacePoint } from './useDashboardTrends.js';
+import { PACE_CHART_COLORS, LMU_COLORS } from '../../utils/themeColors.js';
 
 export interface DashboardPaceSparklineProps {
   points: RecentPacePoint[];
@@ -51,7 +52,11 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
   const areaD = `${lineD} L ${coords[coords.length - 1].x} ${height} L ${coords[0].x} ${height} Z`;
 
   const strokeColor =
-    paceTrendDirection === 'improving' ? '#10b981' : paceTrendDirection === 'declining' ? '#f59e0b' : '#38bdf8';
+    paceTrendDirection === 'improving'
+      ? PACE_CHART_COLORS.Good
+      : paceTrendDirection === 'declining'
+      ? PACE_CHART_COLORS.Competitive
+      : PACE_CHART_COLORS.Midpack;
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`} data-testid="dashboard-pace-sparkline">
@@ -99,7 +104,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
               style={{
                 left: `${leftPct}%`,
                 top: `${topPct}%`,
-                backgroundColor: isLatest ? strokeColor : '#0f172a',
+                backgroundColor: isLatest ? strokeColor : LMU_COLORS.surface,
                 borderColor: strokeColor,
               }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 aspect-square rounded-full cursor-pointer transition-transform hover:scale-125 ${

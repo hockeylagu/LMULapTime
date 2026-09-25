@@ -23,7 +23,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
     <div
       className={`p-2 rounded-xl border flex items-center justify-between gap-2 transition-all ${
         isActive
-          ? 'bg-[#0d1524] border-sky-500/40'
+          ? 'bg-sky-950/40 border-sky-500/40'
           : 'bg-black/20 border-white/5 opacity-60 hover:opacity-100'
       }`}
     >

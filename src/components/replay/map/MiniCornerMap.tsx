@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { projectTrajectoryPoints, buildContinuousSvgPath } from './replayMapUtils.js';
+import { CHART_COLORS, MAP_COLORS } from '../../../utils/themeColors.js';
 
 export interface MiniCornerMapProps {
   points: ReplayTrajectoryPoint[];
@@ -28,9 +29,9 @@ export const MiniCornerMap: React.FC<MiniCornerMapProps> = ({ points, bounds, hi
 
   return (
     <svg viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`} className={className}>
-      <path d={pathD} fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={pathD} fill="none" stroke="#334155" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {marker && <circle cx={marker.sx} cy={marker.sy} r="5" fill="#f43f5e" stroke="#fff" strokeWidth="1.5" />}
+      <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {marker && <circle cx={marker.sx} cy={marker.sy} r="5" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />}
     </svg>
   );
 };

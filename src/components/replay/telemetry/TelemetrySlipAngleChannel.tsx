@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Compass, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetrySlipAngleChannelProps {
   slipAnglePath: string;
@@ -23,12 +24,12 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
   const chartSvg = useMemo(() => (
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       {/* Zero centerline */}
-      <line x1="0" y1="50" x2="1000" y2="50" stroke="#a78bfa" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
+      <line x1="0" y1="50" x2="1000" y2="50" stroke={TELEMETRY_COLORS.slipAngle} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
       {baselineSlipAnglePath && (
         <path
           d={baselineSlipAnglePath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -39,7 +40,7 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
         <path
           d={slipAnglePath}
           fill="none"
-          stroke="#a78bfa"
+          stroke={TELEMETRY_COLORS.slipAngle}
           strokeWidth="1.2"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -54,7 +55,7 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
   const baseSlipAngle = currentComparison?.baseline.slipAngleDeg;
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-[#110d1c]/50">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-violet-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-violet-500/20 text-violet-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Compass className="w-3 h-3" />
@@ -94,11 +95,11 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-violet-400/80 font-mono font-bold text-[11px] text-violet-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-violet-400/80 font-mono font-bold text-[11px] text-violet-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {slipAngle !== undefined ? `${slipAngle > 0 ? `+${slipAngle.toFixed(2)}` : slipAngle.toFixed(2)}°` : '0.00°'}
           </span>
           {baseSlipAngle !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {baseSlipAngle.toFixed(2)}°
             </span>
           )}

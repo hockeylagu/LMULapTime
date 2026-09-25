@@ -11,9 +11,10 @@ import {
   type LegendPayload,
 } from 'recharts';
 import { formatTime } from '../../../utils/formatters.js';
+import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';
-import { BENCHMARK_COLORS, ImprovementPaceSeries } from './ImprovementPaceSeries.js';
+import { ImprovementPaceSeries } from './ImprovementPaceSeries.js';
 
 export interface ImprovementChartPoint {
   chartKey: string;
@@ -106,8 +107,8 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
   const personalBestLegendGradient = `linear-gradient(to right, ${chartData
     .map((point, index) => {
       const color = point.personalBestBenchmarkCategory
-        ? BENCHMARK_COLORS[point.personalBestBenchmarkCategory]
-        : BENCHMARK_COLORS.Offline;
+        ? PACE_CHART_COLORS[point.personalBestBenchmarkCategory]
+        : PACE_CHART_COLORS.Offline;
       const offset = chartData.length > 1 ? (index / (chartData.length - 1)) * 100 : 0;
       return `${color} ${offset}%`;
     })
@@ -153,11 +154,11 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             }
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#232A36" />
+          <CartesianGrid strokeDasharray="3 3" stroke={LMU_COLORS.border} />
           <XAxis
             dataKey="chartKey"
-            stroke="#8D99AE"
-            tick={{ fill: '#8D99AE', fontSize: 11 }}
+            stroke={LMU_COLORS.muted}
+            tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
             interval={chartData.length > 10 ? 'preserveStartEnd' : 0}
             height={chartData.length > 5 ? 40 : 25}
             angle={chartData.length > 5 ? -18 : 0}
@@ -170,8 +171,8 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
           />
           <YAxis
             domain={[minTime, maxTime]}
-            stroke="#8D99AE"
-            tick={{ fill: '#8D99AE', fontSize: 12 }}
+            stroke={LMU_COLORS.muted}
+            tick={{ fill: LMU_COLORS.muted, fontSize: 12 }}
             tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
           />
           <Tooltip content={<ImprovementPaceTooltip metric={metric} onSelectSession={onSelectSession} />} />

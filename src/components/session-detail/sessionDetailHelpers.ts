@@ -1,23 +1,10 @@
 import { DetailedSession } from '../../../server/core/types';
 import { parseDateStringToTimestamp, matchesSessionType } from '../../utils/formatters.js';
 import { matchesTrack } from '../../utils/paceCategory.js';
+import { CHART_COLORS, OPPONENT_COLORS } from '../../utils/themeColors.js';
 
-export const OPPONENT_COLORS = [
-  '#38BDF8', // sky
-  '#34D399', // emerald
-  '#A78BFA', // purple
-  '#F472B6', // pink
-  '#FB923C', // orange
-  '#E2E8F0', // slate
-  '#4ADE80', // green
-  '#2DD4BF', // teal
-  '#818CF8', // indigo
-  '#C084FC', // fuchsia
-  '#F87171', // red
-  '#94A3B8', // cool gray
-];
-
-export const PLAYER_HIGHLIGHT_COLOR = '#FBBF24'; // Vibrant Gold Accent
+export { OPPONENT_COLORS };
+export const PLAYER_HIGHLIGHT_COLOR = CHART_COLORS.playerHighlight; // Vibrant Gold Accent
 
 export interface CandidateRelatedSession {
   id?: string;

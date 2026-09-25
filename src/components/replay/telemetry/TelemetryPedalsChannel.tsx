@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Activity, Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryPedalsChannelProps {
   throttlePath: string;
@@ -32,15 +33,15 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="throttleGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.throttle} stopOpacity="0.8" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.throttle} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       <path d={throttleArea} fill="url(#throttleGrad)" opacity="0.35" />
       {baselineThrottlePath && (
-        <path d={baselineThrottlePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+        <path d={baselineThrottlePath} fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
       )}
-      <path d={throttlePath} fill="none" stroke="#10b981" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={throttlePath} fill="none" stroke={TELEMETRY_COLORS.throttle} strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ), [throttleArea, baselineThrottlePath, throttlePath]);
 
@@ -48,22 +49,22 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="brakeGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.8" />
+          <stop offset="100%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       <path d={brakeArea} fill="url(#brakeGrad)" opacity="0.35" />
       {baselineBrakePath && (
-        <path d={baselineBrakePath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+        <path d={baselineBrakePath} fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
       )}
-      <path d={brakePath} fill="none" stroke="#ef4444" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={brakePath} fill="none" stroke={TELEMETRY_COLORS.brake} strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ), [brakeArea, baselineBrakePath, brakePath]);
 
   return (
     <>
       {/* THROTTLE CHANNEL */}
-      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#091512]/50">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-emerald-950/20">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-emerald-500/20 text-emerald-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Activity className="w-3 h-3" />
@@ -94,7 +95,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
           >
-            <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+            <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
               currentPoint?.tcActive ? 'border-amber-400 text-amber-300' : 'border-emerald-400/80 text-emerald-300'
             }`}>
               {(currentPoint?.throttle ?? 0).toFixed(0)}%
@@ -103,7 +104,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
               )}
             </span>
             {currentComparison && (
-              <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
                 B: {currentComparison.baseline.throttle.toFixed(0)}%
               </span>
             )}
@@ -112,7 +113,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
       </div>
 
       {/* BRAKE CHANNEL */}
-      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-[#190d11]/50">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-rose-950/20">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
           <span className="p-1 rounded bg-rose-500/20 text-rose-400 font-black text-[10px] tracking-wider flex items-center gap-1">
             <Zap className="w-3 h-3" />
@@ -143,7 +144,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
           >
-            <span className={`px-2 py-0.5 rounded-md bg-[#070c18] font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+            <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
               currentPoint?.absActive ? 'border-cyan-400 text-cyan-300' : 'border-rose-400/80 text-rose-300'
             }`}>
               {(currentPoint?.brake ?? 0).toFixed(0)}%
@@ -152,7 +153,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
               )}
             </span>
             {currentComparison && (
-              <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
                 B: {currentComparison.baseline.brake.toFixed(0)}%
               </span>
             )}

@@ -27,7 +27,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   return (
     <div
       onClick={() => onSelectSession(s.id)}
-      className={`glass-panel glass-panel-hover p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
+      className={`bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] transition-all duration-200 ease-in-out hover:bg-lmu-cardHover/85 hover:border-lmu-accent/30 hover:-translate-y-0.5 p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
         empty ? 'border-amber-500/30 bg-amber-950/10' : ''
       }`}
     >

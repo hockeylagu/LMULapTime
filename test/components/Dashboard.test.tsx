@@ -153,7 +153,7 @@ describe('Dashboard component', () => {
     expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Monza').length).toBeGreaterThan(0);
 
-    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.glass-panel');
+    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.backdrop-blur-md');
     expect(sessionCard).not.toBeNull();
     if (sessionCard) {
       fireEvent.click(sessionCard);
@@ -314,6 +314,37 @@ describe('Dashboard component', () => {
 
     expect(screen.queryByRole('button', { name: /Reset track filter/i })).not.toBeInTheDocument();
   });
+
+  it('toggles Has Replay filter and filters sessions by replay presence', () => {
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    const hasReplayBtn = screen.getByRole('button', { name: /Filter sessions with replay/i });
+    expect(hasReplayBtn).toBeInTheDocument();
+    expect(hasReplayBtn).toHaveAttribute('title', expect.stringContaining('replay'));
+
+    // Initially all non-empty sessions are shown (mockSessions has 4 non-empty, only 1 has matchingReplayFile: sess-spa-1)
+    expect(screen.getAllByText('P1').length).toBeGreaterThan(0);
+
+    // Toggle Has Replay filter ON
+    fireEvent.click(hasReplayBtn);
+
+    // Toggle Has Replay filter OFF
+    fireEvent.click(hasReplayBtn);
+  });
+
 
   it('accurately displays Driving Overview aggregated metrics', () => {
     render(

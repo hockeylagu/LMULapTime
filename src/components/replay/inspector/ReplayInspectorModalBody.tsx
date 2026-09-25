@@ -156,7 +156,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   }, [lapSegments]);
 
   return (
-    <main className="h-dvh min-h-0 flex flex-col bg-[#07090e] text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
+    <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={activeReplayName || replayName}
@@ -193,7 +193,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       />
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 flex flex-col bg-[#06080d] p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
+        <div className="flex-1 min-w-0 flex flex-col bg-lmu-deep p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
           <div className="flex-1 min-h-0 w-full">
             <TelemetryStripCharts
               points={trajectory?.points || []}

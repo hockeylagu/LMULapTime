@@ -27,7 +27,7 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
     : 'Never';
 
   return (
-    <div className="glass-panel p-6 rounded-2xl space-y-4">
+    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-lmu-accent" />

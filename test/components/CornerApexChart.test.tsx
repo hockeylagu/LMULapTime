@@ -110,7 +110,7 @@ describe('CornerApexChart', () => {
     const chartSvg = container.querySelector('[data-chart="speed-profile"] svg') ?? Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
     const paths = chartSvg?.querySelectorAll('path') ?? [];
     expect(paths.length).toBe(2);
-    expect(paths[0].getAttribute('stroke')).toBe('#f59e0b');
+    expect(paths[0].getAttribute('stroke')).toBe('#F59E0B');
   });
 
   it('renders only the primary path when no baseline is provided', () => {
@@ -125,7 +125,7 @@ describe('CornerApexChart', () => {
     const chartSvg = container.querySelector('[data-chart="speed-profile"] svg') ?? Array.from(container.querySelectorAll('svg')).find(el => !el.classList.contains('lucide'));
     const paths = chartSvg?.querySelectorAll('path') ?? [];
     expect(paths.length).toBe(1);
-    expect(paths[0].getAttribute('stroke')).toBe('#38bdf8');
+    expect(paths[0].getAttribute('stroke')).toBe('#38BDF8');
   });
 
   it('renders telemetry metrics in solo mode', () => {

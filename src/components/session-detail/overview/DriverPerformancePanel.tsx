@@ -91,7 +91,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
   }, [s3Laps]);
 
   return (
-    <div className="glass-panel p-4 rounded-xl border border-lmu-border/70 space-y-3">
+    <div className="bg-lmu-card/75 backdrop-blur-md p-4 rounded-xl border border-lmu-border/70 space-y-3">
       {/* Header: Title / Car Info / Finish Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-lmu-border/50 pb-2">
         <div className="flex items-center gap-2 flex-wrap">

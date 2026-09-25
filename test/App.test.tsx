@@ -202,7 +202,7 @@ describe('App component', () => {
 
     // Select session card
     const dateMatches = screen.getAllByText('2026/05/28 14:00');
-    const sessionCard = dateMatches[dateMatches.length - 1].closest('div.glass-panel') || dateMatches[0].closest('div.glass-panel');
+    const sessionCard = dateMatches[dateMatches.length - 1].closest('div.backdrop-blur-md') || dateMatches[0].closest('div.backdrop-blur-md');
     if (sessionCard) {
       fireEvent.click(sessionCard);
       await waitFor(() => {

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryVirtualEnergyChannelProps {
   virtualEnergyPath: string;
@@ -26,8 +27,8 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="veGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+          <stop offset="0%" stopColor={WHEEL_CORNER_COLORS.fl} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={WHEEL_CORNER_COLORS.fl} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       {virtualEnergyArea && <path d={virtualEnergyArea} fill="url(#veGrad)" opacity="0.3" />}
@@ -35,7 +36,7 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
         <path
           d={baselineVirtualEnergyPath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -46,7 +47,7 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
         <path
           d={virtualEnergyPath}
           fill="none"
-          stroke="#06b6d4"
+          stroke={WHEEL_CORNER_COLORS.fl}
           strokeWidth="1.3"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -60,7 +61,7 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
   const hasVeData = currentVe !== undefined || Boolean(virtualEnergyPath);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-[#061720]/50">
+    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-cyan-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-cyan-500/20 text-cyan-300 font-black text-[10px] tracking-wider flex items-center gap-1">
           <Zap className="w-3 h-3" />

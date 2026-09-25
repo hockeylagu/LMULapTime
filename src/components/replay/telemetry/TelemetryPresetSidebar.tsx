@@ -20,7 +20,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
   onResetDefaults,
 }) => {
   return (
-    <div className="w-full md:w-56 bg-[#060910] border-b md:border-b-0 md:border-r border-lmu-border/60 flex flex-col shrink-0">
+    <div className="w-full md:w-56 bg-lmu-deep border-b md:border-b-0 md:border-r border-lmu-border/60 flex flex-col shrink-0">
       <div className="p-2.5 flex items-center justify-between border-b border-white/5 shrink-0">
         <span className="text-[10px] uppercase font-bold text-lmu-muted">Presets</span>
         <button

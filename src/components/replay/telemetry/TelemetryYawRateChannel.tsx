@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { RotateCw, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetryYawRateChannelProps {
   yawRatePath: string;
@@ -23,12 +24,12 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
   const chartSvg = useMemo(() => (
     <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
       {/* Zero centerline */}
-      <line x1="0" y1="50" x2="1000" y2="50" stroke="#22d3ee" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
+      <line x1="0" y1="50" x2="1000" y2="50" stroke={TELEMETRY_COLORS.yawRate} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
       {baselineYawRatePath && (
         <path
           d={baselineYawRatePath}
           fill="none"
-          stroke="#f59e0b"
+          stroke={TELEMETRY_COLORS.baseline}
           strokeWidth="1.2"
           strokeDasharray="4 3"
           vectorEffect="non-scaling-stroke"
@@ -39,7 +40,7 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
         <path
           d={yawRatePath}
           fill="none"
-          stroke="#22d3ee"
+          stroke={TELEMETRY_COLORS.yawRate}
           strokeWidth="1.2"
           vectorEffect="non-scaling-stroke"
           strokeLinecap="round"
@@ -61,7 +62,7 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
   };
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-[#08141b]/50">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-cyan-950/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-cyan-500/20 text-cyan-400 font-black text-[10px] tracking-wider flex items-center gap-1">
           <RotateCw className="w-3 h-3" />
@@ -101,11 +102,11 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-cyan-400/80 font-mono font-bold text-[11px] text-cyan-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-cyan-400/80 font-mono font-bold text-[11px] text-cyan-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {formatYawRate(yawRate)}
           </span>
           {baseYawRate !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {formatYawRate(baseYawRate)}
             </span>
           )}

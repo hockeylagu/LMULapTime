@@ -6,6 +6,7 @@ import {
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
 import { getCircuitSpecification } from '../../utils/circuitSpecs.js';
+import { CHART_COLORS } from '../../utils/themeColors.js';
 
 export interface TrackCircuitLayoutProps {
   trackName: string;
@@ -143,7 +144,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         {/* Crisp white circuit outline */}
         <path
           d={pathD}
-          stroke="#ffffff"
+          stroke={CHART_COLORS.white}
           strokeWidth="24"
           strokeLinecap="round"
           strokeLinejoin="round"

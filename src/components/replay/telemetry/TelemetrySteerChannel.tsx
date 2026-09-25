@@ -8,6 +8,7 @@ import {
   detectHandlingBalanceEvents,
   computeVisibleHandlingBands,
 } from '../../../utils/handlingBalanceDetection.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface TelemetrySteerChannelProps {
   steerPath: string;
@@ -93,7 +94,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
         const isUS = band.type === 'understeer';
         const isScrub = showScrub && band.isTireScrub;
         const fill = !isUS ? 'rgba(245, 158, 11, 0.22)' : isScrub ? 'rgba(244, 63, 94, 0.24)' : 'rgba(56, 189, 248, 0.18)';
-        const stroke = !isUS ? '#f59e0b' : isScrub ? '#f43f5e' : '#38bdf8';
+        const stroke = !isUS ? TELEMETRY_COLORS.oversteer : isScrub ? TELEMETRY_COLORS.tireScrub : TELEMETRY_COLORS.understeer;
         const strokeOpacity = isScrub ? 0.85 : 0.65;
 
         return (
@@ -106,13 +107,13 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
       })}
 
       {/* Zero centerline */}
-      <line x1="0" y1="50" x2="1000" y2="50" stroke="#818cf8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
+      <line x1="0" y1="50" x2="1000" y2="50" stroke={TELEMETRY_COLORS.steer} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
 
       {baselineSteerPath && (
-        <path d={baselineSteerPath} fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+        <path d={baselineSteerPath} fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
       )}
       {steerPath && (
-        <path d={steerPath} fill="none" stroke="#818cf8" strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={steerPath} fill="none" stroke={TELEMETRY_COLORS.steer} strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
       )}
     </svg>
   ), [steerPath, baselineSteerPath, showScrub, visibleBands]);
@@ -152,7 +153,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
   }, [showBalance, showScrub, currentPoint, events]);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-[#0e0c1a]/50">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-indigo-950/20">
       {/* Top Left Channel Title & Live Telemetry Values */}
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
         <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-black text-[10px] tracking-wider flex items-center gap-1">
@@ -187,12 +188,18 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           }`}
         >
           <span className="flex items-center gap-1">
-            <span className={`w-1.5 h-1.5 rounded-full transition-all ${showBalance ? 'bg-sky-400 shadow-[0_0_4px_#38bdf8]' : 'bg-slate-600'}`} />
+            <span
+              className={`w-1.5 h-1.5 rounded-full transition-all ${showBalance ? 'bg-sky-400' : 'bg-slate-600'}`}
+              style={{ boxShadow: showBalance ? `0 0 4px ${TELEMETRY_COLORS.understeer}` : undefined }}
+            />
             <span className={showBalance ? 'text-sky-300 font-black' : 'text-slate-500'}>US</span>
           </span>
           <span className="opacity-30">/</span>
           <span className="flex items-center gap-1">
-            <span className={`w-1.5 h-1.5 rounded-full transition-all ${showBalance ? 'bg-amber-400 shadow-[0_0_4px_#f59e0b]' : 'bg-slate-600'}`} />
+            <span
+              className={`w-1.5 h-1.5 rounded-full transition-all ${showBalance ? 'bg-amber-400' : 'bg-slate-600'}`}
+              style={{ boxShadow: showBalance ? `0 0 4px ${TELEMETRY_COLORS.oversteer}` : undefined }}
+            />
             <span className={showBalance ? 'text-amber-300 font-black' : 'text-slate-500'}>OS</span>
           </span>
         </button>
@@ -207,7 +214,10 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
               : 'text-slate-500 hover:text-rose-300 hover:bg-slate-800/40'
           }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full transition-all ${showScrub ? 'bg-rose-400 shadow-[0_0_4px_#f43f5e]' : 'bg-slate-600'}`} />
+          <span
+            className={`w-1.5 h-1.5 rounded-full transition-all ${showScrub ? 'bg-rose-400' : 'bg-slate-600'}`}
+            style={{ boxShadow: showScrub ? `0 0 4px ${TELEMETRY_COLORS.tireScrub}` : undefined }}
+          />
           <span className={showScrub ? 'text-rose-300 font-black' : 'text-slate-500'}>SCRUB</span>
         </button>
       </div>
@@ -258,11 +268,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-[#070c18] border border-indigo-400/80 font-mono font-bold text-[11px] text-indigo-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-indigo-400/80 font-mono font-bold text-[11px] text-indigo-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {steerPercent > 0 ? `+${steerPercent.toFixed(0)}%` : `${steerPercent.toFixed(0)}%`}
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-[#070c18] border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {baseSteerPercent.toFixed(0)}%
             </span>
           )}
