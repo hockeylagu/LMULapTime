@@ -20,8 +20,12 @@ describe('CarsSummaryCard', () => {
       />
     );
 
-    expect(screen.getByText('1600 laps')).toBeInTheDocument();
-    expect(screen.queryByText('7328 km')).not.toBeInTheDocument();
+    const countEl = screen.getByText('1600');
+    expect(countEl).toBeInTheDocument();
+    expect(countEl).toHaveClass('text-white');
+    expect(countEl.nextElementSibling).toHaveClass('text-lmu-muted');
+    expect(countEl.nextElementSibling?.textContent).toBe('laps');
+    expect(screen.queryByText('7328')).not.toBeInTheDocument();
   });
 
   it('switches to distance when the Km toggle is clicked', () => {
@@ -37,11 +41,15 @@ describe('CarsSummaryCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Km' }));
 
-    expect(screen.getByText('7328 km')).toBeInTheDocument();
-    expect(screen.queryByText('1600 laps')).not.toBeInTheDocument();
+    const kmEl = screen.getByText('7328');
+    expect(kmEl).toBeInTheDocument();
+    expect(kmEl).toHaveClass('text-white');
+    expect(kmEl.nextElementSibling).toHaveClass('text-lmu-muted');
+    expect(kmEl.nextElementSibling?.textContent).toBe('km');
+    expect(screen.queryByText('1600')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Laps' }));
-    expect(screen.getByText('1600 laps')).toBeInTheDocument();
+    expect(screen.getByText('1600')).toBeInTheDocument();
   });
 
   it('still invokes onSelectCar when a row is clicked regardless of the active unit', () => {
@@ -111,7 +119,7 @@ describe('CarsSummaryCard', () => {
 
     rowNames = screen.getAllByTitle(/Filter by .*/).map((el) => el.textContent);
     expect(rowNames[0]).toContain('Chevrolet Corvette Z06 LMGT3.R');
-    expect(screen.getByText('950 km')).toBeInTheDocument();
+    expect(screen.getByText('950')).toBeInTheDocument();
   });
 });
 

@@ -7,6 +7,7 @@ describe('TrackSessionsToolbar', () => {
     const setFilterType = vi.fn();
     const setSearchQuery = vi.fn();
     const setHideEmpty = vi.fn();
+    const setHasReplay = vi.fn();
     const setSortBy = vi.fn();
 
     render(
@@ -18,6 +19,9 @@ describe('TrackSessionsToolbar', () => {
         hideEmpty={true}
         setHideEmpty={setHideEmpty}
         emptyCount={3}
+        hasReplay={false}
+        setHasReplay={setHasReplay}
+        replayCount={2}
         sortBy="date-desc"
         setSortBy={setSortBy}
       />
@@ -34,6 +38,10 @@ describe('TrackSessionsToolbar', () => {
     expect(toggle).toBeInTheDocument();
     fireEvent.click(toggle);
     expect(setHideEmpty).toHaveBeenCalledWith(false);
+
+    const replayToggle = screen.getByRole('button', { name: /filter sessions with replay/i });
+    fireEvent.click(replayToggle);
+    expect(setHasReplay).toHaveBeenCalledWith(true);
 
     // Filter pills (Race button)
     const racePill = screen.getByRole('button', { name: 'Race' });

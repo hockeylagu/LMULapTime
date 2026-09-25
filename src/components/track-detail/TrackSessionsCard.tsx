@@ -1,6 +1,6 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
 import { SessionList, SessionListItem } from '../session-list/SessionList.js';
+import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
 import { PaceCategory } from '../../../server/core/types';
 
@@ -11,6 +11,9 @@ export interface TrackSessionsCardProps {
   emptyCount: number;
   hideEmpty: boolean;
   setHideEmpty: (val: boolean) => void;
+  hasReplay: boolean;
+  setHasReplay: (val: boolean) => void;
+  replayCount: number;
   onSelectSession: (id: string) => void;
   onOpenReplay?: (id: string) => void;
   filterType: string;
@@ -21,6 +24,8 @@ export interface TrackSessionsCardProps {
   setSortBy: (val: TrackDetailSortOption) => void;
   getPaceBadge: (s: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
   onResetFilters?: () => void;
+  viewMode: 'grid' | 'table';
+  onViewModeChange: (mode: 'grid' | 'table') => void;
 }
 
 export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
@@ -30,6 +35,9 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   emptyCount,
   hideEmpty,
   setHideEmpty,
+  hasReplay,
+  setHasReplay,
+  replayCount,
   onSelectSession,
   onOpenReplay,
   filterType,
@@ -40,38 +48,34 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   setSortBy,
   getPaceBadge,
   onResetFilters,
+  viewMode,
+  onViewModeChange,
 }) => {
   return (
     <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
+      <TrackSessionsToolbar
+        filterType={filterType}
+        setFilterType={setFilterType}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        hideEmpty={hideEmpty}
+        setHideEmpty={setHideEmpty}
+        emptyCount={emptyCount}
+        hasReplay={hasReplay}
+        setHasReplay={setHasReplay}
+        replayCount={replayCount}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        viewToggle={<SessionViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />}
+      />
       <SessionList
         sessions={sortedSessions}
         onSelectSession={onSelectSession}
         onOpenReplay={onOpenReplay}
         showTrackColumn={false}
-        headerTitle={
-          <>
-            <FileText className="w-5 h-5 text-lmu-accent" />
-            <span>Sessions Recorded</span>
-          </>
-        }
-        headerSubtitle={
-          hideEmpty && emptyCount > 0
-            ? `Filtering ${emptyCount} empty session${emptyCount > 1 ? 's' : ''}`
-            : 'Click any session to view detailed telemetry & sector timings'
-        }
-        headerActions={
-          <TrackSessionsToolbar
-            filterType={filterType}
-            setFilterType={setFilterType}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            hideEmpty={hideEmpty}
-            setHideEmpty={setHideEmpty}
-            emptyCount={emptyCount}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
-          />
-        }
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        hideHeader
         getPaceBadge={getPaceBadge}
         onResetFilters={onResetFilters}
         hideEmptyNotice={

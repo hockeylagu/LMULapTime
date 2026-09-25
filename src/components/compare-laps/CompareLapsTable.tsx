@@ -63,9 +63,6 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
             hideEmpty={hideEmpty}
             onToggle={setHideEmpty}
             emptyCount={emptyCount}
-            label="Hide Empty Laps"
-            titleHiding="Hiding invalid, pit stop, and empty laps. Click to show all."
-            titleShowing="Showing all laps including invalid/pit stops. Click to filter out empty laps."
           />
 
           <SortDropdown<AvailableLapsSortOption>

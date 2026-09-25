@@ -19,7 +19,7 @@ describe('TrackSessionsCard', () => {
     },
   };
 
-  it('renders default subtitle when hideEmpty is false or emptyCount is 0', () => {
+  it('renders the session controls without a results heading or subtitle', () => {
     render(
       <TrackSessionsCard
         trackName="Monza"
@@ -28,6 +28,9 @@ describe('TrackSessionsCard', () => {
         emptyCount={0}
         hideEmpty={false}
         setHideEmpty={vi.fn()}
+        hasReplay={false}
+        setHasReplay={vi.fn()}
+        replayCount={1}
         onSelectSession={vi.fn()}
         filterType="All"
         setFilterType={vi.fn()}
@@ -36,14 +39,16 @@ describe('TrackSessionsCard', () => {
         sortBy="date-desc"
         setSortBy={vi.fn()}
         getPaceBadge={() => null}
+        viewMode="table"
+        onViewModeChange={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Sessions Recorded')).toBeInTheDocument();
-    expect(screen.getByText('Click any session to view detailed telemetry & sector timings')).toBeInTheDocument();
+    expect(screen.queryByText('Sessions Recorded')).not.toBeInTheDocument();
+    expect(screen.queryByText('Click any session to view detailed telemetry & sector timings')).not.toBeInTheDocument();
   });
 
-  it('renders singular empty notice and subtitle when hideEmpty is true and emptyCount is 1', () => {
+  it('renders singular empty notice when hideEmpty is true and emptyCount is 1', () => {
     render(
       <TrackSessionsCard
         trackName="Monza"
@@ -52,6 +57,9 @@ describe('TrackSessionsCard', () => {
         emptyCount={1}
         hideEmpty={true}
         setHideEmpty={vi.fn()}
+        hasReplay={false}
+        setHasReplay={vi.fn()}
+        replayCount={1}
         onSelectSession={vi.fn()}
         filterType="All"
         setFilterType={vi.fn()}
@@ -60,14 +68,15 @@ describe('TrackSessionsCard', () => {
         sortBy="date-desc"
         setSortBy={vi.fn()}
         getPaceBadge={() => null}
+        viewMode="table"
+        onViewModeChange={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Filtering 1 empty session')).toBeInTheDocument();
     expect(screen.getByText('1 empty session is hidden.')).toBeInTheDocument();
   });
 
-  it('renders plural empty notice and subtitle when hideEmpty is true and emptyCount is 3', () => {
+  it('renders plural empty notice when hideEmpty is true and emptyCount is 3', () => {
     render(
       <TrackSessionsCard
         trackName="Monza"
@@ -76,6 +85,9 @@ describe('TrackSessionsCard', () => {
         emptyCount={3}
         hideEmpty={true}
         setHideEmpty={vi.fn()}
+        hasReplay={false}
+        setHasReplay={vi.fn()}
+        replayCount={1}
         onSelectSession={vi.fn()}
         filterType="All"
         setFilterType={vi.fn()}
@@ -84,10 +96,11 @@ describe('TrackSessionsCard', () => {
         sortBy="date-desc"
         setSortBy={vi.fn()}
         getPaceBadge={() => null}
+        viewMode="table"
+        onViewModeChange={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Filtering 3 empty sessions')).toBeInTheDocument();
     expect(screen.getByText('3 empty sessions are hidden.')).toBeInTheDocument();
   });
 });

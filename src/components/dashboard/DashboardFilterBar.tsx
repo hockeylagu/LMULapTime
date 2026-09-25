@@ -24,6 +24,8 @@ export interface DashboardFilterBarProps {
   replayCount?: number;
   sortBy: DashboardSortOption;
   setSortBy: (sort: DashboardSortOption) => void;
+  embedded?: boolean;
+  viewToggle?: React.ReactNode;
 }
 
 export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
@@ -44,6 +46,8 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   replayCount,
   sortBy,
   setSortBy,
+  embedded = false,
+  viewToggle,
 }) => {
   const trackSelectRef = useRef<HTMLSelectElement>(null);
 
@@ -56,7 +60,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl space-y-2">
+    <div className={embedded ? 'p-4 space-y-2 border-b border-lmu-border/50' : 'bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl space-y-2'}>
       {/* Row 1: Content Scope (Track, Car Class, Session Type) */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Track Filter */}
@@ -142,10 +146,6 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
           hideEmpty={hideEmpty}
           onToggle={setHideEmpty}
           emptyCount={emptyCount}
-          label="Hide Empty"
-          ariaLabel="Hide Empty Sessions"
-          titleHiding="Hiding empty sessions (0 laps). Click to show all."
-          titleShowing="Showing all sessions including empty results. Click to filter out empty results."
         />
 
         {/* Has Replay Results Filter Toggle */}
@@ -167,6 +167,8 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
           onChange={setSortBy}
           options={DASHBOARD_SORT_OPTIONS}
         />
+
+        {viewToggle}
       </div>
     </div>
   );

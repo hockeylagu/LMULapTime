@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { formatTime, matchesSessionType, getSessionTypeSortRank, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types';
@@ -8,6 +9,7 @@ import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
 
 export type { TrackDetailSortOption };
 
@@ -30,11 +32,32 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [sessionViewMode, setSessionViewMode] = useState<'grid' | 'table'>(() => {
+    const queryView = searchParams.get('view');
+    if (queryView === 'grid' || queryView === 'table') return queryView;
+    if (typeof window !== 'undefined') {
+      const savedView = localStorage.getItem('lmu_dashboard_view');
+      if (savedView === 'grid' || savedView === 'table') return savedView;
+    }
+    return 'grid';
+  });
+  const setSessionListViewMode = (mode: 'grid' | 'table') => {
+    setSessionViewMode(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lmu_dashboard_view', mode);
+      } catch {}
+    }
+    updateSearchParams(searchParams, setSearchParams, { view: mode });
+  };
   const {
     loading,
     data,
     hideEmpty,
     setHideEmpty,
+    hasReplay,
+    setHasReplay,
     selectedCarModel,
     setSelectedCarModel,
     filterType,
@@ -88,6 +111,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   });
 
   const emptyCount = classTrackSessions.filter((s) => isSessionEmpty(s)).length;
+  const replayCount = data.sessions.filter((s) => Boolean(s.matchingReplayFile)).length;
 
   const filteredSessions = classTrackSessions.filter((s) => {
     const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
@@ -97,7 +121,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       s.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.playerDriver?.name?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
-    return matchesType && matchesSearch && matchesEmpty;
+    const matchesReplay = !hasReplay || Boolean(s.matchingReplayFile);
+    return matchesType && matchesSearch && matchesEmpty && matchesReplay;
   });
 
   const findBenchmarkForClass = (carClass?: string, carType?: string): ReferenceLaptimeEntry | null => {
@@ -246,6 +271,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         emptyCount={emptyCount}
         hideEmpty={hideEmpty}
         setHideEmpty={setHideEmpty}
+        hasReplay={hasReplay}
+        setHasReplay={setHasReplay}
+        replayCount={replayCount}
         onSelectSession={onSelectSession}
         onOpenReplay={onOpenReplay || handleOpenReplay}
         filterType={filterType}
@@ -260,12 +288,15 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
             findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType)
           )
         }
+        viewMode={sessionViewMode}
+        onViewModeChange={setSessionListViewMode}
         onResetFilters={
-          filterType !== 'All' || searchQuery !== '' || (hideEmpty && emptyCount > 0)
+              filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
             ? () => {
                 setFilterType('All');
                 setSearchQuery('');
                 setHideEmpty(false);
+                setHasReplay(false);
                 setSelectedCarModel('All');
               }
             : undefined

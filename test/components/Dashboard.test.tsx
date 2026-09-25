@@ -611,10 +611,11 @@ describe('Dashboard component', () => {
     // Both alternate layouts should be listed separately in the ranked tracks
     expect(screen.getByTitle('View Paul Ricard (1A V2 Short) Track Details')).toBeInTheDocument();
     expect(screen.getByTitle('View Paul Ricard (1A) Track Details')).toBeInTheDocument();
-    expect(screen.getAllByText('8 laps').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('12 laps').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('8').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('12').length).toBeGreaterThanOrEqual(1);
     // And total laps across both layouts in overview and cars card
-    expect(screen.getAllByText('20 laps').length).toBe(2);
+    expect(screen.getByText('20 laps')).toBeInTheDocument();
+    expect(screen.getAllByText('20').length).toBeGreaterThanOrEqual(1);
   });
 
   it('synchronizes card expansion across all cards and reveals extended driving overview statistics', () => {
