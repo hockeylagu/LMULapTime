@@ -54,6 +54,8 @@ export interface SessionListProps {
   headerActions?: React.ReactNode;
   viewMode?: 'grid' | 'table';
   onViewModeChange?: (mode: 'grid' | 'table') => void;
+  hideHeader?: boolean;
+  className?: string;
 }
 
 export const SessionList: React.FC<SessionListProps> = ({
@@ -70,6 +72,8 @@ export const SessionList: React.FC<SessionListProps> = ({
   headerActions,
   viewMode: controlledViewMode,
   onViewModeChange,
+  hideHeader = false,
+  className = '',
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [internalViewMode, setInternalViewMode] = useState<'grid' | 'table'>(() => {
@@ -116,14 +120,16 @@ export const SessionList: React.FC<SessionListProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <SessionListHeader
-        headerTitle={headerTitle}
-        headerSubtitle={headerSubtitle}
-        headerActions={headerActions}
-        viewMode={viewMode}
-        onViewModeChange={handleSetViewMode}
-      />
+    <div className={`space-y-4 ${className}`}>
+      {!hideHeader && (
+        <SessionListHeader
+          headerTitle={headerTitle}
+          headerSubtitle={headerSubtitle}
+          headerActions={headerActions}
+          viewMode={viewMode}
+          onViewModeChange={handleSetViewMode}
+        />
+      )}
 
       {sessions.length === 0 ? (
         <SessionEmptyState

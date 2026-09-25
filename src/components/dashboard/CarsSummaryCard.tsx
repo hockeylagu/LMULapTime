@@ -67,8 +67,9 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
                   {item.car}
                 </span>
               </div>
-              <span className="text-lmu-muted font-mono shrink-0 text-[11px]">
-                {unit === 'km' ? `${item.km.toFixed(0)} km` : `${item.laps} laps`}
+              <span className="font-mono shrink-0 text-[11px]">
+                <span className="text-white font-medium">{unit === 'km' ? item.km.toFixed(0) : item.laps}</span>{' '}
+                <span className="text-lmu-muted">{unit === 'km' ? 'km' : 'laps'}</span>
               </span>
             </div>
           ))

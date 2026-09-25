@@ -18,6 +18,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(true);
   const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
+  const [hasReplay, setHasReplayState] = useState<boolean>(searchParams.get('hasReplay') === 'true');
   const [selectedCarModel, setSelectedCarModelState] = useState<string>(searchParams.get('model') || 'All');
   const [filterType, setFilterTypeState] = useState<string>(searchParams.get('type') || 'All');
   const [searchQuery, setSearchQueryState] = useState<string>(searchParams.get('q') || '');
@@ -60,6 +61,11 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
+  const setHasReplay = (replayOnly: boolean) => {
+    setHasReplayState(replayOnly);
+    updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null });
+  };
+
   useEffect(() => {
     if (selectedCarModel !== 'All') setSelectedCarModel('All');
   }, [selectedCarClass]);
@@ -91,6 +97,8 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     data,
     hideEmpty,
     setHideEmpty,
+    hasReplay,
+    setHasReplay,
     selectedCarModel,
     setSelectedCarModel,
     filterType,

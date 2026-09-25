@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { FileText } from 'lucide-react';
 import { SessionList } from '../session-list/SessionList.js';
+import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
@@ -42,6 +42,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [sessionViewMode, setSessionViewMode] = useState<'grid' | 'table'>(() => {
+    const queryView = searchParams.get('view');
+    if (queryView === 'grid' || queryView === 'table') return queryView;
+    if (typeof window !== 'undefined') {
+      const savedView = localStorage.getItem('lmu_dashboard_view');
+      if (savedView === 'grid' || savedView === 'table') return savedView;
+    }
+    return 'grid';
+  });
+  const setSessionListViewMode = (mode: 'grid' | 'table') => {
+    setSessionViewMode(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('lmu_dashboard_view', mode);
+      } catch {}
+    }
+    updateSearchParams(searchParams, setSearchParams, { view: mode });
+  };
   const handleOpenReplay = (id: string) => {
     const session = sessions.find(item => item.id === id);
     if (!session?.matchingReplayFile) return;
@@ -197,41 +215,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Sessions View */}
       <div className="space-y-4">
-        <DashboardFilterBar
-          tracks={tracks}
-          selectedTrack={selectedTrack}
-          setSelectedTrack={setSelectedTrack}
-          selectedCarClass={selectedCarClass}
-          setSelectedCarClass={setSelectedCarClass}
-          filterType={filterType}
-          setFilterType={setFilterType}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          hideEmpty={hideEmpty}
-          setHideEmpty={setHideEmpty}
-          emptyCount={emptyCount}
-          hasReplay={hasReplay}
-          setHasReplay={setHasReplay}
-          replayCount={replayCount}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-        />
-
-        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl p-5">
+        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl overflow-hidden">
+          <DashboardFilterBar
+            tracks={tracks}
+            selectedTrack={selectedTrack}
+            setSelectedTrack={setSelectedTrack}
+            selectedCarClass={selectedCarClass}
+            setSelectedCarClass={setSelectedCarClass}
+            filterType={filterType}
+            setFilterType={setFilterType}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            hideEmpty={hideEmpty}
+            setHideEmpty={setHideEmpty}
+            emptyCount={emptyCount}
+            hasReplay={hasReplay}
+            setHasReplay={setHasReplay}
+            replayCount={replayCount}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            embedded
+            viewToggle={<SessionViewModeToggle viewMode={sessionViewMode} onViewModeChange={setSessionListViewMode} />}
+          />
           <SessionList
             sessions={sortedSessions}
             onSelectSession={onSelectSession}
             onOpenReplay={handleOpenReplay}
             showTrackColumn={true}
-            headerTitle={
-              <>
-                <FileText className="w-5 h-5 text-lmu-accent" />
-                <span>Session Results ({sortedSessions.length}{hideEmpty && emptyCount > 0 ? ` / ${sessions.length}` : ''})</span>
-              </>
-            }
-            headerSubtitle={
-              hideEmpty && emptyCount > 0 ? `Filtering ${emptyCount} empty session${emptyCount > 1 ? 's' : ''}` : 'Click any session to view detailed telemetry & sector timings'
-            }
+            viewMode={sessionViewMode}
+            onViewModeChange={setSessionListViewMode}
+            hideHeader
+            className="p-5"
             onResetFilters={(selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '') ? () => {
               setSelectedTrack('All');
               setSelectedCarClass('All');

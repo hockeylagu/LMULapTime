@@ -23,8 +23,12 @@ describe('CircuitsSummaryCard', () => {
       />
     );
 
-    expect(screen.getByText('609 laps')).toBeInTheDocument();
-    expect(screen.queryByText('2653 km')).not.toBeInTheDocument();
+    const countEl = screen.getByText('609');
+    expect(countEl).toBeInTheDocument();
+    expect(countEl).toHaveClass('text-white');
+    expect(countEl.nextElementSibling).toHaveClass('text-lmu-muted');
+    expect(countEl.nextElementSibling?.textContent).toBe('laps');
+    expect(screen.queryByText('2653')).not.toBeInTheDocument();
   });
 
   it('switches to distance when the Km toggle is clicked', () => {
@@ -39,11 +43,15 @@ describe('CircuitsSummaryCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Km' }));
 
-    expect(screen.getByText('2653 km')).toBeInTheDocument();
-    expect(screen.queryByText('609 laps')).not.toBeInTheDocument();
+    const kmEl = screen.getByText('2653');
+    expect(kmEl).toBeInTheDocument();
+    expect(kmEl).toHaveClass('text-white');
+    expect(kmEl.nextElementSibling).toHaveClass('text-lmu-muted');
+    expect(kmEl.nextElementSibling?.textContent).toBe('km');
+    expect(screen.queryByText('609')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Laps' }));
-    expect(screen.getByText('609 laps')).toBeInTheDocument();
+    expect(screen.getByText('609')).toBeInTheDocument();
   });
 
   it('navigates to the track detail page carrying the selected car class', () => {
@@ -123,7 +131,7 @@ describe('CircuitsSummaryCard', () => {
 
     rowNames = screen.getAllByTitle(/View .* Track Details/).map((el) => el.textContent);
     expect(rowNames[0]).toContain('Circuit de la Sarthe');
-    expect(screen.getByText('954 km')).toBeInTheDocument();
+    expect(screen.getByText('954')).toBeInTheDocument();
   });
 });
 

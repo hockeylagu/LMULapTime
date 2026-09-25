@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search } from 'lucide-react';
-import { SessionTypePills, HideEmptyToggle, SortDropdown } from '../common';
+import { SessionTypePills, HideEmptyToggle, HasReplayToggle, SortDropdown } from '../common';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackDetailSortOption } from './trackDetailSortOptions.js';
 
@@ -14,8 +14,12 @@ export interface TrackSessionsToolbarProps {
   hideEmpty: boolean;
   setHideEmpty: (hide: boolean) => void;
   emptyCount: number;
+  hasReplay: boolean;
+  setHasReplay: (hasReplay: boolean) => void;
+  replayCount: number;
   sortBy: TrackDetailSortOption;
   setSortBy: (sort: TrackDetailSortOption) => void;
+  viewToggle?: React.ReactNode;
 }
 
 export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
@@ -26,11 +30,15 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
   hideEmpty,
   setHideEmpty,
   emptyCount,
+  hasReplay,
+  setHasReplay,
+  replayCount,
   sortBy,
   setSortBy,
+  viewToggle,
 }) => {
   return (
-    <>
+    <div className="flex flex-wrap items-center gap-3 pb-4 mb-4 border-b border-lmu-border/50">
       {/* Session Type Filter Pills */}
       <SessionTypePills
         selectedType={filterType}
@@ -38,7 +46,7 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
       />
 
       {/* Search Input */}
-      <div className="relative w-full sm:w-52">
+      <div className="relative flex-1 min-w-[220px]">
         <Search className="w-3.5 h-3.5 text-lmu-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
@@ -54,9 +62,16 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
         hideEmpty={hideEmpty}
         onToggle={setHideEmpty}
         emptyCount={emptyCount}
-        label="Hide Empty Sessions"
-        titleHiding="Hiding empty sessions (0 laps). Click to show all."
-        titleShowing="Showing all sessions. Click to filter out empty results."
+      />
+
+      <HasReplayToggle
+        hasReplayOnly={hasReplay}
+        onToggle={setHasReplay}
+        replayCount={replayCount}
+        label="Has Replay"
+        ariaLabel="Filter sessions with replay"
+        titleActive="Showing only sessions with recorded replay (.Vcr). Click to show all."
+        titleInactive="Filter to sessions with recorded replay (.Vcr) telemetry."
       />
 
       {/* Sort Dropdown */}
@@ -65,6 +80,8 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
         onChange={setSortBy}
         options={TRACK_DETAIL_SORT_OPTIONS}
       />
-    </>
+
+      {viewToggle}
+    </div>
   );
 };

@@ -477,6 +477,29 @@ describe('TrackDetail component', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  it('filters sessions to those with a replay in TrackDetail', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /filter sessions with replay/i }));
+    fireEvent.click(screen.getByRole('button', { name: /table view/i }));
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Ferrari 499P')).toBeInTheDocument();
+    expect(within(table).queryByText('Porsche 911 GT3')).not.toBeInTheDocument();
+  });
+
   it('allows sorting sessions by Best Position (P1 First) in TrackDetail', async () => {
     render(
       <TrackDetail

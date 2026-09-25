@@ -282,14 +282,14 @@ describe('CompareLaps component', () => {
     expect(sortSelect.value).toBe('lap-desc');
   });
 
-  it('allows toggling Hide Empty Laps filter', async () => {
+  it('allows toggling the Hide Empty filter', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Hide Empty Laps')).toBeInTheDocument();
+      expect(screen.getByText('Hide Empty')).toBeInTheDocument();
     });
 
-    const hideEmptyBtn = screen.getByText('Hide Empty Laps');
+    const hideEmptyBtn = screen.getByText('Hide Empty');
     fireEvent.click(hideEmptyBtn);
 
     // Verify it can be toggled back
