@@ -10,6 +10,7 @@ import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import { ReplayTrajectoryData, DuckDbLapTelemetry } from '../../server/core/types.js';
+import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
 
 function decompressJson<T>(buf: Buffer): T {
   return JSON.parse(zlib.brotliDecompressSync(buf).toString('utf8')) as T;
@@ -50,7 +51,7 @@ function main() {
   let unscaledDegCount = 0;
 
   for (const row of sampleTrajs) {
-    const traj = decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+    const traj = decompressTrajectory(row.trajectory_br);
     let sampleMax = 0;
     for (const p of traj.points) {
       if (typeof p.steerYaw === 'number') {

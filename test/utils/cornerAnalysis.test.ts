@@ -484,11 +484,11 @@ describe('computeLapSegmentComparisons', () => {
 
   it('accurately computes apex margin on realistic real-world corner (Algarve Turn 9)', async () => {
     const Database = (await import('better-sqlite3')).default;
-    const zlib = (await import('zlib')).default;
+    const { decompressTrajectory } = await import('../../server/core/replayTrajectoryCodec.js');
     const db = new Database('server/lmu_cache.db');
     const row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? AND lap_key = ?').get('Algarve International Circuit R1 19.Vcr', 5) as { trajectory_br: Buffer } | undefined;
     if (!row) return;
-    const traj = JSON.parse(zlib.brotliDecompressSync(row.trajectory_br).toString('utf8'));
+    const traj = decompressTrajectory(row.trajectory_br);
     const { enrichTrajectoryWithTrackGeometry } = await import('../../server/tracks/serverTrackSync.js');
     enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', 'Algarve International Circuit R1 19.Vcr');
 

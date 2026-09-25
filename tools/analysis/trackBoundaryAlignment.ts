@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import zlib from 'zlib';
 import { Point2D, NativeTrackPoint, TrackConfig } from './trackConfigs.js';
+import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
 
 const LMU_API_BASE_URL = process.env.LMU_API_BASE_URL ?? 'http://localhost:6397';
 const NATIVE_TRACKMAP_CACHE = path.resolve('tools/analysis/cache/lmu_all_trackmaps.json');
@@ -232,15 +232,15 @@ export function findSimilarityTransform(source: Point2D[], target: Point2D[]): {
 }
 
 export function loadReplayLap(db: any, filename: string, lapKey: number): Array<{ x: number; z: number }> {
-  let row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ? AND driver_slot = -1').get(filename, `%${filename}%`, lapKey);
+  // The player's laps are keyed by their real slot; -1 is only a pointer in replay_trajectory_defaults.
+  let row = db.prepare(`
+    SELECT rt.trajectory_br FROM replay_trajectories rt
+    JOIN replay_trajectory_defaults d
+      ON d.filename = rt.filename AND d.driver_slot = -1 AND d.resolved_driver_slot = rt.driver_slot
+    WHERE (rt.filename = ? OR rt.filename LIKE ?) AND rt.lap_key = ?
+  `).get(filename, `%${filename}%`, lapKey);
   if (!row) {
     row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = ? ORDER BY points_count DESC').get(filename, `%${filename}%`, lapKey);
-  }
-  if (!row && lapKey !== -1) {
-    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1 AND driver_slot = -1').get(filename, `%${filename}%`);
-  }
-  if (!row && lapKey !== -1) {
-    row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) AND lap_key = -1 ORDER BY points_count DESC').get(filename, `%${filename}%`);
   }
   if (!row) {
     row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE (filename = ? OR filename LIKE ?) ORDER BY points_count DESC LIMIT 1').get(filename, `%${filename}%`);
@@ -248,8 +248,8 @@ export function loadReplayLap(db: any, filename: string, lapKey: number): Array<
   if (!row) {
     throw new Error(`Replay trajectory not found for ${filename}`);
   }
-  const data = JSON.parse(zlib.brotliDecompressSync(row.trajectory_br).toString('utf8'));
-  return data.points.map((p: any) => ({ x: p.x, z: p.z }));
+  const data = decompressTrajectory(row.trajectory_br);
+  return data.points.map(p => ({ x: p.x, z: p.z }));
 }
 
 export function getVenuePrefix(replayPattern: string): string {
@@ -265,10 +265,12 @@ export function extractTrackGateSamples(db: any, layoutKey: string, replayPatter
   const venuePrefix = getVenuePrefix(replayPattern);
 
   let rows = db.prepare(`
-    SELECT trajectory_br FROM replay_trajectories 
-    WHERE (filename = ? OR filename LIKE ?) 
-      AND lap_key >= 1 AND driver_slot = -1 
-    ORDER BY filename, lap_key 
+    SELECT rt.trajectory_br FROM replay_trajectories rt
+    JOIN replay_trajectory_defaults d
+      ON d.filename = rt.filename AND d.driver_slot = -1 AND d.resolved_driver_slot = rt.driver_slot
+    WHERE (rt.filename = ? OR rt.filename LIKE ?)
+      AND rt.lap_key >= 1
+    ORDER BY rt.filename, rt.lap_key
     LIMIT 40
   `).all(replayPattern, `${venuePrefix} %`);
 
@@ -276,10 +278,12 @@ export function extractTrackGateSamples(db: any, layoutKey: string, replayPatter
     const cleanKey = layoutKey.replace(/_(gp|full|short|wec|classic|chicane|outer|paddock|school|curvagrande|road_course)$/i, '');
     console.warn(`[${layoutKey}] No replays matched venue prefix "${venuePrefix}", falling back to broader "${cleanKey}" match.`);
     rows = db.prepare(`
-      SELECT trajectory_br FROM replay_trajectories 
-      WHERE filename LIKE ? 
-        AND lap_key >= 1 AND driver_slot = -1 
-      ORDER BY filename, lap_key 
+      SELECT rt.trajectory_br FROM replay_trajectories rt
+      JOIN replay_trajectory_defaults d
+        ON d.filename = rt.filename AND d.driver_slot = -1 AND d.resolved_driver_slot = rt.driver_slot
+      WHERE rt.filename LIKE ?
+        AND rt.lap_key >= 1
+      ORDER BY rt.filename, rt.lap_key
       LIMIT 40
     `).all(`%${cleanKey}%`);
   }
@@ -290,7 +294,7 @@ export function extractTrackGateSamples(db: any, layoutKey: string, replayPatter
 
   for (const r of rows as any[]) {
     try {
-      const d = JSON.parse(zlib.brotliDecompressSync(r.trajectory_br).toString('utf8'));
+      const d = decompressTrajectory(r.trajectory_br);
       if (!d.points || d.points.length < 10) continue;
 
       const p0 = d.points[0];
