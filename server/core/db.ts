@@ -26,15 +26,17 @@ import {
   DUCKDB_TELEMETRY_CACHE_VERSION,
   CacheStats,
   SyncResult,
+  SessionSyncProgress,
   ReplaySyncProgress,
   ReplaySyncResult,
 } from './dbSchema.js';
 import {
+  syncReplaysAsyncIterator as runSyncReplaysAsyncIterator,
   syncReplaysIterator as runSyncReplaysIterator,
   syncReplaysFromDir as runSyncReplaysFromDir,
 } from './dbReplaySync.js';
 
-export type { CacheStats, SyncResult, ReplaySyncProgress, ReplaySyncResult };
+export type { CacheStats, SyncResult, SessionSyncProgress, ReplaySyncProgress, ReplaySyncResult };
 
 export class SessionDatabase {
   private db: DatabaseType;
@@ -509,6 +511,16 @@ export class SessionDatabase {
     return runSyncReplaysIterator(this, replaysDir, options);
   }
 
+  public syncReplaysAsyncIterator(
+    replaysDir: string,
+    options: {
+      playerName?: string;
+      shouldStop?: () => boolean;
+    } = {}
+  ): AsyncGenerator<ReplaySyncProgress, ReplaySyncResult, void> {
+    return runSyncReplaysAsyncIterator(this, replaysDir, options);
+  }
+
   public syncReplaysFromDir(
     replaysDir: string,
     options: {
@@ -645,12 +657,11 @@ export class SessionDatabase {
     }
   }
 
-  public syncSessionsFromDir(
+  public *syncSessionsIterator(
     resultsDir: string,
     parser: LmuParser,
-    forceReparse = false,
-    onProgress?: (progress: { processed: number; total: number; currentFile: string }) => void
-  ): SyncResult {
+    forceReparse = false
+  ): Generator<SessionSyncProgress, SyncResult, void> {
     if (!fs.existsSync(resultsDir)) {
       return {
         added: 0,
@@ -663,10 +674,6 @@ export class SessionDatabase {
     const DB_PARSER_VERSION = '2.11_accurate_fixed_setups_and_tire_warmers';
     const cachedVersion = this.getMetadata('parser_version');
     const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
-    if (versionMismatch) {
-      this.db.exec('DELETE FROM sessions');
-      this.setMetadata('parser_version', DB_PARSER_VERSION);
-    }
 
     // Get existing cached session file info
     const existingRows = versionMismatch ? [] : (this.db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
@@ -705,8 +712,13 @@ export class SessionDatabase {
     let added = 0;
     let updated = 0;
 
-    // Use transaction for batch upserts
-    const insertTransaction = this.db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
+    // Keep the previous parser-version cache readable until its complete replacement is ready.
+    const persistTransaction = this.db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
+      if (versionMismatch) {
+        this.db.exec('DELETE FROM sessions');
+        this.setMetadata('parser_version', DB_PARSER_VERSION);
+        this.allSessionsCache = null;
+      }
       for (const item of sessionsToInsert) {
         this.upsertSession(item.session, item.filePath, item.mtime, item.size);
       }
@@ -716,9 +728,7 @@ export class SessionDatabase {
 
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      if (onProgress && (i % 25 === 0 || i === files.length - 1)) {
-        onProgress({ processed: i + 1, total: files.length, currentFile: f });
-      }
+      yield { processed: i, total: files.length, currentFile: f, stage: 'Reading XML session log', filePercent: 5 };
       const filePath = path.join(resultsDir, f);
       try {
         const stats = fs.statSync(filePath);
@@ -753,8 +763,9 @@ export class SessionDatabase {
       }
     }
 
-    if (pendingInserts.length > 0) {
-      insertTransaction(pendingInserts);
+    if (pendingInserts.length > 0 || versionMismatch) {
+      yield { processed: files.length, total: files.length, currentFile: '', stage: 'Persisting session cache', filePercent: 95 };
+      persistTransaction(pendingInserts);
     }
 
     const nowIso = new Date().toISOString();
@@ -767,6 +778,35 @@ export class SessionDatabase {
       total: this.getSessionsCount(),
       lastSyncedAt: nowIso,
     };
+  }
+
+  public syncSessionsFromDir(
+    resultsDir: string,
+    parser: LmuParser,
+    forceReparse = false,
+    onProgress?: (progress: SessionSyncProgress) => void
+  ): SyncResult {
+    const iterator = this.syncSessionsIterator(resultsDir, parser, forceReparse);
+    let step = iterator.next();
+    while (!step.done) {
+      onProgress?.(step.value);
+      step = iterator.next();
+    }
+    return step.value;
+  }
+
+  public async *syncSessionsAsyncIterator(
+    resultsDir: string,
+    parser: LmuParser,
+    forceReparse = false
+  ): AsyncGenerator<SessionSyncProgress, SyncResult, void> {
+    const iterator = this.syncSessionsIterator(resultsDir, parser, forceReparse);
+    let step = iterator.next();
+    while (!step.done) {
+      yield step.value;
+      step = iterator.next();
+    }
+    return step.value;
   }
 
   public getSessionsCount(): number {

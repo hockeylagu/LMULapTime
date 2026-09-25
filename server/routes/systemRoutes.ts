@@ -46,6 +46,9 @@ export function createSystemRouter(context: ServerContext): Router {
   });
 
   router.post('/cache/clear', (_req, res) => {
+    if (context.hasActiveFileScan()) {
+      return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before clearing the cache.' });
+    }
     try {
       context.sessionDb.clearCache();
       res.json({
@@ -61,13 +64,17 @@ export function createSystemRouter(context: ServerContext): Router {
     }
   });
 
-  router.post('/scan', async (req, res) => {
+  router.post('/scan', (req, res) => {
     const { resultsDir, replaysDir, telemetryDir, playerName } = req.body;
-    context.configureDirectories({ resultsDir, replaysDir, telemetryDir, playerName });
-    const syncResult = context.sessionDb.syncSessionsFromDir(context.resultsDir, context.currentParser);
+    if (!context.configureDirectories({ resultsDir, replaysDir, telemetryDir, playerName })) {
+      return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
+    }
     context.telemetryCatalog.clear();
-    const telemetryFilesScanned = await context.telemetryCatalog.refresh(context.telemetryDir);
-    context.runReplaySyncInBackground();
+    void context.telemetryCatalog.refresh(context.telemetryDir)
+      .catch((error: unknown) => {
+        console.warn('[SQLite Cache] Telemetry scan warning:', error);
+      });
+    const sessionScanStarted = context.runSessionSyncInBackground();
     const sessions = context.loadSessions();
 
     res.json({
@@ -78,9 +85,10 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryExist: fs.existsSync(context.telemetryDir),
       playerName: context.currentParser.configuredPlayerName,
       sessionsCount: sessions.length,
-      sync: syncResult,
+      sessionScanStarted,
       replayScanStarted: true,
-      telemetryFilesScanned,
+      telemetryScanStarted: true,
+      telemetryFilesScanned: null,
       sqliteCache: context.sessionDb.getCacheStats(),
     });
   });

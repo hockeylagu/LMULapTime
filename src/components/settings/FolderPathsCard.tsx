@@ -1,6 +1,6 @@
 import React from 'react';
 import { HardDrive, CheckCircle2, AlertCircle, User, RefreshCw } from 'lucide-react';
-import { AppStatus } from '../../../server/core/types';
+import { AppStatus, SessionScanStatus } from '../../../server/core/types';
 
 export interface FolderPathsCardProps {
   status: AppStatus | null;
@@ -15,6 +15,7 @@ export interface FolderPathsCardProps {
   isScanning: boolean;
   onScanPaths: (e: React.FormEvent) => void;
   pathMessage: string | null;
+  sessionScanStatus?: SessionScanStatus | null;
 }
 
 export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
@@ -30,7 +31,12 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   isScanning,
   onScanPaths,
   pathMessage,
+  sessionScanStatus,
 }) => {
+  const sessionScanPercent = sessionScanStatus?.total && sessionScanStatus.total > 0
+    ? Math.round(((sessionScanStatus.processed ?? 0) / sessionScanStatus.total) * 100)
+    : 0;
+
   return (
     <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-6">
       <div className="border-b border-lmu-border/50 pb-3">
@@ -111,6 +117,33 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
           <p className="text-xs text-white font-mono truncate">{status?.telemetryDir || 'Not Configured'}</p>
         </div>
       </div>
+
+      {sessionScanStatus?.running && (
+        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-lmu-muted uppercase tracking-wider">Parsing XML Session Logs</span>
+            <span className="font-bold text-white">
+              {sessionScanStatus.processed ?? 0} / {sessionScanStatus.total ?? 0}
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-lmu-border/50 overflow-hidden">
+            <div className="h-full bg-lmu-accent transition-all duration-300" style={{ width: `${sessionScanPercent}%` }} />
+          </div>
+          {sessionScanStatus.currentFile && (
+            <div className="flex flex-col gap-0.5 text-[11px] text-lmu-muted font-mono">
+              <div className="flex items-center justify-between">
+                <span className="truncate">{sessionScanStatus.currentFile}</span>
+                {sessionScanStatus.filePercent !== undefined && sessionScanStatus.filePercent !== null && (
+                  <span className="text-sky-400 font-semibold ml-2 shrink-0">{sessionScanStatus.filePercent}%</span>
+                )}
+              </div>
+              {sessionScanStatus.currentStage && (
+                <span className="text-[10px] text-slate-400 font-sans italic truncate">{sessionScanStatus.currentStage}</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Path Form */}
       <form onSubmit={onScanPaths} className="space-y-4">

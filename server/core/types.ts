@@ -507,6 +507,8 @@ export interface ReplayScanStatus {
   processed: number;
   total: number;
   currentFile: string | null;
+  currentStage?: string | null;
+  filePercent?: number | null;
   startedAt: string | null;
   finishedAt: string | null;
   result: { added: number; updated: number; skipped: number; total: number; lastSyncedAt: string; interrupted: boolean } | null;
@@ -518,6 +520,8 @@ export interface SessionScanStatus {
   processed?: number;
   total?: number;
   currentFile?: string | null;
+  currentStage?: string | null;
+  filePercent?: number | null;
   startedAt: string | null;
   finishedAt: string | null;
   result: { added: number; updated: number; total: number; lastSyncedAt: string } | null;

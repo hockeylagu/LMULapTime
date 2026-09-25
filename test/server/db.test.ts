@@ -51,6 +51,37 @@ describe('SessionDatabase (SQLite Cache)', () => {
     expect(summaries[0]).not.toHaveProperty('drivers');
   });
 
+  it('yields XML parsing and cache-persistence progress while asynchronously scanning sessions', async () => {
+    const iterator = db.syncSessionsAsyncIterator(resultsDir, parser);
+    const progress: Array<{ stage?: string; currentFile: string; filePercent?: number }> = [];
+    let step = await iterator.next();
+    while (!step.done) {
+      progress.push(step.value);
+      step = await iterator.next();
+    }
+
+    expect(step.value.total).toBeGreaterThan(0);
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Reading XML session log', filePercent: 5 }));
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Persisting session cache', filePercent: 95 }));
+    expect(progress.some(item => item.currentFile.endsWith('.xml'))).toBe(true);
+  });
+
+  it('preserves the previous session cache until a parser-version replacement is committed', () => {
+    const initialSync = db.syncSessionsFromDir(resultsDir, parser);
+    const cachedSessions = db.getAllSessions();
+    db.setMetadata('parser_version', 'outdated-parser-version');
+
+    const iterator = db.syncSessionsIterator(resultsDir, parser);
+    const firstStep = iterator.next();
+
+    expect(firstStep.done).toBe(false);
+    expect(db.getSessionsCount()).toBe(initialSync.total);
+    expect(db.getAllSessions()).toEqual(cachedSessions);
+    iterator.return(undefined as never);
+    expect(db.getSessionsCount()).toBe(initialSync.total);
+    expect(db.getMetadata('parser_version')).toBe('outdated-parser-version');
+  });
+
   it('skips parsing unchanged files during subsequent sync (delta sync)', () => {
     const firstSync = db.syncSessionsFromDir(resultsDir, parser);
     expect(firstSync.added).toBeGreaterThanOrEqual(1);
@@ -282,6 +313,34 @@ describe('SessionDatabase replay cache', () => {
     expect(secondSync.added).toBe(0);
     expect(secondSync.updated).toBe(0);
     expect(secondSync.total).toBe(1);
+  });
+
+  it('streams worker decoding progress while asynchronously caching a replay', async () => {
+    fs.mkdirSync(tempDir, { recursive: true });
+    const filename = 'Async_Sync_P1.Vcr';
+    const filePath = path.join(tempDir, filename);
+    fs.writeFileSync(filePath, createSliceVcrBuffer({
+      drivers: [{ name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' }],
+      slices: [
+        { sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 },
+        { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 },
+      ],
+    }));
+
+    const progress = [] as Array<{ stage?: string; filePercent?: number }>;
+    const iterator = db.syncReplaysAsyncIterator(tempDir, { playerName: 'Player Driver' });
+    let step = await iterator.next();
+    while (!step.done) {
+      progress.push(step.value);
+      step = await iterator.next();
+    }
+
+    const stat = fs.statSync(filePath);
+    const mtime = Math.floor(stat.mtimeMs);
+    expect(step.value).toMatchObject({ added: 1, skipped: 0, interrupted: false });
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Decoding telemetry and events' }));
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Persisting trajectory cache', filePercent: 95 }));
+    expect(db.getReplayTrajectoryCache(filename, -1, -1, mtime, stat.size)).not.toBeNull();
   });
 
   it('caches a full-resolution trajectory for every driver in the replay, not just the default one', () => {

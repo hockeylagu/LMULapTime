@@ -45,6 +45,7 @@ describe('TelemetryCatalog', () => {
 
     expect(catalog.getFiles()).toEqual([]);
     expect(catalog.getStatus('C:\\dir').filesCount).toBe(0);
+    expect(catalog.getScanStatus()).toMatchObject({ running: false, result: null, error: null });
   });
 
   it('runs refresh on non-existent directory and records finished scan status', async () => {
@@ -66,5 +67,37 @@ describe('TelemetryCatalog', () => {
     expect(status.finishedAt).not.toBeNull();
     expect(status.result).toEqual({ total: 0, added: 0, updated: 0, cached: 0 });
     expect(status.error).toBeNull();
+  });
+
+  it('ignores a stale refresh after the directory changes', async () => {
+    const mockDb = {
+      getTelemetryFiles: vi.fn().mockReturnValue([]),
+      upsertTelemetryMetadata: vi.fn(),
+      clearIngestError: vi.fn(),
+      recordIngestError: vi.fn(),
+      pruneTelemetryLapCache: vi.fn(),
+    } as unknown as SessionDatabase;
+    const resolvers = new Map<string, (files: DuckDbFileInfo[]) => void>();
+    const enrichDirectory = vi.fn((directory: string) => new Promise<DuckDbFileInfo[]>((resolve) => {
+      resolvers.set(directory, resolve);
+    }));
+    const catalog = new TelemetryCatalog(mockDb, enrichDirectory);
+    const oldDirectory = 'C:\\telemetry-old';
+    const newDirectory = 'C:\\telemetry-new';
+    const oldFile = { filename: 'old.duckdb', filePath: `${oldDirectory}\\old.duckdb` } as DuckDbFileInfo;
+    const newFile = { filename: 'new.duckdb', filePath: `${newDirectory}\\new.duckdb` } as DuckDbFileInfo;
+
+    const oldRefresh = catalog.refresh(oldDirectory);
+    catalog.clear();
+    const newRefresh = catalog.refresh(newDirectory);
+    resolvers.get(newDirectory)?.([newFile]);
+    await newRefresh;
+    resolvers.get(oldDirectory)?.([oldFile]);
+    await oldRefresh;
+
+    expect(catalog.getFiles()).toEqual([newFile]);
+    expect(catalog.getStatus(newDirectory).directory).toBe(newDirectory);
+    expect(mockDb.upsertTelemetryMetadata).toHaveBeenCalledTimes(1);
+    expect(mockDb.upsertTelemetryMetadata).toHaveBeenCalledWith(newFile);
   });
 });

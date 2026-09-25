@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
-import { ReferenceBenchmarkDiff, ReplayScanStatus } from '../../../server/core/types';
+import { ReferenceBenchmarkDiff, ReplayScanStatus, ScanStatus } from '../../../server/core/types';
 import { CacheSettingsCard } from './CacheSettingsCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
@@ -37,7 +37,7 @@ export interface SettingsProps {
     };
   } | null;
   onUpdatePaths: (resultsDir?: string, replaysDir?: string, telemetryDir?: string) => void;
-  replayScanStatus?: ReplayScanStatus | null;
+  replayScanStatus?: ScanStatus | ReplayScanStatus | null;
   onReplayScanTriggered?: () => void;
 }
 
@@ -63,6 +63,9 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   const [updateDiff, setUpdateDiff] = useState<ReferenceBenchmarkDiff | null>(
     status?.referenceLaptimes?.lastUpdateDiff || null
   );
+  const sessionScanStatus = replayScanStatus && 'sessionScan' in replayScanStatus
+    ? replayScanStatus.sessionScan
+    : undefined;
 
   useEffect(() => {
     if (status?.resultsDir && (!resultsDirInput || resultsDirInput.includes('Le Mans Ultimate\\UserData\\LOG\\Results'))) {
@@ -114,7 +117,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         setIsScanning(false);
         if (data.success) {
           onUpdatePaths(resultsDirInput, replaysDirInput, telemetryDirInput);
-          setPathMessage(`Scanned ${data.sessionsCount} sessions successfully! Driver profile: "${data.playerName}"`);
+          setPathMessage(`Scanning session, replay, and telemetry data in the background. Driver profile: "${data.playerName}"`);
           onReplayScanTriggered?.();
         } else {
           setPathMessage('Failed to scan directories. Please check paths.');
@@ -227,6 +230,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         isScanning={isScanning}
         onScanPaths={handleScanPaths}
         pathMessage={pathMessage}
+        sessionScanStatus={sessionScanStatus}
       />
     </div>
   );
