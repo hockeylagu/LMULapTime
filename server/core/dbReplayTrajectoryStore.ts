@@ -1,6 +1,7 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from './types.js';
-import { compressJson, decompressJson, REPLAY_CACHE_VERSION } from './dbSchema.js';
+import { REPLAY_CACHE_VERSION } from './dbSchema.js';
+import { compressTrajectory, decompressTrajectory } from './replayTrajectoryCodec.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not
@@ -110,7 +111,7 @@ export function getReplayTrajectoryCache(
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
   if (!row || !isRowValid(row, mtime, size, filePath)) return null;
-  return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+  return decompressTrajectory(row.trajectory_br);
 }
 
 /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
@@ -122,7 +123,7 @@ export function getStoredReplayTrajectory(
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
   if (!row) return null;
-  return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+  return decompressTrajectory(row.trajectory_br);
 }
 
 // Same validity check as getReplayTrajectoryCache but never decompresses the (multi-MB) blob.
@@ -178,7 +179,7 @@ export function upsertReplayTrajectoryCache(
     size,
     parserVersion: REPLAY_CACHE_VERSION,
     pointsCount: trajectory.points.length,
-    trajectoryBr: compressJson(trajectory),
+    trajectoryBr: compressTrajectory(trajectory),
     updatedAt: Date.now(),
   });
 }

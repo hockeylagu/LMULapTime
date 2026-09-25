@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import zlib from 'zlib';
 import Database from 'better-sqlite3';
 import {
   computeLapComparisons,
   computeStartFinishOffset,
 } from '../../src/utils/replayComparison.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
 import { extractReplayTrajectory } from '../../server/replay/replayParser.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
 
@@ -161,8 +161,7 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
 
       if (!row || !row.trajectory_br) return null;
       try {
-        const jsonStr = zlib.brotliDecompressSync(row.trajectory_br).toString('utf-8');
-        return JSON.parse(jsonStr) as ReplayTrajectoryData;
+        return decompressTrajectory(row.trajectory_br);
       } catch {
         return null;
       }
