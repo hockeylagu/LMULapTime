@@ -153,6 +153,15 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (filename, driver_slot, lap_key)
     );
 
+    CREATE TABLE IF NOT EXISTS replay_trajectory_defaults (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      default_lap_key INTEGER,
+      resolved_driver_slot INTEGER,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (filename, driver_slot)
+    );
+
     CREATE TABLE IF NOT EXISTS telemetry_metadata (
       filename TEXT PRIMARY KEY,
       file_path TEXT NOT NULL,
