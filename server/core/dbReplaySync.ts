@@ -13,14 +13,15 @@ export interface ReplaySyncHost {
   upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void;
   hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
   upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData, sourcePath?: string): void;
+  setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
 }
 
 /**
  * Persists every lap of an `allLaps: true` trajectory result under its own (driverSlot, lap)
- * cache row, plus one extra row keyed by lap -1 mirroring the trajectory's chosen/best lap -
- * matching the cache-key convention used for "no explicit lap requested" lookups.
+ * cache row. The "no explicit lap requested" default is recorded as a pointer instead of a
+ * second copy of the chosen lap's blob.
  */
 export function cacheAllLapsForDriver(
   host: ReplaySyncHost,
@@ -32,11 +33,20 @@ export function cacheAllLapsForDriver(
   trajectory: ReplayTrajectoryData
 ): void {
   const perLap = trajectory.allLapsData && trajectory.allLapsData.length > 0 ? trajectory.allLapsData : [trajectory];
+  let storedDefaultLap = false;
   for (const lapTrajectory of perLap) {
     if (typeof lapTrajectory.currentLap !== 'number') continue;
     const { allLapsData: _unused, ...single } = lapTrajectory;
     host.upsertReplayTrajectoryCache(filename, driverSlotKey, lapTrajectory.currentLap, mtime, size, single, filePath);
+    if (lapTrajectory.currentLap === trajectory.currentLap) storedDefaultLap = true;
   }
+
+  if (storedDefaultLap && typeof trajectory.currentLap === 'number') {
+    host.setReplayTrajectoryDefaults(filename, driverSlotKey, trajectory.currentLap);
+    return;
+  }
+
+  // No numbered row covers the chosen lap, so it must still be stored under the -1 key.
   const { allLapsData: _unused2, ...defaultSingle } = trajectory;
   host.upsertReplayTrajectoryCache(filename, driverSlotKey, -1, mtime, size, defaultSingle, filePath);
 }
@@ -110,10 +120,9 @@ export function* syncReplaysIterator(
           });
           defaultDriverSlot = trajectory.driverSlot;
           yield { processed: i, total: files.length, currentFile: f, stage: 'Persisting trajectory cache', filePercent: 95 };
-          cacheAllLapsForDriver(host, f, filePath, mtime, size, -1, trajectory);
-          if (typeof defaultDriverSlot === 'number') {
-            cacheAllLapsForDriver(host, f, filePath, mtime, size, defaultDriverSlot, trajectory);
-          }
+          const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
+          cacheAllLapsForDriver(host, f, filePath, mtime, size, primarySlot, trajectory);
+          host.setReplayTrajectoryDefaults(f, -1, trajectory.currentLap ?? null, primarySlot);
           anyTrajectoryNewlyCached = true;
           const totalLaps = trajectory.allLapsData?.length || trajectory.laps?.length || 1;
           console.log(`[SQLite Cache] [7/7] Cached ${totalLaps} laps for primary driver (${trajectory.driverName || 'Player'}) in ${f}`);
@@ -243,10 +252,9 @@ export async function* syncReplaysAsyncIterator(
           const trajectory = step.value;
           defaultDriverSlot = trajectory.driverSlot;
           yield { processed: index, total: files.length, currentFile: filename, stage: 'Persisting trajectory cache', filePercent: 95 };
-          cacheAllLapsForDriver(host, filename, filePath, mtime, size, -1, trajectory);
-          if (typeof defaultDriverSlot === 'number') {
-            cacheAllLapsForDriver(host, filename, filePath, mtime, size, defaultDriverSlot, trajectory);
-          }
+          const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
+          cacheAllLapsForDriver(host, filename, filePath, mtime, size, primarySlot, trajectory);
+          host.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, primarySlot);
           trajectoryCached = true;
         } catch (error) {
           host.recordIngestError('vcr', filePath, error);

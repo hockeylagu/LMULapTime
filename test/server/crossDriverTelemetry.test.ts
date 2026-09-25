@@ -138,11 +138,26 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
     const db = new Database(dbPath, { readonly: true });
 
     function loadCachedLap(vcrNameLike: string, slotId: number, lapNumber: number): ReplayTrajectoryData | null {
-      const row = db.prepare(`
+      let row = db.prepare(`
         SELECT trajectory_br FROM replay_trajectories
         WHERE filename LIKE ? AND driver_slot = ? AND lap_key = ?
         LIMIT 1
       `).get(`%${vcrNameLike}%`, slotId, lapNumber) as { trajectory_br: Buffer } | undefined;
+
+      // After the dedup migration the -1 alias is a pointer rather than a stored copy.
+      if (!row && slotId === -1) {
+        const defaults = db.prepare(`
+          SELECT resolved_driver_slot FROM replay_trajectory_defaults
+          WHERE filename LIKE ? AND driver_slot = -1 LIMIT 1
+        `).get(`%${vcrNameLike}%`) as { resolved_driver_slot: number | null } | undefined;
+        if (typeof defaults?.resolved_driver_slot === 'number') {
+          row = db.prepare(`
+            SELECT trajectory_br FROM replay_trajectories
+            WHERE filename LIKE ? AND driver_slot = ? AND lap_key = ?
+            LIMIT 1
+          `).get(`%${vcrNameLike}%`, defaults.resolved_driver_slot, lapNumber) as { trajectory_br: Buffer } | undefined;
+        }
+      }
 
       if (!row || !row.trajectory_br) return null;
       try {

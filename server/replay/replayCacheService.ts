@@ -91,15 +91,22 @@ export class ReplayCacheService {
       lapNumber: options.lapNumber,
     });
     const finalSlotKey = typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : driverSlotKey;
+    const storedLapKey = typeof trajectory.currentLap === 'number' ? trajectory.currentLap : lapKey;
     this.sessionDb.upsertReplayTrajectoryCache(
       replayName,
       finalSlotKey,
-      lapKey,
+      storedLapKey,
       mtime,
       stat.size,
       trajectory,
       filePath,
     );
+    if (storedLapKey !== lapKey || finalSlotKey !== driverSlotKey) {
+      this.sessionDb.setReplayTrajectoryDefaults(replayName, finalSlotKey, storedLapKey);
+      if (driverSlotKey === -1) {
+        this.sessionDb.setReplayTrajectoryDefaults(replayName, -1, storedLapKey, finalSlotKey);
+      }
+    }
     return trajectory;
   }
 }

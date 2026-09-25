@@ -35,6 +35,13 @@ import {
   syncReplaysIterator as runSyncReplaysIterator,
   syncReplaysFromDir as runSyncReplaysFromDir,
 } from './dbReplaySync.js';
+import {
+  getReplayTrajectoryCache,
+  getStoredReplayTrajectory,
+  hasValidReplayTrajectoryCache,
+  setTrajectoryDefaults,
+  upsertReplayTrajectoryCache,
+} from './dbReplayTrajectoryStore.js';
 
 export type { CacheStats, SyncResult, SessionSyncProgress, ReplaySyncProgress, ReplaySyncResult };
 
@@ -254,61 +261,28 @@ export class SessionDatabase {
   }
 
   public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null {
-    const row = this.db.prepare(
-      'SELECT file_mtime, file_size, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
-    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; source_path: string | null; parser_version: string; trajectory_br: Buffer } | undefined;
-    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION || (filePath && row.source_path && row.source_path !== filePath)) {
-      return null;
-    }
-    return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+    return getReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath);
   }
 
   /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
   public getStoredReplayTrajectory(filename: string, driverSlot: number, lapKey: number): ReplayTrajectoryData | null {
-    const row = this.db.prepare(
-      'SELECT parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
-    ).get(filename, driverSlot, lapKey) as { parser_version: string; trajectory_br: Buffer } | undefined;
-    if (!row) return null;
-    return decompressJson<ReplayTrajectoryData>(row.trajectory_br);
+    return getStoredReplayTrajectory(this.db, filename, driverSlot, lapKey);
   }
 
-  // Same validity check as getReplayTrajectoryCache but never reads/decompresses the
-  // (potentially multi-MB) trajectory_br blob
   public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {
-    const row = this.db.prepare(
-      'SELECT file_mtime, file_size, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
-    ).get(filename, driverSlot, lapKey) as { file_mtime: number; file_size: number; source_path: string | null; parser_version: string } | undefined;
-    return !!row && row.file_mtime === mtime && row.file_size === size && row.parser_version === REPLAY_CACHE_VERSION && (!filePath || !row.source_path || row.source_path === filePath);
+    return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath);
   }
 
   public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData, filePath?: string): void {
-    this.db.prepare(`
-      INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime, file_size, parser_version, points_count, trajectory_br, updated_at)
-      VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtime, @size, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
-      ON CONFLICT(filename, driver_slot, lap_key) DO UPDATE SET
-        source_path = excluded.source_path,
-        file_mtime = excluded.file_mtime,
-        file_size = excluded.file_size,
-        parser_version = excluded.parser_version,
-        points_count = excluded.points_count,
-        trajectory_br = excluded.trajectory_br,
-        updated_at = excluded.updated_at
-    `).run({
-      filename,
-      filePath: filePath || null,
-      driverSlot,
-      lapKey,
-      mtime,
-      size,
-      parserVersion: REPLAY_CACHE_VERSION,
-      pointsCount: trajectory.points.length,
-      trajectoryBr: compressJson(trajectory),
-      updatedAt: Date.now(),
-    });
+    upsertReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, trajectory, filePath);
+  }
+
+  public setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void {
+    setTrajectoryDefaults(this.db, filename, driverSlot, defaultLapKey, resolvedDriverSlot);
   }
 
   public clearReplayCache(): void {
-    this.db.exec('DELETE FROM replay_metadata; DELETE FROM replay_trajectories;');
+    this.db.exec('DELETE FROM replay_metadata; DELETE FROM replay_trajectories; DELETE FROM replay_trajectory_defaults;');
   }
 
   public upsertTelemetryMetadata(info: DuckDbFileInfo, matchedSessionId?: string, matchedReplayFilename?: string): void {

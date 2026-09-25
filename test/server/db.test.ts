@@ -376,16 +376,40 @@ describe('SessionDatabase replay cache', () => {
     expect(cachedSlot2?.points.length).toBeGreaterThan(0);
     expect(cachedDefaultLap1).not.toBeNull();
     expect(cachedSlot2Lap1).not.toBeNull();
-    // The default (player) driver is slot 1: it's cached both under the -1 sentinel and
-    // under its own explicit slot number, since the frontend sends an explicit driverSlot
-    // once one has been resolved - even for laps of the default/player driver.
+    // The -1 sentinels resolve to the player's real slot and chosen lap instead of being
+    // stored as extra copies of the same blob.
     expect(cachedSlot1).not.toBeNull();
     expect(cachedSlot1?.driverSlot).toBe(1);
+    expect(cachedDefault?.driverSlot).toBe(1);
 
     const list = db.getReplayCacheList();
-    // Default driver cached under both -1 and slot 1 (2 rows each: 1 lap + alias) plus
-    // slot 2 (2 rows) = 6 cached trajectory rows
-    expect(list[0].trajectoriesCached).toBe(6);
+    // One row per (driver, lap): slot 1 lap 1 and slot 2 lap 1.
+    expect(list[0].trajectoriesCached).toBe(2);
+  });
+
+  it('resolves -1 driver and lap lookups without storing duplicate blobs', () => {
+    fs.mkdirSync(tempDir, { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'Dedup_P1.Vcr'), createSliceVcrBuffer({
+      drivers: [{ name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' }],
+      slices: [
+        { sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 },
+        { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 },
+      ],
+    }));
+
+    db.syncReplaysFromDir(tempDir, { playerName: 'Player Driver' });
+
+    const filePath = path.join(tempDir, 'Dedup_P1.Vcr');
+    const stat = fs.statSync(filePath);
+    const mtime = Math.floor(stat.mtimeMs);
+
+    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtime, stat.size)?.driverSlot).toBe(1);
+    expect(db.getStoredReplayTrajectory('Dedup_P1.Vcr', -1, -1)?.driverSlot).toBe(1);
+    expect(db.hasValidReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtime, stat.size)).toBe(true);
+    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', 1, -1, mtime, stat.size)?.driverSlot).toBe(1);
+
+    const summary = db.getReplayCacheList().find(entry => entry.filename === 'Dedup_P1.Vcr');
+    expect(summary?.trajectoriesCached).toBe(1);
   });
 
   it('fills in missing trajectory cache rows on a later sync even when metadata is already cached', () => {
