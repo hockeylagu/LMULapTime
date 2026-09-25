@@ -64,12 +64,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const scanTooltip = (() => {
     if (!replayScanStatus) return 'View Replays in Settings';
-    if (replayScanStatus.currentFile) return `Syncing Replay: ${replayScanStatus.currentFile}`;
+    if (replayScanStatus.currentFile) {
+      const stage = 'currentStage' in replayScanStatus && replayScanStatus.currentStage ? ` (${replayScanStatus.currentStage})` : '';
+      return `Syncing Replay: ${replayScanStatus.currentFile}${stage}`;
+    }
     const fullStatus =
       'sessionScan' in replayScanStatus || 'telemetryScan' in replayScanStatus || 'allComplete' in replayScanStatus
         ? (replayScanStatus as ScanStatus)
         : null;
-    if (fullStatus?.sessionScan?.currentFile) return `Syncing Session: ${fullStatus.sessionScan.currentFile}`;
+    if (fullStatus?.sessionScan?.currentFile) {
+      const stage = fullStatus.sessionScan.currentStage ? ` (${fullStatus.sessionScan.currentStage})` : '';
+      return `Syncing Session: ${fullStatus.sessionScan.currentFile}${stage}`;
+    }
     if (fullStatus?.telemetryScan?.currentFile) return `Syncing Telemetry: ${fullStatus.telemetryScan.currentFile}`;
     if (fullStatus?.allComplete || fullStatus?.allCached) return 'All sessions, replays, and telemetry are synchronized';
     return 'View Replays in Settings';

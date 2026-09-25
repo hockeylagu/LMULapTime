@@ -770,6 +770,39 @@ describe('replayParser - trajectory & timing', () => {
         expect(traj.laps![0].lapNumber).toBe(1);
         fs.unlinkSync(noTimingVcr);
       });
+
+      it('notifies onProgress callback in chronological order across parsing stages', () => {
+        const stages: string[] = [];
+        const percents: number[] = [];
+        extractReplayTrajectory(tempVcrPath, {
+          driverSlot: 1,
+          onProgress: (p) => {
+            stages.push(p.stage);
+            percents.push(p.percent);
+          },
+        });
+
+        expect(stages).toContain('header');
+        expect(stages).toContain('metadata');
+        expect(stages).toContain('stream_init');
+        expect(stages).toContain('stream_decoding');
+        expect(stages).toContain('lap_analysis');
+        expect(stages).toContain('downsampling');
+
+        const firstHeader = stages.indexOf('header');
+        const firstMeta = stages.indexOf('metadata');
+        const firstStreamInit = stages.indexOf('stream_init');
+        const firstDecode = stages.indexOf('stream_decoding');
+        const firstLapAnalysis = stages.indexOf('lap_analysis');
+        const firstDownsample = stages.indexOf('downsampling');
+
+        expect(firstHeader).toBeLessThan(firstMeta);
+        expect(firstMeta).toBeLessThan(firstStreamInit);
+        expect(firstStreamInit).toBeLessThan(firstDecode);
+        expect(firstDecode).toBeLessThan(firstLapAnalysis);
+        expect(firstLapAnalysis).toBeLessThan(firstDownsample);
+        expect(percents[percents.length - 1]).toBe(100);
+      });
     });
 
 });

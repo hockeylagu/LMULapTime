@@ -102,9 +102,19 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
             />
           </div>
           {replayScanStatus?.currentFile && (
-            <p className="text-[11px] text-lmu-muted font-mono truncate">
-              {replayScanStatus.currentFile}
-            </p>
+            <div className="flex flex-col gap-0.5 text-[11px] text-lmu-muted font-mono">
+              <div className="flex items-center justify-between">
+                <span className="truncate">{replayScanStatus.currentFile}</span>
+                {replayScanStatus.filePercent !== undefined && replayScanStatus.filePercent !== null && (
+                  <span className="text-sky-400 font-semibold ml-2 shrink-0">{replayScanStatus.filePercent}%</span>
+                )}
+              </div>
+              {replayScanStatus.currentStage && (
+                <span className="text-[10px] text-slate-400 font-sans italic truncate">
+                  {replayScanStatus.currentStage}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

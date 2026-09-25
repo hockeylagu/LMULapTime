@@ -3,37 +3,36 @@ import path from 'path';
 import {
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
-  ReplayLapSummary,
   ReplayPenaltyEvent,
   ReplayPitEvent,
   ReplayFlagEvent,
   ReplayStandingsSnapshot,
 } from '../core/types.js';
 import { detectPlayerName, parseReplayMetadata } from './replayParser.js';
+import {
+  RawTrajectoryPoint,
+  VcrTimingEvent,
+  DetectedLapInternal,
+  detectLapsFromTelemetry,
+  isTimeInIntervals,
+} from './replayLapBuilder.js';
+import {
+  ReplayProgressTracker,
+  ReplayProgressCallback,
+  ReplayLogOptions,
+} from './replayProgress.js';
 
-interface RawPoint {
-  sTime: number;
-  x: number;
-  y: number;
-  z: number;
-  rotX?: number;
-  rotY: number;
-  rotZ?: number;
-  steerYaw?: number;
-  rawThrottle?: number;
-  rawBrake?: number;
-  tcActive?: boolean;
-  absActive?: boolean;
-  pitLimiter?: boolean;
-  inPit?: boolean;
-  isOffTrack?: boolean;
-  gearRaw?: number;
-  speedKmhRaw?: number;
-  detachablePartState?: number;
-  engineRpm?: number;
-  wheelSpeeds?: [number, number, number, number];
-  brakeTemps?: [number, number, number, number];
-  fuel?: number;
+export interface ExtractReplayTrajectoryOptions extends ReplayLogOptions {
+  driverSlot?: number;
+  driverName?: string;
+  maxPoints?: number;
+  playerName?: string;
+  lapNumber?: number;
+  // When true, finalizes every detected lap for the target driver in this same file
+  // scan and attaches them all as `allLapsData`, so callers (e.g. the eager replay
+  // cache sync) can persist the whole driver's laps from a single binary pass.
+  allLaps?: boolean;
+  onProgress?: ReplayProgressCallback;
 }
 
 function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
@@ -68,34 +67,43 @@ function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefin
  */
 export function extractReplayTrajectory(
   filePath: string,
-  options: {
-    driverSlot?: number;
-    driverName?: string;
-    maxPoints?: number;
-    playerName?: string;
-    lapNumber?: number;
-    // When true, finalizes every detected lap for the target driver in this same file
-    // scan and attaches them all as `allLapsData`, so callers (e.g. the eager replay
-    // cache sync) can persist the whole driver's laps from a single binary pass.
-    allLaps?: boolean;
-  } = {}
+  options: ExtractReplayTrajectoryOptions = {}
 ): ReplayTrajectoryData {
-  const effectivePlayerName = options.playerName || detectPlayerName(filePath);
-  const meta = parseReplayMetadata(filePath, { playerName: effectivePlayerName });
+  const startTimeMs = Date.now();
+  const filename = path.basename(filePath);
   const stat = fs.statSync(filePath);
+  const totalFileSize = stat.size;
+
   const fd = fs.openSync(filePath, 'r');
 
   try {
     const head = Buffer.alloc(64);
     fs.readSync(fd, head, 0, 64, 0);
 
+    const irsr = head.subarray(45, 49).toString('ascii');
+    if (irsr !== 'IRSR') {
+      throw new Error(`Invalid LMU replay file: missing IRSR magic tag in ${filePath}`);
+    }
+
     const metaOffset = head.readUInt32LE(53);
     const frameStreamEnd = Math.min(metaOffset, stat.size);
-    const frameStreamBytes = frameStreamEnd - 57;
+    const frameStreamBytes = Math.max(0, frameStreamEnd - 57);
+
+    // Stage 1: Container & Header Verification
+    const tracker = new ReplayProgressTracker(frameStreamBytes || totalFileSize, options.onProgress, options);
+    tracker.report('header', 5, { bytesProcessed: 64 });
+
+    if (!options.silent) {
+      const sizeMb = (totalFileSize / (1024 * 1024)).toFixed(1);
+      const streamMb = (frameStreamBytes / (1024 * 1024)).toFixed(1);
+      console.log(
+        `[VCR Parser] [1/6] Container: ${filename} (size: ${sizeMb} MB, format: 0x80000008, stream: ${streamMb} MB, metaOffset: 0x${metaOffset.toString(16)})`
+      );
+    }
 
     if (frameStreamBytes <= 0) {
       return {
-        replayName: path.basename(filePath),
+        replayName: filename,
         pointsCount: 0,
         currentLap: 1,
         laps: [],
@@ -104,6 +112,11 @@ export function extractReplayTrajectory(
         points: [],
       };
     }
+
+    // Stage 2: Metadata Block & Driver Roster
+    tracker.report('metadata', 10);
+    const effectivePlayerName = options.playerName || detectPlayerName(filePath);
+    const meta = parseReplayMetadata(filePath, { playerName: effectivePlayerName });
 
     // Target slot determination
     let targetSlot = options.driverSlot;
@@ -135,9 +148,33 @@ export function extractReplayTrajectory(
       targetSlot = meta.drivers[0].slot;
     }
 
-    const driverPoints = new Map<number, RawPoint[]>();
-    const rawPts: RawPoint[] = [];
-    const vcrTimingEvents: Array<{ sTime: number; drv: number; splitSec: number; sector: number; lapIdx: number }> = [];
+    const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
+    const driverName = matchedDriver?.name || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
+    const carDesc = matchedDriver?.carModel || matchedDriver?.vehicleId || 'Unknown Car';
+
+    if (!options.silent) {
+      const displayTrack = meta.displayTrack || meta.trackName || 'Unknown Track';
+      const scene = meta.sceneDesc || 'N/A';
+      const session = meta.sessionType || 'Session';
+      const duration = meta.durationSec > 0 ? `${meta.durationSec.toFixed(1)}s` : 'N/A';
+      const slices = meta.timeSliceCount > 0 ? meta.timeSliceCount.toLocaleString() : 'N/A';
+      console.log(
+        `[VCR Parser] [2/6] Metadata: Track "${displayTrack}" (${scene}), Session: ${session}, Duration: ${duration}, Slices: ${slices}, Drivers: ${meta.drivers.length} | Target: "${driverName || 'Player'}" (slot ${targetSlot ?? 'auto'}, ${carDesc})`
+      );
+    }
+
+    // Stage 3: Frame Stream Preparation
+    tracker.report('stream_init', 15);
+    if (!options.silent) {
+      const streamMb = (frameStreamBytes / (1024 * 1024)).toFixed(1);
+      console.log(
+        `[VCR Parser] [3/6] Stream Init: Target slot ${targetSlot ?? 'auto'} ("${driverName || 'Player'}"), scanning ${streamMb} MB frame stream...`
+      );
+    }
+
+    const driverPoints = new Map<number, RawTrajectoryPoint[]>();
+    const rawPts: RawTrajectoryPoint[] = [];
+    const vcrTimingEvents: VcrTimingEvent[] = [];
     const replayPenalties: ReplayPenaltyEvent[] = [];
     const replayPitEvents: ReplayPitEvent[] = [];
     const replayFlagEvents: ReplayFlagEvent[] = [];
@@ -154,6 +191,7 @@ export function extractReplayTrajectory(
     let carryoverLen = 0;
     let isFirstChunk = true;
     let slicesFound = 0;
+    let lastSTime = 0;
 
     const driverNameMap = new Map<number, string>();
     for (const d of meta.drivers) {
@@ -163,6 +201,7 @@ export function extractReplayTrajectory(
     }
     const driverFuel = new Map<number, number>();
 
+    // Stage 4: Streaming Binary Decode
     while (filePos < frameStreamEnd) {
       const bytesToRead = Math.min(CHUNK_SIZE - carryoverLen, frameStreamEnd - filePos);
       if (bytesToRead <= 0) break;
@@ -196,6 +235,7 @@ export function extractReplayTrajectory(
         if (!canParseSlice) break;
 
         slicesFound++;
+        lastSTime = sTime;
         let eventSp = sp + 6;
         for (let e = 0; e < nEvents; e++) {
           const h = buf.readUInt32LE(eventSp);
@@ -220,26 +260,23 @@ export function extractReplayTrajectory(
               const rotZ = buf.readFloatLE(eventSp + 5 + 61);
 
               const info2 = buf.readUInt32LE(eventSp + 5 + 4);
-
               const detachablePartState = info2 & 0x3ff;
 
               const raw16 = buf.readUInt16LE(eventSp + 5 + 4);
               const steer10 = raw16 & 0x3ff;
               const steerYaw = parseFloat(((steer10 - 512) / 512).toFixed(4));
 
-              // Byte 5 is the raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
+              // Byte 5 is raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
               const rawThrByte = buf[eventSp + 5 + 5];
               const rawThrottle = rawThrByte <= 1 ? 0 : Math.min(100, Math.round(((rawThrByte - 1) / 248) * 100));
 
-              // Byte 36 is the raw brake input (0 = 0%, bits 0..5 = analog brake pressure up to 63, bit 6 = ABS active, bit 7 = TC active)
+              // Byte 36 is raw brake input (0 = 0%, bits 0..5 = pressure, bit 6 = ABS, bit 7 = TC)
               const rawBrkByte = buf[eventSp + 5 + 36];
               const rawBrake = rawBrkByte === 0 ? 0 : Math.min(100, Math.round(((rawBrkByte & 0x3f) / 63) * 100));
               const absActive = Boolean(rawBrkByte & 0x40);
               const tcActive = Boolean(rawBrkByte & 0x80);
 
-              // Byte 38 is vehicle status & surface/limiter flags:
-              // bit 0 (0x01) = off-track surface / track limit cut
-              // bit 2 (0x04) = pit limiter active (holding 60 km/h)
+              // Byte 38 is status & surface flags (bit 0 = off-track, bit 2 = pit limiter)
               const statusByte = buf[eventSp + 5 + 38];
               const isOffTrack = Boolean(statusByte & 0x01);
               const pitLimiter = Boolean(statusByte & 0x04);
@@ -247,21 +284,16 @@ export function extractReplayTrajectory(
               const inPit = Boolean(info1 & (1 << 17));
               const speedKmhRaw = decodePacketSpeedKmh(buf, eventSp + 5 + 8);
 
-              // Engine RPM: 10-bit field spanning byte 6 bit 5 through byte 7 bit 6 (VCR_FORMAT.md §4)
+              // Engine RPM: 10-bit field spanning byte 6 bit 5 through byte 7 bit 6
               const rpmRaw10 = (buf.readUInt16LE(eventSp + 5 + 6) >>> 5) & 0x3ff;
               const engineRpm = rpmRaw10 < 1023 ? Math.round(rpmRaw10 * 10.9228) : undefined;
 
-              // Gear is encoded directly in the event header's type field (confirmed via a
-              // community reference parser): evType ranges 7-15 for vehicle pose
-              // events, mapping to gear = evType - 8 (7 => reverse (-1), 8 => neutral, 9-15 =>
-              // gears 1-7). Available for every driver, not just the local player. The
-              // The reference tool gates this on evClass === 0; current LMU pose packets
-              // observed here also use Class 0, but the class is left ungated for revisions.
+              // Gear: evType ranges 7-15, mapping to gear = evType - 8
               const gearRaw = evType >= 7 && evType <= 15 ? evType - 8 : undefined;
 
               const latestWheel = driverWheelTelemetry.get(drv);
 
-              const pt: RawPoint = {
+              const pt: RawTrajectoryPoint = {
                 sTime,
                 x,
                 y,
@@ -334,8 +366,6 @@ export function extractReplayTrajectory(
               });
             }
           } else if (evClass === 3 && evType === 10 && sz === 3 && eventSp + 5 + sz <= activeLen) {
-            // Track Condition & Flag Status (Class 3 Type 10, always 3 bytes): flagState confirmed by
-            // inspection (toggles 1<->0 around race-start green flag); bytes 1-2 unconfirmed, kept raw.
             const FLAG_NAMES: Record<number, string> = {
               0: 'Green', 1: 'Local Yellow', 2: 'Double Yellow', 3: 'Full Course Yellow',
               4: 'Safety Car', 5: 'Safety Car In This Lap', 6: 'Virtual Safety Car', 7: 'Red', 8: 'Checkered',
@@ -352,8 +382,6 @@ export function extractReplayTrajectory(
               driverFlag,
             });
           } else if (evType === 48 && (evClass === 3 || evClass === 6 || evClass === 7) && sz === 41 && eventSp + 5 + sz <= activeLen) {
-            // Live Leaderboard (Type 48, always 41 bytes): byte 0 = car count, bytes 1-20 unconfirmed
-            // (reserved/session floats), bytes 21..21+count-1 = slot order P1..Pn (confirmed by inspection).
             const count = buf[eventSp + 5];
             if (count > 0 && count <= 20 && 21 + count <= sz) {
               const order: number[] = [];
@@ -423,7 +451,6 @@ export function extractReplayTrajectory(
               }
             }
           } else if (evType === 15 && (sz === 24 || sz === 37) && eventSp + 5 + 24 <= activeLen) {
-            // Type 15: Brake Rotor Temperature (byte 23 tracks disc core temperature)
             const rawBrakeTemp = buf[eventSp + 5 + 23];
             const brakeTempC = Math.round(Math.max(20, (rawBrakeTemp - 51) * 5.86 + 29));
             let wheelState = driverWheelTelemetry.get(drv);
@@ -438,8 +465,6 @@ export function extractReplayTrajectory(
               Math.round(brakeTempC * 0.88),
             ];
           } else if (evType === 51 && sz === 3 && eventSp + 5 + sz <= activeLen) {
-            // Type 51: Onboard Fuel Quantity Packet (Class 0 Type 51, size 3)
-            // Byte 0: fuel tank level fraction (0..255). Byte 1 bit 1/2: status indicator (0 = active stint)
             const b0 = buf[eventSp + 5];
             const b1 = buf[eventSp + 5 + 1];
             if (b0 > 0 || b1 === 0) {
@@ -456,6 +481,19 @@ export function extractReplayTrajectory(
       if (carryoverLen > 0) {
         buf.copy(buf, 0, sp, activeLen);
       }
+
+      // Progression update (mapped to 15% - 85% range)
+      const bytesDone = filePos - 57;
+      const streamFraction = frameStreamBytes > 0 ? Math.min(1, bytesDone / frameStreamBytes) : 1;
+      const streamPercent = 15 + Math.round(streamFraction * 70);
+      const lapsCount = vcrTimingEvents.filter(e => (targetSlot === undefined || e.drv === targetSlot) && e.sector === 0).length;
+
+      tracker.report('stream_decoding', streamPercent, {
+        bytesProcessed: bytesDone,
+        slicesParsed: slicesFound,
+        currentTimeSec: lastSTime,
+        lapsDetected: lapsCount,
+      });
     }
 
     if (rawPts.length === 0 && targetSlot !== undefined && driverPoints.has(targetSlot)) {
@@ -467,321 +505,27 @@ export function extractReplayTrajectory(
 
     const maxPoints = options.maxPoints !== undefined ? options.maxPoints : 1200;
 
-    // Note: throttle blip filtering, gear neutral-bridging, and speed smoothing are
-    // intentionally NOT applied here. They are display-only post-processing done on the
-    // frontend (src/utils/telemetryPostProcessing.ts) so the raw decoded values persisted
-    // to the SQLite cache and returned by this function are never modified.
+    // Stage 5: Lap Classification & Split Timing Correlation
+    tracker.report('lap_analysis', 88);
+    const lapAnalysis = detectLapsFromTelemetry(rawPts, vcrTimingEvents, targetSlot, replayPitEvents, maxPoints);
+    const { detectedLaps, garageIntervals, pitIntervals, lapsSummary } = lapAnalysis;
 
-    // 3. Detect laps and 3 sectors per lap
-    // Compute cumulative distance along the vehicle path, ignoring teleport anomalies
-    const cumDist: number[] = [0];
-    for (let i = 1; i < rawPts.length; i++) {
-      const d = Math.hypot(rawPts[i].x - rawPts[i - 1].x, rawPts[i].z - rawPts[i - 1].z);
-      if (d < 200) {
-        cumDist.push(cumDist[cumDist.length - 1] + d);
-      } else {
-        cumDist.push(cumDist[cumDist.length - 1]);
-      }
+    if (!options.silent) {
+      const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap);
+      const outLaps = detectedLaps.filter(l => l.isOutlap);
+      const best = detectedLaps.find(l => l.isBest);
+      const bestStr = best
+        ? `Best: Lap ${best.lapNumber} (${best.lapTimeSec.toFixed(3)}s [S1: ${best.s1Sec}s, S2: ${best.s2Sec}s, S3: ${best.s3Sec}s])`
+        : 'Best: N/A';
+      console.log(
+        `[VCR Parser] [5/6] Lap Analysis: ${detectedLaps.length} laps detected (${cleanFlying.length} flying, ${outLaps.length} out-laps) | ${bestStr}`
+      );
     }
 
-    interface DetectedLapInternal {
-      lapNumber: number;
-      startIdx: number;
-      endIdx: number;
-      lapTimeSec: number;
-      lapDistMeters: number;
-      s1Sec: number;
-      s2Sec: number;
-      s3Sec: number;
-      s1Idx: number;
-      s2Idx: number;
-      isOutlap: boolean;
-      isBest: boolean;
-      isValid?: boolean;
-    }
+    // Stage 6: Trajectory Downsampling & Finalization
+    tracker.report('downsampling', 95);
 
-    let detectedLaps: DetectedLapInternal[] = [];
-
-    // 1. Authoritative VCR timing packets (Class 6 / 3, Type 6, sz === 21) from simulation timing loops
-    const targetTimings = targetSlot !== undefined ? vcrTimingEvents.filter(e => e.drv === targetSlot) : [];
-    const finishTimings = targetTimings.filter(e => e.sector === 0).sort((a, b) => a.lapIdx - b.lapIdx);
-
-    if (finishTimings.length >= 1 && rawPts.length >= 2) {
-      function findClosestIdx(sTime: number): number {
-        let low = 0, high = rawPts.length - 1;
-        while (low <= high) {
-          const mid = (low + high) >> 1;
-          if (rawPts[mid].sTime < sTime) low = mid + 1;
-          else high = mid - 1;
-        }
-        if (low >= rawPts.length) return rawPts.length - 1;
-        if (low === 0) return 0;
-        return Math.abs(rawPts[low].sTime - sTime) < Math.abs(rawPts[low - 1].sTime - sTime) ? low : low - 1;
-      }
-
-      for (let i = 0; i < finishTimings.length; i++) {
-        const ft = finishTimings[i];
-        const lapNum = ft.lapIdx + 1;
-        const finishTime = ft.sTime;
-        const startTime = i === 0
-          ? (ft.splitSec > 0 ? ft.sTime - ft.splitSec : rawPts[0].sTime)
-          : finishTimings[i - 1].sTime;
-        const lapTimeSec = ft.splitSec > 0 ? Number(ft.splitSec.toFixed(3)) : Number((finishTime - startTime).toFixed(3));
-
-        const startIdx = findClosestIdx(startTime);
-        const endIdx = findClosestIdx(finishTime);
-        const lapDist = cumDist[endIdx] - cumDist[startIdx];
-
-        const s1Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 1);
-        const s2Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 2);
-
-        // Skip aborted/incomplete session flush events (e.g. session end flush where splitSec is <= 0 and lap was not completed)
-        if (ft.splitSec <= 0 && (!s1Ev || lapTimeSec < 20) && i > 0) {
-          continue;
-        }
-        let s1Sec: number;
-        let s2Sec: number;
-        let s3Sec: number;
-        let s1Idx = startIdx;
-        let s2Idx = startIdx;
-
-        const isValidSplit = (v?: number) => typeof v === 'number' && isFinite(v) && v > 0 && v < 1800;
-
-        if (s1Ev && isValidSplit(s1Ev.splitSec)) {
-          s1Sec = Number(s1Ev.splitSec.toFixed(3));
-          s1Idx = findClosestIdx(s1Ev.sTime);
-        } else if (s1Ev && s1Ev.sTime > startTime && (s1Ev.sTime - startTime) < lapTimeSec) {
-          s1Idx = findClosestIdx(s1Ev.sTime);
-          s1Sec = Number((s1Ev.sTime - startTime).toFixed(3));
-        } else {
-          const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
-          while (s1Idx < endIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
-          s1Sec = Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3));
-        }
-
-        if (s1Ev && s2Ev && isValidSplit(s1Ev.splitSec) && isValidSplit(s2Ev.splitSec) && s2Ev.splitSec > s1Ev.splitSec && (s2Ev.splitSec - s1Ev.splitSec) < lapTimeSec) {
-          s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
-          s2Idx = findClosestIdx(s2Ev.sTime);
-        } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime && (s2Ev.sTime - s1Ev.sTime) < lapTimeSec) {
-          s2Idx = findClosestIdx(s2Ev.sTime);
-          s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
-        } else if (s2Ev && s2Ev.sTime > startTime && (s2Ev.sTime - startTime) < lapTimeSec && (s2Ev.sTime - startTime) > s1Sec) {
-          s2Idx = findClosestIdx(s2Ev.sTime);
-          s2Sec = Number((s2Ev.sTime - startTime - s1Sec).toFixed(3));
-        } else {
-          s2Idx = s1Idx;
-          const s2TargetDist = cumDist[startIdx] + lapDist * 0.6667;
-          while (s2Idx < endIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
-          s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
-        }
-
-        if (s2Ev && isValidSplit(ft.splitSec) && isValidSplit(s2Ev.splitSec) && ft.splitSec > s2Ev.splitSec && (ft.splitSec - s2Ev.splitSec) < lapTimeSec) {
-          s3Sec = Number((ft.splitSec - s2Ev.splitSec).toFixed(3));
-        } else if (s2Ev && finishTime > s2Ev.sTime && (finishTime - s2Ev.sTime) < lapTimeSec) {
-          s3Sec = Number((finishTime - s2Ev.sTime).toFixed(3));
-        } else if (lapTimeSec > s1Sec + s2Sec && (lapTimeSec - s1Sec - s2Sec) > 0) {
-          s3Sec = Number((lapTimeSec - s1Sec - s2Sec).toFixed(3));
-        } else {
-          s3Sec = Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
-        }
-
-        const isValid = ft.splitSec > 0;
-        const isOutlap = i === 0 || (startIdx >= 0 && Boolean(rawPts[startIdx]?.pitLimiter));
-
-        detectedLaps.push({
-          lapNumber: lapNum,
-          startIdx,
-          endIdx,
-          lapTimeSec,
-          lapDistMeters: Math.round(lapDist),
-          s1Sec,
-          s2Sec,
-          s3Sec,
-          s1Idx,
-          s2Idx,
-          isOutlap,
-          isBest: false,
-          isValid,
-        });
-      }
-
-      // If vehicle continued on track after last finish event and completed sectors, capture final in-progress lap
-      if (finishTimings.length > 0 && rawPts.length > 0) {
-        const lastFt = finishTimings[finishTimings.length - 1];
-        const lastStartIdx = findClosestIdx(lastFt.sTime);
-        const finalIdx = rawPts.length - 1;
-        const inProgressDist = cumDist[finalIdx] - cumDist[lastStartIdx];
-        const inProgressTime = rawPts[finalIdx].sTime - lastFt.sTime;
-
-        if (inProgressTime > 15 && inProgressDist > 600) {
-          const s1Ev = targetTimings.find(e => e.lapIdx === lastFt.lapIdx + 1 && e.sector === 1);
-          const s2Ev = targetTimings.find(e => e.lapIdx === lastFt.lapIdx + 1 && e.sector === 2);
-          let s1Sec = 0;
-          let s2Sec = 0;
-          let s3Sec = 0;
-          let s1Idx = lastStartIdx;
-          let s2Idx = lastStartIdx;
-
-          if (s1Ev && s1Ev.splitSec > 0) {
-            s1Sec = Number(s1Ev.splitSec.toFixed(3));
-            s1Idx = findClosestIdx(s1Ev.sTime);
-          } else if (s1Ev && s1Ev.sTime > lastFt.sTime) {
-            s1Idx = findClosestIdx(s1Ev.sTime);
-            s1Sec = Number((s1Ev.sTime - lastFt.sTime).toFixed(3));
-          } else {
-            const s1TargetDist = cumDist[lastStartIdx] + inProgressDist * 0.3333;
-            while (s1Idx < finalIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
-            s1Sec = Number((rawPts[s1Idx].sTime - lastFt.sTime).toFixed(3));
-          }
-
-          if (s2Ev && s1Ev && s2Ev.splitSec > s1Ev.splitSec && s1Ev.splitSec > 0) {
-            s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
-            s2Idx = findClosestIdx(s2Ev.sTime);
-          } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime) {
-            s2Idx = findClosestIdx(s2Ev.sTime);
-            s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
-          } else {
-            s2Idx = s1Idx;
-            const s2TargetDist = cumDist[lastStartIdx] + inProgressDist * 0.6667;
-            while (s2Idx < finalIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
-            s2Sec = Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3));
-          }
-
-          s3Sec = Number((rawPts[finalIdx].sTime - rawPts[s2Idx].sTime).toFixed(3));
-
-          detectedLaps.push({
-            lapNumber: lastFt.lapIdx + 2,
-            startIdx: lastStartIdx,
-            endIdx: finalIdx,
-            lapTimeSec: Number(inProgressTime.toFixed(3)),
-            lapDistMeters: Math.round(inProgressDist),
-            s1Sec,
-            s2Sec,
-            s3Sec,
-            s1Idx,
-            s2Idx,
-            isOutlap: Boolean(rawPts[lastStartIdx]?.pitLimiter || rawPts[lastStartIdx]?.inPit),
-            isBest: false,
-            isValid: false,
-          });
-        }
-      }
-
-      const validLaps = detectedLaps.filter(l => l.isValid && l.lapTimeSec > 30);
-      const validFlying = validLaps.filter(l => !l.isOutlap);
-      const pool = validFlying.length > 0
-        ? validFlying
-        : validLaps;
-      let minTime = Infinity;
-      let bestLapNum = pool[0]?.lapNumber;
-      for (const l of pool) {
-        if (l.lapTimeSec < minTime) {
-          minTime = l.lapTimeSec;
-          bestLapNum = l.lapNumber;
-        }
-      }
-      detectedLaps.forEach(l => {
-        if (l.lapNumber === bestLapNum) l.isBest = true;
-      });
-    }
-
-    if (detectedLaps.length === 0) {
-      const startIdx = 0;
-      const endIdx = Math.max(0, rawPts.length - 1);
-      const lapDist = cumDist.length > 0 ? cumDist[endIdx] - cumDist[startIdx] : 0;
-      const s1TargetDist = (cumDist[startIdx] || 0) + lapDist * 0.3333;
-      const s2TargetDist = (cumDist[startIdx] || 0) + lapDist * 0.6667;
-      let s1Idx = startIdx;
-      while (s1Idx < endIdx && cumDist[s1Idx] < s1TargetDist) s1Idx++;
-      let s2Idx = s1Idx;
-      while (s2Idx < endIdx && cumDist[s2Idx] < s2TargetDist) s2Idx++;
-
-      detectedLaps = [{
-        lapNumber: 1,
-        startIdx,
-        endIdx,
-        lapTimeSec: rawPts.length > 0 ? Number((rawPts[endIdx].sTime - rawPts[startIdx].sTime).toFixed(3)) : 0,
-        lapDistMeters: Math.round(lapDist),
-        s1Sec: rawPts.length > 0 ? Number((rawPts[s1Idx].sTime - rawPts[startIdx].sTime).toFixed(3)) : 0,
-        s2Sec: rawPts.length > 0 ? Number((rawPts[s2Idx].sTime - rawPts[s1Idx].sTime).toFixed(3)) : 0,
-        s3Sec: rawPts.length > 0 ? Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3)) : 0,
-        s1Idx,
-        s2Idx,
-        isOutlap: false,
-        isBest: false,
-      }];
-    }
-
-    // The following are invariant across every lap of this driver, so compute them once
-    // here rather than inside buildLapResult (which may be called once per detected lap
-    // when options.allLaps is set).
-
-    // Build garage and pit intervals for the target vehicle to accurately determine inGarage and inPit states
-    const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
-    const garageIntervals: Array<{ start: number; end: number }> = [];
-    const pitIntervals: Array<{ start: number; end: number }> = [];
-
-    // Check if vehicle started in the garage (prior to first garage exit event)
-    const firstGarageExit = targetPitEvents.find(e => e.code === 16);
-    if (firstGarageExit && firstGarageExit.timeSec > 0) {
-      garageIntervals.push({ start: 0, end: firstGarageExit.timeSec });
-    }
-
-    for (let p = 0; p < targetPitEvents.length; p++) {
-      const ev = targetPitEvents[p];
-      // Garage returns (code 21 or code 49)
-      if (ev.code === 21 || ev.code === 49) {
-        const nextExit = targetPitEvents.slice(p + 1).find(e => e.code === 16);
-        garageIntervals.push({
-          start: ev.timeSec,
-          end: nextExit ? nextExit.timeSec : Infinity,
-        });
-      }
-      // Pit lane entries (code 34)
-      if (ev.code === 34) {
-        const nextPitExit = targetPitEvents.slice(p + 1).find(e => e.code === 32);
-        pitIntervals.push({
-          start: ev.timeSec,
-          end: nextPitExit ? nextPitExit.timeSec : ev.timeSec + 120,
-        });
-      }
-    }
-
-    function isTimeInIntervals(t: number, intervals: Array<{ start: number; end: number }>): boolean {
-      for (const inv of intervals) {
-        if (t >= inv.start && t <= inv.end) return true;
-      }
-      return false;
-    }
-
-    const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
-    const driverName = matchedDriver?.name || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
-
-    // Each lap's own frame count (after downsampling), independent of which lap is
-    // currently being finalized - fixes a prior quirk where every lap's endFrame reflected
-    // whichever lap buildLapResult happened to be processing at the time.
-    const lapsSummary: ReplayLapSummary[] = detectedLaps.map(l => {
-      const rawCount = Math.max(0, l.endIdx - l.startIdx + 1);
-      const frameCount = maxPoints > 0 ? Math.min(rawCount, maxPoints) : rawCount;
-      return {
-        lapNumber: l.lapNumber,
-        lapTimeSec: l.lapTimeSec,
-        lapDistMeters: l.lapDistMeters,
-        s1Sec: l.s1Sec,
-        s2Sec: l.s2Sec,
-        s3Sec: l.s3Sec,
-        isOutlap: l.isOutlap,
-        isBest: l.isBest,
-        isValid: l.isValid ?? !l.isOutlap,
-        startFrame: 0,
-        endFrame: frameCount,
-      };
-    });
-
-    // Builds a full trajectory result for one detected lap, reusing the raw points/events
-    // already collected in this single file scan (no re-parsing of the .Vcr binary).
     function buildLapResult(chosenLap: DetectedLapInternal): ReplayTrajectoryData {
-      // Slice raw points strictly for the chosen lap
       const lapRawPts = rawPts.slice(chosenLap.startIdx, chosenLap.endIdx + 1);
       const rawPointsCount = lapRawPts.length;
       const lapDuration = chosenLap.lapTimeSec || (rawPts.length > 0 ? Math.max(0.001, rawPts[chosenLap.endIdx].sTime - rawPts[chosenLap.startIdx].sTime) : 0);
@@ -789,7 +533,6 @@ export function extractReplayTrajectory(
         ? Math.round((rawPointsCount - 1) / lapDuration)
         : 0;
 
-      // Downsample chosen lap to maxPoints (e.g. 1200, 2400; if maxPoints is 0, preserve 100% full raw fidelity)
       let downsampled = lapRawPts;
       if (maxPoints > 0 && lapRawPts.length > maxPoints) {
         const step = lapRawPts.length / maxPoints;
@@ -806,12 +549,7 @@ export function extractReplayTrajectory(
       const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
       const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
 
-      // Compute an instantaneous per-point speed (packet-reported speed when available,
-      // otherwise derived from the position delta), capped at a physically plausible
-      // maximum so a corrupted/teleported position delta can't produce a nonsense value.
-      // This is a data-integrity clamp, not smoothing - no averaging across frames happens
-      // here (that's the frontend's job, see src/utils/telemetryPostProcessing.ts).
-      const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
+      const MAX_PLAUSIBLE_SPEED_KMH = 400;
       const rawSpeeds: number[] = [];
       for (let i = 0; i < downsampled.length; i++) {
         const cur = downsampled[i];
@@ -825,20 +563,13 @@ export function extractReplayTrajectory(
           }
         }
         const packetSpeed = downsampled[i].speedKmhRaw;
-        rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH
-          ? packetSpeed
-          : speed);
+        rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH ? packetSpeed : speed);
       }
 
       const finalPoints: ReplayTrajectoryPoint[] = [];
       for (let i = 0; i < downsampled.length; i++) {
         const cur = downsampled[i];
         const rawSpeed = rawSpeeds[i];
-
-        const throttle = cur.rawThrottle ?? 0;
-        const brake = cur.rawBrake ?? 0;
-
-        // True garage state based on simulation events; fallback to stationary in pit
         const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
           (garageIntervals.length === 0 && Boolean(cur.inPit) && rawSpeed < 1);
         const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
@@ -851,8 +582,8 @@ export function extractReplayTrajectory(
           rotY: Number(cur.rotY.toFixed(3)),
           rotZ: cur.rotZ,
           speedKmh: Math.round(rawSpeed),
-          throttle,
-          brake,
+          throttle: cur.rawThrottle ?? 0,
+          brake: cur.rawBrake ?? 0,
           steerYaw: cur.steerYaw ?? 0,
           gear: cur.gearRaw,
           inPit,
@@ -871,7 +602,6 @@ export function extractReplayTrajectory(
         });
       }
 
-      // Calculate track bounds
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const p of finalPoints) {
         if (p.x < minX) minX = p.x;
@@ -885,7 +615,7 @@ export function extractReplayTrajectory(
       }
 
       return {
-        replayName: path.basename(filePath),
+        replayName: filename,
         driverSlot: targetSlot,
         driverName,
         pointsCount: finalPoints.length,
@@ -895,10 +625,7 @@ export function extractReplayTrajectory(
         isFullResolution: finalPoints.length >= rawPointsCount,
         currentLap: chosenLap.lapNumber,
         laps: lapsSummary,
-        sectors: {
-          s1Frame,
-          s2Frame,
-        },
+        sectors: { s1Frame, s2Frame },
         bounds: {
           minX: Number(minX.toFixed(2)),
           maxX: Number(maxX.toFixed(2)),
@@ -913,22 +640,17 @@ export function extractReplayTrajectory(
         flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
         standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
         sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
-        wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined || p.tireTemps !== undefined)),
-        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.fuel !== undefined || p.virtualEnergy !== undefined || p.soc !== undefined || p.regenRate !== undefined)),
+        wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
+        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.fuel !== undefined)),
       };
     }
 
-    // Select chosen lap
     let chosen = detectedLaps.find(l => l.lapNumber === options.lapNumber);
     if (!chosen) {
       chosen = detectedLaps.find(l => l.isBest) || detectedLaps[0];
     }
 
-    // When requested, finalize every detected lap in this same single file scan (no extra
-    // .Vcr reads) so the caller can persist full per-lap trajectories for this driver in one pass.
     const allLapsData = options.allLaps ? detectedLaps.map(l => buildLapResult(l)) : undefined;
-    // `chosen` is always a member of `detectedLaps`, and `allLapsData` (when present) was built
-    // by mapping over that same array, so the matching entry is always found.
     const result = allLapsData
       ? allLapsData.find(r => r.currentLap === chosen!.lapNumber)!
       : buildLapResult(chosen);
@@ -937,9 +659,19 @@ export function extractReplayTrajectory(
       result.allLapsData = allLapsData;
     }
 
+    tracker.report('downsampling', 100);
+
+    if (!options.silent) {
+      const elapsedMs = Date.now() - startTimeMs;
+      const wheels = result.wheelTelemetryAvailable ? 'yes' : 'no';
+      const energy = result.energyTelemetryAvailable ? 'yes' : 'no';
+      console.log(
+        `[VCR Parser] [6/6] Finalized: Lap ${result.currentLap} downsampled to ${result.pointsCount} pts (raw: ${result.rawPointsCount} @ ${result.rawSampleRateHz}Hz) | Bounds: ${result.bounds.spanX}m x ${result.bounds.spanZ}m | Telemetry: wheels=${wheels}, energy=${energy} (${elapsedMs}ms)`
+      );
+    }
+
     return result;
   } finally {
     fs.closeSync(fd);
   }
 }
-

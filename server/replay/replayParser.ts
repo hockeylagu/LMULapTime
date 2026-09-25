@@ -62,13 +62,26 @@ export function detectPlayerName(baseDirOrFile?: string): string | undefined {
   return undefined;
 }
 
+export type {
+  ReplayParsingStage,
+  ReplayStreamProgress,
+  ReplayProgressCallback,
+  ReplayLogOptions,
+} from './replayProgress.js';
+export type { ExtractReplayTrajectoryOptions } from './replayTrajectory.js';
+
+export interface ParseReplayMetadataOptions {
+  playerName?: string;
+  verbose?: boolean;
+}
+
 /**
  * Parses replay header and extracts metadata block, driver roster, and session info.
  * Seeks directly to metadataOffset for sub-5ms performance.
  */
 export function parseReplayMetadata(
   filePath: string,
-  options?: { playerName?: string }
+  options?: ParseReplayMetadataOptions
 ): ReplayMetadata {
   const detectedName = detectPlayerName(filePath);
   const effectivePlayerName = options?.playerName || detectedName;
@@ -358,7 +371,7 @@ export function parseReplayMetadata(
     const filenameMatch = baseName.match(/^(.+?)\s+([PQR]\d+)\b/i);
     const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
 
-    return {
+    const metadataResult: ReplayMetadata = {
       filename: baseName,
       filePath,
       fileSizeBytes: stat.size,
@@ -384,6 +397,20 @@ export function parseReplayMetadata(
       carClass: replayCarClass,
       carModel: replayCarModel,
     };
+
+    if (options?.verbose) {
+      const sizeMb = (stat.size / (1024 * 1024)).toFixed(1);
+      const streamMb = (metaOffset / (1024 * 1024)).toFixed(1);
+      const displayTrack = metadataResult.displayTrack || metadataResult.trackName || 'Unknown Track';
+      console.log(
+        `[VCR Parser] [1/6] Container: ${baseName} (size: ${sizeMb} MB, format: 0x80000008, stream: ${streamMb} MB, metaOffset: 0x${metaOffset.toString(16)})`
+      );
+      console.log(
+        `[VCR Parser] [2/6] Metadata: Track "${displayTrack}" (${metadataResult.sceneDesc || 'N/A'}), Session: ${sessionType || 'Session'}, Duration: ${durationSec.toFixed(1)}s, Slices: ${timeSliceCount.toLocaleString()}, Drivers: ${drivers.length} | Target: "${playerDriver?.name || 'Player'}" (slot ${playerDriver?.slot ?? 'auto'})`
+      );
+    }
+
+    return metadataResult;
   } finally {
     fs.closeSync(fd);
   }

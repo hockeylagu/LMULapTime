@@ -2,6 +2,8 @@ import { SessionDatabase } from '../core/db.js';
 import { TelemetryScanStatus } from '../core/types.js';
 import { DuckDbFileInfo, enrichDuckDbDirectory } from './telemetryMatcher.js';
 
+type EnrichDuckDbDirectory = typeof enrichDuckDbDirectory;
+
 export interface TelemetryCatalogStatus {
   directory: string;
   updatedAt: string | null;
@@ -13,6 +15,8 @@ export class TelemetryCatalog {
   private directory = '';
   private updatedAt: string | null = null;
   private refreshPromise: Promise<number> | null = null;
+  private refreshDirectory: string | null = null;
+  private refreshGeneration = 0;
 
   private scanStatus: TelemetryScanStatus = {
     running: false,
@@ -25,7 +29,10 @@ export class TelemetryCatalog {
     error: null,
   };
 
-  public constructor(private readonly sessionDb: SessionDatabase) {
+  public constructor(
+    private readonly sessionDb: SessionDatabase,
+    private readonly enrichDirectory: EnrichDuckDbDirectory = enrichDuckDbDirectory
+  ) {
     try {
       if (typeof this.sessionDb.getTelemetryFiles === 'function') {
         this.files = this.sessionDb.getTelemetryFiles();
@@ -55,13 +62,29 @@ export class TelemetryCatalog {
   }
 
   public clear(): void {
+    this.refreshGeneration++;
+    this.refreshPromise = null;
+    this.refreshDirectory = null;
     this.files = [];
     this.directory = '';
     this.updatedAt = null;
+    this.scanStatus = {
+      running: false,
+      processed: 0,
+      total: 0,
+      currentFile: null,
+      startedAt: null,
+      finishedAt: null,
+      result: null,
+      error: null,
+    };
   }
 
   public refresh(directory: string): Promise<number> {
-    if (this.refreshPromise) return this.refreshPromise;
+    if (this.refreshPromise && this.refreshDirectory === directory) return this.refreshPromise;
+
+    const generation = ++this.refreshGeneration;
+    this.refreshDirectory = directory;
 
     this.scanStatus = {
       running: true,
@@ -83,15 +106,17 @@ export class TelemetryCatalog {
     let addedCount = 0;
     let updatedCount = 0;
 
-    this.refreshPromise = enrichDuckDbDirectory(directory, {
+    const refreshPromise = this.enrichDirectory(directory, {
       cachedFiles: cachedMap,
       onProgress: (p) => {
+        if (generation !== this.refreshGeneration) return;
         this.scanStatus.processed = p.processed;
         this.scanStatus.total = p.total;
         this.scanStatus.currentFile = p.currentFile || null;
       },
     })
       .then((files) => {
+        if (generation !== this.refreshGeneration) return files.length;
         this.files = files;
         this.directory = directory;
         this.updatedAt = new Date().toISOString();
@@ -135,6 +160,7 @@ export class TelemetryCatalog {
         return files.length;
       })
       .catch((error: unknown) => {
+        if (generation !== this.refreshGeneration) throw error;
         const errorMsg = error instanceof Error ? error.message : String(error);
         this.scanStatus.error = errorMsg;
         if (typeof this.sessionDb?.recordIngestError === 'function') {
@@ -143,11 +169,14 @@ export class TelemetryCatalog {
         throw error;
       })
       .finally(() => {
+        if (generation !== this.refreshGeneration) return;
         this.scanStatus.running = false;
         this.scanStatus.finishedAt = new Date().toISOString();
         this.refreshPromise = null;
+        this.refreshDirectory = null;
       });
 
-    return this.refreshPromise;
+    this.refreshPromise = refreshPromise;
+    return refreshPromise;
   }
 }

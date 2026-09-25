@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Settings } from '../../src/components/settings/index.js';
+import type { ScanStatus } from '../../server/core/types.js';
 
 describe('Settings component', () => {
   const mockStatus = {
@@ -52,6 +53,49 @@ describe('Settings component', () => {
     await waitFor(() => {
       expect(onUpdatePaths).toHaveBeenCalled();
     });
+  });
+
+  it('shows active XML session scan file and stage progress', async () => {
+    const scanStatus = {
+      running: false,
+      processed: 0,
+      total: 0,
+      currentFile: null,
+      startedAt: null,
+      finishedAt: null,
+      result: null,
+      error: null,
+      sessionScan: {
+        running: true,
+        processed: 2,
+        total: 5,
+        currentFile: '2026_09_25_12_00_00-01R1.xml',
+        currentStage: 'Reading XML session log',
+        filePercent: 5,
+        startedAt: '2026-09-25T12:00:00.000Z',
+        finishedAt: null,
+        result: null,
+        error: null,
+      },
+      referenceLaptimes: {
+        started: false,
+        running: false,
+        checked: true,
+        completedAt: null,
+        refreshed: false,
+        updatedCount: 0,
+        diff: null,
+        error: null,
+      },
+    } as ScanStatus;
+
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} replayScanStatus={scanStatus} />);
+
+    expect(await screen.findByText('Parsing XML Session Logs')).toBeInTheDocument();
+    expect(screen.getByText('2 / 5')).toBeInTheDocument();
+    expect(screen.getByText('2026_09_25_12_00_00-01R1.xml')).toBeInTheDocument();
+    expect(screen.getByText('Reading XML session log')).toBeInTheDocument();
+    expect(screen.getByText('5%')).toBeInTheDocument();
   });
 
   it('handles reference laptimes manual refresh button click', async () => {

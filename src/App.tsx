@@ -204,13 +204,14 @@ export default function App() {
       setSessions(sessionsData);
       setProgression(progData);
       setTracksMap(tracksData);
+      if (forceRefresh) startScanPolling();
     } catch (err) {
       console.error('Error fetching LMU telemetry data:', err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [startScanPolling]);
 
   const scanStateRef = useRef({ replay: false, sessions: false, telemetry: false });
   useEffect(() => {

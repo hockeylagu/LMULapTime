@@ -7,16 +7,19 @@ import * as refModule from '../../server/benchmarks/referenceLaptimes.js';
 import { createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 describe('Server API routes', () => {
-  beforeAll(async () => {
+  const waitForFileScans = async (): Promise<void> => {
     for (let attempt = 0; attempt < 100; attempt++) {
       const status = await request(app).get('/api/scan/status');
-      if (!status.body.sessionScan?.running) return;
+      if (status.body.allComplete) return;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    throw new Error('Initial session scan did not finish during the test setup window');
-  });
+    throw new Error('File scans did not finish during the test setup window');
+  };
 
-  beforeEach(() => {
+  beforeAll(waitForFileScans);
+
+  beforeEach(async () => {
+    await waitForFileScans();
     vi.restoreAllMocks();
   });
 
@@ -50,6 +53,23 @@ describe('Server API routes', () => {
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('sessionsCount', 0);
     expect(res.body.sqliteCache).toHaveProperty('sessionsCount', 0);
+  });
+
+  it('POST /api/cache/clear rejects while file processing is active', async () => {
+    const scan = await request(app)
+      .post('/api/scan')
+      .send({
+        resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
+        replaysDir: path.join(process.cwd(), 'test', 'fixtures', 'replays'),
+        playerName: 'TestPlayer',
+      });
+    expect(scan.status).toBe(200);
+
+    const clear = await request(app).post('/api/cache/clear');
+
+    expect(clear.status).toBe(409);
+    expect(clear.body.error).toMatch(/file scan is already running/i);
+    await waitForFileScans();
   });
 
   it('GET /api/sessions returns session summaries and supports filtering', async () => {
@@ -120,6 +140,8 @@ describe('Server API routes', () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('success', true);
     expect(res.body).toHaveProperty('playerName', 'TestPlayer');
+    expect(res.body).toHaveProperty('telemetryScanStarted', true);
+    expect(res.body).toHaveProperty('telemetryFilesScanned', null);
   });
 
   it('GET /api/compare/laps returns comparable laps and benchmarks', async () => {
@@ -248,10 +270,10 @@ describe('Server API routes', () => {
       let status;
       for (let i = 0; i < 50; i++) {
         status = (await request(app).get('/api/scan/status')).body;
-        if (!status.running) break;
+        if (status.allComplete) break;
         await new Promise(resolve => setTimeout(resolve, 20));
       }
-      expect(status.running).toBe(false);
+      expect(status.allComplete).toBe(true);
       expect(status.result).toEqual(expect.objectContaining({ added: 1 }));
 
       const cacheListRes = await request(app).get('/api/replays/cache');

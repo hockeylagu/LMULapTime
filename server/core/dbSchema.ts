@@ -35,10 +35,20 @@ export interface SyncResult {
   lastSyncedAt: string;
 }
 
+export interface SessionSyncProgress {
+  processed: number;
+  total: number;
+  currentFile: string;
+  stage?: string;
+  filePercent?: number;
+}
+
 export interface ReplaySyncProgress {
   processed: number;
   total: number;
   currentFile: string;
+  stage?: string;
+  filePercent?: number;
 }
 
 export interface ReplaySyncResult {

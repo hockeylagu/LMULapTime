@@ -37,7 +37,7 @@ function createContext(sessionDb: SessionDatabase = {
 }
 
 function createCompletedReplayIterator() {
-  return (function* () {
+  return (async function* () {
     return {
       added: 2,
       updated: 1,
@@ -45,6 +45,49 @@ function createCompletedReplayIterator() {
       total: 6,
       lastSyncedAt: '2026-09-23T00:00:00.000Z',
       interrupted: false,
+    };
+  })();
+}
+
+function createCompletedSessionIterator() {
+  return (async function* () {
+    return {
+      added: 4,
+      updated: 1,
+      total: 5,
+      lastSyncedAt: '2026-09-23T00:00:00.000Z',
+    };
+  })();
+}
+
+function createFailingSessionIterator() {
+  return (async function* () {
+    throw new Error('Results directory unavailable');
+  })();
+}
+
+function createProgressingReplayIterator() {
+  return (async function* () {
+    yield { processed: 0, total: 1, currentFile: 'Spa P1.Vcr', stage: 'Decoding telemetry and events', filePercent: 50 };
+    return {
+      added: 1,
+      updated: 0,
+      skipped: 0,
+      total: 1,
+      lastSyncedAt: '2026-09-23T00:00:00.000Z',
+      interrupted: false,
+    };
+  })();
+}
+
+function createProgressingSessionIterator() {
+  return (async function* () {
+    yield { processed: 2, total: 5, currentFile: '2026_09_25_12_00_00-01R1.xml', stage: 'Reading XML session log', filePercent: 5 };
+    return {
+      added: 1,
+      updated: 0,
+      total: 5,
+      lastSyncedAt: '2026-09-25T00:00:00.000Z',
     };
   })();
 }
@@ -61,13 +104,8 @@ describe('ServerContext background session sync', () => {
   it('records the completed session scan and starts replay indexing once', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
-      syncSessionsFromDir: vi.fn(() => ({
-        added: 4,
-        updated: 1,
-        total: 5,
-        lastSyncedAt: '2026-09-23T00:00:00.000Z',
-      })),
-      syncReplaysIterator: vi.fn(createCompletedReplayIterator),
+      syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
+      syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
     } as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
@@ -78,8 +116,8 @@ describe('ServerContext background session sync', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(sessionDb.syncSessionsFromDir).toHaveBeenCalledTimes(1);
-    expect(sessionDb.syncReplaysIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
     expect(context.getScanStatus()).toMatchObject({
       running: false,
       processed: 0,
@@ -99,8 +137,8 @@ describe('ServerContext background session sync', () => {
   it('reports a session scan error and still runs replay indexing', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
-      syncSessionsFromDir: vi.fn(() => { throw new Error('Results directory unavailable'); }),
-      syncReplaysIterator: vi.fn(createCompletedReplayIterator),
+      syncSessionsAsyncIterator: vi.fn(createFailingSessionIterator),
+      syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
     } as unknown as SessionDatabase;
     const context = createContext(sessionDb);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -108,7 +146,7 @@ describe('ServerContext background session sync', () => {
     context.runInitialSessionSyncInBackground();
     await vi.runAllTimersAsync();
 
-    expect(sessionDb.syncReplaysIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
     expect(context.getScanStatus()).toMatchObject({
       running: false,
       sessionScan: {
@@ -118,6 +156,75 @@ describe('ServerContext background session sync', () => {
       },
     });
     expect(warn).toHaveBeenCalledWith('[SQLite Cache] Initial sync warning:', expect.any(Error));
+  });
+
+  it('publishes XML file and stage progress before session scanning completes', async () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      syncSessionsAsyncIterator: vi.fn(createProgressingSessionIterator),
+      syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+
+    context.runSessionSyncInBackground();
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(context.getScanStatus().sessionScan).toMatchObject({
+      running: true,
+      processed: 2,
+      total: 5,
+      currentFile: '2026_09_25_12_00_00-01R1.xml',
+      currentStage: 'Reading XML session log',
+      filePercent: 5,
+    });
+  });
+
+  it('refuses directory reconfiguration while a session scan is active', () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      syncSessionsAsyncIterator: vi.fn(createProgressingSessionIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+
+    expect(context.runSessionSyncInBackground()).toBe(true);
+    expect(context.configureDirectories({ resultsDir: process.cwd() })).toBe(false);
+    expect(context.resultsDir).toBe('');
+  });
+
+  it('routes forced reparsing through the guarded background iterator', () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      syncSessionsFromDir: vi.fn(),
+      syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+
+    expect(context.loadSessions(true, true)).toEqual([]);
+
+    expect(sessionDb.syncSessionsFromDir).not.toHaveBeenCalled();
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.any(LmuParser), true);
+  });
+
+  it('queues a forced session reparse until replay indexing finishes', async () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      syncReplaysAsyncIterator: vi.fn(createProgressingReplayIterator),
+      syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+
+    expect(context.runReplaySyncInBackground()).toBe(true);
+    context.loadSessions(true, true);
+    expect(sessionDb.syncSessionsAsyncIterator).not.toHaveBeenCalled();
+
+    await vi.runAllTimersAsync();
+
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.any(LmuParser), true);
   });
 });
 
@@ -133,8 +240,18 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
       setMetadata: vi.fn(),
+      clearTelemetryCache: vi.fn(),
     } as unknown as SessionDatabase;
-    const context = createContext(sessionDb);
+    const telemetryCatalog = { clear: vi.fn() } as unknown as TelemetryCatalog;
+    const context = new ServerContext({
+      resultsDir: '',
+      replaysDir: '',
+      telemetryDir: '',
+      parser: new LmuParser(),
+      sessionDb,
+      telemetryCatalog,
+      replayCache: {} as ReplayCacheService,
+    });
 
     try {
       context.configureDirectories({ resultsDir, replaysDir, telemetryDir, playerName: ' Test Driver ' });
@@ -144,6 +261,8 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       expect(context.telemetryDir).toBe(telemetryDir);
       expect(context.currentParser.configuredPlayerName).toBe('Test Driver');
       expect(sessionDb.setMetadata).toHaveBeenCalledWith('telemetry_dir', telemetryDir);
+      expect(sessionDb.clearTelemetryCache).toHaveBeenCalledTimes(1);
+      expect(telemetryCatalog.clear).toHaveBeenCalledTimes(1);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -194,6 +313,48 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr', hasDuckDbTelemetry: true });
     expect(session.duckdbFilename).toBe('Spa_P1.duckdb');
     expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledTimes(2);
+  });
+
+  it('removes stale telemetry links when the active directory has no match', () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      updateSessionMatchingReplay: vi.fn(),
+    } as unknown as SessionDatabase;
+    const telemetryCatalog = { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog;
+    const context = new ServerContext({
+      resultsDir: '',
+      replaysDir: '',
+      telemetryDir: '',
+      parser: new LmuParser(),
+      sessionDb,
+      telemetryCatalog,
+      replayCache: {} as ReplayCacheService,
+    });
+    const session = {
+      id: 'session-1',
+      timestamp: 1000,
+      trackVenue: 'Spa',
+      trackCourse: 'GP',
+      sessionType: 'Practice',
+      drivers: [],
+      hasDuckDbTelemetry: true,
+      duckdbFilename: 'old-directory.duckdb',
+      matchingReplayFile: {
+        name: 'Spa P1.Vcr',
+        path: 'C:\\replays\\Spa P1.Vcr',
+        sizeBytes: 200,
+        hasDuckDbTelemetry: true,
+        duckdbFilename: 'old-directory.duckdb',
+      },
+    } as unknown as DetailedSession;
+
+    context.enrichSessionsWithTelemetry([session]);
+
+    expect(session.hasDuckDbTelemetry).toBe(false);
+    expect(session.duckdbFilename).toBeUndefined();
+    expect(session.matchingReplayFile).toMatchObject({ hasDuckDbTelemetry: false });
+    expect(session.matchingReplayFile?.duckdbFilename).toBeUndefined();
   });
 });
 
@@ -256,5 +417,35 @@ describe('ServerContext reference laptime refresh', () => {
       '[Reference Laptimes] Startup refresh warning:',
       expect.any(Error)
     );
+  });
+});
+
+describe('ServerContext replay scan progress', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('publishes worker decoding progress before the scan completes', async () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      syncReplaysAsyncIterator: vi.fn(createProgressingReplayIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+
+    context.runReplaySyncInBackground();
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(context.getScanStatus()).toMatchObject({
+      running: true,
+      processed: 0,
+      total: 1,
+      currentFile: 'Spa P1.Vcr',
+      currentStage: 'Decoding telemetry and events',
+      filePercent: 50,
+    });
   });
 });
