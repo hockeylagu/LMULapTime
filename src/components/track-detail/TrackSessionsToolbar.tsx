@@ -1,4 +1,5 @@
 import React from 'react';
+import { Search } from 'lucide-react';
 import { SessionTypePills, HideEmptyToggle, SortDropdown } from '../common';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackDetailSortOption } from './trackDetailSortOptions.js';
@@ -37,13 +38,16 @@ export const TrackSessionsToolbar: React.FC<TrackSessionsToolbarProps> = ({
       />
 
       {/* Search Input */}
-      <input
-        type="text"
-        placeholder="Search car, file, driver..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="bg-lmu-bg border border-lmu-border rounded-xl px-3.5 py-1.5 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent w-full sm:w-48"
-      />
+      <div className="relative w-full sm:w-52">
+        <Search className="w-3.5 h-3.5 text-lmu-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search car, file, driver..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-9 pr-3.5 h-9 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-accent transition-all"
+        />
+      </div>
 
       {/* Hide Empty Toggle */}
       <HideEmptyToggle

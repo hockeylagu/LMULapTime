@@ -272,6 +272,49 @@ describe('Dashboard component', () => {
     fireEvent.click(hideEmptyBtn);
   });
 
+  it('shows reset button when track is selected and clicking it resets to All', () => {
+    const setSelectedTrack = vi.fn();
+    const { rerender } = render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="Spa"
+        setSelectedTrack={setSelectedTrack}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    // Reset button should exist when track !== 'All'
+    const resetTrackBtn = screen.getByRole('button', { name: /Reset track filter/i });
+    expect(resetTrackBtn).toBeInTheDocument();
+
+    fireEvent.click(resetTrackBtn);
+    expect(setSelectedTrack).toHaveBeenCalledWith('All');
+
+    // When selectedTrack is 'All', reset button should not exist
+    rerender(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={setSelectedTrack}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Reset track filter/i })).not.toBeInTheDocument();
+  });
+
   it('accurately displays Driving Overview aggregated metrics', () => {
     render(
       <Dashboard

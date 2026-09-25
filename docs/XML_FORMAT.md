@@ -79,13 +79,13 @@ The `<RaceResults>` element contains top-level server rules, session definitions
 | `<DamageMult>` | Integer | `0`–`100` (%) | Vehicle damage scaling factor (`50` = 50% damage). |
 | `<FuelMult>` | Integer | `1`, `2`, `3`, `5` (Multiplier) | Fuel rate consumption multiplier (`1` = 1x). |
 | `<TireMult>` | Integer | `1`, `2`, `3`, `5` (Multiplier) | Tire degradation multiplier. |
-| `<TireWarmers>` | Boolean | `0` or `1` | Whether starting tires are pre-warmed. |
-| `<FixedSetups>` | Boolean | `0` or `1` | Forces all drivers to use default baseline car setups. |
+| `<TireWarmers>` | Boolean | `0` or `1` | Player default profile flag. In LMU multiplayer, intermediate/advanced races (Open Setup) enforce cold tires per WEC rules; beginner races (Fixed Setup) provide warm tires. |
+| `<FixedSetups>` | Boolean | `0` or `1` | Legacy rFactor 2 flag (often written as `0` in XML results even when fixed). Correlated with `<FreeSettings>`. |
 | `<FixedUpgrades>` | Boolean | `0` or `1` | Disallows custom aerodynamic/engine upgrades. |
 | `<ParcFerme>` | Integer | `0` to `3` | Parc Fermé restrictions between Qualifying & Race. |
 | `<MechFailRate>`| Integer | `0` (None), `1` (Normal), `2` (Time-scaled) | Mechanical failure frequency. |
 | `<VehiclesAllowed>`| String | Comma-separated list | Vehicle / class eligibility whitelist. |
-| `<FreeSettings>` | Integer | Bitmask | Garage adjustability mask during session. |
+| `<FreeSettings>` | Integer | Bitmask | Bitmask of unlocked garage settings. `2147483647` (INT_MAX) = Open Setup; `63` or `0` = Fixed Setup (Daily Race Beginner). |
 | `<ClientFuelVisible>`| Integer | `0`–`3` | Whether opposing fuel loads are revealed to clients. |
 | `<Dedicated>` | Boolean | `0` or `1` | Dedicated server instance vs local listen server. |
 

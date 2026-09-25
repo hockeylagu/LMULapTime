@@ -5,6 +5,7 @@ import { ReferenceLaptimeEntry } from '../../../server/core/types';
 import { formatTime } from '../../utils/formatters';
 import { matchesCarClass, getPaceCategoryFromPercentage } from '../../utils/paceCategory';
 import { PaceBadge, LapStatusBadge } from '../common';
+import { CarClassBadge } from '../common/CarClassBadge.js';
 
 export interface CompareLapCardProps {
   lap: ComparableLap;
@@ -106,19 +107,19 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <p className="text-xs text-lmu-muted truncate" title={lap.driverName}>
             {lap.driverName}
           </p>
-          <p className="text-xs font-medium text-white truncate" title={lap.carType}>
-            {lap.carType}
-          </p>
-          <div className="flex items-center gap-1.5 text-[11px] text-lmu-muted mt-0.5">
-            <span className="px-1.5 py-0.2 bg-lmu-bg rounded text-[10px] font-semibold text-lmu-cyan border border-lmu-border">
-              {lap.carClass}
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            <span className="text-xs font-medium text-white truncate" title={lap.carType}>
+              {lap.carType}
             </span>
-            {lap.sessionName && (
-              <span className="truncate">
-                {lap.sessionName} ({lap.sessionType || 'P'})
-              </span>
+            {lap.carClass && (
+              <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />
             )}
           </div>
+          {lap.sessionName && (
+            <p className="text-[11px] text-lmu-muted truncate mt-0.5">
+              {lap.sessionName} ({lap.sessionType || 'P'})
+            </p>
+          )}
           <h4
             className={`text-2xl font-extrabold font-mono mt-0.5 ${
               lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'

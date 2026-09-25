@@ -20,6 +20,10 @@ export default {
           muted: '#8D99AE',
           dark: '#080A0F'
         }
+      },
+      fontFamily: {
+        sans: ['Segoe UI', 'sans-serif'],
+        mono: ['monospace'],
       }
     },
   },

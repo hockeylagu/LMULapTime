@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trophy } from 'lucide-react';
 import { formatTime } from '../../utils/formatters.js';
-import { PaceBadge, SectorSplitsRow } from '../common';
+import { PaceBadge, SectorSplitsRow, CarClassBadge } from '../common';
 import { PaceCategory } from '../../../server/core/types';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
@@ -71,9 +71,12 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
                   <PaceBadge category={paceInfo.category} percentage={paceInfo.pct} showPercentage />
                 )}
               </div>
-              <p className="text-[11px] text-lmu-muted mt-1 truncate">
-                {t.bestLapCar || 'Car'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-1 truncate">
+                <span className="text-[11px] text-lmu-muted truncate">{t.bestLapCar || 'Car'}</span>
+                {t.bestLapClass && (
+                  <CarClassBadge carClass={t.bestLapClass} carType={t.bestLapCar} size="xs" />
+                )}
+              </div>
             </div>
           </div>
 

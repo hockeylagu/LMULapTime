@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText, CheckCircle2 } from 'lucide-react';
 import { ReferenceBenchmarkDiff } from '../../../server/core/types';
+import { CarClassBadge } from '../common/CarClassBadge.js';
 
 export interface ReferenceChangesListProps {
   updateDiff: ReferenceBenchmarkDiff;
@@ -60,9 +61,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                   NEW
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-lmu-bg text-lmu-muted border border-lmu-border">
-                  {item.carClass}
-                </span>
+                <CarClassBadge carClass={item.carClass} size="xs" />
               </div>
               <div className="flex items-center gap-3 font-mono">
                 <span className="text-emerald-300 font-bold">Alien: {item.newAlienTimeString}</span>
@@ -86,9 +85,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                   UPDATED
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-lmu-bg text-lmu-muted border border-lmu-border">
-                  {item.carClass}
-                </span>
+                <CarClassBadge carClass={item.carClass} size="xs" />
               </div>
               <div className="flex items-center gap-3 font-mono">
                 <div className="flex items-center gap-1.5">
@@ -126,9 +123,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                   REMOVED
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-lmu-bg text-lmu-muted border border-lmu-border">
-                  {item.carClass}
-                </span>
+                <CarClassBadge carClass={item.carClass} size="xs" />
               </div>
               <div className="font-mono text-rose-300 line-through">
                 Alien: {item.oldAlienTimeString}

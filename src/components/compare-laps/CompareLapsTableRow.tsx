@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, Plus } from 'lucide-react';
 import { ComparableLap } from '../../utils/lapComparison';
 import { formatTime } from '../../utils/formatters';
-import { PaceBadge } from '../common';
+import { PaceBadge, CarClassBadge } from '../common';
 
 export interface CompareLapsTableRowProps {
   lap: ComparableLap;
@@ -77,7 +77,10 @@ export const CompareLapsTableRow: React.FC<CompareLapsTableRowProps> = ({
 
       <td className="px-3 py-2.5 font-sans">
         <span className="font-semibold text-white block truncate max-w-[160px]">{lap.driverName}</span>
-        <span className="text-[11px] text-lmu-muted truncate block max-w-[160px]">{lap.carType}</span>
+        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+          <span className="text-[11px] text-lmu-muted truncate block max-w-[140px]">{lap.carType}</span>
+          {lap.carClass && <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />}
+        </div>
       </td>
 
       <td className="px-3 py-2.5 text-center font-bold text-white">{lap.lapNum}</td>

@@ -3,6 +3,7 @@ import { Trophy, Gauge } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../server/core/types';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../utils/lapComparison.js';
 import { computeTheoreticalGap } from '../../../utils/formatters.js';
+import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';
 
@@ -105,10 +106,11 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
             </h3>
           </div>
           <span className="text-xs text-lmu-muted hidden sm:inline">•</span>
-          <span className="text-xs text-slate-200 font-semibold truncate max-w-xs" title={selectedDriver.carType}>
-            {selectedDriver.carType}{' '}
+          <span className="text-xs text-slate-200 font-semibold truncate max-w-xs flex items-center gap-1.5" title={selectedDriver.carType}>
+            <span className="truncate">{selectedDriver.carType}</span>
+            <CarClassBadge carClass={selectedDriver.carClass} carType={selectedDriver.carType} size="xs" />
             <span className="text-lmu-muted font-normal">
-              ({selectedDriver.carClass || 'Class'} • #{selectedDriver.carNumber})
+              (#{selectedDriver.carNumber})
             </span>
           </span>
         </div>

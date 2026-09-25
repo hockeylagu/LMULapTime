@@ -321,6 +321,7 @@ export class LmuParser {
       const rawTire = sessionDataNode?.TireMult ?? raceResults.TireMult;
       const rawWarmers = sessionDataNode?.TireWarmers ?? raceResults.TireWarmers;
       const rawSetups = sessionDataNode?.FixedSetups ?? raceResults.FixedSetups;
+      const rawFreeSettings = sessionDataNode?.FreeSettings ?? raceResults.FreeSettings;
       const rawUpgrades = sessionDataNode?.FixedUpgrades ?? raceResults.FixedUpgrades;
       const rawParcFerme = sessionDataNode?.ParcFerme ?? raceResults.ParcFerme;
       const rawMechFail = sessionDataNode?.MechFailRate ?? raceResults.MechFailRate;
@@ -329,9 +330,54 @@ export class LmuParser {
       const rawRaceTime = sessionDataNode?.RaceTime ?? raceResults.RaceTime;
       const rawVehiclesAllowed = sessionDataNode?.VehiclesAllowed ?? raceResults.VehiclesAllowed;
 
+      const parsedFreeSettings = parseNum(rawFreeSettings);
+      const isMultiplayer = rawSetting !== undefined && String(rawSetting).trim().toLowerCase() === 'multiplayer';
+
+      // Fixed Setups determination:
+      // In rFactor 2 / LMU engine lineage, <FixedSetups> is written as 0 in Results XML even when fixed
+      // because setup restrictions are governed by the bitmask <FreeSettings>.
+      // FreeSettings = 2147483647 (0x7FFFFFFF, INT_MAX) or -1 indicates completely Open Setup.
+      // FreeSettings = 63 (Daily Race Beginner), 0 (Strict fixed), etc. indicates Fixed Setup.
+      let isFixedSetups: boolean | undefined = undefined;
+      if (rawSetups !== undefined && rawSetups !== null && rawSetups !== '') {
+        isFixedSetups = parseBool(rawSetups);
+      }
+      if (parsedFreeSettings !== undefined) {
+        if (parsedFreeSettings === 2147483647 || parsedFreeSettings === -1) {
+          isFixedSetups = false;
+        } else if (isMultiplayer) {
+          isFixedSetups = true;
+        } else if (rawSetups !== undefined && rawSetups !== null && rawSetups !== '') {
+          isFixedSetups = parseBool(rawSetups);
+        }
+      }
+
+      // Tire Warmers / Blankets determination:
+      // In LMU Results XML, <TireWarmers> defaults to 1 from the player profile even when banned by server rules.
+      // 1) Multiplayer Open Setup (Intermediate/Advanced Daily Races & Special Events):
+      //    Follows official WEC regulations where tire blankets/warmers are strictly prohibited (cold tires).
+      // 2) Multiplayer Fixed Setup (Beginner Daily Races):
+      //    Tire blankets are provided so tires start pre-warmed.
+      // 3) Single Player / Race Weekend:
+      //    Governed by player setting <TireWarmers> (defaults to warm).
+      // 4) If <TireWarmers> is explicitly 0 or false, tire warmers are always false.
+      let isTireWarmers: boolean | undefined = undefined;
+      if (rawWarmers !== undefined && rawWarmers !== null && rawWarmers !== '') {
+        isTireWarmers = parseBool(rawWarmers);
+      }
+      if (isMultiplayer) {
+        if (isTireWarmers === false) {
+          isTireWarmers = false;
+        } else if (isFixedSetups === false) {
+          isTireWarmers = false;
+        } else if (isFixedSetups === true) {
+          isTireWarmers = true;
+        }
+      }
+
       const hasAnySetting = [
         rawSetting, rawServerName, rawDamage, rawFuel, rawTire, rawWarmers,
-        rawSetups, rawUpgrades, rawParcFerme, rawMechFail, rawDuration, rawRaceLaps, rawRaceTime, rawVehiclesAllowed
+        rawSetups, rawFreeSettings, rawUpgrades, rawParcFerme, rawMechFail, rawDuration, rawRaceLaps, rawRaceTime, rawVehiclesAllowed
       ].some(v => v !== undefined && v !== null && v !== '');
 
       const settings: SessionSettings | undefined = hasAnySetting ? {
@@ -340,8 +386,9 @@ export class LmuParser {
         damageMultiplier: parseNum(rawDamage),
         fuelMultiplier: parseNum(rawFuel),
         tireMultiplier: parseNum(rawTire),
-        tireWarmers: parseBool(rawWarmers),
-        fixedSetups: parseBool(rawSetups),
+        tireWarmers: isTireWarmers,
+        fixedSetups: isFixedSetups,
+        freeSettings: parsedFreeSettings,
         fixedUpgrades: parseBool(rawUpgrades),
         parcFerme: parseNum(rawParcFerme),
         mechFailRate: parseNum(rawMechFail),

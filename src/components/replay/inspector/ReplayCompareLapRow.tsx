@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { ComparableLap } from '../../../utils/lapComparison.js';
+import { CarClassBadge } from '../../common/CarClassBadge.js';
 
 export interface ReplayCompareLapRowProps {
   lap: ComparableLap;
@@ -33,7 +34,10 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
       </span>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-white">{lap.driverName}</span>
-        <span className="block truncate text-[11px] text-lmu-muted">{lap.carType}</span>
+        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+          <span className="block truncate text-[11px] text-lmu-muted">{lap.carType}</span>
+          {lap.carClass && <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />}
+        </div>
       </span>
       <span className="text-center font-mono text-xs text-lmu-muted">L{lap.lapNum}</span>
       <span

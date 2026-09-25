@@ -1,7 +1,7 @@
 import React from 'react';
 import { Car, ChevronRight, AlertCircle } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../utils/formatters';
-import { PaceBadge, ReplayIndicator } from '../common';
+import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './SessionList.js';
 import { PaceCategory } from '../../../server/core/types';
 
@@ -81,6 +81,9 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <span className="text-white font-medium truncate" title={p?.carType || 'N/A'}>
               {p ? p.carType : 'N/A'}
             </span>
+            {p?.carClass && (
+              <CarClassBadge carClass={p.carClass} carType={p.carType} size="xs" />
+            )}
           </div>
           <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
             <span className="text-[10px] text-lmu-muted uppercase">Best:</span>

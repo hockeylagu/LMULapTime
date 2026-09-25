@@ -712,6 +712,50 @@ describe('parser server module', () => {
       expect(session?.settings?.durationMinutes).toBe(60);
       expect(session?.settings?.vehiclesAllowed).toBe('Ferrari_488_GTE_EVO,');
     });
+
+    it('identifies fixed setup and warm tires in multiplayer beginner daily race', () => {
+      const xmlFixedWarm = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Multiplayer</Setting>
+    <TrackVenue>Circuit de la Sarthe</TrackVenue>
+    <FixedSetups>0</FixedSetups>
+    <FreeSettings>63</FreeSettings>
+    <TireWarmers>1</TireWarmers>
+    <Race><Minutes>20</Minutes><Driver><Name>Racer</Name></Driver></Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlFixedWarm);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+
+      const session = parser.parseSessionXml('fixed_warm_test.xml');
+      expect(session?.settings?.fixedSetups).toBe(true);
+      expect(session?.settings?.tireWarmers).toBe(true);
+      expect(session?.settings?.freeSettings).toBe(63);
+    });
+
+    it('identifies open setup and cold tires (no blankets) in multiplayer intermediate daily race', () => {
+      const xmlOpenCold = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Multiplayer</Setting>
+    <TrackVenue>Daytona International Speedway</TrackVenue>
+    <FixedSetups>0</FixedSetups>
+    <FreeSettings>2147483647</FreeSettings>
+    <TireWarmers>1</TireWarmers>
+    <Race><Minutes>30</Minutes><Driver><Name>Racer</Name></Driver></Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlOpenCold);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+
+      const session = parser.parseSessionXml('open_cold_test.xml');
+      expect(session?.settings?.fixedSetups).toBe(false);
+      expect(session?.settings?.tireWarmers).toBe(false);
+      expect(session?.settings?.freeSettings).toBe(2147483647);
+    });
   });
 
   describe('getDisplayTrackName', () => {

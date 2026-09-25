@@ -138,6 +138,15 @@ describe('DashboardHero', () => {
     expect(onSelectSession).toHaveBeenCalledWith('session-new');
   });
 
+  it('renders red badge for Race session type', () => {
+    render(<DashboardHero sessions={mockSessions} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
+    const badge = screen.getByTestId('hero-session-type-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('Race');
+    expect(badge.className).toContain('text-lmu-accent');
+    expect(badge.className).toContain('bg-lmu-accent/20');
+  });
+
   it('renders yellow 100Hz replay button when session has DuckDB telemetry', () => {
     const duckSessions = [
       {

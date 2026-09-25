@@ -165,7 +165,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
             <div className="flex items-center gap-4">
               <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="session" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span
                     className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
                       session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
