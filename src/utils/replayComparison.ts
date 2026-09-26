@@ -599,6 +599,30 @@ export function interpolateScalarAtDistance(
 }
 
 /**
+ * Elapsed time (from `startT`) at which a lap reaches the finish line (station L). The server
+ * clamps the station of every sample recorded past the line to L, so the first sample at L is in
+ * general beyond it: the line is placed along the driven distance from the last sample before it.
+ * A lap ending before the line is extrapolated (bounded like the start). Null if the whole lap
+ * sits on the line.
+ */
+function timeAtFinishLine(
+  points: ReplayTrajectoryPoint[],
+  stations: number[],
+  trackLengthM: number,
+  startT: number
+): number | null {
+  const j = stations.findIndex(st => st >= trackLengthM);
+  if (j === -1) return interpolatePointAtDistance(points, stations, trackLengthM, startT, true).timeSec;
+  if (j === 0) return null;
+  const dists = rawTrajectoryDistances(points);
+  const lineDist = dists[j - 1] + (trackLengthM - stations[j - 1]);
+  const span = dists[j] - dists[j - 1];
+  const t = span > 1e-6 ? Math.min(1, Math.max(0, (lineDist - dists[j - 1]) / span)) : 1;
+  const t0 = points[j - 1].timeSec || 0;
+  return t0 + t * ((points[j].timeSec || 0) - t0) - startT;
+}
+
+/**
  * Computes comparative telemetry points for the primary lap against a baseline lap,
  * matched either by canonical track layout station (s) or by absolute cumulative distance
  * along the track rather than by lap-fraction, so both laps are compared on the exact same
@@ -650,6 +674,16 @@ export function computeLapComparisons(
     totalBaselineRef = Math.max(1, baselineDists[baselineDists.length - 1]);
   }
 
+  // At and past the finish line (samples clamped to station L) the delta is the lap delta at the
+  // line itself - not a gap that keeps growing while the primary runs on past it.
+  const lineDelta = canMatchByStation && trackLengthM
+    ? (() => {
+        const primaryLineT = timeAtFinishLine(primaryPoints, primaryRefCoords, trackLengthM, primaryStartT);
+        const baselineLineT = timeAtFinishLine(baselinePoints, baselineRefCoords, trackLengthM, baselineStartT);
+        return primaryLineT === null || baselineLineT === null ? null : Number((primaryLineT - baselineLineT).toFixed(3));
+      })()
+    : null;
+
   const hasLateralOffsets = primaryPoints[0]?.lateralOffsetM !== undefined && baselinePoints[0]?.lateralOffsetM !== undefined;
   const baselineOffsets = hasLateralOffsets ? baselinePoints.map(p => p.lateralOffsetM ?? 0) : null;
 
@@ -670,8 +704,10 @@ export function computeLapComparisons(
     if (i === 0 && Math.abs(primaryRefCoords[0]) < 1.0) {
       // Start line boundary: elapsed time is identically 0 for both laps at s ≈ 0
       deltaTimeSec = 0;
-    } else if (i === n - 1 && targetBaselineRef >= totalBaselineRef) {
-      // Finish line boundary: exact difference in total lap times
+    } else if (lineDelta !== null && primaryRefCoords[i] >= totalBaselineRef) {
+      deltaTimeSec = lineDelta;
+    } else if (!canMatchByStation && i === n - 1 && targetBaselineRef >= totalBaselineRef) {
+      // Distance matching (no track stations): the recordings' last samples are taken as the line.
       deltaTimeSec = Number(finishLineDelta.toFixed(3));
     } else {
       const rawDelta = primaryRelativeT - basePoint.timeSec;

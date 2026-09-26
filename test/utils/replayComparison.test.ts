@@ -206,6 +206,27 @@ describe('replayComparison utility', () => {
       expect(maxDelta).toBeLessThanOrEqual(1.0);
     });
 
+    it('reports the delta at the finish line for samples recorded past it (clamped to station L)', () => {
+      // Straight 1000 m lap along +x. Primary: 50 m/s, recorded 20 m past the line - the server
+      // clamps those samples' station to L. Baseline: 50.5 m/s, trimmed 5 m after the start
+      // and 5 m before the finish. True lap delta = 1000/50 - 1000/50.5 = 0.198 s.
+      const trackLengthM = 1000;
+      const lap = (speedMps: number, fromX: number, toX: number): ReplayTrajectoryPoint[] => {
+        const points: ReplayTrajectoryPoint[] = [];
+        for (let x = fromX; x <= toX; x += 10) {
+          points.push({ x, y: 0, z: 0, distM: x - fromX, stationM: Math.min(x, trackLengthM), timeSec: 100 + x / speedMps, speedKmh: speedMps * 3.6 });
+        }
+        return points;
+      };
+      const primary = lap(50, 0, 1020);
+      const baseline = lap(50.5, 5, 995);
+      const comps = computeLapComparisons(primary, baseline, trackLengthM);
+      const trueDelta = 1000 / 50 - 1000 / 50.5;
+      for (let i = primary.findIndex(p => p.stationM === trackLengthM); i < comps.length; i++) {
+        expect(comps[i].deltaTimeSec, `sample ${i} at/after the line`).toBeCloseTo(trueDelta, 2);
+      }
+    });
+
     it('handles single-point and degenerate trajectories gracefully without NaN or infinite deltas', () => {
       const singlePoint: ReplayTrajectoryPoint[] = [
         { x: 0, y: 0, z: 0, speedKmh: 0, throttle: 0, brake: 0, steerYaw: 0, timeSec: 100 },
