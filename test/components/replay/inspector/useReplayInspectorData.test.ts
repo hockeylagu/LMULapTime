@@ -73,6 +73,27 @@ describe('useReplayInspectorData', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'));
   });
 
+  it('asks for one point every 2 m by default, and every sample at full resolution', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response(trajectory);
+    });
+    const trajectoryUrls = () => fetchMock.mock.calls.map(([input]) => String(input)).filter(url => url.includes('/trajectory?'));
+    const lastTrajectoryUrl = () => trajectoryUrls()[trajectoryUrls().length - 1];
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.telemetryResolution).toBe('high');
+    expect(trajectoryUrls()[0]).toContain('trajectory?pointSpacingM=2&');
+
+    act(() => result.current.handleChangeResolution('full'));
+    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?maxPoints=0&'));
+    act(() => result.current.handleChangeResolution('standard'));
+    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?pointSpacingM=4&'));
+  });
+
   it('reports metadata load failures and resets data when closed', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(response(null, false));
     const { result, rerender } = renderHook(

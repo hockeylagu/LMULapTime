@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { Activity, Zap, Cpu, Sparkles, X, Info } from 'lucide-react';
+import { TELEMETRY_POINT_SPACING_M, TelemetryResolution } from './telemetryResolution.js';
 
 export interface TelemetryResolutionPopoverProps {
   isOpen: boolean;
   onClose: () => void;
-  telemetryResolution: number;
-  onChangeResolution: (res: number) => void;
+  telemetryResolution: TelemetryResolution;
+  onChangeResolution: (res: TelemetryResolution) => void;
   pointsCount: number;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
@@ -118,8 +119,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
       <div className="flex items-start gap-2 p-2 rounded-lg bg-lmu-card/50 border border-lmu-border/40 text-[10px] text-lmu-muted leading-relaxed">
         <Info className="w-3.5 h-3.5 text-lmu-accent shrink-0 mt-0.5" />
         <span>
-          <strong className="text-white font-semibold">Trade-off:</strong> Lower sample counts render faster on low-power devices.
-          Higher resolution captures rapid pedal transitions, curb strikes, and eliminates apex interpolation jitter.
+          <strong className="text-white font-semibold">Trade-off:</strong> Points are spaced along the lap, so every track gets the same detail.
+          Fewer points load faster; scrubbing costs the same at any resolution. Full Raw keeps every recorded sample.
         </span>
       </div>
 
@@ -130,11 +131,11 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
           <button
             type="button"
             onClick={() => {
-              onChangeResolution(1200);
+              onChangeResolution('standard');
               onClose();
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-              telemetryResolution === 1200 && !isFullResolution
+              telemetryResolution === 'standard' && !isFullResolution
                 ? 'bg-sky-500/20 border-sky-500/60 text-white shadow-sm'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}
@@ -143,18 +144,18 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Cpu className="w-3 h-3 text-sky-400" />
               Standard
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(1200, effectiveRaw).toLocaleString()} pts</span>
-            <span className="text-[9px] text-sky-300/80 mt-0.5">Fast 60fps</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.standard} m</span>
+            <span className="text-[9px] text-sky-300/80 mt-0.5">Lighter payload</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              onChangeResolution(2400);
+              onChangeResolution('high');
               onClose();
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-              telemetryResolution === 2400 && !isFullResolution
+              telemetryResolution === 'high' && !isFullResolution
                 ? 'bg-emerald-500/20 border-emerald-500/60 text-white shadow-sm'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}
@@ -163,18 +164,18 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Zap className="w-3 h-3 text-emerald-400" />
               High
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{Math.min(2400, effectiveRaw).toLocaleString()} pts</span>
-            <span className="text-[9px] text-emerald-300/80 mt-0.5">2x Precision</span>
+            <span className="text-[9px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.high} m</span>
+            <span className="text-[9px] text-emerald-300/80 mt-0.5">Default</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              onChangeResolution(0);
+              onChangeResolution('full');
               onClose();
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-              telemetryResolution === 0 || isFullResolution
+              telemetryResolution === 'full' || isFullResolution
                 ? 'bg-purple-500/20 border-purple-500/60 text-white shadow-[0_0_10px_rgba(168,85,247,0.3)]'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}

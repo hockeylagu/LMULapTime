@@ -135,6 +135,20 @@ export function nearestSelectedIndex(selected: number[], index: number): number 
   return lo > 0 && index - selected[lo - 1] < selected[lo] - index ? lo - 1 : lo;
 }
 
+/**
+ * How many points give one every `spacingM` metres of the lap: over the track length when the
+ * lap is on a known track, else over the distance the recording covers. A lap is then served at
+ * the same density whatever the track - Le Mans (13.6 km) gets ~6,800 points at 2 m where a fixed
+ * count would spread it three times thinner than Bahrain.
+ */
+export function pointBudgetForSpacing(points: ReplayTrajectoryPoint[], trackLengthM: number | undefined, spacingM: number): number {
+  let lengthM = trackLengthM ?? 0;
+  if (!(lengthM > 0)) {
+    for (let i = 1; i < points.length; i++) lengthM += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
+  }
+  return Math.max(2, Math.ceil(lengthM / spacingM));
+}
+
 /** The samples chosen by selectFeatureSamples. */
 export function downsampleTrajectoryPoints(points: ReplayTrajectoryPoint[], maxPoints: number): ReplayTrajectoryPoint[] {
   return selectFeatureSamples(points, maxPoints).map(i => points[i]);

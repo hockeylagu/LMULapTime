@@ -8,7 +8,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={false}
         onClose={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
         rawPointsCount={7200}
@@ -24,7 +24,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={true}
         onClose={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
         rawPointsCount={7200}
@@ -44,7 +44,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={true}
         onClose={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
         rawPointsCount={7200}
@@ -69,7 +69,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={true}
         onClose={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
         hasDuckDb={true}
@@ -95,7 +95,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={true}
         onClose={handleClose}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={handleChangeResolution}
         pointsCount={2400}
         rawPointsCount={7200}
@@ -103,15 +103,19 @@ describe('TelemetryResolutionPopover', () => {
       />
     );
 
-    // Click Standard (1,200 pts)
-    const standardBtn = screen.getByRole('button', { name: /Standard/i });
+    // Click Standard (one point every 4 m)
+    const standardBtn = screen.getByRole('button', { name: /Standard.*1 pt \/ 4 m/i });
     fireEvent.click(standardBtn);
-    expect(handleChangeResolution).toHaveBeenCalledWith(1200);
+    expect(handleChangeResolution).toHaveBeenCalledWith('standard');
+
+    // Click High (one point every 2 m, the default)
+    fireEvent.click(screen.getByRole('button', { name: /High.*1 pt \/ 2 m/i }));
+    expect(handleChangeResolution).toHaveBeenCalledWith('high');
 
     // Click Full Raw (100% uncompressed)
     const fullRawBtn = screen.getByRole('button', { name: /Full Raw/i });
     fireEvent.click(fullRawBtn);
-    expect(handleChangeResolution).toHaveBeenCalledWith(0);
+    expect(handleChangeResolution).toHaveBeenCalledWith('full');
   });
 
   it('calls onClose when close button is clicked', () => {
@@ -121,7 +125,7 @@ describe('TelemetryResolutionPopover', () => {
       <TelemetryResolutionPopover
         isOpen={true}
         onClose={handleClose}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
       />

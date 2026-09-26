@@ -31,7 +31,7 @@ describe('TelemetryStripToolbar', () => {
         viewStart={0}
         viewEnd={100}
         onResetZoom={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         onChangeResolution={handleChangeResolution}
         pointsCount={2400}
         rawPointsCount={7200}
@@ -48,7 +48,7 @@ describe('TelemetryStripToolbar', () => {
     expect(screen.getByText(/60 Hz/i)).toBeInTheDocument();
   });
 
-  it('displays Full Raw badge when resolution is 0 or isFullResolution is true', () => {
+  it('displays Full Raw badge when resolution is full or isFullResolution is true', () => {
     render(
       <TelemetryStripToolbar
         interactionMode="scrub"
@@ -57,7 +57,7 @@ describe('TelemetryStripToolbar', () => {
         viewStart={0}
         viewEnd={100}
         onResetZoom={vi.fn()}
-        telemetryResolution={0}
+        telemetryResolution="full"
         onChangeResolution={vi.fn()}
         pointsCount={7200}
         rawPointsCount={7200}
@@ -84,7 +84,7 @@ describe('TelemetryStripToolbar', () => {
         hasDuckDb={true}
         onSelectSource={handleSelectSource}
         onChangeResolution={vi.fn()}
-        telemetryResolution={2400}
+        telemetryResolution="high"
         pointsCount={2400}
         rawSampleRateHz={100}
       />

@@ -23,9 +23,12 @@ Since phase 4 the server cuts every lap of a recognised track exactly at the sta
 (`server/tracks/lapLineCut.ts`), using the recording of the neighbouring laps stored in the
 cache, so every fixture lap starts at station 0 and ends at the track length.
 Laps are reduced to the requested resolution by `server/replay/trajectoryDownsampler.ts`
-(Visvalingam-Whyatt over pedals and speed): at 2400 points the pedal points of the four pairs
-match the full-resolution lap within 2 m (9 m once, Spa), except the Le Mans T13 baseline
-throttle pick-up, which no 2400-point reduction keeps.
+(Visvalingam-Whyatt over pedals and speed). Since phase 6 the inspector asks for one point every
+2 m of the lap (`pointSpacingM=2`: 2,863 points at Daytona, 6,813 at Le Mans) instead of a fixed
+2400, and the fixtures are captured the same way. `tools/analysis/measureLapDensity.ts` compares
+each budget with full resolution: at 2 m no pedal point is lost and they match within 5 m (Spa T2
+baseline pick-up; 0-1 m elsewhere), corner deltas within 2 ms, final deltas exactly; at 2400 the Le
+Mans T13 baseline pick-up was lost. Scrubbing and panning cost the same at any density.
 
 Since phase 5 an end with no recording beyond it but within 25 m of the line (the replay starts or
 stops there) is extended to the line by the server, and `trackLengthM` is the centreline's own
@@ -65,4 +68,5 @@ when toggling the comparison lap.
 - Daytona: `http://localhost:5173/#/telemetry?replayName=Daytona+International+Speedway+Road+Course+R1+10.Vcr&lap=2&baselineReplay=Daytona+International+Speedway+Road+Course+R1+10.Vcr&compareDriver=Mack+Pearmain&compareLapNum=9`
 - Le Mans: `http://localhost:5173/#/telemetry?replayName=Circuit+de+la+Sarthe+R1+41.Vcr&lap=4&baselineReplay=Circuit+de+la+Sarthe+R1+41.Vcr&compareDriver=Richard+Faber&compareLapNum=3`
 - Le Mans, cross-session baseline (the original selector bug): `http://localhost:5173/#/telemetry?replayName=Circuit+de+la+Sarthe+R1+41.Vcr&lap=4&baselineReplay=Circuit+de+la+Sarthe+R1+27.Vcr&compareSessionId=2026_09_03_14_41_14-69R1&compareDriver=Andrzej+Nycz&compareLapNum=4`
-- Also switch the telemetry resolution between 1200 and 2400 on one of them.
+- Also switch the telemetry resolution between Standard (4 m), High (2 m) and Full Raw on one of them,
+  and scrub and pan the map at Full Raw on Le Mans: it should stay smooth.

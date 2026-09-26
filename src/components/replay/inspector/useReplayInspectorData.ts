@@ -5,6 +5,7 @@ import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shar
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
+import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ export function useReplayInspectorData({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [chartZoomRange, setChartZoomRange] = useState<{ start: number; end: number } | null>(null);
-  const [telemetryResolution, setTelemetryResolution] = useState<number>(2400);
+  const [telemetryResolution, setTelemetryResolution] = useState<TelemetryResolution>(DEFAULT_TELEMETRY_RESOLUTION);
   const [selectedSource, setSelectedSource] = useState<'duckdb' | 'vcr'>('duckdb');
 
   const animRef = useRef<number | null>(null);
@@ -107,7 +108,7 @@ export function useReplayInspectorData({
 
     Promise.all([
       fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${telemetryResolution}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, rawTrajData]) => {
         if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
@@ -264,7 +265,7 @@ export function useReplayInspectorData({
       ? Promise.resolve(metadata)
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
-    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
+    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
       .then(async r => {
         if (r.ok) return r.json();
         const body: unknown = await r.json().catch(() => null);
@@ -303,7 +304,7 @@ export function useReplayInspectorData({
   const fetchTrajectory = (
     lapNum?: number,
     slot?: number | null,
-    res: number = telemetryResolution,
+    res: TelemetryResolution = telemetryResolution,
     src: 'duckdb' | 'vcr' = selectedSource
   ) => {
     if (!activeReplayName) return;
@@ -313,7 +314,7 @@ export function useReplayInspectorData({
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
     const sourceParam = `&source=${src}`;
-    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?maxPoints=${res}&lap=${targetLap}${slotParam}${sourceParam}`)
+    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
       .then(r => (r.ok ? r.json() : null))
       .then((rawTrajData: ReplayTrajectoryData | null) => {
         if (requestId !== trajectoryRequestIdRef.current) return;
@@ -348,7 +349,7 @@ export function useReplayInspectorData({
     onLapChange?.(lapNum); fetchTrajectory(lapNum, selectedDriverSlot);
   };
 
-  const handleChangeResolution = (res: number) => {
+  const handleChangeResolution = (res: TelemetryResolution) => {
     setTelemetryResolution(res); fetchTrajectory(trajectory?.currentLap, selectedDriverSlot, res);
   };
 

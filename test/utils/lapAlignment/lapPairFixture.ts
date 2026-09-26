@@ -26,7 +26,8 @@ import {
 } from '../../../src/components/replay/map/replayMapUtils.js';
 
 /**
- * Real lap pairs captured from the replay API (`/trajectory?maxPoints=2400`), stored as columns
+ * Real lap pairs captured from the replay API at the inspector's default resolution
+ * (`/trajectory?pointSpacingM=2`, one point every 2 m), stored as columns
  * with only the channels the comparison pipeline reads. Captured with
  * tools/analysis/captureLapPairFixture.ts; see ./README.md.
  */
@@ -43,6 +44,9 @@ interface FixtureLap {
   lapTimeSec: number;
   layoutKey?: string;
   trackLengthM: number;
+  /** Requested resolution: a point spacing ("2m") or a point count. */
+  resolution?: string;
+  /** Points the server reduced the lap to. */
   maxPoints: number;
   columns: Record<string, Array<number | null>>;
 }
