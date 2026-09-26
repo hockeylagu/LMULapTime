@@ -6,178 +6,191 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/Tests-721%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-1060%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
 
-A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Ingests high-fidelity native **100 Hz DuckDB telemetry** (`UserData/Telemetry/*.duckdb`), scans session XML logs, and reverse-engineers binary `.Vcr` replays to deliver professional-grade driver coaching, synchronized multi-metric waveforms, 4-wheel dynamics, physical track limit corridors, and alien benchmark tracking.
+A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Built for sim racers and endurance teams who want to find lap time, master vehicle dynamics, optimize setups, and compare their driving against alien benchmarks.
+
+Plug-and-play with zero manual configuration: automatically indexes native session logs, high-fidelity 100 Hz telemetry, and binary replays into a lightning-fast motorsport analytics dashboard.
 
 ---
 
-### ⚡ Feature Highlights at a Glance
+## ⚡ What You Can Do
 
-| Feature Hub | Core Capabilities |
+```
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                           LMU LAP TIME ANALYZER                        │
+  ├───────────────────────────────────┬────────────────────────────────────┤
+  │ 🏎️  Cockpit & Driver Dashboard    │ 🗺️  Interactive 2D GPS Replay Map   │
+  │    Personal bests, pace trends,   │    Asphalt limits, apex speeds,    │
+  │    consistency & execution gaps   │    racing lines & friction circle  │
+  ├───────────────────────────────────┼────────────────────────────────────┤
+  │ 🎯  Corner Technique Breakdown    │ 📈  Synchronized Telemetry Studio  │
+  │    Entry braking, rotation apex,  │    Speed, pedals, steering yaw,    │
+  │    and exit throttle pick-up      │    4-wheel temps, wear & hybrid    │
+  ├───────────────────────────────────┼────────────────────────────────────┤
+  │ ⚔️  Head-to-Head Lap Battles      │ 🤖  AI Race Engineer Debriefs      │
+  │    Micro-sector delta splits &    │    Ranked technique deficits &     │
+  │    theoretical optimal laps       │    Gemini garage setup advice      │
+  ├───────────────────────────────────┼────────────────────────────────────┤
+  │ 📋  Race Stewards & Session Logs  │ 🌐  Live Alien Benchmark Sync      │
+  │    Standings, tire/fuel curves,   │    Community reference lap times   │
+  │    penalties & collision ledger   │    with patch update changelogs    │
+  └───────────────────────────────────┴────────────────────────────────────┘
+```
+
+---
+
+## 🌟 Feature Tour
+
+### 🏎️ 1. Cockpit Dashboard & Performance Hub
+- **Driver Hero Banner**: Immediate visibility into your all-time stats, total driven sessions, track coverage, personal bests, and True Pace.
+- **True Pace (Top 3 Clean Lap Average)**: Strips away lucky one-off laps to show your genuine, repeatable race pace.
+- **Consistency Rating (%)**: Evaluates your driving precision across clean flying laps, flagging erratic stints.
+- **Execution Gap Tracker**: Highlights the difference between your single fastest lap and your theoretical optimal sectors ($S1 + S2 + S3$).
+- **Visual Stint Sparklines**: Real-time pace progression mini-charts across your recent outings.
+- **Multiclass Filtering**: Switch effortlessly between Hypercar (LMH/LMDh), LMP2, LMGT3, and GTE, or filter down to specific car models (e.g. Ferrari 499P, Porsche 911 GT3 R, BMW M4 GT3).
+
+---
+
+### 🗺️ 2. Interactive 2D GPS Track Map & Replay Studio
+- **Full Physical Track Limits**: Exact 1:1 scale road boundaries, asphalt corridors, and pit lanes across all 32 driven layouts.
+- **Multi-Mode Colored Racing Lines**:
+  - **Speed Heatmap**: Spot corner apex minimums and maximum straight speeds at a glance.
+  - **Pedal Application**: Visualize brake release, trail braking duration, and throttle commitment zones.
+  - **Lateral G & Yaw**: Identify high-load cornering phases and car rotation behavior.
+- **Dynamic G-G Friction Circle**: Real-time traction diagram mapping longitudinal vs. lateral acceleration to visualize tire grip utilization and vehicle balance envelope.
+- **Synchronized Playback Scrubber**: Scrub through any lap with full playback controls, corner apex markers, and a live telemetry HUD.
+- **Mini-Corner Focus**: Dedicated zoomed minimaps that isolate individual turns during deep analysis.
+
+---
+
+### 🎯 3. Turn-by-Turn Corner Analysis & Driving Technique
+- **Complete Corner Speed Breakdown**: Detailed table and delta graphs comparing your corner speeds, braking initiation points, and apex speeds against reference laps.
+- **Three-Phase Corner Deconstruction**:
+  - **Entry Phase**: Measures braking point distance, peak brake application, and trail-braking pressure decay rate.
+  - **Rotation Phase**: Measures minimum corner speed, yaw rotation rate, and apex clipping proximity.
+  - **Exit Phase**: Measures throttle pick-up timing relative to apex, throttle ramp rate, and traction stability on corner exit.
+- **Corner Consistency Scoring**: Automatically spots which specific turns cost you time through erratic braking or inconsistent lines across stints.
+
+---
+
+### 📈 4. High-Precision Multi-Channel Telemetry Studio
+Synchronized multi-metric telemetry traces across distance or elapsed lap time:
+
+| Telemetry Channel | What It Shows |
 | :--- | :--- |
-| **⚡ 100 Hz DuckDB Telemetry** | Primary ingestion of native LMU `.duckdb` logs with microsecond timing, continuous 100 Hz sampling, and fused 2D GPS trajectories. |
-| **🤖 AI Race Engineer & Coaching** | Deterministic technique deficit ranking ($P = \text{Loss} \times \text{Repeatability} \times \text{Confidence}$) + Google Gemini debriefs. |
-| **🛰️ Replay Studio & 4-Wheel Dynamics** | Native binary `gMb1.002f` parser, 11 uncombined telemetry channels, 4-corner wheel dynamics (suspension, wheel speeds, tire wear/pressures/temps, brakes), interactive scrubber. |
-| **🏁 Physical Track Boundaries** | Pre-aligned road limits & asphalt corridors across **all 21 driven layouts** in exact 1:1 LMU simulation coordinates ($x, z$). |
-| **🔬 Deep Lap Comparison Studio** | Head-to-head delta analysis, micro-sector time divergence ($\pm$s), theoretical optimal lap, and synchronized telemetry overlays. |
-| **📊 Session Telemetry & Stewards Log** | Class classifications, incident ledger (penalties, collisions, cut warnings), flying lap filtering, and stint tire/fuel consumption. |
-| **📈 Historical Pace & Progression** | Top 3 Clean Lap Average (True Pace), lap consistency rating (%), execution gap tracking, and multi-class car model filters. |
-| **🌐 Community Benchmarks & Diff Sync** | Live Google Sheets alien benchmark sync with automated changelog highlighting new, updated, and deprecated targets. |
-| **⚡ Blazing-Fast SQLite WAL Cache** | Incremental sync, non-blocking background replay scanner, Brotli lap compression, and sub-millisecond query performance. |
+| **Speed & Lap Delta** | Speed trace overlaid with live +/- time divergence (green for gains, red for time lost). |
+| **Pedal Inputs** | Throttle and brake pedal positions with active **ABS** and **Traction Control (TC)** cut indicators. |
+| **Steering & Balance** | Steering angle trace with real-time **Understeer / Oversteer** balance detection. |
+| **G-Forces (Accel)** | Longitudinal acceleration (braking/acceleration), Lateral G (cornering load), and Total G vector. |
+| **Dynamics** | Vehicle yaw rate, body slip angle, and lateral racing line offset. |
+| **Suspension** | 4-corner suspension deflection and damper travel (FL, FR, RL, RR) in millimeters. |
+| **Wheel Speeds & Slip** | Individual 4-wheel rotational velocity and dynamic slip to detect lockups and wheelspin. |
+| **Tire Temps & Pressures** | Dynamic 4-wheel tire pressures (kPa) and inner/carcass temperatures (°C). |
+| **Tire Degradation** | Stint tire wear progression (0–100%) for all 4 corners. |
+| **Brake Thermals** | 4-corner brake rotor temperatures (°C) to monitor thermal fade and cooling duct efficiency. |
+| **Hypercar Hybrid Powertrain** | Virtual Energy stint tank, high-voltage State of Charge (SoC), and MGU-K regen rates. |
+
+- **Customizable Presets**: Switch instantly between layout presets (*Driver Inputs*, *Chassis Dynamics*, *Tires & Thermals*, *Brakes*, *Hybrid Powertrain*, or *All Channels*). Reorder channels, toggle traces, and save your own custom layouts.
+- **Adjustable Resolution**: Toggle high-density downsampling to balance ultra-fine telemetry fidelity with smooth 60fps chart rendering.
 
 ---
 
-## ✨ In-Depth Feature Tour
+### ⚔️ 5. Head-to-Head Lap Comparison Studio
+- **Lap-to-Lap Battles**: Compare any two laps side-by-side—your personal best, session best, community alien benchmark, or a teammate's lap.
+- **Micro-Sector Delta Splits**: Color-coded sector-by-sector time differentials ($\pm$s) and speed deltas ($\pm$ km/h).
+- **Interactive Delta Curve**: Pinpoints the exact meter on circuit where time was gained or lost.
+- **Theoretical Optimal Lap Builder**: Synthesizes your best individual sectors ($S1 + S2 + S3$) into an ultimate benchmark target.
+- **Strict Layout Disambiguation**: Guarantees comparisons only happen between identical track configurations (e.g. Monza GP never mixes with Curva Grande; Bahrain GP never mixes with Outer or Paddock).
 
-### 🤖 1. Deterministic Coaching Engine & AI Race Engineer
-- **Deterministic Technique Deficit Ranking**:
-  - Automatically identifies and ranks your top driving technique deficits across every corner using pure deterministic evidence:
+---
+
+### 🤖 6. AI Race Engineer & Automated Driver Coaching
+- **Deterministic Deficit Ranking**:
+  - Automatically identifies and ranks your top driving technique deficits across every corner using deterministic telemetry evidence:
     $$\text{Priority} = \text{Estimated Time Loss} \times \text{Repeatability} \times \text{Confidence}$$
-  - Evaluates **Braking Points** (early/late braking initiation), **Trail Braking Shape** (pressure decay rate and release area), **Throttle Application** (distance from apex to initial pick-up and ramp rate to 100%), **Apex Minimum Speed**, and **Line Deviation**.
-  - **Evidence-Linked Drilldown**: Click directly on any coaching finding to immediately focus on the corner, compare baseline vs. target laps, and inspect synchronized telemetry waveforms.
-- **Natural Language Coaching Reports (Google Gemini)**:
-  - Powered by `@google/genai` to synthesize telemetry metrics into actionable engineer debriefs, technique critiques, and garage setup advice.
-  - Generates comprehensive post-stint summaries, tire management guidance, and session improvement tips.
-- **Historical Coaching & Progression Archive**:
-  - Automatically persists historical coaching reports in SQLite cache, allowing you to review your technique progression across multiple sessions.
+  - No AI hallucinations—priorities are rooted purely in physics, telemetry deltas, and repeatability.
+  - **1-Click Drilldown**: Click any coaching finding to immediately zoom into the corner on the GPS track map and overlay telemetry waveforms.
+- **Natural Language Race Engineer Debriefs (Google Gemini)**:
+  - Powered by `@google/genai` to synthesize telemetry into actionable driver debriefs, technique critiques, and garage setup recommendations.
+  - Explains *why* time was lost (e.g. overslowing at apex, oversaturating front tires on entry, hesitating on throttle pick-up) and gives concrete setup tweaks to address car balance.
+- **Historical Coaching Archive**: Saves coaching debriefs so you can track your skill progression over time.
 
 ---
 
-### 🛰️ 2. Dual-Engine Telemetry Studio (100 Hz DuckDB & Binary VCR)
-- **Primary 100 Hz DuckDB Ingestion**:
-  - Automatically queries native LMU `.duckdb` logs (`UserData/Telemetry/`) containing over 58 channels at 100 Hz with microsecond timestamp precision.
-  - Slices continuous session logs into clean flying laps with sector boundary tags.
-  - **Trajectory Fusion**: Fuses 100 Hz DuckDB vehicle dynamics with VCR 2D spatial coordinates and racing line data.
-  - **UI Provenance Indicator**: Shows `⚡ 100Hz DuckDB` badge with source filename, automatically falling back to `🎬 VCR` if DuckDB is absent.
-- **Native Binary VCR Decoder (`gMb1.002f`)**: Directly extracts high-frequency time-slice positions, multi-driver telemetry, and official Class 6 Type 6 timing loops without relying on third-party companion tools.
-- **Customizable & Renamable Telemetry Channel Presets**:
-  - **Quick Preset Selector**: Switch telemetry layouts instantly via the toolbar dropdown (e.g. *Standard*, *Powertrain & Inputs*, *Vehicle Dynamics & Line*, *Suspension & Wheels*, *Tires & Wear*, *Brakes & Thermals*, or *All Channels*).
-  - **Interactive Preset Manager**: Rename any preset, toggle channels on/off, reorder channels with up/down controls, create new presets, duplicate, or delete custom presets.
-  - **Persistent Customization**: All presets and active layout choices are stored in browser `localStorage` with a 1-click **Reset to Defaults** option.
-- **Full Spectrum of 11 Uncombined Telemetry Channels**:
-  - **Vehicle Speed**: Speed trace (0 to max km/h) with baseline comparison and delta overlay.
-  - **Delta Time**: Real-time lap delta curve with emerald green (gaining) and rose red (losing) time divergence areas.
-  - **Throttle Input**: Dedicated throttle pedal position (0–100%) with live Traction Control (`TC`) cut alerts.
-  - **Brake Input**: Dedicated brake pedal pressure (0–100%) with active Anti-Lock Braking (`ABS`) indicators.
-  - **Transmission Gear**: Forward gear step trace (1–7, N, R) highlighting precise shift points in amber/yellow.
-  - **Steering Angle**: Independent steering yaw curve (-180° to +180°) with center zero reference line and L/R degrees.
-  - **Engine RPM**: Real internal combustion engine revs decoded from DuckDB or binary replay stream with baseline comparison in electric violet.
-  - **Lateral Track Offset**: Lateral racing line displacement in meters relative to reference track corridor / centerline.
-  - **Suspension Travel / Deflection**: 4-wheel damper/suspension deflection in millimeters (FL, FR, RL, RR) with min/max grid.
-  - **Individual Wheel Speeds**: 4-wheel rotational velocity in km/h to isolate corner wheel slip, locking, and curb hop.
-  - **Tire Pressures & Temperatures**: 4-wheel dynamic tire pressures in kPa and carcass/inner temps in °C.
-  - **Tire Wear & Brake Temperatures**: Stint tire degradation (0–100%) and 4-corner brake rotor thermals in °C.
-- **Interactive 2D Trajectory Map**:
-  - Renders the complete circuit layout with customizable colored racing lines (**Speed gradient**, **Throttle/Brake application**, and **Lateral Yaw**).
-  - Synchronized interactive playback scrubber with live apex position tracking, corner metrics, and start/finish loops.
-- **Pit Stop & Garage Lifecycle Intelligence**:
-  - Event-driven tracking of pit lane entrance, pit box stop durations, refueling/tire servicing intervals, pit lane exit, and garage motion states (`inPit`, `inGarage`).
-- **Telemetry & Reverse-Engineering Specifications**:
-  - [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): Detailed catalog of LMU DuckDB tables, channels, and session event tags.
-  - [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md): Comprehensive reverse-engineered binary replay specification.
-  - [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): Technical deep-dive and empirical accuracy comparison (VCR vs DuckDB vs Shared Memory Capture).
+### 📋 7. Session Intelligence & Race Stewards Ledger
+- **Multiclass Race Classifications**: Full standings with class positions, interval gaps to the leader, finish statuses (Finished, DNF, DNS, DQ), and position changes ($\Delta$).
+- **Clean Flying Lap Filtering**: Automatically separates valid flying laps from standing/rolling starts, garage exits, in-laps, and out-laps.
+- **Race Stewards Incident Ledger**:
+  - Automatically extracts penalties, contact collisions, track limit cuts, and mechanical damage from session logs.
+  - Displays elapsed session time, driver involved, and penalty severity in a dedicated stewards timeline.
+- **Server Rules & Setup Badges**: Inspects server settings (Mechanical Damage, Tire Warmers, Fixed Setups, Parc Fermé, Fuel/Tire Multipliers) directly from session logs.
 
 ---
 
-### 🏁 3. Physical Track Boundaries & Limit Corridors (21 Driven Layouts)
-- **Full Physical Road Corridors**:
-  - Automatically generates and pre-aligns physical left and right boundary polygons (`leftBoundary`, `rightBoundary`, `centerline`) in exact LMU simulation coordinates ($x, z$).
-  - Evaluates track limit respect and racing line placement relative to actual kerb limits and road margins.
-- **Multi-Source Ingestion & 1-Step Procrustes Alignment**:
-  - **LMU Native API 3D Trackmaps**: In-game 1:1 ground truth extraction with curvature-driven physical road reconstruction, variable width profiling, 3D elevation, pit lane routing, pit stalls, and grid slots (Le Mans 24h).
-  - **TUM Racetrack Database**: Surveyed boundaries for Monza GP, Spa, COTA, Barcelona, Interlagos, Silverstone, and Bahrain GP.
-  - **Track-Atlas & OpenStreetMap GPS**: Curvature-adaptive centerlines with FIA/ACO homologation road width profiling for Imola, Daytona Road Course, Fuji, Laguna Seca, and Sebring Full.
-  - **LMU Telemetry Corridors & Hybrid Synthesis**: Native high-frequency physics extraction for circuit layout variants (Monza Curva Grande, Fuji Classic, Bahrain Outer, Bahrain Paddock, Sebring School, Lusail Short, Paul Ricard Short, Portimão WEC).
-- **Fast 60fps Client-Side Rendering**: Pre-calculated coordinates stored in `server/data/tracks/` and mirrored to `public/tracks/` for zero-overhead client rendering in `GpsTrackMapScene`.
-- **Pipeline Architecture & Adding New Tracks**: Fully automated via `npx tsx tools/analysis/buildAllTrackBoundaries.ts` and documented in [`docs/TRACK_BOUNDARIES_PIPELINE.md`](docs/TRACK_BOUNDARIES_PIPELINE.md).
+### 🏁 8. Circuit Database & 32 Layouts
+- **Comprehensive WEC & IMSA Coverage**: Built-in specifications, turn counts, official lengths, elevation profiles, and famous corners for **32 distinct layouts**:
+  - Autodromo Nazionale Monza (GP, Curva Grande)
+  - Circuit de Spa-Francorchamps
+  - Circuit de la Sarthe / Le Mans 24h
+  - Sebring International Raceway (Full, School)
+  - Bahrain International Circuit (GP, Outer, Paddock)
+  - Circuit of the Americas (COTA)
+  - Autódromo José Carlos Pace (Interlagos)
+  - Fuji Speedway (GP, Classic)
+  - Autodromo Internazionale Enzo e Dino Ferrari (Imola)
+  - Lusail International Circuit (Qatar GP, Short)
+  - Autódromo Internacional do Algarve (Portimão WEC)
+  - Silverstone Circuit (GP, National)
+  - Circuit Paul Ricard (1A-V2, Short)
+  - Daytona International Speedway (Road Course)
+  - WeatherTech Raceway Laguna Seca
+  - Circuit de Barcelona-Catalunya
 
 ---
 
-### 🔬 4. Deep Lap Comparison Studio
-- **Head-to-Head Delta Analysis**: Compare any lap against your **Personal Best**, **Session Best**, **Theoretical Optimal Sectors**, **All-Time Track Record**, or **Community Benchmark Targets**.
-- **Micro Delta Breakdowns**: Real-time sector-by-sector delta color-coding (green for time gained, red for time lost) and speed differentials ($\pm$ km/h).
-- **Synchronized Telemetry Traces**: Overlay throttle, brake, speed, and steering angle waveforms across distance or elapsed lap time.
-- **Interactive Time Delta Chart**: Visual representation of pace divergence across every corner and straight.
-- **Strict Circuit Layout Disambiguation**: Prevents cross-pollinating benchmarks or comparisons between distinct layout variants (e.g. Monza GP vs. Curva Grande; Bahrain GP vs. Outer vs. Paddock; Sebring Full vs. School).
+### 🌐 9. Live Community Alien Benchmarks
+- **Live Google Sheets Sync**: Fetches community alien reference times directly into the application with 1 click.
+- **Benchmark Update Changelog**: Built-in diff engine automatically detects and highlights:
+  - 🟢 **New Benchmarks**: Newly added car classes and track combinations.
+  - 🟡 **Updated Targets**: Adjusted reference lap times with game patch tags (e.g. `Patch 1.3 → 1.4+`) and time deltas ($\Delta$).
+  - 🔴 **Retired Targets**: Deprecated or superseded benchmark times.
 
 ---
 
-### 📊 5. Comprehensive Session Telemetry & Stewards Log
-- **Multi-Metric Telemetry Charts**: Switch between **Lap Pace**, **Sector Times (S1 / S2 / S3)**, **Top Speed**, **Tire Wear degradation** (FL, FR, RL, RR, Avg), and **Fuel & Virtual Energy** stint consumption.
-- **Flying Lap & Out-Lap Intelligence**:
-  - Automatically identifies **Start Laps** (standing/rolling starts or garage exits).
-  - Flags **Pit Stop in-laps** and **Out-laps** (pit exit laps), excluding them from flying average pace and pace consistency ratings.
-  - Plots estimated/inferred lap times for incomplete laps so no telemetry data is lost.
-- **Multiclass Race Classification**: Tracks both **Class Position** (Hypercar, LMP2, LMGT3, GTE) and **Overall Position**, with position deltas ($\Delta$), gaps to class leader, and finish statuses (Finished, DNF, DNS, DQ).
-- **Session Stewards Log & Incident Timeline**:
-  - Extracts penalties, contact collisions, cut-track warnings, and mechanical damage events from XML results.
-  - Displays elapsed lap time, driver involved, and penalty severity in a dedicated stewards ledger.
-- **Session Rules & Server Badges**: Visualizes server configuration (Damage, Tire Warmers, Fixed Setups, ParcFermé, Multipliers) directly from session logs.
-- **Results XML Specification**: Comprehensive technical specification of the simulation results log format and available data structures documented in [`docs/XML_FORMAT.md`](docs/XML_FORMAT.md).
+### 🔌 10. Seamless Plug & Play Integration
+- **Zero-Configuration Setup**: Automatically detects your Steam installation, session logs (`UserData/LOG/Results/*.xml`), 100 Hz telemetry files (`UserData/Telemetry/*.duckdb`), and replays (`UserData/Replays/*.Vcr`).
+- **Blazing-Fast SQLite WAL Cache**: Uses Write-Ahead Logging for instant queries and non-blocking background replay indexing.
+- **Replay Cache Manager**: In-app management view showing cached replays, memory footprint, and 1-click rescan controls.
 
 ---
 
-### 📈 6. Historical Progression & Track Intelligence
-- **True Pace Progression**: Tracks clean flying lap trends, 3-session moving averages, and your **Top 3 Clean Lap Average (True Pace)** over time.
-- **Pace Consistency Rating (%)**: Evaluates driving consistency based on lap time standard deviation across clean flying laps.
-- **Theoretical Execution Gap**: Visualizes the delta between your actual fastest lap and your optimal theoretical sectors ($S1 + S2 + S3$).
-- **Multi-Class & Car Model Filters**: Filter analytics across Hypercar (LMH/LMDh), LMP2, LMGT3, and specific vehicle models (e.g. Porsche 911 GT3 R, Ferrari 499P, BMW M4 GT3).
+## 🛠️ Architecture & Deep-Dive Documentation
 
----
+For engineers, modders, and telemetry enthusiasts interested in the underlying reverse-engineered data structures and pipelines:
 
-### 🌐 7. Live Community Benchmark Sync & Update Changelog
-- **Google Sheets Benchmark Sync**: Synchronizes the latest community reference lap times directly into SQLite.
-- **Benchmark Update Changelog**: Whenever you refresh reference benchmarks, the built-in diff engine automatically highlights:
-  - 🟢 **New References**: Newly added track and car class targets.
-  - 🟡 **Updated Targets**: Adjusted Alien targets with before/after lap times, delta ($\Delta$), and game patch updates (e.g. `Patch 1.3 → 1.4+`).
-  - 🔴 **Removed References**: Deprecated benchmark targets.
-
----
-
-### ⚡ 8. Blazing-Fast SQLite Caching & Background Replay Scanner
-- **Zero-Lag Incremental Sync**: Incremental file modification checking (`mtime` & file size). Only newly created or modified XML files are reparsed.
-- **Asynchronous Background Scanner**: Automatically indexes and downsamples binary replays in a low-priority background thread with real-time UI status tracking in the navigation bar.
-- **Replay Cache Management**: In-app cache inspection card displaying total parsed replays, trajectory size, memory footprint, and rescan controls.
-- **Instantaneous Lookups**: Indexed queries for tracks, timestamps, and driver sessions using Write-Ahead Logging (WAL).
-
----
-
-## 🛠️ Technology Stack
-
-- **Frontend**:
-  - [React 19](https://react.dev/) & [TypeScript](https://www.typescriptlang.org/) (Strict Mode)
-  - [Vite 8](https://vitejs.dev/) - Fast frontend build tool
-  - [Tailwind CSS v4](https://tailwindcss.com/) - Curated dark motorsport UI aesthetic
-  - [Recharts](https://recharts.org/) - Interactive telemetry and delta charts
-  - [Lucide Icons](https://lucide.dev/) - Clean iconography
-- **Backend**:
-  - [Node.js](https://nodejs.org/) & [Express 5](https://expressjs.com/)
-  - [DuckDB Node.js](https://duckdb.org/) - High-speed queries on 100 Hz columnar `.duckdb` telemetry files
-  - [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) with Write-Ahead Logging (WAL)
-  - [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser) - High-throughput XML parsing
-  - Custom Binary `.Vcr` Parser with 4-wheel telemetry & pitstop state machine
-  - [Google Gen AI SDK](https://github.com/googleapis/genai-js) (`@google/genai`) - AI race engineer post-stint coaching
-- **Native Tools & Diagnostics**:
-  - **C# .NET 8 Telemetry Recorder** (`tools/telemetry-recorder/`) - Real-time memory-mapped telemetry probes
-  - **TSX Offline Analysis & Geometry Pipeline** (`tools/analysis/`) - Replay binary verification, boundary generation (`buildAllTrackBoundaries.ts`), and correlation utilities
-- **Testing**:
-  - [Vitest](https://vitest.dev/) & [Testing Library](https://testing-library.com/) - **721 automated unit and integration tests** (71 test files; 3 opt-in integration tests skipped without Steam replay files)
+- [`docs/LMU_SETUP_AND_TELEMETRY_GUIDE.md`](docs/LMU_SETUP_AND_TELEMETRY_GUIDE.md): Methodical guide to developing LMU car setups using telemetry and coaching evidence.
+- [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): Detailed schema of native LMU 100 Hz DuckDB telemetry tables and channels.
+- [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md): Reverse-engineered binary replay stream specification (`gMb1.002f`).
+- [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): Empirical telemetry accuracy comparison (VCR vs. DuckDB vs. Shared Memory).
+- [`docs/XML_FORMAT.md`](docs/XML_FORMAT.md): LMU Results XML log schema specification and event markers.
+- [`docs/TRACK_BOUNDARIES_PIPELINE.md`](docs/TRACK_BOUNDARIES_PIPELINE.md): Track boundary extraction, synthesis, and 1-step Procrustes alignment pipeline.
+- [`docs/LMU_REST_API.md`](docs/LMU_REST_API.md): Embedded LMU REST API (`:6397`) and Swagger integration reference.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (version 18.0 or newer)
-- [Le Mans Ultimate](https://lemansultimate.com/) installed on your computer
-- *(Optional)* Google Gemini API key for AI Race Engineer coaching reports
+- [Node.js](https://nodejs.org/) (v18.0 or newer)
+- [Le Mans Ultimate](https://lemansultimate.com/) installed on your PC
+- *(Optional)* Google Gemini API key for AI Race Engineer post-stint debriefs
 
 ### Installation
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/<your-username>/LMULapTime.git
+   git clone https://github.com/hockeylagu/LMULapTime.git
    cd LMULapTime
    ```
 
@@ -187,39 +200,35 @@ A modern, high-performance telemetry analytics suite, lap comparison studio, and
    ```
 
 3. **Configure Environment (Optional)**:
-   Create a `.env` file in the project root if you want to enable Gemini AI coaching reports:
+   Create a `.env` file in the project root if you want to enable Gemini AI coaching debriefs:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
-4. **Start the application**:
+4. **Launch the application**:
    ```bash
    npm run dev
    ```
    *Windows users can also simply double-click `launch.bat`.*
 
 5. **Open your browser**:
-   - Frontend: [http://localhost:5173](http://localhost:5173)
+   - Frontend UI: [http://localhost:5173](http://localhost:5173)
    - Backend API: [http://localhost:3001](http://localhost:3001)
 
 ---
 
-## ⚙️ Configuration & Directory Setup
+## ⚙️ Configuration & Directory Settings
 
-By default, the application detects standard Steam installation paths:
-- **Results XML Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\LOG\Results`
+By default, the application automatically detects standard Steam installation paths:
+- **Session Results XML**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\LOG\Results`
 - **Replays Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Replays`
 - **Telemetry DuckDB Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry`
 
-You can change these paths at any time via the in-app **Settings** tab:
-1. Navigate to **Settings** in the top navigation bar.
-2. Enter your custom results directory, replays directory, and telemetry directory.
-3. Live status badges will verify if each path exists on disk.
-4. Optionally enter your **In-Game Driver Profile Name** to automatically prioritize your driver telemetry.
-5. Inspect or clear SQLite cache statistics in the **Replay Cache** card.
-6. Click **Rescan & Load Telemetry**.
-
-For a controlled workflow that turns lap comparison, corner phases, tyre trends, and coaching evidence into LMU garage decisions, see the [`LMU Setup Development with Telemetry and Coaching` guide](docs/LMU_SETUP_AND_TELEMETRY_GUIDE.md).
+To adjust your paths or driver profile:
+1. Click **Settings** in the top navigation bar.
+2. Enter your custom results, replays, or telemetry directories (live status badges verify that each directory exists).
+3. Set your **In-Game Driver Profile Name** to automatically prioritize your laps.
+4. Click **Rescan & Load Telemetry**.
 
 ---
 
@@ -227,27 +236,34 @@ For a controlled workflow that turns lap comparison, corner phases, tyre trends,
 
 | Command | Description |
 | :--- | :--- |
-| `npm run dev` | Starts both frontend (Vite) and backend (Express) concurrently with hot-reload. |
-| `npm run dev:server` | Runs the backend server using `tsx watch`. |
-| `npm run dev:client` | Runs the Vite client development server. |
-| `npm run build` | Runs TypeScript typechecks and compiles the production client bundle. |
-| `npm test` | Runs all automated tests with Vitest. |
+| `npm run dev` | Starts frontend (Vite) and backend (Express) concurrently with hot-reload. |
+| `npm run dev:server` | Starts the backend server using `tsx watch`. |
+| `npm run dev:client` | Starts the Vite development server. |
+| `npm run build` | Validates TypeScript types and compiles the production client bundle. |
+| `npm test` | Runs the automated Vitest test suite (**1,060+ tests across 128 test files**). |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
-| `npm run test:coverage` | Runs the full suite and generates the V8 coverage report. The validated baseline is 86.27% statements, 74.32% branches, 85.44% functions, and 88.68% lines. |
+| `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
 | `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
 
-Real Steam replay integration tests are opt-in because they require local `.Vcr` files. Run them with `RUN_REAL_REPLAY_TESTS=1` when replay fixtures are available.
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
+- **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser), [@google/genai](https://github.com/googleapis/genai-js)
+- **Diagnostics & Tooling**: C# .NET 8 Telemetry Recorder, TSX Geometry & Boundary Pipeline
+- **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, JSDOM
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more details.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/<your-username>/LMULapTime/issues).
+Contributions, feedback, and feature suggestions are welcome! Feel free to open an issue or submit a pull request.
