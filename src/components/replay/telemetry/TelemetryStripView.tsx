@@ -6,7 +6,7 @@ import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
-import { TelemetryChannelId, TelemetryPreset } from './telemetryPresets.js';
+import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];

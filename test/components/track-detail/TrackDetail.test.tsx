@@ -1,0 +1,660 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { TrackDetail } from '../../../src/components/track-detail/index.js';
+
+describe('TrackDetail component', () => {
+  const mockTrackDataWithMultipleClasses = {
+    trackName: 'Spa',
+    normalizedTrackName: 'Spa',
+    sessionsCount: 3,
+    sessions: [
+      {
+        id: 'sess-hypercar-1',
+        filename: 'spa_hypercar.xml',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        timeString: '2026/05/28 14:00',
+        sessionType: 'Practice',
+        sessionName: 'P1',
+        driversCount: 1,
+        matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr' },
+        playerDriver: {
+          name: 'Player',
+          carType: 'Ferrari 499P',
+          carClass: 'LMH',
+          bestLapTime: 122.0,
+          bestLapTimeString: '2:02.000',
+          bestS1: 35.0,
+          bestS2: 42.0,
+          bestS3: 45.0,
+          theoreticalBest: 122.0,
+          bestLapPaceCategory: 'Alien' as const,
+          bestLapPacePercentage: 100.1,
+          lapsCount: 5,
+        },
+      },
+      {
+        id: 'sess-gt3-1',
+        filename: 'spa_gt3.xml',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        timeString: '2026/05/29 16:00',
+        sessionType: 'Qualifying',
+        sessionName: 'Q1',
+        driversCount: 1,
+        playerDriver: {
+          name: 'Player',
+          carType: 'Porsche 911 GT3',
+          carClass: 'LMGT3',
+          bestLapTime: 138.0,
+          bestLapTimeString: '2:18.000',
+          bestS1: 40.0,
+          bestS2: 48.0,
+          bestS3: 50.0,
+          theoreticalBest: 138.0,
+          bestLapPaceCategory: 'Competitive' as const,
+          bestLapPacePercentage: 101.2,
+          lapsCount: 4,
+        },
+      },
+    ],
+    benchmarks: [
+      {
+        key: 'spa_lmh',
+        trackName: 'Spa',
+        carClass: 'LMH',
+        patch: '1.4+',
+        target100Sec: 120.0,
+        targets: {
+          alienSec: 120.0,
+          competitiveSec: 121.2,
+          goodSec: 122.4,
+          goodMidpackSec: 123.6,
+          midpackSec: 124.8,
+          midpackTailSec: 126.0,
+          tailEnderSec: 127.2,
+          offlineSec: 128.4,
+        },
+      },
+      {
+        key: 'spa_lmgt3',
+        trackName: 'Spa',
+        carClass: 'LMGT3',
+        patch: '1.4+',
+        target100Sec: 135.0,
+        targets: {
+          alienSec: 135.0,
+          competitiveSec: 136.35,
+          goodSec: 137.7,
+          goodMidpackSec: 139.05,
+          midpackSec: 140.4,
+          midpackTailSec: 141.75,
+          tailEnderSec: 143.1,
+          offlineSec: 144.45,
+        },
+      },
+    ],
+  };
+
+  const mockTrackDataNoBenchmarks = {
+    trackName: 'CustomModCircuit',
+    normalizedTrackName: 'CustomModCircuit',
+    sessionsCount: 1,
+    sessions: [
+      {
+        id: 'sess-custom-1',
+        filename: 'custom_session.xml',
+        trackVenue: 'CustomModCircuit',
+        trackCourse: 'Layout A',
+        timeString: '2026/05/30 14:00',
+        sessionType: 'Practice',
+        sessionName: 'P1',
+        driversCount: 1,
+        playerDriver: {
+          name: 'Player',
+          carType: 'Formula Spec',
+          carClass: 'Formula',
+          bestLapTime: 75.0,
+          bestLapTimeString: '1:15.000',
+          bestS1: 20.0,
+          bestS2: 25.0,
+          bestS3: 30.0,
+          theoreticalBest: 75.0,
+          lapsCount: 5,
+        },
+      },
+    ],
+    benchmarks: [],
+  };
+
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockTrackDataWithMultipleClasses),
+    });
+  });
+
+  it('renders benchmark targets and sessions list', async () => {
+    const onBack = vi.fn();
+    const onSelectSession = vi.fn();
+    const setSelectedCarClass = vi.fn();
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={onBack}
+        onSelectSession={onSelectSession}
+        selectedCarClass="LMH"
+        setSelectedCarClass={setSelectedCarClass}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+      expect(screen.queryByText('Appropriate Reference Lap Times')).not.toBeInTheDocument();
+      expect(screen.getByText('2:00.000')).toBeInTheDocument();
+      expect(screen.getAllByText('Ferrari 499P').length).toBeGreaterThan(0);
+    });
+
+    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.backdrop-blur-md');
+    expect(sessionCard).not.toBeNull();
+    if (sessionCard) {
+      fireEvent.click(sessionCard);
+      expect(onSelectSession).toHaveBeenCalledWith('sess-hypercar-1');
+    }
+  });
+
+  it('renders average qualifying and finish positions for the selected class', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockTrackDataWithMultipleClasses,
+        sessions: [
+          {
+            ...mockTrackDataWithMultipleClasses.sessions[0],
+            sessionType: 'Qualifying',
+            sessionName: 'Q1',
+            playerDriver: {
+              ...mockTrackDataWithMultipleClasses.sessions[0].playerDriver,
+              position: 9,
+            },
+          },
+          {
+            ...mockTrackDataWithMultipleClasses.sessions[0],
+            id: 'sess-hypercar-race-1',
+            filename: 'spa_hypercar_race.xml',
+            sessionType: 'Race',
+            sessionName: 'R1',
+            playerDriver: {
+              ...mockTrackDataWithMultipleClasses.sessions[0].playerDriver,
+              position: 5,
+            },
+          },
+        ],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Quali Avg Pos')).toBeInTheDocument();
+      expect(screen.getByText('Finish Avg Pos')).toBeInTheDocument();
+      expect(screen.getAllByText('P5').length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByText('P9').length).toBeGreaterThan(0);
+  });
+
+  it('opens replay telemetry from the track sessions list', async () => {
+    const onOpenReplay = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        onOpenReplay={onOpenReplay}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Open replay telemetry/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Open replay telemetry/i }));
+    expect(onOpenReplay).toHaveBeenCalledWith('sess-hypercar-1');
+  });
+
+  it('strictly isolates benchmark targets by vehicle class (LMH vs LMGT3)', async () => {
+    const setSelectedCarClass = vi.fn();
+
+    // Render with LMH selected
+    const { rerender } = render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={setSelectedCarClass}
+      />
+    );
+
+    await waitFor(() => {
+      // LMH Alien benchmark target is 2:00.000 (120s)
+      expect(screen.getByText('2:00.000')).toBeInTheDocument();
+      // GT3 Alien benchmark target of 2:15.000 (135s) must NOT be displayed in LMH mode
+      expect(screen.queryByText('2:15.000')).not.toBeInTheDocument();
+    });
+
+    // Switch class to LMGT3
+    rerender(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="LMGT3"
+        setSelectedCarClass={setSelectedCarClass}
+      />
+    );
+
+    await waitFor(() => {
+      // LMGT3 Alien benchmark target is 2:15.000 (135s)
+      expect(screen.getByText('2:15.000')).toBeInTheDocument();
+      // LMH Alien target of 2:00.000 must NOT be displayed in LMGT3 mode
+      expect(screen.queryByText('2:00.000')).not.toBeInTheDocument();
+    });
+  });
+
+  it('uses the latest session car class when no class filter is selected', async () => {
+    const mixedClassData = {
+      ...mockTrackDataWithMultipleClasses,
+      sessions: [
+        ...mockTrackDataWithMultipleClasses.sessions,
+        { ...mockTrackDataWithMultipleClasses.sessions[1], id: 'sess-gt3-2' },
+      ],
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mixedClassData),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        progression={[
+          {
+            sessionId: 'sess-hypercar-1', timestamp: 1, dateString: '2026/05/28', sessionType: 'Practice',
+            sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'LMH',
+            driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
+            cleanLapsCount: 5, totalLapsCount: 5, avgLapTime: 122,
+          },
+          {
+            sessionId: 'sess-gt3-1', timestamp: 2, dateString: '2026/05/29', sessionType: 'Qualifying',
+            sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'LMGT3',
+            driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
+            cleanLapsCount: 4, totalLapsCount: 4, avgLapTime: 138,
+          },
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('2:15.000')).toBeInTheDocument();
+      expect(screen.queryByText('2:00.000')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps LMP2 ELMS and WEC benchmark pace isolated', async () => {
+    const lmp2Benchmark = {
+      ...mockTrackDataWithMultipleClasses.benchmarks[0],
+      key: 'spa_lmp2_elms',
+      carClass: 'LMP2elms',
+      targets: {
+        ...mockTrackDataWithMultipleClasses.benchmarks[0].targets,
+        alienSec: 90,
+      },
+    };
+    const wecBenchmark = {
+      ...lmp2Benchmark,
+      key: 'spa_lmp2_wec',
+      carClass: 'LMP2wec',
+      targets: {
+        ...lmp2Benchmark.targets,
+        alienSec: 120,
+      },
+    };
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockTrackDataNoBenchmarks,
+        sessions: [{
+          ...mockTrackDataNoBenchmarks.sessions[0],
+          playerDriver: {
+            ...mockTrackDataNoBenchmarks.sessions[0].playerDriver,
+            carType: 'Oreca 07',
+            carClass: 'LMP2elms',
+            bestLapTime: 100,
+            bestLapTimeString: '1:40.000',
+          },
+        }],
+        benchmarks: [lmp2Benchmark, wecBenchmark],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Benchmark Pace: Offline (111.1%)')).toBeInTheDocument();
+    });
+  });
+
+  it('displays graceful fallback when a circuit has no benchmark targets', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockTrackDataNoBenchmarks),
+    });
+
+    render(
+      <TrackDetail
+        trackName="CustomModCircuit"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'CustomModCircuit' })).toBeInTheDocument();
+      expect(screen.getByText(/No reference benchmarks found for this track/i)).toBeInTheDocument();
+    });
+  });
+
+  it('handles back button click', async () => {
+    const onBack = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={onBack}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Back to Tracks')).toBeInTheDocument();
+    });
+
+    const backBtn = screen.getByRole('button', { name: /back to tracks/i });
+    fireEvent.click(backBtn);
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('filters by car model and car class', async () => {
+    const setSelectedCarClass = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="LMH"
+        setSelectedCarClass={setSelectedCarClass}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    // Subfilter by car model
+    const carModelBtn = screen.getByRole('button', { name: /Ferrari 499P/i });
+    fireEvent.click(carModelBtn);
+
+    // Switch car class
+    const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
+    fireEvent.click(lmgt3Btn);
+    expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
+  });
+
+  it('toggles between Cards view and Table view in TrackDetail', async () => {
+    const onSelectSession = vi.fn();
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={onSelectSession}
+        selectedCarClass="LMH"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const cardsButton = screen.getByRole('button', { name: /Cards view/i });
+    const tableButton = screen.getByRole('button', { name: /Table view/i });
+    expect(cardsButton).toBeInTheDocument();
+    expect(tableButton).toBeInTheDocument();
+
+    // Switch to Table view
+    fireEvent.click(tableButton);
+    const table = screen.getByRole('table');
+    expect(table).toBeInTheDocument();
+
+    // Verify row selection in table view
+    const tableRow = within(table).getByText('2026/05/28 14:00').closest('tr');
+    expect(tableRow).not.toBeNull();
+    if (tableRow) {
+      fireEvent.click(tableRow);
+      expect(onSelectSession).toHaveBeenCalledWith('sess-hypercar-1');
+    }
+
+    // Switch back to Cards view
+    fireEvent.click(cardsButton);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('filters sessions to those with a replay in TrackDetail', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /filter sessions with replay/i }));
+    fireEvent.click(screen.getByRole('button', { name: /table view/i }));
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Ferrari 499P')).toBeInTheDocument();
+    expect(within(table).queryByText('Porsche 911 GT3')).not.toBeInTheDocument();
+  });
+
+  it('allows sorting sessions by Best Position (P1 First) in TrackDetail', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[comboboxes.length - 1];
+    fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
+    expect(sortSelect).toHaveValue('pos-asc');
+  });
+
+  it('prioritizes Race, then Qualifying, then Practice sessions when sorting by Best Position', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        trackName: 'Spa',
+        normalizedTrackName: 'Spa',
+        sessionsCount: 3,
+        sessions: [
+          {
+            id: 'sess-practice-p1', filename: 'practice.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/28 14:00', sessionType: 'Practice', sessionName: 'P1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 122.0, bestLapTimeString: '2:02.000', bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122.0, lapsCount: 5, position: 1 },
+          },
+          {
+            id: 'sess-qualifying-p2', filename: 'qualifying.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/29 14:00', sessionType: 'Qualifying', sessionName: 'Q1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 121.0, bestLapTimeString: '2:01.000', bestS1: 35, bestS2: 41, bestS3: 45, theoreticalBest: 121.0, lapsCount: 4, position: 2 },
+          },
+          {
+            id: 'sess-race-p5', filename: 'race.xml', trackVenue: 'Spa', trackCourse: 'GP',
+            timeString: '2026/05/30 14:00', sessionType: 'Race', sessionName: 'R1', driversCount: 1,
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 120.0, bestLapTimeString: '2:00.000', bestS1: 34, bestS2: 41, bestS3: 45, theoreticalBest: 120.0, lapsCount: 20, position: 5 },
+          },
+        ],
+        benchmarks: [],
+      }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const sortSelect = comboboxes[comboboxes.length - 1];
+    fireEvent.change(sortSelect, { target: { value: 'pos-asc' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Table view/i }));
+    const table = screen.getByRole('table');
+    const rowTimestamps = within(table).getAllByText(/2026\/05\/(28|29|30) 14:00/).map((el) => el.textContent);
+
+    // Race (worst raw position) sorts first, then Qualifying, then Practice (best raw position) last.
+    expect(rowTimestamps).toEqual(['2026/05/30 14:00', '2026/05/29 14:00', '2026/05/28 14:00']);
+  });
+
+  it('renders interactive chart legend in TrackDetail and allows toggling series visibility', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const bestLapLegend = await waitFor(() =>
+      screen.getByTitle('Click to toggle Best Lap Time visibility')
+    );
+    expect(bestLapLegend).toBeInTheDocument();
+    expect(bestLapLegend.className).not.toContain('line-through');
+
+    fireEvent.click(bestLapLegend);
+    expect(bestLapLegend.className).toContain('line-through');
+
+    fireEvent.click(bestLapLegend);
+    expect(bestLapLegend.className).not.toContain('line-through');
+  });
+
+  it('opens circuit info modal when clicking on the info icon', async () => {
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Spa' })).toBeInTheDocument();
+    });
+
+    const infoBtn = screen.getByTitle('View circuit info for Spa');
+    fireEvent.click(infoBtn);
+
+    expect(screen.getByRole('dialog', { name: /Circuit Information/i })).toBeInTheDocument();
+    expect(screen.getByText('20 Turns')).toBeInTheDocument();
+    expect(screen.getByText(/Belgium/i)).toBeInTheDocument();
+
+    const closeBtn = screen.getByTitle('Close');
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog', { name: /Circuit Information/i })).not.toBeInTheDocument();
+  });
+
+  it('provides Reset All Filters button when car model is the sole active filter and clears it on click', async () => {
+    window.location.hash = '#/track/Spa?model=NonExistentModel';
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No sessions found matching filters.')).toBeInTheDocument();
+    });
+
+    const resetBtn = screen.getByRole('button', { name: /Reset All Filters/i });
+    expect(resetBtn).toBeInTheDocument();
+    fireEvent.click(resetBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('No sessions found matching filters.')).not.toBeInTheDocument();
+    });
+  });
+});
+
+
+
