@@ -219,6 +219,25 @@ export function getTrajectoryDistances(points: ReplayTrajectoryPoint[], trackLen
 }
 
 /**
+ * Whether two laps can be matched on canonical track station: the track length is known and
+ * both carry server-projected stations. This is THE alignment decision - every comparison
+ * (channels, corners, map) asks it here. Without it only each lap's own S/F-zeroed driven
+ * distance is available, which drifts between laps as their lines differ.
+ */
+export function canAlignByStation(
+  points: ReplayTrajectoryPoint[],
+  referencePoints: ReplayTrajectoryPoint[],
+  trackLengthM: number | undefined
+): trackLengthM is number {
+  return (
+    trackLengthM !== undefined &&
+    trackLengthM > 0 &&
+    points[0]?.stationM !== undefined &&
+    referencePoints[0]?.stationM !== undefined
+  );
+}
+
+/**
  * Returns distances along `points` expressed in `referencePoints`' distance frame, matched on
  * canonical track station - the same alignment the telemetry channels use (computeLapComparisons).
  * Each lap's own driven distance drifts from another lap's as their lines differ (metres by
@@ -231,12 +250,7 @@ export function getDistancesInReferenceFrame(
   trackLengthM?: number
 ): number[] {
   const ownDists = getTrajectoryDistances(points, trackLengthM);
-  const canMatchByStation =
-    points !== referencePoints &&
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    points[0]?.stationM !== undefined &&
-    referencePoints[0]?.stationM !== undefined;
-  if (!canMatchByStation || !trackLengthM) return ownDists;
+  if (points === referencePoints || !canAlignByStation(points, referencePoints, trackLengthM)) return ownDists;
 
   const refStations = getMonotonicStations(referencePoints, trackLengthM);
   const refDists = getTrajectoryDistances(referencePoints, trackLengthM);
