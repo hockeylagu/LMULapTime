@@ -213,6 +213,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
                   bestS2Sec={bestSectors.s2}
                   bestS3Sec={bestSectors.s3}
                   isCompareMode={isCompareMode}
+                  trajectory={trajectory}
                   baselineTrajectory={baselineTrajectory ?? null}
                   lapDeltas={lapDeltas}
                   formatLapTime={formatLapTime}

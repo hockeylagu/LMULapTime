@@ -161,6 +161,8 @@ function applyCanonicalProjection(
   trajectory.trackLengthM = Number(trackDef.lengthM.toFixed(2));
   trajectory.lapDistMeters = Number(runningDist.toFixed(2));
   trajectory.timingGates = trackDef.timingGates;
+  trajectory.stationSource = 'track';
+  trajectory.lineCut = { start: cut.start, end: cut.end };
 }
 
 /** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */
@@ -194,6 +196,8 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
   trajectory.trackLengthM = totalLength;
   trajectory.lapDistMeters = totalLength;
   trajectory.layoutKey = undefined;
+  trajectory.stationSource = 'odometer';
+  trajectory.lineCut = { start: 'none', end: 'none' };
 
   // Build synthetic timingGates from sector frame markers or third-splits
   const s1Idx = trajectory.sectors?.s1Frame !== undefined && trajectory.sectors.s1Frame >= 0 && trajectory.sectors.s1Frame < n

@@ -43,7 +43,7 @@ describe('cutLapAtLine', () => {
     const result = cut(samples, sliceStart, sliceEnd);
     const first = result.points[0];
     const last = result.points[result.points.length - 1];
-    expect(result.startCut && result.endCut).toBe(true);
+    expect([result.start, result.end]).toEqual(['line', 'line']);
     expect(first.stationM).toBe(0);
     expect(first.x).toBeCloseTo(0, 6);
     expect(first.timeSec).toBeCloseTo(1, 6);
@@ -65,21 +65,44 @@ describe('cutLapAtLine', () => {
     expect(result.points[result.indexShift].stationM).toBe(11);
   });
 
-  it('keeps the slice start when there is no recording before it', () => {
+  it('extends a start with no recording before it back to the line when it is close enough', () => {
     const lateStart = drive(11, 221);
     const end = lateStart.findIndex(p => Math.abs((p.throttle ?? 0) - 211) < 1e-9);
     const result = cut(lateStart, 0, end);
-    expect(result.startCut).toBe(false);
-    expect(result.points[0].stationM).toBe(11);
-    expect(result.indexShift).toBe(0);
-    expect(result.endCut).toBe(true);
+    expect(result.start).toBe('extrapolated');
+    expect(result.points[0]).toMatchObject({ stationM: 0, speedKmh: 72, throttle: 11, gear: 4 });
+    expect(result.points[0].x).toBeCloseTo(0, 6);
+    expect(result.points[0].timeSec).toBeCloseTo(1, 6); // the car kept its 20 m/s
+    expect(result.points[1].stationM).toBe(11);
+    expect(result.indexShift).toBe(1);
+    expect(result.end).toBe('line');
     expect(result.points[result.points.length - 1].stationM).toBe(L);
+  });
+
+  it('extends a finish with no recording after it forward to the line', () => {
+    const earlyEnd = drive(-19, 190);
+    const start = earlyEnd.findIndex(p => Math.abs((p.throttle ?? 0) - 11) < 1e-9);
+    const result = cut(earlyEnd, start, earlyEnd.length - 1);
+    const last = result.points[result.points.length - 1];
+    expect(result.end).toBe('extrapolated');
+    expect(last.stationM).toBe(L);
+    expect(last.x).toBeCloseTo(0, 6);
+    expect(last.timeSec).toBeCloseTo(11, 6);
+  });
+
+  it('leaves an end far from the line where the replay sliced it (out-lap from the pits)', () => {
+    const fromThePits = drive(71, 221);
+    const end = fromThePits.findIndex(p => Math.abs((p.throttle ?? 0) - 211) < 1e-9);
+    const result = cut(fromThePits, 0, end);
+    expect(result.start).toBe('none');
+    expect(result.points[0].stationM).toBe(71);
+    expect(result.indexShift).toBe(0);
   });
 
   it('trims a slice that starts just before the line', () => {
     const early = drive(-1, 199);
     const result = cut(early, 0, early.length - 1);
-    expect(result.startCut).toBe(true);
+    expect(result.start).toBe('line');
     expect(result.points[0].stationM).toBe(0);
     expect(result.points[0].timeSec).toBeCloseTo(1, 6);
     expect(result.points[1].stationM).toBe(1);
@@ -89,7 +112,7 @@ describe('cutLapAtLine', () => {
     // Sliced at station 71: the crossing was 3.55 s earlier, beyond MAX_LINE_CUT_SHIFT_SEC.
     const start = samples.findIndex(p => Math.abs((p.throttle ?? 0) - 71) < 1e-9);
     const result = cut(samples, start, sliceEnd);
-    expect(result.startCut).toBe(false);
+    expect(result.start).toBe('none');
     expect(result.points[0].stationM).toBe(71);
   });
 });
