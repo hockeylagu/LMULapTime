@@ -5,11 +5,9 @@ import {
   interpolatePointAtDistance,
 } from './replayComparison.js';
 import {
-  canAlignByStation,
   interpolateScalarAtDistance,
   getTrajectoryDistances,
   getDistancesInReferenceFrame,
-  getMonotonicStations,
 } from './lapAlignment.js';
 import { unwrapAngle } from './computedTelemetry.js';
 
@@ -332,23 +330,6 @@ export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: num
   return Math.atan2(dx, dz);
 }
 
-function interpolateCoordinateAtDistance(dists: number[], coordinates: number[], targetDistM: number): number {
-  if (dists.length === 0 || coordinates.length === 0) return targetDistM;
-  if (targetDistM <= dists[0]) return coordinates[0];
-  const lastIndex = dists.length - 1;
-  if (targetDistM >= dists[lastIndex]) return coordinates[lastIndex];
-
-  for (let index = 1; index < dists.length; index++) {
-    if (dists[index] < targetDistM) continue;
-    const distanceSpan = dists[index] - dists[index - 1];
-    if (distanceSpan <= 0) return coordinates[index];
-    const ratio = (targetDistM - dists[index - 1]) / distanceSpan;
-    return coordinates[index - 1] + ratio * (coordinates[index] - coordinates[index - 1]);
-  }
-
-  return coordinates[lastIndex];
-}
-
 /**
  * Detects corners (braking -> apex -> acceleration) from the PRIMARY lap's speed trace and
  * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
@@ -407,22 +388,14 @@ export function computeLapSegmentComparisons(
     turningPoints.push({ index: primaryPoints.length - 1, distM: totalDistM, type: 'max' });
   }
 
-  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
-  const primaryRefCoords = canMatchByStation ? getMonotonicStations(primaryPoints, trackLengthM) : primaryDists;
-
   // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
   // delta channel shows (each lap timed from its own S/F crossing, extrapolated at the lap
-  // edges), so the segments add up to the lap delta and never disagree with the chart.
+  // edges), so the segments add up to the lap delta and never disagree with the chart. The
+  // trace has one value per primary sample, so it is read at primary-frame distances directly.
   const channelDeltas = computeLapComparisons(primaryPoints, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
-  const deltaAt = (stationOrDistM: number): number =>
-    interpolateScalarAtDistance(channelDeltas, primaryRefCoords, stationOrDistM, true);
+  const deltaAt = (distM: number): number => interpolateScalarAtDistance(channelDeltas, primaryDists, distM, true);
 
-  const buildStraight = (
-    fromDist: number,
-    toDist: number,
-    fromCoord: number,
-    toCoord: number
-  ): StraightSegmentComparison | null => {
+  const buildStraight = (fromDist: number, toDist: number): StraightSegmentComparison | null => {
     if (toDist - fromDist < MIN_STRAIGHT_LENGTH_M) return null;
     const primaryAtEntry = interpolatePointAtDistance(primaryPoints, primaryDists, fromDist);
     const primaryAtExit = interpolatePointAtDistance(primaryPoints, primaryDists, toDist);
@@ -442,7 +415,7 @@ export function computeLapSegmentComparisons(
       primaryExitSpeedKmh: Math.round(primaryAtExit.speedKmh),
       baselineExitSpeedKmh: Math.round(baselineAtExit),
       exitSpeedDeltaKmh: Math.round(primaryAtExit.speedKmh - baselineAtExit),
-      timeDeltaSec: Number((deltaAt(toCoord) - deltaAt(fromCoord)).toFixed(3)),
+      timeDeltaSec: Number((deltaAt(toDist) - deltaAt(fromDist)).toFixed(3)),
     };
   };
 
@@ -551,12 +524,8 @@ export function computeLapSegmentComparisons(
       ? primaryTurnInDistM - primaryBrakingDistM
       : null;
 
-    const coordinateAtDistance = (distanceM: number): number =>
-      canMatchByStation
-        ? interpolateCoordinateAtDistance(primaryDists, primaryRefCoords, distanceM)
-        : distanceM;
     const phaseDelta = (startDistM: number, endDistM: number): number =>
-      Number((deltaAt(coordinateAtDistance(endDistM)) - deltaAt(coordinateAtDistance(startDistM))).toFixed(3));
+      Number((deltaAt(endDistM) - deltaAt(startDistM)).toFixed(3));
     const rotationStartDistM = primaryTurnInDistM ?? entry.distM;
     const phaseTiming: CornerPhaseTiming = {
       entry: primaryTurnInDistM !== null
@@ -781,13 +750,7 @@ export function computeLapSegmentComparisons(
         : bchordSagittaM,
     };
 
-    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
-      ? primaryRefCoords[entry.index]
-      : entry.distM;
-    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
-      ? primaryRefCoords[exit.index]
-      : exit.distM;
-    const timeDeltaSec = Number((deltaAt(exitCoord) - deltaAt(entryCoord)).toFixed(3));
+    const timeDeltaSec = Number((deltaAt(exit.distM) - deltaAt(entry.distM)).toFixed(3));
 
     const typeSpecificDetails: CornerTypeSpecificDetails = {
       steeringScrubDeg: maxUndersteerDeg > 0 ? Number(maxUndersteerDeg.toFixed(1)) : undefined,
@@ -853,7 +816,6 @@ export function computeLapSegmentComparisons(
   const segments: LapSegmentComparison[] = [];
   let cornerNumber = 0;
   let prevBoundaryDist = startDistM;
-  let prevBoundaryCoord = canMatchByStation && primaryRefCoords[0] !== undefined ? primaryRefCoords[0] : startDistM;
 
   for (let i = 1; i < turningPoints.length - 1; i++) {
     const min = turningPoints[i];
@@ -861,26 +823,15 @@ export function computeLapSegmentComparisons(
     const exit = turningPoints[i + 1];
     if (min.type !== 'min' || entry.type !== 'max' || exit.type !== 'max') continue;
 
-    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
-      ? primaryRefCoords[entry.index]
-      : entry.distM;
-    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
-      ? primaryRefCoords[exit.index]
-      : exit.distM;
-
-    const straight = buildStraight(prevBoundaryDist, entry.distM, prevBoundaryCoord, entryCoord);
+    const straight = buildStraight(prevBoundaryDist, entry.distM);
     if (straight) segments.push(straight);
 
     cornerNumber++;
     segments.push(buildCorner(cornerNumber, entry, min, exit));
     prevBoundaryDist = exit.distM;
-    prevBoundaryCoord = exitCoord;
   }
 
-  const trailingCoord = canMatchByStation && primaryRefCoords[primaryRefCoords.length - 1] !== undefined
-    ? primaryRefCoords[primaryRefCoords.length - 1]
-    : totalDistM;
-  const trailing = buildStraight(prevBoundaryDist, totalDistM, prevBoundaryCoord, trailingCoord);
+  const trailing = buildStraight(prevBoundaryDist, totalDistM);
   if (trailing) segments.push(trailing);
 
   segments.forEach((s, idx) => { s.segmentIndex = idx; });

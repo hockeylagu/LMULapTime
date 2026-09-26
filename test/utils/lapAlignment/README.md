@@ -15,7 +15,7 @@ Fixtures (`test/fixtures/replays/*.json`) are captured with
 | Fixture | Class | Primary | Baseline | Why it is here |
 |---|---|---|---|---|
 | `daytona-r1-10-lap-pair` | Hypercar (Peugeot 9X8 vs Cadillac V-Series.R) | player lap 2, DuckDB 100 Hz (97.810) | Mack Pearmain lap 9, VCR (95.907) | Baseline sliced 11.3 m after the line (remote timing latency) |
-| `sarthe-r1-41-lap-pair` | GT3 (Corvette vs Lexus) | player lap 4, DuckDB 100 Hz (249.940) | Richard Faber lap 3, VCR (239.249) | 13.6 km lap (5.7 m/sample); primary starts 0.5 m **before** the line |
+| `sarthe-r1-41-lap-pair` | GT3 (Corvette vs Lexus) | player lap 4, DuckDB 100 Hz (249.940) | Richard Faber lap 3, VCR (239.249) | 13.6 km lap (5.7 m/sample); primary starts 0.5 m **before** the line; primary is **stationary ~2 s in T5** (+10 s incident) |
 | `bahrain-r1-10-lap-pair` | GT3 (BMW M4 vs Porsche 911 GT3 R) | player lap 10, DuckDB 100 Hz (120.837) | Harold Hooverson lap 4, VCR (120.301) | Small Δ (0.536 s); baseline sliced 8.9 m after the line |
 | `spa-r1-38-lap-pair` | GTE (Aston Vantage vs Porsche RSR-19) | player lap 3, DuckDB 100 Hz (140.067) | Gabriel Neves lap 4, VCR (140.413) | Primary **faster** (negative Δ); primary starts before the line, baseline sliced 14.9 m after it |
 

@@ -5534,12 +5534,12 @@ exports[`lap comparison golden output: sarthe-r1-41-lap-pair > corner and straig
       "exit": {
         "endDistM": 7545,
         "startDistM": 6172,
-        "timeDeltaSec": 7.255,
+        "timeDeltaSec": 5.175,
       },
       "rotation": {
         "endDistM": 6172,
         "startDistM": 5882,
-        "timeDeltaSec": 2.827,
+        "timeDeltaSec": 4.907,
       },
     },
     "primaryBrakingDistM": 5829,
