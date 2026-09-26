@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, getSessionTypeSortRank, compareSessions } from '../../utils/formatters.js';
 import { matchesSessionCarClass, matchesTrack, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
+import { selectCleanLapCandidates } from '../../utils/lapComparison.js';
 import { DetailedSession } from '../../../server/core/types';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
@@ -141,9 +142,6 @@ export function useDashboardMetrics({
         for (const lap of p.laps) {
           if (lap.lapTime && lap.lapTime > 0) {
             totalDrivingSeconds += lap.lapTime;
-            if (lap.isValid !== false && !lap.isPitStop) {
-              cleanLaps++;
-            }
           }
           if (lap.isPitStop) {
             totalPitStops++;
@@ -153,6 +151,7 @@ export function useDashboardMetrics({
             maxTopSpeedTrack = displayTrack;
           }
         }
+        cleanLaps += selectCleanLapCandidates(p.laps).length;
       } else if (p.avgLapTime && completedLapsCount > 0) {
         totalDrivingSeconds += p.avgLapTime * completedLapsCount;
         cleanLaps += completedLapsCount;

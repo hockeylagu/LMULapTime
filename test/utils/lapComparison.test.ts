@@ -298,6 +298,18 @@ describe('lapComparison utility', () => {
       expect(res.sampleCount).toBe(1);
     });
 
+    it('excludes start lap and does not fall back when only 1 flying lap exists in multi-lap stint', () => {
+      const laps = [
+        { lapNum: 1, lapTime: 135.0, isValid: true }, // Start lap (standing start / out-lap)
+        { lapNum: 2, lapTime: 120.0, isValid: true }, // Clean flying lap
+      ];
+      const res = computeConsistencyRating(laps);
+      expect(res.consistencyScore).toBe(100);
+      expect(res.stdDev).toBe(0);
+      expect(res.avgLapTime).toBe(120.0);
+      expect(res.sampleCount).toBe(1);
+    });
+
     it('returns high consistency score for tightly grouped laps', () => {
       const laps = [
         { lapNum: 1, lapTime: 125.0, isValid: true },

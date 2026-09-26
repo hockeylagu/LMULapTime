@@ -60,8 +60,12 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       driver = s.drivers[0];
     }
 
-    const cleanLaps = (driver?.laps || []).filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
-    const cleanLapsCount = cleanLaps.length;
+    const cleanLaps = driver?.laps && driver.laps.length > 0
+      ? selectCleanLapCandidates(driver.laps)
+      : [];
+    const cleanLapsCount = driver?.laps && driver.laps.length > 0
+      ? cleanLaps.length
+      : (driver?.avgLapTime && (driver?.lapsCount || 0) > 0 ? (driver.lapsCount || 0) : 0);
     const totalLapsCount = driver?.lapsCount || 0;
     const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
 
