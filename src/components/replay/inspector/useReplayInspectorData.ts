@@ -6,6 +6,7 @@ import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemet
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { fetchJsonShared } from './sharedJsonFetch.js';
+import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 
 export interface UseReplayInspectorDataProps {
@@ -64,6 +65,9 @@ export function useReplayInspectorData({
 
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const playbackClockRef = useRef<PlaybackClock | null>(null);
+  const currentIndexRef = useRef(0);
+  currentIndexRef.current = currentIndex;
   const hasInitializedRef = useRef<boolean>(false);
   const trajectoryRequestIdRef = useRef(0);
 
@@ -397,13 +401,27 @@ export function useReplayInspectorData({
       if (animRef.current) cancelAnimationFrame(animRef.current);
       return;
     }
+    // Playback follows the lap's clock (see replayPlaybackClock), not the sample count.
+    const points = trajectory.points;
     lastTimeRef.current = performance.now();
+    playbackClockRef.current = playbackClockAt(points, currentIndexRef.current);
     const loop = (now: number) => {
-      const delta = now - lastTimeRef.current;
-      const framesToAdvance = Math.max(1, Math.round((delta / 25) * playbackSpeed));
-      if (delta >= 20 / playbackSpeed) {
-        lastTimeRef.current = now;
-        setCurrentIndex(prev => (prev + framesToAdvance >= trajectory.points.length ? (setIsPlaying(false), 0) : prev + framesToAdvance));
+      const elapsedMs = now - lastTimeRef.current;
+      lastTimeRef.current = now;
+      let clock = playbackClockRef.current;
+      // The cursor was moved (scrub, corner jump) while playing: carry on from there.
+      if (!clock || clock.index !== currentIndexRef.current) clock = playbackClockAt(points, currentIndexRef.current);
+      const next = advancePlaybackClock(points, clock, elapsedMs, playbackSpeed);
+      if (!next) {
+        playbackClockRef.current = null;
+        setIsPlaying(false);
+        setCurrentIndex(0);
+        return;
+      }
+      playbackClockRef.current = next;
+      if (next.index !== clock.index) {
+        currentIndexRef.current = next.index;
+        setCurrentIndex(next.index);
       }
       animRef.current = requestAnimationFrame(loop);
     };
