@@ -116,8 +116,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   }, [colorBy, points, baselinePoints, effectiveGeometry]);
 
   const baselineDeltaByIdx = useMemo(
-    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, effectiveBaselinePoints, primaryDists, baselineDists, effectiveGeometry?.lengthM, points) : null),
-    [colorBy, deltaByIdx, effectiveBaselinePoints, baselineDists, primaryDists, effectiveGeometry, points]
+    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists) : null),
+    [colorBy, deltaByIdx, baselineDists, primaryDists]
   );
   const baselineGhostPos = useMemo(() => {
     return computeGhostPosition(
@@ -127,11 +127,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       currentIndex,
       effectiveBounds,
       VIEWBOX_SIZE,
-      PADDING,
-      effectiveGeometry?.lengthM,
-      points
+      PADDING
     );
-  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds, effectiveGeometry, points]);
+  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds]);
 
   const pedalMarkerPoints = useMemo(
     () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints),
