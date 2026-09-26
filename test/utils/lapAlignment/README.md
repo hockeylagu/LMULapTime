@@ -22,6 +22,14 @@ Fixtures (`test/fixtures/replays/*.json`) are captured with
 Since phase 4 the server cuts every lap of a recognised track exactly at the start/finish line
 (`server/tracks/lapLineCut.ts`), using the recording of the neighbouring laps stored in the
 cache, so every fixture lap starts at station 0 and ends at the track length.
+Laps are reduced to the requested resolution by `server/replay/trajectoryDownsampler.ts`
+(Visvalingam-Whyatt over pedals and speed): at 2400 points the pedal points of the four pairs
+match the full-resolution lap within 2 m (9 m once, Spa), except the Le Mans T13 baseline
+throttle pick-up, which no 2400-point reduction keeps.
+
+The client still extrapolates up to 25 m at the lap edges (`computeStartFinishOffset`,
+`interpolateScalarAtDistance(..., true)`): real laps no longer need it, but I3 (a recording
+that starts late, e.g. an unknown-layout or uncut lap) does.
 
 ## Rules
 
@@ -40,7 +48,7 @@ cache, so every fixture lap starts at station 0 and ends at the track length.
 | I2 | Pedal points sit where the channel crosses the threshold, and the map draws them there |
 | I3 | Trimming the first 10 m of the baseline recording changes nothing |
 | I4 | Swapping the laps flips the Δ sign |
-| I5 | Halving the resolution keeps pedal points within one sample |
+| I5 | Halving the resolution with the server downsampler keeps pedal points within one sample |
 | I6 | Samples recorded before the S/F line change nothing |
 | I7 | Corner flags don't move when a comparison lap is added |
 

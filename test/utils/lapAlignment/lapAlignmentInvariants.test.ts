@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
+import { downsampleTrajectoryPoints } from '../../../server/replay/trajectoryDownsampler.js';
 import {
   computeLapComparisons,
   interpolatePointAtDistance,
@@ -38,15 +39,9 @@ type InvariantId = 'I0' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'I7';
 
 const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>> = {
   'daytona-r1-10-lap-pair': {},
-  'sarthe-r1-41-lap-pair': {
-    I5: 'phase 4: stride decimation drops a 2-sample brake tap (T11) that the half-resolution lap never sees',
-  },
-  'bahrain-r1-10-lap-pair': {
-    I5: 'phase 4: stride decimation aliases the VCR baseline throttle chatter (33/100) at half resolution (T5-T7); T1 primary is 1 m over (100/70 alternation, a 0.155 s dip at the 0.15 s cut limit)',
-  },
-  'spa-r1-38-lap-pair': {
-    I5: 'phase 4: stride decimation aliases the VCR baseline throttle chatter through the Bus Stop (T10): the full lap never holds throttle, every other sample does',
-  },
+  'sarthe-r1-41-lap-pair': {},
+  'bahrain-r1-10-lap-pair': {},
+  'spa-r1-38-lap-pair': {},
 };
 
 function invariant(pair: LapPairName, id: InvariantId, title: string, fn: () => void) {
@@ -140,7 +135,8 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
   });
 
   invariant(name, 'I5', 'halving the telemetry resolution keeps pedal points within one sample', () => {
-    const half = (lap: ReplayTrajectoryPoint[]) => applyTelemetryPostProcessing(lap.filter((_, i) => i % 2 === 0));
+    // Halved the way the server reduces a lap to the requested resolution.
+    const half = (lap: ReplayTrajectoryPoint[]) => applyTelemetryPostProcessing(downsampleTrajectoryPoints(lap, Math.ceil(lap.length / 2)));
     const halfP = half(pair.primary.rawPoints);
     const halfB = half(pair.baseline.rawPoints);
     const halfCorners = computePairSegments(halfP, halfB, L, pair.primary.layoutKey).filter(isCorner);
