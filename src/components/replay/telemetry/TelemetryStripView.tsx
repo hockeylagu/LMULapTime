@@ -7,6 +7,7 @@ import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
+import { TelemetryResolution } from './telemetryResolution.js';
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];
@@ -34,8 +35,8 @@ export interface TelemetryStripViewProps {
   onResetZoom: () => void;
   onStepIndex?: (delta: number) => void;
   hasBaseline: boolean;
-  telemetryResolution?: number;
-  onChangeResolution?: (res: number) => void;
+  telemetryResolution?: TelemetryResolution;
+  onChangeResolution?: (res: TelemetryResolution) => void;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
   vcrRawPointsCount?: number;

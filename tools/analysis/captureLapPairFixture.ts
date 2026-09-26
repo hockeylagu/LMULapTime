@@ -6,7 +6,10 @@
  * Usage (server running on :3001):
  *   npx tsx tools/analysis/captureLapPairFixture.ts <fixture-name> \
  *     "<replay>" <lap> "<driver or ->" "<source: duckdb|vcr>" \
- *     "<baseline replay>" <lap> "<driver>" "<source>" [maxPoints=2400]
+ *     "<baseline replay>" <lap> "<driver>" "<source>" [resolution=2m]
+ *
+ * The resolution is what the replay inspector asks for: a point spacing ("2m", its default) or a
+ * point count ("2400"; "0" for every sample).
  *
  * Example (the fixtures currently checked in):
  *   npx tsx tools/analysis/captureLapPairFixture.ts daytona-r1-10-lap-pair \
@@ -48,10 +51,11 @@ async function fetchCarClass(req: LapRequest): Promise<string> {
   return resolveDriverCarClass(entry);
 }
 
-async function fetchLap(req: LapRequest, maxPoints: number) {
+async function fetchLap(req: LapRequest, resolution: string) {
   const carClass = await fetchCarClass(req);
   const driver = req.driver === '-' ? '' : `&driverName=${encodeURIComponent(req.driver)}`;
-  const url = `${API}/${encodeURIComponent(req.replay)}/trajectory?maxPoints=${maxPoints}&lap=${req.lap}&source=${req.source}${driver}`;
+  const resolutionQuery = resolution.endsWith('m') ? `pointSpacingM=${resolution.slice(0, -1)}` : `maxPoints=${Number(resolution)}`;
+  const url = `${API}/${encodeURIComponent(req.replay)}/trajectory?${resolutionQuery}&lap=${req.lap}&source=${req.source}${driver}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} for ${url}`);
   const data = (await res.json()) as ReplayTrajectoryData;
@@ -77,7 +81,8 @@ async function fetchLap(req: LapRequest, maxPoints: number) {
     lapTimeSec: lap.lapTimeSec,
     layoutKey: data.layoutKey,
     trackLengthM: data.trackLengthM,
-    maxPoints,
+    resolution,
+    maxPoints: data.maxPoints ?? 0,
     columns,
   };
 }
@@ -88,9 +93,9 @@ async function main() {
     console.log('See usage at the top of tools/analysis/captureLapPairFixture.ts');
     process.exit(1);
   }
-  const maxPoints = Number(max ?? 2400);
-  const primary = await fetchLap({ replay: pReplay, lap: Number(pLap), driver: pDriver, source: pSource }, maxPoints);
-  const baseline = await fetchLap({ replay: bReplay, lap: Number(bLap), driver: bDriver, source: bSource }, maxPoints);
+  const resolution = max ?? '2m';
+  const primary = await fetchLap({ replay: pReplay, lap: Number(pLap), driver: pDriver, source: pSource }, resolution);
+  const baseline = await fetchLap({ replay: bReplay, lap: Number(bLap), driver: bDriver, source: bSource }, resolution);
   if (!primary.carClass || !areComparableCarClasses(primary.carClass, baseline.carClass)) {
     throw new Error(`refusing a cross-class pair: ${primary.driverName} is ${primary.carClass}, ${baseline.driverName} is ${baseline.carClass}`);
   }

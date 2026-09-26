@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nearestSelectedIndex, selectFeatureSamples } from '../../../server/replay/trajectoryDownsampler.js';
+import { nearestSelectedIndex, pointBudgetForSpacing, selectFeatureSamples } from '../../../server/replay/trajectoryDownsampler.js';
 import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
 
 // A lap sampled every 0.1 s at a steady 200 km/h, full throttle, no brake, unless overridden.
@@ -68,5 +68,22 @@ describe('nearestSelectedIndex', () => {
     expect(nearestSelectedIndex(selected, 14)).toBe(1);
     expect(nearestSelectedIndex(selected, 16)).toBe(2);
     expect(nearestSelectedIndex(selected, 99)).toBe(3);
+  });
+});
+
+describe('pointBudgetForSpacing', () => {
+  it('spaces the points over the track length when the lap is on a known track', () => {
+    expect(pointBudgetForSpacing(lap(10), 13624.59, 2)).toBe(6813);
+    expect(pointBudgetForSpacing(lap(10), 5724.06, 2)).toBe(2863);
+  });
+
+  it('falls back to the distance the recording covers', () => {
+    // lap(101): x from 0 to 100 m
+    expect(pointBudgetForSpacing(lap(101), undefined, 2)).toBe(50);
+    expect(pointBudgetForSpacing(lap(101), 0, 3)).toBe(34);
+  });
+
+  it('never asks for fewer than the two end samples', () => {
+    expect(pointBudgetForSpacing(lap(1), undefined, 2)).toBe(2);
   });
 });

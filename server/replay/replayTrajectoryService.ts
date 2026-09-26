@@ -13,6 +13,7 @@ import {
 } from './replayTransforms.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { stripLapEdgeSamples } from '../tracks/serverTrackSync.js';
+import { pointBudgetForSpacing } from './trajectoryDownsampler.js';
 
 export class ReplayTrajectoryService {
   public constructor(
@@ -148,7 +149,10 @@ export class ReplayTrajectoryService {
     }
 
     stripLapEdgeSamples(trajectory);
-    trajectory = downsampleTrajectoryResponse(trajectory, request.maxPoints);
+    const pointBudget = request.pointSpacingM
+      ? pointBudgetForSpacing(trajectory.points, trajectory.trackLengthM, request.pointSpacingM)
+      : request.maxPoints;
+    trajectory = downsampleTrajectoryResponse(trajectory, pointBudget);
 
     if (!trajectory.layoutKey) {
       const circuitSpec = getCircuitSpecification(venue, course, sceneDesc, request.replayName, null, trackLengthMeters);

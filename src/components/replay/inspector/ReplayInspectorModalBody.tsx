@@ -9,6 +9,7 @@ import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { TelemetryStripCharts } from '../telemetry/TelemetryStripCharts.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayInspectorSidebar } from './ReplayInspectorSidebar.js';
+import { TelemetryResolution } from '../telemetry/telemetryResolution.js';
 
 export interface ReplayInspectorModalBodyProps {
   onClose: () => void;
@@ -43,8 +44,8 @@ export interface ReplayInspectorModalBodyProps {
   setPlaybackSpeed: (speed: number) => void;
   chartZoomRange: { start: number; end: number } | null;
   setChartZoomRange: (range: { start: number; end: number } | null) => void;
-  telemetryResolution: number;
-  handleChangeResolution: (res: number) => void;
+  telemetryResolution: TelemetryResolution;
+  handleChangeResolution: (res: TelemetryResolution) => void;
   handleSelectDriver: (slot: number) => void;
   handleSelectLap: (lapNum: number) => void;
   maxSpeed: number;

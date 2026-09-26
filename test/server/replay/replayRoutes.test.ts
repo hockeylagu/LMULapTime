@@ -118,6 +118,11 @@ describe('Replay routes', () => {
 
     const invalidMaxPoints = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?maxPoints=100001');
     expect(invalidMaxPoints.status).toBe(400);
+
+    for (const spacing of ['0.1', '101', 'abc', '-2']) {
+      const invalidSpacing = await request(app).get(`/api/replays/Route_Test_P1.Vcr/trajectory?pointSpacingM=${spacing}`);
+      expect(invalidSpacing.status).toBe(400);
+    }
   });
 
   it('returns 404 for missing files when no cached metadata or trajectory exists', async () => {

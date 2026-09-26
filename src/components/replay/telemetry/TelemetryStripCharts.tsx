@@ -8,6 +8,7 @@ import { TelemetryStripView } from './TelemetryStripView.js';
 import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './presets/telemetryPresets.js';
 import { TelemetryPresetModal } from './presets/TelemetryPresetModal.js';
 import { useTelemetryStripInteraction } from './useTelemetryStripInteraction.js';
+import { TelemetryResolution } from './telemetryResolution.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -31,8 +32,8 @@ export interface TelemetryStripChartsProps {
   baselinePoints?: ReplayTrajectoryPoint[];
   zoomRange?: { start: number; end: number } | null;
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
-  telemetryResolution?: number;
-  onChangeResolution?: (res: number) => void;
+  telemetryResolution?: TelemetryResolution;
+  onChangeResolution?: (res: TelemetryResolution) => void;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
   vcrRawPointsCount?: number;

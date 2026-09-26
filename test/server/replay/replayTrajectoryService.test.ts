@@ -85,6 +85,19 @@ describe('ReplayTrajectoryService', () => {
     expect(traj.driverName).toBe('Samuel Lague');
   });
 
+  it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {
+    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+
+    // Spaced over the Daytona road course's length (5724 m): 2000 m spacing is 3 points, whatever
+    // maxPoints says (0 = full resolution).
+    const traj = await trajectoryService.getTrajectory({ replayName: 'Daytona.Vcr', driverSlot: 0, maxPoints: 0, pointSpacingM: 2000, allowDuckDb: false });
+
+    expect(traj.trackLengthM).toBe(5724.06);
+    expect(traj.points).toHaveLength(3);
+    expect(traj.maxPoints).toBe(3);
+  });
+
   it('projects and cuts the lap at the line at full resolution, then downsamples', async () => {
     // Monza centreline vertices 0.1 s apart; the timing loop sliced the lap 3 vertices late.
     const centerline = getTrackDefinition('monza_gp')?.centerline ?? [];
