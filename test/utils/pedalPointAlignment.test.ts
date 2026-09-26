@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { computeLapSegmentComparisons, CornerSegmentComparison } from '../../src/utils/cornerAnalysis.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 import {
-  buildEffectiveBaselinePoints,
   computePedalMarkerPoints,
   projectTrajectoryPoints,
 } from '../../src/components/replay/map/replayMapUtils.js';
@@ -20,7 +19,8 @@ const throttleAt = (s: number, brakeOnset: number | null, throttleOnset: number)
   brakeOnset === null || s < brakeOnset ? 100 : s >= throttleOnset ? Math.min(100, (s - throttleOnset) * 10) : 0;
 
 /**
- * `firstStation`: where the recording was trimmed (after the S/F line).
+ * `firstStation`: where the replay sliced the lap (after the S/F line). The lap starts on the line
+ * all the same, as the server delivers it: a sample extended back to station 0 (see LapEndCut).
  * `lineLengthFactor`: own driven distance per metre of station (a longer/wider line > 1).
  */
 function buildLap(
@@ -31,12 +31,13 @@ function buildLap(
 ): ReplayTrajectoryPoint[] {
   const points: ReplayTrajectoryPoint[] = [];
   let timeSec = 0;
-  for (let s = firstStation; s <= 450; s += 2) {
-    if (points.length > 0) timeSec += 2 / (speedAt(s) / 3.6);
+  const stations = [...(firstStation > 0 ? [0] : []), ...Array.from({ length: Math.floor((450 - firstStation) / 2) + 1 }, (_, k) => firstStation + 2 * k)];
+  for (const [k, s] of stations.entries()) {
+    if (k > 0) timeSec += (s - stations[k - 1]) / (speedAt(s) / 3.6);
     points.push({
       x: s, y: 0, z: 0,
       stationM: s,
-      distM: (s - firstStation) * lineLengthFactor,
+      distM: s * lineLengthFactor,
       timeSec,
       speedKmh: speedAt(s),
       brake: brakeOnsetStation === null ? 0 : brakeAt(s, brakeOnsetStation),
@@ -48,7 +49,7 @@ function buildLap(
 }
 
 // Primary: recorded from the line, brakes at station 200 (its own speed peak).
-// Baseline: trimmed 11 m after the line, drives a 5% longer line, and brakes 10 m EARLIER
+// Baseline: sliced 11 m after the line, drives a 5% longer line, and brakes 10 m EARLIER
 // (station 190) - before the primary's corner entry.
 const primary = buildLap(0, 200, 1);
 const baseline = buildLap(11, 190, 1.05);
@@ -75,22 +76,17 @@ describe('pedal point alignment between two laps', () => {
   });
 
   it('keeps the map baseline in the same frame, so its brake marker lands on the baseline brake point', () => {
-    const effectiveBaseline = buildEffectiveBaselinePoints(baseline, TRACK_LENGTH_M);
-    // The synthetic S/F point must not shift the baseline's own S/F-zeroed distances.
-    expect(getTrajectoryDistances(effectiveBaseline, TRACK_LENGTH_M).slice(1)[0])
-      .toBeCloseTo(getTrajectoryDistances(baseline, TRACK_LENGTH_M)[0], 1);
-
     const bounds = { minX: 0, maxX: 450, spanX: 450, minZ: -225, maxZ: 225, spanZ: 450 };
     const primarySvg = projectTrajectoryPoints(primary, bounds, 800, 60);
-    const baselineSvg = projectTrajectoryPoints(effectiveBaseline, bounds, 800, 60);
+    const baselineSvg = projectTrajectoryPoints(baseline, bounds, 800, 60);
     const [marker] = computePedalMarkerPoints(
       true,
       [{ cornerNumber: 1, distM: 192, kind: 'brake', isBaseline: true }],
       getTrajectoryDistances(primary, TRACK_LENGTH_M),
-      getDistancesInReferenceFrame(effectiveBaseline, primary, TRACK_LENGTH_M),
+      getDistancesInReferenceFrame(baseline, primary, TRACK_LENGTH_M),
       primarySvg,
       baselineSvg,
-      effectiveBaseline
+      baseline
     );
     const [expected] = projectTrajectoryPoints([{ x: 192, y: 0, z: 0 }], bounds, 800, 60);
     expect(marker.sx).toBeCloseTo(expected.sx, 1);

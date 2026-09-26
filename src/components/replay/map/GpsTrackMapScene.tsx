@@ -12,7 +12,6 @@ import {
   computeEffectiveBounds,
   computeBaselineDeltaByIdx,
   projectStartFinishGate,
-  buildEffectiveBaselinePoints,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -50,10 +49,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   });
   const effectiveGeometry = trackGeometry ?? fetchedGeometry;
 
-  const effectiveBaselinePoints = useMemo(
-    () => buildEffectiveBaselinePoints(baselinePoints, trackLengthM),
-    [baselinePoints, trackLengthM]
-  );
+  const effectiveBaselinePoints = useMemo(() => baselinePoints ?? [], [baselinePoints]);
 
   const effectiveBounds = useMemo(
     () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, effectiveBaselinePoints),

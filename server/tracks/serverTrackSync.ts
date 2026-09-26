@@ -8,7 +8,6 @@ import { cutLapAtLine } from './lapLineCut.js';
 
 interface CachedTrackDefinition {
   layoutKey: string;
-  lengthM: number;
   timingGates?: TrackTimingGates;
   centerline: Array<[number, number]>;
   spatialIndex: CenterlineSpatialIndex;
@@ -53,7 +52,6 @@ export function getTrackDefinition(layoutKey: string): CachedTrackDefinition | n
     const spatialIndex = buildCenterlineSpatialIndex(parsed.centerline);
     const def: CachedTrackDefinition = {
       layoutKey,
-      lengthM: parsed.lengthM || spatialIndex.totalLengthM,
       timingGates: parsed.timingGates,
       centerline: parsed.centerline,
       spatialIndex,
@@ -158,7 +156,10 @@ function applyCanonicalProjection(
   }
 
   trajectory.layoutKey = trackDef.layoutKey;
-  trajectory.trackLengthM = Number(trackDef.lengthM.toFixed(2));
+  // The centreline's own length, where stations wrap and where the cut lap ends: the layout's
+  // published lengthM is the same length rounded to 0.1 m, which leaves every lap a few
+  // centimetres short of (or past) the track length.
+  trajectory.trackLengthM = Number(trackDef.spatialIndex.totalLengthM.toFixed(2));
   trajectory.lapDistMeters = Number(runningDist.toFixed(2));
   trajectory.timingGates = trackDef.timingGates;
   trajectory.stationSource = 'track';

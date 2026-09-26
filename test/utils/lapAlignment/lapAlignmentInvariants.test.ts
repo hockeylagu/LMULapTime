@@ -12,10 +12,8 @@ import {
   interpolateScalarAtDistance,
 } from '../../../src/utils/lapAlignment.js';
 import { BRAKE_ON_THRESHOLD_PCT, CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis.js';
-import {
-  buildEffectiveBaselinePoints,
-  projectTrajectoryPoints,
-} from '../../../src/components/replay/map/replayMapUtils.js';
+import { projectTrajectoryPoints } from '../../../src/components/replay/map/replayMapUtils.js';
+import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
 import {
   computeMapScene,
   computePairSegments,
@@ -70,7 +68,23 @@ const within = (a: number | null | undefined, b: number | null | undefined, tol:
 
 /** Converts a distance in the primary lap's frame (what corner analysis reports) to a track station. */
 function primaryStationAt(P: ReplayTrajectoryPoint[], L: number, distM: number) {
-  return interpolateScalarAtDistance(getMonotonicStations(P, L), getTrajectoryDistances(P, L), distM, true);
+  return interpolateScalarAtDistance(getMonotonicStations(P, L), getTrajectoryDistances(P, L), distM);
+}
+
+/**
+ * The lap as the server would serve it had the replay started `lateM` past the line: the
+ * recording before that is dropped, the lap is extended back to the line (server/tracks/lapLineCut.ts)
+ * and post-processed like any lap the inspector receives.
+ */
+function startLateAndExtend(raw: ReplayTrajectoryPoint[], L: number, lateM: number): ReplayTrajectoryPoint[] {
+  const late = raw.filter(p => (p.stationM ?? 0) >= lateM);
+  const cut = cutLapAtLine(late, late.map(p => p.stationM ?? 0), late.map(p => p.lateralOffsetM ?? 0), L, 0, late.length - 1);
+  let distM = 0;
+  const points = cut.points.map((p, i) => {
+    if (i > 0) distM += Math.hypot(p.x - cut.points[i - 1].x, p.z - cut.points[i - 1].z);
+    return { ...p, distM: Number(distM.toFixed(2)) };
+  });
+  return applyTelemetryPostProcessing(points);
 }
 
 /** Drops leading samples that are recorded before the S/F line (station in the last half of the lap). */
@@ -104,7 +118,7 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
       const station = primaryStationAt(P, L, marker.distM);
       const lap = marker.isBaseline ? B : P;
       const stations = marker.isBaseline ? baselineStations : getMonotonicStations(P, L);
-      const world = interpolatePointAtDistance(lap, stations, station, undefined, true);
+      const world = interpolatePointAtDistance(lap, stations, station);
       const [expected] = projectTrajectoryPoints([{ x: world.x, y: 0, z: world.z }], scene.bounds, MAP_VIEWBOX, MAP_PADDING);
       const offByM = Math.hypot(marker.sx - expected.sx, marker.sy - expected.sy) / scale;
       expect(offByM, `T${marker.cornerNumber} ${marker.kind} ${marker.isBaseline ? 'baseline' : 'primary'}`).toBeLessThanOrEqual(POINT_TOL_M);
@@ -112,15 +126,16 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
     for (const c of corners) {
       if (c.baselineBrakingDistM === null) continue;
       const station = primaryStationAt(P, L, c.baselineBrakingDistM);
-      const before = interpolateScalarAtDistance(baselineBrakes, baselineStations, station - POINT_TOL_M, true);
-      const after = interpolateScalarAtDistance(baselineBrakes, baselineStations, station + POINT_TOL_M, true);
+      const before = interpolateScalarAtDistance(baselineBrakes, baselineStations, station - POINT_TOL_M);
+      const after = interpolateScalarAtDistance(baselineBrakes, baselineStations, station + POINT_TOL_M);
       expect(before, `T${c.cornerNumber} baseline brake before its brake point`).toBeLessThan(BRAKE_ON_THRESHOLD_PCT);
       expect(after, `T${c.cornerNumber} baseline brake after its brake point`).toBeGreaterThanOrEqual(BRAKE_ON_THRESHOLD_PCT);
     }
   });
 
-  invariant(name, 'I3', 'trimming the first 10 m of the baseline recording changes nothing', () => {
-    const trimmed = B.filter(p => (p.stationM ?? 0) >= (B[0].stationM ?? 0) + 10);
+  invariant(name, 'I3', 'a baseline whose recording starts 10 m past the line compares the same once the server extends it', () => {
+    const trimmed = startLateAndExtend(pair.baseline.rawPoints, L, 10);
+    expect(trimmed[0].stationM).toBe(0);
     expect(Math.abs(finalDelta(P, trimmed, L) - finalDelta(P, B, L))).toBeLessThanOrEqual(TIME_TOL_SEC);
     const trimmedSegments = computePairSegments(P, trimmed, L, pair.primary.layoutKey);
     expect(Math.abs(segmentDeltaSum(trimmedSegments) - segmentDeltaSum(segments))).toBeLessThanOrEqual(TIME_TOL_SEC);
@@ -155,12 +170,11 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
     const P2 = dropPreLineSamples(P, L);
     const B2 = dropPreLineSamples(B, L);
     expect(Math.abs(finalDelta(P2, B2, L) - finalDelta(P, B, L))).toBeLessThanOrEqual(TIME_TOL_SEC);
-    // As a map baseline, a lap starting before the line must keep time and station moving forward.
+    // As a map baseline, a lap must keep time and station moving forward.
     for (const lap of [P, B]) {
-      const effective = buildEffectiveBaselinePoints(lap, L);
-      const stations = getMonotonicStations(effective, L);
-      for (let i = 1; i < effective.length; i++) {
-        expect(effective[i].timeSec ?? 0, `time at ${i}`).toBeGreaterThanOrEqual(effective[i - 1].timeSec ?? 0);
+      const stations = getMonotonicStations(lap, L);
+      for (let i = 1; i < lap.length; i++) {
+        expect(lap[i].timeSec ?? 0, `time at ${i}`).toBeGreaterThanOrEqual(lap[i - 1].timeSec ?? 0);
       }
       expect(stations[stations.length - 1] - stations[0]).toBeGreaterThan(L * 0.95);
     }

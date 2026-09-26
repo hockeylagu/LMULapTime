@@ -53,9 +53,9 @@ export interface StartFinishCrossing {
   worldZ: number;
 }
 
-// Two independently-trimmed recordings of "the same lap" rarely start at the exact physical
-// line - if the drift looks bigger than this, the array likely isn't actually split at the
-// line at all, so we bail rather than risk a bogus correction.
+// A crossing found further than this into the recording means the array isn't split at the
+// line at all (e.g. a lap whose start the server couldn't put on the line), so we bail rather
+// than risk a bogus correction.
 export const MAX_START_FINISH_CORRECTION_M = 25;
 
 /** Raw (unaligned) distances - same logic as getTrajectoryDistances minus the S/F correction,
@@ -71,9 +71,10 @@ export function rawTrajectoryDistances(points: ReplayTrajectoryPoint[]): number[
 /**
  * Finds where this lap's own recorded path crosses the canonical start/finish station
  * (stationM === 0, set server-side from the track's timing-gate geometry) by scanning a
- * bounded boundary window for the zero-crossing (or backward linear extrapolation if trimmed
- * slightly late). Returns null when canonical stationM isn't available (unrecognized track) or
- * the drift is too large to trust as a simple trim offset.
+ * bounded boundary window for the zero-crossing. On a lap the server put on the line (see
+ * LapEndCut) that is its first sample. Returns null when canonical stationM isn't available
+ * (unrecognized track) or the recording doesn't cross the line near its start (its start is
+ * away from the line): nothing is extrapolated here.
  *
  * This is the single source of truth for "where is the real line" relative to a specific
  * recording's own frame - used both to draw the S/F line and to re-zero distance and time
@@ -104,39 +105,14 @@ export function computeStartFinishOffset(
     }
   }
 
-  let p0: ReplayTrajectoryPoint;
-  let p1: ReplayTrajectoryPoint;
-  let d0: number;
-  let d1: number;
-  let t: number;
-
-  if (kCrossing >= 0) {
-    p0 = points[kCrossing];
-    p1 = points[kCrossing + 1];
-    d0 = rawDists[kCrossing];
-    d1 = rawDists[kCrossing + 1];
-    const s0 = unwrapStation(p0.stationM ?? 0);
-    const s1 = unwrapStation(p1.stationM ?? 0);
-    const ds = s1 - s0;
-    t = ds > 1e-6 ? -s0 / ds : 0;
-  } else {
-    // If no explicit <=0 to >=0 crossing in window (e.g. lap sliced slightly after the line):
-    p0 = points[0];
-    p1 = points[1];
-    d0 = rawDists[0];
-    d1 = rawDists[1];
-    const s0 = unwrapStation(p0.stationM ?? 0);
-    const s1 = unwrapStation(p1.stationM ?? 0);
-
-    if (Math.abs(s0) > MAX_START_FINISH_CORRECTION_M) return null;
-    let ds = s1 - s0;
-    if (trackLengthM) {
-      if (ds > trackLengthM / 2) ds -= trackLengthM;
-      else if (ds < -trackLengthM / 2) ds += trackLengthM;
-    }
-    if (!Number.isFinite(ds) || Math.abs(ds) < 1e-6) return null;
-    t = -s0 / ds;
-  }
+  if (kCrossing < 0) return null;
+  const p0 = points[kCrossing];
+  const p1 = points[kCrossing + 1];
+  const d0 = rawDists[kCrossing];
+  const d1 = rawDists[kCrossing + 1];
+  const s0 = unwrapStation(p0.stationM ?? 0);
+  const ds = unwrapStation(p1.stationM ?? 0) - s0;
+  const t = ds > 1e-6 ? -s0 / ds : 0;
 
   const time0 = p0.timeSec || 0;
   const time1 = p1.timeSec || 0;
@@ -242,42 +218,18 @@ export function getDistancesInReferenceFrame(
 
   const refStations = getMonotonicStations(referencePoints, trackLengthM);
   const refDists = getTrajectoryDistances(referencePoints, trackLengthM);
-  return getMonotonicStations(points, trackLengthM).map(s => interpolateScalarAtDistance(refDists, refStations, s, true));
+  return getMonotonicStations(points, trackLengthM).map(s => interpolateScalarAtDistance(refDists, refStations, s));
 }
 
 /**
  * Interpolates a scalar value (e.g. lateral offset, a delta trace, a distance) at a given
- * distance along a trajectory. Returns full precision - rounding is the caller's display concern.
+ * distance along a trajectory, holding the end values beyond either end. Returns full
+ * precision - rounding is the caller's display concern.
  */
-export function interpolateScalarAtDistance(
-  values: number[],
-  cumDists: number[],
-  targetDist: number,
-  extrapolateBoundary = false
-): number {
+export function interpolateScalarAtDistance(values: number[], cumDists: number[], targetDist: number): number {
   if (values.length === 0) return 0;
-  if (values.length === 1 || targetDist <= cumDists[0]) {
-    if (extrapolateBoundary && values.length >= 2 && cumDists[1] > cumDists[0]) {
-      const span = cumDists[1] - cumDists[0];
-      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
-      const t = (clampedDist - cumDists[0]) / span;
-      return values[0] + t * (values[1] - values[0]);
-    }
-    return values[0];
-  }
-  const maxDist = cumDists[cumDists.length - 1];
-  if (targetDist >= maxDist) {
-    if (extrapolateBoundary && values.length >= 2) {
-      const n = values.length;
-      const span = cumDists[n - 1] - cumDists[n - 2];
-      if (span > 1e-6) {
-        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
-        const t = (clampedDist - cumDists[n - 2]) / span;
-        return values[n - 2] + t * (values[n - 1] - values[n - 2]);
-      }
-    }
-    return values[values.length - 1];
-  }
+  if (values.length === 1 || targetDist <= cumDists[0]) return values[0];
+  if (targetDist >= cumDists[cumDists.length - 1]) return values[values.length - 1];
 
   let low = 0;
   let high = cumDists.length - 1;

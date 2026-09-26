@@ -1,6 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
-  MAX_START_FINISH_CORRECTION_M,
   canAlignByStation,
   computeStartFinishOffset,
   getMonotonicStations,
@@ -224,14 +223,15 @@ function blendTelemetryPoints(
 }
 
 /**
- * Interpolates a telemetry point at a given distance along a trajectory.
+ * Interpolates a telemetry point at a given distance along a trajectory. Before the first or
+ * past the last sample the end sample is held: the server puts both ends of a lap on the
+ * start/finish line (see LapEndCut), so there is nothing to extrapolate on a lap.
  */
 export function interpolatePointAtDistance(
   points: ReplayTrajectoryPoint[],
   cumDists: number[],
   targetDist: number,
-  startTimeOverride?: number,
-  extrapolateBoundary = false
+  startTimeOverride?: number
 ): InterpolatedPoint {
   if (points.length === 0) {
     return {
@@ -250,47 +250,12 @@ export function interpolatePointAtDistance(
   const startTime0 = startTimeOverride !== undefined ? startTimeOverride : (points[0].timeSec || 0);
 
   if (points.length === 1 || targetDist <= cumDists[0]) {
-    if (extrapolateBoundary && points.length >= 2 && cumDists[1] > cumDists[0]) {
-      // Before the first sample (e.g. primary starts on the line, baseline a few metres later):
-      // extrapolate time/speed/position linearly, hold every other channel at the first sample.
-      const p0 = points[0];
-      const p1 = points[1];
-      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
-      const t = (clampedDist - cumDists[0]) / (cumDists[1] - cumDists[0]);
-      const extrapolated = blendTelemetryPoints(p0, p1, t, startTime0);
-      return {
-        ...blendTelemetryPoints(p0, p0, 0, startTime0),
-        timeSec: extrapolated.timeSec,
-        speedKmh: Math.max(0, extrapolated.speedKmh),
-        x: extrapolated.x,
-        y: extrapolated.y,
-        z: extrapolated.z,
-      };
-    }
     return blendTelemetryPoints(points[0], points[0], 0, startTime0);
   }
 
   const maxDist = cumDists[cumDists.length - 1];
   if (targetDist >= maxDist) {
     const pLast = points[points.length - 1];
-    if (extrapolateBoundary && points.length >= 2) {
-      const p0 = points[points.length - 2];
-      const span = maxDist - cumDists[cumDists.length - 2];
-      if (span > 1e-6) {
-        // Past the last sample: extrapolate time/speed/position, hold the rest at the last sample.
-        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
-        const t = (clampedDist - cumDists[cumDists.length - 2]) / span;
-        const extrapolated = blendTelemetryPoints(p0, pLast, t, startTime0);
-        return {
-          ...blendTelemetryPoints(pLast, pLast, 0, startTime0),
-          timeSec: extrapolated.timeSec,
-          speedKmh: Math.max(0, extrapolated.speedKmh),
-          x: extrapolated.x,
-          y: extrapolated.y,
-          z: extrapolated.z,
-        };
-      }
-    }
     const held = blendTelemetryPoints(pLast, pLast, 0, startTime0);
     return { ...held, timeSec: Math.max(0, held.timeSec) };
   }
@@ -321,11 +286,11 @@ export function interpolatePointAtDistance(
 }
 
 /**
- * Elapsed time (from `startT`) at which a lap reaches the finish line (station L). The server
- * clamps the station of every sample recorded past the line to L, so the first sample at L is in
- * general beyond it: the line is placed along the driven distance from the last sample before it.
- * A lap ending before the line is extrapolated (bounded like the start). Null if the whole lap
- * sits on the line.
+ * Elapsed time (from `startT`) at which a lap reaches the finish line (station L). On a lap the
+ * server put on the line the first sample at L is the line itself; otherwise it can be beyond it
+ * (the server clamps stations past the line to L), so the line is placed along the driven
+ * distance from the last sample before it. Null if the lap never reaches the line (its finish is
+ * away from it, see LapEndCut) or sits on it entirely.
  */
 function timeAtFinishLine(
   points: ReplayTrajectoryPoint[],
@@ -334,8 +299,7 @@ function timeAtFinishLine(
   startT: number
 ): number | null {
   const j = stations.findIndex(st => st >= trackLengthM);
-  if (j === -1) return interpolatePointAtDistance(points, stations, trackLengthM, startT, true).timeSec;
-  if (j === 0) return null;
+  if (j <= 0) return null;
   const dists = rawTrajectoryDistances(points);
   const lineDist = dists[j - 1] + (trackLengthM - stations[j - 1]);
   const span = dists[j] - dists[j - 1];
@@ -409,13 +373,7 @@ export function computeLapComparisons(
   return primaryPoints.map((p, i) => {
     // Match on the same canonical reference coordinate (station or distance)
     const targetBaselineRef = Math.min(primaryRefCoords[i], totalBaselineRef);
-    const basePoint = interpolatePointAtDistance(
-      baselinePoints,
-      baselineRefCoords,
-      targetBaselineRef,
-      baselineStartT,
-      true
-    );
+    const basePoint = interpolatePointAtDistance(baselinePoints, baselineRefCoords, targetBaselineRef, baselineStartT);
 
     const primaryRelativeT = (p.timeSec || 0) - primaryStartT;
 
@@ -444,12 +402,7 @@ export function computeLapComparisons(
 
     if (hasLateralOffsets && baselineOffsets) {
       primaryLateralOffsetM = p.lateralOffsetM;
-      baselineLateralOffsetM = Number(interpolateScalarAtDistance(
-        baselineOffsets,
-        baselineRefCoords,
-        targetBaselineRef,
-        true
-      ).toFixed(2));
+      baselineLateralOffsetM = Number(interpolateScalarAtDistance(baselineOffsets, baselineRefCoords, targetBaselineRef).toFixed(2));
       deltaLateralOffsetM = Number(((primaryLateralOffsetM ?? 0) - baselineLateralOffsetM).toFixed(2));
     }
 

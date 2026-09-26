@@ -27,9 +27,12 @@ Laps are reduced to the requested resolution by `server/replay/trajectoryDownsam
 match the full-resolution lap within 2 m (9 m once, Spa), except the Le Mans T13 baseline
 throttle pick-up, which no 2400-point reduction keeps.
 
-The client still extrapolates up to 25 m at the lap edges (`computeStartFinishOffset`,
-`interpolateScalarAtDistance(..., true)`): real laps no longer need it, but I3 (a recording
-that starts late, e.g. an unknown-layout or uncut lap) does.
+Since phase 5 an end with no recording beyond it but within 25 m of the line (the replay starts or
+stops there) is extended to the line by the server, and `trackLengthM` is the centreline's own
+length, so a lap cut at the line ends exactly at it. The client extrapolates nothing: an end the
+server couldn't put on the line (`lineCut: 'none'`, e.g. an out-lap from the pits) is shown as
+such in the comparison notice. `tools/analysis/measureLapLineCuts.ts` surveys the whole cache
+(read-only): on 2026-09-26, 98.9% of flying-lap starts and 99.2% of finishes were cut at the line.
 
 ## Rules
 
@@ -46,7 +49,7 @@ that starts late, e.g. an unknown-layout or uncut lap) does.
 | I0 | Final channel Δ = official lap-time Δ (±0.02 s) |
 | I1 | Segment Δs add up to the lap Δ |
 | I2 | Pedal points sit where the channel crosses the threshold, and the map draws them there |
-| I3 | Trimming the first 10 m of the baseline recording changes nothing |
+| I3 | A baseline whose recording starts 10 m past the line compares the same once the server extends it to the line |
 | I4 | Swapping the laps flips the Δ sign |
 | I5 | Halving the resolution with the server downsampler keeps pedal points within one sample |
 | I6 | Samples recorded before the S/F line change nothing |

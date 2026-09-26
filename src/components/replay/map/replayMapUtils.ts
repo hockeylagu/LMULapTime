@@ -1,6 +1,6 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
-import { findIndexAtDistance, computeStartFinishOffset } from '../../../utils/lapAlignment.js';
+import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis.js';
@@ -204,43 +204,10 @@ export function computeTrackBoundaryPathD(
 
 
 /**
- * Ensures baseline trajectory points begin cleanly at the start/finish gate line.
- * If baseline begins downstream of the line (e.g. VCR slice boundary latency),
- * prepends the extrapolated start/finish line crossing so the trajectory ribbon
- * starts right on the line without longitudinal offset.
- */
-export function buildEffectiveBaselinePoints(
-  baselinePoints?: ReplayTelemetryPoint[],
-  trackLengthM?: number
-): ReplayTelemetryPoint[] {
-  if (!baselinePoints || baselinePoints.length < 2) return baselinePoints || [];
-  const crossing = trackLengthM ? computeStartFinishOffset(baselinePoints, trackLengthM) : null;
-  const firstStation = baselinePoints[0].stationM ?? 0;
-  // Only a lap trimmed AFTER the line needs the line point prepended. One recorded from before
-  // the line (first station near L) already crosses it - prepending would put the line point in
-  // front of samples that precede it, running time and station backwards.
-  const startsAfterLine = trackLengthM !== undefined && firstStation > 1.0 && firstStation < trackLengthM / 2;
-  if (crossing && startsAfterLine) {
-    const startPt: ReplayTelemetryPoint = {
-      ...baselinePoints[0],
-      x: crossing.worldX,
-      z: crossing.worldZ,
-      stationM: 0,
-      // The raw distance AT the line (negative when the lap was trimmed after it), so this lap's
-      // S/F-zeroed distances stay identical with or without the synthetic point.
-      distM: crossing.distMOffset,
-      timeSec: crossing.timeSecOffset,
-    };
-    return [startPt, ...baselinePoints];
-  }
-  return baselinePoints;
-}
-
-/**
  * Where the baseline car is when the primary car is at `currentIndex`: the baseline sampled at
  * the primary's distance, with `baselineDists` already in the primary lap's frame (matched on
- * track station - see getDistancesInReferenceFrame). Extrapolated slightly past either end so the
- * ghost sits on the line at the start.
+ * track station - see getDistancesInReferenceFrame). Both laps start on the line (the server puts
+ * them there), so the ghost does too.
  */
 export function computeGhostPosition(
   primaryDists: number[],
@@ -266,7 +233,7 @@ export function computeGhostPosition(
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
   const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
-  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, primaryDists[safeIdx], undefined, true);
+  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, primaryDists[safeIdx]);
 
   return {
     sx: offsetX + (ghostPt.x - minX) * scale,
