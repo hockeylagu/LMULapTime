@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { createReplayRouter } from '../../../server/routes/replayRoutes.js';
@@ -11,6 +11,7 @@ import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js'
 import * as telemetryMatcher from '../../../server/telemetry/telemetryMatcher.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
 import type { DuckDbLapTelemetry } from '../../../server/core/types.js';
+import { DuckDbReader } from '../../../server/telemetry/duckdbReader.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 
 describe('Replay routes', () => {
@@ -235,5 +236,146 @@ describe('Replay routes', () => {
       lapTimeSec: 99.123,
       s1Sec: 30.111,
     }));
+  });
+
+  it('does not mutate cached metadata across repeated metadata requests', async () => {
+    sessions.push({
+      id: 'session-repeat',
+      matchingReplayFile: { name: 'Route_Test_P1.Vcr' },
+      trackVenue: 'Overlay Venue',
+      trackCourse: 'Overlay Course',
+      playerDriver: {
+        carClass: 'Hypercar',
+        carType: 'Ferrari 499P',
+        laps: [{ lapNum: 1, lapTime: 95.5, s1: 30, s2: 32, s3: 33.5 }],
+      },
+    });
+
+    const firstResponse = await request(app).get('/api/replays/Route_Test_P1.Vcr/metadata');
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.body.carClass).toBe('Hypercar');
+    expect(firstResponse.body.trackVenue).toBe('Overlay Venue');
+
+    const secondResponse = await request(app).get('/api/replays/Route_Test_P1.Vcr/metadata');
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toEqual(firstResponse.body);
+
+    const cachedRow = db.getStoredReplayMetadata('Route_Test_P1.Vcr');
+    if (cachedRow) {
+      expect(cachedRow.trackVenue).not.toBe('Overlay Venue');
+    }
+  });
+
+  it('handles DuckDbReader failure by logging ingest error and falling back to native VCR', async () => {
+    const duckFile: DuckDbFileInfo = {
+      filename: 'Route_Test_P1.duckdb',
+      filePath: path.join(tempDir, 'Route_Test_P1.duckdb'),
+      fileMtimeMs: Date.now(),
+      fileSizeBytes: 1024,
+      trackName: 'Route Test',
+      sessionType: 'P1',
+      timestampStr: '2026-09-23T00:00:00Z',
+      timestampEpochMs: Date.now(),
+    };
+    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
+    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    vi.spyOn(DuckDbReader.prototype, 'open').mockRejectedValueOnce(new Error('Corrupted duckdb header'));
+    const ingestSpy = vi.spyOn(db, 'recordIngestError');
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('vcr');
+    expect(ingestSpy).toHaveBeenCalledWith('duckdb', duckFile.filePath, expect.any(Error));
+  });
+
+  it('marks duckdbAvailable as false when duckdb lap telemetry is incomplete compared to expected lap time', async () => {
+    const duckFile: DuckDbFileInfo = {
+      filename: 'Route_Test_P1.duckdb',
+      filePath: path.join(tempDir, 'Route_Test_P1.duckdb'),
+      fileMtimeMs: Date.now(),
+      fileSizeBytes: 1024,
+      trackName: 'Route Test',
+      sessionType: 'P1',
+      timestampStr: '2026-09-23T00:00:00Z',
+      timestampEpochMs: Date.now(),
+    };
+    const incompleteDuckLap: DuckDbLapTelemetry = {
+      lapNumber: 1,
+      lapTimeSec: 0.1,
+      pointsCount: 2,
+      sampleRateHz: 100,
+      points: [
+        { x: 0, y: 0, z: 0, timeSec: 0, speedKmh: 100 },
+        { x: 0, y: 0, z: 0, timeSec: 0.1, speedKmh: 105 },
+      ],
+    };
+    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
+    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    db.upsertTelemetryLapCache(duckFile.filename, 1, incompleteDuckLap);
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('vcr');
+    expect(response.body.duckdbAvailable).toBe(false);
+    expect(response.body.duckdbUnavailableReason).toContain('DuckDB telemetry is incomplete for this lap; using Native VCR data.');
+  });
+
+  it('resolves driver slot by driverName query parameter', async () => {
+    const response = await request(app)
+      .get('/api/replays/Route_Test_P1.Vcr/trajectory?driverName=Route%20Driver&source=vcr');
+    expect(response.status).toBe(200);
+    expect(response.body.driverSlot).toBe(1);
+    expect(response.body.driverName).toBe('Route Driver');
+  });
+
+  it('serves trajectory and metadata from database archive when replay file is removed from disk', async () => {
+    // Prime the cache
+    await request(app).get('/api/replays/Route_Test_P1.Vcr/metadata');
+    await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr');
+
+    // Remove the file from disk
+    fs.rmSync(replayPath);
+    expect(fs.existsSync(replayPath)).toBe(false);
+
+    // Both metadata and trajectory must succeed from SQLite archive
+    const metaRes = await request(app).get('/api/replays/Route_Test_P1.Vcr/metadata');
+    expect(metaRes.status).toBe(200);
+    expect(metaRes.body.filename).toBe('Route_Test_P1.Vcr');
+
+    const trajRes = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr');
+    expect(trajRes.status).toBe(200);
+    expect(trajRes.body.points.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to odometer projection when track layout is unknown', async () => {
+    sessions.push({
+      id: 'unknown-session',
+      matchingReplayFile: { name: 'Route_Test_P1.Vcr' },
+      trackVenue: 'Unknown Fantasy Venue',
+      trackCourse: 'Fictional Layout',
+      playerDriver: { name: 'Route Driver', laps: [] },
+    });
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr');
+    expect(response.status).toBe(200);
+    expect(response.body.points[0]).toHaveProperty('stationM');
+    expect(response.body.points[0].stationM).toBe(0);
+    expect(response.body.points[0].lateralOffsetM).toBe(0);
+    expect(response.body.timingGates).toBeDefined();
+  });
+
+  it('isolates circuit layout specifications between variants of the same facility', async () => {
+    sessions.push({
+      id: 'bahrain-outer-session',
+      matchingReplayFile: { name: 'Route_Test_P1.Vcr' },
+      trackVenue: 'Bahrain International Circuit',
+      trackCourse: 'Outer Circuit',
+      trackLengthMeters: 3543,
+      playerDriver: { name: 'Route Driver', laps: [] },
+    });
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr');
+    expect(response.status).toBe(200);
+    expect(response.body.layoutKey).toBe('bahrain_outer');
   });
 });

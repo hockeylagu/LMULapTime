@@ -301,7 +301,7 @@ export class SessionDatabase {
   }
 
   public upsertTelemetryMetadata(info: DuckDbFileInfo, matchedSessionId?: string, matchedReplayFilename?: string): void {
-    this.db.prepare(`
+    const upsert = this.db.prepare(`
       INSERT INTO telemetry_metadata (
         filename, file_path, file_mtime, file_size, track_name, session_type,
         session_timestamp, laps_count, metadata_json, matched_session_id,
@@ -323,20 +323,38 @@ export class SessionDatabase {
         matched_session_id = COALESCE(excluded.matched_session_id, telemetry_metadata.matched_session_id),
         matched_replay_filename = COALESCE(excluded.matched_replay_filename, telemetry_metadata.matched_replay_filename),
         updated_at = excluded.updated_at
-    `).run({
-      filename: info.filename,
-      filePath: info.filePath,
-      fileMtime: info.fileMtimeMs,
-      fileSize: info.fileSizeBytes,
-      trackName: info.trackName,
-      sessionType: info.sessionType,
-      sessionTimestamp: info.timestampStr,
-      lapsCount: info.lapsCount || 0,
-      metadataJson: JSON.stringify(info),
-      matchedSessionId: matchedSessionId || null,
-      matchedReplayFilename: matchedReplayFilename || null,
-      updatedAt: Date.now(),
-    });
+    `);
+
+    this.db.transaction(() => {
+      if (matchedSessionId) {
+        this.db.prepare(`
+          UPDATE telemetry_metadata
+          SET matched_session_id = NULL
+          WHERE matched_session_id = ? AND filename <> ?
+        `).run(matchedSessionId, info.filename);
+      }
+      if (matchedReplayFilename) {
+        this.db.prepare(`
+          UPDATE telemetry_metadata
+          SET matched_replay_filename = NULL
+          WHERE matched_replay_filename = ? AND filename <> ?
+        `).run(matchedReplayFilename, info.filename);
+      }
+      upsert.run({
+        filename: info.filename,
+        filePath: info.filePath,
+        fileMtime: info.fileMtimeMs,
+        fileSize: info.fileSizeBytes,
+        trackName: info.trackName,
+        sessionType: info.sessionType,
+        sessionTimestamp: info.timestampStr,
+        lapsCount: info.lapsCount || 0,
+        metadataJson: JSON.stringify(info),
+        matchedSessionId: matchedSessionId || null,
+        matchedReplayFilename: matchedReplayFilename || null,
+        updatedAt: Date.now(),
+      });
+    })();
   }
 
   public recordIngestError(sourceType: string, sourcePath: string, error: unknown): void {

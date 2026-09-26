@@ -235,6 +235,13 @@ describe('CIRCUIT_SPECIFICATIONS integrity', () => {
       expect(getBenchmark('Michelin Raceway Road Atlanta')).toBe('Road Atlanta');
     });
 
+    it('resolves Daytona Road Course without falsely matching Le Mans chicane token', () => {
+      expect(resolveKey('Daytona International Speedway', 'Road Course (with Le Mans Chicane)')).toBe('daytona_road_course');
+      expect(resolveKey('Daytona International Speedway', 'Daytona International Speedway Road Course')).toBe('daytona_road_course');
+      expect(resolveKey(null, null, 'Daytona International Speedway Road Course P1 20.Vcr')).toBe('daytona_road_course');
+      expect(resolveKey('Circuit de la Sarthe', '24 Heures', 'Daytona_P1.Vcr')).toBe('sarthe_full');
+    });
+
     it('falls back gracefully if no specific mapping matches', () => {
       expect(getBenchmark('Custom Track', 'Layout A')).toBe('Custom Track');
       expect(getBenchmark('Unknown Venue', '')).toBe('Unknown Venue');
