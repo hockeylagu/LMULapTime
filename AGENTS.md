@@ -211,6 +211,16 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ### UI & Component Architecture
 - **Strict Component Size Limit**: Frontend components (`.tsx` files under `src/components/`) **must not exceed 300 lines**. If a component approaches or exceeds this limit, decompose it into focused sub-components, custom hooks, or utility functions in a feature subfolder.
+- **Strict Folder File Limit (Max 20 Files per Directory)**:
+  - Every directory in the codebase (`src/`, `server/`, `shared/`, `test/`) **must contain a maximum of 20 files**.
+  - **Explicit Exception for Track Geometry Folders (`tracks/`)**:
+    - `server/data/tracks/` and `public/tracks/` are **explicitly exempt** from the 20-file limit. These directories store the complete set of 1:1 local Cartesian boundary geometries across all 32 supported LMU layouts (`*.json` and `index.json`) and must remain flat for direct runtime spatial lookups.
+  - When any non-exempt folder approaches or reaches 20 files, decompose it into focused subdirectories organized by **strict semantic boundaries** rather than arbitrary splits or flat catch-alls.
+  - **Enforce Semantic Boundaries**:
+    - **Frontend Components (`src/components/`)**: Group by feature domain (e.g., `dashboard/`, `session-detail/`, `track-detail/`, `replay/`). In complex subdomains (such as `replay/telemetry/`), group channel renderers by physical car subsystem semantics (e.g., chassis & dynamics, powertrain & hybrid energy, tires & brakes, driver inputs).
+    - **Backend Pipeline (`server/`)**: Structure by clear pipeline and subsystem responsibilities (`ai/`, `benchmarks/`, `core/`, `replay/`, `routes/`, `sessions/`, `telemetry/`).
+    - **Domain Layer (`shared/`)**: Clean boundary between pure domain engines (`shared/domain/`) and canonical data contracts (`shared/types/`).
+    - **Test Suites (`test/`)**: Mirror the exact semantic directory hierarchy of the application under test (e.g., `test/components/<feature>/`, `test/server/<domain>/`, `test/utils/`, `test/domain/`) instead of flat, monolithic test folders.
 - Follow the established **sim-racing dark theme**:
   - Backgrounds: Dark slate/zinc (`bg-slate-900`, `bg-slate-950`, `bg-black/40`) with subtle borders (`border-slate-700`, `border-slate-800`).
   - Motorsport accents: Cyan/Sky (`text-sky-400`), Emerald (`text-emerald-400` for gains/personal bests), Amber/Orange (`text-amber-400` for warnings/moderate deltas), Rose/Red (`text-rose-400` for time loss/penalties).

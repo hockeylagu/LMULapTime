@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Play, ZoomIn, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
-import { TelemetryPreset } from './telemetryPresets.js';
-import { TelemetryPresetSelector } from './TelemetryPresetSelector.js';
+import { TelemetryPreset } from './presets/telemetryPresets.js';
+import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';

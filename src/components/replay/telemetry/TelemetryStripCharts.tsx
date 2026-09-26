@@ -4,8 +4,8 @@ import { computeLapComparisons, computeStartFinishOffset } from '../../../utils/
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
-import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './telemetryPresets.js';
-import { TelemetryPresetModal } from './TelemetryPresetModal.js';
+import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './presets/telemetryPresets.js';
+import { TelemetryPresetModal } from './presets/TelemetryPresetModal.js';
 import { useTelemetryStripInteraction } from './useTelemetryStripInteraction.js';
 
 export interface SelectedCornerMarkers {
