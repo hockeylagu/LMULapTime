@@ -41,7 +41,6 @@ const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>
   },
   'sarthe-r1-41-lap-pair': {
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
-    I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
   },
   'bahrain-r1-10-lap-pair': {
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.126 s asymmetry)',
@@ -51,7 +50,6 @@ const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>
     I3: 'phase 4: baseline starts 14.9 m late; trimmed 10 m more it hits the 25 m extrapolation clamp',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.207 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
-    I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
   },
 };
 

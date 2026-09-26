@@ -152,6 +152,16 @@ describe('replayMapUtils', () => {
       expect(result).toHaveLength(2);
       expect(result).toBe(baseline);
     });
+
+    it('leaves a baseline recorded from before the line unchanged (it already crosses the line)', () => {
+      // First sample 3 m before the line (station L - 3), then across it.
+      const baseline: ReplayTelemetryPoint[] = [
+        { x: -108.0, y: 9.8, z: -31.0, stationM: 5721.1, distM: 0, timeSec: 10.0, speedKmh: 300 },
+        { x: -111.0, y: 9.8, z: -35.0, stationM: 0.5, distM: 3.5, timeSec: 10.04, speedKmh: 300 },
+        { x: -113.0, y: 9.8, z: -38.0, stationM: 4.0, distM: 7.0, timeSec: 10.08, speedKmh: 302 },
+      ];
+      expect(buildEffectiveBaselinePoints(baseline, 5724.1)).toBe(baseline);
+    });
   });
 
   describe('computeGhostPosition station-domain matching', () => {

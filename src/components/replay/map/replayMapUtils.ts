@@ -214,7 +214,12 @@ export function buildEffectiveBaselinePoints(
 ): ReplayTelemetryPoint[] {
   if (!baselinePoints || baselinePoints.length < 2) return baselinePoints || [];
   const crossing = trackLengthM ? computeStartFinishOffset(baselinePoints, trackLengthM) : null;
-  if (crossing && (baselinePoints[0].stationM ?? 0) > 1.0) {
+  const firstStation = baselinePoints[0].stationM ?? 0;
+  // Only a lap trimmed AFTER the line needs the line point prepended. One recorded from before
+  // the line (first station near L) already crosses it - prepending would put the line point in
+  // front of samples that precede it, running time and station backwards.
+  const startsAfterLine = trackLengthM !== undefined && firstStation > 1.0 && firstStation < trackLengthM / 2;
+  if (crossing && startsAfterLine) {
     const startPt: ReplayTelemetryPoint = {
       ...baselinePoints[0],
       x: crossing.worldX,
