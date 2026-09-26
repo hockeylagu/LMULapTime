@@ -128,11 +128,24 @@ export function fuseDuckDbWithVcrTrajectory(
       p.regenRate !== undefined
   );
 
+  // The VCR recording either side of the lap, on the DuckDB lap clock, so the fused lap can be
+  // cut at the line too (positions are what matters there; the inputs are the VCR ones).
+  const firstDuckTime = fusedPoints[0]?.timeSec ?? 0;
+  const lastDuckTime = fusedPoints[fusedPoints.length - 1]?.timeSec ?? 0;
+  const onDuckClock = (edge: ReplayTrajectoryPoint[] | undefined, keep: (t: number) => boolean) => {
+    const retimed = (edge ?? [])
+      .map(p => ({ ...p, timeSec: Number(((p.timeSec ?? 0) - vcrBaseTime).toFixed(3)) }))
+      .filter(p => keep(p.timeSec));
+    return retimed.length > 0 ? retimed : undefined;
+  };
+
   return {
     ...vcrTrajectory,
     source: 'duckdb',
     duckdbFilename,
     points: fusedPoints,
+    leadInPoints: onDuckClock(vcrTrajectory.leadInPoints, t => t < firstDuckTime),
+    leadOutPoints: onDuckClock(vcrTrajectory.leadOutPoints, t => t > lastDuckTime),
     pointsCount: fusedPoints.length,
     rawPointsCount: fusedPoints.length,
     rawSampleRateHz: duckLap.sampleRateHz,

@@ -838,6 +838,10 @@ export interface ReplayTrajectoryData {
     spanZ: number;
   };
   points: ReplayTrajectoryPoint[];
+  // Server-internal: raw samples just before / after the lap as sliced by the timing loop, so it
+  // can be cut exactly at the start/finish line once projected on the track. Never sent to clients.
+  leadInPoints?: ReplayTrajectoryPoint[];
+  leadOutPoints?: ReplayTrajectoryPoint[];
   penalties?: ReplayPenaltyEvent[];
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];

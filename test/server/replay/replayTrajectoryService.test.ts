@@ -5,6 +5,7 @@ import { ReplayCacheService } from '../../../server/replay/replayCacheService.js
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../../../server/replay/replayServiceTypes.js';
+import { getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import type {
   DetailedSession,
   DriverData,
@@ -82,6 +83,38 @@ describe('ReplayTrajectoryService', () => {
     expect(traj.rawPointsCount).toBe(4);
     expect(traj.driverSlot).toBe(0);
     expect(traj.driverName).toBe('Samuel Lague');
+  });
+
+  it('projects and cuts the lap at the line at full resolution, then downsamples', async () => {
+    // Monza centreline vertices 0.1 s apart; the timing loop sliced the lap 3 vertices late.
+    const centerline = getTrackDefinition('monza_gp')?.centerline ?? [];
+    const at = (i: number) => {
+      const [x, z] = centerline[(i + centerline.length) % centerline.length];
+      return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
+    };
+    const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => at(from + k));
+    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue({
+      ...mockFullTrajectory,
+      replayName: 'Monza.Vcr',
+      points: range(3, 60),
+      leadInPoints: range(-6, 2),
+      leadOutPoints: range(61, 64),
+    });
+    vi.spyOn(replayCache, 'getMetadata').mockReturnValue({
+      ...mockMetadata,
+      filename: 'Monza.Vcr',
+      trackVenue: 'Autodromo Nazionale Monza',
+      trackCourse: 'Monza GP',
+    });
+
+    const traj = await trajectoryService.getTrajectory({ replayName: 'Monza.Vcr', driverSlot: 0, maxPoints: 10, allowDuckDb: false });
+
+    expect(traj.layoutKey).toBe('monza_gp');
+    expect(traj.points).toHaveLength(10);
+    expect(traj.points[0].stationM).toBe(0);
+    expect(traj.points[0].timeSec).toBeCloseTo(100, 2);
+    expect(traj.leadInPoints).toBeUndefined();
+    expect(traj.leadOutPoints).toBeUndefined();
   });
 
   it('resolves driver slot from driverName parameter', async () => {

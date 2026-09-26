@@ -38,6 +38,7 @@ import {
   compressJson,
   decompressJson,
   REPLAY_CACHE_VERSION,
+  isCompatibleReplayCacheVersion,
   DUCKDB_TELEMETRY_CACHE_VERSION,
   CacheStats,
   SyncResult,
@@ -53,6 +54,7 @@ import {
 import {
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
+  getAdjacentLapTrajectories,
   hasValidReplayTrajectoryCache,
   setTrajectoryDefaults,
   upsertReplayTrajectoryCache,
@@ -210,7 +212,7 @@ export class SessionDatabase {
     const row = this.db.prepare(
       'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
     ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row || row.file_mtime !== mtime || row.file_size !== size || row.parser_version !== REPLAY_CACHE_VERSION || (filePath && row.file_path !== filePath)) {
+    if (!row || row.file_mtime !== mtime || row.file_size !== size || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
       return null;
     }
     return decompressJson<ReplayMetadata>(row.metadata_br);
@@ -282,6 +284,11 @@ export class SessionDatabase {
   /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
   public getStoredReplayTrajectory(filename: string, driverSlot: number, lapKey: number, options?: { allowFallback?: boolean }): ReplayTrajectoryData | null {
     return getStoredReplayTrajectory(this.db, filename, driverSlot, lapKey, options);
+  }
+
+  /** The stored rows of the laps either side of a lap of the same recording (see dbReplayTrajectoryStore). */
+  public getAdjacentLapTrajectories(filename: string, driverSlot: number, lapKey: number): { previous: ReplayTrajectoryData | null; next: ReplayTrajectoryData | null } {
+    return getAdjacentLapTrajectories(this.db, filename, driverSlot, lapKey);
   }
 
   public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {

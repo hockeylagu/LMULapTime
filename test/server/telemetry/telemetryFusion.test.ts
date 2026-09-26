@@ -83,4 +83,36 @@ describe('telemetryFusion', () => {
     // With shortest-arc interpolation, midPoint.rotY should remain at or near +/-pi (~3.14159 or -3.14159)
     expect(Math.abs(midPoint.rotY ?? 0)).toBeGreaterThan(3.1);
   });
+
+  it('carries the VCR recording either side of the lap onto the DuckDB lap clock', () => {
+    const vcr: ReplayTrajectoryData = {
+      replayName: 'Lead_Test.Vcr',
+      pointsCount: 3,
+      bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 0, spanX: 100, spanZ: 0 },
+      points: [
+        { x: 0, y: 0, z: 0, timeSec: 500 },
+        { x: 50, y: 0, z: 0, timeSec: 501 },
+        { x: 100, y: 0, z: 0, timeSec: 502 },
+      ],
+      leadInPoints: [{ x: -25, y: 0, z: 0, timeSec: 499.5 }, { x: -5, y: 0, z: 0, timeSec: 499.9 }],
+      leadOutPoints: [{ x: 101, y: 0, z: 0, timeSec: 502.02 }, { x: 125, y: 0, z: 0, timeSec: 502.5 }],
+    };
+    const duck: DuckDbLapTelemetry = {
+      lapNumber: 1,
+      lapTimeSec: 2.05,
+      pointsCount: 2,
+      sampleRateHz: 100,
+      points: [
+        { x: 0, y: 0, z: 0, timeSec: 0 },
+        { x: 0, y: 0, z: 0, timeSec: 2.05 },
+      ],
+    };
+
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
+
+    expect(fused.leadInPoints?.map(p => p.timeSec)).toEqual([-0.5, -0.1]);
+    // A lead-out sample recorded before the DuckDB lap's last sample is dropped: time must keep moving forward.
+    expect(fused.leadOutPoints?.map(p => p.timeSec)).toEqual([2.5]);
+    expect(fused.leadOutPoints?.[0].x).toBe(125);
+  });
 });
