@@ -1,16 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeCumulativeDistances,
   interpolatePointAtDistance,
   computeLapComparisons,
-  findIndexAtDistance,
   filterCompatibleReplays,
+} from '../../src/utils/replayComparison.js';
+import {
+  computeCumulativeDistances,
+  findIndexAtDistance,
   computeStartFinishOffset,
   getTrajectoryDistances,
   getMonotonicStations,
   getNormalizedTrajectoryTimes,
   interpolateScalarAtDistance,
-} from '../../src/utils/replayComparison.js';
+} from '../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/core/types.js';
 
 describe('replayComparison utility', () => {

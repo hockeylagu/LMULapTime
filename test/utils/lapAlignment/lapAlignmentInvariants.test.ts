@@ -3,11 +3,13 @@ import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
 import {
   computeLapComparisons,
+  interpolatePointAtDistance,
+} from '../../../src/utils/replayComparison.js';
+import {
   getMonotonicStations,
   getTrajectoryDistances,
-  interpolatePointAtDistance,
   interpolateScalarAtDistance,
-} from '../../../src/utils/replayComparison.js';
+} from '../../../src/utils/lapAlignment.js';
 import { BRAKE_ON_THRESHOLD_PCT, CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis.js';
 import {
   buildEffectiveBaselinePoints,

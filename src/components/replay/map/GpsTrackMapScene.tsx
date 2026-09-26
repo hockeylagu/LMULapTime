@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { getTrajectoryDistances, getDistancesInReferenceFrame, computeLapComparisons } from '../../../utils/replayComparison.js';
+import { computeLapComparisons } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame } from '../../../utils/lapAlignment.js';
 import {
   projectTrajectoryPoints,
   projectBoundaryPoints,

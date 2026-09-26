@@ -1,8 +1,10 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
   interpolatePointAtDistance,
-  getDistancesInReferenceFrame,
 } from './replayComparison.js';
+import {
+  getDistancesInReferenceFrame,
+} from './lapAlignment.js';
 import { unwrapAngle } from './computedTelemetry.js';
 import {
   computeLapSegmentComparisons,

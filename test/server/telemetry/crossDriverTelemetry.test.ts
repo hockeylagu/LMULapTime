@@ -4,8 +4,10 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import {
   computeLapComparisons,
-  computeStartFinishOffset,
 } from '../../../src/utils/replayComparison.js';
+import {
+  computeStartFinishOffset,
+} from '../../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
 import { decompressTrajectory } from '../../../server/core/replayTrajectoryCodec.js';
 import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';

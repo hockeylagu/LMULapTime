@@ -3,11 +3,13 @@ import {
   InterpolatedPoint,
   computeLapComparisons,
   interpolatePointAtDistance,
+} from './replayComparison.js';
+import {
   interpolateScalarAtDistance,
   getTrajectoryDistances,
   getDistancesInReferenceFrame,
   getMonotonicStations,
-} from './replayComparison.js';
+} from './lapAlignment.js';
 import { unwrapAngle } from './computedTelemetry.js';
 
 interface BaseSegmentComparison {
