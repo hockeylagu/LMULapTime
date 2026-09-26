@@ -125,7 +125,8 @@ export function getCircuitSpecification(
   }
 
   // Sarthe / Le Mans
-  if (combined.includes('sarthe') || combined.includes('le mans') || combined.includes('lemans') || combined.includes('24 heures')) {
+  const hasDaytonaVenueOrCourse = `${venueOrKey || ''} ${course || ''}`.toLowerCase().includes('daytona');
+  if (!hasDaytonaVenueOrCourse && (combined.includes('sarthe') || combined.includes('le mans') || combined.includes('lemans') || combined.includes('24 heures'))) {
     if (/\b(straight|chicaneless|sans\s*chicanes?|mulsanne)\b/.test(combined)) return CIRCUIT_SPECIFICATIONS.sarthe_mulsanne;
     return CIRCUIT_SPECIFICATIONS.sarthe_full;
   }

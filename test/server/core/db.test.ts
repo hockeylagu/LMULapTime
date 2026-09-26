@@ -668,5 +668,37 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getTelemetryFiles()).toHaveLength(0);
     expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
   });
+
+  it('replaces stale replay and session associations when a newer telemetry file is matched', () => {
+    const staleFile = {
+      filename: 'Daytona_Stale.duckdb',
+      filePath: 'C:\\Telemetry\\Daytona_Stale.duckdb',
+      fileMtimeMs: 1000,
+      fileSizeBytes: 1024,
+      trackName: 'Daytona International Speedway',
+      sessionType: 'R',
+      timestampStr: '2026-09-01T00:00:00Z',
+      timestampEpochMs: 1000,
+    };
+    const currentFile = {
+      ...staleFile,
+      filename: 'Daytona_Current.duckdb',
+      filePath: 'C:\\Telemetry\\Daytona_Current.duckdb',
+      fileMtimeMs: 2000,
+      timestampStr: '2026-09-02T00:00:00Z',
+      timestampEpochMs: 2000,
+    };
+
+    db.upsertTelemetryMetadata(staleFile, 'session-daytona', 'Daytona_R.Vcr');
+    db.upsertTelemetryMetadata(currentFile, 'session-daytona', 'Daytona_R.Vcr');
+
+    const metadata = db.getTelemetryMetadata();
+    expect(metadata.filter(item => item.matchedSessionId === 'session-daytona')).toEqual([
+      expect.objectContaining({ filename: currentFile.filename }),
+    ]);
+    expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toEqual([
+      expect.objectContaining({ filename: currentFile.filename }),
+    ]);
+  });
 });
 
