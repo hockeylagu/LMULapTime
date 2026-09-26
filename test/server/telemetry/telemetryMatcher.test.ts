@@ -292,6 +292,35 @@ describe('telemetryMatcher', () => {
     expect(matchDuckDbToReplay([distant, nearest], replay, 100_000)?.filename).toBe('nearest.duckdb');
   });
 
+  it('matches replay to DuckDB using durationSec when replay file mtime was recorded at session end', () => {
+    const replay: ReplayMetadata = {
+      filename: 'Daytona_R1.Vcr',
+      filePath: 'C:\\fake\\Daytona_R1.Vcr',
+      fileSizeBytes: 1,
+      mtimeMs: 12_400_000,
+      trackName: 'Daytona International Speedway',
+      sessionType: 'Race',
+      timeSliceCount: 100,
+      totalEvents: 1,
+      durationSec: 2400, // 40-minute race
+      drivers: [{ slot: 0, name: 'Samuel Lague', isPlayer: true, vehicleId: 'car' }],
+    };
+    const candidate: DuckDbFileInfo = {
+      filename: 'Daytona_R_session_start.duckdb',
+      filePath: 'C:\\fake\\Daytona.duckdb',
+      fileMtimeMs: 0,
+      fileSizeBytes: 1000,
+      trackName: 'Daytona International Speedway',
+      sessionType: 'R',
+      timestampStr: '',
+      timestampEpochMs: 10_000_000, // session start time matches 12_400_000 - 2400*1000
+      driverName: 'Samuel Lague',
+    };
+    const matched = matchDuckDbToReplay([candidate], replay, 12_400_000, 300);
+    expect(matched).not.toBeNull();
+    expect(matched?.filename).toBe('Daytona_R_session_start.duckdb');
+  });
+
   describe('enrichDuckDbDirectory', () => {
     it('returns an empty array when directory does not exist', async () => {
       const progressUpdates: unknown[] = [];
