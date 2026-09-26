@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 
 export interface TelemetryDragSelection {
   startX: number;

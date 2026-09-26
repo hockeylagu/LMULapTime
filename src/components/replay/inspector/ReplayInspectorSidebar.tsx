@@ -10,7 +10,7 @@ import { AIReportTab } from '../analysis/AIReportTab.js';
 import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
 import { ConsistencyPanel } from '../analysis/ConsistencyPanel.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
-import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 
 export interface ReplayInspectorSidebarProps {
   activeTab: 'map' | 'corners' | 'ai-report';

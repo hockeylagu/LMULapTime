@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeLapSegmentComparisons, CornerSegmentComparison } from '../../src/utils/cornerAnalysis.js';
-import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/replayComparison.js';
+import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 import {
   buildEffectiveBaselinePoints,
   computePedalMarkerPoints,

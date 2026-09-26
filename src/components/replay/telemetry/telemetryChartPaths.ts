@@ -1,5 +1,6 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { PointComparison, getTrajectoryDistances } from '../../../utils/replayComparison.js';
+import { PointComparison } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans

@@ -1,6 +1,7 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { CornerSegmentComparison } from './cornerAnalysis.js';
-import { getTrajectoryDistances, PointComparison } from './replayComparison.js';
+import { PointComparison } from './replayComparison.js';
+import { getTrajectoryDistances } from './lapAlignment.js';
 
 export type HandlingBalanceType = 'understeer' | 'oversteer';
 export type HandlingBalancePhase = 'E' | 'M' | 'X' | 'EM' | 'MX';

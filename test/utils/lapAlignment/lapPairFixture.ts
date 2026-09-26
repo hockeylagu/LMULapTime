@@ -5,9 +5,11 @@ import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js'
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
 import {
   computeLapComparisons,
+} from '../../../src/utils/replayComparison.js';
+import {
   getDistancesInReferenceFrame,
   getTrajectoryDistances,
-} from '../../../src/utils/replayComparison.js';
+} from '../../../src/utils/lapAlignment.js';
 import {
   computeLapSegmentComparisons,
   CornerSegmentComparison,

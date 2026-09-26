@@ -1,5 +1,6 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
-import { findIndexAtDistance, interpolatePointAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/replayComparison.js';
+import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
+import { findIndexAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis.js';

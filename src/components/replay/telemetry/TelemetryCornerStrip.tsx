@@ -1,6 +1,7 @@
 import React from 'react';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
-import { findIndexAtDistance, PointComparison } from '../../../utils/replayComparison.js';
+import { PointComparison } from '../../../utils/replayComparison.js';
+import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 
 export interface TelemetryCornerStripProps {
   corners: CornerSegmentComparison[];
