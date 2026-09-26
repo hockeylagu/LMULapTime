@@ -212,6 +212,10 @@ function findSpeedTurningPoints(
 export const SEGMENT_SCAN_STEP_M = 2;
 export const BRAKE_ON_THRESHOLD_PCT = 10;
 export const THROTTLE_ON_THRESHOLD_PCT = 90;
+// Throttle counts as on once its mean over this long after the crossing (or until the corner's
+// exit) is at/over the threshold. A single sample over 90% - a VCR quantisation spike, a stab the driver takes
+// back - is not the pick-up, and whether one such sample survives depends on the resolution.
+export const THROTTLE_ON_MIN_HOLD_SEC = 0.4;
 const MIN_STRAIGHT_LENGTH_M = 5;
 
 // A steering reversal only counts as "genuine" if the lock built up to at least this fraction
@@ -261,6 +265,9 @@ function firstIndexAbove(dists: number[], d: number): number {
  * application started before the window: samples are walked backwards (up to lookbackM) to
  * where it began, instead of reporting the window start as the onset. If it never drops below
  * the threshold within the lookback (e.g. a corner taken flat), the window start is returned.
+ *
+ * With `minHoldSec` > 0 a crossing only counts if the channel's mean over that long after it
+ * (cut short at toDist) is at/over the threshold; crossings that fall back sooner are skipped.
  */
 export function findThresholdCrossingDistM(
   points: ReplayTrajectoryPoint[],
@@ -269,17 +276,20 @@ export function findThresholdCrossingDistM(
   toDist: number,
   getValue: (p: InterpolatedPoint) => number,
   threshold: number,
-  lookbackM = 0
+  lookbackM = 0,
+  minHoldSec = 0
 ): number | null {
   if (toDist <= fromDist || points.length === 0) return null;
   const valueAt = (d: number) => getValue(interpolatePointAtDistance(points, dists, d));
   const crossingBetween = (d0: number, v0: number, d1: number, v1: number) =>
     Math.round(v1 === v0 ? d1 : d0 + ((threshold - v0) / (v1 - v0)) * (d1 - d0));
+  const timeAt = (d: number) => interpolatePointAtDistance(points, dists, d).timeSec;
+  const holds = (d: number) => holdsAboveThreshold(points, dists, d, Math.min(timeAt(d) + minHoldSec, timeAt(toDist)), valueAt, threshold);
 
   const startValue = valueAt(fromDist);
   const firstAfterStart = firstIndexAbove(dists, fromDist);
 
-  if (startValue >= threshold) {
+  if (startValue >= threshold && (minHoldSec <= 0 || holds(fromDist))) {
     if (lookbackM <= 0) return Math.round(fromDist);
     const limit = fromDist - lookbackM;
     let laterD = fromDist;
@@ -299,12 +309,54 @@ export function findThresholdCrossingDistM(
   for (let k = firstAfterStart; k < dists.length && dists[k] < toDist; k++) {
     if (dists[k] <= prevD) continue;
     const v = valueAt(dists[k]);
-    if (v >= threshold) return crossingBetween(prevD, prevV, dists[k], v);
+    if (v >= threshold && prevV < threshold) {
+      const crossing = crossingBetween(prevD, prevV, dists[k], v);
+      if (minHoldSec <= 0 || holds(crossing)) return crossing;
+    }
     prevD = dists[k];
     prevV = v;
   }
   const endValue = valueAt(toDist);
   return endValue >= threshold ? crossingBetween(prevD, prevV, toDist, endValue) : null;
+}
+
+/**
+ * Whether the channel's mean, from distance fromD until lap time untilSec, is at/over the
+ * threshold. The mean is taken over time on the linearly interpolated trace, so a single
+ * sample dipping just under it doesn't fail the hold, a single spike doesn't pass it, and the
+ * answer doesn't depend on how densely the lap is sampled. Laps without timestamps cannot
+ * measure a hold, so they always pass.
+ */
+function holdsAboveThreshold(
+  points: ReplayTrajectoryPoint[],
+  dists: number[],
+  fromD: number,
+  untilSec: number,
+  valueAt: (d: number) => number,
+  threshold: number
+): boolean {
+  const t0 = points[0].timeSec ?? 0;
+  const timeOf = (k: number) => (points[k].timeSec ?? 0) - t0;
+  if (timeOf(points.length - 1) <= 0) return true;
+  const startSec = interpolatePointAtDistance(points, dists, fromD).timeSec;
+  if (untilSec - startSec <= 1e-6) return true;
+  let prevT = startSec;
+  let prevV = valueAt(fromD);
+  let area = 0;
+  for (let k = firstIndexAbove(dists, fromD); k < points.length && prevT < untilSec; k++) {
+    const t = timeOf(k);
+    if (t <= prevT) continue;
+    let v = valueAt(dists[k]);
+    let segEnd = t;
+    if (t > untilSec) {
+      v = prevV + ((untilSec - prevT) / (t - prevT)) * (v - prevV);
+      segEnd = untilSec;
+    }
+    area += ((prevV + v) / 2) * (segEnd - prevT);
+    prevT = segEnd;
+    prevV = v;
+  }
+  return area / (prevT - startSec || 1) >= threshold;
 }
 
 /**
@@ -430,8 +482,8 @@ export function computeLapSegmentComparisons(
     const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
     const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
     const throttleLookbackM = throttleOnsetLookbackM(entry.distM, min.distM);
-    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
-    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
+    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
+    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
 
     // --- Enhanced Technique & Geometry Metrics ---
     const hEntry = getHeadingAtDistance(primaryPoints, primaryDists, entry.distM);

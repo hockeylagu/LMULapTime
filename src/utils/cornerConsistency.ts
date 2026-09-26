@@ -14,6 +14,7 @@ import {
   BRAKE_ON_THRESHOLD_PCT,
   BRAKE_ONSET_LOOKBACK_M,
   THROTTLE_ON_THRESHOLD_PCT,
+  THROTTLE_ON_MIN_HOLD_SEC,
   throttleOnsetLookbackM,
 } from './cornerAnalysis.js';
 
@@ -169,7 +170,7 @@ export function computeCornerConsistencyStats(
       // absolute lap distance, so the number reads the same regardless of where on the track
       // this corner sits.
       if (brakingDistM !== null) pushTo(brakingByCorner, corner.cornerNumber, lap.lapNumber, corner.minDistM - brakingDistM);
-      const throttleOnDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
+      const throttleOnDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
       // Reported relative to the apex too (meters AFTER the minimum-speed point).
       if (throttleOnDistM !== null) pushTo(throttleByCorner, corner.cornerNumber, lap.lapNumber, throttleOnDistM - corner.minDistM);
 
