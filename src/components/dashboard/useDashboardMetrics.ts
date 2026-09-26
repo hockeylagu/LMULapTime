@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isSessionEmpty, getDisplayTrackName, matchesSessionType, getSessionTypeSortRank, compareSessions } from '../../../shared/domain/formatters.js';
+import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
 import { matchesSessionCarClass, matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
@@ -66,26 +66,7 @@ export function useDashboardMetrics({
   }, [sessions, selectedTrack, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
 
   const sortedSessions = useMemo(() => {
-    return [...filteredSessions].sort((a, b) => {
-      if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-        return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
-      }
-      if (sortBy === 'pos-asc') {
-        const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
-        const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
-        if (typeRankA !== typeRankB) return typeRankA - typeRankB;
-        const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
-        const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
-        if (posA !== posB) return posA - posB;
-        return compareSessions(a, b, 'desc');
-      }
-      const pctA = a.playerDriver?.bestLapPacePercentage ?? 999;
-      const pctB = b.playerDriver?.bestLapPacePercentage ?? 999;
-      if (pctA !== pctB) {
-        return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
-      }
-      return compareSessions(a, b, 'desc');
-    });
+    return [...filteredSessions].sort((a, b) => compareSessionsBySortOption(a, b, sortBy));
   }, [filteredSessions, sortBy]);
 
   const metrics = useMemo(() => {

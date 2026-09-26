@@ -260,3 +260,76 @@ export function compareSessions(
   return direction === 'desc' ? idB.localeCompare(idA) : idA.localeCompare(idB);
 }
 
+export type SessionSortOption = 'date-desc' | 'date-asc' | 'pos-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
+
+export interface SessionSortSelectors<T> {
+  getPosition?: (session: T) => number | null | undefined;
+  getBestLapTime?: (session: T) => number | null | undefined;
+  getPacePercentage?: (session: T) => number | null | undefined;
+}
+
+/**
+ * Shared session comparator handling date sorting, session type & position ranking,
+ * best-lap time ranking, pace percentage ranking, and date/timestamp tie-breaks.
+ */
+export function compareSessionsBySortOption<T extends SessionComparable>(
+  a: T,
+  b: T,
+  sortBy: SessionSortOption | string,
+  selectors?: SessionSortSelectors<T>
+): number {
+  if (sortBy === 'date-desc' || sortBy === 'date-asc') {
+    return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
+  }
+
+  if (sortBy === 'pos-asc') {
+    const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
+    const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
+    if (typeRankA !== typeRankB) return typeRankA - typeRankB;
+
+    const rawPosA = selectors?.getPosition
+      ? selectors.getPosition(a)
+      : (a as { playerDriver?: { position?: number | null } }).playerDriver?.position;
+    const rawPosB = selectors?.getPosition
+      ? selectors.getPosition(b)
+      : (b as { playerDriver?: { position?: number | null } }).playerDriver?.position;
+
+    const posA = rawPosA && rawPosA > 0 ? rawPosA : 9999;
+    const posB = rawPosB && rawPosB > 0 ? rawPosB : 9999;
+    if (posA !== posB) return posA - posB;
+    return compareSessions(a, b, 'desc');
+  }
+
+  if (sortBy === 'lap-asc') {
+    const rawLapA = selectors?.getBestLapTime
+      ? selectors.getBestLapTime(a)
+      : (a as { playerDriver?: { bestLapTime?: number | null } }).playerDriver?.bestLapTime;
+    const rawLapB = selectors?.getBestLapTime
+      ? selectors.getBestLapTime(b)
+      : (b as { playerDriver?: { bestLapTime?: number | null } }).playerDriver?.bestLapTime;
+
+    const lapA = rawLapA && rawLapA > 0 ? rawLapA : 999999;
+    const lapB = rawLapB && rawLapB > 0 ? rawLapB : 999999;
+    if (lapA !== lapB) return lapA - lapB;
+    return compareSessions(a, b, 'desc');
+  }
+
+  if (sortBy === 'pace-asc' || sortBy === 'pace-desc') {
+    const rawPctA = selectors?.getPacePercentage
+      ? selectors.getPacePercentage(a)
+      : (a as { playerDriver?: { bestLapPacePercentage?: number | null } }).playerDriver?.bestLapPacePercentage;
+    const rawPctB = selectors?.getPacePercentage
+      ? selectors.getPacePercentage(b)
+      : (b as { playerDriver?: { bestLapPacePercentage?: number | null } }).playerDriver?.bestLapPacePercentage;
+
+    const pctA = rawPctA ?? 999;
+    const pctB = rawPctB ?? 999;
+    if (pctA !== pctB) {
+      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
+    }
+    return compareSessions(a, b, 'desc');
+  }
+
+  return compareSessions(a, b, 'desc');
+}
+

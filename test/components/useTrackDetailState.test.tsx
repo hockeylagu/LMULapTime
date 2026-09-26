@@ -156,4 +156,37 @@ describe('useTrackDetailState', () => {
       expect(result.current.selectedCarModel).toBe('Ferrari 499P');
     });
   });
+
+  it('preserves initial car model from URL on initial deep link mount', async () => {
+    vi.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockTrackData),
+      } as Response)
+    );
+
+    const DeepLinkWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+      <MemoryRouter initialEntries={['/track/Monza?model=Ferrari%20499P']}>
+        {children}
+      </MemoryRouter>
+    );
+
+    const { result, rerender } = renderHook(
+      ({ carClass }) => useTrackDetailState('Monza', carClass),
+      {
+        wrapper: DeepLinkWrapper,
+        initialProps: { carClass: 'Hypercar' },
+      }
+    );
+
+    expect(result.current.selectedCarModel).toBe('Ferrari 499P');
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.selectedCarModel).toBe('Ferrari 499P');
+
+    // Changing car class resets selectedCarModel to 'All'
+    rerender({ carClass: 'LMGT3' });
+    expect(result.current.selectedCarModel).toBe('All');
+  });
 });
+

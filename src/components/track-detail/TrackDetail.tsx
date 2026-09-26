@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTime, matchesSessionType, getSessionTypeSortRank, compareSessions, isSessionEmpty } from '../../../shared/domain/formatters.js';
+import { formatTime, matchesSessionType, compareSessions, compareSessionsBySortOption, isSessionEmpty } from '../../../shared/domain/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
@@ -148,40 +148,15 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const qualifyingAveragePosition = averagePosition(qualifyingSessions);
   const finishAveragePosition = averagePosition(raceSessions);
 
-  const sortedSessions = [...filteredSessions].sort((a, b) => {
-    if (sortBy === 'date-desc' || sortBy === 'date-asc') {
-      return compareSessions(a, b, sortBy === 'date-desc' ? 'desc' : 'asc');
-    }
-    if (sortBy === 'pos-asc') {
-      const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
-      const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
-      if (typeRankA !== typeRankB) return typeRankA - typeRankB;
-      const posA = a.playerDriver?.position && a.playerDriver.position > 0 ? a.playerDriver.position : 9999;
-      const posB = b.playerDriver?.position && b.playerDriver.position > 0 ? b.playerDriver.position : 9999;
-      if (posA !== posB) return posA - posB;
-      return compareSessions(a, b, 'desc');
-    }
-    if (sortBy === 'lap-asc') {
-      const lapA = a.playerDriver?.bestLapTime && a.playerDriver.bestLapTime > 0 ? a.playerDriver.bestLapTime : 999999;
-      const lapB = b.playerDriver?.bestLapTime && b.playerDriver.bestLapTime > 0 ? b.playerDriver.bestLapTime : 999999;
-      if (lapA !== lapB) return lapA - lapB;
-      return compareSessions(a, b, 'desc');
-    }
-    const paceA = getPaceCategoryForLap(
-      a.playerDriver?.bestLapTime || null,
-      findBenchmarkForClass(a.playerDriver?.carClass, a.playerDriver?.carType)
-    );
-    const paceB = getPaceCategoryForLap(
-      b.playerDriver?.bestLapTime || null,
-      findBenchmarkForClass(b.playerDriver?.carClass, b.playerDriver?.carType)
-    );
-    const pctA = paceA?.percentage ?? 999;
-    const pctB = paceB?.percentage ?? 999;
-    if (pctA !== pctB) {
-      return sortBy === 'pace-asc' ? pctA - pctB : pctB - pctA;
-    }
-    return compareSessions(a, b, 'desc');
-  });
+  const sortedSessions = [...filteredSessions].sort((a, b) =>
+    compareSessionsBySortOption(a, b, sortBy, {
+      getPacePercentage: (s) =>
+        getPaceCategoryForLap(
+          s.playerDriver?.bestLapTime || null,
+          findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType)
+        )?.percentage,
+    })
+  );
 
   const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression).map((point) => {
     const paceInfo = getPaceCategoryForLap(
@@ -272,7 +247,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         viewMode={sessionViewMode}
         onViewModeChange={setSessionListViewMode}
         onResetFilters={
-              filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
+          selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
             ? () => {
                 setFilterType('All');
                 setSearchQuery('');
