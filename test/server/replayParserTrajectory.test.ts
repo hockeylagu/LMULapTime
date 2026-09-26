@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import {
-  extractReplayTrajectory,
-  parseReplayMetadata,
-} from '../../server/replay/replayParser.js';
+import { parseReplayMetadata } from '../../server/replay/replayParser.js';
+import { extractReplayTrajectory } from '../../server/replay/replayTrajectory.js';
 import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';

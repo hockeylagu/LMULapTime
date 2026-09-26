@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayMetadata, ReplayTrajectoryData } from './types.js';
 import { ReplaySyncProgress, ReplaySyncResult } from './dbSchema.js';
-import { parseReplayMetadata, extractReplayTrajectory } from '../replay/replayParser.js';
+import { parseReplayMetadata } from '../replay/replayParser.js';
+import { extractReplayTrajectory } from '../replay/replayTrajectory.js';
 import { extractReplayTrajectoryInWorker } from '../replay/replayTrajectoryWorkerClient.js';
 
 export interface ReplaySyncHost {

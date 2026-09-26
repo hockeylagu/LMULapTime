@@ -1,52 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getDisplayTrackName, computeTheoreticalBest, parseDateStringToTimestamp, minValidTime } from '../../utils/formatters.js';
-import { matchesSessionCarClass, findReferenceEntry, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
-import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache } from '../../../server/core/types';
+import { findReferenceEntry, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
+import { aggregateTrackSummaries, TrackSessionSummary } from '../../utils/trackSummaryUtils.js';
+import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../server/core/types';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
 import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
 
-export type { TracksSortOption };
-
-export interface TrackSessionSummary {
-  id: string;
-  filename: string;
-  trackVenue: string;
-  trackCourse?: string;
-  timeString: string;
-  sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
-  sessionName: string;
-  driversCount: number;
-  playerDriver?: {
-    name: string;
-    carType: string;
-    carClass?: string;
-    bestLapTime: number | null;
-    bestLapTimeString: string;
-    bestS1: number | null;
-    bestS2: number | null;
-    bestS3: number | null;
-    lapsCount: number;
-  };
-}
-
-export interface TrackSummaryData {
-  trackVenue: string;
-  sessionsCount: number;
-  totalLaps: number;
-  bestLapTime: number | null;
-  bestLapDriver: string;
-  bestLapCar: string;
-  bestLapClass?: string;
-  bestS1: number | null;
-  bestS2: number | null;
-  bestS3: number | null;
-  theoreticalBest: number | null;
-  carsUsed: string[];
-}
+export type { TracksSortOption, TrackSessionSummary };
+export type TrackSummaryData = TrackSummary;
 
 export interface TrackSummariesProps {
   sessions?: TrackSessionSummary[];
-  tracksMap: Record<string, TrackSummaryData>;
   onSelectTrack: (trackName: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
@@ -54,7 +17,6 @@ export interface TrackSummariesProps {
 
 export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   sessions = [],
-  tracksMap = {},
   onSelectTrack,
   selectedCarClass,
   setSelectedCarClass,
@@ -71,86 +33,16 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
 
   const trackList: TrackSummaryItem[] = useMemo(() => {
     if (!sessions || sessions.length === 0) {
-      return Object.values(tracksMap).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
+      return [];
     }
 
-    // Group filtered sessions by display track name in a single pass
-    const sessionsByVenue = new Map<string, TrackSessionSummary[]>();
-    const allVenues = new Set<string>();
-
-    sessions.forEach(s => {
-      const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
-      if (!venue) return;
-      allVenues.add(venue);
-      if (matchesSessionCarClass(s, selectedCarClass)) {
-        const group = sessionsByVenue.get(venue) || [];
-        group.push(s);
-        sessionsByVenue.set(venue, group);
-      }
+    const aggregated = aggregateTrackSummaries(sessions, {
+      carClass: selectedCarClass,
+      includeEmptyVenues: true,
     });
 
-    const list = Array.from(allVenues).map(venue => {
-      const venueSessions = sessionsByVenue.get(venue) || [];
-      const fallback = tracksMap[venue];
-      if (selectedCarClass === 'All' && fallback) {
-        const lastSessionTimestamp = venueSessions.reduce(
-          (latest, session) => Math.max(latest, parseDateStringToTimestamp(session.timeString)),
-          0
-        );
-        return { ...fallback, lastSessionTimestamp };
-      }
-
-      let bestLapTime: number | null = null;
-      let bestLapDriver = '';
-      let bestLapCar = '';
-      let bestLapClass = '';
-      let bestS1: number | null = null;
-      let bestS2: number | null = null;
-      let bestS3: number | null = null;
-      let totalLaps = 0;
-      const carsUsedSet = new Set<string>();
-      let lastSessionTimestamp = 0;
-
-      venueSessions.forEach(s => {
-        const timestamp = parseDateStringToTimestamp(s.timeString);
-        if (timestamp > lastSessionTimestamp) lastSessionTimestamp = timestamp;
-
-        const p = s.playerDriver;
-        if (p) {
-          totalLaps += p.lapsCount || 0;
-          if (p.carType) carsUsedSet.add(p.carType);
-
-          if (p.bestLapTime && (bestLapTime === null || p.bestLapTime < bestLapTime)) {
-            bestLapTime = p.bestLapTime;
-            bestLapDriver = p.name;
-            bestLapCar = p.carType;
-            bestLapClass = p.carClass || '';
-          }
-          bestS1 = minValidTime(bestS1, p.bestS1);
-          bestS2 = minValidTime(bestS2, p.bestS2);
-          bestS3 = minValidTime(bestS3, p.bestS3);
-        }
-      });
-
-      return {
-        trackVenue: venue,
-        sessionsCount: venueSessions.length,
-        totalLaps,
-        bestLapTime,
-        bestLapDriver,
-        bestLapCar,
-        bestLapClass: bestLapClass || '',
-        bestS1,
-        bestS2,
-        bestS3,
-        theoreticalBest: computeTheoreticalBest(bestS1, bestS2, bestS3),
-        carsUsed: Array.from(carsUsedSet),
-        lastSessionTimestamp,
-      };
-    });
-
-    return list.sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
-  }, [sessions, tracksMap, selectedCarClass]);
+    return Object.values(aggregated).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
+  }, [sessions, selectedCarClass]);
 
   const getRefEntryForTrack = (trackName: string, carType?: string, carClass?: string): ReferenceLaptimeEntry | null => {
     if (!refCache?.entries) return null;

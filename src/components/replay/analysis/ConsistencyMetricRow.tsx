@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ConsistencyMetricStat } from '../../../utils/cornerAnalysis.js';
+import { ConsistencyMetricStat } from '../../../utils/cornerConsistency.js';
 import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 
 export function consistencyClass(pct: number): string {

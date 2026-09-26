@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ReplayCompareLapPicker } from '../../src/components/replay/inspector/ReplayCompareLapPicker.js';
-import { ComparableLap } from '../../src/utils/lapComparison.js';
+import { ComparableLap } from '../../server/core/types.js';
 
 const mockLaps: ComparableLap[] = [
   {

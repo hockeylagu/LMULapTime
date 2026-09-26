@@ -7,8 +7,6 @@ import {
 } from '../../src/utils/paceCategory.js';
 import { getSessionDatabase } from '../core/db.js';
 
-export { normalizeCarClass };
-
 const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
 

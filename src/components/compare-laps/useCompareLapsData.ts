@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { ReferenceLaptimeEntry, PaceCategory, DetailedSession } from '../../../server/core/types';
+import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../server/core/types';
 import { getDisplayTrackName } from '../../utils/formatters.js';
 import {
   matchesCarClass,
   getPaceCategoryFromPercentage,
 } from '../../utils/paceCategory.js';
 import {
-  ComparableLap,
   createTheoreticalBestLap,
   filterLapsByCarCategory,
 } from '../../utils/lapComparison.js';

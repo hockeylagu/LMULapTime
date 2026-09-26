@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry } from '../../../../server/core/types';
-import { ComparableLap } from '../../../utils/lapComparison.js';
-import { mapVehicleIdToClass } from '../../../utils/replayComparison.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../server/core/types';
+import { mapVehicleIdToClass } from '../../../utils/vehicleMapping.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';

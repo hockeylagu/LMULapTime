@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types';
-import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerAnalysis.js';
+import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { applyTelemetryPostProcessing } from '../../../utils/telemetryPostProcessing.js';
 
 // Kept small since these laps are only used for corner-window timing, not full detail rendering.

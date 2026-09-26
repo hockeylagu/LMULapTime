@@ -15,9 +15,6 @@ function mockApi() {
     if (url.includes('/api/progression')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     }
-    if (url.includes('/api/tracks')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    }
     if (url.includes('/api/scan/status')) {
       return Promise.resolve({
         ok: true,

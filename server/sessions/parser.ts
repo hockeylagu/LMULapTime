@@ -15,7 +15,6 @@ import {
   formatTime,
   formatElapsedSeconds,
   parseTimeStringToSeconds,
-  getDisplayTrackName,
   computeTheoreticalBest,
   parseDateStringToTimestamp,
   getSessionTypeWeight,
@@ -27,44 +26,12 @@ import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
-  RawStreamIncidentNode,
-  RawStreamSectorNode,
-  RawStreamTrackLimitNode,
-  RawStreamPenaltyNode,
   RawStreamXmlNode,
   RawSessionXmlNode,
   ReplayFileEntry,
 } from './sessionXmlTypes.js';
 import { parseStreamEvents } from './sessionXmlStream.js';
-import {
-  computeAverageLapTime,
-  computeProgression,
-  computeTrackSummaries,
-  extractComparableLaps,
-  ComparableLapsResult,
-} from './sessionAnalytics.js';
-
-export {
-  getDisplayTrackName,
-  parseStreamEvents,
-  computeAverageLapTime,
-  computeProgression,
-  computeTrackSummaries,
-  extractComparableLaps,
-};
-
-export type {
-  RawLapXmlNode,
-  RawDriverXmlNode,
-  RawStreamIncidentNode,
-  RawStreamSectorNode,
-  RawStreamTrackLimitNode,
-  RawStreamPenaltyNode,
-  RawStreamXmlNode,
-  RawSessionXmlNode,
-  ReplayFileEntry,
-  ComparableLapsResult,
-};
+import { computeAverageLapTime } from './sessionAnalytics.js';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,

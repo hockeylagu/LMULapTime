@@ -108,12 +108,6 @@ describe('Server API routes', () => {
     expect(Array.isArray(raceProg.body)).toBe(true);
   });
 
-  it('GET /api/tracks returns track summaries', async () => {
-    const res = await request(app).get('/api/tracks');
-    expect(res.status).toBe(200);
-    expect(typeof res.body).toBe('object');
-  });
-
   it('GET /api/track/:trackName returns track details with benchmarks', async () => {
     const res = await request(app).get('/api/track/Spa');
     expect(res.status).toBe(200);

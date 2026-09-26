@@ -829,15 +829,3 @@ export function computeLapSegmentComparisons(
   return segments;
 }
 
-export {
-  type LapMetricSample,
-  type ConsistencyMetricStat,
-  type CornerConsistencyStat,
-  type CornerConsistencyLapInput,
-  computeMetricStat,
-  applyTimeRelativeBestWorst,
-  bestAndWorstTimeLaps,
-  computeCornerConsistencyStats,
-  filterCornerConsistencyStats,
-} from './cornerConsistency.js';
-

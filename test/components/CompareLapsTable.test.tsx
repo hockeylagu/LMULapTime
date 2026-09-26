@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CompareLapsTable, CompareLapsTableProps } from '../../src/components/compare-laps/CompareLapsTable.js';
-import { ComparableLap } from '../../src/utils/lapComparison.js';
+import { ComparableLap } from '../../server/core/types.js';
 
 describe('CompareLapsTable component', () => {
   const mockLap1: ComparableLap = {

@@ -2,16 +2,13 @@ import {
   DetailedSession,
   ComparableLap,
   SessionProgressionPoint,
-  TrackSummary,
   LapData,
 } from '../core/types.js';
 import {
   formatTime,
   compareSessions,
-  computeTheoreticalBest,
   computeTheoreticalGap,
   getDisplayTrackName,
-  minValidTime,
 } from '../../src/utils/formatters.js';
 import {
   computeTopNLapAverage,
@@ -19,8 +16,6 @@ import {
   selectCleanLapCandidates,
 } from '../../src/utils/lapComparison.js';
 import { matchesTrack, matchesCarClass } from '../../src/utils/paceCategory.js';
-
-const updateMinTime = minValidTime;
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
   const candidates = selectCleanLapCandidates(laps);
@@ -108,55 +103,6 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
   });
 }
 
-/**
- * Aggregates summary statistics per track.
- */
-export function computeTrackSummaries(sessions: DetailedSession[]): Record<string, TrackSummary> {
-  const map: Record<string, TrackSummary> = {};
-
-  sessions.forEach(s => {
-    const track = getDisplayTrackName(s.trackVenue, s.trackCourse);
-    if (!map[track]) {
-      map[track] = {
-        trackVenue: track,
-        sessionsCount: 0,
-        totalLaps: 0,
-        bestLapTime: null,
-        bestLapDriver: '',
-        bestLapCar: '',
-        bestS1: null,
-        bestS2: null,
-        bestS3: null,
-        theoreticalBest: null,
-        carsUsed: [],
-      };
-    }
-
-    const summary = map[track];
-    summary.sessionsCount += 1;
-
-    const p = s.playerDriver || s.drivers.find(d => d.isPlayer);
-    if (p) {
-      summary.totalLaps += p.lapsCount || 0;
-      if (p.carType && !summary.carsUsed.includes(p.carType)) {
-        summary.carsUsed.push(p.carType);
-      }
-
-      if (p.bestLapTime && (summary.bestLapTime === null || p.bestLapTime < summary.bestLapTime)) {
-        summary.bestLapTime = p.bestLapTime;
-        summary.bestLapDriver = p.name;
-        summary.bestLapCar = p.carType;
-      }
-      summary.bestS1 = updateMinTime(summary.bestS1, p.bestS1);
-      summary.bestS2 = updateMinTime(summary.bestS2, p.bestS2);
-      summary.bestS3 = updateMinTime(summary.bestS3, p.bestS3);
-    }
-
-    summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);
-  });
-
-  return map;
-}
 
 /**
  * Extracts and aggregates comparable laps across sessions matching a specific track and optional filters.

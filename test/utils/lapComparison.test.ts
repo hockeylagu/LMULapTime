@@ -7,9 +7,8 @@ import {
   computeLapToLapDelta,
   computeTopNLapAverage,
   computeConsistencyRating,
-  ComparableLap,
 } from '../../src/utils/lapComparison.js';
-import { ReferenceLaptimeEntry } from '../../server/core/types.js';
+import { ReferenceLaptimeEntry, ComparableLap } from '../../server/core/types.js';
 
 describe('lapComparison utility', () => {
   const baseLap: ComparableLap = {

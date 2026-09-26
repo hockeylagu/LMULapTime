@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeCornerConsistencyStats,
   computeLapSegmentComparisons,
-  filterCornerConsistencyStats,
   CornerSegmentComparison,
 } from '../../src/utils/cornerAnalysis.js';
+import {
+  computeCornerConsistencyStats,
+  filterCornerConsistencyStats,
+} from '../../src/utils/cornerConsistency.js';
 import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 describe('computeLapSegmentComparisons', () => {

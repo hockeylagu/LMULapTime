@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
-import { ComparableLap, computeLapDeltas } from '../../utils/lapComparison';
-import { ReferenceLaptimeEntry } from '../../../server/core/types';
+import { computeLapDeltas } from '../../utils/lapComparison';
+import { ReferenceLaptimeEntry, ComparableLap } from '../../../server/core/types';
 import { formatTime } from '../../utils/formatters';
 import { matchesCarClass, getPaceCategoryFromPercentage } from '../../utils/paceCategory';
 import { PaceBadge, LapStatusBadge } from '../common';

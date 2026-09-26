@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
-import { parseReplayMetadata, extractReplayTrajectory } from './replayParser.js';
+import { parseReplayMetadata } from './replayParser.js';
+import { extractReplayTrajectory } from './replayTrajectory.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 
 export interface ReplayCacheServiceOptions {

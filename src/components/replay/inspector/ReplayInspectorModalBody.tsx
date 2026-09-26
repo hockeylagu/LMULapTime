@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types';
-import { ComparableLap } from '../../../utils/lapComparison.js';
-import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint, ComparableLap } from '../../../../server/core/types';
+import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';

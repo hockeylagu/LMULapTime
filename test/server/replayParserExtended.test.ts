@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import {
   parseReplayMetadata,
-  extractReplayTrajectory,
   extractReplayLapSummaries,
 } from '../../server/replay/replayParser.js';
+import { extractReplayTrajectory } from '../../server/replay/replayTrajectory.js';
 import { LmuParser } from '../../server/sessions/parser.js';
 import { MockSlice, createSliceVcrBuffer } from '../utils/mockVcr.js';
 

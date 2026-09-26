@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-import { ComparableLap } from '../../../utils/lapComparison.js';
+import { ComparableLap } from '../../../../server/core/types.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 
 export interface ReplayCompareLapRowProps {

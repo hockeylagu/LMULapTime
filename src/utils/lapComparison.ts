@@ -2,8 +2,6 @@ import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../../server
 import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 
-export type { ComparableLap };
-
 export interface LapSelectionInput {
   lapTime: number | null;
   isValid?: boolean;
