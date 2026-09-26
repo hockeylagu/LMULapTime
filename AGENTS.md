@@ -122,7 +122,7 @@ LMULapTime/
 │   │   │   ├── analysis/           # Corner phase cards (Entry/Rotation/Exit), speed tables, AI tab
 │   │   │   ├── inspector/          # Replay layout header, sidebar, lap picker, timeline footer
 │   │   │   ├── map/                # 2D GPS track map scene, ribbons, friction circle, pan/zoom
-│   │   │   └── telemetry/          # Multi-channel strip charts, presets modal, resolution popover
+│   │   │   └── telemetry/          # Multi-channel strip charts (channels/ [inputs, dynamics, tires, powertrain] & presets/)
 │   │   ├── session-detail/         # Multiclass standings, multi-metric charts, stewards log
 │   │   ├── session-list/           # Filterable & searchable session history
 │   │   ├── settings/               # Path configuration, rescan triggers, cache stats
@@ -141,10 +141,10 @@ LMULapTime/
 │   │   ├── trackLimits.ts          # Boundary collision and lateral offset evaluation
 │   │   └── urlParams.ts            # Hash-based navigation and query string persistence
 │   └── index.css                   # Tailwind CSS imports & theme utilities
-├── test/                           # Automated test suite (1,060+ tests across 128 files)
-│   ├── components/                 # React component tests (@testing-library/react)
+├── test/                           # Automated test suite (1,080+ tests across 132 files)
+│   ├── components/                 # React component tests mirrored by feature domain (<= 20 files per folder)
 │   ├── fixtures/                   # Mock XML logs, binary VCR samples, telemetry files
-│   ├── server/                     # Express routes, parser, DB, and DuckDB tests
+│   ├── server/                     # Backend domain test suites (ai, benchmarks, core, replay, sessions, telemetry)
 │   ├── utils/                      # Unit tests for algorithms, math, and formatters
 │   └── setup.ts                    # Vitest environment setup
 ├── tools/                          # C# recorder and standalone TSX utilities
