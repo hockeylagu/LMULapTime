@@ -189,18 +189,6 @@ export function getMonotonicStations(points: ReplayTrajectoryPoint[], trackLengt
 }
 
 /**
- * Returns the canonical lap elapsed time (seconds) along the trajectory, re-zeroed so that
- * 0 always means the true physical start/finish line crossing (see computeStartFinishOffset).
- * Falls back to elapsed time from points[0] when canonical start/finish is unavailable.
- */
-export function getNormalizedTrajectoryTimes(points: ReplayTrajectoryPoint[], trackLengthM?: number): number[] {
-  if (!points || points.length === 0) return [];
-  const crossing = computeStartFinishOffset(points, trackLengthM);
-  const baseT = crossing ? crossing.timeSecOffset : (points[0].timeSec || 0);
-  return points.map(p => (p.timeSec || 0) - baseT);
-}
-
-/**
  * Returns the canonical lap distance index (meters) along the trajectory, re-zeroed so that
  * 0 always means the true physical start/finish crossing (see computeStartFinishOffset) -
  * this is what makes distance-matched comparisons between two independently recorded laps
