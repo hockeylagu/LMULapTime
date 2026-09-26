@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Compass } from 'lucide-react';
-import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
-import { getSteerPercent } from '../../../utils/formatters.js';
+import { getSteerPercent } from '../../../../shared/domain/formatters.js';
 import {
   detectHandlingBalanceEvents,
   computeVisibleHandlingBands,

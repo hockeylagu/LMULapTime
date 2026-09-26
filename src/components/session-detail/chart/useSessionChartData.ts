@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { DetailedSession, DriverData, LapData } from '../../../../server/core/types';
-import { formatTime } from '../../../utils/formatters.js';
-import { matchesCarClass } from '../../../utils/paceCategory.js';
-import { selectCleanLapCandidates } from '../../../utils/lapComparison.js';
+import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
+import { matchesCarClass } from '../../../../shared/domain/paceCategory.js';
+import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 
 export type SessionPositionChartPoint = Record<string, string | number | boolean | null | undefined>;
 

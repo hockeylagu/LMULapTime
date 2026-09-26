@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
-import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../server/core/types';
-import { getDisplayTrackName } from '../../../utils/formatters.js';
-import { normalizeCarClass } from '../../../utils/paceCategory.js';
+import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
+import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/index.js';
 
 export interface SessionTelemetryPointData {

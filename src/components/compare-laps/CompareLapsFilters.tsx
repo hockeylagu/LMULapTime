@@ -1,5 +1,5 @@
 import React from 'react';
-import { VEHICLE_CLASS_OPTIONS } from '../../utils/paceCategory';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 
 export interface CompareLapsFiltersProps {
   availableTracks: string[];

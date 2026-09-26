@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../server/core/types';
-import { getDisplayTrackName } from '../../utils/formatters.js';
+import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../shared/types/index.js';
+import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import {
   matchesCarClass,
   getPaceCategoryFromPercentage,
-} from '../../utils/paceCategory.js';
+} from '../../../shared/domain/paceCategory.js';
 import {
   createTheoreticalBestLap,
   filterLapsByCarCategory,
-} from '../../utils/lapComparison.js';
+} from '../../../shared/domain/lapComparison.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
 
 export type AvailableLapsSortOption =

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, Calendar } from 'lucide-react';
-import { TimeRangeFilter } from './ImprovementChart.js';
+export type TimeRangeFilter = 'all' | 'last-5' | 'last-10' | 'last-20' | 'week' | 'month' | 'year';
 
 export type ImprovementMetric = 'bestLap' | 'sectors' | 'bestPr' | 'consistency';
 

@@ -1,6 +1,6 @@
 import React from 'react';
-import { ReferenceLaptimeEntry } from '../../../server/core/types';
-import { formatTime } from '../../utils/formatters';
+import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface BenchmarkTargetsGridProps {
   benchmark?: ReferenceLaptimeEntry | null;

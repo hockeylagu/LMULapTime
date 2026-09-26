@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { projectTrajectoryPoints, buildContinuousSvgPath } from './replayMapUtils.js';
 import { CHART_COLORS, MAP_COLORS } from '../../../utils/themeColors.js';

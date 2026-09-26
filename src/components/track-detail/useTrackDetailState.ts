@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { ReferenceLaptimeEntry } from '../../../server/core/types';
+import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta } from './trackDetailHelpers.js';
 

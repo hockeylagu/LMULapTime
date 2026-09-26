@@ -1,4 +1,4 @@
-import { TrackSummary } from '../../server/core/types.js';
+import { TrackSummary } from '../types/index.js';
 import {
   getDisplayTrackName,
   computeTheoreticalBest,

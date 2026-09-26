@@ -7,8 +7,8 @@ import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
 import { CompareLapsTable } from './CompareLapsTable.js';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
-import { ReplaySummary } from '../../../server/core/types';
-import { matchesTrack } from '../../utils/paceCategory.js';
+import { ReplaySummary } from '../../../shared/types/index.js';
+import { matchesTrack } from '../../../shared/domain/paceCategory.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };

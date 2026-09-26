@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeftRight, Activity } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
-import { getDisplayTrackName } from '../../../utils/formatters.js';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 
 export interface SessionLapTableActionsProps {
   session: DetailedSession;

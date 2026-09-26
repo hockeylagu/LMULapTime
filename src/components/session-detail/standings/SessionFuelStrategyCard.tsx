@@ -1,6 +1,6 @@
 import React from 'react';
 import { Fuel, Clock, Zap, Scale } from 'lucide-react';
-import { DriverData } from '../../../../server/core/types';
+import { DriverData } from '../../../../shared/types/index.js';
 
 export interface SessionFuelStrategyCardProps {
   selectedDriver: DriverData;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification, LMU_SCENE_DESC_MAP } from '../../src/utils/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification, LMU_SCENE_DESC_MAP } from '../../shared/domain/circuitSpecs.js';
 
 const resolveKey = (
   venue?: string | null,

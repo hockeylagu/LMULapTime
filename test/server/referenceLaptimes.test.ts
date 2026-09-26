@@ -10,7 +10,7 @@ import {
 } from '../../server/benchmarks/referenceLaptimes.js';
 import { getSessionDatabase, resetSessionDatabaseForTest } from '../../server/core/db.js';
 import { ReferenceLaptimeEntry } from '../../server/core/types.js';
-import { normalizeCarClass } from '../../src/utils/paceCategory.js';
+import { normalizeCarClass } from '../../shared/domain/paceCategory.js';
 
 describe('referenceLaptimes server module', () => {
   const sampleCsv = `Key,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest Car,Record,Diff,Diff%,Class

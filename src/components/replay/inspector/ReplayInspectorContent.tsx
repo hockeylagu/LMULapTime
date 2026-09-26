@@ -6,8 +6,8 @@ import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/repl
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
 import { filterCornerConsistencyStats } from '../../../utils/cornerConsistency.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
-import { formatTime } from '../../../utils/formatters.js';
-import { getCircuitSpecification } from '../../../utils/circuitSpecs.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
+import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 
 export interface ReplayInspectorContentProps {

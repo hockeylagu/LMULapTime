@@ -6,7 +6,7 @@ import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { matchDuckDbToReplay, matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
 import { enrichTrajectoryWithTrackGeometry } from '../tracks/serverTrackSync.js';
-import { getDisplayTrackName } from '../../src/utils/formatters.js';
+import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { DetailedSession, DriverData, LapData, ReplayDriverEntry, ReplayMetadata, ReplaySummary } from '../core/types.js';
 import { ServerContext } from '../core/serverContext.js';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Zap, Trash2, CheckCircle2 } from 'lucide-react';
-import { AppStatus } from '../../../server/core/types';
+import { AppStatus } from '../../../shared/types/index.js';
 
 export interface CacheSettingsCardProps {
   status: AppStatus | null;

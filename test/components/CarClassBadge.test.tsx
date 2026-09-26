@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CarClassBadge, getCarClassBadgeConfig, VehicleClassPills } from '../../src/components/common/CarClassBadge.js';
+import { CarClassBadge, getCarClassBadgeConfig } from '../../src/components/common/CarClassBadge.js';
+import { VehicleClassPills } from '../../src/components/common/VehicleClassPills.js';
 
 describe('CarClassBadge', () => {
   it('renders Hypercar (HY) in red', () => {

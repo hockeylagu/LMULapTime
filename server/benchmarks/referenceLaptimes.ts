@@ -1,10 +1,10 @@
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../core/types.js';
-import { parseTimeStringToSeconds, formatTime } from '../../src/utils/formatters.js';
+import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/formatters.js';
 import {
   getPaceCategoryFromPercentage,
   findReferenceEntry,
   normalizeCarClass,
-} from '../../src/utils/paceCategory.js';
+} from '../../shared/domain/paceCategory.js';
 import { getSessionDatabase } from '../core/db.js';
 
 const PUBLISHED_SPREADSHEET_CSV_URL =

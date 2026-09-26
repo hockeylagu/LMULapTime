@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateTrackSummaries, TrackSessionSummary } from '../../src/utils/trackSummaryUtils.js';
+import { aggregateTrackSummaries, TrackSessionSummary } from '../../shared/domain/trackSummaryUtils.js';
 
 describe('trackSummaryUtils', () => {
   const sampleSessions: TrackSessionSummary[] = [

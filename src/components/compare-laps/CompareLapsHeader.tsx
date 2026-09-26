@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2 } from 'lucide-react';
-import { formatTime } from '../../utils/formatters';
-import { ComparableLap } from '../../../server/core/types';
+import { formatTime } from '../../../shared/domain/formatters.js';
+import { ComparableLap } from '../../../shared/types/index.js';
 
 export interface CompareLapsHeaderProps {
   selectedTrack: string;

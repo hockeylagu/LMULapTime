@@ -1,6 +1,6 @@
 import React from 'react';
-import { ReplayTelemetryPoint } from '../../../../server/core/types';
-import { getSteerPercent } from '../../../utils/formatters.js';
+import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import { getSteerPercent } from '../../../../shared/domain/formatters.js';
 
 export interface ReplayTelemetryHudProps {
   currentPoint?: ReplayTelemetryPoint | null;

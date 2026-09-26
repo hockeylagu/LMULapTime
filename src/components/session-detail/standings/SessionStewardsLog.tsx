@@ -1,6 +1,6 @@
 import { AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
-import { DriverData, LapTrackLimit } from '../../../../server/core/types';
-import { formatElapsedSeconds } from '../../../utils/formatters.js';
+import { DriverData, LapTrackLimit } from '../../../../shared/types/index.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
 import {
   getTrackLimitSeverity,
   getWorstTrackLimitSeverity,

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Activity, BrainCircuit, Timer, X } from 'lucide-react';
-import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';

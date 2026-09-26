@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance, findIndexAtDistance } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import {

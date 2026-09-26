@@ -1,7 +1,7 @@
 import React from 'react';
-import { formatTime } from '../../../utils/formatters.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
-import { ImprovementTooltipPayloadEntry } from './ImprovementPaceChart.js';
+import { ImprovementTooltipPayloadEntry } from './improvementChartTypes.js';
 
 export interface ImprovementPaceTooltipProps {
   active?: boolean;

@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 
 export interface CornerPaths {

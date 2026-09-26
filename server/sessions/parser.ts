@@ -19,10 +19,10 @@ import {
   parseDateStringToTimestamp,
   getSessionTypeWeight,
   minValidTime,
-} from '../../src/utils/formatters.js';
+} from '../../shared/domain/formatters.js';
 import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
-import { matchesTrack } from '../../src/utils/paceCategory.js';
-import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
+import { matchesTrack } from '../../shared/domain/paceCategory.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,

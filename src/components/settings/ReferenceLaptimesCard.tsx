@@ -1,6 +1,6 @@
 import React from 'react';
 import { Database, Globe, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { ReferenceBenchmarkDiff, AppStatus } from '../../../server/core/types';
+import { ReferenceBenchmarkDiff, AppStatus } from '../../../shared/types/index.js';
 import { ReferenceChangesList } from './ReferenceChangesList';
 
 export interface ReferenceLaptimesCardProps {

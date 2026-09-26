@@ -2,7 +2,7 @@ import React from 'react';
 import { Line } from 'recharts';
 import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
-import type { ImprovementChartPoint } from './ImprovementPaceChart.js';
+import type { ImprovementChartPoint } from './improvementChartTypes.js';
 
 export interface ImprovementPaceSeriesProps {
   metric: ImprovementMetric;

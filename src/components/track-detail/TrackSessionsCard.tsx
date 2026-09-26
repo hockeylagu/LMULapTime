@@ -2,7 +2,7 @@ import React from 'react';
 import { SessionList, SessionListItem } from '../session-list/SessionList.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
-import { PaceCategory } from '../../../server/core/types';
+import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface TrackSessionsCardProps {
   trackName: string;

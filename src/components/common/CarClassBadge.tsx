@@ -234,5 +234,3 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
   );
 };
 
-export { VehicleClassPills, VehicleClassPills as CarClassPills } from './VehicleClassPills.js';
-export type { VehicleClassPillsProps, VehicleClassPillsProps as CarClassPillsProps } from './VehicleClassPills.js';

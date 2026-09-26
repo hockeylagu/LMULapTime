@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison, getTrajectoryDistances } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 

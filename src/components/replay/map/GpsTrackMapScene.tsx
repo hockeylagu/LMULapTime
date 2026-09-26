@@ -24,9 +24,9 @@ import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
 import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
-import type { GpsTrackMapProps } from './GpsTrackMap.js';
+import type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
-export type GpsTrackMapSceneProps = GpsTrackMapProps;
+export type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   points,

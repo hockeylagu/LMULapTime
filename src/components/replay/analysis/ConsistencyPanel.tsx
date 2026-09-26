@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, Flag, Loader2 } from 'lucide-react';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { MiniCornerMap } from '../map/MiniCornerMap.js';

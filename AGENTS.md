@@ -15,7 +15,7 @@ This document provides architectural standards, domain rules, coding conventions
   - Slices continuous session logs into clean flying laps with sector boundary tags and fused spatial coordinates.
 - **XML Session Log Parsing & Stewards Ledger**: Extracts timing, lap splits (S1/S2/S3), sector speeds, tire degradation, fuel consumption, multiclass driver classifications, contact collisions, track limit cuts, and steward penalties from LMU's `UserData/LOG/Results/*.xml`.
 - **Physical Track Boundaries & Limit Corridors**: Pre-aligned physical road boundaries (`leftBoundary`, `rightBoundary`, `centerline`) in exact 1:1 LMU local Cartesian coordinates ($x, z$) across all 32 driven layouts.
-- **Unified Circuit Specifications & Layout Disambiguation**: Centralized single source of truth in `src/utils/circuitSpecs.ts` and `src/utils/circuitDefinitions.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`). Directly maps all 32 layouts to their canonical `circuitId`, `layoutId`, `isDefaultLayout`, `sceneDescs`, and official `benchmarkName` targets without intermediate shims.
+- **Unified Circuit Specifications & Layout Disambiguation**: Centralized single source of truth in `shared/domain/circuitSpecs.ts` and `shared/domain/circuitDefinitions.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`). Directly maps all 32 layouts to their canonical `circuitId`, `layoutId`, `isDefaultLayout`, `sceneDescs`, and official `benchmarkName` targets without intermediate shims.
 - **Three-Phase Corner Analysis & Consistency**: Deconstructs every turn on circuit into **Entry Phase** (braking point, peak hit, trail brake decay), **Rotation Phase** (apex minimum speed, yaw rotation rate, apex clipping proximity), and **Exit Phase** (throttle pick-up timing, ramp rate, traction), paired with corner consistency scoring.
 - **Synchronized Multi-Channel Telemetry Studio**: Full spectrum of telemetry traces including speed, lap delta, pedals (throttle/brake with ABS/TC indicators), steering angle with real-time understeer/oversteer detection overlay, G-forces (Lat/Lon/Total Accel), yaw rate, body slip angle, 4-corner damper deflection, 4-wheel rotational speeds & slip, dynamic tire pressures & temps, stint tire wear degradation, 4-corner brake rotor thermals, and Hypercar hybrid powertrain (SoC, Virtual Energy, Regen).
 - **G-G Traction Circle (Friction Diagram)**: Visualizes tire grip limits, combined braking/cornering forces, and traction envelopes.
@@ -97,10 +97,19 @@ LMULapTime/
 │   │   ├── telemetryCatalog.ts     # File indexing and metadata extractor
 │   │   ├── telemetryFusion.ts      # Merges DuckDB channels with VCR coordinates
 │   │   └── telemetryMatcher.ts     # Matches session XMLs with telemetry files
-│   ├── tracks/                     # Server-side track geometry synchronization
 │   │   ├── serverTrackSync.ts      # Disk to DB track geometry sync
 │   │   └── trackProjection.ts      # Local coordinate transform utilities
 │   └── index.ts                    # Express application entry point & router mounting
+├── shared/                         # Pure domain logic & shared TypeScript types
+│   ├── types/                      # Canonical domain models (DetailedSession, LapData, etc.)
+│   └── domain/                     # Pure mathematical, formatting & circuit resolution engines
+│       ├── circuitDefinitions.ts   # Canonical specs for all 32 circuits & layouts
+│       ├── circuitSpecs.ts         # Single source of truth circuit resolution engine
+│       ├── formatters.ts           # Lap time formatters & math
+│       ├── lapComparison.ts        # Delta interpolation & sector calculations
+│       ├── paceCategory.ts         # Pace percentages & vehicle class matching
+│       ├── trackSummaryUtils.ts    # Multi-session track aggregation helpers
+│       └── vehicleMapping.ts       # Car class categorization & model identification
 ├── public/tracks/                  # Mirrored track boundary JSON files for client map
 ├── src/                            # React 19 frontend
 │   ├── App.tsx                     # Root component, tabs, hash routing & global state
@@ -119,23 +128,18 @@ LMULapTime/
 │   │   ├── settings/               # Path configuration, rescan triggers, cache stats
 │   │   ├── track-detail/           # Circuit layout telemetry, progression, benchmarks
 │   │   └── track-summaries/        # Multi-track summary grid
-│   ├── utils/                      # Core math, physics, formatters & specifications
-│   │   ├── circuitDefinitions.ts   # Canonical specs for all 32 circuits & layouts
-│   │   ├── circuitSpecs.ts         # Circuit resolution engine & single source of truth
+│   ├── utils/                      # Frontend math, physics, graphics & telemetry utilities
+│   │   ├── aiReportPayload.ts      # Telemetry evidence builder for AI Race Engineer
+│   │   ├── computedTelemetry.ts    # Dynamic channel derivation (G-forces, slip, balance)
 │   │   ├── cornerAnalysis.ts       # Turn detection, 3-phase corner metrics & deficit scoring
 │   │   ├── cornerConsistency.ts    # Corner-by-corner repeatability scoring
-│   │   ├── computedTelemetry.ts    # Dynamic channel derivation (G-forces, slip, balance)
-│   │   ├── formatters.ts           # Lap time formatters (m:ss.sss, deltas)
 │   │   ├── handlingBalanceDetection.ts # Real-time understeer / oversteer gradient calculation
-│   │   ├── lapComparison.ts        # Delta interpolations and sector calculations
 │   │   ├── lapConsistency.ts       # Flying lap standard deviation & consistency rating
-│   │   ├── paceCategory.ts         # Pace percentages, styling, and vehicle class mapping
 │   │   ├── replayComparison.ts     # Replay trajectory alignment & deltas
 │   │   ├── telemetryPostProcessing.ts # Waveform smoothing and decimation
 │   │   ├── themeColors.ts          # Centralized motorsport color palette tokens
 │   │   ├── trackLimits.ts          # Boundary collision and lateral offset evaluation
-│   │   ├── urlParams.ts            # Hash-based navigation and query string persistence
-│   │   └── vehicleMapping.ts       # Car class categorization and model identification
+│   │   └── urlParams.ts            # Hash-based navigation and query string persistence
 │   └── index.css                   # Tailwind CSS imports & theme utilities
 ├── test/                           # Automated test suite (1,060+ tests across 128 files)
 │   ├── components/                 # React component tests (@testing-library/react)
@@ -156,7 +160,7 @@ LMULapTime/
 When adding features, fixing bugs, or refactoring code, adhere strictly to these domain invariants:
 
 ### A. Strict Circuit Layout Disambiguation & Single Source of Truth
-- **Single Source of Truth**: All 32 circuit and layout definitions, benchmark targets, and native engine scene descriptors (`sceneDescs`) are centralized in `src/utils/circuitDefinitions.ts` and resolved via `src/utils/circuitSpecs.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`).
+- **Single Source of Truth**: All 32 circuit and layout definitions, benchmark targets, and native engine scene descriptors (`sceneDescs`) are centralized in `shared/domain/circuitDefinitions.ts` and resolved via `shared/domain/circuitSpecs.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`).
 - **Rule**: Never cross-pollinate benchmarks, records, or lap comparisons across differing layouts of the same facility (e.g. Monza GP vs. Curva Grande; Bahrain GP vs. Outer/Paddock; Sebring Full vs. School; Silverstone GP vs. National; Fuji GP vs. Classic; Paul Ricard 1A-V2 vs. Short).
 - **Direct Resolution (No Shims)**: Always call `getCircuitSpecification(venueOrKey, course, sceneDesc, replayName, explicitKey, trackLengthMeters)` directly. Access `.layoutKey`, `.benchmarkName`, `.circuitId`, or `.layoutId` from the returned specification. Do not introduce intermediate wrappers, duplicate lookup tables, or shims.
 

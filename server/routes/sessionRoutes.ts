@@ -2,10 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
 import { computeProgression, extractComparableLaps } from '../sessions/sessionAnalytics.js';
-import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../../src/utils/paceCategory.js';
-import { matchesSessionType, isSessionEmpty } from '../../src/utils/formatters.js';
+import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../../shared/domain/paceCategory.js';
+import { matchesSessionType, isSessionEmpty } from '../../shared/domain/formatters.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
-import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
 
 export function createSessionRouter(context: ServerContext): Router {

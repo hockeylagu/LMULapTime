@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { formatTime, matchesSessionType, compareSessions } from '../../../utils/formatters.js';
-import { matchesCarClass, matchesTrack } from '../../../utils/paceCategory.js';
-import { PaceCategory } from '../../../../server/core/types';
+import { formatTime, matchesSessionType, compareSessions } from '../../../../shared/domain/formatters.js';
+import { matchesCarClass, matchesTrack } from '../../../../shared/domain/paceCategory.js';
+import { PaceCategory } from '../../../../shared/types/index.js';
 import { ImprovementHeader } from './ImprovementHeader.js';
 import { ImprovementStatsBanner } from './ImprovementStatsBanner.js';
-import { ImprovementChartControls, ImprovementMetric } from './ImprovementChartControls.js';
+import { ImprovementChartControls, ImprovementMetric, TimeRangeFilter } from './ImprovementChartControls.js';
 import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 
-export type TimeRangeFilter = 'all' | 'last-5' | 'last-10' | 'last-20' | 'week' | 'month' | 'year';
+export type { TimeRangeFilter, ImprovementMetric };
 
 export { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';
 import { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';

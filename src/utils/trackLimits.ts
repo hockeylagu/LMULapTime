@@ -1,4 +1,4 @@
-import { LapTrackLimit } from '../../server/core/types';
+import { LapTrackLimit } from '../../shared/types/index.js';
 
 export type TrackLimitSeverity = 'green' | 'yellow' | 'orange';
 

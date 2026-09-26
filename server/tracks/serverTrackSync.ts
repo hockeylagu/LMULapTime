@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
-import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
 
 interface CachedTrackDefinition {

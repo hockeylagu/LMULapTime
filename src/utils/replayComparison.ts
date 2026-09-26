@@ -1,5 +1,5 @@
-import { ReplayTrajectoryPoint, ReplaySummary } from '../../server/core/types';
-import { matchesTrack, matchesCarClass } from './paceCategory.js';
+import { ReplayTrajectoryPoint, ReplaySummary } from '../../shared/types/index.js';
+import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
 
 // Neutral (0) / reverse (-1) are clamped to 1 for chart/comparison display.
 function resolveGearValue(p: ReplayTrajectoryPoint): number {

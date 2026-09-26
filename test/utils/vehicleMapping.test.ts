@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
-} from '../../src/utils/vehicleMapping.js';
+} from '../../shared/domain/vehicleMapping.js';
 
 describe('vehicleMapping utility', () => {
   describe('mapVehicleIdToModel', () => {

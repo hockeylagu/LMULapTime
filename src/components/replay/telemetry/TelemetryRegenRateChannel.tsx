@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Activity } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 

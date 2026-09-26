@@ -1,35 +1,33 @@
 import React from 'react';
-import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryChannelId } from './telemetryPresets.js';
-import {
-  TelemetrySpeedChannel,
-  TelemetryDeltaChannel,
-  TelemetryThrottleChannel,
-  TelemetryBrakeChannel,
-  TelemetryGearChannel,
-  TelemetrySteerChannel,
-  TelemetryRpmChannel,
-  TelemetryLateralOffsetChannel,
-  TelemetryAccelLatChannel,
-  TelemetryAccelLonChannel,
-  TelemetryAccelTotalChannel,
-  TelemetrySlipAngleChannel,
-  TelemetryUndersteerChannel,
-  TelemetryYawRateChannel,
-  TelemetryBrakeTempsChannel,
-  TelemetrySuspPosChannel,
-  TelemetryWheelSpeedsChannel,
-  TelemetryTirePressuresChannel,
-  TelemetryTireWearChannel,
-  TelemetryTireTempsChannel,
-  TelemetryFuelChannel,
-  TelemetryVirtualEnergyChannel,
-  TelemetrySocChannel,
-  TelemetryRegenRateChannel,
-} from './index.js';
+import { TelemetrySpeedChannel } from './TelemetrySpeedChannel.js';
+import { TelemetryDeltaChannel } from './TelemetryDeltaChannel.js';
+import { TelemetryThrottleChannel } from './TelemetryThrottleChannel.js';
+import { TelemetryBrakeChannel } from './TelemetryBrakeChannel.js';
+import { TelemetryGearChannel } from './TelemetryGearChannel.js';
+import { TelemetrySteerChannel } from './TelemetrySteerChannel.js';
+import { TelemetryRpmChannel } from './TelemetryRpmChannel.js';
+import { TelemetryLateralOffsetChannel } from './TelemetryLateralOffsetChannel.js';
+import { TelemetryAccelLatChannel } from './TelemetryAccelLatChannel.js';
+import { TelemetryAccelLonChannel } from './TelemetryAccelLonChannel.js';
+import { TelemetryAccelTotalChannel } from './TelemetryAccelTotalChannel.js';
+import { TelemetrySlipAngleChannel } from './TelemetrySlipAngleChannel.js';
+import { TelemetryUndersteerChannel } from './TelemetryUndersteerChannel.js';
+import { TelemetryYawRateChannel } from './TelemetryYawRateChannel.js';
+import { TelemetryBrakeTempsChannel } from './TelemetryBrakeTempsChannel.js';
+import { TelemetrySuspPosChannel } from './TelemetrySuspPosChannel.js';
+import { TelemetryWheelSpeedsChannel } from './TelemetryWheelSpeedsChannel.js';
+import { TelemetryTirePressuresChannel } from './TelemetryTirePressuresChannel.js';
+import { TelemetryTireWearChannel } from './TelemetryTireWearChannel.js';
+import { TelemetryTireTempsChannel } from './TelemetryTireTempsChannel.js';
+import { TelemetryFuelChannel } from './TelemetryFuelChannel.js';
+import { TelemetryVirtualEnergyChannel } from './TelemetryVirtualEnergyChannel.js';
+import { TelemetrySocChannel } from './TelemetrySocChannel.js';
+import { TelemetryRegenRateChannel } from './TelemetryRegenRateChannel.js';
 
 export interface TelemetryChannelRendererProps {
   channelId: TelemetryChannelId;

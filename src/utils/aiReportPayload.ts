@@ -1,4 +1,4 @@
-import { AiLapEvidence, ReplayLapSummary, ReplayTrajectoryData } from '../../server/core/types';
+import { AiLapEvidence, ReplayLapSummary, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { LapSegmentComparison } from './cornerAnalysis.js';
 
 const round = (value: number): number => Number(value.toFixed(3));

@@ -4,9 +4,9 @@ import { useDashboardTrends } from './useDashboardTrends.js';
 import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
-import { PACE_CATEGORY_STYLES } from '../../utils/paceCategory.js';
+import { PACE_CATEGORY_STYLES } from '../../utils/paceCategoryStyles.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
-import type { SessionSummary } from './Dashboard.js';
+import type { SessionSummary } from './dashboardTypes.js';
 
 export interface DashboardHeroProps {
   sessions: SessionSummary[];

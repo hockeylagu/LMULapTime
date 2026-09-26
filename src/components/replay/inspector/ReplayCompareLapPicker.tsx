@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
-import { ComparableLap } from '../../../../server/core/types.js';
+import { ComparableLap } from '../../../../shared/types/index.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';

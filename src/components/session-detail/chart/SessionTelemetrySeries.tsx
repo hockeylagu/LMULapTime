@@ -1,6 +1,6 @@
 import React from 'react';
 import { Line } from 'recharts';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { CHART_COLORS, COMPARE_LAP_COLORS, LMU_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { OPPONENT_COLORS, PLAYER_HIGHLIGHT_COLOR } from '../sessionDetailHelpers.js';
 

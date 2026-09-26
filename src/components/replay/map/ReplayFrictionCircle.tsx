@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface ReplayFrictionCircleProps {

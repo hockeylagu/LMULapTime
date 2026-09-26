@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle2, Plus } from 'lucide-react';
-import { ComparableLap } from '../../../server/core/types';
-import { formatTime } from '../../utils/formatters';
+import { ComparableLap } from '../../../shared/types/index.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge, CarClassBadge } from '../common';
 
 export interface CompareLapsTableRowProps {

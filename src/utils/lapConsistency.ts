@@ -1,4 +1,4 @@
-import { ReplayLapSummary } from '../../server/core/types';
+import { ReplayLapSummary } from '../../shared/types/index.js';
 
 export interface SectorConsistencyStat {
   key: 'lapTimeSec' | 's1Sec' | 's2Sec' | 's3Sec';
