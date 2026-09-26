@@ -2,6 +2,7 @@ import { ReplayTrajectoryPoint, ReplaySummary } from '../../shared/types/index.j
 import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
 import {
   MAX_START_FINISH_CORRECTION_M,
+  canAlignByStation,
   computeStartFinishOffset,
   getMonotonicStations,
   getTrajectoryDistances,
@@ -377,10 +378,7 @@ export function computeLapComparisons(
   const finishLineDelta = primaryTotalLapTime - baselineTotalLapTime;
 
   // Determine whether to match by canonical track station or normalized distance
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
+  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
 
   let primaryRefCoords: number[];
   let baselineRefCoords: number[];

@@ -5,6 +5,7 @@ import {
   interpolatePointAtDistance,
 } from './replayComparison.js';
 import {
+  canAlignByStation,
   interpolateScalarAtDistance,
   getTrajectoryDistances,
   getDistancesInReferenceFrame,
@@ -406,12 +407,8 @@ export function computeLapSegmentComparisons(
     turningPoints.push({ index: primaryPoints.length - 1, distM: totalDistM, type: 'max' });
   }
 
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
-
-  const primaryRefCoords = canMatchByStation && trackLengthM ? getMonotonicStations(primaryPoints, trackLengthM) : primaryDists;
+  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
+  const primaryRefCoords = canMatchByStation ? getMonotonicStations(primaryPoints, trackLengthM) : primaryDists;
 
   // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
   // delta channel shows (each lap timed from its own S/F crossing, extrapolated at the lap
