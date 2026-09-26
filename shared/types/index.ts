@@ -814,6 +814,14 @@ export interface ReplayTrajectoryValidation {
   }>;
 }
 
+/**
+ * How one end of a lap was put on the start/finish line: cut where the recording crosses it
+ * ('line'), extended to it over the last few metres because the recording stops just short of it
+ * ('extrapolated'), or not at all because the recording is nowhere near it ('none', e.g. an
+ * out-lap starting in the pits): the lap then starts or ends where the replay sliced it.
+ */
+export type LapEndCut = 'line' | 'extrapolated' | 'none';
+
 export interface ReplayTrajectoryData {
   replayName: string;
   driverSlot?: number;
@@ -854,6 +862,12 @@ export interface ReplayTrajectoryData {
   trackLengthM?: number;
   lapDistMeters?: number;
   timingGates?: TrackTimingGates;
+  // How stationM was obtained: projected on the layout's centreline ('track'), or the lap's own
+  // driven distance when there is no geometry for the layout ('odometer'). Odometer stations of
+  // two laps don't refer to the same place on track: they start wherever each lap was sliced.
+  stationSource?: 'track' | 'odometer';
+  // How each end of the lap was put on the start/finish line (see LapEndCut).
+  lineCut?: { start: LapEndCut; end: LapEndCut };
   source?: 'vcr' | 'duckdb';
   duckdbFilename?: string;
   duckdbAvailable?: boolean;

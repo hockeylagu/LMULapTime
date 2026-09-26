@@ -125,6 +125,8 @@ describe('serverTrackSync', () => {
     );
 
     expect(enriched.layoutKey).toBeUndefined();
+    expect(enriched.stationSource).toBe('odometer');
+    expect(enriched.lineCut).toEqual({ start: 'none', end: 'none' });
     expect(enriched.trackLengthM).toBe(300); // 100m + 200m
     expect(enriched.points[0].distM).toBe(0);
     expect(enriched.points[1].distM).toBe(100);
@@ -202,6 +204,17 @@ describe('serverTrackSync', () => {
       expect(enriched.points[0].x).toBeCloseTo(x0, 1);
       expect(enriched.points[0].z).toBeCloseTo(z0, 1);
       expect(enriched.points[0].timeSec).toBeCloseTo(100, 2);
+      expect(enriched.stationSource).toBe('track');
+      expect(enriched.lineCut).toEqual({ start: 'line', end: 'none' }); // the lap stops hundreds of metres short of the line
+    });
+
+    it('extends a start with no recording before it back to the line, and says so', () => {
+      const trajectory = lapAroundTheLine();
+      delete trajectory.leadInPoints;
+      const enriched = enrichTrajectoryWithTrackGeometry(trajectory, 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      expect(enriched.lineCut).toEqual({ start: 'extrapolated', end: 'none' });
+      expect(enriched.points[0].stationM).toBe(0);
+      expect(enriched.points[0].timeSec).toBeCloseTo(100, 1); // along Monza's start straight
     });
 
     it('never returns the recording either side of the lap', () => {

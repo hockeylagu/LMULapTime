@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../core/types.js';
+import { LapEndCut, ReplayTrajectoryPoint } from '../core/types.js';
 import { interpolateAngle } from '../telemetry/telemetryFusion.js';
 
 /**
@@ -7,6 +7,12 @@ import { interpolateAngle } from '../telemetry/telemetryFusion.js';
  * further away belongs to some other pass over the line (pit lane, spin).
  */
 export const MAX_LINE_CUT_SHIFT_SEC = 2.5;
+
+/**
+ * An end of the lap with no recording beyond it (the replay starts or stops there) but within
+ * this distance of the line is extended to the line, assuming the car kept its speed and heading.
+ */
+export const MAX_LINE_EXTRAPOLATION_M = 25;
 
 const ANGLE_FIELDS = new Set(['rotX', 'rotY', 'rotZ']);
 // Numeric channels that hold a state, not a measurement: never blended between two samples.
@@ -17,8 +23,8 @@ export interface LapLineCut {
   points: ReplayTrajectoryPoint[];
   /** New index of a sample that was at index i of the timing-loop slice: i + indexShift. */
   indexShift: number;
-  startCut: boolean;
-  endCut: boolean;
+  start: LapEndCut;
+  end: LapEndCut;
 }
 
 /** Linear interpolation of every measured channel between two consecutive samples. */
@@ -43,8 +49,9 @@ function interpolatePoint(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, f:
  * recording just before and after it, and `stations` their projection on the centreline,
  * wrapped in [0, trackLengthM). Each end of the lap is moved to the line crossing nearest in
  * time to the timing-loop boundary, where a sample is interpolated so the lap starts at station
- * 0 and ends at station trackLengthM. An end with no crossing within MAX_LINE_CUT_SHIFT_SEC
- * (out-lap from the pits, no recording past a late slice) keeps the timing-loop boundary.
+ * 0 and ends at station trackLengthM. An end with no crossing within MAX_LINE_CUT_SHIFT_SEC but
+ * within MAX_LINE_EXTRAPOLATION_M of the line (a slice at the very start or end of the replay) is
+ * extrapolated to it; any other end (out-lap from the pits) keeps the timing-loop boundary.
  *
  * `trackLengthM` must be the centreline's own length (the station at which it wraps).
  */
@@ -101,17 +108,46 @@ export function cutLapAtLine(
     };
   };
 
+  // Beyond the recorded end sample `edge`, continuing the step from `inner`: position, time and
+  // speed are extended, every other channel is held at the edge sample.
+  const extrapolated = (edge: number, inner: number, target: number): ReplayTrajectoryPoint => {
+    const g = (target - u[edge]) / (u[edge] - u[inner]);
+    const a = samples[edge];
+    const b = samples[inner];
+    const extend = (va: number | undefined, vb: number | undefined) =>
+      va === undefined || vb === undefined ? va : Number((va + g * (va - vb)).toFixed(3));
+    return {
+      ...a,
+      x: extend(a.x, b.x) ?? a.x,
+      y: extend(a.y, b.y) ?? a.y,
+      z: extend(a.z, b.z) ?? a.z,
+      timeSec: extend(a.timeSec, b.timeSec),
+      speedKmh: Math.max(0, extend(a.speedKmh, b.speedKmh) ?? 0),
+      stationM: Number(target.toFixed(2)),
+      lateralOffsetM: Number((lateralOffsets[edge] ?? 0).toFixed(2)),
+    };
+  };
+  // Only towards the line from the right side, with the car moving forward over the last step.
+  const canExtrapolate = (edge: number, inner: number, gapM: number) =>
+    inner >= lapStartIdx && inner <= lapEndIdx && gapM > 0 && gapM <= MAX_LINE_EXTRAPOLATION_M &&
+    u[Math.max(edge, inner)] - u[Math.min(edge, inner)] > 1e-6;
+
+  const start: LapEndCut = startK >= 0 ? 'line' : canExtrapolate(lapStartIdx, lapStartIdx + 1, u[lapStartIdx]) ? 'extrapolated' : 'none';
+  const end: LapEndCut = endK >= 0 ? 'line' : canExtrapolate(lapEndIdx, lapEndIdx - 1, L - u[lapEndIdx]) ? 'extrapolated' : 'none';
+
   const first = startK >= 0 ? startK + 1 : lapStartIdx;
   const last = endK >= 0 ? endK : lapEndIdx;
   const points: ReplayTrajectoryPoint[] = [];
-  if (startK >= 0) points.push(boundary(startK, 0));
+  if (start === 'line') points.push(boundary(startK, 0));
+  else if (start === 'extrapolated') points.push(extrapolated(lapStartIdx, lapStartIdx + 1, 0));
   for (let i = first; i <= last; i++) points.push(withProjection(i));
-  if (endK >= 0) points.push(boundary(endK, L));
+  if (end === 'line') points.push(boundary(endK, L));
+  else if (end === 'extrapolated') points.push(extrapolated(lapEndIdx, lapEndIdx - 1, L));
 
   return {
     points,
-    indexShift: (startK >= 0 ? 1 : 0) + lapStartIdx - first,
-    startCut: startK >= 0,
-    endCut: endK >= 0,
+    indexShift: (start === 'none' ? 0 : 1) + lapStartIdx - first,
+    start,
+    end,
   };
 }
