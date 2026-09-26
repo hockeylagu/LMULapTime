@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import React from 'react';
 import { formatTime, matchesSessionType, getSessionTypeSortRank, compareSessions, isSessionEmpty } from '../../utils/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../utils/paceCategory.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types';
@@ -9,7 +8,7 @@ import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
-import { updateSearchParams } from '../../utils/urlParams.js';
+import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 
 export type { TrackDetailSortOption };
 
@@ -32,25 +31,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   setSelectedCarClass,
   progression = [],
 }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [sessionViewMode, setSessionViewMode] = useState<'grid' | 'table'>(() => {
-    const queryView = searchParams.get('view');
-    if (queryView === 'grid' || queryView === 'table') return queryView;
-    if (typeof window !== 'undefined') {
-      const savedView = localStorage.getItem('lmu_dashboard_view');
-      if (savedView === 'grid' || savedView === 'table') return savedView;
-    }
-    return 'grid';
-  });
-  const setSessionListViewMode = (mode: 'grid' | 'table') => {
-    setSessionViewMode(mode);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('lmu_dashboard_view', mode);
-      } catch {}
-    }
-    updateSearchParams(searchParams, setSearchParams, { view: mode });
-  };
+  const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
   const {
     loading,
     data,

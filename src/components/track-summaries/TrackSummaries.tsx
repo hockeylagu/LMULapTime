@@ -92,6 +92,13 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     const list = Array.from(allVenues).map(venue => {
       const venueSessions = sessionsByVenue.get(venue) || [];
       const fallback = tracksMap[venue];
+      if (selectedCarClass === 'All' && fallback) {
+        const lastSessionTimestamp = venueSessions.reduce(
+          (latest, session) => Math.max(latest, parseDateStringToTimestamp(session.timeString)),
+          0
+        );
+        return { ...fallback, lastSessionTimestamp };
+      }
 
       let bestLapTime: number | null = null;
       let bestLapDriver = '';
@@ -125,22 +132,19 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         }
       });
 
-      const hasVenueSessions = venueSessions.length > 0;
-      const useFallback = !hasVenueSessions && selectedCarClass === 'All' && fallback;
-
       return {
         trackVenue: venue,
         sessionsCount: venueSessions.length,
-        totalLaps: hasVenueSessions ? totalLaps : (useFallback ? fallback.totalLaps : 0),
-        bestLapTime: bestLapTime ?? (useFallback ? fallback.bestLapTime : null),
-        bestLapDriver: bestLapDriver || (useFallback ? fallback.bestLapDriver : ''),
-        bestLapCar: bestLapCar || (useFallback ? fallback.bestLapCar : ''),
+        totalLaps,
+        bestLapTime,
+        bestLapDriver,
+        bestLapCar,
         bestLapClass: bestLapClass || '',
-        bestS1: bestS1 ?? (useFallback ? fallback.bestS1 : null),
-        bestS2: bestS2 ?? (useFallback ? fallback.bestS2 : null),
-        bestS3: bestS3 ?? (useFallback ? fallback.bestS3 : null),
-        theoreticalBest: computeTheoreticalBest(bestS1, bestS2, bestS3) ?? (useFallback ? fallback.theoreticalBest : null),
-        carsUsed: carsUsedSet.size > 0 ? Array.from(carsUsedSet) : (useFallback ? fallback.carsUsed : []),
+        bestS1,
+        bestS2,
+        bestS3,
+        theoreticalBest: computeTheoreticalBest(bestS1, bestS2, bestS3),
+        carsUsed: Array.from(carsUsedSet),
         lastSessionTimestamp,
       };
     });

@@ -97,6 +97,99 @@ describe('TrackSummaries component', () => {
     fireEvent.change(sortSelect, { target: { value: 'last-session-desc' } });
   });
 
+  it('uses server aggregates for all classes and computes class-filtered summaries from sessions', async () => {
+    const sessions = [
+      {
+        id: 'spa-lmh',
+        filename: 'spa-lmh.xml',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        timeString: '2026/05/28 14:00',
+        sessionType: 'Practice' as const,
+        sessionName: 'P1',
+        driversCount: 1,
+        playerDriver: {
+          name: 'LMH Driver', carType: 'Ferrari 499P', carClass: 'LMH',
+          bestLapTime: 130, bestLapTimeString: '2:10.000',
+          bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 8,
+        },
+      },
+      {
+        id: 'spa-gt3',
+        filename: 'spa-gt3.xml',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        timeString: '2026/05/29 14:00',
+        sessionType: 'Practice' as const,
+        sessionName: 'P2',
+        driversCount: 1,
+        playerDriver: {
+          name: 'GT3 Driver', carType: 'Porsche 911 GT3', carClass: 'LMGT3',
+          bestLapTime: 140, bestLapTimeString: '2:20.000',
+          bestS1: 43, bestS2: 48, bestS3: 49, lapsCount: 4,
+        },
+      },
+    ];
+    const onSelectTrack = vi.fn();
+    const { rerender } = render(
+      <TrackSummaries
+        sessions={sessions}
+        tracksMap={mockTrackSummaries}
+        onSelectTrack={onSelectTrack}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('3 Sessions • 15 Total Laps')).toBeInTheDocument();
+    expect(screen.getAllByText('2:02.000')).toHaveLength(2);
+
+    rerender(
+      <TrackSummaries
+        sessions={sessions}
+        tracksMap={mockTrackSummaries}
+        onSelectTrack={onSelectTrack}
+        selectedCarClass="LMGT3"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('1 Sessions • 4 Total Laps')).toBeInTheDocument();
+    expect(screen.getAllByText('2:20.000')).toHaveLength(2);
+  });
+
+  it('keeps distinct layouts at the same venue in separate summaries', async () => {
+    const sessions = ['Layout A', 'Layout B'].map((trackCourse, index) => ({
+      id: `layout-${index}`,
+      filename: `layout-${index}.xml`,
+      trackVenue: 'Test Circuit',
+      trackCourse,
+      timeString: `2026/05/2${8 + index} 14:00`,
+      sessionType: 'Practice' as const,
+      sessionName: `P${index + 1}`,
+      driversCount: 1,
+      playerDriver: {
+        name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH',
+        bestLapTime: 130 + index, bestLapTimeString: '2:10.000',
+        bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 1,
+      },
+    }));
+
+    render(
+      <TrackSummaries
+        sessions={sessions}
+        tracksMap={{}}
+        onSelectTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByRole('heading', { level: 2, name: /2 Tracks/i })).toBeInTheDocument();
+    expect(screen.getByText('Test Circuit (Layout A)')).toBeInTheDocument();
+    expect(screen.getByText('Test Circuit (Layout B)')).toBeInTheDocument();
+  });
+
   it('handles empty track summaries list', async () => {
     render(
       <TrackSummaries

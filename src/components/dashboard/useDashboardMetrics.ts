@@ -4,7 +4,7 @@ import { matchesSessionCarClass, matchesTrack, getPaceCategoryFromPercentage } f
 import { DetailedSession } from '../../../server/core/types';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
-import { SessionSummary } from './Dashboard.js';
+import { SessionSummary } from './dashboardTypes.js';
 
 export type DashboardSessionItem = SessionSummary | DetailedSession;
 

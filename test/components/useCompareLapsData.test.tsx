@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router';
 import { useCompareLapsData } from '../../src/components/compare-laps/useCompareLapsData.js';
 
 const laps = [
@@ -19,8 +19,18 @@ const laps = [
   },
 ];
 
+let navigateTo: (to: string) => void = () => {};
+
+const NavigationBridge: React.FC = () => {
+  navigateTo = useNavigate();
+  return null;
+};
+
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <MemoryRouter initialEntries={['/compare']}>{children}</MemoryRouter>
+  <MemoryRouter initialEntries={['/compare']}>
+    <NavigationBridge />
+    {children}
+  </MemoryRouter>
 );
 
 describe('useCompareLapsData selection fallbacks', () => {
@@ -58,5 +68,36 @@ describe('useCompareLapsData selection fallbacks', () => {
     });
     expect(result.current.chartData).toHaveLength(4);
     expect(result.current.bestComparedS1).toBe(28);
+  });
+
+  it('updates comparison scope when the route query changes externally', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve({
+        laps,
+        allTimeBestLap: null,
+        playerBestLap: null,
+        overallTrackBestLap: laps[2],
+        bestS1: 28,
+        bestS2: 33,
+        bestS3: 37,
+        theoreticalBestSec: 98,
+        benchmarks: [],
+      }),
+    });
+
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => navigateTo('/compare?track=Monza&carClass=LMP2&playerOnly=false&hideEmpty=false'));
+
+    await waitFor(() => {
+      expect(result.current.selectedTrack).toBe('Monza');
+      expect(result.current.selectedCarClass).toBe('LMP2');
+      expect(result.current.playerOnly).toBe(false);
+      expect(result.current.hideEmpty).toBe(false);
+    });
   });
 });

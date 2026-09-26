@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useSearchParams } from 'react-router';
 import { useTrackDetailState } from '../../src/components/track-detail/useTrackDetailState';
 
 const mockNavigate = vi.fn();
@@ -13,8 +13,19 @@ vi.mock('react-router', async (importOriginal) => {
   };
 });
 
+let updateQuery: (params: URLSearchParams) => void = () => {};
+
+const NavigationBridge: React.FC = () => {
+  const [, setSearchParams] = useSearchParams();
+  updateQuery = (params) => setSearchParams(params);
+  return null;
+};
+
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <MemoryRouter initialEntries={['/track/Monza']}>{children}</MemoryRouter>
+  <MemoryRouter initialEntries={['/track/Monza']}>
+    <NavigationBridge />
+    {children}
+  </MemoryRouter>
 );
 
 describe('useTrackDetailState', () => {
@@ -72,19 +83,16 @@ describe('useTrackDetailState', () => {
     );
 
     // Test setters
-    act(() => {
-      result.current.setSearchQuery('Ferrari');
-      result.current.setFilterType('Race');
-      result.current.setSortBy('pos-asc');
-      result.current.setHideEmpty(false);
-      result.current.setSelectedCarModel('Ferrari 499P');
-    });
-
-    expect(result.current.searchQuery).toBe('Ferrari');
-    expect(result.current.filterType).toBe('Race');
-    expect(result.current.sortBy).toBe('pos-asc');
-    expect(result.current.hideEmpty).toBe(false);
-    expect(result.current.selectedCarModel).toBe('Ferrari 499P');
+    act(() => result.current.setSearchQuery('Ferrari'));
+    await waitFor(() => expect(result.current.searchQuery).toBe('Ferrari'));
+    act(() => result.current.setFilterType('Race'));
+    await waitFor(() => expect(result.current.filterType).toBe('Race'));
+    act(() => result.current.setSortBy('pos-asc'));
+    await waitFor(() => expect(result.current.sortBy).toBe('pos-asc'));
+    act(() => result.current.setHideEmpty(false));
+    await waitFor(() => expect(result.current.hideEmpty).toBe(false));
+    act(() => result.current.setSelectedCarModel('Ferrari 499P'));
+    await waitFor(() => expect(result.current.selectedCarModel).toBe('Ferrari 499P'));
 
     // Changing selectedCarClass resets selectedCarModel to 'All'
     rerender({ carClass: 'LMGT3' });
@@ -94,9 +102,11 @@ describe('useTrackDetailState', () => {
     act(() => {
       result.current.handleOpenReplay('sess-1');
     });
-    expect(mockNavigate).toHaveBeenCalledWith(
-      expect.stringContaining('/telemetry?replayName=Monza_2026.Vcr&lap=1')
-    );
+    const replayUrl = new URL(mockNavigate.mock.calls[0][0], 'http://localhost');
+    expect(replayUrl.pathname).toBe('/telemetry');
+    expect(replayUrl.searchParams.get('replayName')).toBe('Monza_2026.Vcr');
+    expect(replayUrl.searchParams.get('lap')).toBe('1');
+    expect(replayUrl.searchParams.get('q')).toBe('Ferrari');
 
     // Opening session without replay does nothing
     mockNavigate.mockClear();
@@ -122,5 +132,28 @@ describe('useTrackDetailState', () => {
 
     expect(result.current.data).toBeNull();
     consoleErrorSpy.mockRestore();
+  });
+
+  it('synchronizes filter state when the route query changes externally', async () => {
+    vi.spyOn(global, 'fetch').mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockTrackData),
+      } as Response)
+    );
+
+    const { result } = renderHook(() => useTrackDetailState('Monza', 'Hypercar'), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => updateQuery(new URLSearchParams('type=Race&q=Ferrari&sort=pos-asc&hideEmpty=false&hasReplay=true&model=Ferrari%20499P')));
+
+    await waitFor(() => {
+      expect(result.current.filterType).toBe('Race');
+      expect(result.current.searchQuery).toBe('Ferrari');
+      expect(result.current.sortBy).toBe('pos-asc');
+      expect(result.current.hideEmpty).toBe(false);
+      expect(result.current.hasReplay).toBe(true);
+      expect(result.current.selectedCarModel).toBe('Ferrari 499P');
+    });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { SessionList } from '../session-list/SessionList.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
@@ -11,6 +11,7 @@ import { DashboardHero } from './DashboardHero.js';
 import { DashboardFilterBar, DashboardSortOption } from './DashboardFilterBar.js';
 import { useDashboardMetrics } from './useDashboardMetrics.js';
 import { SessionSummary } from './dashboardTypes.js';
+import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 
 export type { DashboardSortOption, SessionSummary };
 
@@ -42,24 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [sessionViewMode, setSessionViewMode] = useState<'grid' | 'table'>(() => {
-    const queryView = searchParams.get('view');
-    if (queryView === 'grid' || queryView === 'table') return queryView;
-    if (typeof window !== 'undefined') {
-      const savedView = localStorage.getItem('lmu_dashboard_view');
-      if (savedView === 'grid' || savedView === 'table') return savedView;
-    }
-    return 'grid';
-  });
-  const setSessionListViewMode = (mode: 'grid' | 'table') => {
-    setSessionViewMode(mode);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('lmu_dashboard_view', mode);
-      } catch {}
-    }
-    updateSearchParams(searchParams, setSearchParams, { view: mode });
-  };
+  const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
   const handleOpenReplay = (id: string) => {
     const session = sessions.find(item => item.id === id);
     if (!session?.matchingReplayFile) return;
@@ -68,36 +52,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     replayParams.set('lap', '1');
     navigate(`/telemetry?${replayParams.toString()}`);
   };
-  const [selectedTrack, setSelectedTrackState] = useState<string>(
-    () => searchParams.get('track') || initialSelectedTrack
-  );
-  const [filterType, setFilterTypeState] = useState<string>(
-    () => searchParams.get('type') || initialFilterType
-  );
-  const [searchQuery, setSearchQueryState] = useState<string>(
-    () => searchParams.get('q') || initialSearchQuery
-  );
-
-  useEffect(() => {
-    setSelectedTrackState(searchParams.get('track') || initialSelectedTrack);
-    setFilterTypeState(searchParams.get('type') || initialFilterType);
-    setSearchQueryState(searchParams.get('q') || initialSearchQuery);
-  }, [initialFilterType, initialSearchQuery, initialSelectedTrack, searchParams]);
+  const selectedTrack = searchParams.get('track') || initialSelectedTrack;
+  const filterType = searchParams.get('type') || initialFilterType;
+  const searchQuery = searchParams.get('q') || initialSearchQuery;
 
   const setSelectedTrack = (track: string) => {
-    setSelectedTrackState(track);
     legacySetSelectedTrack?.(track);
     updateSearchParams(searchParams, setSearchParams, { track });
   };
 
   const setFilterType = (type: string) => {
-    setFilterTypeState(type);
     legacySetFilterType?.(type);
     updateSearchParams(searchParams, setSearchParams, { type });
   };
 
   const setSearchQuery = (query: string) => {
-    setSearchQueryState(query);
     legacySetSearchQuery?.(query);
     updateSearchParams(searchParams, setSearchParams, { q: query });
   };
@@ -112,24 +81,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const [hideEmpty, setHideEmptyState] = useState<boolean>(searchParams.get('hideEmpty') !== 'false');
-  const [hasReplay, setHasReplayState] = useState<boolean>(searchParams.get('hasReplay') === 'true');
-  const [sortBy, setSortByState] = useState<DashboardSortOption>(
-    (searchParams.get('sort') as DashboardSortOption) || 'date-desc'
-  );
+  const hideEmpty = searchParams.get('hideEmpty') !== 'false';
+  const hasReplay = searchParams.get('hasReplay') === 'true';
+  const sortBy = (searchParams.get('sort') as DashboardSortOption) || 'date-desc';
 
   const setSortBy = (sort: DashboardSortOption) => {
-    setSortByState(sort);
     updateSearchParams(searchParams, setSearchParams, { sort });
   };
 
   const setHideEmpty = (hide: boolean) => {
-    setHideEmptyState(hide);
     updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
   };
 
   const setHasReplay = (replayOnly: boolean) => {
-    setHasReplayState(replayOnly);
     updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null });
   };
 

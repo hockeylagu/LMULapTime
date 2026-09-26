@@ -27,6 +27,15 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   );
   const [data, setData] = useState<TrackDetailData | null>(null);
 
+  useEffect(() => {
+    setHideEmptyState(searchParams.get('hideEmpty') !== 'false');
+    setHasReplayState(searchParams.get('hasReplay') === 'true');
+    setSelectedCarModelState(searchParams.get('model') || 'All');
+    setFilterTypeState(searchParams.get('type') || 'All');
+    setSearchQueryState(searchParams.get('q') || '');
+    setSortByState((searchParams.get('sort') as TrackDetailSortOption) || 'date-desc');
+  }, [searchParams]);
+
   const handleOpenReplay = (sessionId: string) => {
     const session = data?.sessions.find((item) => item.id === sessionId);
     if (!session?.matchingReplayFile) return;
