@@ -17,13 +17,14 @@ import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
+import { GpsSceneCarMarkers } from './GpsSceneCarMarkers.js';
 import { useGpsMapPanZoom } from './useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from './GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
 import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
-import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { MAP_COLORS } from '../../../utils/themeColors.js';
 
 import type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
@@ -190,95 +191,70 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         />
       )}
 
-      <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md">
-        <defs>
-          <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor={TELEMETRY_COLORS.primary} floodOpacity="0.9" />
-          </filter>
-          <filter id="ghostGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={TELEMETRY_COLORS.baseline} floodOpacity="0.9" />
-          </filter>
-        </defs>
+      <div className="relative w-full h-full">
+        {/* Static scene on its own layer: the minimap and car markers above it move every frame. */}
+        <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md will-change-transform">
+          {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
+            <GpsTrackRoadRibbon
+              leftSvgPoints={leftSvgPoints}
+              rightSvgPoints={rightSvgPoints}
+              centerlineSvgPoints={centerlineSvgPoints}
+            />
+          ) : (
+            <>
+              <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            </>
+          )}
 
-        {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
-          <GpsTrackRoadRibbon
-            leftSvgPoints={leftSvgPoints}
-            rightSvgPoints={rightSvgPoints}
-            centerlineSvgPoints={centerlineSvgPoints}
+          <GpsTrackSegments
+            svgPoints={svgPoints}
+            baselineSvgPoints={baselineSvgPoints}
+            colorBy={colorBy}
+            deltaByIdx={deltaByIdx}
+            baselineDeltaByIdx={baselineDeltaByIdx}
+            primaryOpacity={primaryOpacity}
+            baselineOpacity={baselineOpacity}
+            onSelectIndex={onSelectIndex}
+            highlightDistRange={highlightDistRange}
+            primaryDists={primaryDists}
+            baselineDists={baselineDists}
+            dimNonSelectedTrack={dimNonSelectedTrack}
           />
-        ) : (
-          <>
-            <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
 
-        <GpsTrackSegments
-          svgPoints={svgPoints}
-          baselineSvgPoints={baselineSvgPoints}
-          colorBy={colorBy}
-          deltaByIdx={deltaByIdx}
-          baselineDeltaByIdx={baselineDeltaByIdx}
+          <GpsStartFinishLine
+            svgPoints={svgPoints}
+            zoomLevel={zoomLevel}
+            markerScale={markerScale}
+            cornerMarkers={cornerMarkers}
+            pedalMarkers={pedalMarkerPoints}
+            gateLeftSvg={gateLeftSvg}
+            gateRightSvg={gateRightSvg}
+          />
+
+          <GpsSceneMarkers
+            cornerMarkers={cornerMarkers}
+            pedalMarkers={pedalMarkerPoints}
+            selectedCornerNumber={selectedCornerNumber}
+            onSelectCornerNumber={onSelectCornerNumber}
+            onSelectIndex={onSelectIndex}
+            markerScale={markerScale}
+            zoomLevel={zoomLevel}
+            primaryOpacity={primaryOpacity}
+            baselineOpacity={baselineOpacity}
+            dimNonSelectedTrack={dimNonSelectedTrack}
+            showCornerFlags={showCornerFlags}
+          />
+        </svg>
+        <GpsSceneCarMarkers
+          viewBox={currentViewBox}
+          currentPos={currentPos}
+          baselineGhostPos={baselineGhostPos}
+          markerScale={markerScale}
           primaryOpacity={primaryOpacity}
           baselineOpacity={baselineOpacity}
-          onSelectIndex={onSelectIndex}
-          highlightDistRange={highlightDistRange}
-          primaryDists={primaryDists}
-          baselineDists={baselineDists}
-          dimNonSelectedTrack={dimNonSelectedTrack}
         />
-
-        <GpsStartFinishLine
-          svgPoints={svgPoints}
-          zoomLevel={zoomLevel}
-          markerScale={markerScale}
-          cornerMarkers={cornerMarkers}
-          pedalMarkers={pedalMarkerPoints}
-          gateLeftSvg={gateLeftSvg}
-          gateRightSvg={gateRightSvg}
-        />
-
-        <GpsSceneMarkers
-          cornerMarkers={cornerMarkers}
-          pedalMarkers={pedalMarkerPoints}
-          selectedCornerNumber={selectedCornerNumber}
-          onSelectCornerNumber={onSelectCornerNumber}
-          onSelectIndex={onSelectIndex}
-          markerScale={markerScale}
-          zoomLevel={zoomLevel}
-          primaryOpacity={primaryOpacity}
-          baselineOpacity={baselineOpacity}
-          dimNonSelectedTrack={dimNonSelectedTrack}
-          showCornerFlags={showCornerFlags}
-        />
-
-        {currentPos && baselineGhostPos && (
-          <line
-            x1={currentPos.sx}
-            y1={currentPos.sy}
-            x2={baselineGhostPos.sx}
-            y2={baselineGhostPos.sy}
-            stroke={TELEMETRY_COLORS.baseline}
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-            opacity={0.75 * baselineOpacity}
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
-        {baselineGhostPos && (
-          <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)}) scale(${markerScale})`} opacity={baselineOpacity}>
-            <circle r="11" fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
-            <circle r="6" fill={TELEMETRY_COLORS.baseline} stroke={CHART_COLORS.white} strokeWidth="2" filter="url(#ghostGlow)" />
-          </g>
-        )}
-
-        {currentPos && (
-          <g transform={`translate(${currentPos.sx}, ${currentPos.sy}) scale(${markerScale})`} opacity={primaryOpacity}>
-            <circle r="12" fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" className="animate-ping opacity-50" />
-            <circle r="6.5" fill={TELEMETRY_COLORS.primary} stroke={CHART_COLORS.white} strokeWidth="2.2" filter="url(#carGlow)" />
-          </g>
-        )}
-      </svg>
+      </div>
 
       <GpsSceneHudOverlay isStationary={isStationary} />
 
