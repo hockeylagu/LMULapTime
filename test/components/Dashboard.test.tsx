@@ -196,6 +196,23 @@ describe('Dashboard component', () => {
     expect(setFilterType).toHaveBeenCalledWith('Qualifying');
   });
 
+  it('applies URL-backed session filters and view mode on mount', () => {
+    window.location.hash = '#/?track=Monza&type=Qualifying&q=Porsche&sort=date-asc&view=table';
+
+    render(
+      <Dashboard
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Porsche 911 GT3')).toBeInTheDocument();
+    expect(within(table).queryByText('Ferrari 499P')).not.toBeInTheDocument();
+  });
+
   it('handles sort dropdown changes (date-asc, pace-asc, pace-desc)', () => {
     render(
       <Dashboard

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { SessionList, SessionListItem } from '../../src/components/session-list/index.js';
 
 describe('SessionList component', () => {
@@ -145,6 +145,49 @@ describe('SessionList component', () => {
       fireEvent.click(row);
       expect(onSelectSession).toHaveBeenCalledWith('sess-2');
     }
+  });
+
+  it('prefers the query view over the saved view', () => {
+    localStorage.setItem('lmu_dashboard_view', 'grid');
+    window.location.hash = '#/?view=table';
+
+    render(<SessionList sessions={mockSessions} onSelectSession={vi.fn()} />);
+
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('uses and persists the saved view when the query has no view', async () => {
+    localStorage.setItem('lmu_dashboard_view', 'table');
+
+    render(<SessionList sessions={mockSessions} onSelectSession={vi.fn()} />);
+    expect(screen.getByRole('table')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Cards view/i }));
+
+    await waitFor(() => expect(window.location.hash).not.toContain('view='));
+    expect(localStorage.getItem('lmu_dashboard_view')).toBe('grid');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('delegates view changes when controlled without writing its own preference', () => {
+    const onViewModeChange = vi.fn();
+    localStorage.setItem('lmu_dashboard_view', 'grid');
+    window.location.hash = '#/?view=table';
+
+    render(
+      <SessionList
+        sessions={mockSessions}
+        onSelectSession={vi.fn()}
+        viewMode="grid"
+        onViewModeChange={onViewModeChange}
+      />
+    );
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Table view/i }));
+
+    expect(onViewModeChange).toHaveBeenCalledWith('table');
+    expect(localStorage.getItem('lmu_dashboard_view')).toBe('grid');
   });
 
   it('hides track column when showTrackColumn is false', () => {

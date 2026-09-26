@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { updateSearchParams } from '../../utils/urlParams.js';
+import React from 'react';
 import { PaceCategory } from '../../../server/core/types';
 import { SessionListHeader } from './SessionListHeader.js';
 import { SessionEmptyState } from './SessionEmptyState.js';
 import { SessionGridView } from './SessionGridView.js';
 import { SessionTableView } from './SessionTableView.js';
+import { useSessionViewMode } from './useSessionViewMode.js';
 
 export interface SessionListItem {
   id: string;
@@ -75,35 +74,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   hideHeader = false,
   className = '',
 }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [internalViewMode, setInternalViewMode] = useState<'grid' | 'table'>(() => {
-    const paramView = searchParams.get('view');
-    if (paramView === 'table' || paramView === 'grid') return paramView;
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lmu_dashboard_view');
-      if (saved === 'table' || saved === 'grid') return saved;
-    }
-    return 'grid';
-  });
-
-  const paramView = searchParams.get('view');
-  const viewMode = controlledViewMode ?? (
-    paramView === 'table' || paramView === 'grid' ? paramView : internalViewMode
-  );
-
-  const handleSetViewMode = (mode: 'grid' | 'table') => {
-    if (onViewModeChange) {
-      onViewModeChange(mode);
-    } else {
-      setInternalViewMode(mode);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('lmu_dashboard_view', mode);
-        } catch {}
-      }
-      updateSearchParams(searchParams, setSearchParams, { view: mode });
-    }
-  };
+  const { viewMode, setViewMode: handleSetViewMode } = useSessionViewMode(controlledViewMode, onViewModeChange);
 
   const resolvePaceBadge = (s: SessionListItem) => {
     if (getPaceBadge) {

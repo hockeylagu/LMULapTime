@@ -215,9 +215,9 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Responsive & clean: Provide clear empty states, error fallbacks, and skeleton/loading indicators for async operations.
 
 ### Hash-Based Navigation
-- The client uses hash routing without full page reloads to ensure seamless local file and web server compatibility:
-  - Read/write routes using `src/utils/urlParams.ts` (`getHashRouteAndParams`, `updateHashParams`, `setHashRoute`).
-  - Do not introduce conflicting browser history pushState patterns that break hash route persistence.
+- The client uses React Router's `HashRouter` in `src/main.tsx` and route components in `src/App.tsx`.
+- Read and update query parameters with React Router's `useSearchParams`; use `updateSearchParams` from `src/utils/urlParams.ts` when applying partial query updates so unrelated parameters are preserved.
+- Do not add a competing hash parser or direct history manipulation that bypasses React Router.
 
 ---
 
