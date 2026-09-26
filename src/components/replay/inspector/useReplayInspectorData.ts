@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
-import { mapVehicleIdToClass } from '../../../../shared/domain/vehicleMapping.js';
+import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
@@ -156,7 +156,9 @@ export function useReplayInspectorData({
     }
     setIsCompareLapsLoading(true);
     const activeDriver = metadata?.drivers?.find(d => d.slot === selectedDriverSlot) || metadata?.drivers?.find(d => d.isPlayer) || metadata?.drivers?.[0];
-    const carClass = metadata?.carClass || activeDriver?.carClass || (activeDriver ? mapVehicleIdToClass(activeDriver.vehicleId, activeDriver.carModel) : undefined);
+    // Laps are only compared within one car class: the INSPECTED driver's, which in a multiclass
+    // replay may differ from the replay's own (player's) class in metadata.carClass.
+    const carClass = resolveDriverCarClass(activeDriver) || metadata?.carClass;
     const needsAllDrivers = compareLapFilter === 'all' || compareLapFilter === 'same-sessions';
     const query = new URLSearchParams({
       track: trackToQuery,
@@ -412,12 +414,28 @@ export function useReplayInspectorData({
   const currentPoint = trajectory?.points[currentIndex];
   const currentLapSummary = trajectory?.laps?.find(l => l.lapNumber === trajectory.currentLap) || trajectory?.laps?.[0];
 
+  // Laps are only ever compared within one car class. However the baseline was chosen (URL,
+  // lap picker, swap) or the inspected driver changed afterwards, a baseline of another class
+  // is withheld and reported instead of being compared.
+  const inspectedCarClass = resolveDriverCarClass(selectedDriver ?? playerDriver);
+  const baselineCarClass = useMemo(() => {
+    if (!baselineReplayName) return '';
+    const meta = baselineReplayName === activeReplayName ? metadata : baselineMetadata;
+    const name = (baselineDriverName || baselineTrajectory?.driverName || '').toLowerCase();
+    return resolveDriverCarClass(meta?.drivers?.find(d => (name ? d.name.toLowerCase() === name : d.isPlayer)));
+  }, [baselineReplayName, activeReplayName, metadata, baselineMetadata, baselineDriverName, baselineTrajectory?.driverName]);
+  const isBaselineClassMismatch = Boolean(baselineTrajectory) && !areComparableCarClasses(inspectedCarClass, baselineCarClass);
+  const comparableBaselineTrajectory = isBaselineClassMismatch ? null : baselineTrajectory;
+  const comparableBaselineError = isBaselineClassMismatch
+    ? `Comparison lap is ${baselineCarClass}, not ${inspectedCarClass}: laps are only compared within the same car class`
+    : baselineError;
+
   const baselineLapSummary = useMemo(() => {
-    if (!baselineTrajectory) return null;
-    const laps = baselineTrajectory.laps || baselineMetadata?.laps || [];
-    const cur = baselineTrajectory.currentLap ?? baselineLapNumber ?? 1;
+    if (!comparableBaselineTrajectory) return null;
+    const laps = comparableBaselineTrajectory.laps || baselineMetadata?.laps || [];
+    const cur = comparableBaselineTrajectory.currentLap ?? baselineLapNumber ?? 1;
     return laps.find(l => l.lapNumber === cur) || laps[0] || null;
-  }, [baselineTrajectory, baselineMetadata, baselineLapNumber]);
+  }, [comparableBaselineTrajectory, baselineMetadata, baselineLapNumber]);
 
   const lapDeltas = useMemo(() => {
     if (!currentLapSummary || !baselineLapSummary) return null;
@@ -435,9 +453,9 @@ export function useReplayInspectorData({
     isLoading, isTrajLoading, error, isCompareMode, handleToggleCompare,
     handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineReplayName, setBaselineReplayName,
     baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
-    baselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
+    baselineTrajectory: comparableBaselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
     isCompareLapsLoading, setCompareLapFilter, handleSelectCompareLap,
-    isBaselineLoading, baselineError, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
+    isBaselineLoading, baselineError: comparableBaselineError, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
     playbackSpeed, setPlaybackSpeed, chartZoomRange, setChartZoomRange,
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
     maxSpeed, currentPoint, currentLapSummary, lapDeltas, activeReplayName,
