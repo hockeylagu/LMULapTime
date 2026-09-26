@@ -1,5 +1,4 @@
-import { ReplayTrajectoryPoint, ReplaySummary } from '../../shared/types/index.js';
-import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
   MAX_START_FINISH_CORRECTION_M,
   canAlignByStation,
@@ -467,41 +466,6 @@ export function computeLapComparisons(
       baselineLateralOffsetM,
       deltaLateralOffsetM,
     };
-  });
-}
-
-/**
- * Filters replays sharing the same track and vehicle class for cross-session lap comparisons.
- */
-export function filterCompatibleReplays(
-  allReplays: ReplaySummary[],
-  currentTrackName?: string,
-  currentCarClass?: string,
-  excludeReplayName?: string
-): ReplaySummary[] {
-  if (!allReplays || allReplays.length === 0 || !currentTrackName) {
-    return [];
-  }
-
-  return allReplays.filter(r => {
-    if (excludeReplayName && r.name === excludeReplayName) return false;
-    if (!r.trackName) return false;
-
-    // Track matching rule
-    if (!matchesTrack(r.trackName, currentTrackName, '')) return false;
-
-    // Vehicle class rule (if vehicle class specified)
-    if (currentCarClass && currentCarClass !== 'All') {
-      const isClassMatch =
-        (r.carClass || r.carModel)
-          ? matchesCarClass(r.carClass || '', r.carModel || '', currentCarClass)
-          : matchesCarClass(r.eventTitle || '', '', currentCarClass);
-      if (!isClassMatch) {
-        return false;
-      }
-    }
-
-    return true;
   });
 }
 

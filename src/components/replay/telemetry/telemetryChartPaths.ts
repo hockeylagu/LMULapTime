@@ -1,6 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
-import { getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
@@ -134,7 +133,8 @@ export function computeTelemetryChartPaths(
   pointComparisons: PointComparison[],
   viewStart: number,
   viewEnd: number,
-  distances?: number[]
+  // The strip's x-axis distances (same frame as the cursor and sector lines), one per point.
+  distances: number[]
 ): TelemetryChartPathsResult {
   if (points.length === 0) {
     const emptyCorner: CornerPaths = { fl: '', fr: '', rl: '', rr: '' };
@@ -284,9 +284,7 @@ export function computeTelemetryChartPaths(
   const maxRegen = Math.ceil(rawMaxRegen / 50) * 50;
   const hasRegenRate = points.some(p => p.regenRate !== undefined);
 
-  const cumDists = distances && distances.length === points.length
-    ? distances
-    : getTrajectoryDistances(points);
+  const cumDists = distances;
   const distStart = cumDists[viewStart] ?? 0;
   const distEnd = cumDists[viewEnd] ?? distStart;
   const distSpan = Math.max(1e-6, distEnd - distStart);
