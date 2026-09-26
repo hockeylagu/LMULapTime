@@ -44,6 +44,7 @@ export function useReplayInspectorData({
   const [baselineTrajectory, setBaselineTrajectory] = useState<ReplayTrajectoryData | null>(null);
   const [baselineMetadata, setBaselineMetadata] = useState<ReplayMetadata | null>(null);
   const [isBaselineLoading, setIsBaselineLoading] = useState<boolean>(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
   const [availableCompareLaps, setAvailableCompareLaps] = useState<ComparableLap[]>([]);
   const [compareLapFilter, setCompareLapFilter] = useState<CompareLapFilter>('player');
   const [isCompareLapsLoading, setIsCompareLapsLoading] = useState(false);
@@ -248,10 +249,11 @@ export function useReplayInspectorData({
   // Load baseline trajectory
   useEffect(() => {
     if (!isCompareMode || !baselineReplayName) {
-      setBaselineTrajectory(null); setBaselineMetadata(null); return;
+      setBaselineTrajectory(null); setBaselineMetadata(null); setBaselineError(null); return;
     }
     let isMounted = true;
     setIsBaselineLoading(true);
+    setBaselineError(null);
     const targetReplay = baselineReplayName;
     const targetLap = baselineLapNumber ?? 1;
     const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
@@ -261,7 +263,12 @@ export function useReplayInspectorData({
       : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
     const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?maxPoints=${telemetryResolution}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
-      .then(r => (r.ok ? r.json() : null));
+      .then(async r => {
+        if (r.ok) return r.json();
+        const body: unknown = await r.json().catch(() => null);
+        const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : null;
+        throw new Error(message || `Failed to load comparison lap (HTTP ${r.status})`);
+      });
 
     Promise.all([fetchMeta, fetchTraj])
       .then(([meta, rawTraj]: [ReplayMetadata | null, ReplayTrajectoryData | null]) => {
@@ -274,8 +281,11 @@ export function useReplayInspectorData({
           setBaselineLapNumber(traj.currentLap);
         }
       })
-      .catch(() => {
-        if (isMounted) setIsBaselineLoading(false);
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setBaselineTrajectory(null);
+        setBaselineError(err instanceof Error ? err.message : 'Failed to load comparison lap');
+        setIsBaselineLoading(false);
       });
 
     return () => { isMounted = false; };
@@ -427,7 +437,7 @@ export function useReplayInspectorData({
     baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
     baselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
     isCompareLapsLoading, setCompareLapFilter, handleSelectCompareLap,
-    isBaselineLoading, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
+    isBaselineLoading, baselineError, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
     playbackSpeed, setPlaybackSpeed, chartZoomRange, setChartZoomRange,
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
     maxSpeed, currentPoint, currentLapSummary, lapDeltas, activeReplayName,

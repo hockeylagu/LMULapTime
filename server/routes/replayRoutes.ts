@@ -5,6 +5,7 @@ import { ServerContext } from '../core/serverContext.js';
 import { buildReplayListSummaries, composeReplayMetadata } from '../replay/replayMetadataService.js';
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
+import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 
 function isSafeFileName(value: string): boolean {
   return value.length > 0 && value !== '.' && value !== '..' && path.basename(value) === value && !value.includes('\0');
@@ -170,6 +171,9 @@ export function createReplayRouter(context: ServerContext): Router {
 
       res.json(trajectory);
     } catch (error: unknown) {
+      if (error instanceof ReplayDriverNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
       console.error(`Failed to extract replay trajectory for ${req.params.name}:`, error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to extract replay trajectory' });
     }

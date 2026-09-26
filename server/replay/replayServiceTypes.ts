@@ -60,3 +60,11 @@ export interface ReplaySummarySourceData {
   }>;
   getMetadata: (filePath: string, filename: string) => import('../core/types.js').ReplayMetadata | null;
 }
+
+/** Thrown when a trajectory is requested for a named driver who is not in the replay. */
+export class ReplayDriverNotFoundError extends Error {
+  public constructor(driverName: string, replayName: string) {
+    super(`Driver "${driverName}" is not in replay "${replayName}"`);
+    this.name = 'ReplayDriverNotFoundError';
+  }
+}

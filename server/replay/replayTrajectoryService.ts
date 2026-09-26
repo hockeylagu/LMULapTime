@@ -3,7 +3,7 @@ import path from 'path';
 import { DetailedSession, DriverData, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 import { ReplayCacheService } from './replayCacheService.js';
 import { ReplayTelemetryService } from './replayTelemetryService.js';
-import { ReplayTrajectoryRequest } from './replayServiceTypes.js';
+import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServiceTypes.js';
 import { composeReplayMetadata } from './replayMetadataService.js';
 import {
   applyPureOfficialLapValidation,
@@ -29,6 +29,13 @@ export class ReplayTrajectoryService {
 
     if (driverSlot === undefined && driverName) {
       driverSlot = this.replayCache.resolveDriverSlot(filePath, request.replayName, driverName, configuredPlayer);
+      // An explicitly named driver who is not in this replay must not silently fall back to the
+      // player's car: the caller would render someone else's lap under that driver's name.
+      const isOtherDriver = Boolean(request.driverName) &&
+        request.driverName?.toLowerCase() !== configuredPlayer.toLowerCase();
+      if (driverSlot === undefined && isOtherDriver && request.driverName) {
+        throw new ReplayDriverNotFoundError(request.driverName, request.replayName);
+      }
     }
 
     let matchedSession: DetailedSession | undefined;
@@ -56,7 +63,7 @@ export class ReplayTrajectoryService {
           }
         }
 
-        if (!matchedDriver) {
+        if (!matchedDriver && !request.driverName) {
           matchedDriver = matchedSession.playerDriver || matchedSession.drivers[0];
         }
       }

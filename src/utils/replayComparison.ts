@@ -267,232 +267,16 @@ export function getTrajectoryDistances(points: ReplayTrajectoryPoint[], trackLen
 }
 
 /**
- * Interpolates a telemetry point at a given distance along a trajectory.
+ * Blends two trajectory samples at fraction t (0 = p0, 1 = p1) into a display-ready point.
+ * Every interpolatePointAtDistance branch goes through here so all channels share one
+ * rounding/precision policy; blending a sample with itself (t = 0) yields that sample.
  */
-export function interpolatePointAtDistance(
-  points: ReplayTrajectoryPoint[],
-  cumDists: number[],
-  targetDist: number,
-  startTimeOverride?: number,
-  extrapolateBoundary = false
+function blendTelemetryPoints(
+  p0: ReplayTrajectoryPoint,
+  p1: ReplayTrajectoryPoint,
+  t: number,
+  startTime0: number
 ): InterpolatedPoint {
-  if (points.length === 0) {
-    return {
-      timeSec: 0,
-      speedKmh: 0,
-      throttle: 0,
-      brake: 0,
-      steerYaw: 0,
-      gear: 1,
-      x: 0,
-      y: 0,
-      z: 0,
-    };
-  }
-
-  const startTime0 = startTimeOverride !== undefined ? startTimeOverride : (points[0].timeSec || 0);
-
-  if (points.length === 1 || targetDist <= cumDists[0]) {
-    if (extrapolateBoundary && points.length >= 2 && cumDists[1] > cumDists[0]) {
-      const p0 = points[0];
-      const p1 = points[1];
-      const span = cumDists[1] - cumDists[0];
-      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
-      const t = (clampedDist - cumDists[0]) / span;
-      const spd = Math.max(0, (p0.speedKmh || 0) + t * ((p1.speedKmh || 0) - (p0.speedKmh || 0)));
-      const curLapTime0 = (p0.timeSec || 0) - startTime0;
-      const curLapTime1 = (p1.timeSec || 0) - startTime0;
-      const relativeTime = curLapTime0 + t * (curLapTime1 - curLapTime0);
-      return {
-        timeSec: relativeTime,
-        speedKmh: spd,
-        throttle: p0.throttle || 0,
-        brake: p0.brake || 0,
-        steerYaw: p0.steerYaw || 0,
-        gear: resolveGearValue(p0),
-        x: p0.x + t * (p1.x - p0.x),
-        y: p0.y + t * (p1.y - p0.y),
-        z: p0.z + t * (p1.z - p0.z),
-        tcActive: p0.tcActive,
-        absActive: p0.absActive,
-        engineRpm: p0.engineRpm,
-        tireTemps: p0.tireTemps ? [...p0.tireTemps] : undefined,
-        tireWear: p0.tireWear ? [...p0.tireWear] : undefined,
-        brakeTemps: p0.brakeTemps ? [...p0.brakeTemps] : undefined,
-        rideHeight: p0.rideHeight ? [...p0.rideHeight] : undefined,
-        wheelSpeeds: p0.wheelSpeeds ? [...p0.wheelSpeeds] : undefined,
-        tirePressures: p0.tirePressures ? [...p0.tirePressures] : undefined,
-        lateralOffsetM: p0.lateralOffsetM,
-        accelLonG: p0.accelLonG,
-        accelLatG: p0.accelLatG,
-        accelTotalG: p0.accelTotalG,
-        yawRateDeg: p0.yawRateDeg,
-        slipAngleDeg: p0.slipAngleDeg,
-        understeerDeg: p0.understeerDeg,
-        tireSlipPct: p0.tireSlipPct,
-        wheelLockActive: p0.wheelLockActive,
-      };
-    }
-
-    const p = points[0];
-    const spd = p.speedKmh || 0;
-    return {
-      timeSec: (p.timeSec || 0) - startTime0,
-      speedKmh: spd,
-      throttle: p.throttle || 0,
-      brake: p.brake || 0,
-      steerYaw: p.steerYaw || 0,
-      gear: resolveGearValue(p),
-      x: p.x,
-      y: p.y,
-      z: p.z,
-      tcActive: p.tcActive,
-      absActive: p.absActive,
-      engineRpm: p.engineRpm,
-      tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
-      tireWear: p.tireWear ? [...p.tireWear] : undefined,
-      brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
-      rideHeight: p.rideHeight ? [...p.rideHeight] : undefined,
-      wheelSpeeds: p.wheelSpeeds ? [...p.wheelSpeeds] : undefined,
-      tirePressures: p.tirePressures ? [...p.tirePressures] : undefined,
-      lateralOffsetM: p.lateralOffsetM,
-      accelLonG: p.accelLonG,
-      accelLatG: p.accelLatG,
-      accelTotalG: p.accelTotalG,
-      yawRateDeg: p.yawRateDeg,
-      slipAngleDeg: p.slipAngleDeg,
-      understeerDeg: p.understeerDeg,
-      tireSlipPct: p.tireSlipPct,
-      wheelLockActive: p.wheelLockActive,
-    };
-  }
-
-  const maxDist = cumDists[cumDists.length - 1];
-  if (targetDist >= maxDist) {
-    if (extrapolateBoundary && points.length >= 2) {
-      const p0 = points[points.length - 2];
-      const p1 = points[points.length - 1];
-      const span = cumDists[cumDists.length - 1] - cumDists[cumDists.length - 2];
-      if (span > 1e-6) {
-        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
-        const t = (clampedDist - cumDists[cumDists.length - 2]) / span;
-        const spd = Math.max(0, (p0.speedKmh || 0) + t * ((p1.speedKmh || 0) - (p0.speedKmh || 0)));
-        const curLapTime0 = (p0.timeSec || 0) - startTime0;
-        const curLapTime1 = (p1.timeSec || 0) - startTime0;
-        const relativeTime = curLapTime0 + t * (curLapTime1 - curLapTime0);
-        return {
-          timeSec: relativeTime,
-          speedKmh: spd,
-          throttle: p1.throttle || 0,
-          brake: p1.brake || 0,
-          steerYaw: p1.steerYaw || 0,
-          gear: resolveGearValue(p1),
-          x: p0.x + t * (p1.x - p0.x),
-          y: p0.y + t * (p1.y - p0.y),
-          z: p0.z + t * (p1.z - p0.z),
-          tcActive: p1.tcActive,
-          absActive: p1.absActive,
-          engineRpm: p1.engineRpm,
-          tireTemps: p1.tireTemps ? [...p1.tireTemps] : undefined,
-          tireWear: p1.tireWear ? [...p1.tireWear] : undefined,
-          brakeTemps: p1.brakeTemps ? [...p1.brakeTemps] : undefined,
-          lateralOffsetM: p1.lateralOffsetM,
-          accelLonG: p1.accelLonG,
-          accelLatG: p1.accelLatG,
-          accelTotalG: p1.accelTotalG,
-          yawRateDeg: p1.yawRateDeg,
-          slipAngleDeg: p1.slipAngleDeg,
-          understeerDeg: p1.understeerDeg,
-          tireSlipPct: p1.tireSlipPct,
-          wheelLockActive: p1.wheelLockActive,
-        };
-      }
-    }
-
-    const p = points[points.length - 1];
-    const spd = p.speedKmh || 0;
-    return {
-      timeSec: Math.max(0, (p.timeSec || 0) - startTime0),
-      speedKmh: spd,
-      throttle: p.throttle || 0,
-      brake: p.brake || 0,
-      steerYaw: p.steerYaw || 0,
-      gear: resolveGearValue(p),
-      x: p.x,
-      y: p.y,
-      z: p.z,
-      tcActive: p.tcActive,
-      absActive: p.absActive,
-      engineRpm: p.engineRpm,
-      tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
-      tireWear: p.tireWear ? [...p.tireWear] : undefined,
-      brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
-      lateralOffsetM: p.lateralOffsetM,
-      accelLonG: p.accelLonG,
-      accelLatG: p.accelLatG,
-      accelTotalG: p.accelTotalG,
-      yawRateDeg: p.yawRateDeg,
-      slipAngleDeg: p.slipAngleDeg,
-      understeerDeg: p.understeerDeg,
-      tireSlipPct: p.tireSlipPct,
-      wheelLockActive: p.wheelLockActive,
-    };
-  }
-
-  // Binary search for segment
-  let low = 0;
-  let high = cumDists.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (cumDists[mid] < targetDist) {
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-
-  const idx0 = Math.max(0, low - 1);
-  const idx1 = Math.min(points.length - 1, low);
-
-  if (idx0 === idx1) {
-    const p = points[idx0];
-    const spd = p.speedKmh || 0;
-    return {
-      timeSec: Math.max(0, (p.timeSec || 0) - startTime0),
-      speedKmh: spd,
-      throttle: p.throttle || 0,
-      brake: p.brake || 0,
-      steerYaw: p.steerYaw || 0,
-      gear: resolveGearValue(p),
-      x: p.x,
-      y: p.y,
-      z: p.z,
-      tcActive: p.tcActive,
-      absActive: p.absActive,
-      engineRpm: p.engineRpm,
-      tireTemps: p.tireTemps ? [...p.tireTemps] : undefined,
-      tireWear: p.tireWear ? [...p.tireWear] : undefined,
-      brakeTemps: p.brakeTemps ? [...p.brakeTemps] : undefined,
-      rideHeight: p.rideHeight ? [...p.rideHeight] : undefined,
-      wheelSpeeds: p.wheelSpeeds ? [...p.wheelSpeeds] : undefined,
-      tirePressures: p.tirePressures ? [...p.tirePressures] : undefined,
-      lateralOffsetM: p.lateralOffsetM,
-      accelLonG: p.accelLonG,
-      accelLatG: p.accelLatG,
-      accelTotalG: p.accelTotalG,
-      yawRateDeg: p.yawRateDeg,
-      slipAngleDeg: p.slipAngleDeg,
-      understeerDeg: p.understeerDeg,
-      tireSlipPct: p.tireSlipPct,
-      wheelLockActive: p.wheelLockActive,
-    };
-  }
-
-  const span = cumDists[idx1] - cumDists[idx0];
-  const t = span > 0 ? (targetDist - cumDists[idx0]) / span : 0;
-  const p0 = points[idx0];
-  const p1 = points[idx1];
-
   const spd = (p0.speedKmh || 0) + t * ((p1.speedKmh || 0) - (p0.speedKmh || 0));
   const curLapTime0 = (p0.timeSec || 0) - startTime0;
   const curLapTime1 = (p1.timeSec || 0) - startTime0;
@@ -640,6 +424,105 @@ export function interpolatePointAtDistance(
     regenRate,
     isOffTrack: Boolean(p0.isOffTrack || p1.isOffTrack),
   };
+}
+
+/**
+ * Interpolates a telemetry point at a given distance along a trajectory.
+ */
+export function interpolatePointAtDistance(
+  points: ReplayTrajectoryPoint[],
+  cumDists: number[],
+  targetDist: number,
+  startTimeOverride?: number,
+  extrapolateBoundary = false
+): InterpolatedPoint {
+  if (points.length === 0) {
+    return {
+      timeSec: 0,
+      speedKmh: 0,
+      throttle: 0,
+      brake: 0,
+      steerYaw: 0,
+      gear: 1,
+      x: 0,
+      y: 0,
+      z: 0,
+    };
+  }
+
+  const startTime0 = startTimeOverride !== undefined ? startTimeOverride : (points[0].timeSec || 0);
+
+
+  if (points.length === 1 || targetDist <= cumDists[0]) {
+    if (extrapolateBoundary && points.length >= 2 && cumDists[1] > cumDists[0]) {
+      // Before the first sample (e.g. primary starts on the line, baseline a few metres later):
+      // extrapolate time/speed/position linearly, hold every other channel at the first sample.
+      const p0 = points[0];
+      const p1 = points[1];
+      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
+      const t = (clampedDist - cumDists[0]) / (cumDists[1] - cumDists[0]);
+      const extrapolated = blendTelemetryPoints(p0, p1, t, startTime0);
+      return {
+        ...blendTelemetryPoints(p0, p0, 0, startTime0),
+        timeSec: extrapolated.timeSec,
+        speedKmh: Math.max(0, extrapolated.speedKmh),
+        x: extrapolated.x,
+        y: extrapolated.y,
+        z: extrapolated.z,
+      };
+    }
+    return blendTelemetryPoints(points[0], points[0], 0, startTime0);
+  }
+
+  const maxDist = cumDists[cumDists.length - 1];
+  if (targetDist >= maxDist) {
+    const pLast = points[points.length - 1];
+    if (extrapolateBoundary && points.length >= 2) {
+      const p0 = points[points.length - 2];
+      const span = maxDist - cumDists[cumDists.length - 2];
+      if (span > 1e-6) {
+        // Past the last sample: extrapolate time/speed/position, hold the rest at the last sample.
+        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
+        const t = (clampedDist - cumDists[cumDists.length - 2]) / span;
+        const extrapolated = blendTelemetryPoints(p0, pLast, t, startTime0);
+        return {
+          ...blendTelemetryPoints(pLast, pLast, 0, startTime0),
+          timeSec: extrapolated.timeSec,
+          speedKmh: Math.max(0, extrapolated.speedKmh),
+          x: extrapolated.x,
+          y: extrapolated.y,
+          z: extrapolated.z,
+        };
+      }
+    }
+    const held = blendTelemetryPoints(pLast, pLast, 0, startTime0);
+    return { ...held, timeSec: Math.max(0, held.timeSec) };
+  }
+
+  // Binary search for segment
+  let low = 0;
+  let high = cumDists.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (cumDists[mid] < targetDist) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  const idx0 = Math.max(0, low - 1);
+  const idx1 = Math.min(points.length - 1, low);
+
+
+  if (idx0 === idx1) {
+    const held = blendTelemetryPoints(points[idx0], points[idx0], 0, startTime0);
+    return { ...held, timeSec: Math.max(0, held.timeSec) };
+  }
+
+  const span = cumDists[idx1] - cumDists[idx0];
+  const t = span > 0 ? (targetDist - cumDists[idx0]) / span : 0;
+  return blendTelemetryPoints(points[idx0], points[idx1], t, startTime0);
 }
 
 /**

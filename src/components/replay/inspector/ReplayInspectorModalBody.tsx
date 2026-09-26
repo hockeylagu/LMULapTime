@@ -35,6 +35,7 @@ export interface ReplayInspectorModalBodyProps {
   setCompareLapFilter: (filter: CompareLapFilter) => void;
   handleSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
+  baselineError?: string | null;
   setCurrentIndex: (index: number) => void;
   isPlaying: boolean;
   setIsPlaying: (value: boolean) => void;
@@ -106,6 +107,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   setCompareLapFilter,
   handleSelectCompareLap,
   isBaselineLoading,
+  baselineError,
   setCurrentIndex,
   isPlaying,
   setIsPlaying,
@@ -182,6 +184,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onChangeCompareLapFilter={setCompareLapFilter}
         onSelectCompareLap={handleSelectCompareLap}
         isBaselineLoading={isBaselineLoading}
+        baselineError={baselineError}
         isStationary={maxSpeed <= 1}
         isTrajLoading={isTrajLoading}
         isPlaying={isPlaying}
