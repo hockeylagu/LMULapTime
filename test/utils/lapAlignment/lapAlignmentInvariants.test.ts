@@ -37,29 +37,22 @@ type InvariantId = 'I0' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'I7';
 
 const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>> = {
   'daytona-r1-10-lap-pair': {
-    I1: 'phase 1: deltaAt does not extrapolate at the lap edges (segments 0.118 s over the lap delta)',
-    I3: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.1 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'sarthe-r1-41-lap-pair': {
-    I1: 'phase 1: deltaAt does not extrapolate at the lap edges (segments 0.201 s over the lap delta)',
-    I3: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
     I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'bahrain-r1-10-lap-pair': {
-    I1: 'phase 1: deltaAt does not extrapolate at the lap edges (segments 0.138 s over the lap delta)',
-    I3: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.126 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'spa-r1-38-lap-pair': {
-    I1: 'phase 1: deltaAt does not extrapolate at the lap edges (segments 0.281 s off the lap delta: -0.064 vs -0.345)',
-    I3: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line',
+    I3: 'phase 4: baseline starts 14.9 m late; trimmed 10 m more it hits the 25 m extrapolation clamp',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.207 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
