@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import {
   ReplayTrajectoryData,
-  ReplayTrajectoryPoint,
   ReplayPenaltyEvent,
   ReplayPitEvent,
   ReplayFlagEvent,
@@ -15,8 +14,8 @@ import {
   VcrTimingEvent,
   DetectedLapInternal,
   detectLapsFromTelemetry,
-  isTimeInIntervals,
 } from './replayLapBuilder.js';
+import { buildTrajectoryPoints } from './replayLapPoints.js';
 import {
   ReplayProgressTracker,
   ReplayProgressCallback,
@@ -550,58 +549,7 @@ export function extractReplayTrajectory(
       const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
       const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
 
-      const MAX_PLAUSIBLE_SPEED_KMH = 400;
-      const rawSpeeds: number[] = [];
-      for (let i = 0; i < downsampled.length; i++) {
-        const cur = downsampled[i];
-        let speed = 0;
-        if (i > 0) {
-          const prev = downsampled[i - 1];
-          const dt = cur.sTime - prev.sTime;
-          const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
-          if (dt > 0.005 && dist < 60) {
-            speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
-          }
-        }
-        const packetSpeed = downsampled[i].speedKmhRaw;
-        rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH ? packetSpeed : speed);
-      }
-
-      const finalPoints: ReplayTrajectoryPoint[] = [];
-      for (let i = 0; i < downsampled.length; i++) {
-        const cur = downsampled[i];
-        const rawSpeed = rawSpeeds[i];
-        const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
-          (garageIntervals.length === 0 && Boolean(cur.inPit) && rawSpeed < 1);
-        const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
-
-        finalPoints.push({
-          x: Number(cur.x.toFixed(2)),
-          y: Number(cur.y.toFixed(2)),
-          z: Number(cur.z.toFixed(2)),
-          rotX: cur.rotX,
-          rotY: Number(cur.rotY.toFixed(3)),
-          rotZ: cur.rotZ,
-          speedKmh: Math.round(rawSpeed),
-          throttle: cur.rawThrottle ?? 0,
-          brake: cur.rawBrake ?? 0,
-          steerYaw: cur.steerYaw ?? 0,
-          gear: cur.gearRaw,
-          inPit,
-          isOffTrack: cur.isOffTrack,
-          inGarage,
-          isTeleport: false,
-          timeSec: Number(cur.sTime.toFixed(2)),
-          tcActive: cur.tcActive,
-          absActive: cur.absActive,
-          pitLimiter: cur.pitLimiter,
-          detachablePartState: cur.detachablePartState,
-          engineRpm: cur.engineRpm,
-          wheelSpeeds: cur.wheelSpeeds,
-          brakeTemps: cur.brakeTemps,
-          fuel: cur.fuel,
-        });
-      }
+      const finalPoints = buildTrajectoryPoints(downsampled, garageIntervals, pitIntervals);
 
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const p of finalPoints) {

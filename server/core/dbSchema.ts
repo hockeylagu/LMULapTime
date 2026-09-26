@@ -1,7 +1,21 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import zlib from 'zlib';
 
+// Bumping REPLAY_CACHE_VERSION makes every replay on disk be decoded again (once per driver),
+// and replays LMU has since deleted can never be: their rows are the only copy left. Only bump
+// it when stored rows can no longer be read; a version whose rows the current code still reads
+// correctly belongs in COMPATIBLE_REPLAY_CACHE_VERSIONS instead.
 export const REPLAY_CACHE_VERSION = 'v3';
+export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
+  REPLAY_CACHE_VERSION,
+  // Written by an unreleased build that also stored each lap's edge samples (now derived from
+  // the neighbouring lap rows on read); otherwise identical to v3.
+  'v4',
+]);
+
+export function isCompatibleReplayCacheVersion(version: string): boolean {
+  return COMPATIBLE_REPLAY_CACHE_VERSIONS.has(version);
+}
 export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v9';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are

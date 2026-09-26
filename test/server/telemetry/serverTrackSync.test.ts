@@ -172,4 +172,47 @@ describe('serverTrackSync', () => {
 
     expect(elapsedMs).toBeLessThan(350);
   });
+
+  describe('cutting the lap at the start/finish line', () => {
+    // Samples along Monza's own centreline around the line, 0.1 s apart; the timing loop
+    // sliced the lap three samples after the line (a late remote timing event).
+    const lapAroundTheLine = () => {
+      const centerline = getTrackDefinition('monza_gp')?.centerline ?? [];
+      const at = (i: number): ReplayTrajectoryPoint => {
+        const [x, z] = centerline[(i + centerline.length) % centerline.length];
+        return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
+      };
+      const leadIn = [-4, -3, -2, -1, 0, 1, 2].map(at);
+      const lap = [3, 4, 5, 6, 7, 8, 9, 10].map(at);
+      const trajectory: ReplayTrajectoryData = {
+        replayName: 'Monza_Test.Vcr',
+        pointsCount: lap.length,
+        points: lap,
+        leadInPoints: leadIn,
+        leadOutPoints: [11, 12].map(at),
+        bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      };
+      return trajectory;
+    };
+
+    it('starts a late-sliced lap exactly at the line, using the recording before the slice', () => {
+      const enriched = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      const [x0, z0] = getTrackDefinition('monza_gp')?.centerline[0] ?? [NaN, NaN];
+      expect(enriched.points[0].stationM).toBe(0);
+      expect(enriched.points[0].distM).toBe(0);
+      expect(enriched.points[0].x).toBeCloseTo(x0, 1);
+      expect(enriched.points[0].z).toBeCloseTo(z0, 1);
+      expect(enriched.points[0].timeSec).toBeCloseTo(100, 2);
+    });
+
+    it('never returns the recording either side of the lap', () => {
+      const known = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      const unknown = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Unknown Venue', 'Unknown', 'Unknown.Vcr');
+      for (const t of [known, unknown]) {
+        expect(t.leadInPoints).toBeUndefined();
+        expect(t.leadOutPoints).toBeUndefined();
+      }
+      expect(unknown.points).toHaveLength(8);
+    });
+  });
 });

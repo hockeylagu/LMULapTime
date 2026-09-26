@@ -1,6 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from './types.js';
-import { REPLAY_CACHE_VERSION } from './dbSchema.js';
+import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from './dbSchema.js';
 import { compressTrajectory, decompressTrajectory } from './replayTrajectoryCodec.js';
 
 /**
@@ -96,7 +96,7 @@ function selectResolvedRow(db: DatabaseType, filename: string, driverSlot: numbe
 function isRowValid(row: TrajectoryRow, mtime: number, size: number, filePath?: string): boolean {
   return row.file_mtime === mtime &&
     row.file_size === size &&
-    row.parser_version === REPLAY_CACHE_VERSION &&
+    isCompatibleReplayCacheVersion(row.parser_version) &&
     (!filePath || !row.source_path || row.source_path === filePath);
 }
 
@@ -138,6 +138,28 @@ export function getStoredReplayTrajectory(
   }
 
   return null;
+}
+
+/**
+ * The laps just before and after (driverSlot, lapKey) of the same recording, read from the stored
+ * rows only: a lap row is the one place the recording either side of a lap survives once LMU has
+ * deleted the replay. Rows from another version of the file (different mtime or size) are ignored.
+ */
+export function getAdjacentLapTrajectories(
+  db: DatabaseType,
+  filename: string,
+  driverSlot: number,
+  lapKey: number
+): { previous: ReplayTrajectoryData | null; next: ReplayTrajectoryData | null } {
+  const lap = selectTrajectoryRow(db, filename, driverSlot, lapKey);
+  if (!lap) return { previous: null, next: null };
+  const neighbour = (key: number): ReplayTrajectoryData | null => {
+    const row = selectTrajectoryRow(db, filename, driverSlot, key);
+    return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size
+      ? decompressTrajectory(row.trajectory_br)
+      : null;
+  };
+  return { previous: neighbour(lapKey - 1), next: neighbour(lapKey + 1) };
 }
 
 // Same validity check as getReplayTrajectoryCache but never decompresses the (multi-MB) blob.

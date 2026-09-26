@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
+import { cutLapAtLine } from './lapLineCut.js';
 
 interface CachedTrackDefinition {
   layoutKey: string;
@@ -122,10 +123,25 @@ function applyCanonicalProjection(
   trajectory: ReplayTrajectoryData,
   trackDef: CachedTrackDefinition
 ): void {
-  const { stations, lateralOffsets } = projectTrajectoryToCenterline(
-    trajectory.points,
-    trackDef.spatialIndex
+  // Project the lap with the recording either side of it, then cut it at the line: the
+  // timing-loop slice starts and ends wherever the (possibly late) timing event landed.
+  const leadIn = trajectory.leadInPoints ?? [];
+  const samples = [...leadIn, ...trajectory.points, ...(trajectory.leadOutPoints ?? [])];
+  const { stations, lateralOffsets } = projectTrajectoryToCenterline(samples, trackDef.spatialIndex, { clampSeam: false });
+  const cut = cutLapAtLine(
+    samples,
+    stations,
+    lateralOffsets,
+    trackDef.spatialIndex.totalLengthM,
+    leadIn.length,
+    leadIn.length + trajectory.points.length - 1
   );
+  stripLapEdgeSamples(trajectory);
+  trajectory.points = cut.points;
+  if (trajectory.sectors) {
+    const shifted = (frame: number) => Math.max(0, Math.min(cut.points.length - 1, frame + cut.indexShift));
+    trajectory.sectors = { s1Frame: shifted(trajectory.sectors.s1Frame), s2Frame: shifted(trajectory.sectors.s2Frame) };
+  }
 
   const n = trajectory.points.length;
   let runningDist = 0;
@@ -139,8 +155,6 @@ function applyCanonicalProjection(
       runningDist += (d < 1000 ? d : 0);
     }
     pt.distM = Number(runningDist.toFixed(2));
-    pt.stationM = Number((stations[i] ?? 0).toFixed(2));
-    pt.lateralOffsetM = Number((lateralOffsets[i] ?? 0).toFixed(2));
   }
 
   trajectory.layoutKey = trackDef.layoutKey;
@@ -149,7 +163,14 @@ function applyCanonicalProjection(
   trajectory.timingGates = trackDef.timingGates;
 }
 
+/** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */
+export function stripLapEdgeSamples(trajectory: ReplayTrajectoryData): void {
+  delete trajectory.leadInPoints;
+  delete trajectory.leadOutPoints;
+}
+
 function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
+  stripLapEdgeSamples(trajectory);
   const points = trajectory.points;
   const n = points.length;
   let runningDist = 0;

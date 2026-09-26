@@ -7,10 +7,12 @@ import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServ
 import { composeReplayMetadata } from './replayMetadataService.js';
 import {
   applyPureOfficialLapValidation,
+  cloneReplayTrajectory,
   downsampleTrajectoryResponse,
   enrichTrajectoryGeometryResponse,
 } from './replayTransforms.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { stripLapEdgeSamples } from '../tracks/serverTrackSync.js';
 
 export class ReplayTrajectoryService {
   public constructor(
@@ -78,7 +80,8 @@ export class ReplayTrajectoryService {
       playerName: configuredPlayer,
     });
 
-    let trajectory = downsampleTrajectoryResponse(fullTrajectory, request.maxPoints);
+    // Kept at full resolution until the lap has been projected on the track and cut at the line.
+    let trajectory = cloneReplayTrajectory(fullTrajectory);
     trajectory.source = 'vcr';
     trajectory.vcrRawPointsCount = fullTrajectory.rawPointsCount ?? fullTrajectory.points.length;
     trajectory.vcrRawSampleRateHz = fullTrajectory.rawSampleRateHz;
@@ -121,7 +124,6 @@ export class ReplayTrajectoryService {
       fullTrajectory,
       currentTrajectory: trajectory,
       lapNumber: request.lapNumber,
-      maxPoints: request.maxPoints,
     });
     trajectory = telemetryResult.trajectory;
 
@@ -144,6 +146,9 @@ export class ReplayTrajectoryService {
     } catch (error) {
       console.warn(`[serverTrackSync] Failed to enrich trajectory for ${request.replayName}:`, error);
     }
+
+    stripLapEdgeSamples(trajectory);
+    trajectory = downsampleTrajectoryResponse(trajectory, request.maxPoints);
 
     if (!trajectory.layoutKey) {
       const circuitSpec = getCircuitSpecification(venue, course, sceneDesc, request.replayName, null, trackLengthMeters);

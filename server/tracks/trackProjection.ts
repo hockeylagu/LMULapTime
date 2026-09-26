@@ -75,10 +75,15 @@ export function buildCenterlineSpatialIndex(centerline: Array<[number, number]>)
  * Coordinates:
  * - station (s): Curvilinear distance along centerline in meters [0, L_track].
  * - lateralOffset (d_perp): Signed distance in meters (+ = right of center, - = left of center).
+ *
+ * By default a station that wraps back to the start in the second half of the points is pinned
+ * at the track length. Pass clampSeam: false to get the true wrapped stations, e.g. to locate
+ * where the path crosses the start/finish line.
  */
 export function projectTrajectoryToCenterline(
   points: ReplayTrajectoryPoint[],
-  centerline: Array<[number, number]> | CenterlineSpatialIndex
+  centerline: Array<[number, number]> | CenterlineSpatialIndex,
+  options: { clampSeam?: boolean } = {}
 ): ProjectedTrajectory {
   if (!points || points.length === 0) {
     return { stations: [], lateralOffsets: [], trackLengthM: 0 };
@@ -248,7 +253,7 @@ export function projectTrajectoryToCenterline(
   }
 
   // Ensure monotonicity around the start/finish seam for flying laps near the finish line
-  for (let i = 1; i < stations.length; i++) {
+  for (let i = 1; options.clampSeam !== false && i < stations.length; i++) {
     // If the car has progressed past 80% of the lap, do not let station wrap backwards prematurely
     if (i > points.length * 0.5 && stations[i - 1] > totalLength * 0.85 && stations[i] < totalLength * 0.15) {
       stations[i] = Number(totalLength.toFixed(2));
