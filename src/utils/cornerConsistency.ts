@@ -1,7 +1,7 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
   interpolatePointAtDistance,
-  getTrajectoryDistances,
+  getDistancesInReferenceFrame,
 } from './replayComparison.js';
 import { unwrapAngle } from './computedTelemetry.js';
 import {
@@ -10,7 +10,9 @@ import {
   findThresholdCrossingDistM,
   getHeadingAtDistance,
   BRAKE_ON_THRESHOLD_PCT,
+  BRAKE_ONSET_LOOKBACK_M,
   THROTTLE_ON_THRESHOLD_PCT,
+  throttleOnsetLookbackM,
 } from './cornerAnalysis.js';
 
 export interface LapMetricSample {
@@ -142,9 +144,12 @@ export function computeCornerConsistencyStats(
 
   for (const lap of laps) {
     if (!lap.points?.length) continue;
-    const lapDists = getTrajectoryDistances(lap.points, trackLengthM);
+    // Corner windows come from the reference lap, so this lap is measured in the reference
+    // lap's distance frame (station-matched) rather than its own drifting driven distance.
+    const lapDists = getDistancesInReferenceFrame(lap.points, referencePoints, trackLengthM);
 
     for (const corner of canonicalCorners) {
+      const throttleLookbackM = throttleOnsetLookbackM(corner.entryDistM, corner.minDistM);
       // Same entry->exit window computeLapSegmentComparisons uses for the "vs Baseline" corner
       // table, so a corner's time here always agrees with what that table calls its Δ Time -
       // apex-to-apex would measure a different (overlapping but distinct) stretch of track.
@@ -157,12 +162,12 @@ export function computeCornerConsistencyStats(
       pushTo(apexSpeedByCorner, corner.cornerNumber, lap.lapNumber, interpolatePointAtDistance(lap.points, lapDists, corner.minDistM).speedKmh);
       pushTo(exitSpeedByCorner, corner.cornerNumber, lap.lapNumber, interpolatePointAtDistance(lap.points, lapDists, corner.exitDistM).speedKmh);
 
-      const brakingDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.entryDistM, corner.minDistM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
+      const brakingDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.entryDistM, corner.minDistM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
       // Reported relative to the apex (meters BEFORE the minimum-speed point), not as an
       // absolute lap distance, so the number reads the same regardless of where on the track
       // this corner sits.
       if (brakingDistM !== null) pushTo(brakingByCorner, corner.cornerNumber, lap.lapNumber, corner.minDistM - brakingDistM);
-      const throttleOnDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
+      const throttleOnDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
       // Reported relative to the apex too (meters AFTER the minimum-speed point).
       if (throttleOnDistM !== null) pushTo(throttleByCorner, corner.cornerNumber, lap.lapNumber, throttleOnDistM - corner.minDistM);
 
@@ -170,7 +175,7 @@ export function computeCornerConsistencyStats(
       if (turnInDistM !== null) pushTo(turnInByCorner, corner.cornerNumber, lap.lapNumber, corner.minDistM - turnInDistM);
 
       if (corner.cornerAngleDeg && corner.cornerAngleDeg > 5) {
-        const initialThrDist = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, 15) ?? throttleOnDistM;
+        const initialThrDist = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, 15, throttleLookbackM) ?? throttleOnDistM;
         if (initialThrDist !== null) {
           const hEntry = getHeadingAtDistance(lap.points, lapDists, corner.entryDistM);
           const hThr = getHeadingAtDistance(lap.points, lapDists, initialThrDist);

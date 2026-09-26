@@ -137,7 +137,8 @@ describe('replayMapUtils', () => {
       const result = buildEffectiveBaselinePoints(baseline, 5724.1);
       expect(result).toHaveLength(3);
       expect(result[0].stationM).toBe(0);
-      expect(result[0].distM).toBe(0);
+      // Raw distance at the line: 8.04 m before the first sample, keeping S/F-zeroed distances unchanged.
+      expect(result[0].distM).toBeCloseTo(-8.04, 1);
       expect(result[0].timeSec).toBeCloseTo(375.12, 1);
       expect(result[0].x).toBeCloseTo(-111.07, 1);
       expect(result[0].z).toBeCloseTo(-35.11, 1);

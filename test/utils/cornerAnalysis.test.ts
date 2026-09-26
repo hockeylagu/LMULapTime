@@ -88,19 +88,19 @@ describe('computeLapSegmentComparisons', () => {
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
-    // Brake/throttle ramp linearly between 10m-spaced samples, so the detected threshold
-    // crossing lands a bit before the raw keyframe distance - the delta between the two
+    // Brake/throttle ramp linearly between 10m-spaced samples, so the interpolated threshold
+    // crossing lands before the raw keyframe distance (throttle 0->100 over 70->80 reaches 90% at 79) - the delta between the two
     // laps is unaffected since both ramps are shaped identically, just offset by 10m.
     expect(corner.baselineBrakingDistM).toBe(32);
     expect(corner.primaryBrakingDistM).toBe(42);
     expect(corner.brakingPointDeltaM).toBe(10); // primary braked 10m later than baseline
 
-    expect(corner.baselineThrottleOnDistM).toBe(80);
-    expect(corner.primaryThrottleOnDistM).toBe(70);
+    expect(corner.baselineThrottleOnDistM).toBe(79);
+    expect(corner.primaryThrottleOnDistM).toBe(69); // 90% reached 1 m before the apex - found by looking back
     expect(corner.throttleOnDeltaM).toBe(-10); // primary got back to full throttle 10m earlier
     expect(corner.baselineInitialThrottleDistM).toBe(72);
-    expect(corner.primaryInitialThrottleDistM).toBe(70);
-    expect(corner.initialThrottleDeltaM).toBe(-2);
+    expect(corner.primaryInitialThrottleDistM).toBe(62); // 15% reached at 61.5 m, before the apex
+    expect(corner.initialThrottleDeltaM).toBe(-10);
   });
 
   it('splits the isolated corner delta into measurable phase deltas', () => {
@@ -116,8 +116,8 @@ describe('computeLapSegmentComparisons', () => {
     const corner = computeLapSegmentComparisons(primary, baseline).find(segment => segment.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
-    expect(corner.phaseTiming?.entry).toMatchObject({ startDistM: 30, endDistM: 44 });
-    expect(corner.phaseTiming?.rotation).toMatchObject({ startDistM: 44, endDistM: 70 });
+    expect(corner.phaseTiming?.entry).toMatchObject({ startDistM: 30, endDistM: 43 });
+    expect(corner.phaseTiming?.rotation).toMatchObject({ startDistM: 43, endDistM: 70 });
     expect(corner.phaseTiming?.exit).toMatchObject({ startDistM: 70, endDistM: 110 });
     const phaseTotal = (corner.phaseTiming?.entry?.timeDeltaSec ?? 0) +
       corner.phaseTiming!.rotation.timeDeltaSec +
@@ -155,8 +155,8 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.baselineBrakingDistM).toBe(32);
     expect(corner.primaryBrakingDistM).toBe(42);
     expect(corner.brakingPointDeltaM).toBe(10);
-    expect(corner.baselineThrottleOnDistM).toBe(80);
-    expect(corner.primaryThrottleOnDistM).toBe(70);
+    expect(corner.baselineThrottleOnDistM).toBe(79);
+    expect(corner.primaryThrottleOnDistM).toBe(69); // 90% reached 1 m before the apex - found by looking back
     expect(corner.throttleOnDeltaM).toBe(-10);
   });
 

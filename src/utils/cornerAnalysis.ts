@@ -3,6 +3,7 @@ import {
   InterpolatedPoint,
   interpolatePointAtDistance,
   getTrajectoryDistances,
+  getDistancesInReferenceFrame,
   getMonotonicStations,
 } from './replayComparison.js';
 import { unwrapAngle } from './computedTelemetry.js';
@@ -226,9 +227,37 @@ function computeMaxAbsSteer(points: ReplayTrajectoryPoint[]): number {
   return maxAbs;
 }
 
+// How far before a corner's entry (speed peak) a brake application may have started. A lap
+// compared against another lap's corner windows can brake before that lap's speed peak.
+export const BRAKE_ONSET_LOOKBACK_M = 150;
+
 /**
- * Scans forward from fromDist to toDist (in fixed steps) and returns the distance where the
- * sampled channel first reaches `threshold`, or null if it never does within the window.
+ * Throttle pick-up is searched from the apex, but a lap can be back on the throttle before
+ * the (other lap's) apex - look back as far as the corner entry, never into the straight before.
+ */
+export function throttleOnsetLookbackM(entryDistM: number, apexDistM: number): number {
+  return Math.max(0, apexDistM - entryDistM);
+}
+
+function firstIndexAbove(dists: number[], d: number): number {
+  let low = 0;
+  let high = dists.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (dists[mid] <= d) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+/**
+ * Returns the distance where the channel first reaches `threshold` between fromDist and
+ * toDist, linearly interpolated between recorded samples, or null if it never does.
+ *
+ * When the channel is already at/over the threshold at fromDist and `lookbackM` > 0, the
+ * application started before the window: samples are walked backwards (up to lookbackM) to
+ * where it began, instead of reporting the window start as the onset. If it never drops below
+ * the threshold within the lookback (e.g. a corner taken flat), the window start is returned.
  */
 export function findThresholdCrossingDistM(
   points: ReplayTrajectoryPoint[],
@@ -236,13 +265,43 @@ export function findThresholdCrossingDistM(
   fromDist: number,
   toDist: number,
   getValue: (p: InterpolatedPoint) => number,
-  threshold: number
+  threshold: number,
+  lookbackM = 0
 ): number | null {
-  if (toDist <= fromDist) return null;
-  for (let d = fromDist; d < toDist; d += SEGMENT_SCAN_STEP_M) {
-    if (getValue(interpolatePointAtDistance(points, dists, d)) >= threshold) return Math.round(d);
+  if (toDist <= fromDist || points.length === 0) return null;
+  const valueAt = (d: number) => getValue(interpolatePointAtDistance(points, dists, d));
+  const crossingBetween = (d0: number, v0: number, d1: number, v1: number) =>
+    Math.round(v1 === v0 ? d1 : d0 + ((threshold - v0) / (v1 - v0)) * (d1 - d0));
+
+  const startValue = valueAt(fromDist);
+  const firstAfterStart = firstIndexAbove(dists, fromDist);
+
+  if (startValue >= threshold) {
+    if (lookbackM <= 0) return Math.round(fromDist);
+    const limit = fromDist - lookbackM;
+    let laterD = fromDist;
+    let laterV = startValue;
+    for (let k = firstAfterStart - 1; k >= 0 && dists[k] >= limit; k--) {
+      if (dists[k] >= laterD) continue;
+      const v = valueAt(dists[k]);
+      if (v < threshold) return crossingBetween(dists[k], v, laterD, laterV);
+      laterD = dists[k];
+      laterV = v;
+    }
+    return Math.round(fromDist);
   }
-  return getValue(interpolatePointAtDistance(points, dists, toDist)) >= threshold ? Math.round(toDist) : null;
+
+  let prevD = fromDist;
+  let prevV = startValue;
+  for (let k = firstAfterStart; k < dists.length && dists[k] < toDist; k++) {
+    if (dists[k] <= prevD) continue;
+    const v = valueAt(dists[k]);
+    if (v >= threshold) return crossingBetween(prevD, prevV, dists[k], v);
+    prevD = dists[k];
+    prevV = v;
+  }
+  const endValue = valueAt(toDist);
+  return endValue >= threshold ? crossingBetween(prevD, prevV, toDist, endValue) : null;
 }
 
 /**
@@ -315,10 +374,12 @@ export function computeLapSegmentComparisons(
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
-  // Both laps are re-zeroed to the SAME physical start/finish crossing (not just each
-  // recording's own point[0]) - critical so brake/throttle distances below are comparable.
+  // Every segment window and pedal point below is in the PRIMARY lap's distance frame. The
+  // baseline's distances are expressed in that same frame (matched on track station, like the
+  // telemetry channels) so its brake/throttle points refer to the same physical spot - its own
+  // driven distance drifts metres away from the primary's by mid-lap.
   const primaryDists = getTrajectoryDistances(primaryPoints, trackLengthM);
-  const baselineDists = getTrajectoryDistances(baselinePoints, trackLengthM);
+  const baselineDists = getDistancesInReferenceFrame(baselinePoints, primaryPoints, trackLengthM);
   const primaryMinSteerAmplitude = computeMaxAbsSteer(primaryPoints) * STEER_REVERSAL_FRACTION;
   const turningPoints = findSpeedTurningPoints(primaryPoints, primaryDists, minProminenceKmh, primaryMinSteerAmplitude);
   const totalDistM = primaryDists[primaryDists.length - 1] || 0;
@@ -399,10 +460,11 @@ export function computeLapSegmentComparisons(
     const baselineAtMin = interpolatePointAtDistance(baselinePoints, baselineDists, min.distM);
     const baselineAtExit = interpolatePointAtDistance(baselinePoints, baselineDists, exit.distM);
 
-    const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
-    const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
-    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
-    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
+    const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
+    const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
+    const throttleLookbackM = throttleOnsetLookbackM(entry.distM, min.distM);
+    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
+    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM);
 
     // --- Enhanced Technique & Geometry Metrics ---
     const hEntry = getHeadingAtDistance(primaryPoints, primaryDists, entry.distM);
@@ -535,7 +597,8 @@ export function computeLapSegmentComparisons(
       min.distM,
       exit.distM,
       p => p.throttle,
-      15
+      15,
+      throttleLookbackM
     ) ?? primaryThrottleOnDistM;
 
     const initialBaselineThrottleDistM = findThresholdCrossingDistM(
@@ -544,7 +607,8 @@ export function computeLapSegmentComparisons(
       min.distM,
       exit.distM,
       p => p.throttle,
-      15
+      15,
+      throttleLookbackM
     ) ?? baselineThrottleOnDistM;
 
     let primaryRotationAtThrottlePct: number | null = null;

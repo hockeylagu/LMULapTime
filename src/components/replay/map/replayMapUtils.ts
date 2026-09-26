@@ -2,6 +2,7 @@ import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { findIndexAtDistance, interpolatePointAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/replayComparison.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -55,9 +56,11 @@ export function getHeatmapColor(
   if (colorBy === 'pedal') {
     const th = p.throttle || 0;
     const brk = p.brake || 0;
-    // Braking dominates when both are non-trivial (trail-braking overlap).
-    if (brk > 5 && brk >= th) {
-      return sampleGradient([[0, [71, 85, 105]], [1, [239, 68, 68]]], brk / 100);
+    // Braking dominates when both are non-trivial (trail-braking overlap). It starts at the
+    // same threshold as the brake markers and at a clearly red tone (not the coast grey), so a
+    // gradual brake build-up is visible exactly where the brake marker says braking begins.
+    if (brk >= BRAKE_ON_THRESHOLD_PCT && brk >= th) {
+      return sampleGradient([[0, [153, 27, 27]], [1, [239, 68, 68]]], (brk - BRAKE_ON_THRESHOLD_PCT) / (100 - BRAKE_ON_THRESHOLD_PCT));
     }
     if (th > 5) {
       return sampleGradient([[0, [71, 85, 105]], [1, [16, 185, 129]]], th / 100);
@@ -217,7 +220,9 @@ export function buildEffectiveBaselinePoints(
       x: crossing.worldX,
       z: crossing.worldZ,
       stationM: 0,
-      distM: 0,
+      // The raw distance AT the line (negative when the lap was trimmed after it), so this lap's
+      // S/F-zeroed distances stay identical with or without the synthetic point.
+      distM: crossing.distMOffset,
       timeSec: crossing.timeSecOffset,
     };
     return [startPt, ...baselinePoints];
@@ -321,12 +326,19 @@ export function computePedalMarkerPoints(
       const idx = findIndexAtDistance(dists, m.distM);
       const pt = pts[Math.min(idx, pts.length - 1)];
       if (!pt) return null;
+      // Place the marker at the exact distance along the line, not the nearest sample.
+      const lo = dists[pt.idx] <= m.distM ? pt.idx : Math.max(0, pt.idx - 1);
+      const hi = Math.min(pts.length - 1, lo + 1);
+      const span = (dists[hi] ?? 0) - (dists[lo] ?? 0);
+      const t = span > 0 ? Math.min(1, Math.max(0, (m.distM - dists[lo]) / span)) : 0;
+      const sx = pts[lo].sx + t * (pts[hi].sx - pts[lo].sx);
+      const sy = pts[lo].sy + t * (pts[hi].sy - pts[lo].sy);
       const prev = pts[Math.max(0, pt.idx - 2)] ?? pt;
       const next = pts[Math.min(pts.length - 1, pt.idx + 2)] ?? pt;
       const dx = next.sx - prev.sx;
       const dy = next.sy - prev.sy;
       const headingLen = Math.hypot(dx, dy) || 1;
-      return { ...m, sx: pt.sx, sy: pt.sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
+      return { ...m, sx, sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
     })
     .filter((m): m is MappedPedalMarker => m !== null);
 

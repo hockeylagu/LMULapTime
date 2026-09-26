@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { getTrajectoryDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame, computeLapComparisons } from '../../../utils/replayComparison.js';
 import {
   projectTrajectoryPoints,
   projectBoundaryPoints,
@@ -102,9 +102,11 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
   const primaryDists = useMemo(() => getTrajectoryDistances(points, effectiveGeometry?.lengthM), [points, effectiveGeometry]);
+  // Baseline distances in the PRIMARY lap's frame (station-matched), the same frame corner
+  // analysis reports baseline brake/throttle points and corner ranges in.
   const baselineDists = useMemo(
-    () => (effectiveBaselinePoints.length > 0 ? getTrajectoryDistances(effectiveBaselinePoints, effectiveGeometry?.lengthM) : []),
-    [effectiveBaselinePoints, effectiveGeometry]
+    () => (effectiveBaselinePoints.length > 0 ? getDistancesInReferenceFrame(effectiveBaselinePoints, points, effectiveGeometry?.lengthM) : []),
+    [effectiveBaselinePoints, points, effectiveGeometry]
   );
 
   const deltaByIdx = useMemo(() => {
