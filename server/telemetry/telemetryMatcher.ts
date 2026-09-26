@@ -253,9 +253,14 @@ export function matchDuckDbToReplay(
       continue;
     }
 
-    // 3. Time comparison against replay file mtime
+    // 3. Time comparison against replay file mtime (or estimated replay start time)
     if (replayMtimeMs && duck.timestampEpochMs > 0) {
-      const deltaSec = Math.abs(duck.timestampEpochMs - replayMtimeMs) / 1000;
+      const replayStartMs = replay.durationSec && replay.durationSec > 0
+        ? replayMtimeMs - Math.round(replay.durationSec * 1000)
+        : replayMtimeMs;
+      const deltaSecStart = Math.abs(duck.timestampEpochMs - replayStartMs) / 1000;
+      const deltaSecEnd = Math.abs(duck.timestampEpochMs - replayMtimeMs) / 1000;
+      const deltaSec = Math.min(deltaSecStart, deltaSecEnd);
       if (deltaSec <= maxTimeDeltaSec) {
         timedCandidateDeltas.push(deltaSec);
         if (shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {

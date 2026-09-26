@@ -10,7 +10,7 @@ import { ServerContext } from '../../../server/core/serverContext.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import * as telemetryMatcher from '../../../server/telemetry/telemetryMatcher.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
-import type { DuckDbLapTelemetry } from '../../../server/core/types.js';
+import type { DetailedSession, DuckDbLapTelemetry } from '../../../server/core/types.js';
 import { DuckDbReader } from '../../../server/telemetry/duckdbReader.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 
@@ -43,7 +43,12 @@ describe('Replay routes', () => {
       telemetryCatalog,
       replayCache,
       currentParser: { configuredPlayerName: 'Route Driver' },
-      loadSessions: () => sessions,
+      loadSessions() {
+        if (!this || !(this as unknown as ServerContext).sessionDb) {
+          throw new TypeError("Cannot read properties of undefined (reading 'sessionDb')");
+        }
+        return sessions as DetailedSession[];
+      },
     } as unknown as ServerContext;
 
     app = express();

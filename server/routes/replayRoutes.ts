@@ -25,7 +25,7 @@ export function createReplayRouter(context: ServerContext): Router {
     context.replaysDir,
     context.replayCache,
     context.currentParser,
-    context.loadSessions,
+    () => context.loadSessions(),
     telemetryService
   );
 
