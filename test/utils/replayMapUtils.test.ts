@@ -10,6 +10,7 @@ import {
   buildEffectiveBaselinePoints,
 } from '../../src/components/replay/map/replayMapUtils.js';
 import type { ReplayTelemetryPoint } from '../../server/core/types.js';
+import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 
 describe('replayMapUtils', () => {
   const mockPoints: ReplayTelemetryPoint[] = [
@@ -178,15 +179,13 @@ describe('replayMapUtils', () => {
 
       const bounds = { minX: -200, maxX: 200, spanX: 400, minZ: -200, maxZ: 200, spanZ: 400 };
       const ghost = computeGhostPosition(
-        [1.36, 4.91],
-        [8.04, 9.82],
+        getTrajectoryDistances(primary, 5724.1),
+        getDistancesInReferenceFrame(baseline, primary, 5724.1),
         baseline,
         0, // Primary at station 1.36
         bounds,
         800,
-        60,
-        5724.1,
-        primary
+        60
       );
 
       expect(ghost).not.toBeNull();
@@ -196,25 +195,11 @@ describe('replayMapUtils', () => {
     });
   });
 
-  describe('computeBaselineDeltaByIdx station matching', () => {
-    it('samples delta correctly when station matching is active', () => {
-      const primary: ReplayTelemetryPoint[] = [
-        { x: 0, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1 },
-        { x: 0, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2 },
-      ];
-      const baseline: ReplayTelemetryPoint[] = [
-        { x: 2, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1.1 },
-        { x: 2, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2.2 },
-      ];
-      const deltas = computeBaselineDeltaByIdx(
-        [-0.1, -0.2],
-        baseline,
-        [10, 20],
-        [10, 20],
-        100,
-        primary
-      );
-      expect(deltas).toEqual([-0.1, -0.2]);
+  describe('computeBaselineDeltaByIdx', () => {
+    it('colours each baseline sample with the primary delta at the same distance (primary frame)', () => {
+      // Baseline samples at primary-frame distances 9, 21 and 40 m.
+      expect(computeBaselineDeltaByIdx([-0.1, -0.2, -0.3], [10, 20, 30], [9, 21, 40])).toEqual([-0.1, -0.2, -0.3]);
+      expect(computeBaselineDeltaByIdx(null, [10], [10])).toBeNull();
     });
   });
 });

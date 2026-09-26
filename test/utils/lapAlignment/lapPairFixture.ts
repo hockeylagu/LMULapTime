@@ -171,9 +171,9 @@ export function computeMapScene(
   const primaryDists = getTrajectoryDistances(primary, trackLengthM);
   const baselineDists = getDistancesInReferenceFrame(effectiveBaseline, primary, trackLengthM);
   const deltaByIdx = computeLapComparisons(primary, baseline, trackLengthM).map(c => c.deltaTimeSec);
-  const baselineDeltaByIdx = computeBaselineDeltaByIdx(deltaByIdx, effectiveBaseline, primaryDists, baselineDists, trackLengthM, primary);
+  const baselineDeltaByIdx = computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists);
   const ghostAt = (index: number) =>
-    computeGhostPosition(primaryDists, baselineDists, effectiveBaseline, index, bounds, MAP_VIEWBOX, MAP_PADDING, trackLengthM, primary);
+    computeGhostPosition(primaryDists, baselineDists, effectiveBaseline, index, bounds, MAP_VIEWBOX, MAP_PADDING);
   const pedalMarkerPoints = computePedalMarkerPoints(true, buildPedalMarkers(corners), primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaseline);
   const cornerMarkers = computeDispersedCornerMarkers(corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints);
   return {

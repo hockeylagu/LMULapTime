@@ -1,6 +1,6 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
-import { findIndexAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/lapAlignment.js';
+import { findIndexAtDistance, computeStartFinishOffset } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis.js';
@@ -236,21 +236,25 @@ export function buildEffectiveBaselinePoints(
   return baselinePoints;
 }
 
+/**
+ * Where the baseline car is when the primary car is at `currentIndex`: the baseline sampled at
+ * the primary's distance, with `baselineDists` already in the primary lap's frame (matched on
+ * track station - see getDistancesInReferenceFrame). Extrapolated slightly past either end so the
+ * ghost sits on the line at the start.
+ */
 export function computeGhostPosition(
   primaryDists: number[],
-  baseDists: number[],
+  baselineDists: number[],
   baselinePoints: ReplayTelemetryPoint[],
   currentIndex: number,
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
-  padding: number,
-  trackLengthM?: number,
-  primaryPoints?: ReplayTelemetryPoint[]
+  padding: number
 ) {
   if (
     !baselinePoints || baselinePoints.length === 0 ||
     !primaryDists || primaryDists.length === 0 ||
-    !baseDists || baseDists.length === 0
+    !baselineDists || baselineDists.length === 0
   ) {
     return null;
   }
@@ -261,30 +265,8 @@ export function computeGhostPosition(
   const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints?.[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
-
-  let primaryRefCoords: number[];
-  let baseRefCoords: number[];
-  let totalBase: number;
-
-  if (canMatchByStation && trackLengthM && primaryPoints) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baseRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-    totalBase = trackLengthM;
-  } else {
-    primaryRefCoords = primaryDists;
-    baseRefCoords = baseDists;
-    totalBase = Math.max(1, baseDists[baseDists.length - 1]);
-  }
-
-  const safeIdx = Math.max(0, Math.min(currentIndex, primaryRefCoords.length - 1));
-  const currentDist = primaryRefCoords[safeIdx];
-  // Match on the same absolute track distance/station, with extrapolateBoundary=true to seamlessly extrapolate back to the start line
-  const targetDist = Math.min(totalBase, currentDist);
-  const ghostPt = interpolatePointAtDistance(baselinePoints, baseRefCoords, targetDist, undefined, true);
+  const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
+  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, primaryDists[safeIdx], undefined, true);
 
   return {
     sx: offsetX + (ghostPt.x - minX) * scale,
@@ -568,40 +550,17 @@ export function computeEffectiveBounds(
 }
 
 
+/**
+ * Delta colouring for the baseline line: each baseline sample takes the delta of the primary
+ * sample at the same distance, `baselineDists` being in the primary lap's frame.
+ */
 export function computeBaselineDeltaByIdx(
   deltaByIdx: number[] | null,
-  baselinePoints?: ReplayTelemetryPoint[],
-  primaryDists?: number[],
-  baselineDists?: number[],
-  trackLengthM?: number,
-  primaryPoints?: ReplayTelemetryPoint[]
+  primaryDists: number[],
+  baselineDists: number[]
 ): number[] | null {
-  if (!deltaByIdx || !baselinePoints || baselinePoints.length === 0 || !primaryDists || !baselineDists) {
-    return null;
-  }
-
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints?.[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
-
-  if (canMatchByStation && trackLengthM && primaryPoints) {
-    const pStations = getMonotonicStations(primaryPoints, trackLengthM);
-    const bStations = getMonotonicStations(baselinePoints, trackLengthM);
-    return bStations.map(s => {
-      const idx = findIndexAtDistance(pStations, s);
-      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
-    });
-  }
-
-  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
-  return baselineDists.map(d => {
-    const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
-    const idx = findIndexAtDistance(primaryDists, targetDist);
-    return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
-  });
+  if (!deltaByIdx || deltaByIdx.length === 0 || primaryDists.length === 0 || baselineDists.length === 0) return null;
+  return baselineDists.map(d => deltaByIdx[Math.min(findIndexAtDistance(primaryDists, d), deltaByIdx.length - 1)]);
 }
 
 export interface GpsStartFinishGateProjection {
