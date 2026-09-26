@@ -5,6 +5,7 @@ import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shar
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
+import { fetchJsonShared } from './sharedJsonFetch.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 
 export interface UseReplayInspectorDataProps {
@@ -49,7 +50,9 @@ export function useReplayInspectorData({
   const [availableCompareLaps, setAvailableCompareLaps] = useState<ComparableLap[]>([]);
   const [compareLapFilter, setCompareLapFilter] = useState<CompareLapFilter>('player');
   const [isCompareLapsLoading, setIsCompareLapsLoading] = useState(false);
-  const [baselineDriverName, setBaselineDriverName] = useState<string | null>(null);
+  // Seeded from the props, not only by the open effect: the baseline load runs in the same commit
+  // and would otherwise fetch the lap once without its driver (the replay player's lap instead).
+  const [baselineDriverName, setBaselineDriverName] = useState<string | null>(initialBaselineDriverName ?? null);
   const [pendingDriverName, setPendingDriverName] = useState<string | null>(null);
   const [pendingLapNumber, setPendingLapNumber] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -107,8 +110,8 @@ export function useReplayInspectorData({
     const driverQuery = requestedDriverName ? `&driverName=${encodeURIComponent(requestedDriverName)}` : '';
 
     Promise.all([
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
+      fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.body as ReplayMetadata | null : null)),
+      fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.body as ReplayTrajectoryData | null : null)),
     ])
       .then(([metaData, rawTrajData]) => {
         if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
@@ -151,7 +154,9 @@ export function useReplayInspectorData({
     const filenameMatch = activeReplayName ? activeReplayName.match(/^(.+?)\s+([PQR]\d+)\b/i) : null;
     const filenameTrack = filenameMatch ? filenameMatch[1].trim() : null;
     const trackToQuery = metadata?.displayTrack || metadata?.trackCourse || filenameTrack || metadata?.trackName;
-    if (!isOpen || !trackToQuery) {
+    // Wait for the metadata: before it the inspected driver's car class is unknown, and the
+    // request would be repeated with it (laps are only compared within one car class).
+    if (!isOpen || !metadata || !trackToQuery) {
       setAvailableCompareLaps([]); setIsCompareLapsLoading(false);
       return;
     }
@@ -178,7 +183,7 @@ export function useReplayInspectorData({
         setIsCompareLapsLoading(false);
       })
       .catch(() => { setAvailableCompareLaps([]); setIsCompareLapsLoading(false); });
-  }, [isOpen, metadata?.displayTrack, metadata?.trackCourse, metadata?.trackName, activeReplayName, metadata?.carClass, selectedDriverSlot, compareLapFilter]);
+  }, [isOpen, metadata, activeReplayName, selectedDriverSlot, compareLapFilter]);
 
   // Open the comparison lap picker. Comparison stays active until explicitly removed.
   const handleToggleCompare = () => {
@@ -261,14 +266,15 @@ export function useReplayInspectorData({
     const targetLap = baselineLapNumber ?? 1;
     const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
 
-    const fetchMeta = targetReplay === activeReplayName && metadata
-      ? Promise.resolve(metadata)
-      : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
+    // A baseline from the inspected replay uses its metadata; only another replay's is fetched.
+    const fetchMeta = targetReplay === activeReplayName
+      ? Promise.resolve(null)
+      : fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.body as ReplayMetadata | null : null));
 
-    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
-      .then(async r => {
-        if (r.ok) return r.json();
-        const body: unknown = await r.json().catch(() => null);
+    const fetchTraj = fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
+      .then(r => {
+        if (r.ok) return r.body as ReplayTrajectoryData | null;
+        const body = r.body;
         const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : null;
         throw new Error(message || `Failed to load comparison lap (HTTP ${r.status})`);
       });
@@ -292,7 +298,7 @@ export function useReplayInspectorData({
       });
 
     return () => { isMounted = false; };
-  }, [isCompareMode, baselineReplayName, baselineLapNumber, baselineDriverName, activeReplayName, metadata, telemetryResolution, selectedSource]);
+  }, [isCompareMode, baselineReplayName, baselineLapNumber, baselineDriverName, activeReplayName, telemetryResolution, selectedSource]);
 
   // Handle external lap changes
   useEffect(() => {
@@ -314,9 +320,9 @@ export function useReplayInspectorData({
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
     const sourceParam = `&source=${src}`;
-    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
-      .then(r => (r.ok ? r.json() : null))
-      .then((rawTrajData: ReplayTrajectoryData | null) => {
+    fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
+      .then(r => (r.ok ? r.body as ReplayTrajectoryData | null : null))
+      .then(rawTrajData => {
         if (requestId !== trajectoryRequestIdRef.current) return;
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {

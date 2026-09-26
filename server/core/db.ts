@@ -267,7 +267,23 @@ export class SessionDatabase {
     this.db.exec('DELETE FROM replay_metadata; DELETE FROM replay_trajectories; DELETE FROM replay_trajectory_defaults;');
   }
 
+  private telemetryMetadataRevision = 0;
+
+  /** Changes whenever a telemetry_metadata row does: callers cache what they derive from the rows. */
+  public getTelemetryMetadataRevision(): number {
+    return this.telemetryMetadataRevision;
+  }
+
   public upsertTelemetryMetadata(info: DuckDbFileInfo, matchedSessionId?: string, matchedReplayFilename?: string): void {
+    // Every session list and trajectory request re-asserts its matches: rewriting an identical row
+    // cost ~1 ms each. A row that already holds a match is the only one holding it (see below).
+    const metadataJson = JSON.stringify(info);
+    const existing = this.db.prepare('SELECT metadata_json, matched_session_id, matched_replay_filename FROM telemetry_metadata WHERE filename = ?')
+      .get(info.filename) as { metadata_json: string; matched_session_id: string | null; matched_replay_filename: string | null } | undefined;
+    if (existing && existing.metadata_json === metadataJson
+      && (!matchedSessionId || existing.matched_session_id === matchedSessionId)
+      && (!matchedReplayFilename || existing.matched_replay_filename === matchedReplayFilename)) return;
+    this.telemetryMetadataRevision++;
     const upsert = this.db.prepare(`
       INSERT INTO telemetry_metadata (
         filename, file_path, file_mtime, file_size, track_name, session_type,
@@ -316,7 +332,7 @@ export class SessionDatabase {
         sessionType: info.sessionType,
         sessionTimestamp: info.timestampStr,
         lapsCount: info.lapsCount || 0,
-        metadataJson: JSON.stringify(info),
+        metadataJson,
         matchedSessionId: matchedSessionId || null,
         matchedReplayFilename: matchedReplayFilename || null,
         updatedAt: Date.now(),
@@ -440,6 +456,7 @@ export class SessionDatabase {
 
   public clearTelemetryCache(): void {
     this.db.exec('DELETE FROM telemetry_metadata; DELETE FROM telemetry_lap_cache;');
+    this.telemetryMetadataRevision++;
   }
 
   public getReplaysCount(): number {
@@ -613,10 +630,13 @@ export class SessionDatabase {
   }
 
   public updateSessionMatchingReplay(sessionId: string, matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>): void {
-    const row = this.db.prepare('SELECT metadata_json, data_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string; data_json: string } | undefined;
-    if (!row) return;
+    const metaRow = this.db.prepare('SELECT metadata_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string } | undefined;
+    if (!metaRow) return;
     try {
-      const meta = JSON.parse(row.metadata_json) as SessionMetadata;
+      const meta = JSON.parse(metaRow.metadata_json) as SessionMetadata;
+      // Enrichment re-asserts every match on each session list request: skip identical rewrites.
+      if (JSON.stringify(meta.matchingReplayFile) === JSON.stringify(matchingReplayFile)) return;
+      const row = this.db.prepare('SELECT data_json FROM sessions WHERE id = ?').get(sessionId) as { data_json: string };
       const data = JSON.parse(row.data_json) as DetailedSession;
       meta.matchingReplayFile = matchingReplayFile;
       data.matchingReplayFile = matchingReplayFile;

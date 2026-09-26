@@ -700,5 +700,31 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
       expect.objectContaining({ filename: currentFile.filename }),
     ]);
   });
+
+  it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
+    const file = {
+      filename: 'Spa_R.duckdb', filePath: 'C:\Telemetry\Spa_R.duckdb', fileMtimeMs: 1000, fileSizeBytes: 1024,
+      trackName: 'Spa', sessionType: 'R', timestampStr: '2026-09-01T00:00:00Z', timestampEpochMs: 1000,
+    };
+    const other = { ...file, filename: 'Spa_Q.duckdb', filePath: 'C:\Telemetry\Spa_Q.duckdb' };
+    const start = db.getTelemetryMetadataRevision();
+
+    db.upsertTelemetryMetadata(file, 'session-spa', 'Spa_R.Vcr');
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
+    db.upsertTelemetryMetadata(file, 'session-spa', 'Spa_R.Vcr');
+    db.upsertTelemetryMetadata(file);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
+
+    // A match moving to another file and back is written each time.
+    db.upsertTelemetryMetadata(other, 'session-spa');
+    db.upsertTelemetryMetadata(file, 'session-spa');
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
+    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename)).toEqual([file.filename]);
+
+    db.upsertTelemetryMetadata({ ...file, fileMtimeMs: 2000 });
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
+    db.clearTelemetryCache();
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 5);
+  });
 });
 
