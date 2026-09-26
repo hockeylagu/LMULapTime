@@ -65,8 +65,9 @@ describe('useReplayInspectorData', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.selectedDriverSlot).toBe(2);
     expect(result.current.selectedDriver?.name).toBe('Player Driver');
-    expect(result.current.currentPoint?.speedKmh).toBe(127);
-    expect(result.current.maxSpeed).toBe(153);
+    // Speed smoothing is a centred time window, so the recording's end samples keep their values.
+    expect(result.current.currentPoint?.speedKmh).toBe(100);
+    expect(result.current.maxSpeed).toBe(180);
     expect(result.current.currentLapSummary?.lapTimeSec).toBe(100);
     expect(onLapChange).toHaveBeenCalledWith(2);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'));
