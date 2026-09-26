@@ -1,5 +1,5 @@
 import React from 'react';
-import { VEHICLE_CLASS_OPTIONS } from '../../utils/paceCategory.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { CarClassBadge } from './CarClassBadge.js';
 
 export interface VehicleClassPillsProps {

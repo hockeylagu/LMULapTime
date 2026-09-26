@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, CheckCircle2 } from 'lucide-react';
-import { ReferenceBenchmarkDiff } from '../../../server/core/types';
+import { ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 
 export interface ReferenceChangesListProps {

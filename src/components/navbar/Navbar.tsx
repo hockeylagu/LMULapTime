@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, ArrowLeftRight, Film } from 'lucide-react';
-import { ReplayScanStatus, ScanStatus } from '../../../server/core/types';
+import { ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
 
 export interface NavbarProps {
   status: {

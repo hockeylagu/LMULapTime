@@ -1,9 +1,9 @@
 import React from 'react';
 import { ChevronRight, AlertCircle, MapPin } from 'lucide-react';
-import { isSessionEmpty, getDisplayTrackName } from '../../utils/formatters';
+import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
-import { SessionListItem } from './SessionList.js';
-import { PaceCategory } from '../../../server/core/types';
+import { SessionListItem } from './sessionListTypes.js';
+import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface SessionTableRowProps {
   session: SessionListItem;

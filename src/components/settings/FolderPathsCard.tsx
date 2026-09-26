@@ -1,6 +1,6 @@
 import React from 'react';
 import { HardDrive, CheckCircle2, AlertCircle, User, RefreshCw } from 'lucide-react';
-import { AppStatus, SessionScanStatus } from '../../../server/core/types';
+import { AppStatus, SessionScanStatus } from '../../../shared/types/index.js';
 
 export interface FolderPathsCardProps {
   status: AppStatus | null;

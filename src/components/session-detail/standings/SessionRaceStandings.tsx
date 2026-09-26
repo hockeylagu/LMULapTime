@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowDown, ArrowUp, Trophy } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { SessionRaceStandingsRow } from './SessionRaceStandingsRow.js';
 
 export interface SessionRaceStandingsProps {

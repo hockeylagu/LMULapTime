@@ -17,7 +17,22 @@ import {
   DuckDbLapTelemetry,
 } from './types.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
-import { LmuParser } from '../sessions/parser.js';
+
+export interface SessionXmlSyncParser {
+  addReplayEntry(entry: {
+    name: string;
+    path: string;
+    sizeBytes: number;
+    trackName: string;
+    sessionCode: string;
+    mtime: number;
+    durationSec?: number;
+    eventTitle?: string;
+    splitNo?: number;
+    eventType?: string;
+  }): void;
+  parseSessionXml(filePath: string): DetailedSession | null;
+}
 import {
   initDbSchema,
   compressJson,
@@ -633,7 +648,7 @@ export class SessionDatabase {
 
   public *syncSessionsIterator(
     resultsDir: string,
-    parser: LmuParser,
+    parser: SessionXmlSyncParser,
     forceReparse = false
   ): Generator<SessionSyncProgress, SyncResult, void> {
     if (!fs.existsSync(resultsDir)) {
@@ -756,7 +771,7 @@ export class SessionDatabase {
 
   public syncSessionsFromDir(
     resultsDir: string,
-    parser: LmuParser,
+    parser: SessionXmlSyncParser,
     forceReparse = false,
     onProgress?: (progress: SessionSyncProgress) => void
   ): SyncResult {
@@ -771,7 +786,7 @@ export class SessionDatabase {
 
   public async *syncSessionsAsyncIterator(
     resultsDir: string,
-    parser: LmuParser,
+    parser: SessionXmlSyncParser,
     forceReparse = false
   ): AsyncGenerator<SessionSyncProgress, SyncResult, void> {
     const iterator = this.syncSessionsIterator(resultsDir, parser, forceReparse);

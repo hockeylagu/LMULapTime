@@ -1,4 +1,4 @@
-import { ReplayTelemetryPoint } from '../../../../server/core/types';
+import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';

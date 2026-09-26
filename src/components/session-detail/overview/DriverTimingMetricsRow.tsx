@@ -1,7 +1,7 @@
 import { Activity } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
-import { formatTime, getDisplayTrackName } from '../../../utils/formatters.js';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common';
 
 export interface DriverTimingMetricsRowProps {

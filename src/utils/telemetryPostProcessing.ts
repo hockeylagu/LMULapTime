@@ -1,6 +1,6 @@
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { computeVehicleDynamics } from './computedTelemetry.js';
-import { getSteerAngleDeg } from './formatters.js';
+import { getSteerAngleDeg } from '../../shared/domain/formatters.js';
 
 const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
 const NEUTRAL_MAX_FRAMES = 6;

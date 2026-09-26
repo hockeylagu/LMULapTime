@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import type { PaceCategory } from '../../../../server/core/types.js';
 import {
   ResponsiveContainer,
   LineChart,
@@ -10,51 +9,17 @@ import {
   Legend,
   type LegendPayload,
 } from 'recharts';
-import { formatTime } from '../../../utils/formatters.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';
 import { ImprovementPaceSeries } from './ImprovementPaceSeries.js';
+import type { ImprovementChartPoint } from './improvementChartTypes.js';
 
-export interface ImprovementChartPoint {
-  chartKey: string;
-  shortSession: string;
-  fullDate: string;
-  sessionId: string;
-  session: string;
-  car: string;
-  weather?: string;
-  bestLap: number | null;
-  top3Avg: number | null;
-  top3AvgStr: string | null;
-  movingAvg: number | null;
-  avgLap: number | null;
-  bestPr: number | null;
-  lapPrDelta: number | null;
-  personalBestImproved: boolean;
-  benchmarkCategory?: PaceCategory | null;
-  personalBestBenchmarkCategory?: PaceCategory | null;
-  benchmarkPercentage: number | null;
-  theoretical: number | null;
-  theoreticalGap: number | null;
-  consistencyScore: number | null;
-  s1: number | null;
-  s2: number | null;
-  s3: number | null;
-  lapStr: string;
-  theoreticalStr: string;
-  avgLapStr: string;
-  cleanLaps: number;
-  replay?: string;
-}
-
-export interface ImprovementTooltipPayloadEntry {
-  dataKey?: string | number;
-  name?: string;
-  value?: number | string | null;
-  color?: string;
-  payload: ImprovementChartPoint;
-}
+export type {
+  ImprovementChartPoint,
+  ImprovementTooltipPayloadEntry,
+} from './improvementChartTypes.js';
 
 export interface ImprovementPaceChartProps {
   chartData: ImprovementChartPoint[];

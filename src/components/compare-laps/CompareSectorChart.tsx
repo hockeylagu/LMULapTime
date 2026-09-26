@@ -12,8 +12,8 @@ import {
   Cell,
 } from 'recharts';
 import { Clock, Activity } from 'lucide-react';
-import { ComparableLap } from '../../../server/core/types';
-import { formatTime } from '../../utils/formatters';
+import { ComparableLap } from '../../../shared/types/index.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
 
 export interface CompareSectorChartDataItem {

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { matchesTrack } from '../../src/utils/paceCategory.js';
+import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { DuckDbReader } from './duckdbReader.js';
 import { DetailedSession, ReplayMetadata } from '../core/types.js';
 

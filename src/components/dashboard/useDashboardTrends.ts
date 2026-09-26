@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { getDisplayTrackName, isSessionEmpty } from '../../utils/formatters.js';
-import { computeConsistencyRating } from '../../utils/lapComparison.js';
-import { PaceCategory } from '../../../server/core/types';
-import { SessionSummary } from './Dashboard.js';
+import { getDisplayTrackName, isSessionEmpty } from '../../../shared/domain/formatters.js';
+import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
+import { PaceCategory } from '../../../shared/types/index.js';
+import type { SessionSummary } from './dashboardTypes.js';
 
 export interface RecentPacePoint {
   id: string;

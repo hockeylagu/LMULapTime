@@ -6,13 +6,13 @@ import {
   ReplayEventInfo,
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
-  ReplayLapSummary,
 } from '../core/types.js';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
-} from '../../src/utils/vehicleMapping.js';
-import { extractReplayTrajectory } from './replayTrajectory.js';/**
+} from '../../shared/domain/vehicleMapping.js';
+
+/**
  * Dynamically detects the LMU player profile name from UserData/player/settings.json,
  * avoiding any hardcoded player names.
  */
@@ -63,7 +63,6 @@ export type {
   ReplayProgressCallback,
   ReplayLogOptions,
 } from './replayProgress.js';
-export type { ExtractReplayTrajectoryOptions } from './replayTrajectory.js';
 
 export interface ParseReplayMetadataOptions {
   playerName?: string;
@@ -444,25 +443,4 @@ export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints
       s2Frame: Math.min(sampled.length - 1, Math.round(s2Frac * sampled.length)),
     },
   };
-}
-
-/**
- * Fast direct extractor for 100% official lap summaries and sector splits
- * streaming Class 6 Type 6 simulation timing events.
- */
-export function extractReplayLapSummaries(
-  filePath: string,
-  options: {
-    driverSlot?: number;
-    driverName?: string;
-    playerName?: string;
-  } = {}
-): ReplayLapSummary[] {
-  const traj = extractReplayTrajectory(filePath, {
-    driverSlot: options.driverSlot,
-    driverName: options.driverName,
-    playerName: options.playerName,
-    maxPoints: 10,
-  });
-  return traj.laps || [];
 }

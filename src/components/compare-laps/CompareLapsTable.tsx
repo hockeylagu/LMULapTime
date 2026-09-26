@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gauge, ChevronDown, ChevronUp } from 'lucide-react';
-import { ComparableLap } from '../../../server/core/types';
+import { ComparableLap } from '../../../shared/types/index.js';
 import { AvailableLapsSortOption } from './useCompareLapsData';
 import { CompareLapsTableRow } from './CompareLapsTableRow';
 import { HideEmptyToggle, SortDropdown } from '../common/index.js';

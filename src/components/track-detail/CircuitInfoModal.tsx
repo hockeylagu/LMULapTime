@@ -10,7 +10,7 @@ import {
   Award,
   Mountain,
 } from 'lucide-react';
-import { getCircuitSpecification } from '../../utils/circuitSpecs.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { useTrackBoundaryGeometry, TrackBoundaryGeometry } from '../replay/map/index.js';
 

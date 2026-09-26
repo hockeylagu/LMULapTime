@@ -1,8 +1,8 @@
 import React from 'react';
 import { Trophy } from 'lucide-react';
-import { formatTime } from '../../utils/formatters.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge, SectorSplitsRow, CarClassBadge } from '../common';
-import { PaceCategory } from '../../../server/core/types';
+import { PaceCategory } from '../../../shared/types/index.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
 export interface TrackSummaryItem {

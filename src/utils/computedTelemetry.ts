@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../server/core/types';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 const G_CONST = 9.80665;
 const WHEELBASE_M = 2.7; // Standard GT3 / Prototype wheelbase (~2.7m)

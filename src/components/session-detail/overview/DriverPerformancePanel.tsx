@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Trophy, Gauge } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
-import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../utils/lapComparison.js';
-import { computeTheoreticalGap } from '../../../utils/formatters.js';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
+import { computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';

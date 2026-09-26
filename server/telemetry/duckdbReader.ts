@@ -4,8 +4,8 @@ import {
   DuckDbEventEntry,
   DuckDbLapSummary,
   DuckDbLapTelemetry,
-  ReplayTrajectoryPoint,
-} from '../core/types.js';
+} from './duckdbTypes.js';
+import { ReplayTrajectoryPoint } from '../core/types.js';
 
 export interface DuckDbSessionMetadata {
   trackName?: string;

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { Router } from 'express';
-import { aggregateTrackSummaries } from '../../src/utils/trackSummaryUtils.js';
+import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { ServerContext } from '../core/serverContext.js';
 
@@ -24,7 +24,7 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryExist,
       playerName: context.currentParser.configuredPlayerName,
       sessionsCount: sessions.length,
-      tracksCount: Object.keys(aggregateTrackSummaries(sessions)).length,
+      tracksCount: new Set(sessions.map((s) => getDisplayTrackName(s.trackVenue, s.trackCourse)).filter(Boolean)).size,
       referenceLaptimes: {
         lastUpdated: refCache?.lastUpdated || null,
         entriesCount: refCache?.entriesCount || 0,

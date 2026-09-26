@@ -5,7 +5,7 @@ import {
   computeTrackBoundaryPathD,
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
-import { getCircuitSpecification } from '../../utils/circuitSpecs.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
 
 export interface TrackCircuitLayoutProps {

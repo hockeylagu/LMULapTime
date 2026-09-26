@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { DetailedSession, DriverData, LapData } from '../../../../server/core/types';
-import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../utils/formatters.js';
-import { computeLapToLapDelta } from '../../../utils/lapComparison.js';
+import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
+import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
+import { computeLapToLapDelta } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';

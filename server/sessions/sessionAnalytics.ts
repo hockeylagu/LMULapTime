@@ -9,13 +9,13 @@ import {
   compareSessions,
   computeTheoreticalGap,
   getDisplayTrackName,
-} from '../../src/utils/formatters.js';
+} from '../../shared/domain/formatters.js';
 import {
   computeTopNLapAverage,
   computeConsistencyRating,
   selectCleanLapCandidates,
-} from '../../src/utils/lapComparison.js';
-import { matchesTrack, matchesCarClass } from '../../src/utils/paceCategory.js';
+} from '../../shared/domain/lapComparison.js';
+import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
   const candidates = selectCleanLapCandidates(laps);

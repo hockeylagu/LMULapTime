@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Ban, Flag, ShieldAlert } from 'lucide-react';
-import { LapData } from '../../../../server/core/types';
+import { LapData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/index.js';
 import {
   getWorstTrackLimitSeverity,

@@ -1,6 +1,6 @@
-import { DetailedSession } from '../../../server/core/types';
-import { parseDateStringToTimestamp, matchesSessionType } from '../../utils/formatters.js';
-import { matchesTrack } from '../../utils/paceCategory.js';
+import { DetailedSession } from '../../../shared/types/index.js';
+import { parseDateStringToTimestamp, matchesSessionType } from '../../../shared/domain/formatters.js';
+import { matchesTrack } from '../../../shared/domain/paceCategory.js';
 import { CHART_COLORS, OPPONENT_COLORS } from '../../utils/themeColors.js';
 
 export { OPPONENT_COLORS };

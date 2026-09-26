@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { applyTelemetryPostProcessing } from '../../../utils/telemetryPostProcessing.js';
 

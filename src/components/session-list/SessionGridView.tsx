@@ -1,7 +1,7 @@
 import React from 'react';
-import { SessionListItem } from './SessionList.js';
+import { SessionListItem } from './sessionListTypes.js';
 import { SessionGridCard } from './SessionGridCard';
-import { PaceCategory } from '../../../server/core/types';
+import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface SessionGridViewProps {
   sessions: SessionListItem[];

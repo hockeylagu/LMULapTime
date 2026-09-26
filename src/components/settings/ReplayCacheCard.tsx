@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Film, RefreshCw } from 'lucide-react';
-import { ReplayCacheSummary, ReplayScanStatus } from '../../../server/core/types';
+import { ReplayCacheSummary, ReplayScanStatus } from '../../../shared/types/index.js';
 
 export interface ReplayCacheCardProps {
   replayScanStatus?: ReplayScanStatus | null;

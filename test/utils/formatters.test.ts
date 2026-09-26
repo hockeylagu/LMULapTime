@@ -12,7 +12,7 @@ import {
   minValidTime,
   getSessionTypeWeight,
   compareSessions,
-} from '../../src/utils/formatters.js';
+} from '../../shared/domain/formatters.js';
 
 describe('formatters utility', () => {
   describe('formatTime', () => {

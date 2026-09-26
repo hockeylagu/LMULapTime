@@ -2,7 +2,7 @@ import React from 'react';
 import {
   X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, Scale, ArrowLeftRight, Users,
 } from 'lucide-react';
-import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../server/core/types';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
 
 export interface ReplayInspectorHeaderProps {

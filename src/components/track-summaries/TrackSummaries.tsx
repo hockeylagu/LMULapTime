@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { findReferenceEntry, getPaceCategoryFromPercentage } from '../../utils/paceCategory.js';
-import { aggregateTrackSummaries, TrackSessionSummary } from '../../utils/trackSummaryUtils.js';
-import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../server/core/types';
+import { findReferenceEntry, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { aggregateTrackSummaries, TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
+import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../shared/types/index.js';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
 import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
 

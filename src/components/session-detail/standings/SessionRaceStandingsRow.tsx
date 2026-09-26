@@ -1,8 +1,8 @@
 import React from 'react';
 import { Ban, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { DetailedSession, DriverData } from '../../../../server/core/types';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
-import { formatElapsedSeconds, formatTime } from '../../../utils/formatters.js';
+import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/formatters.js';
 import {
   getWorstTrackLimitSeverity,
   getTrackLimitStandingsPillClasses,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCircuitSpecification } from '../../src/utils/circuitSpecs.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import {
   projectBoundaryPoints,
   buildRoadRibbonSvgPath,

@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../../server/core/types';
+import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../types/index.js';
 import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 

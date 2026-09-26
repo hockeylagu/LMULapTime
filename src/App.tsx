@@ -12,7 +12,7 @@ import {
   ReferenceLaptimeUpdateToast,
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
-import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../server/core/types';
+import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../shared/types/index.js';
 
 interface SessionRouteProps {
   onBack: () => void;

@@ -1,4 +1,4 @@
-import { LapData, PaceCategory } from '../../../server/core/types';
+import { LapData, PaceCategory } from '../../../shared/types/index.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';
 
 export type { DashboardSortOption };

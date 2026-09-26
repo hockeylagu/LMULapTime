@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowDown, ArrowLeftRight, ArrowUp, Clock } from 'lucide-react';
-import { DetailedSession, DriverData, LapData } from '../../../../server/core/types';
-import { getDisplayTrackName } from '../../../utils/formatters.js';
-import { computeLapToLapDelta } from '../../../utils/lapComparison.js';
+import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
+import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { computeLapToLapDelta } from '../../../../shared/domain/lapComparison.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
 
 type SortableLapColumn = 'lap' | 'position' | 'lapTime' | 'delta' | 'prevDelta' | 's1' | 's2' | 's3' | 'topSpeed';

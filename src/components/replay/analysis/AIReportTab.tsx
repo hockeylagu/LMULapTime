@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BrainCircuit, RefreshCw, Sparkles } from 'lucide-react';
-import { AiAnalyzeResponse, AiErrorCode, ReplayLapSummary, ReplayTrajectoryData } from '../../../../server/core/types';
+import { AiAnalyzeResponse, AiErrorCode, ReplayLapSummary, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { buildAiLapEvidence } from '../../../utils/aiReportPayload.js';
 

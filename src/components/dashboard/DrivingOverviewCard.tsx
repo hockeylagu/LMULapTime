@@ -1,8 +1,8 @@
 import React from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
 import { RankBadge } from '../common';
-import { getPaceCategoryStyle } from '../../utils/paceCategory';
-import { PaceCategory } from '../../../server/core/types';
+import { getPaceCategoryStyle } from '../../utils/paceCategoryStyles.js';
+import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface DrivingOverviewCardProps {
   sessionsCount: number;

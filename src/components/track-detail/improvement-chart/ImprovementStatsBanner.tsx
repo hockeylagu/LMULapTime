@@ -1,8 +1,8 @@
 import React from 'react';
 import { Clock, Trophy, Zap, Activity, Flag } from 'lucide-react';
-import { formatTime } from '../../../utils/formatters.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/index.js';
-import { PaceCategory } from '../../../../server/core/types';
+import { PaceCategory } from '../../../../shared/types/index.js';
 
 export interface ImprovementStatsBannerProps {
   trackDataCount: number;
