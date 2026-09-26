@@ -280,8 +280,8 @@ export class SessionDatabase {
   }
 
   /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
-  public getStoredReplayTrajectory(filename: string, driverSlot: number, lapKey: number): ReplayTrajectoryData | null {
-    return getStoredReplayTrajectory(this.db, filename, driverSlot, lapKey);
+  public getStoredReplayTrajectory(filename: string, driverSlot: number, lapKey: number, options?: { allowFallback?: boolean }): ReplayTrajectoryData | null {
+    return getStoredReplayTrajectory(this.db, filename, driverSlot, lapKey, options);
   }
 
   public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {

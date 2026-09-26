@@ -7,34 +7,67 @@ import { matchesSessionType, isSessionEmpty } from '../../shared/domain/formatte
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
+import { DetailedSession } from '../core/types.js';
+
+export interface SessionFilterOptions {
+  track?: string;
+  car?: string;
+  carClass?: string;
+  driver?: string;
+  sessionType?: string;
+  hideEmpty?: boolean;
+}
+
+export function parseSessionFilters(query: Record<string, unknown>): SessionFilterOptions {
+  return {
+    track: query.track as string | undefined,
+    car: query.car as string | undefined,
+    carClass: query.carClass as string | undefined,
+    driver: query.driver as string | undefined,
+    sessionType: query.sessionType as string | undefined,
+    hideEmpty: query.hideEmpty === 'true' || query.filterEmpty === 'true',
+  };
+}
+
+export function filterSessions(sessions: DetailedSession[], options: SessionFilterOptions): DetailedSession[] {
+  let filtered = sessions;
+
+  if (options.hideEmpty) {
+    filtered = filtered.filter(session => !isSessionEmpty(session));
+  }
+  if (options.track && options.track !== 'All') {
+    filtered = filtered.filter(session => matchesTrack(options.track, session.trackVenue, session.trackCourse));
+  }
+  if (options.sessionType && options.sessionType !== 'All') {
+    filtered = filtered.filter(session => matchesSessionType(session.sessionType, session.sessionName, options.sessionType));
+  }
+  if (options.carClass && options.carClass !== 'All') {
+    filtered = filtered.filter(session => matchesSessionCarClass(session, options.carClass));
+  }
+  if (options.driver && options.driver !== 'All') {
+    const driverLower = options.driver.toLowerCase();
+    filtered = filtered.filter(session =>
+      (session.playerDriver?.name && session.playerDriver.name.toLowerCase().includes(driverLower)) ||
+      session.drivers.some(driverData => driverData.name.toLowerCase().includes(driverLower))
+    );
+  }
+  if (options.car && options.car !== 'All') {
+    const carLower = options.car.toLowerCase();
+    filtered = filtered.filter(session =>
+      session.drivers.some(driverData => driverData.carType.toLowerCase().includes(carLower))
+    );
+  }
+
+  return filtered;
+}
 
 export function createSessionRouter(context: ServerContext): Router {
   const router = Router();
 
   router.get('/sessions', (req, res) => {
     const forceRefresh = req.query.refresh === 'true';
-    const track = req.query.track as string | undefined;
-    const car = req.query.car as string | undefined;
-    const carClass = req.query.carClass as string | undefined;
-    const driver = req.query.driver as string | undefined;
-    const sessionType = req.query.sessionType as string | undefined;
-    const hideEmpty = req.query.hideEmpty === 'true' || req.query.filterEmpty === 'true';
-    let sessions = context.loadSessions(forceRefresh);
-
-    if (hideEmpty) sessions = sessions.filter(session => !isSessionEmpty(session));
-    if (track && track !== 'All') sessions = sessions.filter(session => matchesTrack(track, session.trackVenue, session.trackCourse));
-    if (sessionType && sessionType !== 'All') sessions = sessions.filter(session => matchesSessionType(session.sessionType, session.sessionName, sessionType));
-    if (carClass && carClass !== 'All') sessions = sessions.filter(session => matchesSessionCarClass(session, carClass));
-    if (driver && driver !== 'All') {
-      const driverLower = driver.toLowerCase();
-      sessions = sessions.filter(session =>
-        (session.playerDriver?.name && session.playerDriver.name.toLowerCase().includes(driverLower)) ||
-        session.drivers.some(driverData => driverData.name.toLowerCase().includes(driverLower))
-      );
-    }
-    if (car && car !== 'All') {
-      sessions = sessions.filter(session => session.drivers.some(driverData => driverData.carType.toLowerCase().includes(car.toLowerCase())));
-    }
+    const filters = parseSessionFilters(req.query as Record<string, unknown>);
+    const sessions = filterSessions(context.loadSessions(forceRefresh), filters);
 
     res.json(sessions.map(session => {
       const { drivers, ...metadata } = session;
@@ -64,19 +97,11 @@ export function createSessionRouter(context: ServerContext): Router {
   });
 
   router.get('/progression', (req, res) => {
-    const driverName = req.query.driver as string | undefined;
-    const track = req.query.track as string | undefined;
-    const carClass = req.query.carClass as string | undefined;
-    const sessionType = req.query.sessionType as string | undefined;
-    const hideEmpty = req.query.hideEmpty === 'true' || req.query.filterEmpty === 'true';
-    let sessions = context.loadSessions();
+    const filters = parseSessionFilters(req.query as Record<string, unknown>);
+    // In progression, driver is the focal driver for progression points rather than a session exclusion filter
+    const sessions = filterSessions(context.loadSessions(), { ...filters, driver: undefined });
 
-    if (hideEmpty) sessions = sessions.filter(session => !isSessionEmpty(session));
-    if (track && track !== 'All') sessions = sessions.filter(session => matchesTrack(track, session.trackVenue, session.trackCourse));
-    if (sessionType && sessionType !== 'All') sessions = sessions.filter(session => matchesSessionType(session.sessionType, session.sessionName, sessionType));
-    if (carClass && carClass !== 'All') sessions = sessions.filter(session => matchesSessionCarClass(session, carClass));
-
-    res.json(computeProgression(sessions, driverName));
+    res.json(computeProgression(sessions, filters.driver));
   });
 
   router.get('/track/:trackName', (req, res) => {

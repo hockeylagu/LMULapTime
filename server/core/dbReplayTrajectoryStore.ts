@@ -119,11 +119,25 @@ export function getStoredReplayTrajectory(
   db: DatabaseType,
   filename: string,
   driverSlot: number,
-  lapKey: number
+  lapKey: number,
+  options?: { allowFallback?: boolean }
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
-  if (!row) return null;
-  return decompressTrajectory(row.trajectory_br);
+  if (row) return decompressTrajectory(row.trajectory_br);
+
+  if (options?.allowFallback) {
+    if (lapKey !== -1) {
+      const rowFallbackLap = selectResolvedRow(db, filename, driverSlot, -1);
+      if (rowFallbackLap) return decompressTrajectory(rowFallbackLap.trajectory_br);
+    }
+    if (driverSlot !== -1) {
+      const rowFallbackSlot = selectResolvedRow(db, filename, -1, lapKey)
+        || selectResolvedRow(db, filename, -1, -1);
+      if (rowFallbackSlot) return decompressTrajectory(rowFallbackSlot.trajectory_br);
+    }
+  }
+
+  return null;
 }
 
 // Same validity check as getReplayTrajectoryCache but never decompresses the (multi-MB) blob.
