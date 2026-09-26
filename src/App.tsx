@@ -12,7 +12,7 @@ import {
   ReferenceLaptimeUpdateToast,
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
-import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint, TrackSummary } from '../server/core/types';
+import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../server/core/types';
 
 interface SessionRouteProps {
   onBack: () => void;
@@ -110,7 +110,6 @@ export default function App() {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [sessions, setSessions] = useState<DetailedSession[]>([]);
   const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
-  const [tracksMap, setTracksMap] = useState<Record<string, TrackSummary>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [replayScanStatus, setReplayScanStatus] = useState<ScanStatus | null>(null);
@@ -188,22 +187,19 @@ export default function App() {
   const fetchData = useCallback(async (forceRefresh = false) => {
     setIsRefreshing(true);
     try {
-      const [statusRes, sessionsRes, progRes, tracksRes] = await Promise.all([
+      const [statusRes, sessionsRes, progRes] = await Promise.all([
         fetch('/api/status'),
         fetch(`/api/sessions${forceRefresh ? '?refresh=true' : ''}`),
         fetch('/api/progression'),
-        fetch('/api/tracks'),
       ]);
 
       const statusData = await statusRes.json();
       const sessionsData = await sessionsRes.json();
       const progData = await progRes.json();
-      const tracksData = await tracksRes.json();
 
       setStatus(statusData);
       setSessions(sessionsData);
       setProgression(progData);
-      setTracksMap(tracksData);
       if (forceRefresh) startScanPolling();
     } catch (err) {
       console.error('Error fetching LMU telemetry data:', err);
@@ -280,7 +276,6 @@ export default function App() {
             <Route path="/tracks" element={
               <TrackSummaries
                 sessions={sessions}
-                tracksMap={tracksMap}
                 onSelectTrack={handleSelectTrack}
                 selectedCarClass={selectedCarClass}
                 setSelectedCarClass={setSelectedCarClass}

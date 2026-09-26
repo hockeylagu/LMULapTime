@@ -8,16 +8,11 @@ import {
   ReplayTrajectoryPoint,
   ReplayLapSummary,
 } from '../core/types.js';
-
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
 } from '../../src/utils/vehicleMapping.js';
-
-export { mapVehicleIdToModel, mapVehicleIdToClass };
-
-
-/**
+import { extractReplayTrajectory } from './replayTrajectory.js';/**
  * Dynamically detects the LMU player profile name from UserData/player/settings.json,
  * avoiding any hardcoded player names.
  */
@@ -416,8 +411,6 @@ export function parseReplayMetadata(
   }
 }
 
-export { extractReplayTrajectory } from './replayTrajectory.js';
-import { extractReplayTrajectory } from './replayTrajectory.js';
 
 /**
  * Downsamples an already-extracted full-resolution trajectory to at most `maxPoints`

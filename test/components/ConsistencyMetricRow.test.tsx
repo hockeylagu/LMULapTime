@@ -6,7 +6,7 @@ import {
   MetricRow,
   LeastConsistentBadge,
 } from '../../src/components/replay/analysis/ConsistencyMetricRow.js';
-import { ConsistencyMetricStat } from '../../src/utils/cornerAnalysis.js';
+import { ConsistencyMetricStat } from '../../src/utils/cornerConsistency.js';
 
 vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,

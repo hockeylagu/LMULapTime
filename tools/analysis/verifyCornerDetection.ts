@@ -17,7 +17,7 @@ import path from 'path';
 import readline from 'readline';
 import { computeCumulativeDistances, interpolatePointAtDistance } from '../../src/utils/replayComparison.js';
 import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis.js';
-import { extractReplayTrajectory } from '../../server/replay/replayParser.js';
+import { extractReplayTrajectory } from '../../server/replay/replayTrajectory.js';
 import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 interface TelRecord {

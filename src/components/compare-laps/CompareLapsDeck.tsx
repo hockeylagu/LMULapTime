@@ -1,7 +1,7 @@
 import React from 'react';
 import { Flag, ArrowLeftRight } from 'lucide-react';
-import { ComparableLap, computeLapDeltas } from '../../utils/lapComparison';
-import { ReferenceLaptimeEntry } from '../../../server/core/types';
+import { computeLapDeltas } from '../../utils/lapComparison';
+import { ReferenceLaptimeEntry, ComparableLap } from '../../../server/core/types';
 import { CompareLapCard } from './CompareLapCard';
 
 export interface CompareLapsDeckProps {

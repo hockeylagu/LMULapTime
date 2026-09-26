@@ -6,7 +6,7 @@ import {
   CompareSectorTooltip,
   SectorTooltipPayloadItem,
 } from '../../src/components/compare-laps/CompareSectorChart.js';
-import { ComparableLap } from '../../src/utils/lapComparison.js';
+import { ComparableLap } from '../../server/core/types.js';
 
 const baseline: ComparableLap = {
   id: 'baseline',

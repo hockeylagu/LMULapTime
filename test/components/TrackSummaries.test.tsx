@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { TrackSummaries } from '../../src/components/track-summaries/index.js';
+import { TrackSummaries, TrackSessionSummary } from '../../src/components/track-summaries/index.js';
 
 describe('TrackSummaries component', () => {
   beforeEach(() => {
@@ -11,38 +11,41 @@ describe('TrackSummaries component', () => {
       })
     );
   });
-  const mockTrackSummaries = {
-    Spa: {
+
+  const mockSessions: TrackSessionSummary[] = [
+    {
+      id: 'spa-sess',
       trackVenue: 'Spa',
-      sessionsCount: 3,
-      totalLaps: 15,
-      bestLapTime: 122.0,
-      bestLapTimeString: '2:02.000',
-      bestLapDriver: 'Player',
-      bestLapCar: 'Ferrari 499P',
-      bestLapClass: 'LMH',
-      bestS1: 34.0,
-      bestS2: 42.0,
-      bestS3: 46.0,
-      theoreticalBest: 122.0,
-      carsUsed: ['Ferrari 499P'],
+      timeString: '2026/05/28 14:00',
+      playerDriver: {
+        name: 'Player',
+        carType: 'Ferrari 499P',
+        carClass: 'LMH',
+        bestLapTime: 122.0,
+        bestLapTimeString: '2:02.000',
+        bestS1: 34.0,
+        bestS2: 42.0,
+        bestS3: 46.0,
+        lapsCount: 15,
+      },
     },
-    Monza: {
+    {
+      id: 'monza-sess',
       trackVenue: 'Monza',
-      sessionsCount: 1,
-      totalLaps: 5,
-      bestLapTime: 108.0,
-      bestLapTimeString: '1:48.000',
-      bestLapDriver: 'Player',
-      bestLapCar: 'Porsche 911 GT3',
-      bestLapClass: 'LMGT3',
-      bestS1: 28.0,
-      bestS2: 38.0,
-      bestS3: 42.0,
-      theoreticalBest: 108.0,
-      carsUsed: ['Porsche 911 GT3'],
+      timeString: '2026/05/27 14:00',
+      playerDriver: {
+        name: 'Player',
+        carType: 'Porsche 911 GT3',
+        carClass: 'LMGT3',
+        bestLapTime: 108.0,
+        bestLapTimeString: '1:48.000',
+        bestS1: 28.0,
+        bestS2: 38.0,
+        bestS3: 42.0,
+        lapsCount: 5,
+      },
     },
-  };
+  ];
 
   it('renders track cards and allows selecting a track', async () => {
     const onSelectTrack = vi.fn();
@@ -50,7 +53,7 @@ describe('TrackSummaries component', () => {
 
     render(
       <TrackSummaries
-        tracksMap={mockTrackSummaries}
+        sessions={mockSessions}
         onSelectTrack={onSelectTrack}
         selectedCarClass="All"
         setSelectedCarClass={setSelectedCarClass}
@@ -76,7 +79,7 @@ describe('TrackSummaries component', () => {
 
     render(
       <TrackSummaries
-        tracksMap={mockTrackSummaries}
+        sessions={mockSessions}
         onSelectTrack={vi.fn()}
         selectedCarClass="All"
         setSelectedCarClass={setSelectedCarClass}
@@ -97,7 +100,7 @@ describe('TrackSummaries component', () => {
     fireEvent.change(sortSelect, { target: { value: 'last-session-desc' } });
   });
 
-  it('uses server aggregates for all classes and computes class-filtered summaries from sessions', async () => {
+  it('computes class-filtered summaries directly from sessions', async () => {
     const sessions = [
       {
         id: 'spa-lmh',
@@ -134,20 +137,18 @@ describe('TrackSummaries component', () => {
     const { rerender } = render(
       <TrackSummaries
         sessions={sessions}
-        tracksMap={mockTrackSummaries}
         onSelectTrack={onSelectTrack}
         selectedCarClass="All"
         setSelectedCarClass={vi.fn()}
       />
     );
 
-    expect(await screen.findByText('3 Sessions • 15 Total Laps')).toBeInTheDocument();
-    expect(screen.getAllByText('2:02.000')).toHaveLength(2);
+    expect(await screen.findByText('2 Sessions • 12 Total Laps')).toBeInTheDocument();
+    expect(screen.getAllByText('2:10.000')).toHaveLength(2);
 
     rerender(
       <TrackSummaries
         sessions={sessions}
-        tracksMap={mockTrackSummaries}
         onSelectTrack={onSelectTrack}
         selectedCarClass="LMGT3"
         setSelectedCarClass={vi.fn()}
@@ -178,7 +179,6 @@ describe('TrackSummaries component', () => {
     render(
       <TrackSummaries
         sessions={sessions}
-        tracksMap={{}}
         onSelectTrack={vi.fn()}
         selectedCarClass="All"
         setSelectedCarClass={vi.fn()}
@@ -193,7 +193,7 @@ describe('TrackSummaries component', () => {
   it('handles empty track summaries list', async () => {
     render(
       <TrackSummaries
-        tracksMap={{}}
+        sessions={[]}
         onSelectTrack={vi.fn()}
         selectedCarClass="All"
         setSelectedCarClass={vi.fn()}

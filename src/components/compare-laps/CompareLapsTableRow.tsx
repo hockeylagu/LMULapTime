@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle2, Plus } from 'lucide-react';
-import { ComparableLap } from '../../utils/lapComparison';
+import { ComparableLap } from '../../../server/core/types';
 import { formatTime } from '../../utils/formatters';
 import { PaceBadge, CarClassBadge } from '../common';
 

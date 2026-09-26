@@ -841,5 +841,3 @@ export function filterCompatibleReplays(
   });
 }
 
-export { mapVehicleIdToClass, mapVehicleIdToModel } from './vehicleMapping.js';
-

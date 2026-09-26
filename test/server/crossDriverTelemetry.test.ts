@@ -8,7 +8,7 @@ import {
 } from '../../src/utils/replayComparison.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
 import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
-import { extractReplayTrajectory } from '../../server/replay/replayParser.js';
+import { extractReplayTrajectory } from '../../server/replay/replayTrajectory.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';

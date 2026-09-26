@@ -468,11 +468,13 @@ export interface TrackSummary {
   bestLapTime: number | null;
   bestLapDriver: string;
   bestLapCar: string;
+  bestLapClass?: string;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
   theoreticalBest: number | null;
   carsUsed: string[];
+  lastSessionTimestamp?: number;
 }
 
 export interface AppStatus {

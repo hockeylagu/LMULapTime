@@ -12,7 +12,7 @@ import {
   Cell,
 } from 'recharts';
 import { Clock, Activity } from 'lucide-react';
-import { ComparableLap } from '../../utils/lapComparison';
+import { ComparableLap } from '../../../server/core/types';
 import { formatTime } from '../../utils/formatters';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { Activity, Flag, Loader2 } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
-import { CornerConsistencyStat } from '../../../utils/cornerAnalysis.js';
+import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { MiniCornerMap } from '../map/MiniCornerMap.js';
 import { LapSelectorDropdown, LapConsistencyOption } from './LapSelectorDropdown.js';
 import { consistencyClass, MetricRow, LeastConsistentBadge } from './ConsistencyMetricRow.js';

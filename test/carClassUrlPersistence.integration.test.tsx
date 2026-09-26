@@ -62,9 +62,6 @@ function mockApi() {
         }),
       });
     }
-    if (url.includes('/api/tracks')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    }
     if (url.includes('/api/reference-laptimes')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ entries: [] }) });
     }

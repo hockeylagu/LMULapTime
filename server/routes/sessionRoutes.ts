@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
-import { computeProgression, computeTrackSummaries, extractComparableLaps } from '../sessions/parser.js';
+import { computeProgression, extractComparableLaps } from '../sessions/sessionAnalytics.js';
 import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../../src/utils/paceCategory.js';
 import { matchesSessionType, isSessionEmpty } from '../../src/utils/formatters.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
@@ -77,10 +77,6 @@ export function createSessionRouter(context: ServerContext): Router {
     if (carClass && carClass !== 'All') sessions = sessions.filter(session => matchesSessionCarClass(session, carClass));
 
     res.json(computeProgression(sessions, driverName));
-  });
-
-  router.get('/tracks', (_req, res) => {
-    res.json(computeTrackSummaries(context.loadSessions()));
   });
 
   router.get('/track/:trackName', (req, res) => {

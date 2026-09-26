@@ -45,22 +45,6 @@ describe('App component', () => {
     },
   ];
 
-  const mockTracks = {
-    Spa: {
-      trackVenue: 'Spa',
-      sessionsCount: 1,
-      totalLaps: 5,
-      bestLapTime: 122.0,
-      bestLapDriver: 'Player',
-      bestLapCar: 'Ferrari 499P',
-      bestS1: 34.0,
-      bestS2: 42.0,
-      bestS3: 46.0,
-      theoreticalBest: 122.0,
-      carsUsed: ['Ferrari 499P'],
-    },
-  };
-
   beforeEach(() => {
     window.location.hash = '#dashboard';
     startupScanStatus = {
@@ -77,9 +61,6 @@ describe('App component', () => {
       }
       if (url.includes('/api/progression')) {
         return Promise.resolve({ json: () => Promise.resolve([]) });
-      }
-      if (url.includes('/api/tracks')) {
-        return Promise.resolve({ json: () => Promise.resolve(mockTracks) });
       }
       if (url.includes('/api/track/')) {
         return Promise.resolve({

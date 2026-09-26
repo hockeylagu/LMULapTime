@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ConsistencyPanel } from '../../src/components/replay/analysis/ConsistencyPanel';
 import { LapConsistencyStats } from '../../src/utils/lapConsistency';
-import { CornerConsistencyStat } from '../../src/utils/cornerAnalysis';
+import { CornerConsistencyStat } from '../../src/utils/cornerConsistency';
 
 vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
