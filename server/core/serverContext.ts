@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
+import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
@@ -24,6 +25,10 @@ export class ServerContext {
   private currentTelemetryDir: string;
   private parser: LmuParser;
   private pendingForcedSessionReparse = false;
+  // Session id -> replay index revision at which its stored replay match was last re-checked.
+  private readonly replayMatchCheckedAt = new Map<string, number>();
+  // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
+  private readonly xmlMtimeCache = new Map<string, number | null>();
   private replayScanStatus: ReplayScanStatus = {
     running: false,
     processed: 0,
@@ -129,35 +134,92 @@ export class ServerContext {
     }
   }
 
+  private getXmlMtime(session: DetailedSession): number | undefined {
+    if (!session.filePath) return undefined;
+    let mtime = this.xmlMtimeCache.get(session.filePath);
+    if (mtime === undefined) {
+      try {
+        mtime = fs.statSync(session.filePath).mtimeMs;
+      } catch {
+        mtime = null;
+      }
+      this.xmlMtimeCache.set(session.filePath, mtime);
+    }
+    return mtime ?? undefined;
+  }
+
+  private estimateSessionEndMs(session: DetailedSession): number {
+    let maxElapsed = 0;
+    for (const d of session.drivers ?? []) {
+      for (const l of d.laps ?? []) {
+        if (typeof l.elapsedSeconds === 'number' && l.elapsedSeconds > maxElapsed) {
+          maxElapsed = l.elapsedSeconds;
+        }
+      }
+    }
+    return session.timestamp + Math.round(maxElapsed * 1000);
+  }
+
+  /**
+   * A stored match can be stale when the session XML was parsed before its own replay was
+   * cached (the replay sync runs after the session sync, so the index only learns about it later).
+   * LMU saves both files within about a second of each other at session end, so a replay saved
+   * within SAME_SAVE_WINDOW_MS of the XML replaces a stored match that was not.
+   */
+  private recheckStoredReplayMatch(session: DetailedSession, replaysByName: Map<string, ReplayFileEntry>): void {
+    const SAME_SAVE_WINDOW_MS = 60_000;
+    const stored = session.matchingReplayFile;
+    if (!stored) return;
+    const revision = this.parser.getReplayIndexRevision();
+    if (this.replayMatchCheckedAt.get(session.id) === revision) return;
+    this.replayMatchCheckedAt.set(session.id, revision);
+
+    const current = replaysByName.get(stored.name);
+    const xmlMtime = this.getXmlMtime(session);
+    if (!current || xmlMtime === undefined) return;
+    if (Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
+
+    const candidate = this.parser.findMatchingReplay(
+      session.trackVenue,
+      session.trackCourse,
+      session.sessionName || session.sessionType,
+      session.timestamp,
+      xmlMtime
+    );
+    if (!candidate || candidate.name === stored.name) return;
+    if (Math.abs(candidate.mtime - xmlMtime) > SAME_SAVE_WINDOW_MS) return;
+
+    console.log(`[ServerContext] Re-matched session ${session.id}: ${stored.name} -> ${candidate.name}`);
+    session.matchingReplayFile = {
+      name: candidate.name,
+      path: candidate.path,
+      sizeBytes: candidate.sizeBytes,
+      eventTitle: candidate.eventTitle,
+      splitNo: candidate.splitNo,
+      eventType: candidate.eventType,
+      durationSec: candidate.durationSec,
+    };
+    this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+  }
+
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
     try {
       this.populateReplayIndexFromDb();
+      const replaysByName = new Map(this.parser.getReplaysList().map(r => [r.name, r] as const));
 
       for (const session of sessions) {
-        if (!session.matchingReplayFile) {
-          let estimatedEndMs = session.timestamp;
-          if (session.drivers && session.drivers.length > 0) {
-            let maxElapsed = 0;
-            for (const d of session.drivers) {
-              if (d.laps) {
-                for (const l of d.laps) {
-                  if (typeof l.elapsedSeconds === 'number' && l.elapsedSeconds > maxElapsed) {
-                    maxElapsed = l.elapsedSeconds;
-                  }
-                }
-              }
-            }
-            if (maxElapsed > 0) {
-              estimatedEndMs = session.timestamp + Math.round(maxElapsed * 1000);
-            }
-          }
-
+        if (session.matchingReplayFile) {
+          this.recheckStoredReplayMatch(session, replaysByName);
+        } else {
+          // Sessions parsed before their replay was cached (the replay sync runs after the
+          // session sync) are linked here. The XML mtime is the real session end; the last-lap
+          // estimate can be 15+ minutes early (post-race cool-down), outside the match window.
           const matchedReplay = this.parser.findMatchingReplay(
             session.trackVenue,
             session.trackCourse,
             session.sessionName || session.sessionType,
             session.timestamp,
-            estimatedEndMs
+            this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)
           );
           if (matchedReplay) {
             session.matchingReplayFile = {

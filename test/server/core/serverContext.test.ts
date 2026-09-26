@@ -448,4 +448,102 @@ describe('ServerContext replay scan progress', () => {
       filePercent: 50,
     });
   });
+
+  describe('stored replay match re-check', () => {
+    const xmlMtimeMs = Date.parse('2026-09-03T18:41:14.451Z');
+    const replayRow = (filename: string, mtime: number, durationSec: number) => ({
+      filename,
+      file_path: 'C:\\replays\\' + filename,
+      file_size: 100,
+      file_mtime: mtime,
+      metadata: { durationSec },
+    });
+    const previousRace = replayRow('Circuit de la Sarthe R1 27.Vcr', Date.parse('2026-09-03T17:41:39.560Z'), 2206);
+    const ownRace = replayRow('Circuit de la Sarthe R1 28.Vcr', Date.parse('2026-09-03T18:41:14.416Z'), 2166);
+
+    function setup(storedReplays: ReturnType<typeof replayRow>[], linkedReplay: string) {
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
+      const sessionDb = {
+        getAllStoredReplayFiles: vi.fn(() => storedReplays),
+        getTelemetryMetadata: vi.fn(() => []),
+        updateSessionMatchingReplay: vi.fn(),
+      } as unknown as SessionDatabase;
+      const context = new ServerContext({
+        resultsDir: '',
+        replaysDir: '',
+        telemetryDir: '',
+        parser: new LmuParser(),
+        sessionDb,
+        telemetryCatalog: { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog,
+        replayCache: {} as ReplayCacheService,
+      });
+      const session = {
+        id: '2026_09_03_14_41_14-69R1',
+        filePath: 'C:\\results\\2026_09_03_14_41_14-69R1.xml',
+        timestamp: Date.parse('2026-09-03T17:51:01.301Z'),
+        trackVenue: 'Circuit de la Sarthe',
+        trackCourse: '',
+        sessionType: 'Race',
+        sessionName: 'R1',
+        drivers: [],
+        matchingReplayFile: { name: linkedReplay, path: 'C:\\replays\\' + linkedReplay, sizeBytes: 100 },
+      } as unknown as DetailedSession;
+      return { context, sessionDb, session };
+    }
+
+    it('replaces a stale match with the replay saved alongside the session XML', () => {
+      const { context, sessionDb, session } = setup([previousRace, ownRace], previousRace.filename);
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
+      expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledWith(
+        '2026_09_03_14_41_14-69R1',
+        expect.objectContaining({ name: ownRace.filename })
+      );
+    });
+
+    it('keeps a stale match when no replay was saved alongside the session XML', () => {
+      const { context, sessionDb, session } = setup([previousRace], previousRace.filename);
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile?.name).toBe(previousRace.filename);
+      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+    });
+
+    it('keeps a match saved alongside the session XML without searching again', () => {
+      const { context, sessionDb, session } = setup([previousRace, ownRace], ownRace.filename);
+      const findSpy = vi.spyOn(context.currentParser, 'findMatchingReplay');
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
+      expect(findSpy).not.toHaveBeenCalled();
+      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+    });
+
+    it('links an unmatched session once the replay sync has cached its replay, using the XML mtime', () => {
+      // Session sync runs first: the new VCR is not cached yet, so the session stays unlinked.
+      const storedReplays = [previousRace];
+      const { context, sessionDb, session } = setup(storedReplays, '');
+      Object.assign(session, { matchingReplayFile: undefined });
+      // Last lap ends at 18:23:02, 18 minutes before the XML (and VCR) were written at 18:41:14;
+      // an end-time estimate from laps alone would fall outside the match window.
+      session.drivers = [{ laps: [{ elapsedSeconds: 1921.16 }] }] as unknown as DetailedSession['drivers'];
+
+      context.enrichSessionsWithTelemetry([session]);
+      expect(session.matchingReplayFile).toBeUndefined();
+
+      // Replay sync completes and caches the session's own VCR, then enriches again.
+      storedReplays.push(ownRace);
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
+      expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledWith(
+        '2026_09_03_14_41_14-69R1',
+        expect.objectContaining({ name: ownRace.filename })
+      );
+    });
+  });
 });

@@ -30,6 +30,7 @@ export interface ReplayInspectorHeaderProps {
   onChangeCompareLapFilter: (filter: CompareLapFilter) => void;
   onSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
+  baselineError?: string | null;
   isStationary: boolean;
   isTrajLoading: boolean;
   isPlaying: boolean;
@@ -46,7 +47,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
   baselineReplayName, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
   isCompareLapsLoading, onChangeCompareLapFilter, onSelectCompareLap,
-  isBaselineLoading, isStationary, isTrajLoading,
+  isBaselineLoading, baselineError, isStationary, isTrajLoading,
   isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
 }) => {
   const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
@@ -179,11 +180,12 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               type="button"
               onClick={onToggleCompare}
-              className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2 py-1 text-[10px] font-mono text-amber-400 max-w-[250px] hover:bg-amber-500/20 hover:border-amber-500/50 transition-colors cursor-pointer"
-              title="Click to change the comparison lap"
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono max-w-[250px] transition-colors cursor-pointer ${baselineError ? 'bg-rose-500/10 border border-rose-500/40 text-rose-400 hover:bg-rose-500/20' : 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50'}`}
+              title={baselineError ? `${baselineError}. Click to pick another comparison lap` : 'Click to change the comparison lap'}
             >
               <span className="font-bold">vs</span>
               <span className="truncate">{baselineDriverName || baselineReplayName || 'Baseline'} L{baselineTrajectory?.currentLap ?? baselineLapNumber ?? '?'}</span>
+              {baselineError ? <span className="font-sans font-semibold">(unavailable)</span> : null}
               {baselineSummary?.lapTimeSec ? <span className="text-white">({formatLapTime(baselineSummary.lapTimeSec)})</span> : null}
             </button>
             <button

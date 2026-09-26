@@ -45,6 +45,9 @@ const updateMinTime = minValidTime;
 
 export class LmuParser {
   private replaysMap: ReplayFileEntry[] = [];
+  // Bumped whenever a replay is added or its timing metadata changes, so callers can tell
+  // when previously computed session -> replay matches deserve a second look.
+  private replayIndexRevision = 0;
   public configuredPlayerName: string = '';
 
   constructor(replaysDir?: string, resultsDir?: string) {
@@ -66,12 +69,25 @@ export class LmuParser {
     }
   }
 
+  public getReplayIndexRevision(): number {
+    return this.replayIndexRevision;
+  }
+
   public addReplayEntry(entry: ReplayFileEntry) {
     const existingIndex = this.replaysMap.findIndex(r => r.name === entry.name);
     if (existingIndex >= 0) {
+      const existing = this.replaysMap[existingIndex];
+      if (
+        existing.mtime !== entry.mtime ||
+        existing.sizeBytes !== entry.sizeBytes ||
+        existing.durationSec !== entry.durationSec
+      ) {
+        this.replayIndexRevision++;
+      }
       this.replaysMap[existingIndex] = entry;
     } else {
       this.replaysMap.push(entry);
+      this.replayIndexRevision++;
     }
   }
 
@@ -787,11 +803,17 @@ export class LmuParser {
     };
 
     const getMinDiff = (v: ReplayFileEntry) => {
-      const replayStart = v.durationSec ? v.mtime - Math.round(v.durationSec * 1000) : v.mtime;
-      const diffStart = Math.abs(replayStart - sessionTimestampMs);
+      // A replay's mtime is when the VCR was saved, i.e. the END of the recorded session, so it
+      // is compared with the XML mtime (also written at session end); start-to-start uses the
+      // replay duration. Comparing replay end with session start is only a fallback for replays
+      // without a known duration: in back-to-back races it lands on the PREVIOUS race's replay,
+      // which ends minutes before the next race starts.
       const diffEnd = Math.abs(v.mtime - xmlFileMtimeMs);
-      const diffDirect = Math.abs(v.mtime - sessionTimestampMs);
-      return Math.min(diffStart, diffEnd, diffDirect);
+      if (!v.durationSec) {
+        return Math.min(diffEnd, Math.abs(v.mtime - sessionTimestampMs));
+      }
+      const replayStart = v.mtime - Math.round(v.durationSec * 1000);
+      return Math.min(diffEnd, Math.abs(replayStart - sessionTimestampMs));
     };
 
     const sessionScoped = this.replaysMap.filter(v => matchesSessionCode(v.sessionCode, normSession) && getMinDiff(v) <= 600000);

@@ -349,6 +349,62 @@ describe('parser server module', () => {
 
 
 
+  describe('back-to-back session replay matching', () => {
+    // Real Le Mans daily race timings: session starts 17:51:01Z, results XML saved 18:41:14.451Z.
+    // The previous race's replay (R1 27) ended 17:41:39Z, 562 s before this race started.
+    const sessionStartMs = Date.parse('2026-09-03T17:51:01.301Z');
+    const xmlMtimeMs = Date.parse('2026-09-03T18:41:14.451Z');
+    const previousRace = {
+      name: 'Circuit de la Sarthe R1 27.Vcr',
+      path: '/replays/Circuit de la Sarthe R1 27.Vcr',
+      sizeBytes: 100,
+      trackName: 'Circuit de la Sarthe',
+      sessionCode: 'R1',
+      mtime: Date.parse('2026-09-03T17:41:39.560Z'),
+      durationSec: 2206,
+      splitNo: 5,
+    };
+    const ownRace = {
+      name: 'Circuit de la Sarthe R1 28.Vcr',
+      path: '/replays/Circuit de la Sarthe R1 28.Vcr',
+      sizeBytes: 100,
+      trackName: 'Circuit de la Sarthe',
+      sessionCode: 'R1',
+      mtime: Date.parse('2026-09-03T18:41:14.416Z'),
+      durationSec: 2166,
+    };
+
+    it('does not match the previous race replay that ended just before this session started', () => {
+      const p = new LmuParser();
+      p.addReplayEntry(previousRace);
+      expect(p.findMatchingReplay('Circuit de la Sarthe', '', 'R1', sessionStartMs, xmlMtimeMs)).toBeUndefined();
+    });
+
+    it('matches the replay saved with the results XML over the previous race replay', () => {
+      const p = new LmuParser();
+      p.addReplayEntry(previousRace);
+      p.addReplayEntry(ownRace);
+      expect(p.findMatchingReplay('Circuit de la Sarthe', '', 'R1', sessionStartMs, xmlMtimeMs)?.name)
+        .toBe('Circuit de la Sarthe R1 28.Vcr');
+    });
+
+    it('bumps the replay index revision only when a replay is added or its timing changes', () => {
+      const p = new LmuParser();
+      p.addReplayEntry(previousRace);
+      const revision = p.getReplayIndexRevision();
+
+      // Re-seeding identical cached entries (done on every enrich pass) is not a change.
+      p.addReplayEntry({ ...previousRace });
+      expect(p.getReplayIndexRevision()).toBe(revision);
+
+      p.addReplayEntry(ownRace);
+      expect(p.getReplayIndexRevision()).toBe(revision + 1);
+
+      p.addReplayEntry({ ...previousRace, durationSec: 2207 });
+      expect(p.getReplayIndexRevision()).toBe(revision + 2);
+    });
+  });
+
   describe('Tire wear and fuel parsing', () => {
     it('parses twfl, twfr, twrl, twrr, corner compounds, and fuel attributes correctly', () => {
       const xmlWithTireWear = `<?xml version="1.0" encoding="utf-8"?>

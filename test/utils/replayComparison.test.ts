@@ -95,6 +95,50 @@ describe('replayComparison utility', () => {
       const after = interpolatePointAtDistance(mockPoints, cumDists, 50);
       expect(after.x).toBe(30);
     });
+
+    describe('boundary extrapolation uses the same precision and channels as interior samples', () => {
+      const rawPoints: ReplayTrajectoryPoint[] = [
+        {
+          x: 0, y: 0, z: 0, speedKmh: 160.1551, throttle: 99.6, brake: 0, steerYaw: 0.04, timeSec: 10,
+          fuel: 41.23456, soc: 55.54, virtualEnergy: 80.04, regenRate: 12.34, isOffTrack: false,
+          wheelSpeeds: [160.04, 160.06, 159.97, 160.01], rideHeight: [40.04, 40.06, 60.01, 60.04],
+          tirePressures: [170.04, 171.06, 168.97, 169.01],
+        },
+        {
+          x: 8, y: 0, z: 0, speedKmh: 161.8448, throttle: 100, brake: 0, steerYaw: 0.06, timeSec: 10.18,
+          fuel: 41.23, soc: 55.5, virtualEnergy: 80, regenRate: 12, isOffTrack: false,
+          wheelSpeeds: [161.5, 161.6, 161.4, 161.5], rideHeight: [40, 40, 60, 60],
+          tirePressures: [170, 171, 169, 169],
+        },
+      ];
+      const cumDists = [8, 16];
+
+      it('rounds the extrapolated speed before the first sample (first playback frame)', () => {
+        const point = interpolatePointAtDistance(rawPoints, cumDists, 0, 10, true);
+        expect(Number.isInteger(point.speedKmh)).toBe(true);
+        expect(point.speedKmh).toBe(158);
+        expect(point.x).toBeCloseTo(-8);
+        expect(point.throttle).toBe(100);
+        expect(point.fuel).toBe(41.23);
+        expect(point.soc).toBe(55.5);
+        expect(point.isOffTrack).toBe(false);
+      });
+
+      it('rounds and keeps every channel past the last sample', () => {
+        const point = interpolatePointAtDistance(rawPoints, cumDists, 20, 10, true);
+        expect(Number.isInteger(point.speedKmh)).toBe(true);
+        expect(point.wheelSpeeds).toEqual([161.5, 161.6, 161.4, 161.5]);
+        expect(point.rideHeight).toEqual([40, 40, 60, 60]);
+        expect(point.tirePressures).toEqual([170, 171, 169, 169]);
+        expect(point.regenRate).toBe(12);
+      });
+
+      it('rounds held samples when clamping without extrapolation', () => {
+        const point = interpolatePointAtDistance(rawPoints, cumDists, 0, 10);
+        expect(point.speedKmh).toBe(160);
+        expect(point.wheelSpeeds).toEqual([160, 160.1, 160, 160]);
+      });
+    });
   });
 
   describe('computeLapComparisons', () => {

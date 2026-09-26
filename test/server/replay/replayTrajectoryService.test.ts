@@ -4,6 +4,7 @@ import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js'
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
+import { ReplayDriverNotFoundError } from '../../../server/replay/replayServiceTypes.js';
 import type {
   DetailedSession,
   DriverData,
@@ -159,5 +160,32 @@ describe('ReplayTrajectoryService', () => {
     });
 
     expect(traj.layoutKey).toBe('daytona_road_course');
+  });
+
+  it('rejects a named driver who is not in the replay instead of falling back to the player', async () => {
+    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+
+    await expect(trajectoryService.getTrajectory({
+      replayName: 'Daytona.Vcr',
+      driverName: 'Andrzej Nycz',
+      lapNumber: 4,
+      maxPoints: 100,
+      allowDuckDb: false,
+    })).rejects.toBeInstanceOf(ReplayDriverNotFoundError);
+    expect(fullTrajectorySpy).not.toHaveBeenCalled();
+  });
+
+  it('resolves a named non-player driver present in the replay to their slot', async () => {
+    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+
+    await trajectoryService.getTrajectory({
+      replayName: 'Daytona.Vcr',
+      driverName: 'Other Driver',
+      maxPoints: 100,
+      allowDuckDb: false,
+    });
+    expect(fullTrajectorySpy).toHaveBeenCalledWith(expect.any(String), 'Daytona.Vcr', expect.objectContaining({ driverSlot: 1 }));
   });
 });

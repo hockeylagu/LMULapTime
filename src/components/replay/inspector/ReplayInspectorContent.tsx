@@ -56,6 +56,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     handleSelectCompareLap,
     baselineTrajectory,
     isBaselineLoading,
+    baselineError,
     currentIndex,
     setCurrentIndex,
     isPlaying,
@@ -225,6 +226,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       setCompareLapFilter={setCompareLapFilter}
       handleSelectCompareLap={handleSelectCompareLap}
       isBaselineLoading={isBaselineLoading}
+      baselineError={baselineError}
       setCurrentIndex={setCurrentIndex}
       isPlaying={isPlaying}
       setIsPlaying={setIsPlaying}
