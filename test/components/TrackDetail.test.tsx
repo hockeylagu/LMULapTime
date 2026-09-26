@@ -629,6 +629,32 @@ describe('TrackDetail component', () => {
     fireEvent.click(closeBtn);
     expect(screen.queryByRole('dialog', { name: /Circuit Information/i })).not.toBeInTheDocument();
   });
+
+  it('provides Reset All Filters button when car model is the sole active filter and clears it on click', async () => {
+    window.location.hash = '#/track/Spa?model=NonExistentModel';
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No sessions found matching filters.')).toBeInTheDocument();
+    });
+
+    const resetBtn = screen.getByRole('button', { name: /Reset All Filters/i });
+    expect(resetBtn).toBeInTheDocument();
+    fireEvent.click(resetBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('No sessions found matching filters.')).not.toBeInTheDocument();
+    });
+  });
 });
+
 
 

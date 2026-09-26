@@ -12,6 +12,7 @@ import {
   minValidTime,
   getSessionTypeWeight,
   compareSessions,
+  compareSessionsBySortOption,
 } from '../../shared/domain/formatters.js';
 
 describe('formatters utility', () => {
@@ -278,6 +279,110 @@ describe('formatters utility', () => {
       // Newest first: Race, Quali, Practice
       const sortedDesc = [...list].sort((a, b) => compareSessions(a, b, 'desc'));
       expect(sortedDesc.map(s => s.id)).toEqual(['R1', 'Q1', 'P1']);
+    });
+  });
+
+  describe('compareSessionsBySortOption', () => {
+    const s1 = {
+      id: 'sess-1',
+      timeString: '2026/05/28 10:00:00',
+      sessionType: 'Race',
+      sessionName: 'R1',
+      playerDriver: {
+        position: 1,
+        bestLapTime: 120.5,
+        bestLapPacePercentage: 101.2,
+      },
+    };
+
+    const s2 = {
+      id: 'sess-2',
+      timeString: '2026/05/28 12:00:00',
+      sessionType: 'Qualifying',
+      sessionName: 'Q1',
+      playerDriver: {
+        position: 2,
+        bestLapTime: 119.8,
+        bestLapPacePercentage: 100.5,
+      },
+    };
+
+    const s3 = {
+      id: 'sess-3',
+      timeString: '2026/05/28 09:00:00',
+      sessionType: 'Practice',
+      sessionName: 'P1',
+      playerDriver: {
+        position: 5,
+        bestLapTime: 125.0,
+        bestLapPacePercentage: 104.5,
+      },
+    };
+
+    const sNoData = {
+      id: 'sess-empty',
+      timeString: '2026/05/28 08:00:00',
+      sessionType: 'Practice',
+      sessionName: 'P0',
+    };
+
+    it('sorts by date-desc and date-asc', () => {
+      const list = [s1, s2, s3];
+      const desc = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'date-desc'));
+      expect(desc.map((s) => s.id)).toEqual(['sess-2', 'sess-1', 'sess-3']);
+
+      const asc = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'date-asc'));
+      expect(asc.map((s) => s.id)).toEqual(['sess-3', 'sess-1', 'sess-2']);
+    });
+
+    it('sorts by pos-asc prioritizing Race over Quali over Practice, then position, then date tie-break', () => {
+      const list = [s3, s2, s1];
+      const sorted = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'pos-asc'));
+      // Race (s1) has highest type rank (0), Quali (s2) rank 1, Practice (s3) rank 2
+      expect(sorted.map((s) => s.id)).toEqual(['sess-1', 'sess-2', 'sess-3']);
+    });
+
+    it('sorts by lap-asc with fastest bestLapTime first and missing laps placed last', () => {
+      const list = [s1, sNoData, s3, s2];
+      const sorted = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'lap-asc'));
+      // 119.8 (s2) < 120.5 (s1) < 125.0 (s3) < no data (sNoData)
+      expect(sorted.map((s) => s.id)).toEqual(['sess-2', 'sess-1', 'sess-3', 'sess-empty']);
+    });
+
+    it('sorts by pace-asc and pace-desc with lowest/highest pace % first and missing pace placed last', () => {
+      const list = [s1, sNoData, s3, s2];
+      const asc = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'pace-asc'));
+      // 100.5 (s2) < 101.2 (s1) < 104.5 (s3) < 999 (sNoData)
+      expect(asc.map((s) => s.id)).toEqual(['sess-2', 'sess-1', 'sess-3', 'sess-empty']);
+
+      const desc = [...list].sort((a, b) => compareSessionsBySortOption(a, b, 'pace-desc'));
+      // 104.5 (s3) > 101.2 (s1) > 100.5 (s2) (with sNoData placed at 999 first)
+      expect(desc[0].id).toBe('sess-empty');
+      expect(desc.slice(1).map((s) => s.id)).toEqual(['sess-3', 'sess-1', 'sess-2']);
+    });
+
+    it('supports custom selectors for lap times and pace percentages', () => {
+      interface CustomSession {
+        id: string;
+        customLap?: number;
+        customPace?: number;
+      }
+      const c1: CustomSession = { id: 'c1', customLap: 100, customPace: 102 };
+      const c2: CustomSession = { id: 'c2', customLap: 90, customPace: 105 };
+
+      const sortedByLap = [c1, c2].sort((a, b) =>
+        compareSessionsBySortOption(a, b, 'lap-asc', {
+          getBestLapTime: (s) => s.customLap,
+        })
+      );
+      expect(sortedByLap.map((s) => s.id)).toEqual(['c2', 'c1']);
+
+      const sortedByPace = [c1, c2].sort((a, b) =>
+        compareSessionsBySortOption(a, b, 'pace-asc', {
+          getPacePercentage: (s) => s.customPace,
+        })
+      );
+      expect(sortedByPace.map((s) => s.id)).toEqual(['c1', 'c2']);
     });
   });
 });

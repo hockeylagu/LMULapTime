@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
@@ -26,6 +26,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     (searchParams.get('sort') as TrackDetailSortOption) || 'date-desc'
   );
   const [data, setData] = useState<TrackDetailData | null>(null);
+  const prevCarClassRef = useRef(selectedCarClass);
 
   useEffect(() => {
     setHideEmptyState(searchParams.get('hideEmpty') !== 'false');
@@ -76,8 +77,13 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   };
 
   useEffect(() => {
-    if (selectedCarModel !== 'All') setSelectedCarModel('All');
-  }, [selectedCarClass]);
+    if (prevCarClassRef.current !== selectedCarClass) {
+      prevCarClassRef.current = selectedCarClass;
+      if (selectedCarModel !== 'All') {
+        setSelectedCarModel('All');
+      }
+    }
+  }, [selectedCarClass, selectedCarModel]);
 
   useEffect(() => {
     let isCurrent = true;

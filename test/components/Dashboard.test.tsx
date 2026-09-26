@@ -476,6 +476,33 @@ describe('Dashboard component', () => {
     expect(setSearchQuery).toHaveBeenCalledWith('');
   });
 
+  it('provides Reset All Filters button when replay-only is the sole active filter and clears it on click', () => {
+    window.location.hash = '#/?hasReplay=true';
+    const noReplaySessions = mockSessions.filter((s) => !s.matchingReplayFile);
+
+    render(
+      <Dashboard
+        sessions={noReplaySessions}
+        onSelectSession={vi.fn()}
+        selectedTrack="All"
+        setSelectedTrack={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+        filterType="All"
+        setFilterType={vi.fn()}
+        searchQuery=""
+        setSearchQuery={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('No sessions found matching filters.')).toBeInTheDocument();
+    const resetBtn = screen.getByRole('button', { name: /Reset All Filters/i });
+    expect(resetBtn).toBeInTheDocument();
+    fireEvent.click(resetBtn);
+
+    expect(window.location.hash).not.toContain('hasReplay=true');
+  });
+
   it('allows clicking a benchmark lap item to select session', () => {
     const onSelectSession = vi.fn();
     render(

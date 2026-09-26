@@ -210,11 +210,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onViewModeChange={setSessionListViewMode}
             hideHeader
             className="p-5"
-            onResetFilters={(selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '') ? () => {
+            onResetFilters={(selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay) ? () => {
               setSelectedTrack('All');
               setSelectedCarClass('All');
               setFilterType('All');
               setSearchQuery('');
+              setHasReplay(false);
             } : undefined}
             hideEmptyNotice={hideEmpty && emptyCount > 0 ? (
               <span>
