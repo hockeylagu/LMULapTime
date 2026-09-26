@@ -209,6 +209,37 @@ describe('useReplayInspectorData', () => {
     expect(result.current.baselineError).toBeNull();
   });
 
+  it('opens a comparison from the same replay with one request each, the baseline asked with its driver', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({ ...trajectory, currentLap: Number(new URL(url).searchParams.get('lap')) });
+    });
+    fetchMock.mockClear();
+    const urls = () => fetchMock.mock.calls.map(([input]) => String(input));
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true,
+      replayName: metadata.filename,
+      initialLapNumber: 2,
+      initialCompareMode: true,
+      initialBaselineReplayName: metadata.filename,
+      initialBaselineLapNumber: 1,
+      initialBaselineDriverName: 'Other Driver',
+    }), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
+    await waitFor(() => expect(urls().filter(url => url.includes('/compare/laps')).length).toBeGreaterThan(0));
+
+    expect(urls().filter(url => url.includes('/compare/laps'))).toHaveLength(1);
+    expect(urls().filter(url => url.includes('/metadata'))).toHaveLength(1);
+    const baselineUrls = urls().filter(url => url.includes('&lap=1'));
+    expect(baselineUrls).toHaveLength(1);
+    expect(baselineUrls[0]).toContain('driverName=Other%20Driver');
+    expect(new URL(urls().find(url => url.includes('/compare/laps')) ?? '').searchParams.get('carClass')).toBeTruthy();
+  });
+
   it('initializes baseline replay, lap, and driver directly from comparison props', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);

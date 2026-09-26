@@ -25,6 +25,8 @@ export class ServerContext {
   private currentTelemetryDir: string;
   private parser: LmuParser;
   private pendingForcedSessionReparse = false;
+  // What the cached session list was last enriched against (see loadSessions).
+  private enrichedInputs: unknown[] | null = null;
   // Session id -> replay index revision at which its stored replay match was last re-checked.
   private readonly replayMatchCheckedAt = new Map<string, number>();
   // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
@@ -284,8 +286,26 @@ export class ServerContext {
       if (!started && forceReparse) this.pendingForcedSessionReparse = true;
     }
     const sessions = this.sessionDb.getAllSessions();
+    // getAllSessions returns the same cached objects until sessions change, and enrichment writes
+    // its results into them: it only needs to run again when one of its inputs changed. It cost
+    // ~340 ms, paid by every session list, metadata and trajectory request.
+    this.populateReplayIndexFromDb();
+    const inputs = this.enrichmentInputs(sessions);
+    if (this.enrichedInputs && inputs.every((input, i) => input === this.enrichedInputs?.[i])) return sessions;
     this.enrichSessionsWithTelemetry(sessions);
+    // Enrichment itself records the matches it finds; key on the state it leaves behind.
+    this.enrichedInputs = this.enrichmentInputs(sessions);
     return sessions;
+  }
+
+  private enrichmentInputs(sessions: DetailedSession[]): unknown[] {
+    return [
+      sessions,
+      this.parser,
+      typeof this.parser.getReplayIndexRevision === 'function' ? this.parser.getReplayIndexRevision() : NaN,
+      typeof this.telemetryCatalog?.getFiles === 'function' ? this.telemetryCatalog.getFiles() : NaN,
+      typeof this.sessionDb.getTelemetryMetadataRevision === 'function' ? this.sessionDb.getTelemetryMetadataRevision() : NaN,
+    ];
   }
 
   public parseAndCacheFile(filePath: string): DetailedSession | null {
