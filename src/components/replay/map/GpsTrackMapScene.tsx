@@ -11,6 +11,7 @@ import {
   computeEffectiveBounds,
   computeBaselineDeltaByIdx,
   projectStartFinishGate,
+  buildEffectiveBaselinePoints,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
@@ -28,34 +29,15 @@ import type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
 export type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
-export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
-  points,
-  bounds,
-  currentIndex,
-  onSelectIndex,
-  colorBy = 'pedal',
-  className = '',
-  baselinePoints,
-  corners,
-  selectedCornerNumber,
-  onSelectCornerNumber,
-  primaryOpacity = 1,
-  baselineOpacity = 1,
-  pedalMarkers,
-  showPedalMarkers = false,
-  showMinimap = true,
-  showLegend = true,
-  showControls = true,
-  controlsOrientation,
-  highlightDistRange,
-  dimNonSelectedTrack = false,
-  showCornerFlags = true,
-  trackVenue,
-  trackCourse,
-  layoutKey,
-  replayName,
-  trackGeometry,
-}) => {
+export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
+  const {
+    points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',
+    baselinePoints, corners, selectedCornerNumber, onSelectCornerNumber,
+    primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
+    showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
+    highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
+    trackVenue, trackCourse, layoutKey, replayName, trackGeometry,
+  } = props;
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
 
@@ -67,13 +49,21 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   });
   const effectiveGeometry = trackGeometry ?? fetchedGeometry;
 
+  const effectiveBaselinePoints = useMemo(
+    () => buildEffectiveBaselinePoints(baselinePoints, effectiveGeometry?.lengthM),
+    [baselinePoints, effectiveGeometry]
+  );
+
   const effectiveBounds = useMemo(
-    () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, baselinePoints),
-    [bounds, effectiveGeometry, baselinePoints]
+    () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, effectiveBaselinePoints),
+    [bounds, effectiveGeometry, effectiveBaselinePoints]
   );
 
   const svgPoints = useMemo(() => projectTrajectoryPoints(points, effectiveBounds, VIEWBOX_SIZE, PADDING), [points, effectiveBounds]);
-  const baselineSvgPoints = useMemo(() => projectTrajectoryPoints(baselinePoints || [], effectiveBounds, VIEWBOX_SIZE, PADDING), [baselinePoints, effectiveBounds]);
+  const baselineSvgPoints = useMemo(
+    () => projectTrajectoryPoints(effectiveBaselinePoints, effectiveBounds, VIEWBOX_SIZE, PADDING),
+    [effectiveBaselinePoints, effectiveBounds]
+  );
   const currentPos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
 
   const { leftSvgPoints, rightSvgPoints, centerlineSvgPoints } = useMemo(() => ({
@@ -113,8 +103,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
 
   const primaryDists = useMemo(() => getTrajectoryDistances(points, effectiveGeometry?.lengthM), [points, effectiveGeometry]);
   const baselineDists = useMemo(
-    () => (baselinePoints ? getTrajectoryDistances(baselinePoints, effectiveGeometry?.lengthM) : []),
-    [baselinePoints, effectiveGeometry]
+    () => (effectiveBaselinePoints.length > 0 ? getTrajectoryDistances(effectiveBaselinePoints, effectiveGeometry?.lengthM) : []),
+    [effectiveBaselinePoints, effectiveGeometry]
   );
 
   const deltaByIdx = useMemo(() => {
@@ -123,15 +113,26 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = ({
   }, [colorBy, points, baselinePoints, effectiveGeometry]);
 
   const baselineDeltaByIdx = useMemo(
-    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, baselinePoints, primaryDists, baselineDists) : null),
-    [colorBy, deltaByIdx, baselinePoints, baselineDists, primaryDists]
+    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, effectiveBaselinePoints, primaryDists, baselineDists, effectiveGeometry?.lengthM, points) : null),
+    [colorBy, deltaByIdx, effectiveBaselinePoints, baselineDists, primaryDists, effectiveGeometry, points]
   );
-  const baselineGhostPos = useMemo(() => computeGhostPosition(primaryDists, baselineDists, baselinePoints || [], currentIndex, effectiveBounds, VIEWBOX_SIZE, PADDING), [primaryDists, baselineDists, baselinePoints, currentIndex, effectiveBounds]);
-
+  const baselineGhostPos = useMemo(() => {
+    return computeGhostPosition(
+      primaryDists,
+      baselineDists,
+      effectiveBaselinePoints,
+      currentIndex,
+      effectiveBounds,
+      VIEWBOX_SIZE,
+      PADDING,
+      effectiveGeometry?.lengthM,
+      points
+    );
+  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds, effectiveGeometry, points]);
 
   const pedalMarkerPoints = useMemo(
-    () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, baselinePoints),
-    [showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, baselinePoints]
+    () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints),
+    [showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints]
   );
 
   const cornerMarkers = useMemo(

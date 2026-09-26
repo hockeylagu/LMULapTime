@@ -1,5 +1,5 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
-import { findIndexAtDistance, interpolatePointAtDistance } from '../../../utils/replayComparison.js';
+import { findIndexAtDistance, interpolatePointAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/replayComparison.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
@@ -199,6 +199,32 @@ export function computeTrackBoundaryPathD(
 }
 
 
+/**
+ * Ensures baseline trajectory points begin cleanly at the start/finish gate line.
+ * If baseline begins downstream of the line (e.g. VCR slice boundary latency),
+ * prepends the extrapolated start/finish line crossing so the trajectory ribbon
+ * starts right on the line without longitudinal offset.
+ */
+export function buildEffectiveBaselinePoints(
+  baselinePoints?: ReplayTelemetryPoint[],
+  trackLengthM?: number
+): ReplayTelemetryPoint[] {
+  if (!baselinePoints || baselinePoints.length < 2) return baselinePoints || [];
+  const crossing = trackLengthM ? computeStartFinishOffset(baselinePoints, trackLengthM) : null;
+  if (crossing && (baselinePoints[0].stationM ?? 0) > 1.0) {
+    const startPt: ReplayTelemetryPoint = {
+      ...baselinePoints[0],
+      x: crossing.worldX,
+      z: crossing.worldZ,
+      stationM: 0,
+      distM: 0,
+      timeSec: crossing.timeSecOffset,
+    };
+    return [startPt, ...baselinePoints];
+  }
+  return baselinePoints;
+}
+
 export function computeGhostPosition(
   primaryDists: number[],
   baseDists: number[],
@@ -206,7 +232,9 @@ export function computeGhostPosition(
   currentIndex: number,
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
-  padding: number
+  padding: number,
+  trackLengthM?: number,
+  primaryPoints?: ReplayTelemetryPoint[]
 ) {
   if (
     !baselinePoints || baselinePoints.length === 0 ||
@@ -222,13 +250,30 @@ export function computeGhostPosition(
   const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
-  const totalBase = Math.max(1, baseDists[baseDists.length - 1]);
+  const canMatchByStation =
+    Boolean(trackLengthM && trackLengthM > 0) &&
+    primaryPoints?.[0]?.stationM !== undefined &&
+    baselinePoints[0]?.stationM !== undefined;
 
-  const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
-  const currentDist = primaryDists[safeIdx];
-  // Match on the same absolute track distance/station, clamped to baseline's available bounds
-  const targetDist = Math.max(baseDists[0], Math.min(totalBase, currentDist));
-  const ghostPt = interpolatePointAtDistance(baselinePoints, baseDists, targetDist);
+  let primaryRefCoords: number[];
+  let baseRefCoords: number[];
+  let totalBase: number;
+
+  if (canMatchByStation && trackLengthM && primaryPoints) {
+    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
+    baseRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
+    totalBase = trackLengthM;
+  } else {
+    primaryRefCoords = primaryDists;
+    baseRefCoords = baseDists;
+    totalBase = Math.max(1, baseDists[baseDists.length - 1]);
+  }
+
+  const safeIdx = Math.max(0, Math.min(currentIndex, primaryRefCoords.length - 1));
+  const currentDist = primaryRefCoords[safeIdx];
+  // Match on the same absolute track distance/station, with extrapolateBoundary=true to seamlessly extrapolate back to the start line
+  const targetDist = Math.min(totalBase, currentDist);
+  const ghostPt = interpolatePointAtDistance(baselinePoints, baseRefCoords, targetDist, undefined, true);
 
   return {
     sx: offsetX + (ghostPt.x - minX) * scale,
@@ -512,11 +557,28 @@ export function computeBaselineDeltaByIdx(
   deltaByIdx: number[] | null,
   baselinePoints?: ReplayTelemetryPoint[],
   primaryDists?: number[],
-  baselineDists?: number[]
+  baselineDists?: number[],
+  trackLengthM?: number,
+  primaryPoints?: ReplayTelemetryPoint[]
 ): number[] | null {
   if (!deltaByIdx || !baselinePoints || baselinePoints.length === 0 || !primaryDists || !baselineDists) {
     return null;
   }
+
+  const canMatchByStation =
+    Boolean(trackLengthM && trackLengthM > 0) &&
+    primaryPoints?.[0]?.stationM !== undefined &&
+    baselinePoints[0]?.stationM !== undefined;
+
+  if (canMatchByStation && trackLengthM && primaryPoints) {
+    const pStations = getMonotonicStations(primaryPoints, trackLengthM);
+    const bStations = getMonotonicStations(baselinePoints, trackLengthM);
+    return bStations.map(s => {
+      const idx = findIndexAtDistance(pStations, s);
+      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
+    });
+  }
+
   const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
   const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
   const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
