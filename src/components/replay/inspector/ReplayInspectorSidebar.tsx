@@ -10,7 +10,7 @@ import { AIReportTab } from '../analysis/AIReportTab.js';
 import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
 import { ConsistencyPanel } from '../analysis/ConsistencyPanel.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
-import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/replayComparison.js';
 
 export interface ReplayInspectorSidebarProps {
   activeTab: 'map' | 'corners' | 'ai-report';
@@ -91,9 +91,12 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
     () => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []),
     [trajectory]
   );
+  // In the primary lap's frame (matched by track station), like the corner windows it is drawn against.
   const baselineDists = React.useMemo(
-    () => (baselineTrajectory?.points ? getTrajectoryDistances(baselineTrajectory.points, baselineTrajectory.trackLengthM) : []),
-    [baselineTrajectory]
+    () => (baselineTrajectory?.points && trajectory?.points
+      ? getDistancesInReferenceFrame(baselineTrajectory.points, trajectory.points, trajectory.trackLengthM)
+      : []),
+    [baselineTrajectory, trajectory]
   );
 
   const handleSelectMapCorner = useCallback((cornerNumber: number | null) => {
