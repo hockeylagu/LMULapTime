@@ -84,8 +84,10 @@ export function lapEdgesFromNeighbours(
   const last = lap[lap.length - 1];
   if (!first || !last) return { leadIn: [], leadOut: [] };
   const timeOf = (p: ReplayTrajectoryPoint) => p.timeSec ?? NaN;
+  // Times are stored to 0.01 s, so two consecutive samples can share one: only going back in
+  // time or a teleport breaks the recording.
   const isContinuous = (a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint) =>
-    timeOf(b) > timeOf(a) && Math.hypot(b.x - a.x, b.z - a.z) < MAX_SAMPLE_JUMP_M;
+    timeOf(b) >= timeOf(a) && Math.hypot(b.x - a.x, b.z - a.z) < MAX_SAMPLE_JUMP_M;
 
   const leadIn: ReplayTrajectoryPoint[] = [];
   let after = first;
