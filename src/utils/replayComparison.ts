@@ -267,6 +267,31 @@ export function getTrajectoryDistances(points: ReplayTrajectoryPoint[], trackLen
 }
 
 /**
+ * Returns distances along `points` expressed in `referencePoints`' distance frame, matched on
+ * canonical track station - the same alignment the telemetry channels use (computeLapComparisons).
+ * Each lap's own driven distance drifts from another lap's as their lines differ (metres by
+ * mid-lap), so windows or pedal points taken from one lap must never be applied to another
+ * lap's own distances. Falls back to the lap's own S/F-zeroed distances without stations.
+ */
+export function getDistancesInReferenceFrame(
+  points: ReplayTrajectoryPoint[],
+  referencePoints: ReplayTrajectoryPoint[],
+  trackLengthM?: number
+): number[] {
+  const ownDists = getTrajectoryDistances(points, trackLengthM);
+  const canMatchByStation =
+    points !== referencePoints &&
+    Boolean(trackLengthM && trackLengthM > 0) &&
+    points[0]?.stationM !== undefined &&
+    referencePoints[0]?.stationM !== undefined;
+  if (!canMatchByStation || !trackLengthM) return ownDists;
+
+  const refStations = getMonotonicStations(referencePoints, trackLengthM);
+  const refDists = getTrajectoryDistances(referencePoints, trackLengthM);
+  return getMonotonicStations(points, trackLengthM).map(s => interpolateScalarAtDistance(refDists, refStations, s, true));
+}
+
+/**
  * Blends two trajectory samples at fraction t (0 = p0, 1 = p1) into a display-ready point.
  * Every interpolatePointAtDistance branch goes through here so all channels share one
  * rounding/precision policy; blending a sample with itself (t = 0) yields that sample.
