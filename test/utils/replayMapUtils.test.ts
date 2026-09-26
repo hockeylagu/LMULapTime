@@ -5,6 +5,9 @@ import {
   computeDispersedCornerMarkers,
   getHeatmapColor,
   computeTrackBoundaryPathD,
+  computeGhostPosition,
+  computeBaselineDeltaByIdx,
+  buildEffectiveBaselinePoints,
 } from '../../src/components/replay/map/replayMapUtils.js';
 import type { ReplayTelemetryPoint } from '../../server/core/types.js';
 
@@ -122,6 +125,87 @@ describe('replayMapUtils', () => {
     it('returns undefined if all boundary point arrays are empty', () => {
       const result = computeTrackBoundaryPathD([], [], []);
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('buildEffectiveBaselinePoints', () => {
+    it('prepends extrapolated start/finish line crossing point when baseline begins after the line', () => {
+      const baseline: ReplayTelemetryPoint[] = [
+        { x: -115.95, y: 9.8, z: -41.52, stationM: 8.04, distM: 0, timeSec: 375.21, speedKmh: 320 },
+        { x: -117.03, y: 9.8, z: -42.94, stationM: 9.82, distM: 1.78, timeSec: 375.23, speedKmh: 321 },
+      ];
+      const result = buildEffectiveBaselinePoints(baseline, 5724.1);
+      expect(result).toHaveLength(3);
+      expect(result[0].stationM).toBe(0);
+      expect(result[0].distM).toBe(0);
+      expect(result[0].timeSec).toBeCloseTo(375.12, 1);
+      expect(result[0].x).toBeCloseTo(-111.07, 1);
+      expect(result[0].z).toBeCloseTo(-35.11, 1);
+      expect(result[1]).toBe(baseline[0]);
+    });
+
+    it('leaves baseline unchanged when it already begins at or before the start line', () => {
+      const baseline: ReplayTelemetryPoint[] = [
+        { x: -111.0, y: 9.8, z: -35.0, stationM: 0.5, distM: 0, timeSec: 0, speedKmh: 300 },
+        { x: -113.0, y: 9.8, z: -38.0, stationM: 4.0, distM: 3.5, timeSec: 0.04, speedKmh: 302 },
+      ];
+      const result = buildEffectiveBaselinePoints(baseline, 5724.1);
+      expect(result).toHaveLength(2);
+      expect(result).toBe(baseline);
+    });
+  });
+
+  describe('computeGhostPosition station-domain matching', () => {
+    it('aligns ghost position side-by-side using canonical station rather than divergent odometer distances', () => {
+      const primary: ReplayTelemetryPoint[] = [
+        { x: -111.03, y: 0, z: -36.83, stationM: 1.36, distM: 0, timeSec: 0, speedKmh: 320 },
+        { x: -113.13, y: 0, z: -39.70, stationM: 4.91, distM: 3.56, timeSec: 0.04, speedKmh: 320 },
+      ];
+      // Baseline starts 8m downstream, shifted laterally across the track width
+      const baseline: ReplayTelemetryPoint[] = [
+        { x: -115.95, y: 0, z: -41.52, stationM: 8.04, distM: 0, timeSec: 375.21, speedKmh: 320 },
+        { x: -117.03, y: 0, z: -42.94, stationM: 9.82, distM: 1.78, timeSec: 375.23, speedKmh: 321 },
+      ];
+
+      const bounds = { minX: -200, maxX: 200, spanX: 400, minZ: -200, maxZ: 200, spanZ: 400 };
+      const ghost = computeGhostPosition(
+        [1.36, 4.91],
+        [8.04, 9.82],
+        baseline,
+        0, // Primary at station 1.36
+        bounds,
+        800,
+        60,
+        5724.1,
+        primary
+      );
+
+      expect(ghost).not.toBeNull();
+      // At station 1.36m, ghost is extrapolated backwards from station 8.04m, placing it side-by-side with primary car
+      const dist = Math.hypot(primary[0].x - ghost!.point.x, primary[0].z - ghost!.point.z);
+      expect(dist).toBeLessThan(3.0);
+    });
+  });
+
+  describe('computeBaselineDeltaByIdx station matching', () => {
+    it('samples delta correctly when station matching is active', () => {
+      const primary: ReplayTelemetryPoint[] = [
+        { x: 0, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1 },
+        { x: 0, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2 },
+      ];
+      const baseline: ReplayTelemetryPoint[] = [
+        { x: 2, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1.1 },
+        { x: 2, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2.2 },
+      ];
+      const deltas = computeBaselineDeltaByIdx(
+        [-0.1, -0.2],
+        baseline,
+        [10, 20],
+        [10, 20],
+        100,
+        primary
+      );
+      expect(deltas).toEqual([-0.1, -0.2]);
     });
   });
 });
