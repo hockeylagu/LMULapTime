@@ -24,7 +24,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ReplayDriverEntry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
-import { mapVehicleIdToClass } from '../../shared/domain/vehicleMapping.js';
+import { areComparableCarClasses, resolveDriverCarClass } from '../../shared/domain/vehicleMapping.js';
 
 const API = 'http://localhost:3001/api/replays';
 const FIELDS: Array<keyof ReplayTrajectoryPoint> = [
@@ -45,7 +45,7 @@ async function fetchCarClass(req: LapRequest): Promise<string> {
   const meta = (await res.json()) as { drivers?: ReplayDriverEntry[] };
   const entry = meta.drivers?.find(d => (req.driver === '-' ? d.isPlayer : d.name === req.driver));
   if (!entry) throw new Error(`driver ${req.driver} not found in ${req.replay}`);
-  return entry.carClass || mapVehicleIdToClass(entry.vehicleId, entry.carModel);
+  return resolveDriverCarClass(entry);
 }
 
 async function fetchLap(req: LapRequest, maxPoints: number) {
@@ -91,7 +91,7 @@ async function main() {
   const maxPoints = Number(max ?? 2400);
   const primary = await fetchLap({ replay: pReplay, lap: Number(pLap), driver: pDriver, source: pSource }, maxPoints);
   const baseline = await fetchLap({ replay: bReplay, lap: Number(bLap), driver: bDriver, source: bSource }, maxPoints);
-  if (primary.carClass !== baseline.carClass) {
+  if (!primary.carClass || !areComparableCarClasses(primary.carClass, baseline.carClass)) {
     throw new Error(`refusing a cross-class pair: ${primary.driverName} is ${primary.carClass}, ${baseline.driverName} is ${baseline.carClass}`);
   }
 
