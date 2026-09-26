@@ -5,7 +5,6 @@ import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shar
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
-import { fetchJsonShared } from './sharedJsonFetch.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 
@@ -114,8 +113,8 @@ export function useReplayInspectorData({
     const driverQuery = requestedDriverName ? `&driverName=${encodeURIComponent(requestedDriverName)}` : '';
 
     Promise.all([
-      fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.body as ReplayMetadata | null : null)),
-      fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.body as ReplayTrajectoryData | null : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
+      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
     ])
       .then(([metaData, rawTrajData]) => {
         if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
@@ -273,12 +272,12 @@ export function useReplayInspectorData({
     // A baseline from the inspected replay uses its metadata; only another replay's is fetched.
     const fetchMeta = targetReplay === activeReplayName
       ? Promise.resolve(null)
-      : fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.body as ReplayMetadata | null : null));
+      : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
 
-    const fetchTraj = fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
-      .then(r => {
-        if (r.ok) return r.body as ReplayTrajectoryData | null;
-        const body = r.body;
+    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
+      .then(async r => {
+        if (r.ok) return r.json() as Promise<ReplayTrajectoryData | null>;
+        const body: unknown = await r.json().catch(() => null);
         const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : null;
         throw new Error(message || `Failed to load comparison lap (HTTP ${r.status})`);
       });
@@ -324,8 +323,8 @@ export function useReplayInspectorData({
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
     const sourceParam = `&source=${src}`;
-    fetchJsonShared(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
-      .then(r => (r.ok ? r.body as ReplayTrajectoryData | null : null))
+    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
+      .then(r => (r.ok ? r.json() : null))
       .then(rawTrajData => {
         if (requestId !== trajectoryRequestIdRef.current) return;
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
