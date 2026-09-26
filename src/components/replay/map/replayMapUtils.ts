@@ -19,8 +19,15 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Colour steps per gradient. The racing line is drawn as one path per run of equal colour
+ * (buildTrackLineRuns), so a continuous gradient would give every sample its own path; 32 steps
+ * (~9 km/h each in speed mode) look continuous on a 2 px line.
+ */
+const GRADIENT_LEVELS = 32;
+
 function sampleGradient(stops: Array<[number, [number, number, number]]>, t: number): string {
-  const clamped = Math.min(1, Math.max(0, t));
+  const clamped = Math.round(Math.min(1, Math.max(0, t)) * GRADIENT_LEVELS) / GRADIENT_LEVELS;
   for (let i = 0; i < stops.length - 1; i++) {
     const [t0, c0] = stops[i];
     const [t1, c1] = stops[i + 1];
@@ -120,10 +127,7 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
     if (i === 0) {
       d += `M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
     } else {
-      const prev = svgPoints[i - 1];
-      const dist = Math.hypot(p.sx - prev.sx, p.sy - prev.sy);
-      const worldDist = Math.hypot(p.x - prev.x, p.z - prev.z);
-      if (p.isTeleport || worldDist > 20 || dist > 30) {
+      if (isLineBreak(svgPoints[i - 1], p)) {
         d += ` M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
       } else {
         d += ` L ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
@@ -131,6 +135,67 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
     }
   }
   return d;
+}
+
+/** True where the line must not be drawn from `prev` to `p` (a teleport or a recording gap). */
+export function isLineBreak(prev: { sx: number; sy: number; x: number; z: number }, p: { sx: number; sy: number; x: number; z: number; isTeleport?: boolean }): boolean {
+  return Boolean(p.isTeleport) || Math.hypot(p.x - prev.x, p.z - prev.z) > 20 || Math.hypot(p.sx - prev.sx, p.sy - prev.sy) > 30;
+}
+
+export interface TrackLineRun {
+  /** SVG path through the run's vertices. */
+  d: string;
+  color: string;
+  isHighlighted: boolean;
+  /** Positions in the projected points of the run's first and last vertex. */
+  from: number;
+  to: number;
+}
+
+/**
+ * The racing line as runs of consecutive segments sharing a colour and highlight state, one path
+ * each, instead of one SVG element per sample (tens of thousands at full resolution, which the
+ * browser re-rasterises on every pan or zoom). A segment takes the style of its end sample.
+ */
+export function buildTrackLineRuns(
+  points: ProjectedPoint[],
+  colorOf: (p: ProjectedPoint) => string,
+  isHighlightedAt: (p: ProjectedPoint) => boolean
+): TrackLineRun[] {
+  const runs: TrackLineRun[] = [];
+  let run: TrackLineRun | null = null;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const p = points[i];
+    if (isLineBreak(prev, p)) {
+      run = null;
+      continue;
+    }
+    const color = colorOf(p);
+    const isHighlighted = isHighlightedAt(p);
+    if (run && run.to === i - 1 && run.color === color && run.isHighlighted === isHighlighted) {
+      run.d += ` L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`;
+      run.to = i;
+    } else {
+      run = { d: `M ${prev.sx.toFixed(2)} ${prev.sy.toFixed(2)} L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`, color, isHighlighted, from: i - 1, to: i };
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/** Position (in `points`, between `from` and `to`) of the vertex nearest to (sx, sy). */
+export function nearestRunVertex(points: ProjectedPoint[], from: number, to: number, sx: number, sy: number): number {
+  let best = from;
+  let bestDistSq = Infinity;
+  for (let i = from; i <= to; i++) {
+    const dSq = (points[i].sx - sx) ** 2 + (points[i].sy - sy) ** 2;
+    if (dSq < bestDistSq) {
+      bestDistSq = dSq;
+      best = i;
+    }
+  }
+  return best;
 }
 
 export function projectBoundaryPoints(
