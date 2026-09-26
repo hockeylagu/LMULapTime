@@ -21,6 +21,13 @@ describe('lapEdgesFromNeighbours', () => {
     expect(leadOut).toHaveLength(20);
   });
 
+  it('goes on past two samples stored with the same time (times are kept to 0.01 s)', () => {
+    const previous = samples(0, 50);
+    previous[45] = { ...previous[45], timeSec: previous[44].timeSec };
+    const { leadIn } = lapEdgesFromNeighbours(samples(50, 150), previous, undefined);
+    expect(leadIn).toHaveLength(20);
+  });
+
   it('returns no edges without neighbouring laps (first lap, lap not stored)', () => {
     expect(lapEdgesFromNeighbours(samples(50, 150), undefined, undefined)).toEqual({ leadIn: [], leadOut: [] });
   });
