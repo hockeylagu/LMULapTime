@@ -169,7 +169,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   }, [trajectory]);
 
   const primaryDists = useMemo(
-    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points) : []),
+    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []),
     [trajectory]
   );
 
