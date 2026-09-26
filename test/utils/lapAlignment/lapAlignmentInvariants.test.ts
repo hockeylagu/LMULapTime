@@ -39,19 +39,17 @@ type InvariantId = 'I0' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'I7';
 const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>> = {
   'daytona-r1-10-lap-pair': {
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.1 s asymmetry)',
-    I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
   },
   'sarthe-r1-41-lap-pair': {
-    I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
+    I5: 'phase 4: stride decimation drops a 2-sample brake tap (T11) that the half-resolution lap never sees',
   },
   'bahrain-r1-10-lap-pair': {
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.126 s asymmetry)',
-    I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
+    I5: 'phase 4: stride decimation aliases the VCR baseline throttle chatter (33/100) at half resolution (T5-T7); T1 primary is 1 m over (100/70 alternation, a 0.155 s dip at the 0.15 s cut limit)',
   },
   'spa-r1-38-lap-pair': {
     I3: 'phase 4: baseline starts 14.9 m late; trimmed 10 m more it hits the 25 m extrapolation clamp',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.207 s asymmetry)',
-    I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
   },
 };
 
