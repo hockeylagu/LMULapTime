@@ -308,6 +308,82 @@ function timeAtFinishLine(
   return t0 + t * ((points[j].timeSec || 0) - t0) - startT;
 }
 
+interface LapReferenceCoords {
+  canMatchByStation: boolean;
+  primaryRefCoords: number[];
+  baselineRefCoords: number[];
+  totalBaselineRef: number;
+}
+
+/** Where each sample of both laps is on the common axis: track station, else distance driven. */
+function lapReferenceCoords(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  trackLengthM: number | undefined,
+  primaryDists: number[],
+  baselineDists: number[],
+): LapReferenceCoords {
+  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
+  if (canMatchByStation && trackLengthM) {
+    return {
+      canMatchByStation,
+      primaryRefCoords: getMonotonicStations(primaryPoints, trackLengthM),
+      baselineRefCoords: getMonotonicStations(baselinePoints, trackLengthM),
+      totalBaselineRef: trackLengthM,
+    };
+  }
+  return {
+    canMatchByStation,
+    primaryRefCoords: primaryDists,
+    baselineRefCoords: baselineDists,
+    totalBaselineRef: Math.max(1, baselineDists[baselineDists.length - 1]),
+  };
+}
+
+/** A baseline sample placed on the primary lap's chart axis. */
+export interface BaselineChartSample {
+  /** Position in the frame of `primaryAxis` (the strip's x-axis distances). */
+  distance: number;
+  point: InterpolatedPoint;
+}
+
+/**
+ * The baseline lap's own samples, each placed where it is on the track in the frame of the
+ * primary lap's chart axis (`primaryAxis`, one value per primary sample).
+ *
+ * computeLapComparisons reads the baseline at the primary's samples, which the server keeps where
+ * the PRIMARY's traces change: on the primary's full-throttle straight they are up to ~8 m apart,
+ * so a baseline that brakes there was drawn as a straight ramp and its brake point lost. Charts
+ * draw the baseline traces from these samples instead.
+ */
+export function computeBaselineChartSamples(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  trackLengthM: number | undefined,
+  primaryAxis: number[],
+): BaselineChartSample[] {
+  if (primaryPoints.length === 0 || baselinePoints.length === 0 || primaryAxis.length !== primaryPoints.length) return [];
+  const { primaryRefCoords, baselineRefCoords } = lapReferenceCoords(
+    primaryPoints, baselinePoints, trackLengthM,
+    getTrajectoryDistances(primaryPoints, trackLengthM), getTrajectoryDistances(baselinePoints, trackLengthM),
+  );
+  const baselineCrossing = computeStartFinishOffset(baselinePoints, trackLengthM);
+  const baselineStartT = baselineCrossing ? baselineCrossing.timeSecOffset : (baselinePoints[0].timeSec || 0);
+  const first = primaryRefCoords[0];
+  const last = primaryRefCoords[primaryRefCoords.length - 1];
+  const samples: BaselineChartSample[] = [];
+  baselinePoints.forEach((bp, j) => {
+    const ref = baselineRefCoords[j];
+    // Outside the primary lap there is no axis to place it on.
+    if (ref < first || ref > last) return;
+    samples.push({
+      distance: interpolateScalarAtDistance(primaryAxis, primaryRefCoords, ref),
+      point: blendTelemetryPoints(bp, bp, 0, baselineStartT),
+    });
+  });
+  return samples;
+}
+
 /**
  * Computes comparative telemetry points for the primary lap against a baseline lap,
  * matched either by canonical track layout station (s) or by absolute cumulative distance
@@ -340,22 +416,8 @@ export function computeLapComparisons(
   const baselineTotalLapTime = Math.max(0, (baselinePoints[baselinePoints.length - 1].timeSec || 0) - baselineStartT);
   const finishLineDelta = primaryTotalLapTime - baselineTotalLapTime;
 
-  // Determine whether to match by canonical track station or normalized distance
-  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
-
-  let primaryRefCoords: number[];
-  let baselineRefCoords: number[];
-  let totalBaselineRef: number;
-
-  if (canMatchByStation && trackLengthM) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baselineRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-    totalBaselineRef = trackLengthM;
-  } else {
-    primaryRefCoords = primaryDists;
-    baselineRefCoords = baselineDists;
-    totalBaselineRef = Math.max(1, baselineDists[baselineDists.length - 1]);
-  }
+  const { canMatchByStation, primaryRefCoords, baselineRefCoords, totalBaselineRef } =
+    lapReferenceCoords(primaryPoints, baselinePoints, trackLengthM, primaryDists, baselineDists);
 
   // At and past the finish line (samples clamped to station L) the delta is the lap delta at the
   // line itself - not a gap that keeps growing while the primary runs on past it.

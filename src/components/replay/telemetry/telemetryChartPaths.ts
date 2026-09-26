@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { PointComparison } from '../../../utils/replayComparison.js';
+import { BaselineChartSample, InterpolatedPoint, PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
@@ -134,7 +134,10 @@ export function computeTelemetryChartPaths(
   viewStart: number,
   viewEnd: number,
   // The strip's x-axis distances (same frame as the cursor and sector lines), one per point.
-  distances: number[]
+  distances: number[],
+  // The baseline lap's own samples on that axis (computeBaselineChartSamples). Without them the
+  // baseline traces are read at the primary's samples.
+  baselineSamples?: BaselineChartSample[]
 ): TelemetryChartPathsResult {
   if (points.length === 0) {
     const emptyCorner: CornerPaths = { fl: '', fr: '', rl: '', rr: '' };
@@ -372,6 +375,114 @@ export function computeTelemetryChartPaths(
   let lastDtX = 0;
   let prevComp: PointComparison | null = null;
 
+  // Baseline traces, one sample at a time (x in 0-1000 view units).
+  const appendBaseline = (bp: InterpolatedPoint, prevBp: InterpolatedPoint, x: number, isFirst: boolean): void => {
+    const bSpdNorm = Math.min(1, Math.max(0, (bp.speedKmh || 0) / maxSpd));
+    const bsy = 95 - bSpdNorm * 85;
+    bSpd += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bsy.toFixed(1)} `;
+
+    const bThrNorm = Math.min(1, Math.max(0, (bp.throttle || 0) / 100));
+    const bty = 95 - bThrNorm * 85;
+    bThr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bty.toFixed(1)} `;
+
+    const bBrkNorm = Math.min(1, Math.max(0, (bp.brake || 0) / 100));
+    const bby = 95 - bBrkNorm * 85;
+    bBrk += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bby.toFixed(1)} `;
+
+    // Steering: Left is UP (-100% -> 10), Right is BOTTOM (+100% -> 90), center at 50
+    const bst = Math.min(100, Math.max(-100, ((bp.steerYaw || 0) / 270) * 100));
+    const bsty = 50 + (bst / 100) * 40;
+    bStr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bsty.toFixed(1)} `;
+
+    const bGy = 95 - (bp.gear / 7) * 80;
+    if (isFirst) {
+      bGr += `M ${x.toFixed(1)} ${bGy.toFixed(1)} `;
+    } else {
+      const prevBgy = 95 - (prevBp.gear / 7) * 80;
+      bGr += `L ${x.toFixed(1)} ${prevBgy.toFixed(1)} L ${x.toFixed(1)} ${bGy.toFixed(1)} `;
+    }
+
+    if (bp.engineRpm !== undefined) {
+      const brpmNorm = Math.min(1, Math.max(0, bp.engineRpm / maxRpm));
+      const bry = 95 - brpmNorm * 85;
+      bRpm += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
+    }
+
+    appendCornerPoint(bCornerBuilders, bp, x, isFirst, cornerExtrema);
+
+    if (bp.lateralOffsetM !== undefined) {
+      const latClamped = Math.min(10, Math.max(-10, bp.lateralOffsetM));
+      const latY = 50 - (latClamped / 10) * 40;
+      bLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
+    }
+
+    if (bp.accelLatG !== undefined) {
+      const latClamped = Math.max(-3.0, Math.min(3.0, bp.accelLatG));
+      const latY = 50 - (latClamped / 3.0) * 42;
+      bAccLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
+    }
+
+    if (bp.accelLonG !== undefined) {
+      const lonClamped = Math.max(-3.0, Math.min(3.0, bp.accelLonG));
+      const lonY = 50 - (lonClamped / 3.0) * 42;
+      bAccLon += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${lonY.toFixed(1)} `;
+    }
+
+    if (bp.accelTotalG !== undefined) {
+      const totClamped = Math.max(0, Math.min(4.0, bp.accelTotalG));
+      const totY = 95 - (totClamped / 4.0) * 85;
+      bAccTot += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${totY.toFixed(1)} `;
+    }
+
+    if (bp.slipAngleDeg !== undefined) {
+      const saClamped = Math.max(-12, Math.min(12, bp.slipAngleDeg));
+      const saY = 50 - (saClamped / 12) * 42;
+      bSlipAng += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${saY.toFixed(1)} `;
+    }
+
+    if (bp.understeerDeg !== undefined) {
+      const uClamped = Math.max(-8, Math.min(8, bp.understeerDeg));
+      const uY = 50 - (uClamped / 8) * 42;
+      bUSteer += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${uY.toFixed(1)} `;
+    }
+
+    if (bp.tireSlipPct !== undefined) {
+      const slpClamped = Math.max(0, Math.min(100, bp.tireSlipPct));
+      const slpY = 95 - (slpClamped / 100) * 85;
+      bTireSlp += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${slpY.toFixed(1)} `;
+    }
+
+    if (bp.yawRateDeg !== undefined) {
+      const yrClamped = Math.max(-90, Math.min(90, bp.yawRateDeg));
+      const yrY = 50 - (yrClamped / 90) * 42;
+      bYawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
+    }
+
+    if (bp.fuel !== undefined) {
+      const fuelNorm = Math.min(1, Math.max(0, bp.fuel / maxFuel));
+      const bfy = 95 - fuelNorm * 85;
+      bFuel += `${bFuel ? 'L' : 'M'} ${x.toFixed(1)} ${bfy.toFixed(1)} `;
+    }
+
+    if (bp.virtualEnergy !== undefined) {
+      const veNorm = Math.min(1, Math.max(0, bp.virtualEnergy / 100));
+      const bveY = 95 - veNorm * 85;
+      bVe += `${bVe ? 'L' : 'M'} ${x.toFixed(1)} ${bveY.toFixed(1)} `;
+    }
+
+    if (bp.soc !== undefined) {
+      const socNorm = Math.min(1, Math.max(0, bp.soc / 100));
+      const bsocY = 95 - socNorm * 85;
+      bSoc += `${bSoc ? 'L' : 'M'} ${x.toFixed(1)} ${bsocY.toFixed(1)} `;
+    }
+
+    if (bp.regenRate !== undefined) {
+      const rNorm = Math.min(1, Math.max(0, bp.regenRate / maxRegen));
+      const bry = 95 - rNorm * 85;
+      bRegen += `${bRegen ? 'L' : 'M'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
+    }
+  };
+
   for (let i = viewStart; i <= viewEnd; i++) {
     const p = points[i];
     const x = xForIndex(i);
@@ -502,116 +613,9 @@ export function computeTelemetryChartPaths(
       regen += `${regen ? 'L' : 'M'} ${x.toFixed(1)} ${ry.toFixed(1)} `;
     }
 
-    // Baseline comparisons
     if (pointComparisons[i]) {
       const comp = pointComparisons[i];
-      const bp = comp.baseline;
-
-      const bSpdNorm = Math.min(1, Math.max(0, (bp.speedKmh || 0) / maxSpd));
-      const bsy = 95 - bSpdNorm * 85;
-      bSpd += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bsy.toFixed(1)} `;
-
-      const bThrNorm = Math.min(1, Math.max(0, (bp.throttle || 0) / 100));
-      const bty = 95 - bThrNorm * 85;
-      bThr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bty.toFixed(1)} `;
-
-      const bBrkNorm = Math.min(1, Math.max(0, (bp.brake || 0) / 100));
-      const bby = 95 - bBrkNorm * 85;
-      bBrk += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bby.toFixed(1)} `;
-
-      // Steering: Left is UP (-100% -> 10), Right is BOTTOM (+100% -> 90), center at 50
-      const bst = Math.min(100, Math.max(-100, ((bp.steerYaw || 0) / 270) * 100));
-      const bsty = 50 + (bst / 100) * 40;
-      bStr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bsty.toFixed(1)} `;
-
-      const bGy = 95 - (bp.gear / 7) * 80;
-      if (isFirst) {
-        bGr += `M ${x.toFixed(1)} ${bGy.toFixed(1)} `;
-      } else {
-        const prevBp = pointComparisons[i - 1]?.baseline || bp;
-        const prevBgy = 95 - (prevBp.gear / 7) * 80;
-        bGr += `L ${x.toFixed(1)} ${prevBgy.toFixed(1)} L ${x.toFixed(1)} ${bGy.toFixed(1)} `;
-      }
-
-      if (bp.engineRpm !== undefined) {
-        const brpmNorm = Math.min(1, Math.max(0, bp.engineRpm / maxRpm));
-        const bry = 95 - brpmNorm * 85;
-        bRpm += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
-      }
-
-      appendCornerPoint(bCornerBuilders, bp, x, isFirst, cornerExtrema);
-
-      if (bp.lateralOffsetM !== undefined) {
-        const latClamped = Math.min(10, Math.max(-10, bp.lateralOffsetM));
-        const latY = 50 - (latClamped / 10) * 40;
-        bLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
-      }
-
-      if (bp.accelLatG !== undefined) {
-        const latClamped = Math.max(-3.0, Math.min(3.0, bp.accelLatG));
-        const latY = 50 - (latClamped / 3.0) * 42;
-        bAccLat += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${latY.toFixed(1)} `;
-      }
-
-      if (bp.accelLonG !== undefined) {
-        const lonClamped = Math.max(-3.0, Math.min(3.0, bp.accelLonG));
-        const lonY = 50 - (lonClamped / 3.0) * 42;
-        bAccLon += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${lonY.toFixed(1)} `;
-      }
-
-      if (bp.accelTotalG !== undefined) {
-        const totClamped = Math.max(0, Math.min(4.0, bp.accelTotalG));
-        const totY = 95 - (totClamped / 4.0) * 85;
-        bAccTot += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${totY.toFixed(1)} `;
-      }
-
-      if (bp.slipAngleDeg !== undefined) {
-        const saClamped = Math.max(-12, Math.min(12, bp.slipAngleDeg));
-        const saY = 50 - (saClamped / 12) * 42;
-        bSlipAng += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${saY.toFixed(1)} `;
-      }
-
-      if (bp.understeerDeg !== undefined) {
-        const uClamped = Math.max(-8, Math.min(8, bp.understeerDeg));
-        const uY = 50 - (uClamped / 8) * 42;
-        bUSteer += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${uY.toFixed(1)} `;
-      }
-
-      if (bp.tireSlipPct !== undefined) {
-        const slpClamped = Math.max(0, Math.min(100, bp.tireSlipPct));
-        const slpY = 95 - (slpClamped / 100) * 85;
-        bTireSlp += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${slpY.toFixed(1)} `;
-      }
-
-      if (bp.yawRateDeg !== undefined) {
-        const yrClamped = Math.max(-90, Math.min(90, bp.yawRateDeg));
-        const yrY = 50 - (yrClamped / 90) * 42;
-        bYawRt += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${yrY.toFixed(1)} `;
-      }
-
-      if (bp.fuel !== undefined) {
-        const fuelNorm = Math.min(1, Math.max(0, bp.fuel / maxFuel));
-        const bfy = 95 - fuelNorm * 85;
-        bFuel += `${bFuel ? 'L' : 'M'} ${x.toFixed(1)} ${bfy.toFixed(1)} `;
-      }
-
-      if (bp.virtualEnergy !== undefined) {
-        const veNorm = Math.min(1, Math.max(0, bp.virtualEnergy / 100));
-        const bveY = 95 - veNorm * 85;
-        bVe += `${bVe ? 'L' : 'M'} ${x.toFixed(1)} ${bveY.toFixed(1)} `;
-      }
-
-      if (bp.soc !== undefined) {
-        const socNorm = Math.min(1, Math.max(0, bp.soc / 100));
-        const bsocY = 95 - socNorm * 85;
-        bSoc += `${bSoc ? 'L' : 'M'} ${x.toFixed(1)} ${bsocY.toFixed(1)} `;
-      }
-
-      if (bp.regenRate !== undefined) {
-        const rNorm = Math.min(1, Math.max(0, bp.regenRate / maxRegen));
-        const bry = 95 - rNorm * 85;
-        bRegen += `${bRegen ? 'L' : 'M'} ${x.toFixed(1)} ${bry.toFixed(1)} `;
-      }
+      if (!baselineSamples) appendBaseline(comp.baseline, pointComparisons[i - 1]?.baseline || comp.baseline, x, isFirst);
 
       // Delta time: negative is faster (above zero line, Y < 50), positive is slower (below, Y > 50)
       const dtNorm = Math.max(-1, Math.min(1, comp.deltaTimeSec / maxDelta));
@@ -635,6 +639,20 @@ export function computeTelemetryChartPaths(
       prevDtX = x;
       prevDtY = dty;
       prevComp = comp;
+    }
+  }
+
+  if (baselineSamples) {
+    // The visible samples plus one on each side, so the lines run to the view's edges.
+    let from = baselineSamples.findIndex(sample => sample.distance >= distStart);
+    if (from < 0) from = baselineSamples.length;
+    let to = from;
+    while (to < baselineSamples.length && baselineSamples[to].distance <= distEnd) to++;
+    const lo = Math.max(0, from - 1);
+    const hi = Math.min(baselineSamples.length - 1, to);
+    for (let j = lo; j <= hi && baselineSamples.length > 0; j++) {
+      const x = ((baselineSamples[j].distance - distStart) / distSpan) * 1000;
+      appendBaseline(baselineSamples[j].point, baselineSamples[j - 1]?.point ?? baselineSamples[j].point, x, j === lo);
     }
   }
 
