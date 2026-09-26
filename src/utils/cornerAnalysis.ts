@@ -347,9 +347,10 @@ function interpolateCoordinateAtDistance(dists: number[], coordinates: number[],
 }
 
 /**
- * Detects corners (braking -> apex -> acceleration) from the baseline lap's speed trace and
+ * Detects corners (braking -> apex -> acceleration) from the PRIMARY lap's speed trace and
  * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
- * them) comparing primary vs baseline. Each segment's `timeDeltaSec` isolates the time
+ * them) comparing primary vs baseline. All distances are in the primary lap's frame; corner
+ * numbering can therefore change when the primary lap changes. Each segment's `timeDeltaSec` isolates the time
  * gained/lost across just that stretch (not cumulative drift from earlier on), so the full
  * list sums to the lap's total time delta - together this explains where the overall gap
  * comes from, not just how big it is.
