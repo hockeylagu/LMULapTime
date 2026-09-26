@@ -3,6 +3,13 @@ import { Layers } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
+
+const GEAR_GRID_LINES: readonly TelemetryGridLine[] = [
+  { label: 'G7', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
+  { label: 'G4', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
+  { label: 'G1', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
+];
 
 export interface TelemetryGearChannelProps {
   gearPath: string;
@@ -74,13 +81,11 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-amber-400 font-mono">G7</div>
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-amber-400 font-mono">G4</div>
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-amber-400 font-mono">G1</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace
+        chart={chartSvg}
+        gridLines={GEAR_GRID_LINES}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20"
+      />
 
       {isCursorInView && (
         <div

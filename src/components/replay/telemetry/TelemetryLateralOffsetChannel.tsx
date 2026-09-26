@@ -3,6 +3,7 @@ import { GitCommit } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryLateralOffsetChannelProps {
   lateralOffsetPath: string;
@@ -76,13 +77,11 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-teal-400/30 w-full text-[8px] text-teal-400 font-mono">+10m Right</div>
-        <div className="border-b border-teal-400/50 w-full text-[8px] text-teal-300 font-mono">0m Center</div>
-        <div className="border-b border-teal-400/30 w-full text-[8px] text-teal-400 font-mono">-10m Left</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '+10m Right', borderClassName: 'border-b border-teal-400/30', labelClassName: 'text-[8px] text-teal-400 font-mono' },
+        { label: '0m Center', borderClassName: 'border-b border-teal-400/50', labelClassName: 'text-[8px] text-teal-300 font-mono' },
+        { label: '-10m Left', borderClassName: 'border-b border-teal-400/30', labelClassName: 'text-[8px] text-teal-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasOffset && (
         <div

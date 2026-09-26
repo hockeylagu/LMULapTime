@@ -3,6 +3,7 @@ import { Gauge, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryAccelLonChannelProps {
   accelLonPath: string;
@@ -89,13 +90,11 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-emerald-400 font-mono">+3.0G Acceleration</div>
-        <div className="border-b border-amber-400/50 w-full text-[8px] text-amber-300 font-mono">0.0G Neutral</div>
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-rose-400 font-mono">-3.0G Braking</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '+3.0G Acceleration', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-emerald-400 font-mono' },
+        { label: '0.0G Neutral', borderClassName: 'border-b border-amber-400/50', labelClassName: 'text-[8px] text-amber-300 font-mono' },
+        { label: '-3.0G Braking', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-rose-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasLonG && (
         <div

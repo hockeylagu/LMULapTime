@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Disc, AlertTriangle, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -111,13 +112,11 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-red-400/30 w-full text-[8px] text-red-400 font-mono">100% Saturation / Skid</div>
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-amber-300 font-mono">50% Dynamic Grip</div>
-        <div className="border-b border-emerald-400/30 w-full text-[8px] text-emerald-400 font-mono">0% Free Rolling</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '100% Saturation / Skid', borderClassName: 'border-b border-red-400/30', labelClassName: 'text-[8px] text-red-400 font-mono' },
+        { label: '50% Dynamic Grip', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-300 font-mono' },
+        { label: '0% Free Rolling', borderClassName: 'border-b border-emerald-400/30', labelClassName: 'text-[8px] text-emerald-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasSlip && (
         <div

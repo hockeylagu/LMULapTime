@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { CircleGauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -80,13 +81,11 @@ export const TelemetryTirePressuresChannel: React.FC<TelemetryTirePressuresChann
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400 font-mono">{maxTirePressure} kPa</div>
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400 font-mono">{midPres} kPa</div>
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400 font-mono">{minTirePressure} kPa</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxTirePressure} kPa`, borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400 font-mono' },
+        { label: `${midPres} kPa`, borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400 font-mono' },
+        { label: `${minTirePressure} kPa`, borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasData && tp && (
         <div

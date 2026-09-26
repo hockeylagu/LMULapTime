@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Activity, BrainCircuit, Timer, X } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types';
 import { CornerConsistencyStat, CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
@@ -95,6 +95,11 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
     [baselineTrajectory]
   );
 
+  const handleSelectMapCorner = useCallback((cornerNumber: number | null) => {
+    handleSelectCorner(cornerNumber);
+    if (cornerNumber !== null) setActiveTab('corners');
+  }, [handleSelectCorner, setActiveTab]);
+
   const isDoublePanel = activeTab !== 'map';
 
   const mapContainer = (
@@ -109,12 +114,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       currentPoint={currentPoint}
       corners={cornerSegments}
       selectedCornerNumber={selectedCornerNumber}
-      onSelectCornerNumber={cornerNumber => {
-        handleSelectCorner(cornerNumber);
-        if (cornerNumber !== null) {
-          setActiveTab('corners');
-        }
-      }}
+      onSelectCornerNumber={handleSelectMapCorner}
       trackVenue={trackVenue}
       trackCourse={trackCourse}
       layoutKey={layoutKey}

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -85,14 +86,11 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
         )}
       </div>
 
-      {/* Grid lines */}
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-purple-400/30 w-full text-[9px] text-purple-300 font-mono">{maxRpm} rpm</div>
-        <div className="border-b border-purple-400/30 w-full text-[9px] text-purple-300 font-mono">{Math.round(maxRpm / 2)} rpm</div>
-        <div className="border-b border-purple-400/30 w-full text-[9px] text-purple-300 font-mono">0 rpm</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxRpm} rpm`, borderClassName: 'border-b border-purple-400/30', labelClassName: 'text-[9px] text-purple-300 font-mono' },
+        { label: `${Math.round(maxRpm / 2)} rpm`, borderClassName: 'border-b border-purple-400/30', labelClassName: 'text-[9px] text-purple-300 font-mono' },
+        { label: '0 rpm', borderClassName: 'border-b border-purple-400/30', labelClassName: 'text-[9px] text-purple-300 font-mono' },
+      ]} />
 
       {isCursorInView && hasRpmData && (
         <div

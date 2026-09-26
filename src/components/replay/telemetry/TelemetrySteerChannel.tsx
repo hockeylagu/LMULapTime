@@ -9,6 +9,13 @@ import {
   computeVisibleHandlingBands,
 } from '../../../utils/handlingBalanceDetection.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
+
+const STEER_GRID_LINES: readonly TelemetryGridLine[] = [
+  { label: '-100% L', borderClassName: 'border-b border-indigo-400/30', labelClassName: 'text-[8px] text-indigo-400 font-mono' },
+  { label: '0% Center', borderClassName: 'border-b border-indigo-400/50', labelClassName: 'text-[8px] text-indigo-300 font-mono' },
+  { label: '+100% R', borderClassName: 'border-b border-indigo-400/30', labelClassName: 'text-[8px] text-indigo-400 font-mono' },
+];
 
 export interface TelemetrySteerChannelProps {
   steerPath: string;
@@ -222,12 +229,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
         </button>
       </div>
 
-      {/* Grid Lines */}
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">-100% L</div>
-        <div className="border-b border-indigo-400/50 w-full text-[8px] text-indigo-300 font-mono">0% Center</div>
-        <div className="border-b border-indigo-400/30 w-full text-[8px] text-indigo-400 font-mono">+100% R</div>
-      </div>
+      <TelemetryStaticTrace
+        chart={chartSvg}
+        gridLines={STEER_GRID_LINES}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20"
+      />
 
       {/* Understeer / Oversteer / Tire Scrub Top Badges */}
       {(showBalance || showScrub) && (
@@ -257,8 +263,6 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           })}
         </div>
       )}
-
-      {chartSvg}
 
       {/* Cursor Value Callout */}
       {isCursorInView && (

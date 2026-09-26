@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Activity } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -80,13 +81,11 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">{maxSuspPos} mm</div>
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">{midSusp} mm</div>
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">{minSuspPos} mm</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxSuspPos} mm`, borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+        { label: `${midSusp} mm`, borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+        { label: `${minSuspPos} mm`, borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasData && susp && (
         <div

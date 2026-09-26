@@ -3,6 +3,7 @@ import { Compass, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetrySlipAngleChannelProps {
   slipAnglePath: string;
@@ -80,13 +81,11 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-violet-400/30 w-full text-[8px] text-violet-400 font-mono">+12° Slip Right</div>
-        <div className="border-b border-violet-400/50 w-full text-[8px] text-violet-300 font-mono">0° In-Line</div>
-        <div className="border-b border-violet-400/30 w-full text-[8px] text-violet-400 font-mono">-12° Slip Left</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '+12° Slip Right', borderClassName: 'border-b border-violet-400/30', labelClassName: 'text-[8px] text-violet-400 font-mono' },
+        { label: '0° In-Line', borderClassName: 'border-b border-violet-400/50', labelClassName: 'text-[8px] text-violet-300 font-mono' },
+        { label: '-12° Slip Left', borderClassName: 'border-b border-violet-400/30', labelClassName: 'text-[8px] text-violet-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasSlipAngle && (
         <div

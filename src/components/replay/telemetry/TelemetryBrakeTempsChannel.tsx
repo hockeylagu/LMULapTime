@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Thermometer } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -77,13 +78,11 @@ export const TelemetryBrakeTempsChannel: React.FC<TelemetryBrakeTempsChannelProp
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-orange-400/40 w-full text-[9px] text-orange-400 font-mono">{maxBrakeTemp}°C</div>
-        <div className="border-b border-orange-400/40 w-full text-[9px] text-orange-400 font-mono">{Math.round(maxBrakeTemp / 2)}°C</div>
-        <div className="border-b border-orange-400/40 w-full text-[9px] text-orange-400 font-mono">0°C</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxBrakeTemp}°C`, borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
+        { label: `${Math.round(maxBrakeTemp / 2)}°C`, borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
+        { label: '0°C', borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasTemps && temps && (
         <div

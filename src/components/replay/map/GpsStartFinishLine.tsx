@@ -13,7 +13,7 @@ export interface GpsStartFinishLineProps {
   gateRightSvg?: { sx: number; sy: number } | null;
 }
 
-export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
+export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = React.memo(({
   svgPoints,
   zoomLevel,
   markerScale,
@@ -173,4 +173,4 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = ({
       </g>
     </g>
   );
-};
+});

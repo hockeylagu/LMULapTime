@@ -3,6 +3,7 @@ import { Compass, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryAccelLatChannelProps {
   accelLatPath: string;
@@ -89,13 +90,11 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-sky-400/30 w-full text-[8px] text-sky-400 font-mono">+3.0G Right</div>
-        <div className="border-b border-sky-400/50 w-full text-[8px] text-sky-300 font-mono">0.0G Center</div>
-        <div className="border-b border-sky-400/30 w-full text-[8px] text-sky-400 font-mono">-3.0G Left</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '+3.0G Right', borderClassName: 'border-b border-sky-400/30', labelClassName: 'text-[8px] text-sky-400 font-mono' },
+        { label: '0.0G Center', borderClassName: 'border-b border-sky-400/50', labelClassName: 'text-[8px] text-sky-300 font-mono' },
+        { label: '-3.0G Left', borderClassName: 'border-b border-sky-400/30', labelClassName: 'text-[8px] text-sky-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasLatG && (
         <div

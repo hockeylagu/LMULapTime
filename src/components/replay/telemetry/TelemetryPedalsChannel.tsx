@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Activity, Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -80,13 +81,11 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
           )}
         </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-          <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400">100%</div>
-          <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400">50%</div>
-          <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400">0%</div>
-        </div>
-
-        {throttleSvg}
+        <TelemetryStaticTrace chart={throttleSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+          { label: '100%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
+          { label: '50%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
+          { label: '0%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
+        ]} />
 
         {isCursorInView && (
           <div
@@ -129,13 +128,11 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
           )}
         </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-          <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400">100%</div>
-          <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400">50%</div>
-          <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400">0%</div>
-        </div>
-
-        {brakeSvg}
+        <TelemetryStaticTrace chart={brakeSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+          { label: '100%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
+          { label: '50%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
+          { label: '0%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
+        ]} />
 
         {isCursorInView && (
           <div

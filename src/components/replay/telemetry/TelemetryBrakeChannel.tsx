@@ -3,6 +3,13 @@ import { Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
+
+const BRAKE_GRID_LINES: readonly TelemetryGridLine[] = [
+  { label: '100%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400 font-mono' },
+  { label: '50%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400 font-mono' },
+  { label: '0%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400 font-mono' },
+];
 
 export interface TelemetryBrakeChannelProps {
   brakePath: string;
@@ -84,13 +91,11 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400 font-mono">100%</div>
-        <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400 font-mono">50%</div>
-        <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400 font-mono">0%</div>
-      </div>
-
-      {brakeSvg}
+      <TelemetryStaticTrace
+        chart={brakeSvg}
+        gridLines={BRAKE_GRID_LINES}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20"
+      />
 
       {isCursorInView && (
         <div

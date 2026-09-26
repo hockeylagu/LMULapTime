@@ -3,6 +3,7 @@ import { Scale, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryUndersteerChannelProps {
   understeerPath: string;
@@ -92,13 +93,11 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-amber-400/30 w-full text-[8px] text-amber-400 font-mono">+8° Understeer (Front Push)</div>
-        <div className="border-b border-amber-400/50 w-full text-[8px] text-amber-300 font-mono">0° Neutral Balance</div>
-        <div className="border-b border-rose-400/30 w-full text-[8px] text-rose-400 font-mono">-8° Oversteer (Rear Loose)</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '+8° Understeer (Front Push)', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
+        { label: '0° Neutral Balance', borderClassName: 'border-b border-amber-400/50', labelClassName: 'text-[8px] text-amber-300 font-mono' },
+        { label: '-8° Oversteer (Rear Loose)', borderClassName: 'border-b border-rose-400/30', labelClassName: 'text-[8px] text-rose-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasBalance && (
         <div
