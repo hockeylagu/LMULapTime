@@ -17,7 +17,6 @@ import {
 } from '../../../src/utils/cornerAnalysis.js';
 import { computeCornerConsistencyStats } from '../../../src/utils/cornerConsistency.js';
 import {
-  buildEffectiveBaselinePoints,
   computeBaselineDeltaByIdx,
   computeDispersedCornerMarkers,
   computeEffectiveBounds,
@@ -164,7 +163,7 @@ export function computeMapScene(
   trackLengthM: number,
   corners: CornerSegmentComparison[]
 ) {
-  const effectiveBaseline = buildEffectiveBaselinePoints(baseline, trackLengthM);
+  const effectiveBaseline = baseline;
   const bounds = computeEffectiveBounds(pointBounds(primary), null, effectiveBaseline);
   const svgPoints = projectTrajectoryPoints(primary, bounds, MAP_VIEWBOX, MAP_PADDING);
   const baselineSvgPoints = projectTrajectoryPoints(effectiveBaseline, bounds, MAP_VIEWBOX, MAP_PADDING);

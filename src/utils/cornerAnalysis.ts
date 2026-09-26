@@ -441,11 +441,10 @@ export function computeLapSegmentComparisons(
   }
 
   // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
-  // delta channel shows (each lap timed from its own S/F crossing, extrapolated at the lap
-  // edges), so the segments add up to the lap delta and never disagree with the chart. The
+  // delta channel shows (each lap timed from its own S/F crossing), so the segments add up to the lap delta and never disagree with the chart. The
   // trace has one value per primary sample, so it is read at primary-frame distances directly.
   const channelDeltas = computeLapComparisons(primaryPoints, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
-  const deltaAt = (distM: number): number => interpolateScalarAtDistance(channelDeltas, primaryDists, distM, true);
+  const deltaAt = (distM: number): number => interpolateScalarAtDistance(channelDeltas, primaryDists, distM);
 
   const buildStraight = (fromDist: number, toDist: number): StraightSegmentComparison | null => {
     if (toDist - fromDist < MIN_STRAIGHT_LENGTH_M) return null;

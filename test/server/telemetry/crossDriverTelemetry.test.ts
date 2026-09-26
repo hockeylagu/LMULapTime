@@ -12,6 +12,7 @@ import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/cor
 import { decompressTrajectory } from '../../../server/core/replayTrajectoryCodec.js';
 import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../../server/tracks/serverTrackSync.js';
+import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 const steamReplaysDir = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
@@ -23,7 +24,8 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
   describe('Synthetic Bullet-Proof Cross-Driver Scenarios', () => {
     const trackLengthM = 5000;
 
-    // Helper to generate a realistic lap trajectory around a circuit
+    // A lap recorded from `startStationOffsetM` around a circuit, served as the server serves it:
+    // put on the start/finish line (server/tracks/lapLineCut.ts), distances measured from there.
     function generateSyntheticLap(
       _driverName: string,
       startStationOffsetM: number, // positive = trimmed after line, negative = trimmed before line
@@ -61,7 +63,8 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
         currentTime += 10 / speedMs;
       }
 
-      return points;
+      const cut = cutLapAtLine(points, points.map(p => p.stationM ?? 0), points.map(() => 0), trackLengthM, 0, points.length - 1);
+      return cut.points.map((p, i) => ({ ...p, distM: Number((i === 0 ? 0 : (p.x - cut.points[0].x)).toFixed(2)) }));
     }
 
     it('Scenario 1: Same session, same driver (Samuel Lague Lap A vs Lap B with identical pace)', () => {
@@ -72,8 +75,7 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
       const comparisons = computeLapComparisons(lapA, lapB, trackLengthM);
       expect(comparisons.length).toBe(lapA.length);
 
-      // S/F crossing index for lapA is between node 0 (-2m) and node 1 (+8m)
-      // At station 0, elapsed time is 0 for both, so delta must be 0.000s
+      // Both laps are served from the line, where elapsed time is 0 for both: delta must be 0.000s
       const nearSfComp = comparisons.find(c => Math.abs((c.primary.stationM ?? 0)) < 15);
       expect(nearSfComp).toBeDefined();
       expect(Math.abs(nearSfComp!.deltaTimeSec)).toBeLessThanOrEqual(0.005);
