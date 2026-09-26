@@ -447,12 +447,12 @@ export function computeLapComparisons(
 
     if (hasLateralOffsets && baselineOffsets) {
       primaryLateralOffsetM = p.lateralOffsetM;
-      baselineLateralOffsetM = interpolateScalarAtDistance(
+      baselineLateralOffsetM = Number(interpolateScalarAtDistance(
         baselineOffsets,
         baselineRefCoords,
         targetBaselineRef,
         true
-      );
+      ).toFixed(2));
       deltaLateralOffsetM = Number(((primaryLateralOffsetM ?? 0) - baselineLateralOffsetM).toFixed(2));
     }
 

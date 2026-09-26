@@ -244,7 +244,8 @@ export function getDistancesInReferenceFrame(
 }
 
 /**
- * Interpolates a scalar value (e.g. lateral offset) at a given distance along a trajectory.
+ * Interpolates a scalar value (e.g. lateral offset, a delta trace, a distance) at a given
+ * distance along a trajectory. Returns full precision - rounding is the caller's display concern.
  */
 export function interpolateScalarAtDistance(
   values: number[],
@@ -258,7 +259,7 @@ export function interpolateScalarAtDistance(
       const span = cumDists[1] - cumDists[0];
       const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
       const t = (clampedDist - cumDists[0]) / span;
-      return Number((values[0] + t * (values[1] - values[0])).toFixed(2));
+      return values[0] + t * (values[1] - values[0]);
     }
     return values[0];
   }
@@ -270,7 +271,7 @@ export function interpolateScalarAtDistance(
       if (span > 1e-6) {
         const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
         const t = (clampedDist - cumDists[n - 2]) / span;
-        return Number((values[n - 2] + t * (values[n - 1] - values[n - 2])).toFixed(2));
+        return values[n - 2] + t * (values[n - 1] - values[n - 2]);
       }
     }
     return values[values.length - 1];
@@ -288,5 +289,5 @@ export function interpolateScalarAtDistance(
   if (idx0 === idx1) return values[idx0];
   const span = cumDists[idx1] - cumDists[idx0];
   const t = span > 0 ? (targetDist - cumDists[idx0]) / span : 0;
-  return Number((values[idx0] + t * (values[idx1] - values[idx0])).toFixed(2));
+  return values[idx0] + t * (values[idx1] - values[idx0]);
 }
