@@ -37,8 +37,6 @@ import {
   initDbSchema,
   compressJson,
   decompressJson,
-  REPLAY_CACHE_VERSION,
-  isCompatibleReplayCacheVersion,
   DUCKDB_TELEMETRY_CACHE_VERSION,
   CacheStats,
   SyncResult,
@@ -59,6 +57,14 @@ import {
   setTrajectoryDefaults,
   upsertReplayTrajectoryCache,
 } from './dbReplayTrajectoryStore.js';
+import {
+  StoredReplayFileInfo,
+  getAllStoredReplayFiles,
+  getReplayMetadataCache,
+  getStoredReplayFileInfo,
+  getStoredReplayMetadata,
+  upsertReplayMetadataCache,
+} from './dbReplayMetadataStore.js';
 
 export type { CacheStats, SyncResult, SessionSyncProgress, ReplaySyncProgress, ReplaySyncResult };
 
@@ -209,72 +215,26 @@ export class SessionDatabase {
   }
 
   public getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null {
-    const row = this.db.prepare(
-      'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
-    ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row || row.file_mtime !== mtime || row.file_size !== size || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
-      return null;
-    }
-    return decompressJson<ReplayMetadata>(row.metadata_br);
+    return getReplayMetadataCache(this.db, filename, mtime, size, filePath);
   }
 
   /** Returns stored metadata even when LMU has deleted the source .Vcr. */
   public getStoredReplayMetadata(filename: string): ReplayMetadata | null {
-    const row = this.db.prepare(
-      'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
-    ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row) return null;
-    return decompressJson<ReplayMetadata>(row.metadata_br);
+    return getStoredReplayMetadata(this.db, filename);
   }
 
   /** Returns stored file attributes and metadata for a cached replay file. */
-  public getStoredReplayFileInfo(filename: string): { file_mtime: number; file_size: number; file_path: string; metadata: ReplayMetadata } | null {
-    const row = this.db.prepare(
-      'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
-    ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
-    if (!row) return null;
-    return {
-      file_path: row.file_path,
-      file_mtime: row.file_mtime,
-      file_size: row.file_size,
-      metadata: decompressJson<ReplayMetadata>(row.metadata_br),
-    };
+  public getStoredReplayFileInfo(filename: string): StoredReplayFileInfo | null {
+    return getStoredReplayFileInfo(this.db, filename);
   }
 
   /** Returns all cached replay metadata and disk properties stored in the database. */
-  public getAllStoredReplayFiles(): Array<{ filename: string; file_path: string; file_mtime: number; file_size: number; metadata: ReplayMetadata }> {
-    const rows = this.db.prepare(
-      'SELECT filename, file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata ORDER BY file_mtime DESC'
-    ).all() as Array<{ filename: string; file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer }>;
-    return rows.map(row => ({
-      filename: row.filename,
-      file_path: row.file_path,
-      file_mtime: row.file_mtime,
-      file_size: row.file_size,
-      metadata: decompressJson<ReplayMetadata>(row.metadata_br),
-    }));
+  public getAllStoredReplayFiles(): Array<StoredReplayFileInfo & { filename: string }> {
+    return getAllStoredReplayFiles(this.db);
   }
 
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
-    this.db.prepare(`
-      INSERT INTO replay_metadata (filename, file_path, file_mtime, file_size, parser_version, metadata_br, updated_at)
-      VALUES (@filename, @filePath, @mtime, @size, @parserVersion, @metadataBr, @updatedAt)
-      ON CONFLICT(filename) DO UPDATE SET
-        file_path = excluded.file_path,
-        file_mtime = excluded.file_mtime,
-        file_size = excluded.file_size,
-        parser_version = excluded.parser_version,
-        metadata_br = excluded.metadata_br,
-        updated_at = excluded.updated_at
-    `).run({
-      filename,
-      filePath,
-      mtime,
-      size,
-      parserVersion: REPLAY_CACHE_VERSION,
-      metadataBr: compressJson(metadata),
-      updatedAt: Date.now(),
-    });
+    upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
   }
 
   public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null {
