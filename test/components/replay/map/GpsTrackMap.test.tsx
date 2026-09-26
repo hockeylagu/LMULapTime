@@ -922,8 +922,10 @@ describe('GpsTrackMap', () => {
     const primLine = primaryLines[0];
     const baseLine = baselineLines[0];
 
-    const pX1 = parseFloat(primLine.getAttribute('x1') || '0');
-    const bX1 = parseFloat(baseLine.getAttribute('x1') || '0');
+    // Each line is drawn as paths starting "M x y": compare the start x.
+    const startX = (el: Element) => parseFloat((el.getAttribute('d') || 'M 0').split(' ')[1]);
+    const pX1 = startX(primLine);
+    const bX1 = startX(baseLine);
 
     const svgDiff = Math.abs(bX1 - pX1);
     expect(svgDiff).toBeGreaterThan(0);

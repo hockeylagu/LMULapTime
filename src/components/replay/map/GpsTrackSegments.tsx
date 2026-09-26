@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { getHeatmapColor, MapColorMode, ProjectedPoint } from './replayMapUtils.js';
+import { buildTrackLineRuns, getHeatmapColor, MapColorMode, nearestRunVertex, ProjectedPoint, TrackLineRun } from './replayMapUtils.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];
@@ -16,6 +16,21 @@ export interface GpsTrackSegmentsProps {
   dimNonSelectedTrack?: boolean;
 }
 
+function isInDistRange(distM: number | undefined, range: { startDistM: number; endDistM: number } | null | undefined, dim: boolean): boolean {
+  if (!dim || !range || distM === undefined) return true;
+  return range.startDistM <= range.endDistM
+    ? distM >= range.startDistM && distM <= range.endDistM
+    : distM >= range.startDistM || distM <= range.endDistM;
+}
+
+/** The click position in the SVG's user space (null without layout, e.g. in jsdom). */
+function toSvgCoords(e: React.MouseEvent<SVGPathElement>): { sx: number; sy: number } | null {
+  const ctm = e.currentTarget.getScreenCTM?.();
+  if (!ctm) return null;
+  const inv = ctm.inverse();
+  return { sx: inv.a * e.clientX + inv.c * e.clientY + inv.e, sy: inv.b * e.clientX + inv.d * e.clientY + inv.f };
+}
+
 export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   svgPoints,
   baselineSvgPoints = [],
@@ -30,122 +45,58 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   baselineDists,
   dimNonSelectedTrack = false,
 }) => {
-  const baselineTrackSegments = useMemo(() => {
-    return baselineSvgPoints.map((bp, i) => {
-      if (i === 0) return null;
-      const prev = baselineSvgPoints[i - 1];
-      if (bp.isTeleport || Math.hypot(bp.x - prev.x, bp.z - prev.z) > 20 || Math.hypot(bp.sx - prev.sx, bp.sy - prev.sy) > 30) {
-        return null;
-      }
-      const distM = baselineDists ? baselineDists[bp.idx] : undefined;
-      let isHighlighted = true;
-      if (dimNonSelectedTrack && highlightDistRange && distM !== undefined) {
-        if (highlightDistRange.startDistM <= highlightDistRange.endDistM) {
-          isHighlighted = distM >= highlightDistRange.startDistM && distM <= highlightDistRange.endDistM;
-        } else {
-          isHighlighted = distM >= highlightDistRange.startDistM || distM <= highlightDistRange.endDistM;
-        }
-      }
+  const primaryRuns = useMemo(() => buildTrackLineRuns(
+    svgPoints,
+    p => getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined),
+    p => isInDistRange(primaryDists?.[p.idx], highlightDistRange, dimNonSelectedTrack)
+  ), [svgPoints, colorBy, deltaByIdx, primaryDists, highlightDistRange, dimNonSelectedTrack]);
 
-      if (!isHighlighted) {
-        return (
-          <line
-            key={`baseline-${i}`}
-            x1={prev.sx}
-            y1={prev.sy}
-            x2={bp.sx}
-            y2={bp.sy}
-            stroke={getHeatmapColor(bp, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[bp.idx] : undefined)}
-            strokeWidth="1.3"
-            strokeDasharray="6 4"
-            strokeLinecap="round"
-            strokeOpacity={0.4 * baselineOpacity}
-            vectorEffect="non-scaling-stroke"
-            data-track-line="baseline"
-          />
-        );
-      }
+  const baselineRuns = useMemo(() => buildTrackLineRuns(
+    baselineSvgPoints,
+    p => getHeatmapColor(p, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[p.idx] : undefined),
+    p => isInDistRange(baselineDists?.[p.idx], highlightDistRange, dimNonSelectedTrack)
+  ), [baselineSvgPoints, colorBy, baselineDeltaByIdx, baselineDists, highlightDistRange, dimNonSelectedTrack]);
 
-      return (
-        <line
-          key={`baseline-${i}`}
-          x1={prev.sx}
-          y1={prev.sy}
-          x2={bp.sx}
-          y2={bp.sy}
-          stroke={getHeatmapColor(bp, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[bp.idx] : undefined)}
-          strokeWidth={dimNonSelectedTrack ? '2.5' : '1.8'}
-          strokeDasharray="8 6"
-          strokeLinecap="round"
-          strokeOpacity={0.9 * baselineOpacity}
-          vectorEffect="non-scaling-stroke"
-          data-track-line="baseline"
-        />
-      );
-    });
-  }, [baselineSvgPoints, colorBy, baselineDeltaByIdx, baselineOpacity, dimNonSelectedTrack, highlightDistRange, baselineDists]);
-
-  const primaryTrackSegments = useMemo(() => {
-    return svgPoints.map((p, i) => {
-      if (i === 0) return null;
-      const prev = svgPoints[i - 1];
-      if (p.isTeleport || Math.hypot(p.x - prev.x, p.z - prev.z) > 20 || Math.hypot(p.sx - prev.sx, p.sy - prev.sy) > 30) {
-        return null;
-      }
-      const distM = primaryDists ? primaryDists[p.idx] : undefined;
-      let isHighlighted = true;
-      if (dimNonSelectedTrack && highlightDistRange && distM !== undefined) {
-        if (highlightDistRange.startDistM <= highlightDistRange.endDistM) {
-          isHighlighted = distM >= highlightDistRange.startDistM && distM <= highlightDistRange.endDistM;
-        } else {
-          isHighlighted = distM >= highlightDistRange.startDistM || distM <= highlightDistRange.endDistM;
-        }
-      }
-
-      if (!isHighlighted) {
-        return (
-          <line
-            key={i}
-            x1={prev.sx}
-            y1={prev.sy}
-            x2={p.sx}
-            y2={p.sy}
-            stroke={getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined)}
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeOpacity={0.45 * primaryOpacity}
-            vectorEffect="non-scaling-stroke"
-            className="hover:stroke-white transition-colors cursor-pointer"
-            onClick={() => onSelectIndex?.(p.idx)}
-            data-track-line="primary"
-          />
-        );
-      }
-
-      return (
-        <line
-          key={i}
-          x1={prev.sx}
-          y1={prev.sy}
-          x2={p.sx}
-          y2={p.sy}
-          stroke={getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined)}
-          strokeWidth={dimNonSelectedTrack ? '3.2' : '2'}
-          strokeLinecap="round"
-          strokeOpacity={primaryOpacity}
-          vectorEffect="non-scaling-stroke"
-          className="hover:stroke-white transition-colors cursor-pointer"
-          onClick={() => onSelectIndex?.(p.idx)}
-          data-track-line="primary"
-        />
-      );
-    });
-  }, [svgPoints, colorBy, deltaByIdx, primaryOpacity, onSelectIndex, dimNonSelectedTrack, highlightDistRange, primaryDists]);
+  // Clicking the line jumps to the nearest sample of the clicked run.
+  const selectNearest = (run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => {
+    const at = toSvgCoords(e);
+    if (!at || !onSelectIndex) return;
+    onSelectIndex(svgPoints[nearestRunVertex(svgPoints, run.from, run.to, at.sx, at.sy)].idx);
+  };
 
   return (
     <>
-      {primaryTrackSegments}
-      {baselineTrackSegments}
+      {primaryRuns.map(run => (
+        <path
+          key={`primary-${run.from}`}
+          d={run.d}
+          fill="none"
+          stroke={run.color}
+          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '3.2' : '2') : '1.4'}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={run.isHighlighted ? primaryOpacity : 0.45 * primaryOpacity}
+          vectorEffect="non-scaling-stroke"
+          className="cursor-pointer"
+          onClick={e => selectNearest(run, e)}
+          data-track-line="primary"
+        />
+      ))}
+      {baselineRuns.map(run => (
+        <path
+          key={`baseline-${run.from}`}
+          d={run.d}
+          fill="none"
+          stroke={run.color}
+          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '2.5' : '1.8') : '1.3'}
+          strokeDasharray={run.isHighlighted ? '8 6' : '6 4'}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeOpacity={run.isHighlighted ? 0.9 * baselineOpacity : 0.4 * baselineOpacity}
+          vectorEffect="non-scaling-stroke"
+          data-track-line="baseline"
+        />
+      ))}
     </>
   );
 });

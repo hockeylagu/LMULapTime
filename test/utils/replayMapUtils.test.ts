@@ -98,6 +98,12 @@ describe('replayMapUtils', () => {
     expect(losingColor).toBe('rgb(239, 68, 68)');
   });
 
+  it('steps the speed gradient so nearby speeds share a colour (the racing line is drawn per colour run)', () => {
+    const at = (speedKmh: number) => getHeatmapColor({ x: 0, y: 0, z: 0, speedKmh }, 'speed');
+    expect(at(200)).toBe(at(202));
+    expect(at(200)).not.toBe(at(215));
+  });
+
   describe('computeTrackBoundaryPathD', () => {
     it('uses centerlineSvgPoints when available', () => {
       const centerline = [{ sx: 10, sy: 20 }, { sx: 30, sy: 40 }];
