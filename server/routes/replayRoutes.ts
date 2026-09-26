@@ -209,7 +209,7 @@ export function createReplayRouter(context: ServerContext): Router {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
       }
       if (!fs.existsSync(filePath) &&
-          !context.sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey) &&
+          !context.sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey, { allowFallback: true }) &&
           !context.sessionDb.getStoredReplayMetadata(replayName)) {
         return res.status(404).json({ error: `Replay file "${replayName}" not found` });
       }

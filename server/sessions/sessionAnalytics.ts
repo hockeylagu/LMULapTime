@@ -1,5 +1,6 @@
 import {
   DetailedSession,
+  DriverData,
   ComparableLap,
   SessionProgressionPoint,
   LapData,
@@ -23,6 +24,65 @@ export const computeAverageLapTime = (laps: LapData[]): number | null => {
   const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
   return parseFloat((sum / candidates.length).toFixed(3));
 };
+
+/**
+ * Projects raw session, driver, and lap data into a standardized ComparableLap domain model.
+ */
+export function toComparableLap(
+  session: DetailedSession,
+  driver: DriverData,
+  lap: LapData,
+  overrides?: Partial<ComparableLap>
+): ComparableLap {
+  const replayFile = typeof session.matchingReplayFile === 'string'
+    ? session.matchingReplayFile
+    : session.matchingReplayFile?.name;
+
+  return {
+    id: `${session.id}_${driver.name}_lap_${lap.lapNum}`,
+    sessionId: session.id,
+    sessionName: session.sessionName,
+    sessionType: session.sessionType,
+    dateString: session.timeString,
+    timestamp: session.timestamp,
+    driverName: driver.name,
+    carType: driver.carType,
+    carClass: driver.carClass || 'General',
+    lapNum: lap.lapNum,
+    lapTime: lap.lapTime,
+    lapTimeString: lap.lapTimeString,
+    s1: lap.s1,
+    s2: lap.s2,
+    s3: lap.s3,
+    s1String: formatTime(lap.s1),
+    s2String: formatTime(lap.s2),
+    s3String: formatTime(lap.s3),
+    topSpeed: lap.topSpeed,
+    fCompound: lap.fCompound,
+    rCompound: lap.rCompound,
+    flCompound: lap.flCompound,
+    frCompound: lap.frCompound,
+    rlCompound: lap.rlCompound,
+    rrCompound: lap.rrCompound,
+    tireWear: lap.tireWear,
+    fuel: lap.fuel,
+    fuelUsed: lap.fuelUsed,
+    virtualEnergy: lap.virtualEnergy,
+    virtualEnergyUsed: lap.virtualEnergyUsed,
+    elapsedSeconds: lap.elapsedSeconds,
+    elapsedTimeString: lap.elapsedTimeString,
+    pitStopDurationString: lap.pitStopDurationString,
+    gapToLeaderString: lap.gapToLeaderString,
+    isPitStop: lap.isPitStop,
+    isOutLap: lap.isOutLap || false,
+    isValid: lap.isValid,
+    isInferred: lap.isInferred || false,
+    paceCategory: lap.paceCategory || null,
+    pacePercentage: lap.pacePercentage || null,
+    matchingReplayFile: replayFile,
+    ...overrides,
+  };
+}
 
 export interface ComparableLapsResult {
   laps: ComparableLap[];
@@ -154,97 +214,19 @@ export function extractComparableLaps(
       (d.laps || []).forEach(l => {
         if (l.isValid && l.lapTime && l.lapTime > 0) {
           if (!overallTrackBestLap || overallTrackBestLap.lapTime === null || l.lapTime < overallTrackBestLap.lapTime) {
-            overallTrackBestLap = {
-              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-              sessionId: s.id,
-              sessionName: s.sessionName,
-              sessionType: s.sessionType,
-              dateString: s.timeString,
-              timestamp: s.timestamp,
-              driverName: d.name,
-              carType: d.carType,
-              carClass: d.carClass || 'General',
-              lapNum: l.lapNum,
-              lapTime: l.lapTime,
-              lapTimeString: l.lapTimeString,
-              s1: l.s1,
-              s2: l.s2,
-              s3: l.s3,
-              s1String: formatTime(l.s1),
-              s2String: formatTime(l.s2),
-              s3String: formatTime(l.s3),
-              topSpeed: l.topSpeed,
-              fCompound: l.fCompound,
-              rCompound: l.rCompound,
-              flCompound: l.flCompound,
-              frCompound: l.frCompound,
-              rlCompound: l.rlCompound,
-              rrCompound: l.rrCompound,
-              tireWear: l.tireWear,
-              fuel: l.fuel,
-              fuelUsed: l.fuelUsed,
-              virtualEnergy: l.virtualEnergy,
-              virtualEnergyUsed: l.virtualEnergyUsed,
-              elapsedSeconds: l.elapsedSeconds,
-              elapsedTimeString: l.elapsedTimeString,
-              pitStopDurationString: l.pitStopDurationString,
-              gapToLeaderString: l.gapToLeaderString,
-              isPitStop: l.isPitStop,
-              isValid: l.isValid,
-              paceCategory: l.paceCategory || null,
-              pacePercentage: l.pacePercentage || null,
+            overallTrackBestLap = toComparableLap(s, d, l, {
               isOverallTrackBest: true,
               tag: `🏆 All-Time Best (${d.name})`,
-              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-            };
+            });
           }
 
           const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
           if (isPlayerDriver && (!playerBestLap || playerBestLap.lapTime === null || l.lapTime < playerBestLap.lapTime)) {
-            playerBestLap = {
-              id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-              sessionId: s.id,
-              sessionName: s.sessionName,
-              sessionType: s.sessionType,
-              dateString: s.timeString,
-              timestamp: s.timestamp,
-              driverName: d.name,
-              carType: d.carType,
-              carClass: d.carClass || 'General',
-              lapNum: l.lapNum,
-              lapTime: l.lapTime,
-              lapTimeString: l.lapTimeString,
-              s1: l.s1,
-              s2: l.s2,
-              s3: l.s3,
-              s1String: formatTime(l.s1),
-              s2String: formatTime(l.s2),
-              s3String: formatTime(l.s3),
-              topSpeed: l.topSpeed,
-              fCompound: l.fCompound,
-              rCompound: l.rCompound,
-              flCompound: l.flCompound,
-              frCompound: l.frCompound,
-              rlCompound: l.rlCompound,
-              rrCompound: l.rrCompound,
-              tireWear: l.tireWear,
-              fuel: l.fuel,
-              fuelUsed: l.fuelUsed,
-              virtualEnergy: l.virtualEnergy,
-              virtualEnergyUsed: l.virtualEnergyUsed,
-              elapsedSeconds: l.elapsedSeconds,
-              elapsedTimeString: l.elapsedTimeString,
-              pitStopDurationString: l.pitStopDurationString,
-              gapToLeaderString: l.gapToLeaderString,
-              isPitStop: l.isPitStop,
-              isValid: l.isValid,
-              paceCategory: l.paceCategory || null,
-              pacePercentage: l.pacePercentage || null,
+            playerBestLap = toComparableLap(s, d, l, {
               isAllTimePB: true,
               isPlayer: true,
               tag: '⭐ Personal Best',
-              matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-            };
+            });
           }
         }
       });
@@ -274,52 +256,11 @@ export function extractComparableLaps(
         const isPlayer = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
         const isAllTimePB = false;
 
-        const lapItem = {
-          id: `${s.id}_${d.name}_lap_${l.lapNum}`,
-          sessionId: s.id,
-          sessionName: s.sessionName,
-          sessionType: s.sessionType,
-          dateString: s.timeString,
-          timestamp: s.timestamp,
-          driverName: d.name,
-          carType: d.carType,
-          carClass: d.carClass || 'General',
-          lapNum: l.lapNum,
-          lapTime: l.lapTime,
-          lapTimeString: l.lapTimeString,
-          s1: l.s1,
-          s2: l.s2,
-          s3: l.s3,
-          s1String: formatTime(l.s1),
-          s2String: formatTime(l.s2),
-          s3String: formatTime(l.s3),
-          topSpeed: l.topSpeed,
-          fCompound: l.fCompound,
-          rCompound: l.rCompound,
-          flCompound: l.flCompound,
-          frCompound: l.frCompound,
-          rlCompound: l.rlCompound,
-          rrCompound: l.rrCompound,
-          tireWear: l.tireWear,
-          fuel: l.fuel,
-          fuelUsed: l.fuelUsed,
-          virtualEnergy: l.virtualEnergy,
-          virtualEnergyUsed: l.virtualEnergyUsed,
-          elapsedSeconds: l.elapsedSeconds,
-          elapsedTimeString: l.elapsedTimeString,
-          pitStopDurationString: l.pitStopDurationString,
-          gapToLeaderString: l.gapToLeaderString,
-          isPitStop: l.isPitStop,
-          isOutLap: l.isOutLap || false,
-          isValid: l.isValid,
-          isInferred: l.isInferred || false,
-          paceCategory: l.paceCategory || null,
-          pacePercentage: l.pacePercentage || null,
+        const lapItem = toComparableLap(s, d, l, {
           isSessionBest,
           isAllTimePB,
           isPlayer,
-          matchingReplayFile: typeof s.matchingReplayFile === 'string' ? s.matchingReplayFile : s.matchingReplayFile?.name,
-        };
+        });
 
         if (l.isValid && l.lapTime && l.lapTime > 0) {
           if (!allTimeBestLap || allTimeBestLap.lapTime === null || l.lapTime < allTimeBestLap.lapTime) {

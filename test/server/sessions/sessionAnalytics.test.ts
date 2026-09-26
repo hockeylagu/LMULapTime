@@ -3,8 +3,9 @@ import {
   computeProgression,
   extractComparableLaps,
   computeAverageLapTime,
+  toComparableLap,
 } from '../../../server/sessions/sessionAnalytics.js';
-import { DetailedSession, LapData } from '../../../server/core/types.js';
+import { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
 
 describe('sessionAnalytics server module', () => {
   describe('computeAverageLapTime', () => {
@@ -390,6 +391,82 @@ describe('sessionAnalytics server module', () => {
       });
       expect(wecResult.laps.length).toBe(1);
       expect(wecResult.laps[0].driverName).toBe('WEC Driver');
+    });
+  });
+
+  describe('toComparableLap', () => {
+    it('accurately projects session, driver, and lap details with overrides', () => {
+      const mockSession: DetailedSession = {
+        id: 'sess_1',
+        filename: 'sess_1.xml',
+        filePath: '/mock/sess_1.xml',
+        trackVenue: 'Monza',
+        trackCourse: 'GP',
+        trackEvent: '',
+        trackLengthMeters: 5793,
+        timeString: '2026-09-20 10:00:00',
+        timestamp: 1726826400,
+        sessionType: 'Practice',
+        sessionName: 'P1',
+        driversCount: 1,
+        drivers: [],
+        matchingReplayFile: { name: 'Monza_P1.Vcr', path: '/replays/Monza_P1.Vcr', sizeBytes: 1024 },
+      };
+
+      const mockDriver: DriverData = {
+        name: 'Test Pilot',
+        isPlayer: true,
+        carType: 'Ferrari 499P',
+        carClass: 'Hypercar',
+        carNumber: '51',
+        teamName: 'AF Corse',
+        position: 1,
+        classPosition: 1,
+        bestLapTime: 96.425,
+        bestLapTimeString: '1:36.425',
+        bestS1: 27.12,
+        bestS2: 38.45,
+        bestS3: 30.855,
+        theoreticalBest: 96.425,
+        theoreticalBestString: '1:36.425',
+        lapsCount: 1,
+        laps: [],
+      };
+
+      const mockLap: LapData = {
+        lapNum: 4,
+        position: 1,
+        lapTime: 96.425,
+        lapTimeString: '1:36.425',
+        s1: 27.12,
+        s2: 38.45,
+        s3: 30.855,
+        topSpeed: 334.2,
+        fCompound: 'Medium',
+        rCompound: 'Medium',
+        isValid: true,
+        isPitStop: false,
+        isOutLap: false,
+        isInferred: false,
+      };
+
+      const projected = toComparableLap(mockSession, mockDriver, mockLap, {
+        isSessionBest: true,
+        tag: '⭐ Session Best',
+      });
+
+      expect(projected.id).toBe('sess_1_Test Pilot_lap_4');
+      expect(projected.sessionId).toBe('sess_1');
+      expect(projected.driverName).toBe('Test Pilot');
+      expect(projected.carType).toBe('Ferrari 499P');
+      expect(projected.carClass).toBe('Hypercar');
+      expect(projected.lapNum).toBe(4);
+      expect(projected.lapTime).toBe(96.425);
+      expect(projected.matchingReplayFile).toBe('Monza_P1.Vcr');
+      expect(projected.isSessionBest).toBe(true);
+      expect(projected.tag).toBe('⭐ Session Best');
+      expect(projected.isOutLap).toBe(false);
+      expect(projected.isInferred).toBe(false);
     });
   });
 });
