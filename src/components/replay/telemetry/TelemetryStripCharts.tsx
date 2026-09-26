@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { computeLapComparisons } from '../../../utils/replayComparison.js';
+import { computeBaselineChartSamples, computeLapComparisons } from '../../../utils/replayComparison.js';
 import { computeStartFinishOffset } from '../../../utils/lapAlignment.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
@@ -107,11 +107,15 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       : []),
     [points, baselinePoints, trackLengthM]
   );
+  const baselineSamples = useMemo(
+    () => (baselinePoints && baselinePoints.length > 0 ? computeBaselineChartSamples(points, baselinePoints, trackLengthM, cumDists) : undefined),
+    [points, baselinePoints, trackLengthM, cumDists]
+  );
   const currentComparison = pointComparisons[safeIndex] || null;
   const sfCrossing = useMemo(() => computeStartFinishOffset(points, trackLengthM), [points, trackLengthM]);
   const startTimeSec = sfCrossing?.timeSecOffset ?? (points[0]?.timeSec ?? 0);
   const currentTimeSec = currentPoint ? Math.max(0, (currentPoint.timeSec || 0) - startTimeSec) : 0;
-  const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists), [points, pointComparisons, viewStart, viewEnd, cumDists]);
+  const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples), [points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples]);
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
   const cursorPct = pctForIndex(safeIndex);
 
