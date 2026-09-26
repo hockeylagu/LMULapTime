@@ -1,7 +1,9 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
   InterpolatedPoint,
+  computeLapComparisons,
   interpolatePointAtDistance,
+  interpolateScalarAtDistance,
   getTrajectoryDistances,
   getDistancesInReferenceFrame,
   getMonotonicStations,
@@ -406,22 +408,14 @@ export function computeLapSegmentComparisons(
     primaryPoints[0]?.stationM !== undefined &&
     baselinePoints[0]?.stationM !== undefined;
 
-  let primaryRefCoords: number[];
-  let baselineRefCoords: number[];
+  const primaryRefCoords = canMatchByStation && trackLengthM ? getMonotonicStations(primaryPoints, trackLengthM) : primaryDists;
 
-  if (canMatchByStation && trackLengthM) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baselineRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-  } else {
-    primaryRefCoords = primaryDists;
-    baselineRefCoords = baselineDists;
-  }
-
-  const deltaAt = (stationOrDistM: number): number => {
-    const p = interpolatePointAtDistance(primaryPoints, primaryRefCoords, stationOrDistM);
-    const b = interpolatePointAtDistance(baselinePoints, baselineRefCoords, stationOrDistM);
-    return p.timeSec - b.timeSec;
-  };
+  // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
+  // delta channel shows (each lap timed from its own S/F crossing, extrapolated at the lap
+  // edges), so the segments add up to the lap delta and never disagree with the chart.
+  const channelDeltas = computeLapComparisons(primaryPoints, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
+  const deltaAt = (stationOrDistM: number): number =>
+    interpolateScalarAtDistance(channelDeltas, primaryRefCoords, stationOrDistM, true);
 
   const buildStraight = (
     fromDist: number,
