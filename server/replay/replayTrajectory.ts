@@ -16,6 +16,7 @@ import {
   detectLapsFromTelemetry,
 } from './replayLapBuilder.js';
 import { buildTrajectoryPoints } from './replayLapPoints.js';
+import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import {
   ReplayProgressTracker,
   ReplayProgressCallback,
@@ -533,23 +534,18 @@ export function extractReplayTrajectory(
         ? Math.round((rawPointsCount - 1) / lapDuration)
         : 0;
 
-      let downsampled = lapRawPts;
-      if (maxPoints > 0 && lapRawPts.length > maxPoints) {
-        const step = lapRawPts.length / maxPoints;
-        downsampled = [];
-        for (let i = 0; i < maxPoints; i++) {
-          downsampled.push(lapRawPts[Math.min(lapRawPts.length - 1, Math.floor(i * step))]);
-        }
-      }
+      const lapPoints = buildTrajectoryPoints(lapRawPts, garageIntervals, pitIntervals);
+      const selected = maxPoints > 0 && lapPoints.length > maxPoints ? selectFeatureSamples(lapPoints, maxPoints) : null;
+      const finalPoints = selected ? selected.map(i => lapPoints[i]) : lapPoints;
 
       const lapSpan = Math.max(1, chosenLap.endIdx - chosenLap.startIdx);
-      const s1Fraction = (chosenLap.s1Idx - chosenLap.startIdx) / lapSpan;
-      const s2Fraction = (chosenLap.s2Idx - chosenLap.startIdx) / lapSpan;
-      const targetFrames = downsampled.length;
-      const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
-      const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
-
-      const finalPoints = buildTrajectoryPoints(downsampled, garageIntervals, pitIntervals);
+      const sectorFrame = (sectorIdx: number): number => {
+        if (selected) return nearestSelectedIndex(selected, sectorIdx - chosenLap.startIdx);
+        const fraction = (sectorIdx - chosenLap.startIdx) / lapSpan;
+        return Math.min(finalPoints.length - 1, Math.round(fraction * finalPoints.length));
+      };
+      const s1Frame = sectorFrame(chosenLap.s1Idx);
+      const s2Frame = sectorFrame(chosenLap.s2Idx);
 
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const p of finalPoints) {

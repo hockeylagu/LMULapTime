@@ -5,12 +5,12 @@ import {
   ReplayDriverEntry,
   ReplayEventInfo,
   ReplayTrajectoryData,
-  ReplayTrajectoryPoint,
 } from '../core/types.js';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
 } from '../../shared/domain/vehicleMapping.js';
+import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 
 /**
  * Dynamically detects the LMU player profile name from UserData/player/settings.json,
@@ -413,7 +413,7 @@ export function parseReplayMetadata(
 
 /**
  * Downsamples an already-extracted full-resolution trajectory to at most `maxPoints`
- * points, without touching the source .Vcr file. Used to serve cached (DB-backed)
+ * points (keeping pedal and speed features, see selectFeatureSamples), without touching the source .Vcr file. Used to serve cached (DB-backed)
  * full-resolution trajectories at whatever resolution the caller requested.
  */
 export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints: number | undefined): ReplayTrajectoryData {
@@ -421,15 +421,9 @@ export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints
     return full;
   }
 
-  const points = full.points;
-  const step = points.length / maxPoints;
-  const sampled: ReplayTrajectoryPoint[] = [];
-  for (let i = 0; i < maxPoints; i++) {
-    sampled.push(points[Math.min(points.length - 1, Math.floor(i * step))]);
-  }
-
-  const s1Frac = full.sectors ? full.sectors.s1Frame / points.length : 0;
-  const s2Frac = full.sectors ? full.sectors.s2Frame / points.length : 0;
+  const selected = selectFeatureSamples(full.points, maxPoints);
+  const sampled = selected.map(i => full.points[i]);
+  const sampledFrame = (frame: number) => nearestSelectedIndex(selected, frame);
 
   return {
     ...full,
@@ -438,9 +432,8 @@ export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints
     rawPointsCount: full.rawPointsCount || full.points.length,
     maxPoints,
     isFullResolution: false,
-    sectors: {
-      s1Frame: Math.min(sampled.length - 1, Math.round(s1Frac * sampled.length)),
-      s2Frame: Math.min(sampled.length - 1, Math.round(s2Frac * sampled.length)),
-    },
+    sectors: full.sectors
+      ? { s1Frame: sampledFrame(full.sectors.s1Frame), s2Frame: sampledFrame(full.sectors.s2Frame) }
+      : undefined,
   };
 }
