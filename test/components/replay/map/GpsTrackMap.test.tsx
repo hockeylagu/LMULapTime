@@ -391,10 +391,10 @@ describe('GpsTrackMap', () => {
     expect(followBtn).toHaveAttribute('title', 'Follow Car (Active)');
   });
 
-  it('rescales a corner\'s baseline-lap distance onto the primary lap so the marker lands on the same physical corner', () => {
-    // minDistM (5) is measured along a much shorter baseline lap (total 10m); on the ~107.7m
-    // primary lap that same 50%-of-lap point falls near primary point index 1, not index 0
-    // (which is where a naive un-rescaled lookup of raw distance 5 would land).
+  it('anchors a corner flag at its distance on the primary lap, whatever the baseline lap length', () => {
+    // Corner distances are in the primary lap's frame: minDistM 50 is primary point index 1
+    // (~53.9 m). A much shorter baseline (10 m) must not move it - rescaling by the lap-length
+    // ratio would send it past the end of the lap (index 2).
     const shortBaselinePoints: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
       { x: 10, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.1 },
@@ -407,7 +407,7 @@ describe('GpsTrackMap', () => {
         bounds={mockBounds}
         currentIndex={0}
         baselinePoints={shortBaselinePoints}
-        corners={[{ cornerNumber: 1, minDistM: 5 }]}
+        corners={[{ cornerNumber: 1, minDistM: 50 }]}
         onSelectIndex={onSelectIndex}
       />
     );

@@ -11,7 +11,6 @@ import {
 import { BRAKE_ON_THRESHOLD_PCT, CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis.js';
 import {
   buildEffectiveBaselinePoints,
-  computeDispersedCornerMarkers,
   projectTrajectoryPoints,
 } from '../../../src/components/replay/map/replayMapUtils.js';
 import {
@@ -39,24 +38,20 @@ const KNOWN_VIOLATIONS: Record<LapPairName, Partial<Record<InvariantId, string>>
   'daytona-r1-10-lap-pair': {
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.1 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
-    I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'sarthe-r1-41-lap-pair': {
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
-    I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'bahrain-r1-10-lap-pair': {
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.126 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
-    I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
   'spa-r1-38-lap-pair': {
     I3: 'phase 4: baseline starts 14.9 m late; trimmed 10 m more it hits the 25 m extrapolation clamp',
     I4: 'phase 4: lap edges are patched by extrapolation instead of sliced at the line (0.207 s asymmetry)',
     I5: 'phases 3+4: frame-based throttle filters, stride decimation, resolution-dependent corner windows',
     I6: 'phase 1: buildEffectiveBaselinePoints prepends a line point before pre-line samples (time runs backwards)',
-    I7: 'phase 1: corner flags rescaled by the baseline/primary lap-length ratio',
   },
 };
 
@@ -186,9 +181,12 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
     const selfCompare = computeMapScene(P, P, L, corners);
     const anchors = (markers: typeof withBaseline.cornerMarkers) => markers.map(m => ({ c: m.cornerNumber, idx: m.idx }));
     expect(anchors(withBaseline.cornerMarkers)).toEqual(anchors(selfCompare.cornerMarkers));
-    // Direct check of the rescale: flags anchored on the primary lap must not depend on the baseline's length.
-    const shortBaselineDists = withBaseline.baselineDists.map(d => d * 0.98);
-    const rescaled = computeDispersedCornerMarkers(corners, withBaseline.primaryDists, shortBaselineDists, withBaseline.svgPoints);
-    expect(anchors(rescaled)).toEqual(anchors(withBaseline.cornerMarkers));
+    // Each flag is anchored on the primary line at its corner's apex (within one sample).
+    for (const m of withBaseline.cornerMarkers) {
+      const corner = corners.find(c => c.cornerNumber === m.cornerNumber);
+      const dists = withBaseline.primaryDists;
+      const spacing = Math.max(dists[m.idx + 1] - dists[m.idx] || 0, dists[m.idx] - dists[m.idx - 1] || 0);
+      expect(Math.abs(dists[m.idx] - (corner?.minDistM ?? NaN)), `T${m.cornerNumber}`).toBeLessThanOrEqual(spacing);
+    }
   });
 });

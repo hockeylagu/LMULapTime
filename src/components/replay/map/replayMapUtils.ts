@@ -382,27 +382,24 @@ function distanceToPolyline(
 /**
  * Calculates corner flag positions on the 2D map with trajectory clearance checking
  * so flags are never placed on top of either the primary racing line or the baseline racing line.
+ * Corner apex distances are in the primary lap's frame (see computeLapSegmentComparisons), so
+ * each flag is anchored on the primary line at that distance, whatever the baseline.
  */
 export function computeDispersedCornerMarkers(
   corners: Array<{ cornerNumber: number; minDistM: number }> | undefined,
   primaryDists: number[],
-  baselineDists: number[],
   svgPoints: ProjectedPoint[],
   baselineSvgPoints?: ProjectedPoint[],
   pedalMarkers?: Array<{ sx: number; sy: number; nx?: number; ny?: number; isStaggered?: boolean }>
 ): DispersedCornerMarker[] {
   if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
-  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
 
   const markers: DispersedCornerMarker[] = [];
   const candidateDistances = [38, 46, 54, 62, 70];
 
   for (let i = 0; i < corners.length; i++) {
     const c = corners[i];
-    const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
-    const idx = findIndexAtDistance(primaryDists, targetDist);
+    const idx = findIndexAtDistance(primaryDists, c.minDistM);
     const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
     if (!pt) continue;
 
