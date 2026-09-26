@@ -196,6 +196,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             layoutKey={layoutKey}
             replayName={trajectory.replayName}
             trackGeometry={trackGeometry}
+            trackLengthM={trajectory.trackLengthM}
           />
         </div>
       </div>

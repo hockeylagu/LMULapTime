@@ -41,6 +41,9 @@ export interface GpsTrackMapProps {
   layoutKey?: string;
   replayName?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
+  // Length of the track the trajectories' stations are measured on (trajectory.trackLengthM):
+  // the map aligns laps with it exactly as the telemetry channels and corner analysis do.
+  trackLengthM?: number;
 }
 
 export type GpsTrackMapSceneProps = GpsTrackMapProps;
