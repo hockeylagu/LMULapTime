@@ -437,11 +437,60 @@ describe('parser server module', () => {
       expect(progression[0].bestLapTime).toBe(122.0);
       expect(progression[1].sessionId).toBe('sess2');
       expect(progression[1].bestLapTime).toBe(120.0);
-      expect(progression[1].cleanLapsCount).toBe(2);
+      expect(progression[1].cleanLapsCount).toBe(1);
       expect(progression[1].avgLapTime).toBe(120.0);
       expect(progression[1].top3AvgLapTime).toBe(120.0);
       expect(progression[1].theoreticalGap).toBe(0);
-      expect(progression[1].consistencyScore).toBe(99.6);
+      expect(progression[1].consistencyScore).toBe(100);
+    });
+
+    it('excludes pit stops, out-laps, and start laps from cleanLapsCount while preserving totalLapsCount and bestLapTime', () => {
+      const mockSession: DetailedSession = {
+        id: 'sess-pit-test',
+        filename: 'sess_pit.xml',
+        filePath: '/path/pit',
+        trackVenue: 'Spa',
+        trackCourse: 'GP',
+        trackEvent: '',
+        trackLengthMeters: 7004,
+        timeString: '2026/05/30 14:00',
+        timestamp: 3000,
+        sessionType: 'Practice',
+        sessionName: 'P1',
+        driversCount: 1,
+        drivers: [
+          {
+            name: 'Player',
+            isPlayer: true,
+            carType: 'Ferrari 499P',
+            carClass: 'LMH',
+            carNumber: '50',
+            teamName: 'AF',
+            position: 1,
+            classPosition: 1,
+            bestLapTime: 120.0,
+            bestLapTimeString: '2:00.000',
+            bestS1: 34.0,
+            bestS2: 41.0,
+            bestS3: 45.0,
+            theoreticalBest: 120.0,
+            theoreticalBestString: '2:00.000',
+            lapsCount: 5,
+            laps: [
+              { lapNum: 1, position: 1, lapTime: 125.0, lapTimeString: '2:05.000', s1: 35, s2: 43, s3: 47, topSpeed: 318, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+              { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 34, s2: 41, s3: 45, topSpeed: 322, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+              { lapNum: 3, position: 1, lapTime: 145.0, lapTimeString: '2:25.000', s1: 34, s2: 42, s3: 69, topSpeed: 280, fCompound: 'H', rCompound: 'H', isPitStop: true, isValid: true },
+              { lapNum: 4, position: 1, lapTime: 180.0, lapTimeString: '3:00.000', s1: 60, s2: 60, s3: 60, topSpeed: 300, fCompound: 'H', rCompound: 'H', isOutLap: true, isPitStop: false, isValid: true },
+              { lapNum: 5, position: 1, lapTime: 120.5, lapTimeString: '2:00.500', s1: 34, s2: 41.5, s3: 45, topSpeed: 321, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+            ],
+          },
+        ],
+      };
+
+      const progression = computeProgression([mockSession], 'Player');
+      expect(progression[0].totalLapsCount).toBe(5);
+      expect(progression[0].cleanLapsCount).toBe(2);
+      expect(progression[0].bestLapTime).toBe(120.0);
     });
   });
 

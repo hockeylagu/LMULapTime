@@ -17,7 +17,8 @@ export interface LapSelectionInput {
 
 /**
  * Selects the laps used for clean-lap averages and consistency metrics.
- * Prefer valid flying laps, then valid non-pit laps when a session has too few flying laps.
+ * Evaluates valid flying laps completed at racing speed, excluding pit stops,
+ * out-laps, and start laps (lap 1 when multiple laps exist).
  */
 export function selectCleanLapCandidates<T extends LapSelectionInput>(
   laps: T[],
@@ -36,17 +37,9 @@ export function selectCleanLapCandidates<T extends LapSelectionInput>(
     !isAfterPitStop(index) &&
     (!hasMultiple || (lap.lapNum ?? 2) > 1)
   );
-  const validNonPit = completed.filter((lap, index) =>
-    (lap.isValid ?? true) &&
-    !lap.isPitStop &&
-    !lap.isOutLap &&
-    !isAfterPitStop(index)
-  );
 
   const minimumFlyingLaps = options.minimumFlyingLaps ?? 1;
-  return validFlying.length >= minimumFlyingLaps
-    ? validFlying
-    : (validNonPit.length >= 2 ? validNonPit : (validFlying.length > 0 ? validFlying : validNonPit));
+  return validFlying.length >= minimumFlyingLaps ? validFlying : [];
 }
 
 export interface LapDeltaResult {
@@ -327,7 +320,7 @@ export function computeTopNLapAverage(
 export function computeConsistencyRating(
   laps: LapSelectionInput[]
 ): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null; sampleCount: number } {
-  const candidates = selectCleanLapCandidates(laps, { minimumFlyingLaps: 2 });
+  const candidates = selectCleanLapCandidates(laps);
 
   if (candidates.length === 0) {
     return { consistencyScore: null, avgLapTime: null, stdDev: null, sampleCount: 0 };
