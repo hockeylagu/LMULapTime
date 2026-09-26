@@ -929,6 +929,30 @@ describe('GpsTrackMap', () => {
     expect(svgDiff).toBeGreaterThan(0);
     expect(svgDiff).toBeLessThan(30);
   });
+
+  it('aligns baseline pedal points by station with the trajectory track length (no boundary geometry)', () => {
+    // Primary along +x with station = x; the baseline starts at station 11 and its odometer
+    // reads 5% long, so only station alignment puts its 30 m brake point at x = 30.
+    const line = (fromX: number, distScale: number): ReplayTrajectoryPoint[] =>
+      Array.from({ length: 101 - fromX }, (_, i) => ({
+        x: fromX + i, y: 0, z: 50, stationM: fromX + i, distM: i * distScale, timeSec: i * 0.02, speedKmh: 180,
+      }));
+    const bounds = { minX: 0, maxX: 100, spanX: 100, minZ: 0, maxZ: 100, spanZ: 100 };
+    const { container } = render(
+      <GpsTrackMap
+        points={line(0, 1)}
+        baselinePoints={line(11, 1.05)}
+        bounds={bounds}
+        currentIndex={0}
+        trackLengthM={1000}
+        pedalMarkers={[{ cornerNumber: 1, distM: 30, kind: 'brake', isBaseline: true }]}
+        showPedalMarkers={true}
+      />
+    );
+    const expectedSx = projectTrajectoryPoints([{ x: 30, y: 0, z: 50 }], bounds, 800, 60)[0].sx;
+    const dot = container.querySelector('[data-testid="pedal-marker-baseline-brake-1"] circle[r="2.8"]');
+    expect(Number(dot?.getAttribute('cx'))).toBeCloseTo(expectedSx, 0);
+  });
 });
 
 

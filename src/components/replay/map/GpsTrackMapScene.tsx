@@ -37,7 +37,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
-    trackVenue, trackCourse, layoutKey, replayName, trackGeometry,
+    trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM,
   } = props;
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -51,8 +51,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const effectiveGeometry = trackGeometry ?? fetchedGeometry;
 
   const effectiveBaselinePoints = useMemo(
-    () => buildEffectiveBaselinePoints(baselinePoints, effectiveGeometry?.lengthM),
-    [baselinePoints, effectiveGeometry]
+    () => buildEffectiveBaselinePoints(baselinePoints, trackLengthM),
+    [baselinePoints, trackLengthM]
   );
 
   const effectiveBounds = useMemo(
@@ -102,18 +102,18 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
-  const primaryDists = useMemo(() => getTrajectoryDistances(points, effectiveGeometry?.lengthM), [points, effectiveGeometry]);
+  const primaryDists = useMemo(() => getTrajectoryDistances(points, trackLengthM), [points, trackLengthM]);
   // Baseline distances in the PRIMARY lap's frame (station-matched), the same frame corner
   // analysis reports baseline brake/throttle points and corner ranges in.
   const baselineDists = useMemo(
-    () => (effectiveBaselinePoints.length > 0 ? getDistancesInReferenceFrame(effectiveBaselinePoints, points, effectiveGeometry?.lengthM) : []),
-    [effectiveBaselinePoints, points, effectiveGeometry]
+    () => (effectiveBaselinePoints.length > 0 ? getDistancesInReferenceFrame(effectiveBaselinePoints, points, trackLengthM) : []),
+    [effectiveBaselinePoints, points, trackLengthM]
   );
 
   const deltaByIdx = useMemo(() => {
     if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
-    return computeLapComparisons(points, baselinePoints, effectiveGeometry?.lengthM).map(c => c.deltaTimeSec);
-  }, [colorBy, points, baselinePoints, effectiveGeometry]);
+    return computeLapComparisons(points, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
+  }, [colorBy, points, baselinePoints, trackLengthM]);
 
   const baselineDeltaByIdx = useMemo(
     () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists) : null),
