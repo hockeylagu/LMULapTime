@@ -18,6 +18,7 @@ export interface ConsistencyPanelProps {
   formatLapTime: (sec?: number | null) => string;
   trackPoints?: ReplayTrajectoryPoint[];
   trackBounds?: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number } | null;
+  trackLengthM?: number;
   availableLaps?: LapConsistencyOption[];
   excludedLaps?: Set<number>;
   onToggleLapExclusion?: (lapNumber: number) => void;
@@ -37,6 +38,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   formatLapTime,
   trackPoints,
   trackBounds,
+  trackLengthM,
   availableLaps = [],
   excludedLaps = new Set<number>(),
   onToggleLapExclusion,
@@ -144,6 +146,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                       points={trackPoints}
                       bounds={trackBounds}
                       highlightDistM={c.minDistM}
+                      trackLengthM={trackLengthM}
                       className="w-8 h-8 shrink-0"
                     />
                   )}

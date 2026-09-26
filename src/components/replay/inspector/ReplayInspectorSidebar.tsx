@@ -271,6 +271,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                 formatLapTime={formatLapTime}
                 trackPoints={trajectory?.points}
                 trackBounds={trajectory?.bounds}
+                trackLengthM={trajectory?.trackLengthM}
                 availableLaps={availableConsistencyLaps}
                 excludedLaps={excludedConsistencyLaps}
                 onToggleLapExclusion={toggleConsistencyLap}

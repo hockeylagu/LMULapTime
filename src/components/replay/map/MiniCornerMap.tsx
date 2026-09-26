@@ -8,6 +8,8 @@ export interface MiniCornerMapProps {
   points: ReplayTrajectoryPoint[];
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
   highlightDistM: number;
+  // Needed to zero distances at the S/F line for a lap recorded from before the line.
+  trackLengthM?: number;
   className?: string;
 }
 
@@ -18,9 +20,9 @@ const PADDING = 12;
  * Tiny read-only circuit outline with a single highlighted dot, so each corner's consistency
  * card shows where on the track that corner actually is without needing the full GPS map.
  */
-export const MiniCornerMap: React.FC<MiniCornerMapProps> = ({ points, bounds, highlightDistM, className = '' }) => {
+export const MiniCornerMap: React.FC<MiniCornerMapProps> = ({ points, bounds, highlightDistM, trackLengthM, className = '' }) => {
   const svgPoints = useMemo(() => projectTrajectoryPoints(points, bounds, VIEWBOX_SIZE, PADDING), [points, bounds]);
-  const dists = useMemo(() => getTrajectoryDistances(points), [points]);
+  const dists = useMemo(() => getTrajectoryDistances(points, trackLengthM), [points, trackLengthM]);
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const markerIdx = useMemo(() => findIndexAtDistance(dists, highlightDistM), [dists, highlightDistM]);
   const marker = svgPoints[Math.min(markerIdx, svgPoints.length - 1)];
