@@ -138,8 +138,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   );
 
   const cornerMarkers = useMemo(
-    () => computeDispersedCornerMarkers(corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints),
-    [corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
+    () => computeDispersedCornerMarkers(corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints),
+    [corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
   );
 
   const lastSelectedCornerRef = useRef<number | null>(null);

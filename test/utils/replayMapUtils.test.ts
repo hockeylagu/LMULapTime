@@ -49,7 +49,6 @@ describe('replayMapUtils', () => {
   it('computes dispersed corner markers with trajectory and pedal clearance', () => {
     const projected = projectTrajectoryPoints(mockPoints, mockBounds, 800, 50);
     const primaryDists = [0, 50, 100];
-    const baselineDists = [0, 50, 100];
 
     // Pedal marker near corner apex
     const pedalMarkers = [{ sx: 400, sy: 420, nx: 0, ny: 1 }];
@@ -57,7 +56,6 @@ describe('replayMapUtils', () => {
     const markers = computeDispersedCornerMarkers(
       [{ cornerNumber: 1, minDistM: 50 }],
       primaryDists,
-      baselineDists,
       projected,
       undefined,
       pedalMarkers

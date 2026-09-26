@@ -173,7 +173,7 @@ export function computeMapScene(
   const ghostAt = (index: number) =>
     computeGhostPosition(primaryDists, baselineDists, effectiveBaseline, index, bounds, MAP_VIEWBOX, MAP_PADDING, trackLengthM, primary);
   const pedalMarkerPoints = computePedalMarkerPoints(true, buildPedalMarkers(corners), primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaseline);
-  const cornerMarkers = computeDispersedCornerMarkers(corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints);
+  const cornerMarkers = computeDispersedCornerMarkers(corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints);
   return {
     bounds, effectiveBaseline, svgPoints, baselineSvgPoints, primaryDists, baselineDists,
     deltaByIdx, baselineDeltaByIdx, ghostAt, pedalMarkerPoints, cornerMarkers,
