@@ -3,6 +3,7 @@ import { Activity, Sparkles } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryAccelTotalChannelProps {
   accelTotalPath: string;
@@ -93,13 +94,11 @@ export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProp
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-rose-400/30 w-full text-[8px] text-rose-400 font-mono">4.0G Max Grip</div>
-        <div className="border-b border-rose-400/30 w-full text-[8px] text-rose-300 font-mono">2.0G</div>
-        <div className="border-b border-rose-400/30 w-full text-[8px] text-rose-400 font-mono">0.0G Rest</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '4.0G Max Grip', borderClassName: 'border-b border-rose-400/30', labelClassName: 'text-[8px] text-rose-400 font-mono' },
+        { label: '2.0G', borderClassName: 'border-b border-rose-400/30', labelClassName: 'text-[8px] text-rose-300 font-mono' },
+        { label: '0.0G Rest', borderClassName: 'border-b border-rose-400/30', labelClassName: 'text-[8px] text-rose-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasTotalG && (
         <div

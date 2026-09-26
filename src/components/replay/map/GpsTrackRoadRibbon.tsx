@@ -9,7 +9,7 @@ export interface GpsTrackRoadRibbonProps {
   className?: string;
 }
 
-export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
+export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(({
   leftSvgPoints,
   rightSvgPoints,
   centerlineSvgPoints,
@@ -87,4 +87,4 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = ({
       />
     </g>
   );
-};
+});

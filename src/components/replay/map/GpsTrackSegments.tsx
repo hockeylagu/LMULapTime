@@ -16,7 +16,7 @@ export interface GpsTrackSegmentsProps {
   dimNonSelectedTrack?: boolean;
 }
 
-export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = ({
+export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   svgPoints,
   baselineSvgPoints = [],
   colorBy,
@@ -148,4 +148,4 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = ({
       {baselineTrackSegments}
     </>
   );
-};
+});

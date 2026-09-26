@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -77,13 +78,11 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-cyan-400/40 w-full text-[9px] text-cyan-400 font-mono">{maxWheelSpeed} km/h</div>
-        <div className="border-b border-cyan-400/40 w-full text-[9px] text-cyan-400 font-mono">{Math.round(maxWheelSpeed / 2)} km/h</div>
-        <div className="border-b border-cyan-400/40 w-full text-[9px] text-cyan-400 font-mono">0 km/h</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxWheelSpeed} km/h`, borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
+        { label: `${Math.round(maxWheelSpeed / 2)} km/h`, borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
+        { label: '0 km/h', borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasData && ws && (
         <div

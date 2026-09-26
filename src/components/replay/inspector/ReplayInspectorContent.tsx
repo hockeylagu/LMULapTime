@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
@@ -190,9 +190,9 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     };
   }, [selectedCorner, primaryDists]);
 
-  const handleSelectCorner = (cornerNumber: number | null) => {
+  const handleSelectCorner = useCallback((cornerNumber: number | null) => {
     setSelectedCornerNumber(prev => (cornerNumber !== null && prev === cornerNumber ? null : cornerNumber));
-  };
+  }, []);
 
   const formatLapTime = (sec?: number | null): string => formatTime(sec);
 

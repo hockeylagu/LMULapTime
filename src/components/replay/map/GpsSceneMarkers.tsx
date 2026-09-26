@@ -40,7 +40,7 @@ export interface GpsSceneMarkersProps {
   showCornerFlags?: boolean;
 }
 
-export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
+export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
   cornerMarkers,
   markers,
   selectedCornerNumber,
@@ -287,4 +287,4 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = ({
       })}
     </>
   );
-};
+});

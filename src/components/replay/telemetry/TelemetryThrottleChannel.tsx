@@ -3,6 +3,13 @@ import { Activity } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
+
+const THROTTLE_GRID_LINES: readonly TelemetryGridLine[] = [
+  { label: '100%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+  { label: '50%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+  { label: '0%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+];
 
 export interface TelemetryThrottleChannelProps {
   throttlePath: string;
@@ -79,13 +86,11 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">100%</div>
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">50%</div>
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">0%</div>
-      </div>
-
-      {throttleSvg}
+      <TelemetryStaticTrace
+        chart={throttleSvg}
+        gridLines={THROTTLE_GRID_LINES}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20"
+      />
 
       {isCursorInView && (
         <div

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Zap } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -83,14 +84,11 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
         )}
       </div>
 
-      {/* Grid lines */}
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-cyan-400/30 w-full text-[9px] text-cyan-300 font-mono">100%</div>
-        <div className="border-b border-cyan-400/30 w-full text-[9px] text-cyan-300 font-mono">50%</div>
-        <div className="border-b border-cyan-400/30 w-full text-[9px] text-cyan-300 font-mono">0%</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: '100%', borderClassName: 'border-b border-cyan-400/30', labelClassName: 'text-[9px] text-cyan-300 font-mono' },
+        { label: '50%', borderClassName: 'border-b border-cyan-400/30', labelClassName: 'text-[9px] text-cyan-300 font-mono' },
+        { label: '0%', borderClassName: 'border-b border-cyan-400/30', labelClassName: 'text-[9px] text-cyan-300 font-mono' },
+      ]} />
 
       {isCursorInView && hasVeData && (
         <div

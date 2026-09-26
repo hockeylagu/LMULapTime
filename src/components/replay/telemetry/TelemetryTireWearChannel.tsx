@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 import { Layers } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
@@ -80,13 +81,11 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
         )}
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-amber-400/40 w-full text-[9px] text-amber-400 font-mono">{maxTireWear}%</div>
-        <div className="border-b border-amber-400/40 w-full text-[9px] text-amber-400 font-mono">{midWear}%</div>
-        <div className="border-b border-amber-400/40 w-full text-[9px] text-amber-400 font-mono">{minTireWear}%</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+        { label: `${maxTireWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
+        { label: `${midWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
+        { label: `${minTireWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
+      ]} />
 
       {isCursorInView && hasData && tw && (
         <div

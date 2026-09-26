@@ -3,6 +3,13 @@ import { Gauge } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../server/core/types';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
+
+const SPEED_GRID_LINES: readonly TelemetryGridLine[] = [
+  { label: '250 km/h', borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400' },
+  { label: '125 km/h', borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400' },
+  { label: '0 km/h', borderClassName: 'border-b border-sky-400/40', labelClassName: 'text-[9px] text-sky-400' },
+];
 
 export interface TelemetrySpeedChannelProps {
   speedPath: string;
@@ -66,14 +73,11 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
         )}
       </div>
 
-      {/* Grid lines */}
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400">250 km/h</div>
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400">125 km/h</div>
-        <div className="border-b border-sky-400/40 w-full text-[9px] text-sky-400">0 km/h</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace
+        chart={chartSvg}
+        gridLines={SPEED_GRID_LINES}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20"
+      />
 
       {isCursorInView && (
         <div

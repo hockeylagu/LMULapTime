@@ -317,7 +317,6 @@ export class ServerContext {
     };
 
     const iterator = this.sessionDb.syncSessionsAsyncIterator(this.currentResultsDir, this.parser, forceReparse);
-    let lastLoggedStage: string | null = null;
     const step = async (): Promise<void> => {
       try {
         const { value, done } = await iterator.next();
@@ -338,13 +337,6 @@ export class ServerContext {
         this.sessionScanStatus.currentFile = value.currentFile || null;
         this.sessionScanStatus.currentStage = value.stage || null;
         this.sessionScanStatus.filePercent = value.filePercent ?? null;
-        const shouldLogProgress = value.stage !== lastLoggedStage || value.processed === 0 || value.processed % 25 === 0;
-        if (shouldLogProgress) {
-          lastLoggedStage = value.stage || null;
-          const progress = value.total > 0 ? `${value.processed}/${value.total}` : 'starting';
-          const file = value.currentFile ? ` (${value.currentFile})` : '';
-          console.log(`[SQLite Cache] [XML] ${value.stage || 'Processing'}: ${progress}${file}`);
-        }
         setImmediate(() => { void step(); });
       } catch (error: unknown) {
         this.sessionScanStatus.error = error instanceof Error ? error.message : String(error);

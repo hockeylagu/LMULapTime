@@ -3,6 +3,7 @@ import { Timer } from 'lucide-react';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { DeltaGradientStop } from './telemetryChartPaths.js';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { TelemetryGridLine, TelemetryStaticTrace } from './TelemetryStaticTrace.js';
 
 export interface TelemetryDeltaChannelProps {
   deltaTimePath: string;
@@ -83,6 +84,12 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
     </svg>
   ), [deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
 
+  const gridLines = useMemo<readonly TelemetryGridLine[]>(() => [
+    { label: `-${maxDeltaSec.toFixed(1)}s (Faster)`, borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+    { label: '0.00s (Equal)', borderClassName: 'border-b border-white/60', labelClassName: 'text-[9px] text-white font-mono' },
+    { label: `+${maxDeltaSec.toFixed(1)}s (Slower)`, borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400 font-mono' },
+  ], [maxDeltaSec]);
+
   return (
     <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-purple-950/20">
       <div className="absolute top-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
@@ -137,13 +144,11 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
         </div>
       </div>
 
-      <div className="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20">
-        <div className="border-b border-emerald-400/40 w-full text-[9px] text-emerald-400 font-mono">-{maxDeltaSec.toFixed(1)}s (Faster)</div>
-        <div className="border-b border-white/60 w-full text-[9px] text-white font-mono">0.00s (Equal)</div>
-        <div className="border-b border-rose-400/40 w-full text-[9px] text-rose-400 font-mono">+{maxDeltaSec.toFixed(1)}s (Slower)</div>
-      </div>
-
-      {chartSvg}
+      <TelemetryStaticTrace
+        chart={chartSvg}
+        gridLines={gridLines}
+        gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20"
+      />
 
       {isCursorInView && (
         <div
