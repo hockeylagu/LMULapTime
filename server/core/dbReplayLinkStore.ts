@@ -39,14 +39,16 @@ export function rejectSessionReplayLink(
   return withdraw() ? { replayName: link.name, reason, rejectedAt } : null;
 }
 
-/** The latest withdrawal per session. */
-export function getRejectedReplayLinks(db: DatabaseType): Map<string, RejectedReplayLink> {
+/** Every withdrawal per session, oldest first. */
+export function getRejectedReplayLinks(db: DatabaseType): Map<string, RejectedReplayLink[]> {
   const rows = db.prepare(
     'SELECT session_id, replay_filename, reason, rejected_at FROM rejected_replay_links ORDER BY rejected_at ASC'
   ).all() as Array<{ session_id: string; replay_filename: string; reason: ReplayLinkRejectionReason; rejected_at: number }>;
-  const bySession = new Map<string, RejectedReplayLink>();
+  const bySession = new Map<string, RejectedReplayLink[]>();
   for (const row of rows) {
-    bySession.set(row.session_id, { replayName: row.replay_filename, reason: row.reason, rejectedAt: row.rejected_at });
+    const withdrawals = bySession.get(row.session_id) ?? [];
+    withdrawals.push({ replayName: row.replay_filename, reason: row.reason, rejectedAt: row.rejected_at });
+    bySession.set(row.session_id, withdrawals);
   }
   return bySession;
 }

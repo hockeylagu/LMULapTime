@@ -588,11 +588,45 @@ describe('ServerContext replay scan progress', () => {
       expect(sessionDb.rejectSessionReplayLink).not.toHaveBeenCalled();
     });
 
+    it('gives a replay claimed by two sessions to the one saved with it', () => {
+      // Both XMLs are within the match window of the replay; the earlier one loses it.
+      const { context, sessionDb, session } = setup([ownRace], ownRace.filename);
+      const earlier = {
+        ...session,
+        id: '2026_09_03_14_36_00-11R1',
+        filePath: 'C:\\results\\2026_09_03_14_36_00-11R1.xml',
+        matchingReplayFile: { ...session.matchingReplayFile },
+      } as DetailedSession;
+      vi.mocked(fs.statSync).mockImplementation(((file: string) => ({
+        mtimeMs: file === earlier.filePath ? xmlMtimeMs - 5 * 60_000 : xmlMtimeMs,
+      })) as unknown as typeof fs.statSync);
+
+      context.enrichSessionsWithTelemetry([earlier, session]);
+
+      expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
+      expect(earlier.matchingReplayFile).toBeUndefined();
+      expect(earlier.rejectedReplayLink?.reason).toBe('owned-by-other-session');
+      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledTimes(1);
+    });
+
+    it('never links a session again to a replay withdrawn from it', () => {
+      const { context, sessionDb, session } = setup([ownRace], '');
+      Object.assign(session, { matchingReplayFile: undefined });
+      const withdrawal = { replayName: ownRace.filename, reason: 'owned-by-other-session', rejectedAt: 5 };
+      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, [withdrawal]]]) as never);
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile).toBeUndefined();
+      expect(session.rejectedReplayLink).toEqual(withdrawal);
+      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+    });
+
     it('tells the UI why a session has no replay after a restart', () => {
       const { context, sessionDb, session } = setup([], '');
       Object.assign(session, { matchingReplayFile: undefined });
       const withdrawal = { replayName: previousRace.filename, reason: 'time-window', rejectedAt: 5 };
-      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, withdrawal]]) as never);
+      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, [withdrawal]]]) as never);
 
       context.enrichSessionsWithTelemetry([session]);
 

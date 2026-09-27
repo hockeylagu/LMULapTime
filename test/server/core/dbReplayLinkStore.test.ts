@@ -45,7 +45,7 @@ describe('rejected replay links', () => {
     db.invalidateSessionCache();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
     expect(db.getAllSessionSummaries()[0].matchingReplayFile).toBeUndefined();
-    expect(db.getRejectedReplayLinks().get(session.id)).toEqual(rejected);
+    expect(db.getRejectedReplayLinks().get(session.id)).toEqual([rejected]);
   });
 
   it('keeps the previous link so the withdrawal can be undone', () => {

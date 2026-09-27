@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findMatchingReplay, replayLinkRejection, ReplayMatchTarget } from '../../../server/sessions/replayMatching.js';
+import { findMatchingReplay, pickReplayOwner, replayLinkRejection, ReplayMatchTarget } from '../../../server/sessions/replayMatching.js';
 import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.js';
 
 // Real timings from the cache (2026-06-28): LMU saved one replay for a practice run of 7 session
@@ -53,5 +53,24 @@ describe('findMatchingReplay', () => {
 
   it('finds the replay for the session it records', () => {
     expect(findMatchingReplay([practiceRunReplay], lastOfRun)?.name).toBe(practiceRunReplay.name);
+  });
+});
+
+describe('pickReplayOwner', () => {
+  // Two practice sessions saved 5 minutes apart both pass the rules against the replay.
+  const earlier = paddockPractice('2026-06-28T23:30:00.000Z', '2026-06-28T23:39:43.000Z');
+
+  it('gives the replay to the session saved with it', () => {
+    expect(pickReplayOwner(practiceRunReplay, [
+      { id: 'earlier', target: earlier },
+      { id: 'last', target: lastOfRun },
+    ])).toBe('last');
+  });
+
+  it('prefers the exact session code over a closer session of another code', () => {
+    expect(pickReplayOwner(practiceRunReplay, [
+      { id: 'practice-2', target: { ...lastOfRun, sessionCode: 'P2' } },
+      { id: 'practice-1', target: earlier },
+    ])).toBe('practice-1');
   });
 });
