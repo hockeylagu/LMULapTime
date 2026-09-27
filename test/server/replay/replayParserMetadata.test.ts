@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import {
   parseReplayMetadata,
@@ -110,20 +111,17 @@ function createBinaryDriverVcrBuffer(options: {
 }
 
 describe('replayParser - metadata, player detection & downsampling', () => {
-  const tempDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_temp_meta');
+  // A fresh folder per run, outside the repository, removed once at the end (see
+  // replayParserTrajectory.test.ts: deleting each file right after its test failed at random).
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-replays-temp-meta-'));
   const tempVcrPath = path.join(tempDir, 'Test_Replay_P1.Vcr');
 
   beforeAll(() => {
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
     fs.writeFileSync(tempVcrPath, createMockVcrBuffer());
   });
 
   afterAll(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   describe('detectPlayerName', () => {
@@ -222,14 +220,12 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const invalidPath = path.join(tempDir, 'invalid.vcr');
       fs.writeFileSync(invalidPath, Buffer.from('NOT A REPLAY FILE AT ALL'));
       expect(() => parseReplayMetadata(invalidPath)).toThrow(/Invalid LMU replay file/);
-      fs.unlinkSync(invalidPath);
     });
 
     it('throws error when replay file is too small or missing IRSR magic tag', () => {
       const tooSmallPath = path.join(tempDir, 'too_small.vcr');
       fs.writeFileSync(tooSmallPath, Buffer.from('Short text'));
       expect(() => parseReplayMetadata(tooSmallPath)).toThrow(/Invalid LMU replay file/);
-      fs.unlinkSync(tooSmallPath);
     });
 
     it('throws error when replay file does not exist', () => {
@@ -241,7 +237,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const corruptOffsetPath = path.join(tempDir, 'corrupt_offset.vcr');
       fs.writeFileSync(corruptOffsetPath, createSliceVcrBuffer({ corruptMetaOffset: true }));
       expect(() => parseReplayMetadata(corruptOffsetPath)).toThrow(/Invalid metadata offset/);
-      fs.unlinkSync(corruptOffsetPath);
     });
 
     it('handles malformed non-JSON event info string without throwing', () => {
@@ -251,7 +246,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       expect(meta.eventInfo).toEqual({ eventTitle: '{ unclosed invalid json' });
       expect(meta.trackName).toBe('Test_Track');
       expect(meta.drivers.length).toBe(2);
-      fs.unlinkSync(malformedJsonPath);
     });
 
     it('correctly sets isPlayer flag when explicit playerName is provided in options', () => {
@@ -288,7 +282,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       expect(lewis?.slot).toBe(12);
       expect(lewis?.carNumber).toBe('44');
 
-      fs.unlinkSync(binPath);
     });
   });
 
@@ -299,7 +292,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const meta = parseReplayMetadata(emptyEvPath);
       expect(meta.eventInfo).toBeNull();
       expect(meta.trackName).toBe('Test_Track');
-      fs.unlinkSync(emptyEvPath);
     });
 
     it('handles zero-driver replay gracefully', () => {
@@ -311,14 +303,12 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const meta = parseReplayMetadata(zeroDriverPath);
       expect(meta.drivers).toEqual([]);
       expect(meta.trackName).toBe('Test_Track');
-      fs.unlinkSync(zeroDriverPath);
     });
 
     it('throws a descriptive error for files smaller than 64 bytes', () => {
       const tinyPath = path.join(tempDir, 'tiny.vcr');
       fs.writeFileSync(tinyPath, Buffer.alloc(32));
       expect(() => parseReplayMetadata(tinyPath)).toThrow(/file too small/);
-      fs.unlinkSync(tinyPath);
     });
 
     it('coerces NaN trailer floats to 0 instead of propagating NaN', () => {
@@ -335,7 +325,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       expect(meta.startTimeSec).toBe(0);
       expect(meta.endTimeSec).toBe(0);
       expect(meta.durationSec).toBe(0);
-      fs.unlinkSync(nanTrailerPath);
     });
   });
 
