@@ -39,7 +39,7 @@ export function *syncSessionsIterator(
     };
   }
 
-  const DB_PARSER_VERSION = '2.14_lap_traffic';
+  const DB_PARSER_VERSION = '2.15_off_pace_2pct';
   const cachedVersion = host.getMetadata('parser_version');
   const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
 
