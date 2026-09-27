@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { Crosshair, Loader2 } from 'lucide-react';
-import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { useSessionDebrief } from './useSessionDebrief.js';
 import { debriefCornerLink, SessionDebrief } from './loadSessionDebrief.js';
@@ -17,26 +17,44 @@ function formatDelta(delta: number | null): string {
   return `${delta > 0 ? '+' : ''}${delta.toFixed(3)}s`;
 }
 
-function ReferenceLine({ debrief }: { debrief: SessionDebrief }) {
-  const { reference } = debrief;
-  const when = [reference.sessionType, reference.dateString?.split(' ')[0]].filter(Boolean).join(' ');
+function LapLabel({ lap }: { lap: ComparableLap }) {
+  const when = [lap.sessionType, lap.dateString?.split(' ')[0]].filter(Boolean).join(' ');
   return (
-    <p className="text-xs text-lmu-muted">
-      Lap {debrief.lapNumber} <span className="font-mono text-white">{formatTime(debrief.lapTimeSec)}</span>
-      {debrief.lapDeltaSec !== null && (
-        <span className={`font-mono font-bold ${debrief.lapDeltaSec > 0 ? 'text-rose-400' : 'text-emerald-400'}`}> {formatDelta(debrief.lapDeltaSec)}</span>
-      )}
-      {' '}vs <span className="text-white">{reference.driverName}</span>{' '}
-      <span className="font-mono text-white">{formatTime(reference.lapTime)}</span>
+    <>
+      <span className="text-white">{lap.driverName}</span>{' '}
+      <span className="font-mono text-white">{formatTime(lap.lapTime)}</span>
       {when ? ` (${when})` : ''}
-    </p>
+    </>
+  );
+}
+
+function Delta({ delta }: { delta: number | null }) {
+  if (delta === null) return null;
+  return <span className={`font-mono font-bold ${delta > 0 ? 'text-rose-400' : 'text-emerald-400'}`}> {formatDelta(delta)}</span>;
+}
+
+/** The analysed lap, the realistic target the corners are ranked against, and the fastest lap for technique. */
+function ReferenceLines({ debrief }: { debrief: SessionDebrief }) {
+  return (
+    <div className="space-y-0.5 text-xs text-lmu-muted">
+      <p>
+        Lap {debrief.lapNumber} <span className="font-mono text-white">{formatTime(debrief.lapTimeSec)}</span>
+        <Delta delta={debrief.lapDeltaSec} /> vs {debrief.technique ? 'realistic target ' : ''}<LapLabel lap={debrief.reference} />
+      </p>
+      {debrief.technique && (
+        <p>
+          Technique from the fastest: <LapLabel lap={debrief.technique} /><Delta delta={debrief.techniqueDeltaSec} />
+        </p>
+      )}
+    </div>
   );
 }
 
 /**
  * The first thing to read after a session: the corners of the best lap that cost the most
- * against the fastest same-car lap on this layout, ranked deterministically (time lost x how
- * often it happens x comparison confidence), each one a click away in telemetry.
+ * against a realistic same-car target (about 0.5% faster), with how the fastest same-car lap
+ * drives them, ranked deterministically (time lost x how often it happens x comparison
+ * confidence), each one a click away in telemetry.
  */
 export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session, selectedDriver }) => {
   const navigate = useNavigate();
@@ -49,12 +67,12 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           <Crosshair className="w-4 h-4 text-amber-400" />
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">Debrief: Where the Time Goes</h3>
         </div>
-        <span className="text-xs text-lmu-muted">vs the fastest {selectedDriver.carType} on this layout</span>
+        <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
       </div>
 
       {state.status === 'loading' && (
         <p className="flex items-center gap-2 text-xs text-lmu-muted py-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparing your best lap with the fastest {selectedDriver.carType}...
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparing your best lap with other {selectedDriver.carType} laps and placing the traffic (the first time for a race takes a few seconds)...
         </p>
       )}
       {state.status === 'unavailable' && <p className="text-xs text-lmu-muted py-1">{state.reason}</p>}
@@ -62,7 +80,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
 
       {state.status === 'ready' && (
         <>
-          <ReferenceLine debrief={state.debrief} />
+          <ReferenceLines debrief={state.debrief} />
           {state.debrief.corners.length > 0 ? (
             <ol>
               {state.debrief.corners.map((corner, i) => (
@@ -70,7 +88,8 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
                   key={corner.cornerNumber}
                   rank={i + 1}
                   corner={corner}
-                  onOpen={(cornerNumber) => navigate(debriefCornerLink(state.debrief, cornerNumber))}
+                  hasTechnique={state.debrief.technique !== null}
+                  onOpen={(cornerNumber, against) => navigate(debriefCornerLink(state.debrief, cornerNumber, against))}
                 />
               ))}
             </ol>
@@ -79,6 +98,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           )}
           <p className="text-[11px] text-lmu-muted">
             Ranked by time lost × how often you lose it ({state.debrief.lapsTimed} laps timed) × comparison confidence ({Math.round(state.debrief.confidence * 100)}%).
+            {state.debrief.trafficKnown && ' Passes through a corner with another car within a second are left out, and a corner of this lap driven in traffic ranks lower.'}
           </p>
           {state.debrief.caveats.map((caveat) => (
             <p key={caveat} className="text-[11px] text-amber-300">{caveat}</p>

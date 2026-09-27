@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickFastestSameCarLap, suggestReferenceLap } from '../../src/utils/referenceLaps.js';
+import { pickAttainableSameCarLap, pickFastestSameCarLap, suggestReferenceLap } from '../../src/utils/referenceLaps.js';
 import type { ComparableLap } from '../../shared/types/index.js';
 
 const RACE = 'Daytona International Speedway Road Course R1 10.Vcr';
@@ -86,5 +86,35 @@ describe('pickFastestSameCarLap', () => {
 
   it('returns nothing without another same-car lap', () => {
     expect(pickFastestSameCarLap([lap(RACE, 20, 95.894)], analysed)).toBeNull();
+  });
+});
+
+describe('pickAttainableSameCarLap', () => {
+  // 95.894 x 0.995 = 95.415: the target.
+  const analysed = { sessionId: RACE, driverName: ME, lapNum: 20, carType: 'Peugeot 9x8', lapTime: 95.894 };
+
+  it('picks the same-car lap closest to 0.5% faster than the analysed lap, not the fastest', () => {
+    const laps = [
+      ...myLaps,
+      lap(OTHER_QUALI, 3, 93.974, { driverName: 'Davide Catani' }),
+      lap(OTHER_QUALI, 8, 95.45, { driverName: 'Near Rival' }),
+      lap(OTHER_QUALI, 9, 95.3, { driverName: 'Other Rival' }),
+    ];
+    expect(pickAttainableSameCarLap(laps, analysed)?.driverName).toBe('Near Rival');
+  });
+
+  it('only considers faster laps, and prefers the faster of two equally close', () => {
+    expect(pickAttainableSameCarLap([lap(RACE, 16, 95.961)], analysed)).toBeNull();
+    const tied = [lap(OTHER_QUALI, 1, 95.315, { driverName: 'A' }), lap(OTHER_QUALI, 2, 95.515, { driverName: 'B' })];
+    expect(pickAttainableSameCarLap(tied, analysed)?.driverName).toBe('A');
+  });
+
+  it('skips laps that cannot be a reference, like the fastest-lap picker', () => {
+    const laps = [
+      lap(OTHER_QUALI, 1, 95.41, { driverName: 'X', nonRepresentativeReason: 'traffic' }),
+      lap(OTHER_QUALI, 2, 95.42, { driverName: 'X', carType: 'Porsche 963' }),
+      lap(OTHER_QUALI, 3, 95.6, { driverName: 'X' }),
+    ];
+    expect(pickAttainableSameCarLap(laps, analysed)?.lapNum).toBe(3);
   });
 });

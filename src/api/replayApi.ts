@@ -1,4 +1,4 @@
-import type { ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { fetchJson } from './apiClient.js';
 
 export type TelemetrySource = 'duckdb' | 'vcr';
@@ -32,4 +32,12 @@ export function fetchReplayMetadata(replayName: string, init?: RequestInit): Pro
 
 export function fetchReplayTrajectory(replayName: string, request: TrajectoryRequest, init?: RequestInit): Promise<ReplayTrajectoryData> {
   return fetchJson<ReplayTrajectoryData>(replayTrajectoryPath(replayName, request), init);
+}
+
+/**
+ * Who was close to a driver on the road, lap by lap. The first request for a replay builds its
+ * positions index on the server, which takes seconds; later ones are quick.
+ */
+export function fetchReplayTraffic(replayName: string, driverName: string, init?: RequestInit): Promise<ReplayTrafficResponse> {
+  return fetchJson<ReplayTrafficResponse>(`${replayPath(replayName)}/traffic?driverName=${encodeURIComponent(driverName)}`, init);
 }
