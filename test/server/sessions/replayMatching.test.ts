@@ -134,3 +134,53 @@ describe('replayIndexEntryFromStored', () => {
     expect(replayIndexEntryFromStored(stored({ sceneDesc: 'SEBRINGWEC', eventInfo: { sceneDesc: 'X' } })).sceneDesc).toBe('SEBRINGWEC');
   });
 });
+
+describe('candidate rules', () => {
+  const saved = Date.parse('2026-07-04T20:00:00.000Z');
+  const target = (overrides: Partial<ReplayMatchTarget> = {}): ReplayMatchTarget => ({
+    trackVenue: 'Circuit de Spa-Francorchamps', trackCourse: 'Circuit de Spa-Francorchamps', sessionCode: 'P1',
+    sessionTimestampMs: saved - 1_200_000, xmlFileMtimeMs: saved, ...overrides,
+  });
+  const spaReplay = (sessionCode: string, mtime: number, overrides: Partial<ReplayFileEntry> = {}): ReplayFileEntry => ({
+    name: `Circuit de Spa-Francorchamps ${sessionCode} ${mtime}.Vcr`, path: '', sizeBytes: 1,
+    trackName: 'Circuit de Spa-Francorchamps', sessionCode, mtime, durationSec: 1200, ...overrides,
+  });
+
+  it('matches a word session type from the XML to the replay code letter', () => {
+    expect(replayLinkRejection(spaReplay('P2', saved), target({ sessionCode: 'Practice' }))).toBeNull();
+    expect(replayLinkRejection(spaReplay('Q1', saved), target({ sessionCode: 'Qualifying' }))).toBeNull();
+    expect(replayLinkRejection(spaReplay('R1', saved), target({ sessionCode: 'Race' }))).toBeNull();
+    expect(replayLinkRejection(spaReplay('Q1', saved), target({ sessionCode: 'Practice' }))).toBe('session-type');
+    expect(replayLinkRejection(spaReplay('R1', saved), target({ sessionCode: '' }))).toBe('session-type');
+  });
+
+  it('accepts a replay whose start matches the session start although its XML was written much later', () => {
+    const lateXml = target({ xmlFileMtimeMs: saved + 1_800_000 });
+    expect(replayLinkRejection(spaReplay('P1', saved), lateXml)).toBeNull();
+  });
+
+  it('rejects a replay saved outside the window from both the session start and the XML', () => {
+    expect(replayLinkRejection(spaReplay('P1', saved + 700_000, { durationSec: undefined }), target())).toBe('time-window');
+  });
+
+  it('picks the exact session code before a closer replay of the same type', () => {
+    const exact = spaReplay('P1', saved + 300_000);
+    const closer = spaReplay('P2', saved);
+    expect(findMatchingReplay([closer, exact], target())?.name).toBe(exact.name);
+  });
+
+  it('picks the closest replay in time among the same session code', () => {
+    const far = spaReplay('P1', saved + 400_000);
+    const near = spaReplay('P1', saved + 30_000);
+    expect(findMatchingReplay([far, near], target())?.name).toBe(near.name);
+    expect(findMatchingReplay([], target())).toBeUndefined();
+  });
+
+  it('compares names only when neither layout is known', () => {
+    const unknownSession = target({ trackVenue: 'Fantasy Ring', trackCourse: '' });
+    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Fantasy Ring' }), unknownSession)).toBeNull();
+    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Other Place' }), unknownSession)).toBe('layout');
+    // A known layout never matches an unknown one by a loose name comparison.
+    expect(replayLinkRejection(spaReplay('P1', saved), unknownSession)).toBe('layout');
+  });
+});

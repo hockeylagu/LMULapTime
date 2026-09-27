@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
 import type { DetailedSession } from '../../../server/core/types.js';
 
@@ -80,5 +80,62 @@ describe('rejected replay links', () => {
   it('records nothing for a session that is not stored', () => {
     expect(db.rejectSessionReplayLink('missing', replayLink, 'layout')).toBeNull();
     expect(db.getRejectedReplayLinks().size).toBe(0);
+  });
+});
+
+describe('stored replay links', () => {
+  let db: SessionDatabase;
+  const unlinked = { ...session, matchingReplayFile: undefined } as DetailedSession;
+  const updatedAt = () => (db as unknown as { db: { prepare(sql: string): { get(id: string): { updated_at: number } } } }).db
+    .prepare('SELECT updated_at FROM sessions WHERE id = ?').get(session.id).updated_at;
+
+  beforeEach(() => {
+    db = new SessionDatabase(':memory:');
+    db.upsertSession(unlinked, 'C:\\results\\2026_06_28_18_29_32-98P1.xml', 1, 1);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('stores a new link in the session row and in the loaded session list', () => {
+    const loaded = db.getAllSessions()[0];
+
+    db.updateSessionMatchingReplay(session.id, replayLink);
+
+    expect(loaded.matchingReplayFile).toEqual(replayLink);
+    db.invalidateSessionCache();
+    expect(db.getSessionById(session.id)?.matchingReplayFile).toEqual(replayLink);
+    expect(db.getAllSessionSummaries()[0].matchingReplayFile).toEqual(replayLink);
+  });
+
+  it('does not rewrite the row when the same link is stored again', () => {
+    db.updateSessionMatchingReplay(session.id, replayLink);
+    const firstWrite = updatedAt();
+    const later = vi.spyOn(Date, 'now').mockReturnValue(firstWrite + 60_000);
+
+    db.updateSessionMatchingReplay(session.id, { ...replayLink });
+
+    expect(updatedAt()).toBe(firstWrite);
+    later.mockRestore();
+  });
+
+  it('links, withdraws and links another replay, each read back from the database', () => {
+    const other = { ...replayLink, name: 'Bahrain Paddock Circuit P1 19.Vcr' };
+
+    db.updateSessionMatchingReplay(session.id, replayLink);
+    db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
+    db.invalidateSessionCache();
+    expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
+
+    db.updateSessionMatchingReplay(session.id, other);
+    db.invalidateSessionCache();
+    expect(db.getSessionById(session.id)?.matchingReplayFile?.name).toBe(other.name);
+    expect(db.getRejectedReplayLinks().get(session.id)?.map(link => link.replayName)).toEqual([replayLink.name]);
+  });
+
+  it('ignores a session that is not stored', () => {
+    expect(() => db.updateSessionMatchingReplay('missing', replayLink)).not.toThrow();
+    expect(db.getSessionsCount()).toBe(1);
   });
 });
