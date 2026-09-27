@@ -79,7 +79,8 @@ export class LmuParser {
       if (
         existing.mtime !== entry.mtime ||
         existing.sizeBytes !== entry.sizeBytes ||
-        existing.durationSec !== entry.durationSec
+        existing.durationSec !== entry.durationSec ||
+        existing.sceneDesc !== entry.sceneDesc
       ) {
         this.replayIndexRevision++;
       }

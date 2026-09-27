@@ -137,4 +137,6 @@ export interface ReplayFileEntry {
   splitNo?: number;
   eventType?: string;
   durationSec?: number;
+  /** LMU engine scene of the recording (from its metadata): names the exact layout. */
+  sceneDesc?: string;
 }

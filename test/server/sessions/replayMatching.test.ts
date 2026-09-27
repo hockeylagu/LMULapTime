@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findMatchingReplay, pickReplayOwner, replayLinkRejection, ReplayMatchTarget } from '../../../server/sessions/replayMatching.js';
+import { findMatchingReplay, pickReplayOwner, replayIndexEntryFromStored, replayLinkRejection, ReplayMatchTarget } from '../../../server/sessions/replayMatching.js';
 import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.js';
 
 // Real timings from the cache (2026-06-28): LMU saved one replay for a practice run of 7 session
@@ -72,5 +72,65 @@ describe('pickReplayOwner', () => {
       { id: 'practice-2', target: { ...lastOfRun, sessionCode: 'P2' } },
       { id: 'practice-1', target: earlier },
     ])).toBe('practice-1');
+  });
+});
+
+describe('layout matching', () => {
+  const saved = Date.parse('2026-06-29T17:06:16.000Z');
+  const sessionAt = (trackVenue: string, trackCourse: string): ReplayMatchTarget => ({
+    trackVenue,
+    trackCourse,
+    sessionCode: 'P1',
+    sessionTimestampMs: saved - 600_000,
+    xmlFileMtimeMs: saved,
+  });
+  const replay = (trackName: string, sceneDesc?: string): ReplayFileEntry => ({
+    name: `${trackName} P1 1.Vcr`,
+    path: `C:\replays\${trackName} P1 1.Vcr`,
+    sizeBytes: 1,
+    trackName,
+    sessionCode: 'P1',
+    mtime: saved,
+    durationSec: 600,
+    sceneDesc,
+  });
+
+  it('never gives a School circuit replay to a full-course Sebring session', () => {
+    const school = replay('Sebring School Circuit', 'SEBRINGWEC_SCHOOL');
+    const fullCourse = sessionAt('Sebring International Raceway', 'Sebring International Raceway');
+
+    expect(replayLinkRejection(school, fullCourse)).toBe('layout');
+    expect(findMatchingReplay([school], fullCourse)).toBeUndefined();
+  });
+
+  it('takes the layout from the recorded scene when the filename only names the facility', () => {
+    const curvaGrande = replay('Autodromo Nazionale Monza', 'MONZAWEC_GRANDE');
+
+    expect(replayLinkRejection(curvaGrande, sessionAt('Autodromo Nazionale Monza', 'Autodromo Nazionale Monza'))).toBe('layout');
+    expect(replayLinkRejection(curvaGrande, sessionAt('Autodromo Nazionale Monza', 'Monza Curva Grande Circuit'))).toBeNull();
+  });
+
+  it('falls back to the filename when the scene is unknown', () => {
+    expect(replayLinkRejection(replay('Monza Curva Grande Circuit'), sessionAt('Autodromo Nazionale Monza', 'Monza Curva Grande Circuit')))
+      .toBeNull();
+  });
+});
+
+describe('replayIndexEntryFromStored', () => {
+  const stored = (metadata: Record<string, unknown>) => ({
+    filename: 'Sebring School Circuit P1 1.Vcr',
+    file_path: 'C:\replays\Sebring School Circuit P1 1.Vcr',
+    file_size: 1,
+    file_mtime: 2,
+    metadata: metadata as never,
+  });
+
+  it('reads the track and session code from the filename', () => {
+    expect(replayIndexEntryFromStored(stored({}))).toMatchObject({ trackName: 'Sebring School Circuit', sessionCode: 'P1' });
+  });
+
+  it('takes the scene from the event info when older rows lack the top-level field', () => {
+    expect(replayIndexEntryFromStored(stored({ eventInfo: { sceneDesc: 'SEBRINGWEC_SCHOOL' } })).sceneDesc).toBe('SEBRINGWEC_SCHOOL');
+    expect(replayIndexEntryFromStored(stored({ sceneDesc: 'SEBRINGWEC', eventInfo: { sceneDesc: 'X' } })).sceneDesc).toBe('SEBRINGWEC');
   });
 });
