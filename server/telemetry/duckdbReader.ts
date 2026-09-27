@@ -439,6 +439,23 @@ export class DuckDbReader {
       return { rows, hz };
     };
 
+    // A timestamped channel (Gear, ABS, TC) only logs a row when its state changes. The state at
+    // the lap start is the last row at or before it, however long ago: in top gear down a long
+    // straight the last shift can be well before the line.
+    const fetchEventChannel = async (tableName: string, endPadSec: number): Promise<Array<{ ts: number; value: number }>> => {
+      const [before, during] = await Promise.all([
+        this.queryAll<{ ts: number; value: number }>(
+          `SELECT ts, value FROM "${tableName}" WHERE ts <= ? ORDER BY ts DESC LIMIT 1`,
+          [startTs]
+        ),
+        this.queryAll<{ ts: number; value: number }>(
+          `SELECT ts, value FROM "${tableName}" WHERE ts > ? AND ts <= ? ORDER BY ts ASC`,
+          [startTs, endTs + endPadSec]
+        ),
+      ]);
+      return [...before, ...during];
+    };
+
     const [
       speedData,
       throttleData,
@@ -514,24 +531,9 @@ export class DuckDbReader {
       hasGear && !gearHasTs
         ? fetchContinuousChannel<{ value: number }>('Gear', 'value', declaredHz)
         : Promise.resolve({ rows: [], hz: declaredHz }),
-      hasGear && gearHasTs
-        ? this.queryAll<{ ts: number; value: number }>(
-            'SELECT ts, value FROM "Gear" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
-            [startTs - 5, endTs + 5]
-          )
-        : Promise.resolve([]),
-      hasAbs && absHasTs
-        ? this.queryAll<{ ts: number; value: number }>(
-            'SELECT ts, value FROM "ABS" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
-            [startTs - 1, endTs + 1]
-          )
-        : Promise.resolve([]),
-      hasTc && tcHasTs
-        ? this.queryAll<{ ts: number; value: number }>(
-            'SELECT ts, value FROM "TC" WHERE ts >= ? AND ts <= ? ORDER BY ts ASC',
-            [startTs - 1, endTs + 1]
-          )
-        : Promise.resolve([]),
+      hasGear && gearHasTs ? fetchEventChannel('Gear', 5) : Promise.resolve([]),
+      hasAbs && absHasTs ? fetchEventChannel('ABS', 1) : Promise.resolve([]),
+      hasTc && tcHasTs ? fetchEventChannel('TC', 1) : Promise.resolve([]),
       fetchContinuousChannel<{ value: number }>(fuelTable, 'value', 20),
       fetchContinuousChannel<{ value: number }>(virtualEnergyTable, 'value', 20),
       fetchContinuousChannel<{ value: number }>(socTable, 'value', 20),
