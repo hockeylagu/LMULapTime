@@ -172,6 +172,11 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
         carClasses: carClasses.length > 0 ? carClasses : undefined,
         hasDuckDbTelemetry: Boolean(matchedDuckFilename),
         duckdbFilename: matchedDuckFilename,
+        hasRain: metadata.hasRain,
+        maxRainIntensity: metadata.maxRainIntensity,
+        weatherCondition: metadata.weatherCondition,
+        ambientTemp: metadata.ambientTemp,
+        trackTemp: metadata.trackTemp,
       });
     } catch {
       // Skip unreadable files
