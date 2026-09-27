@@ -48,6 +48,13 @@ import {
   upsertReplayTrajectoryCache,
 } from './dbReplayTrajectoryStore.js';
 import {
+  ReplayLapRow,
+  getRacePositions,
+  getReplayLapSignature,
+  listReplayLapRows,
+  saveRacePositions,
+} from './dbRacePositionStore.js';
+import {
   StoredReplayFileInfo,
   getAllStoredReplayFiles,
   getReplayMetadataCache,
@@ -258,6 +265,23 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {
     return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath);
+  }
+
+  /** Which stored laps a replay's race positions index is built from (see dbRacePositionStore). */
+  public getReplayLapSignature(filename: string): string | null {
+    return getReplayLapSignature(this.db, filename);
+  }
+
+  public listReplayLapRows(filename: string): ReplayLapRow[] {
+    return listReplayLapRows(this.db, filename);
+  }
+
+  public getRacePositions<T>(filename: string, signature: string): T | null {
+    return getRacePositions<T>(this.db, filename, signature);
+  }
+
+  public saveRacePositions(filename: string, signature: string, positions: unknown): void {
+    saveRacePositions(this.db, filename, signature, positions);
   }
 
   public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData, filePath?: string): void {

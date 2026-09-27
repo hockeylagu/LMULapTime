@@ -385,4 +385,24 @@ describe('Replay routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.layoutKey).toBe('bahrain_outer');
   });
+
+  it('answers a traffic request for a replay, and says why there is none to show', async () => {
+    sessions.push({
+      id: 'bahrain-outer-session',
+      matchingReplayFile: { name: 'Route_Test_P1.Vcr' },
+      trackVenue: 'Bahrain International Circuit',
+      trackCourse: 'Outer Circuit',
+      trackLengthMeters: 3543,
+      drivers: [{ name: 'Route Driver', carClass: 'GT3' }],
+      playerDriver: { name: 'Route Driver', laps: [] },
+    });
+
+    const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/traffic?driverName=Route%20Driver');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ available: false, reason: 'The replay has no stored laps yet.', laps: [] });
+
+    expect((await request(app).get('/api/replays/..%2Fsecret.Vcr/traffic')).status).toBe(400);
+    expect((await request(app).get('/api/replays/Missing_P1.Vcr/traffic')).status).toBe(404);
+    expect((await request(app).get('/api/replays/Route_Test_P1.Vcr/traffic?driverName=Nobody')).status).toBe(404);
+  });
 });

@@ -7,6 +7,7 @@ import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
+import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 
 function isSafeFileName(value: string): boolean {
@@ -23,6 +24,7 @@ export function createReplayRouter(context: ServerContext): Router {
     () => context.loadSessions(),
     telemetryService
   );
+  const trafficService = new RaceTrafficService(context.sessionDb);
 
   router.get('/replays/cache', (_req, res) => {
     try {
@@ -183,6 +185,42 @@ export function createReplayRouter(context: ServerContext): Router {
       }
       console.error(`Failed to extract replay trajectory for ${req.params.name}:`, error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to extract replay trajectory' });
+    }
+  });
+
+  // Who was close to a driver on the road, lap by lap. The first request for a replay builds its
+  // positions index on a worker thread (seconds); later ones read the stored index.
+  router.get('/replays/:name/traffic', async (req, res) => {
+    try {
+      const replayName = req.params.name;
+      if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
+        return res.status(400).json({ error: 'Invalid replay filename' });
+      }
+      const filePath = path.join(context.replaysDir, replayName);
+      const playerName = context.currentParser.configuredPlayerName;
+      if (!fs.existsSync(filePath) && !context.sessionDb.getStoredReplayMetadata(replayName)) {
+        return res.status(404).json({ error: `Replay file "${replayName}" not found` });
+      }
+      const driverName = queryString(req.query.driverName) || playerName;
+      const driverSlot = context.replayCache.resolveDriverSlot(filePath, replayName, driverName, playerName);
+      if (driverSlot === undefined) {
+        return res.status(404).json({ error: `Driver "${driverName}" is not in replay "${replayName}"` });
+      }
+      const metadata = context.replayCache.getMetadata(filePath, replayName, playerName);
+      const session = context.loadSessions().find(s => s.matchingReplayFile?.name === replayName);
+
+      res.json(await trafficService.getDriverTraffic({
+        replayName,
+        driverSlot,
+        replayDrivers: metadata.drivers.flatMap(d => (typeof d.slot === 'number' ? [{ slot: d.slot, name: d.name, carClass: d.carClass }] : [])),
+        session,
+        sceneDesc: metadata.sceneDesc,
+        trackVenue: metadata.trackName,
+        trackCourse: metadata.trackCourse,
+      }));
+    } catch (error: unknown) {
+      console.error(`Failed to find traffic for ${req.params.name}:`, error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to find traffic' });
     }
   });
 

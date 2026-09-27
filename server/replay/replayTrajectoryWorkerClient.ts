@@ -15,17 +15,23 @@ export interface ReplayWorkerClientOptions {
   workerPath?: string | URL;
 }
 
-function findWorkerBootstrap(): string {
-  const moduleUrl = new URL(import.meta.url);
-  if (moduleUrl.protocol === 'file:') {
-    return fileURLToPath(new URL('./replayTrajectoryWorkerBootstrap.mjs', moduleUrl));
+/**
+ * The path of a worker's .mjs bootstrap, `serverRelativePath` under server/. Next to the calling
+ * module when it runs from a file; otherwise (bundled or transformed, as under the test runner)
+ * found by walking up from the entry script and the working directory.
+ */
+export function findWorkerBootstrap(moduleUrl: string, serverRelativePath: string[]): string {
+  const url = new URL(moduleUrl);
+  const fileName = serverRelativePath[serverRelativePath.length - 1];
+  if (url.protocol === 'file:') {
+    return fileURLToPath(new URL(`./${fileName}`, url));
   }
 
   const startingDirectories = [path.dirname(path.resolve(process.argv[1] || '.')), process.cwd()];
   for (const startingDirectory of startingDirectories) {
     let directory = startingDirectory;
     while (true) {
-      const candidate = path.join(directory, 'server', 'replay', 'replayTrajectoryWorkerBootstrap.mjs');
+      const candidate = path.join(directory, 'server', ...serverRelativePath);
       if (fs.existsSync(candidate)) return candidate;
       const parent = path.dirname(directory);
       if (parent === directory) break;
@@ -33,7 +39,7 @@ function findWorkerBootstrap(): string {
     }
   }
 
-  throw new Error('Unable to locate replay trajectory worker bootstrap');
+  throw new Error(`Unable to locate worker bootstrap ${fileName}`);
 }
 
 export async function* extractReplayTrajectoryInWorker(
@@ -41,7 +47,7 @@ export async function* extractReplayTrajectoryInWorker(
   options: ExtractReplayTrajectoryOptions,
   clientOptions: ReplayWorkerClientOptions = {}
 ): AsyncGenerator<ReplayStreamProgress, ReplayTrajectoryData, void> {
-  const workerPath = clientOptions.workerPath || findWorkerBootstrap();
+  const workerPath = clientOptions.workerPath || findWorkerBootstrap(import.meta.url, ['replay', 'replayTrajectoryWorkerBootstrap.mjs']);
   const worker = new Worker(workerPath, {
     workerData: { filePath, options: { ...options, silent: true } },
   });

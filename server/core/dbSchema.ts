@@ -173,6 +173,15 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (filename, driver_slot, lap_key)
     );
 
+    -- Every car's low-rate track position through a replay, built from its stored laps (the
+    -- signature says which), to find who was close to whom and where.
+    CREATE TABLE IF NOT EXISTS replay_race_positions (
+      filename TEXT PRIMARY KEY,
+      signature TEXT NOT NULL,
+      positions_br BLOB NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS replay_trajectory_defaults (
       filename TEXT NOT NULL,
       driver_slot INTEGER NOT NULL,
