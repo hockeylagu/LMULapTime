@@ -25,7 +25,8 @@
     "test:coverage": "vitest run --coverage",
     "telemetry:probe": "dotnet run -c Release --project tools/telemetry-recorder -- probe",
     "telemetry:record": "dotnet run -c Release --project tools/telemetry-recorder -- record",
-    "vcr:correlate": "tsx tools/analysis/correlateVcr.ts"
+    "vcr:correlate": "tsx tools/analysis/correlateVcr.ts",
+    "vehicles:catalog": "tsx tools/analysis/buildVehicleCatalog.ts"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",

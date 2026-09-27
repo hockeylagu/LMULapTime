@@ -57,10 +57,10 @@ export function buildTrajectoryPoints(
       engineRpm: cur.engineRpm,
       wheelSpeeds: cur.wheelSpeeds,
       brakeTemps: cur.brakeTemps,
-      fuel: cur.fuel,
+      virtualEnergy: cur.virtualEnergy,
       rainIntensity: cur.rainIntensity,
       ambientTemp: cur.ambientTemp,
-      trackTemp: cur.trackTemp,
+      tireCompoundIndices: cur.tireCompoundIndices,
     };
   });
 }

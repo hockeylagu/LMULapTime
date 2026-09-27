@@ -3,6 +3,7 @@ import path from 'path';
 import {
   ReplayTrajectoryData,
   ReplayPenaltyEvent,
+  ReplayContactEvent,
   ReplayPitEvent,
   ReplayFlagEvent,
   ReplayStandingsSnapshot,
@@ -36,6 +37,23 @@ export interface ExtractReplayTrajectoryOptions extends ReplayLogOptions {
   allLaps?: boolean;
   onProgress?: ReplayProgressCallback;
 }
+
+// Class 0 Type 17 contact, byte +32: values below ~105 are the other car's slot, these are objects.
+const CONTACT_OBJECT_NAMES: Record<number, string> = {
+  105: 'Cone',
+  106: 'Post',
+  107: 'Sign',
+  108: 'Wheel',
+  109: 'Wing',
+  112: 'Immovable',
+};
+
+// Class 3 Types 5 / 7 penalty issued / served, byte +0.
+const PENALTY_TYPE_NAMES: Record<number, string> = {
+  0: 'Stop/Go',
+  1: 'Drive Thru',
+  3: 'Time',
+};
 
 function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
   const b0 = payload[offset];
@@ -178,18 +196,20 @@ export function extractReplayTrajectory(
     const rawPts: RawTrajectoryPoint[] = [];
     const vcrTimingEvents: VcrTimingEvent[] = [];
     const replayPenalties: ReplayPenaltyEvent[] = [];
+    const replayContacts: ReplayContactEvent[] = [];
     const replayPitEvents: ReplayPitEvent[] = [];
     const replayFlagEvents: ReplayFlagEvent[] = [];
     const standingsHistory: ReplayStandingsSnapshot[] = [];
     const replayWeatherEvents: ReplayWeatherEvent[] = [];
     let currentAmbientTemp: number | undefined = undefined;
-    let currentTrackTemp: number | undefined = undefined;
     let currentRainIntensity: number | undefined = undefined;
     let maxSessionRain = 0;
     const driverWheelTelemetry = new Map<number, {
       wheelSpeeds?: [number, number, number, number];
       brakeTemps?: [number, number, number, number];
     }>();
+    const driverVirtualEnergy = new Map<number, number>();
+    const driverTireCompounds = new Map<number, [number, number, number, number]>();
 
     // Sequential streaming slice parser across the full frame stream (16MB chunk buffer)
     const CHUNK_SIZE = 16 * 1024 * 1024;
@@ -206,7 +226,6 @@ export function extractReplayTrajectory(
         driverNameMap.set(d.slot, d.name);
       }
     }
-    const driverFuel = new Map<number, number>();
 
     // Stage 4: Streaming Binary Decode
     while (filePos < frameStreamEnd) {
@@ -248,7 +267,9 @@ export function extractReplayTrajectory(
           const h = buf.readUInt32LE(eventSp);
           const sz = (h >>> 8) & 0x1ff;
           const drv = h & 0xff;
-          const evClass = (h >>> 29);
+          // Bit 29 only flags a race replay: practice / qualifying send the same packets with it clear.
+          const evClass = (h >>> 30);
+          const rawClass = (h >>> 29);
           const evType = (h >>> 17) & 0x3f;
 
           if (sz === 65 && evType >= 7 && evType <= 15) {
@@ -322,10 +343,10 @@ export function extractReplayTrajectory(
                 engineRpm,
                 wheelSpeeds: latestWheel?.wheelSpeeds ? [...latestWheel.wheelSpeeds] : undefined,
                 brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
-                fuel: driverFuel.get(drv),
+                virtualEnergy: driverVirtualEnergy.get(drv),
                 rainIntensity: currentRainIntensity,
                 ambientTemp: currentAmbientTemp,
-                trackTemp: currentTrackTemp,
+                tireCompoundIndices: driverTireCompounds.get(drv),
               };
 
               if (targetSlot !== undefined) {
@@ -339,43 +360,39 @@ export function extractReplayTrajectory(
                 pts.push(pt);
               }
             }
-          } else if ((evClass === 3 || evClass === 6 || evClass === 7) && evType === 6 &&
+          } else if (evClass === 3 && evType === 6 &&
                      (sz === 18 || sz === 21) && eventSp + 5 + 9 <= activeLen) {
             const splitSec = buf.readFloatLE(eventSp + 5);
             const sec = buf[eventSp + 5 + 8] & 3;
             const lapIdx = buf[eventSp + 5 + 8] >> 2;
             vcrTimingEvents.push({ sTime, drv, splitSec, sector: sec, lapIdx });
-          } else if (evClass === 2 && (evType === 5 || evType === 7 || evType === 8) && eventSp + 5 + sz <= activeLen) {
-            const drvName = driverNameMap.get(drv);
-            if (evType === 5 && sz > 3) {
-              const pText = buf.subarray(eventSp + 5 + 3, eventSp + 5 + sz).toString('utf8').replace(/\0.*$/, '').trim();
+          } else if (evClass === 3 && ((evType === 5 && sz >= 2) || (evType === 7 && sz === 1)) && eventSp + 5 + sz <= activeLen) {
+            // Type 5 issued: +0 penalty type, +1 seconds / 2, reason text from +2. Type 7 served: +0 type.
+            // Penalties handed out in a burst at the start and disqualifications are not in the replay.
+            const pType = PENALTY_TYPE_NAMES[buf[eventSp + 5]] ?? `Type ${buf[eventSp + 5]}`;
+            if (evType === 5) {
+              const pSeconds = buf[eventSp + 5 + 1] * 2;
+              const pText = buf.subarray(eventSp + 5 + 2, eventSp + 5 + sz).toString('utf8').replace(/\0.*$/, '').trim();
               replayPenalties.push({
                 driverSlot: drv,
-                driverName: drvName,
+                driverName: driverNameMap.get(drv),
                 timeSec: Number(sTime.toFixed(4)),
                 penaltyText: pText || 'Penalty',
+                penaltyType: pType,
+                penaltySeconds: pSeconds > 0 ? pSeconds : undefined,
                 action: 'given',
               });
-            } else if (evType === 7) {
-              const pType = buf[eventSp + 5] === 0 ? 'Stop/Go' : 'Drive Thru';
+            } else {
               replayPenalties.push({
                 driverSlot: drv,
-                driverName: drvName,
+                driverName: driverNameMap.get(drv),
                 timeSec: Number(sTime.toFixed(4)),
                 penaltyText: `Served ${pType}`,
                 penaltyType: pType,
                 action: 'served',
               });
-            } else if (evType === 8) {
-              replayPenalties.push({
-                driverSlot: drv,
-                driverName: drvName,
-                timeSec: Number(sTime.toFixed(4)),
-                penaltyText: 'Penalty removed by admin',
-                action: 'removed',
-              });
             }
-          } else if (evClass === 3 && evType === 10 && sz === 3 && eventSp + 5 + sz <= activeLen) {
+          } else if (evClass === 1 && evType === 10 && sz === 3 && eventSp + 5 + sz <= activeLen) {
             const FLAG_NAMES: Record<number, string> = {
               0: 'Green', 1: 'Local Yellow', 2: 'Double Yellow', 3: 'Full Course Yellow',
               4: 'Safety Car', 5: 'Safety Car In This Lap', 6: 'Virtual Safety Car', 7: 'Red', 8: 'Checkered',
@@ -391,7 +408,7 @@ export function extractReplayTrajectory(
               driverSlot: drv,
               driverFlag,
             });
-          } else if (evType === 48 && (evClass === 3 || evClass === 6 || evClass === 7) && sz >= 22 && eventSp + 5 + sz <= activeLen) {
+          } else if (evType === 48 && evClass === 3 && sz >= 22 && eventSp + 5 + sz <= activeLen) {
             const count = buf[eventSp + 5];
             if (count > 0 && 21 + count <= sz) {
               const order: number[] = [];
@@ -400,18 +417,15 @@ export function extractReplayTrajectory(
               }
               standingsHistory.push({ timeSec: Number(sTime.toFixed(4)), order });
             }
-          } else if (evClass === 1 && evType === 10 && sz === 80 && eventSp + 5 + 78 <= activeLen) {
+          } else if (evClass === 0 && evType === 10 && sz === 80 && eventSp + 5 + 78 <= activeLen) {
             const rawTemp = buf[eventSp + 5 + 38];
-            const ambientTempC = Number((25.0 - (146 - rawTemp) * 0.176).toFixed(1));
-            const rawTrack = buf[eventSp + 5 + 39];
-            const trackTempC = Number((27.3 - (129 - rawTrack) * 0.176).toFixed(1));
+            const ambientTempC = Number((rawTemp / 8 + 5.9).toFixed(1));
             let maxRainChannel = 0;
             for (let ch = 42; ch < 78; ch += 4) {
               const r = buf[eventSp + 5 + ch];
               if (r > maxRainChannel) maxRainChannel = r;
             }
             currentAmbientTemp = ambientTempC;
-            currentTrackTemp = trackTempC;
             currentRainIntensity = maxRainChannel;
             if (maxRainChannel > maxSessionRain) {
               maxSessionRain = maxRainChannel;
@@ -419,12 +433,30 @@ export function extractReplayTrajectory(
             replayWeatherEvents.push({
               timeSec: Number(sTime.toFixed(4)),
               ambientTemp: ambientTempC,
-              trackTemp: trackTempC,
               rainIntensity: maxRainChannel,
-              rainPercent: Math.min(100, Math.round((maxRainChannel / 25) * 100)),
+              rainPercent: Math.round((maxRainChannel / 255) * 100),
             });
-          } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
-                     (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
+          } else if (evClass === 0 && evType === 16 && sz === 4 && eventSp + 5 + 4 <= activeLen) {
+            driverTireCompounds.set(drv, [
+              buf[eventSp + 5],
+              buf[eventSp + 5 + 1],
+              buf[eventSp + 5 + 2],
+              buf[eventSp + 5 + 3],
+            ]);
+          } else if (evClass === 0 && evType === 17 && sz === 33 && eventSp + 5 + 33 <= activeLen) {
+            const impactMagnitude = buf.readFloatLE(eventSp + 5 + 8);
+            const otherParty = buf[eventSp + 5 + 32];
+            const otherPartyName = CONTACT_OBJECT_NAMES[otherParty] ?? driverNameMap.get(otherParty);
+            replayContacts.push({
+              driverSlot: drv,
+              driverName: driverNameMap.get(drv),
+              timeSec: Number(sTime.toFixed(4)),
+              impactMagnitude: Number(impactMagnitude.toFixed(2)),
+              otherParty,
+              otherPartyName,
+            });
+          } else if (((evType === 2 && evClass === 0) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
+                     (evType === 49 && (rawClass === 2 || rawClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
             const drvName = driverNameMap.get(drv);
             const PIT_CODE_MAP: Record<number, { action: string; isGarage?: boolean }> = {
@@ -497,12 +529,14 @@ export function extractReplayTrajectory(
               Math.round(brakeTempC * 0.88),
               Math.round(brakeTempC * 0.88),
             ];
-          } else if (evType === 51 && sz === 3 && eventSp + 5 + sz <= activeLen) {
+          } else if (evClass === 0 && evType === 51 && sz === 3 && eventSp + 5 + sz <= activeLen) {
             const b0 = buf[eventSp + 5];
             const b1 = buf[eventSp + 5 + 1];
-            if (b0 > 0 || b1 === 0) {
-              const fuelPct = Number(((b0 / 255) * 100).toFixed(1));
-              driverFuel.set(drv, fuelPct);
+            // Cars without a Virtual Energy system (e.g. GTE) send this packet as all zeros for the
+            // whole session: a car only has VE once it has reported a non-zero value (VE starts full).
+            if (b0 > 0 || (b1 === 0 && driverVirtualEnergy.has(drv))) {
+              const vePct = Number((b0 / 2.55).toFixed(1));
+              driverVirtualEnergy.set(drv, vePct);
             }
           }
           eventSp += 4 + 1 + sz;
@@ -613,17 +647,18 @@ export function extractReplayTrajectory(
         },
         points: finalPoints,
         penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
+        contacts: replayContacts.length > 0 ? replayContacts : undefined,
         pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
         flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
         standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
         sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
         wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
-        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.fuel !== undefined)),
+        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.virtualEnergy !== undefined)),
         weatherEvents: replayWeatherEvents.length > 0 ? replayWeatherEvents : undefined,
         weatherCondition: maxSessionRain > 16 ? 'Wet' : maxSessionRain > 0 ? 'Dynamic Weather' : 'Dry',
         maxRainIntensity: maxSessionRain > 0 ? maxSessionRain : undefined,
         ambientTemp: currentAmbientTemp,
-        trackTemp: currentTrackTemp,
+        tireCompounds: targetSlot !== undefined ? driverTireCompounds.get(targetSlot) : undefined,
       };
     }
 
