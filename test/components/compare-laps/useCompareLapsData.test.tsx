@@ -102,4 +102,46 @@ describe('useCompareLapsData selection fallbacks', () => {
       expect(result.current.hideEmpty).toBe(false);
     });
   });
+
+  it("drops the previous track's laps and reports the error when the next track fails to load", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url.includes('track=Monza')
+      ? { ok: false, status: 500, json: () => Promise.resolve({ error: 'database is locked' }) }
+      : { ok: true, status: 200, json: () => Promise.resolve({ laps, allTimeBestLap: null, overallTrackBestLap: laps[2], bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [] }) })));
+
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.apiData.laps).toHaveLength(3));
+    expect(result.current.loadError).toBeNull();
+
+    act(() => navigateTo('/compare?track=Monza&carClass=LMGT3'));
+
+    await waitFor(() => expect(result.current.loadError).toBe('database is locked'));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.apiData.laps).toEqual([]);
+    expect(result.current.displayLaps).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+
+  it('never keeps the previous track’s laps in the comparison when the track changes in the URL', async () => {
+    const monzaLap = { ...laps[1], id: 'monza-player', sessionId: 'session-3', lapTime: 107 };
+    const reply = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+    vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('track=Monza')
+      ? new Promise(resolve => setTimeout(() => resolve(reply({ laps: [monzaLap], allTimeBestLap: null, playerBestLap: monzaLap, benchmarks: [] })), 20))
+      : reply({ laps, allTimeBestLap: null, playerBestLap: laps[1], benchmarks: [] })));
+
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['fast-player']));
+
+    act(() => navigateTo('/compare?track=Monza&carClass=LMGT3'));
+
+    await waitFor(() => expect(result.current.apiData.laps.map(lap => lap.id)).toEqual(['monza-player']));
+    expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['monza-player']);
+    vi.unstubAllGlobals();
+  });
 });
