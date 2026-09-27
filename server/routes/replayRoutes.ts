@@ -90,7 +90,7 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/telemetry', (_req, res) => res.json(context.telemetryCatalog.getFiles()));
 
-  router.get('/replays/:name/metadata', (req, res) => {
+  router.get('/replays/:name/metadata', async (req, res) => {
     try {
       const replayName = req.params.name;
       if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
@@ -120,16 +120,18 @@ export function createReplayRouter(context: ServerContext): Router {
       const duckFiles = context.telemetryCatalog.getFiles();
       const telemetryMeta = context.sessionDb.getTelemetryMetadata();
 
+      // Metadata without laps borrows them from the player's trajectory (decoded in the worker if needed).
+      const fallbackLaps = rawMetadata.laps?.length
+        ? undefined
+        : await context.replayCache.getFullTrajectory(filePath, replayName, { playerName: context.currentParser.configuredPlayerName })
+          .then(trajectory => trajectory.laps)
+          .catch(() => undefined);
+
       const metadata = composeReplayMetadata({
         metadata: rawMetadata,
         replayName,
         matchedSession,
-        fallbackTrajectoryLaps: () => {
-          const trajectory = context.replayCache.getFullTrajectory(filePath, replayName, {
-            playerName: context.currentParser.configuredPlayerName,
-          });
-          return trajectory.laps;
-        },
+        fallbackTrajectoryLaps: () => fallbackLaps,
         duckFiles,
         telemetryMeta,
         fileMtime,

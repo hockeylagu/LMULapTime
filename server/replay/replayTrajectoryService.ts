@@ -73,7 +73,7 @@ export class ReplayTrajectoryService {
       // Ignore session lookup errors
     }
 
-    const fullTrajectory = this.replayCache.getFullTrajectory(filePath, request.replayName, {
+    const fullTrajectory = await this.replayCache.getFullTrajectory(filePath, request.replayName, {
       driverSlot,
       driverName,
       lapNumber: request.lapNumber,

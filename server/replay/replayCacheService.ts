@@ -1,7 +1,8 @@
 import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './replayParser.js';
-import { extractReplayTrajectory } from './replayTrajectory.js';
+import { extractReplayTrajectoryInWorker } from './replayTrajectoryWorkerClient.js';
+import { isReplayDriverSettled } from '../core/dbReplayIngestStore.js';
 import { lapEdgesFromNeighbours } from './replayLapPoints.js';
 import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
@@ -11,6 +12,9 @@ export interface ReplayCacheServiceOptions {
 }
 
 export class ReplayCacheService {
+  // Decodes in flight, by replay, driver and file version (see decodeDriver).
+  private readonly pendingDecodes = new Map<string, Promise<ReplayTrajectoryData>>();
+
   public constructor(private readonly sessionDb: SessionDatabase) {}
 
   public getMetadata(filePath: string, replayName: string, playerName?: string): ReplayMetadata {
@@ -48,11 +52,11 @@ export class ReplayCacheService {
     }
   }
 
-  public getFullTrajectory(
+  public async getFullTrajectory(
     filePath: string,
     replayName: string,
     options: { driverSlot?: number; driverName?: string; lapNumber?: number; playerName?: string }
-  ): ReplayTrajectoryData {
+  ): Promise<ReplayTrajectoryData> {
     const resolvedSlot = typeof options.driverSlot === 'number'
       ? options.driverSlot
       : this.resolveDriverSlot(filePath, replayName, options.driverName, options.playerName);
@@ -70,44 +74,67 @@ export class ReplayCacheService {
 
     const stat = fs.statSync(filePath);
     const mtime = Math.floor(stat.mtimeMs);
-    const cached = this.sessionDb.getReplayTrajectoryCache(
-      replayName,
-      driverSlotKey,
-      lapKey,
-      mtime,
-      stat.size,
-      filePath,
-    );
+    const cached = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, filePath);
     if (cached) return this.withLapEdges(replayName, cached);
 
-    // Stores the file's metadata first: if the file is another recording than the stored rows under
-    // its name, those are renamed out of the way before the decoded laps take the name.
-    this.getMetadata(filePath, replayName, options.playerName);
-    const trajectory = extractReplayTrajectory(filePath, {
-      driverSlot: resolvedSlot,
-      driverName: options.driverName,
-      maxPoints: 0,
-      playerName: options.playerName,
-      lapNumber: options.lapNumber,
-    });
-    const finalSlotKey = typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : driverSlotKey;
-    const storedLapKey = typeof trajectory.currentLap === 'number' ? trajectory.currentLap : lapKey;
-    this.sessionDb.upsertReplayTrajectoryCache(
-      replayName,
-      finalSlotKey,
-      storedLapKey,
-      mtime,
-      stat.size,
-      trajectory,
-      filePath,
-    );
-    if (storedLapKey !== lapKey || finalSlotKey !== driverSlotKey) {
-      this.sessionDb.setReplayTrajectoryDefaults(replayName, finalSlotKey, storedLapKey);
-      if (driverSlotKey === -1) {
-        this.sessionDb.setReplayTrajectoryDefaults(replayName, -1, storedLapKey, finalSlotKey);
-      }
+    // A decode that already failed for this file and parser version would fail again (see A2 in
+    // dbReplayIngestStore): it is retried only after the parser version changes.
+    const attempt = this.sessionDb.getReplayDriverIngest(replayName, driverSlotKey);
+    if (attempt?.status === 'failed' && isReplayDriverSettled(attempt, mtime, stat.size)) {
+      throw new Error(`Replay ${replayName} could not be decoded for driver ${driverSlotKey}: ${attempt.error ?? 'unknown error'}`);
     }
-    return this.withLapEdges(replayName, trajectory);
+
+    const decoded = await this.decodeDriver(filePath, replayName, driverSlotKey, mtime, stat.size, options.playerName);
+    const laps = decoded.allLapsData && decoded.allLapsData.length > 0 ? decoded.allLapsData : [decoded];
+    // The requested lap, or the default lap (the best one) when the recording has no such lap.
+    const { allLapsData: _unused, ...chosen } = laps.find(lap => lap.currentLap === options.lapNumber) ?? decoded;
+    return this.withLapEdges(replayName, chosen);
+  }
+
+  /**
+   * Decodes every lap of one driver in the worker thread, off the event loop, and stores the set
+   * the way the sync does (replaceReplayDriverLaps). Requests for the same driver while it decodes
+   * share the one decode.
+   */
+  private decodeDriver(
+    filePath: string,
+    replayName: string,
+    driverSlotKey: number,
+    mtime: number,
+    size: number,
+    playerName?: string
+  ): Promise<ReplayTrajectoryData> {
+    const key = `${replayName}\0${driverSlotKey}\0${mtime}\0${size}`;
+    const pending = this.pendingDecodes.get(key);
+    if (pending) return pending;
+
+    const decode = (async (): Promise<ReplayTrajectoryData> => {
+      // Stores the file's metadata first: if the file is another recording than the stored rows under
+      // its name, those are renamed out of the way before the decoded laps take the name.
+      this.getMetadata(filePath, replayName, playerName);
+      const extraction = extractReplayTrajectoryInWorker(filePath, {
+        ...(driverSlotKey === -1 ? {} : { driverSlot: driverSlotKey }),
+        playerName,
+        maxPoints: 0,
+        allLaps: true,
+      });
+      let step = await extraction.next();
+      while (!step.done) step = await extraction.next();
+      const trajectory = step.value;
+      // No driver asked for: the decode picked the player, whose laps are also the default.
+      const isPrimary = driverSlotKey === -1;
+      const slotKey = isPrimary && typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : driverSlotKey;
+      this.sessionDb.replaceReplayDriverLaps(replayName, filePath, mtime, size, slotKey, trajectory, isPrimary);
+      return trajectory;
+    })();
+    this.pendingDecodes.set(key, decode);
+    return decode
+      .catch((error: unknown) => {
+        this.sessionDb.recordIngestError('vcr', filePath, error);
+        this.sessionDb.recordReplayDriverIngest(replayName, driverSlotKey, mtime, size, 'failed', error instanceof Error ? error.message : String(error));
+        throw error;
+      })
+      .finally(() => this.pendingDecodes.delete(key));
   }
 
   /**
