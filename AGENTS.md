@@ -11,8 +11,17 @@ This document provides architectural standards, domain rules, coding conventions
 ### Key Capabilities:
 - **Dual Telemetry Ingestion (100 Hz DuckDB & Binary VCR)**:
   - Ingests high-fidelity native 100 Hz columnar DuckDB telemetry (`UserData/Telemetry/*.duckdb`) with microsecond timestamp precision.
+  - Multi-file DuckDB session ownership: Tracks all DuckDB telemetry files written across multi-stint sessions with persistent caching (`telemetryLinks.ts`).
+  - Timing line continuity: Smoothly interpolates telemetry samples across start/finish timing loops (`lapLineCut.ts`) while repairing station distance glitches (`stationGlitches.ts`) and preserving 4-corner channels without data loss.
   - Reverse-engineers native `gMb1.002f` binary replay files (`UserData/Replays/*.Vcr`) using worker-thread decoding for 2D trajectories and multi-driver telemetry.
   - Slices continuous session logs into clean flying laps with sector boundary tags and fused spatial coordinates.
+- **Replay & Ingestion Integrity**:
+  - Deterministic session-to-replay matching with automated validation and link withdrawal for invalid pairings (`replayMatching.ts`, `dbReplayLinkStore.ts`).
+  - Archived replay identity tracking preventing filename collisions when LMU reuses replay filenames (`dbReplayIdentity.ts`).
+  - Background replay upgrade runner re-parsing legacy replay formats with live progress reporting in Settings (`replayUpgradeRunner.ts`, `dbReplayUpgrade.ts`).
+- **Spatial Lap Alignment & Trajectory Downsampling**:
+  - Station and distance-based lap trajectory alignment with pedal onset synchronization and live comparison accuracy indicators (`lapAlignment.ts`).
+  - Feature-preserving trajectory downsampling keeping apex minimums, braking initiation points, and straight speed maximums intact (`trajectoryDownsampler.ts`).
 - **XML Session Log Parsing & Stewards Ledger**: Extracts timing, lap splits (S1/S2/S3), sector speeds, tire degradation, fuel consumption, multiclass driver classifications, contact collisions, track limit cuts, and steward penalties from LMU's `UserData/LOG/Results/*.xml`.
 - **Physical Track Boundaries & Limit Corridors**: Pre-aligned physical road boundaries (`leftBoundary`, `rightBoundary`, `centerline`) in exact 1:1 LMU local Cartesian coordinates ($x, z$) across all 32 driven layouts.
 - **Unified Circuit Specifications & Layout Disambiguation**: Centralized single source of truth in `shared/domain/circuitSpecs.ts` and `shared/domain/circuitDefinitions.ts` (`CIRCUIT_SPECIFICATIONS`, `LMU_SCENE_DESC_MAP`, `getCircuitSpecification`). Directly maps all 32 layouts to their canonical `circuitId`, `layoutId`, `isDefaultLayout`, `sceneDescs`, and official `benchmarkName` targets without intermediate shims.
@@ -64,31 +73,51 @@ LMULapTime/
 ├── server/                         # Modular Express backend & ingestion pipeline
 │   ├── ai/                         # Gemini AI race engineer analysis (aiReport.ts)
 │   ├── benchmarks/                 # Google Sheets benchmark scraper & diff engine
-│   ├── core/                       # Database abstraction, columnar store, context & types
-│   │   ├── db.ts                   # SQLite instance, transactions, columnar telemetry tables
-│   │   ├── dbSchema.ts             # DDL definitions and index setup
+│   ├── core/                       # Database abstraction, modular stores, context & types
+│   │   ├── db.ts                   # SQLite instance, transactions, schema initialization
+│   │   ├── dbAiReportStore.ts      # AI race engineer coaching reports
+│   │   ├── dbMetadataStore.ts      # Key-value system cache metadata & version tags
+│   │   ├── dbReferenceLaptimeStore.ts # Community alien benchmark targets cache
+│   │   ├── dbReplayIdentity.ts     # Replay file fingerprinting, versioning & collision protection
+│   │   ├── dbReplayIngestStore.ts  # Atomic replay lap ingest operations
+│   │   ├── dbReplayLinkStore.ts    # Session-to-replay link tracking & withdrawal
+│   │   ├── dbReplayMetadataStore.ts # Replay headers, driver rosters & layout metadata
 │   │   ├── dbReplaySync.ts         # Replay sync queries and transaction wrappers
-│   │   ├── dbReplayTrajectoryStore.ts # Trajectory compression and columnar persistence
+│   │   ├── dbReplayTrajectoryStore.ts # Trajectory compression, decimation & columnar persistence
+│   │   ├── dbReplayUpgrade.ts      # Replay parser versioning & background upgrade state
+│   │   ├── dbSchema.ts             # DDL definitions, tables and index setup
+│   │   ├── dbSessionStore.ts       # Session queries, standings, and summaries
+│   │   ├── dbSessionSync.ts        # Bulk session XML persistence transactions
+│   │   ├── dbTelemetryStore.ts     # Columnar 100 Hz DuckDB telemetry persistence
 │   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
 │   │   ├── serverContext.ts        # Background scanner lifecycle and state coordinator
 │   │   └── types.ts                # Core shared domain interfaces and telemetry models
 │   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index.json
 │   ├── replay/                     # Binary .Vcr parser, downsampler & worker thread decoder
-│   │   ├── replayParser.ts         # Header, driver index & slice packet decoder
-│   │   ├── replayTrajectory.ts     # Spatial coordinate extraction & downsampling
-│   │   ├── replayLapBuilder.ts     # Timing loop detection & lap slicing
 │   │   ├── replayCacheService.ts   # Replay cache inspection & management
+│   │   ├── replayLapBuilder.ts     # Timing loop detection & lap slicing
+│   │   ├── replayLapPoints.ts      # Trajectory point slicing and indexing
+│   │   ├── replayMetadataService.ts # Driver roster and replay header extraction
+│   │   ├── replayParser.ts         # Header, driver index & slice packet decoder
 │   │   ├── replayProgress.ts       # Progress reporting event emitter
+│   │   ├── replayServiceTypes.ts   # Replay service interfaces and DTOs
+│   │   ├── replayTelemetryService.ts # Telemetry slice fusion and extraction
+│   │   ├── replayTrajectory.ts     # Spatial coordinate extraction & transformations
+│   │   ├── replayTrajectoryService.ts # Trajectory retrieval and point projection
 │   │   ├── replayTrajectoryWorker.ts # Node worker thread implementation
-│   │   └── replayTrajectoryWorkerClient.ts # Worker thread client pool
+│   │   ├── replayTrajectoryWorkerClient.ts # Worker thread client pool
+│   │   ├── replayTransforms.ts     # Trajectory coordinate rotations and conversions
+│   │   ├── replayUpgradeRunner.ts  # Background legacy replay re-parser & upgrade service
+│   │   └── trajectoryDownsampler.ts # Feature-preserving trajectory downsampling
 │   ├── routes/                     # Domain-scoped Express routers
 │   │   ├── aiRoutes.ts             # /api/ai/* endpoints
 │   │   ├── referenceRoutes.ts      # /api/reference-laptimes/* endpoints
 │   │   ├── replayRoutes.ts         # /api/replays/* endpoints
 │   │   ├── sessionRoutes.ts        # /api/sessions/* endpoints
-│   │   └── systemRoutes.ts         # /api/system/* health and config endpoints
+│   │   └── systemRoutes.ts         # /api/system/* health, config & upgrade endpoints
 │   ├── sessions/                   # XML session results parsing & analytics
 │   │   ├── parser.ts               # LmuParser class and driver profile detector
+│   │   ├── replayMatching.ts       # Deterministic session-to-replay correlation & validation
 │   │   ├── sessionAnalytics.ts     # True Pace, sector averages, fuel/tire curves
 │   │   ├── sessionXmlStream.ts     # Streaming XML parser
 │   │   └── sessionXmlTypes.ts      # Raw XML schema interfaces
@@ -96,8 +125,12 @@ LMULapTime/
 │   │   ├── duckdbReader.ts         # Direct DuckDB columnar reader
 │   │   ├── telemetryCatalog.ts     # File indexing and metadata extractor
 │   │   ├── telemetryFusion.ts      # Merges DuckDB channels with VCR coordinates
+│   │   ├── telemetryLinks.ts       # Persistent session DuckDB links & multi-file mapping
 │   │   └── telemetryMatcher.ts     # Matches session XMLs with telemetry files
+│   ├── tracks/                     # Server track projection & timing loop geometry
+│   │   ├── lapLineCut.ts           # Timing loop boundary interpolation & channel preservation
 │   │   ├── serverTrackSync.ts      # Disk to DB track geometry sync
+│   │   ├── stationGlitches.ts      # Lap distance glitch repair & monotonic enforcement
 │   │   └── trackProjection.ts      # Local coordinate transform utilities
 │   └── index.ts                    # Express application entry point & router mounting
 ├── shared/                         # Pure domain logic & shared TypeScript types
@@ -134,6 +167,7 @@ LMULapTime/
 │   │   ├── cornerAnalysis.ts       # Turn detection, 3-phase corner metrics & deficit scoring
 │   │   ├── cornerConsistency.ts    # Corner-by-corner repeatability scoring
 │   │   ├── handlingBalanceDetection.ts # Real-time understeer / oversteer gradient calculation
+│   │   ├── lapAlignment.ts         # Distance & station lap alignment, pedal onset synchronization
 │   │   ├── lapConsistency.ts       # Flying lap standard deviation & consistency rating
 │   │   ├── replayComparison.ts     # Replay trajectory alignment & deltas
 │   │   ├── telemetryPostProcessing.ts # Waveform smoothing and decimation
@@ -141,11 +175,11 @@ LMULapTime/
 │   │   ├── trackLimits.ts          # Boundary collision and lateral offset evaluation
 │   │   └── urlParams.ts            # Hash-based navigation and query string persistence
 │   └── index.css                   # Tailwind CSS imports & theme utilities
-├── test/                           # Automated test suite (1,080+ tests across 132 files)
+├── test/                           # Automated test suite (1,380+ tests across 159 files)
 │   ├── components/                 # React component tests mirrored by feature domain (<= 20 files per folder)
 │   ├── fixtures/                   # Mock XML logs, binary VCR samples, telemetry files
 │   ├── server/                     # Backend domain test suites (ai, benchmarks, core, replay, sessions, telemetry)
-│   ├── utils/                      # Unit tests for algorithms, math, and formatters
+│   ├── utils/                      # Unit tests for algorithms, math, formatters & lap alignment (golden tests)
 │   └── setup.ts                    # Vitest environment setup
 ├── tools/                          # C# recorder and standalone TSX utilities
 ├── package.json                    # Node scripts and dependencies
@@ -189,6 +223,13 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Never cross-pollinate track geometries across distinct layout variants of the same facility.
 - When a new track or layout is driven, follow the procedure in `docs/TRACK_BOUNDARIES_PIPELINE.md` using `tools/analysis/buildAllTrackBoundaries.ts`.
 
+### F. Telemetry & Replay Ingestion Integrity
+- **Multi-File Session Ownership**: Sessions may generate multiple DuckDB telemetry files over long multi-stint sessions. A session owns all corresponding DuckDB files (`telemetryLinks.ts`), and every lap must resolve directly to the specific file containing its timestamp range.
+- **Strict Session-to-Replay Matching & Link Withdrawal**: Replays must be matched strictly against session metadata (layout, driver, timestamp constraints). Any invalid or mismatched link must be withdrawn (`replayMatching.ts`, `dbReplayLinkStore.ts`), never guessed.
+- **Replay Identity Collision Protection**: Reused replay filenames must never overwrite existing cached sessions. Name collisions must be detected and archived with versioned timestamps (`dbReplayIdentity.ts`).
+- **Timing Line-Crossing Continuity**: Laps cut at the start/finish line must be smoothly interpolated across boundary crossing points without losing 4-corner channels (tires, brakes, dampers) or inserting zeroed points (`lapLineCut.ts`).
+- **Asynchronous Worker Decoding & Upgrades**: CPU-heavy replay decoding—both on-demand for uncached laps and in the background for legacy replay upgrades (`replayUpgradeRunner.ts`)—must execute in worker threads to prevent blocking the Node.js event loop.
+
 ---
 
 ## 5. Coding & Architecture Conventions
@@ -202,9 +243,10 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - No unused variables or parameters (`noUnusedLocals` and `noUnusedParameters` strictly enforced in `tsconfig.json`).
 - **Strict File Size Limit**: All `.ts` and `.tsx` source and test files (`src/`, `server/`, `tools/`, `test/`) **must not exceed 1,000 lines**. If any module or test suite approaches or exceeds this limit, decompose it into focused submodules, dedicated data/definition files, cohesive helpers, or separate domain test suites.
 
-### Database Patterns (`server/core/db.ts`)
+### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
 - WAL mode is mandatory: `PRAGMA journal_mode = WAL;`.
+- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`, `dbReplaySync.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
 - Use columnar tables for high-frequency telemetry data to maintain sub-millisecond query performance and compact storage.
 - Always use parameterized queries (`stmt.run(arg1, arg2)`) to guard against SQL injection and handle player/track names containing special characters or apostrophes.
 - Wrap bulk operations (e.g., scanning hundreds of XML files or saving hundreds of benchmark rows) in transactions: `db.transaction(...)`.
@@ -218,7 +260,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - When any non-exempt folder approaches or reaches 20 files, decompose it into focused subdirectories organized by **strict semantic boundaries** rather than arbitrary splits or flat catch-alls.
   - **Enforce Semantic Boundaries**:
     - **Frontend Components (`src/components/`)**: Group by feature domain (e.g., `dashboard/`, `session-detail/`, `track-detail/`, `replay/`). In complex subdomains (such as `replay/telemetry/`), group channel renderers by physical car subsystem semantics (e.g., chassis & dynamics, powertrain & hybrid energy, tires & brakes, driver inputs).
-    - **Backend Pipeline (`server/`)**: Structure by clear pipeline and subsystem responsibilities (`ai/`, `benchmarks/`, `core/`, `replay/`, `routes/`, `sessions/`, `telemetry/`).
+    - **Backend Pipeline (`server/`)**: Structure by clear pipeline and subsystem responsibilities (`ai/`, `benchmarks/`, `core/`, `replay/`, `routes/`, `sessions/`, `telemetry/`, `tracks/`).
     - **Domain Layer (`shared/`)**: Clean boundary between pure domain engines (`shared/domain/`) and canonical data contracts (`shared/types/`).
     - **Test Suites (`test/`)**: Mirror the exact semantic directory hierarchy of the application under test (e.g., `test/components/<feature>/`, `test/server/<domain>/`, `test/utils/`, `test/domain/`) instead of flat, monolithic test folders.
 - Follow the established **sim-racing dark theme**:
@@ -237,7 +279,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with **over 1,060 tests across 128 test files**. Any change must preserve this coverage and run with zero warnings.
+The repository maintains an extensive automated test suite with **over 1,380 tests across 159 test files**. Any change must preserve this coverage and run with zero warnings.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`
@@ -249,15 +291,16 @@ The repository maintains an extensive automated test suite with **over 1,060 tes
 - **Server API & DB Tests**: Located in `test/server/`. Use in-memory SQLite instances or isolated test database fixtures (`:memory:` or temporary test DB paths).
 - **Component Tests**: Located in `test/components/`. Use `@testing-library/react` and Vitest jsdom environment.
 - **Utils Tests**: Pure functions for math, formatting, track limits, and pace categorization in `test/utils/`.
+- **Lap Alignment & Telemetry Golden Tests**: Located in `test/utils/lapAlignment/`. Validates station monotonic progression, boundary line-cut interpolation, downsampling fidelity, and golden invariant regressions.
 - **Replay Parser Tests**: When testing `.Vcr` decoding, use fixtures from `test/fixtures/` or synthetic buffers constructed via `test/utils/mockVcr.ts`.
 
 ---
 
 ## 7. Recommended Development Workflow
 
-1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/sessions/`), replay decoding (`server/replay/`), telemetry ingestion (`server/telemetry/`), database cache (`server/core/db.ts`), track boundaries (`tools/analysis/buildAllTrackBoundaries.ts`), or UI views (`src/components/`).
+1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/sessions/`), replay decoding (`server/replay/`), telemetry ingestion (`server/telemetry/`), track geometry & timing loops (`server/tracks/`), database cache (`server/core/`), track boundaries (`tools/analysis/buildAllTrackBoundaries.ts`), or UI views (`src/components/`).
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
-   - Run `npm test` to verify no regressions across the 1,060+ unit/integration tests.
+   - Run `npm test` to verify no regressions across the 1,380+ unit/integration tests.
    - Run `npm run build` to verify clean TypeScript compilation and bundle generation.
-4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants via `src/utils/circuitSpecs.ts`.
+4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants via `shared/domain/circuitSpecs.ts`.
