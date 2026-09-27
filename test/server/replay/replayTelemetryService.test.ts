@@ -215,6 +215,39 @@ describe('ReplayTelemetryService', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  describe('a lap cached by an older reader', () => {
+    const ageCachedLaps = () => (db as unknown as { db: { exec(sql: string): void } }).db.exec("UPDATE telemetry_lap_cache SET cache_version = 'v9'");
+
+    it('is read again from the file while it is on disk', async () => {
+      const file = onDisk(mockDuckFile);
+      db.upsertTelemetryMetadata(file, 'session-456');
+      db.upsertTelemetryLapCache(file.filename, 1, { ...mockDuckLap, lapTimeSec: 1 });
+      ageCachedLaps();
+      vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+      vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+      vi.spyOn(DuckDbReader.prototype, 'getLapList').mockResolvedValue([{ lapNumber: 1, lapTimeSec: 96, startTs: 0, endTs: 96 }]);
+      const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockResolvedValue(mockDuckLap);
+
+      const result = await request({ matchedSession: session });
+
+      expect(read).toHaveBeenCalled();
+      expect(result.fused).toBe(true);
+      expect(db.getTelemetryLapCache(file.filename, 1)?.lapTimeSec).toBe(96);
+    });
+
+    it('is still served once the file is deleted: it is the only copy left', async () => {
+      db.upsertTelemetryMetadata(mockDuckFile, 'session-456');
+      db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+      ageCachedLaps();
+      expect(db.getTelemetryLapCache(mockDuckFile.filename, 1)).toBeNull();
+
+      const result = await request({ matchedSession: session });
+
+      expect(result.fused).toBe(true);
+      expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+    });
+  });
+
   it('reports a lap that was never read before the DuckDB file was deleted', async () => {
     db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);
     db.upsertTelemetryLapCache(mockDuckFile.filename, 2, { ...mockDuckLap, lapNumber: 2 });

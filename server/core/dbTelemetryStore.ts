@@ -98,11 +98,15 @@ export function getTelemetryMetadata(db: DatabaseType): TelemetryMetadataRecord[
   }));
 }
 
-export function getTelemetryLapCache(db: DatabaseType, filename: string, lapNumber: number): DuckDbLapTelemetry | null {
+/**
+ * A cached lap at the current version. `anyVersion` also returns a lap cached by an older reader:
+ * for a file no longer on disk it is the only copy left.
+ */
+export function getTelemetryLapCache(db: DatabaseType, filename: string, lapNumber: number, anyVersion = false): DuckDbLapTelemetry | null {
   const row = db.prepare(
     'SELECT telemetry_br, cache_version FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
   ).get(filename, lapNumber) as { telemetry_br: Buffer; cache_version: string } | undefined;
-  if (!row || row.cache_version !== DUCKDB_TELEMETRY_CACHE_VERSION) return null;
+  if (!row || (!anyVersion && row.cache_version !== DUCKDB_TELEMETRY_CACHE_VERSION)) return null;
   return decompressJson<DuckDbLapTelemetry>(row.telemetry_br);
 }
 
@@ -147,10 +151,9 @@ export function clearTelemetryLinks(db: DatabaseType): void {
   db.exec('UPDATE telemetry_metadata SET matched_session_id = NULL, matched_replay_filename = NULL');
 }
 
-/** The telemetry files with at least one lap cached at the current version. */
+/** The telemetry files with at least one lap cached, at any version. */
 export function getTelemetryLapCacheFilenames(db: DatabaseType): Set<string> {
-  const rows = db.prepare('SELECT DISTINCT filename FROM telemetry_lap_cache WHERE cache_version = ?')
-    .all(DUCKDB_TELEMETRY_CACHE_VERSION) as Array<{ filename: string }>;
+  const rows = db.prepare('SELECT DISTINCT filename FROM telemetry_lap_cache').all() as Array<{ filename: string }>;
   return new Set(rows.map(row => row.filename));
 }
 

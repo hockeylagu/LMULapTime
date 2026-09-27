@@ -18,7 +18,9 @@ export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
 export function isCompatibleReplayCacheVersion(version: string): boolean {
   return COMPATIBLE_REPLAY_CACHE_VERSIONS.has(version);
 }
-export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v9';
+// v10: pedals and tyre wear are scaled to percent once per channel, not per sample (v9 turned a
+// pedal passing through 0-1 % into a 0-100 % spike).
+export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v10';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
