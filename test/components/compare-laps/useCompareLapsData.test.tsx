@@ -102,4 +102,26 @@ describe('useCompareLapsData selection fallbacks', () => {
       expect(result.current.hideEmpty).toBe(false);
     });
   });
+
+  it("drops the previous track's laps and reports the error when the next track fails to load", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url.includes('track=Monza')
+      ? { ok: false, status: 500, json: () => Promise.resolve({ error: 'database is locked' }) }
+      : { ok: true, status: 200, json: () => Promise.resolve({ laps, allTimeBestLap: null, overallTrackBestLap: laps[2], bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [] }) })));
+
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.apiData.laps).toHaveLength(3));
+    expect(result.current.loadError).toBeNull();
+
+    act(() => navigateTo('/compare?track=Monza&carClass=LMGT3'));
+
+    await waitFor(() => expect(result.current.loadError).toBe('database is locked'));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.apiData.laps).toEqual([]);
+    expect(result.current.displayLaps).toEqual([]);
+    vi.unstubAllGlobals();
+  });
 });

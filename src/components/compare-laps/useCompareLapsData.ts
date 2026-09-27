@@ -11,7 +11,7 @@ import {
   filterLapsByCarCategory,
 } from '../../../shared/domain/lapComparison.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { fetchJson, isAbortError } from '../../api/apiClient.js';
+import { apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 
 /** The /api/compare/laps response. */
 interface CompareLapsApiData {
@@ -58,6 +58,18 @@ export interface UseCompareLapsParams {
   initialCompareLapNum?: number;
 }
 
+const NO_COMPARE_LAPS: CompareLapsApiData = {
+  laps: [],
+  allTimeBestLap: null,
+  playerBestLap: null,
+  overallTrackBestLap: null,
+  bestS1: null,
+  bestS2: null,
+  bestS3: null,
+  theoreticalBestSec: null,
+  benchmarks: [],
+};
+
 export function useCompareLapsData({
   sessions,
   initialTrack,
@@ -87,17 +99,9 @@ export function useCompareLapsData({
   const [availableLapsSort, setAvailableLapsSort] = useState<AvailableLapsSortOption>('lap-asc');
   const hideEmpty = searchParams.get('hideEmpty') !== 'false';
 
-  const [apiData, setApiData] = useState<CompareLapsApiData>({
-    laps: [],
-    allTimeBestLap: null,
-    playerBestLap: null,
-    overallTrackBestLap: null,
-    bestS1: null,
-    bestS2: null,
-    bestS3: null,
-    theoreticalBestSec: null,
-    benchmarks: [],
-  });
+  const [apiData, setApiData] = useState<CompareLapsApiData>(NO_COMPARE_LAPS);
+  // Why the laps for the selected track could not be loaded; null otherwise.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedLaps, setSelectedLaps] = useState<ComparableLap[]>([]);
   const [baselineLapId, setBaselineLapId] = useState<string>('');
@@ -138,6 +142,7 @@ export function useCompareLapsData({
     if (!selectedTrack) return;
     const controller = new AbortController();
     setLoading(true);
+    setLoadError(null);
     const query = new URLSearchParams({
       track: selectedTrack,
       carClass: selectedCarClass,
@@ -152,6 +157,9 @@ export function useCompareLapsData({
       .catch((err) => {
         if (isAbortError(err)) return;
         console.error('Failed to fetch compare laps:', err);
+        // Never leave the previous track's or layout's laps under the new selection.
+        setApiData(NO_COMPARE_LAPS);
+        setLoadError(apiErrorMessage(err, 'The laps for this track could not be loaded.'));
         setLoading(false);
       });
 
@@ -455,6 +463,7 @@ export function useCompareLapsData({
     setPlayerOnlyState: setPlayerOnly,
     setPlayerOnly,
     loading,
+    loadError,
     availableLapsSort,
     setAvailableLapsSort,
     hideEmpty,
