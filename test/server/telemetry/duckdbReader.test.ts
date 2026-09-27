@@ -314,5 +314,43 @@ describe('DuckDbReader', () => {
     expect(Math.max(...lap!.points.filter((_, index) => index < 300 || index >= 500).map(point => point.brake ?? 0))).toBeLessThan(1);
   });
 
+  it('starts a lap in the gear of the last shift before it, however long ago', async () => {
+    // At Daytona the last upshift to 7th is well before the line down the banking; looking back
+    // only 5 s found no shift and every lap started in gear 1 at 318 km/h (R1 10, 2026-09-25).
+    const gearDbPath = path.join(testDbDir, 'Daytona_Gear_R_2026-09-25T22_42_51Z.duckdb');
+    const db = new duckdb.Database(gearDbPath);
+    await new Promise<void>((resolve, reject) => {
+      db.exec(`
+        CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
+        INSERT INTO channelsList VALUES ('GPS Time', 100, 's'), ('Ground Speed', 100, 'km/h');
+        CREATE TABLE "GPS Time" (value FLOAT);
+        CREATE TABLE "Ground Speed" (value FLOAT);
+        CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
+        CREATE TABLE "Gear" (ts DOUBLE, value INTEGER);
+        CREATE TABLE "ABS" (ts DOUBLE, value INTEGER);
+        INSERT INTO "Lap" VALUES (0.0, 1), (30.0, 2), (60.0, 3);
+        -- Up to 7th at 12 s, 18 s before lap 2 starts; down to 6th 5 s into lap 2.
+        INSERT INTO "Gear" VALUES (0.0, 5), (6.0, 6), (12.0, 7), (35.0, 6);
+        -- ABS switched on 10 s before lap 2 and still on at its start.
+        INSERT INTO "ABS" VALUES (20.0, 1), (31.0, 0);
+        INSERT INTO "GPS Time" SELECT (i * 0.01)::FLOAT FROM range(6100) t(i);
+        INSERT INTO "Ground Speed" SELECT 318.0::FLOAT FROM range(6100) t(i);
+      `, (err) => (err ? reject(err) : resolve()));
+    });
+    await new Promise<void>((resolve, reject) => db.close(err => (err ? reject(err) : resolve())));
+
+    const reader = new DuckDbReader(gearDbPath);
+    await reader.open();
+    const lap = await reader.getLapTelemetry(2);
+    await reader.close();
+
+    const points = lap!.points;
+    expect(points[0].gear).toBe(7);
+    expect(points[0].absActive).toBe(true);
+    expect(points[100].absActive).toBe(false);
+    expect(points[499].gear).toBe(7);
+    expect(points[501].gear).toBe(6);
+  });
+
   afterAll(() => removeQuietly(testDbDir));
 });

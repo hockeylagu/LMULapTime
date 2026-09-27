@@ -20,7 +20,9 @@ export function isCompatibleReplayCacheVersion(version: string): boolean {
 }
 // v10: pedals and tyre wear are scaled to percent once per channel, not per sample (v9 turned a
 // pedal passing through 0-1 % into a 0-100 % spike).
-export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v10';
+// v11: the gear, ABS and TC state at the lap start is the last change before it, however long ago
+// (v10 looked back 5 s for gear and 1 s for ABS/TC, and started a lap on a long straight in gear 1).
+export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v11';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
