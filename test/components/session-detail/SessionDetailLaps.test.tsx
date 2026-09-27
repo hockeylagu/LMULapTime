@@ -579,7 +579,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     // Verify Incomplete status badge contains incident tooltip details
     const incompleteEl = screen.getByText('Incomplete');
     expect(incompleteEl).toBeInTheDocument();
-    const incompleteContainer = incompleteEl.closest('span');
+    const incompleteContainer = incompleteEl.closest('[title]');
     expect(incompleteContainer?.getAttribute('title')).toContain('Contact with Immovable (4522N)');
 
     // Verify compact badges on laps - yellow for 0.25 pts

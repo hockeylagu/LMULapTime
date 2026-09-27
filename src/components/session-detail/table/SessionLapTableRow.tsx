@@ -1,11 +1,14 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
 import { computeLapToLapDelta, isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
+import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
+import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
 
 export interface SessionLapTableRowProps {
   session: DetailedSession;
@@ -21,6 +24,10 @@ export interface SessionLapTableRowProps {
   isMultiClass: boolean;
   hasTireWearData: boolean;
   hasFuelData: boolean;
+  isExpanded: boolean;
+  onToggleExpanded: (lapNum: number) => void;
+  /** The table's column count, for the expanded row to span. */
+  columnCount: number;
 }
 
 export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
@@ -37,6 +44,9 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   isMultiClass,
   hasTireWearData,
   hasFuelData,
+  isExpanded,
+  onToggleExpanded,
+  columnCount,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -90,21 +100,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           }).length
       : l.position;
 
-  const hasLapIncidents = Boolean(l.incidentCount && l.incidentCount > 0);
-  const hasLapTrackLimits = Boolean(l.trackLimitCount && l.trackLimitCount > 0);
-  const hasLapPenalties = Boolean(l.penaltyCount && l.penaltyCount > 0);
-
-  const lapEventLines: string[] = [];
-  if (hasLapIncidents) {
-    lapEventLines.push(`💥 Incidents (${l.incidentCount}):\n${l.incidents?.map((i) => `  • ${i.description}`).join('\n')}`);
-  }
-  if (hasLapTrackLimits) {
-    lapEventLines.push(`⚠️ Track Limits (${l.trackLimitCount}):\n${l.trackLimits?.map((tl) => `  • ${tl.description}`).join('\n')}`);
-  }
-  if (hasLapPenalties) {
-    lapEventLines.push(`🛑 Penalties (${l.penaltyCount}):\n${l.penalties?.map((p) => `  • ${p.description}`).join('\n')}`);
-  }
-  const eventsTooltip = lapEventLines.length > 0 ? lapEventLines.join('\n\n') : undefined;
+  const eventsTooltip = lapEventsTooltip(l);
+  const detailSections = lapDetailSections(l);
 
   const incompleteTooltip = eventsTooltip
     ? `Incomplete Lap:\n${eventsTooltip}`
@@ -126,6 +123,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   };
 
   return (
+    <>
     <tr
       onClick={handleOpenTelemetry}
       className={`hover:bg-lmu-card/70 transition-colors cursor-pointer group ${
@@ -134,10 +132,26 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       title={`Click to open telemetry for Lap ${l.lapNum}`}
     >
       <td
-        className="px-3 py-2.5 font-bold text-white"
+        className="px-3 py-2.5 font-bold text-white whitespace-nowrap"
         title={l.elapsedTimeString ? `Session Time: ${l.elapsedTimeString}` : undefined}
       >
-        {l.lapNum}
+        <span className="inline-flex items-center gap-1">
+          {detailSections.length > 0 ? (
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); onToggleExpanded(l.lapNum); }}
+              className="-ml-1 p-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/10"
+              aria-expanded={isExpanded}
+              aria-label={`${isExpanded ? 'Hide' : 'Show'} what happened on lap ${l.lapNum}`}
+              title={`${isExpanded ? 'Hide' : 'Show'} what happened on this lap`}
+            >
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            </button>
+          ) : (
+            <span className="w-4" aria-hidden="true" />
+          )}
+          {l.lapNum}
+        </span>
       </td>
       <td
         className="px-3 py-2.5 text-lmu-muted font-mono"
@@ -274,5 +288,9 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         />
       </td>
     </tr>
+    {isExpanded && detailSections.length > 0 && (
+      <SessionLapDetailsRow lapNum={l.lapNum} sections={detailSections} columnCount={columnCount} />
+    )}
+    </>
   );
 };
