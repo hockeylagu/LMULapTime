@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { replayLinkRejection } from '../sessions/replayMatching.js';
-import { DetailedSession, RejectedReplayLink, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
+import { pickReplayOwner, replayLinkRejection, ReplayMatchTarget } from '../sessions/replayMatching.js';
+import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
@@ -209,13 +209,7 @@ export class ServerContext {
     const xmlMtime = this.getXmlMtime(session);
     if (!current || xmlMtime === undefined) return;
 
-    const target = {
-      trackVenue: session.trackVenue,
-      trackCourse: session.trackCourse,
-      sessionCode: session.sessionName || session.sessionType,
-      sessionTimestampMs: session.timestamp,
-      xmlFileMtimeMs: xmlMtime,
-    };
+    const target = this.matchTarget(session, xmlMtime);
     const rejection = replayLinkRejection(current, target);
     if (!rejection && Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
 
@@ -228,12 +222,53 @@ export class ServerContext {
       this.relinkSession(session, candidate);
       return;
     }
-    if (!rejection) return;
+    if (rejection) this.withdrawReplayLink(session, rejection);
+  }
 
-    console.log(`[ServerContext] Withdrew replay ${stored.name} from session ${session.id} (${rejection})`);
-    const rejected = this.sessionDb.rejectSessionReplayLink(session.id, stored, rejection);
+  private matchTarget(session: DetailedSession, xmlFileMtimeMs: number): ReplayMatchTarget {
+    return {
+      trackVenue: session.trackVenue,
+      trackCourse: session.trackCourse,
+      sessionCode: session.sessionName || session.sessionType,
+      sessionTimestampMs: session.timestamp,
+      xmlFileMtimeMs,
+    };
+  }
+
+  private withdrawReplayLink(session: DetailedSession, reason: ReplayLinkRejectionReason): void {
+    const stored = session.matchingReplayFile;
+    if (!stored) return;
+    console.log(`[ServerContext] Withdrew replay ${stored.name} from session ${session.id} (${reason})`);
+    const rejected = this.sessionDb.rejectSessionReplayLink(session.id, stored, reason);
     delete session.matchingReplayFile;
     if (rejected) session.rejectedReplayLink = rejected;
+  }
+
+  /**
+   * A replay records one session. LMU can save a single replay for a run of sessions (restarting a
+   * practice keeps the file), so several sessions can each pass the matching rules against it: the
+   * closest one keeps it and the others lose it. A replay the index does not know cannot be judged.
+   */
+  private enforceOneSessionPerReplay(sessions: DetailedSession[], replaysByName: Map<string, ReplayFileEntry>): void {
+    const claimsByReplay = new Map<string, DetailedSession[]>();
+    for (const session of sessions) {
+      const name = session.matchingReplayFile?.name;
+      if (!name) continue;
+      const claims = claimsByReplay.get(name) ?? [];
+      claims.push(session);
+      claimsByReplay.set(name, claims);
+    }
+    for (const [name, claims] of claimsByReplay) {
+      const replay = replaysByName.get(name);
+      if (claims.length < 2 || !replay) continue;
+      const ownerId = pickReplayOwner(replay, claims.map(session => ({
+        id: session.id,
+        target: this.matchTarget(session, this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)),
+      })));
+      for (const session of claims) {
+        if (session.id !== ownerId) this.withdrawReplayLink(session, 'owned-by-other-session');
+      }
+    }
   }
 
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
@@ -242,7 +277,7 @@ export class ServerContext {
       const replaysByName = new Map(this.parser.getReplaysList().map(r => [r.name, r] as const));
       const rejectedLinks = typeof this.sessionDb.getRejectedReplayLinks === 'function'
         ? this.sessionDb.getRejectedReplayLinks()
-        : new Map<string, RejectedReplayLink>();
+        : new Map<string, RejectedReplayLink[]>();
 
       for (const session of sessions) {
         if (session.matchingReplayFile) {
@@ -258,13 +293,22 @@ export class ServerContext {
             session.timestamp,
             this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)
           );
-          if (matchedReplay) {
+          // A replay withdrawn from this session is never linked to it again.
+          const withdrawn = rejectedLinks.get(session.id)?.some(link => link.replayName === matchedReplay?.name);
+          if (matchedReplay && !withdrawn) {
             session.matchingReplayFile = this.toReplayLink(matchedReplay);
             this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
           }
         }
-        // Tells the UI why a session has no replay when one was withdrawn from it.
-        const rejected = session.matchingReplayFile ? undefined : rejectedLinks.get(session.id) ?? session.rejectedReplayLink;
+      }
+      this.enforceOneSessionPerReplay(sessions, replaysByName);
+      // Tells the UI why a session has no replay when one was withdrawn from it.
+      for (const session of sessions) {
+        const withdrawals = rejectedLinks.get(session.id);
+        // The session's own field holds a withdrawal made during this pass, newer than the table read.
+        const rejected = session.matchingReplayFile
+          ? undefined
+          : session.rejectedReplayLink ?? withdrawals?.[withdrawals.length - 1];
         if (rejected) session.rejectedReplayLink = rejected;
         else delete session.rejectedReplayLink;
       }

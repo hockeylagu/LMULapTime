@@ -101,3 +101,17 @@ export function findMatchingReplay(replays: readonly ReplayFileEntry[], target: 
   fallbackCandidates.sort((a, b) => replayTimeDistanceMs(a, target) - replayTimeDistanceMs(b, target));
   return fallbackCandidates[0];
 }
+
+/**
+ * The one session a replay records when several claim it (LMU can save a single replay for a run of
+ * sessions): an exact session code first, then the closest in time; the id breaks exact ties.
+ */
+export function pickReplayOwner(replay: ReplayFileEntry, claimants: ReadonlyArray<{ id: string; target: ReplayMatchTarget }>): string | undefined {
+  const rank = (claimant: { id: string; target: ReplayMatchTarget }) => ({
+    code: replay.sessionCode.toLowerCase() === (claimant.target.sessionCode || '').toLowerCase() ? 0 : 1,
+    distance: replayTimeDistanceMs(replay, claimant.target),
+  });
+  const ranked = claimants.map(claimant => ({ id: claimant.id, ...rank(claimant) }));
+  ranked.sort((a, b) => a.code - b.code || a.distance - b.distance || a.id.localeCompare(b.id));
+  return ranked[0]?.id;
+}

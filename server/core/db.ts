@@ -370,7 +370,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return rejected;
   }
 
-  public getRejectedReplayLinks(): Map<string, RejectedReplayLink> {
+  public getRejectedReplayLinks(): Map<string, RejectedReplayLink[]> {
     return getRejectedReplayLinks(this.db);
   }
 
