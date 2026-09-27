@@ -9,6 +9,7 @@ import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
+import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -34,6 +35,7 @@ export class ServerContext {
   private readonly replayMatchCheckedAt = new Map<string, number>();
   // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
   private readonly xmlMtimeCache = new Map<string, number | null>();
+  private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
   private replayScanStatus: ReplayScanStatus = {
     running: false,
     processed: 0,
@@ -82,8 +84,23 @@ export class ServerContext {
   public get telemetryDir(): string { return this.currentTelemetryDir; }
   public get currentParser(): LmuParser { return this.parser; }
 
+  /** Null when the database cannot run the upgrade (test doubles). */
+  public get replayUpgrade(): ReplayUpgradeRunner | null {
+    if (!this.replayUpgradeRunner && typeof this.sessionDb.upgradeReplaysAsyncIterator === 'function') {
+      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb);
+    }
+    return this.replayUpgradeRunner;
+  }
+
+  // The upgrade is the lowest-priority work: it runs only once no scan is running.
+  public startReplayUpgradeWhenIdle(): boolean {
+    if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
+  }
+
   public configureDirectories(values: { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown }): boolean {
     if (this.hasActiveFileScan()) return false;
+    this.replayUpgrade?.stop();
 
     if (typeof values.resultsDir === 'string' && fs.existsSync(values.resultsDir)) this.currentResultsDir = values.resultsDir;
     if (typeof values.replaysDir === 'string' && fs.existsSync(values.replaysDir)) this.currentReplaysDir = values.replaysDir;
@@ -371,6 +388,7 @@ export class ServerContext {
 
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
+    this.replayUpgrade?.stop();
     this.replayScanStatus = {
       running: true,
       processed: 0,
@@ -403,6 +421,7 @@ export class ServerContext {
             console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
           }
           this.runPendingForcedSessionReparse();
+          this.startReplayUpgradeWhenIdle();
           return;
         }
         this.replayScanStatus.processed = value.processed;
@@ -419,6 +438,7 @@ export class ServerContext {
         this.replayScanStatus.currentStage = null;
         this.replayScanStatus.filePercent = null;
         this.runPendingForcedSessionReparse();
+        this.startReplayUpgradeWhenIdle();
       }
     };
     setImmediate(() => { void step(); });
@@ -433,6 +453,7 @@ export class ServerContext {
 
   public runSessionSyncInBackground(forceReparse = false): boolean {
     if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    this.replayUpgrade?.stop();
     this.sessionScanStatus = {
       running: true,
       processed: 0,
@@ -546,6 +567,7 @@ export class ServerContext {
     return {
       ...this.replayScanStatus,
       sessionScan: this.sessionScanStatus,
+      replayUpgrade: this.replayUpgrade?.getStatus(),
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
       allComplete,

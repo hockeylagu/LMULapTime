@@ -564,8 +564,23 @@ export interface ReferenceLaptimeRefreshStatus {
   error: string | null;
 }
 
+/** Background re-decode of on-disk replays whose stored rows are behind the current parser version. */
+export interface ReplayUpgradeStatus {
+  enabled: boolean;
+  running: boolean;
+  processed: number;
+  total: number;
+  currentFile: string | null;
+  currentStage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: { replays: number; upgraded: number; failed: number; interrupted: boolean } | null;
+  error: string | null;
+}
+
 export interface ScanStatus extends ReplayScanStatus {
   sessionScan: SessionScanStatus;
+  replayUpgrade?: ReplayUpgradeStatus;
   telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;
   allComplete?: boolean;
