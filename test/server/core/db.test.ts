@@ -716,5 +716,13 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     db.clearTelemetryCache();
     expect(db.getTelemetryMetadataRevision()).toBe(start + 5);
   });
+
+  it('changes the replay metadata revision on every replay metadata write', () => {
+    const start = db.getReplayMetadataRevision();
+    const metadata = { replayName: 'Spa_R.Vcr' } as unknown as ReplayMetadata;
+    db.upsertReplayMetadataCache('Spa_R.Vcr', 'C:/replays/Spa_R.Vcr', 1000, 5000, metadata);
+    db.upsertReplayMetadataCache('Spa_R.Vcr', 'C:/replays/Spa_R.Vcr', 2000, 5000, metadata);
+    expect(db.getReplayMetadataRevision()).toBe(start + 2);
+  });
 });
 

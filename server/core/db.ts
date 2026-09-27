@@ -233,8 +233,16 @@ export class SessionDatabase {
     return getAllStoredReplayFiles(this.db);
   }
 
+  private replayMetadataRevision = 0;
+
+  /** Changes whenever a replay_metadata row does: callers cache what they derive from the rows. */
+  public getReplayMetadataRevision(): number {
+    return this.replayMetadataRevision;
+  }
+
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
     upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
+    this.replayMetadataRevision++;
   }
 
   public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null {
