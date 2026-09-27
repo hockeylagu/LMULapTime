@@ -1,6 +1,7 @@
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
-import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { getCircuitSpecification, type CircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { ReplayLinkRejectionReason } from '../../shared/types/index.js';
+import type { StoredReplayFileInfo } from '../core/dbReplayMetadataStore.js';
 import { ReplayFileEntry } from './sessionXmlTypes.js';
 
 /** The session a replay is matched against: its XML start timestamp and the XML file's mtime (session end). */
@@ -41,65 +42,76 @@ export function replayTimeDistanceMs(replay: ReplayFileEntry, target: ReplayMatc
   return Math.min(diffEnd, Math.abs(replayStart - target.sessionTimestampMs));
 }
 
-function isExactTrackMatch(replay: ReplayFileEntry, target: ReplayMatchTarget): boolean {
-  return matchesTrack(replay.trackName, target.trackVenue, target.trackCourse);
+/** The replay's layout: its recorded engine scene when known (ground truth), else its filename's track. */
+function replayLayoutSpec(replay: ReplayFileEntry): CircuitSpecification {
+  if (replay.sceneDesc) {
+    const byScene = getCircuitSpecification(undefined, undefined, replay.sceneDesc);
+    if (byScene.layoutKey !== 'unknown') return byScene;
+  }
+  return getCircuitSpecification(replay.trackName);
 }
 
-// Generic-vs-specific same-circuit match, only used when no exact-layout replay is available.
-function isFallbackTrackMatch(replay: ReplayFileEntry, target: ReplayMatchTarget): boolean {
-  const replaySpec = getCircuitSpecification(replay.trackName);
+/**
+ * Same layout, never just the same facility: when both layouts are known they must be equal (Monza GP
+ * is not Curva Grande, Sebring is not the School circuit). Names are only compared when a layout is
+ * unknown.
+ */
+function isSameLayout(replay: ReplayFileEntry, target: ReplayMatchTarget): boolean {
+  const replaySpec = replayLayoutSpec(replay);
   const sessionSpec = getCircuitSpecification(target.trackVenue, target.trackCourse);
-
   if (replaySpec.layoutKey !== 'unknown' && sessionSpec.layoutKey !== 'unknown') {
-    if (replaySpec.circuitId !== sessionSpec.circuitId) return false;
-    return Boolean(replaySpec.isDefaultLayout || sessionSpec.isDefaultLayout);
+    return replaySpec.layoutKey === sessionSpec.layoutKey;
   }
+  if (matchesTrack(replay.trackName, target.trackVenue, target.trackCourse)) return true;
+  if (replaySpec.layoutKey !== 'unknown' || sessionSpec.layoutKey !== 'unknown') return false;
 
-  if (replaySpec.layoutKey === 'unknown' && sessionSpec.layoutKey === 'unknown') {
-    const normVcrTrack = replay.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normXmlCourse = (target.trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normXmlVenue = target.trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return Boolean(
-      (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
-      (!target.trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)))
-    );
-  }
-
-  return false;
+  const normVcrTrack = replay.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normXmlCourse = (target.trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normXmlVenue = target.trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return Boolean(
+    (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
+    (!target.trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)))
+  );
 }
 
 /** Why `replay` cannot be the recording of the target session, or null when it can. */
 export function replayLinkRejection(replay: ReplayFileEntry, target: ReplayMatchTarget): ReplayLinkRejectionReason | null {
   if (!matchesSessionCode(replay.sessionCode, target.sessionCode || '')) return 'session-type';
   if (replayTimeDistanceMs(replay, target) > REPLAY_MATCH_WINDOW_MS) return 'time-window';
-  if (!isExactTrackMatch(replay, target) && !isFallbackTrackMatch(replay, target)) return 'layout';
+  if (!isSameLayout(replay, target)) return 'layout';
   return null;
 }
 
-/** The replay recorded for the target session: exact layout first, then the closest in time. */
+/** The replay recorded for the target session: same layout, exact session code first, then the closest in time. */
 export function findMatchingReplay(replays: readonly ReplayFileEntry[], target: ReplayMatchTarget): ReplayFileEntry | undefined {
   const normSession = (target.sessionCode || '').toLowerCase();
-  const sessionScoped = replays.filter(replay =>
-    matchesSessionCode(replay.sessionCode, normSession) && replayTimeDistanceMs(replay, target) <= REPLAY_MATCH_WINDOW_MS
-  );
+  const candidates = replays.filter(replay => replayLinkRejection(replay, target) === null);
+  candidates.sort((a, b) => {
+    const aExactCode = a.sessionCode.toLowerCase() === normSession ? 0 : 1;
+    const bExactCode = b.sessionCode.toLowerCase() === normSession ? 0 : 1;
+    if (aExactCode !== bExactCode) return aExactCode - bExactCode;
+    return replayTimeDistanceMs(a, target) - replayTimeDistanceMs(b, target);
+  });
+  return candidates[0];
+}
 
-  // 1. Exact track/layout match takes priority whenever one exists.
-  const exactCandidates = sessionScoped.filter(replay => isExactTrackMatch(replay, target));
-  if (exactCandidates.length > 0) {
-    exactCandidates.sort((a, b) => {
-      const aExactCode = a.sessionCode.toLowerCase() === normSession ? 0 : 1;
-      const bExactCode = b.sessionCode.toLowerCase() === normSession ? 0 : 1;
-      if (aExactCode !== bExactCode) return aExactCode - bExactCode;
-      return replayTimeDistanceMs(a, target) - replayTimeDistanceMs(b, target);
-    });
-    return exactCandidates[0];
-  }
-
-  // 2. Fall back to generic-vs-specific same-circuit matches only when no exact-layout replay is available.
-  const fallbackCandidates = sessionScoped.filter(replay => isFallbackTrackMatch(replay, target));
-  if (fallbackCandidates.length === 0) return undefined;
-  fallbackCandidates.sort((a, b) => replayTimeDistanceMs(a, target) - replayTimeDistanceMs(b, target));
-  return fallbackCandidates[0];
+/** The replay index entry for a stored replay row (the filename names the track and session code). */
+export function replayIndexEntryFromStored(stored: StoredReplayFileInfo & { filename: string }): ReplayFileEntry {
+  const match = stored.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
+  const metadata = stored.metadata;
+  return {
+    name: stored.filename,
+    path: stored.file_path,
+    sizeBytes: stored.file_size,
+    trackName: match ? match[1].trim() : (metadata.trackVenue || metadata.trackCourse || metadata.trackName || stored.filename.replace(/\.vcr$/i, '')),
+    sessionCode: match ? match[2].toUpperCase() : (metadata.sessionType || ''),
+    mtime: stored.file_mtime,
+    eventTitle: metadata.eventInfo?.eventTitle,
+    splitNo: metadata.eventInfo?.splitNo,
+    eventType: metadata.eventInfo?.eventType,
+    durationSec: metadata.durationSec,
+    sceneDesc: metadata.sceneDesc || metadata.eventInfo?.sceneDesc || undefined,
+  };
 }
 
 /**

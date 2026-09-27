@@ -4,20 +4,11 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession } from './types.js';
 import { SyncResult, SessionSyncProgress } from './dbSchema.js';
 import { StoredReplayFileInfo } from './dbReplayMetadataStore.js';
+import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
+import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
 
 export interface SessionXmlSyncParser {
-  addReplayEntry(entry: {
-    name: string;
-    path: string;
-    sizeBytes: number;
-    trackName: string;
-    sessionCode: string;
-    mtime: number;
-    durationSec?: number;
-    eventTitle?: string;
-    splitNo?: number;
-    eventType?: string;
-  }): void;
+  addReplayEntry(entry: ReplayFileEntry): void;
   parseSessionXml(filePath: string): DetailedSession | null;
 }
 
@@ -68,23 +59,7 @@ export function *syncSessionsIterator(
 
   // Seed parser's replay index with stored DB replays so deleted VCR files still match
   const storedReplays = host.getAllStoredReplayFiles();
-  for (const r of storedReplays) {
-    const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
-    const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
-    const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
-    parser.addReplayEntry({
-      name: r.filename,
-      path: r.file_path,
-      sizeBytes: r.file_size,
-      trackName,
-      sessionCode,
-      mtime: r.file_mtime,
-      eventTitle: r.metadata.eventInfo?.eventTitle,
-      splitNo: r.metadata.eventInfo?.splitNo,
-      eventType: r.metadata.eventInfo?.eventType,
-      durationSec: r.metadata.durationSec,
-    });
-  }
+  for (const r of storedReplays) parser.addReplayEntry(replayIndexEntryFromStored(r));
 
   const files = fs.readdirSync(resultsDir).filter(f => f.endsWith('.xml'));
   let added = 0;

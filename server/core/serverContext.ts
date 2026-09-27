@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { pickReplayOwner, replayLinkRejection, ReplayMatchTarget } from '../sessions/replayMatching.js';
+import { pickReplayOwner, replayIndexEntryFromStored, replayLinkRejection, ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
@@ -121,23 +121,7 @@ export class ServerContext {
     if (this.replayIndexLoadedFor?.[0] === this.parser && this.replayIndexLoadedFor[1] === revision) return;
     try {
       const stored = this.sessionDb.getAllStoredReplayFiles();
-      for (const r of stored) {
-        const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
-        const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
-        const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
-        this.parser.addReplayEntry({
-          name: r.filename,
-          path: r.file_path,
-          sizeBytes: r.file_size,
-          trackName,
-          sessionCode,
-          mtime: r.file_mtime,
-          eventTitle: r.metadata.eventInfo?.eventTitle,
-          splitNo: r.metadata.eventInfo?.splitNo,
-          eventType: r.metadata.eventInfo?.eventType,
-          durationSec: r.metadata.durationSec,
-        });
-      }
+      for (const r of stored) this.parser.addReplayEntry(replayIndexEntryFromStored(r));
       this.replayIndexLoadedFor = [this.parser, revision];
     } catch (err) {
       console.warn('[ServerContext] Error populating replay index from DB:', err);
