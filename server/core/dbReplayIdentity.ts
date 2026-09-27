@@ -62,6 +62,7 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
     db.prepare('UPDATE replay_metadata SET filename = ?, file_path = ? WHERE filename = ?').run(newName, newPath, filename);
     db.prepare('UPDATE replay_trajectories SET filename = ?, source_path = ? WHERE filename = ?').run(newName, newPath, filename);
     db.prepare('UPDATE replay_trajectory_defaults SET filename = ? WHERE filename = ?').run(newName, filename);
+    db.prepare('UPDATE replay_ingest_drivers SET filename = ? WHERE filename = ?').run(newName, filename);
     db.prepare('UPDATE telemetry_metadata SET matched_replay_filename = ? WHERE matched_replay_filename = ?').run(newName, filename);
     db.prepare('UPDATE ai_reports SET replay_name = ? WHERE replay_name = ?').run(newName, filename);
     db.prepare('UPDATE ai_reports SET baseline_replay_name = ? WHERE baseline_replay_name = ?').run(newName, filename);

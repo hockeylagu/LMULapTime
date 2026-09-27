@@ -62,6 +62,7 @@ describe('replay identity', () => {
     db.upsertReplayTrajectoryCache(name, 0, 1, savedAt, 6863306, lap(1), replayPath);
     db.upsertReplayTrajectoryCache(name, 0, 2, savedAt, 6863306, lap(2), replayPath);
     db.setReplayTrajectoryDefaults(name, -1, 2, 0);
+    db.recordReplayDriverIngest(name, 0, savedAt, 6863306, 'stored');
     db.upsertSession(session('owner'), 'C:\\results\\owner.xml', 1, 1);
     db.upsertSession(session('withdrawn'), 'C:\\results\\withdrawn.xml', 1, 1);
     db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, sizeBytes: 6863306 }, 'owned-by-other-session');
@@ -77,6 +78,8 @@ describe('replay identity', () => {
     expect(db.getStoredReplayTrajectory(archivedName, 0, 2)?.points[0].x).toBe(2);
     expect(db.getStoredReplayTrajectory(archivedName, -1, -1)?.currentLap).toBe(2);
     expect(db.getStoredReplayTrajectory(name, 0, 2)).toBeNull();
+    expect(db.getReplayDriverIngest(archivedName, 0)?.fileMtime).toBe(savedAt);
+    expect(db.getReplayDriverIngest(name, 0)).toBeNull();
     expect(db.getSessionById('owner')?.matchingReplayFile).toMatchObject({ name: archivedName, path: `C:\\replays\\${archivedName}` });
     expect(db.getRejectedReplayLinks().get('withdrawn')?.[0].replayName).toBe(archivedName);
     expect(db.getTelemetryMetadata()[0].matchedReplayFilename).toBe(archivedName);
