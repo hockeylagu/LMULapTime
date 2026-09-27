@@ -34,7 +34,7 @@ export interface DebriefCorner {
   priority: number;
   /** The corner phase that lost the most time, when the phases could be measured. */
   worstPhase: CornerPhase | null;
-  /** Measured differences to the technique reference (or the reference), in words, e.g. "Brakes 18 m earlier". */
+  /** What to change to match the technique reference (or the reference), e.g. "Brake 18 m later". */
   evidence: string[];
   /** Time lost through the corner against the technique reference, when there is a separate one. */
   techniqueLossSec: number | null;
@@ -88,24 +88,27 @@ function worstPhase(corner: CornerSegmentComparison): CornerPhase | null {
   return loss > 0 ? phase : null;
 }
 
-/** The corner's measured differences to the reference, in the order the driver meets them. */
+/**
+ * What to change to drive the corner like the reference, from the measured differences, in the
+ * order the driver meets them: a driver who braked 28 m before the reference reads "Brake 28 m later".
+ */
 export function describeCornerEvidence(corner: CornerSegmentComparison): string[] {
   const evidence: string[] = [];
   const braking = corner.brakingPointDeltaM;
   if (braking !== null && Math.abs(braking) >= EVIDENCE_MIN_DIST_M) {
-    evidence.push(`Brakes ${Math.abs(braking)} m ${braking < 0 ? 'earlier' : 'later'}`);
+    evidence.push(`Brake ${Math.abs(braking)} m ${braking < 0 ? 'later' : 'earlier'}`);
   }
   const apex = corner.minSpeedDeltaKmh;
   if (Math.abs(apex) >= EVIDENCE_MIN_SPEED_KMH) {
-    evidence.push(`${Math.abs(apex)} km/h ${apex < 0 ? 'slower' : 'faster'} at the apex`);
+    evidence.push(`Carry ${Math.abs(apex)} km/h ${apex < 0 ? 'more' : 'less'} to the apex`);
   }
   const throttle = corner.throttleOnDeltaM;
   if (throttle !== null && Math.abs(throttle) >= EVIDENCE_MIN_DIST_M) {
-    evidence.push(`Full throttle ${Math.abs(throttle)} m ${throttle > 0 ? 'later' : 'earlier'}`);
+    evidence.push(`Full throttle ${Math.abs(throttle)} m ${throttle > 0 ? 'earlier' : 'later'}`);
   }
   const exit = corner.exitSpeedDeltaKmh;
   if (Math.abs(exit) >= EVIDENCE_MIN_SPEED_KMH) {
-    evidence.push(`${Math.abs(exit)} km/h ${exit < 0 ? 'slower' : 'faster'} on exit`);
+    evidence.push(`Exit ${Math.abs(exit)} km/h ${exit < 0 ? 'faster' : 'slower'}`);
   }
   return evidence;
 }
