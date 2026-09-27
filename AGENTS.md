@@ -176,11 +176,12 @@ LMULapTime/
 │   │   ├── trackLimits.ts          # Boundary collision and lateral offset evaluation
 │   │   └── urlParams.ts            # Hash-based navigation and query string persistence
 │   └── index.css                   # Tailwind CSS imports & theme utilities
-├── test/                           # Automated test suite (1,380+ tests across 159 files)
+├── test/                           # Automated test suite (1,450+ tests across 164 files)
 │   ├── components/                 # React component tests mirrored by feature domain (<= 20 files per folder)
+│   ├── domain/                     # Pure shared/domain engines (circuit specs, formatters, lap comparison, pace, vehicles)
 │   ├── fixtures/                   # Mock XML logs, binary VCR samples, telemetry files
-│   ├── server/                     # Backend domain test suites (ai, benchmarks, core, replay, sessions, telemetry)
-│   ├── utils/                      # Unit tests for algorithms, math, formatters & lap alignment (golden tests)
+│   ├── server/                     # Backend suites mirroring server/ (ai, benchmarks, core, replay, routes, sessions, telemetry, tracks)
+│   ├── utils/                      # Unit tests for src/utils algorithms & lap alignment (golden tests), mockVcr.ts
 │   └── setup.ts                    # Vitest environment setup
 ├── tools/                          # C# recorder and standalone TSX utilities
 ├── package.json                    # Node scripts and dependencies
@@ -207,7 +208,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - **Out-Laps**: Laps exiting the pit box / pit lane (excluded from flying averages).
   - **Incomplete / Partial Laps**: Crashed or disconnected laps (display estimated/partial time where possible; never treat as clean flying laps).
 - **Rule**: True Pace (e.g. Top 3 Clean Lap Average) and Consistency Ratings **must only** include valid, clean flying laps.
-- **One classification**: the session parser (`server/sessions/parser.ts`) infers missing lap times (`isInferred`) and marks out-laps (`isOutLap`) once. Views and analytics read those flags through `isRacingLap` / `isCompletedPitStop` in `shared/domain/lapComparison.ts`; never re-derive them from neighbouring laps. Changing a rule means bumping `DB_PARSER_VERSION` so stored sessions are re-parsed.
+- **One classification**: the session parser (`server/sessions/parser.ts`) infers missing lap times (`isInferred`) and marks out-laps (`isOutLap`) once. Views and analytics read those flags (`isRacingLap`, `selectCleanLapCandidates` in `shared/domain/lapComparison.ts`); never re-derive them from neighbouring laps (`isCompletedPitStop` is the parser's rule). Changing a rule means bumping `DB_PARSER_VERSION` so stored sessions are re-parsed.
 
 ### C. Deterministic Logic First (AI Is Secondary)
 - Calculations of deltas, telemetry traces, sector rankings, tire wear, pace categories, handling balance (understeer/oversteer), and coaching deficits **must be 100% deterministic**.
@@ -286,18 +287,19 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with **over 1,380 tests across 159 test files**. Any change must preserve this coverage and run with zero warnings.
+The repository maintains an extensive automated test suite with **over 1,450 tests across 164 test files**. Any change must preserve this coverage and run with zero warnings.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`
 - **Watch mode**: `npm run test:watch`
-- **Coverage report**: `npm run test:coverage`
+- **Coverage report**: `npm run test:coverage` (fails below the thresholds in `vitest.config.ts`, set just under the measured coverage: raise them when coverage grows, never lower them to land a change)
 - **TypeScript build check**: `npm run build`
 
 ### Testing Best Practices
 - **Server API & DB Tests**: Located in `test/server/`. Use in-memory SQLite instances or isolated test database fixtures (`:memory:` or temporary test DB paths).
 - **Component Tests**: Located in `test/components/`. Use `@testing-library/react` and Vitest jsdom environment.
-- **Utils Tests**: Pure functions for math, formatting, track limits, and pace categorization in `test/utils/`.
+- **Domain & Utils Tests**: `shared/domain/` engines in `test/domain/`; `src/utils/` algorithms (track limits, corner analysis, lap alignment) in `test/utils/`.
+- **Route Tests**: Each router in `server/routes/` is tested in `test/server/routes/` by mounting it on its own Express app with supertest; `test/server/core/api.test.ts` only checks that `server/index.ts` wires the routers together.
 - **Lap Alignment & Telemetry Golden Tests**: Located in `test/utils/lapAlignment/`. Validates station monotonic progression, boundary line-cut interpolation, downsampling fidelity, and golden invariant regressions.
 - **Replay Parser Tests**: When testing `.Vcr` decoding, use fixtures from `test/fixtures/` or synthetic buffers constructed via `test/utils/mockVcr.ts`.
 
@@ -307,6 +309,6 @@ The repository maintains an extensive automated test suite with **over 1,380 tes
 
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
-   - Run `npm test` to verify no regressions across the 1,380+ unit/integration tests.
+   - Run `npm test` to verify no regressions across the 1,450+ unit/integration tests.
    - Run `npm run build` to verify clean TypeScript compilation and bundle generation.
 4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants via `shared/domain/circuitSpecs.ts`.
