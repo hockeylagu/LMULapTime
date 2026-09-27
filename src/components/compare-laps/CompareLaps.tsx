@@ -50,6 +50,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     playerOnly,
     setPlayerOnlyState,
     loading,
+    loadError,
     availableLapsSort,
     setAvailableLapsSort,
     hideEmpty,
@@ -221,6 +222,12 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
             onCompareTelemetry={onCompareTelemetry}
           />
         </div>
+      )}
+
+      {loadError && (
+        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">
+          Could not load laps for {selectedTrack}: {loadError}
+        </p>
       )}
 
       <CompareLapsTable
