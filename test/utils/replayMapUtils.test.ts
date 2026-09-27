@@ -7,9 +7,9 @@ import {
   computeTrackBoundaryPathD,
   computeGhostPosition,
   computeBaselineDeltaByIdx,
-  buildEffectiveBaselinePoints,
 } from '../../src/components/replay/map/replayMapUtils.js';
 import type { ReplayTelemetryPoint } from '../../server/core/types.js';
+import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 
 describe('replayMapUtils', () => {
   const mockPoints: ReplayTelemetryPoint[] = [
@@ -49,7 +49,6 @@ describe('replayMapUtils', () => {
   it('computes dispersed corner markers with trajectory and pedal clearance', () => {
     const projected = projectTrajectoryPoints(mockPoints, mockBounds, 800, 50);
     const primaryDists = [0, 50, 100];
-    const baselineDists = [0, 50, 100];
 
     // Pedal marker near corner apex
     const pedalMarkers = [{ sx: 400, sy: 420, nx: 0, ny: 1 }];
@@ -57,7 +56,6 @@ describe('replayMapUtils', () => {
     const markers = computeDispersedCornerMarkers(
       [{ cornerNumber: 1, minDistM: 50 }],
       primaryDists,
-      baselineDists,
       projected,
       undefined,
       pedalMarkers
@@ -100,6 +98,12 @@ describe('replayMapUtils', () => {
     expect(losingColor).toBe('rgb(239, 68, 68)');
   });
 
+  it('steps the speed gradient so nearby speeds share a colour (the racing line is drawn per colour run)', () => {
+    const at = (speedKmh: number) => getHeatmapColor({ x: 0, y: 0, z: 0, speedKmh }, 'speed');
+    expect(at(200)).toBe(at(202));
+    expect(at(200)).not.toBe(at(215));
+  });
+
   describe('computeTrackBoundaryPathD', () => {
     it('uses centerlineSvgPoints when available', () => {
       const centerline = [{ sx: 10, sy: 20 }, { sx: 30, sy: 40 }];
@@ -128,84 +132,43 @@ describe('replayMapUtils', () => {
     });
   });
 
-  describe('buildEffectiveBaselinePoints', () => {
-    it('prepends extrapolated start/finish line crossing point when baseline begins after the line', () => {
-      const baseline: ReplayTelemetryPoint[] = [
-        { x: -115.95, y: 9.8, z: -41.52, stationM: 8.04, distM: 0, timeSec: 375.21, speedKmh: 320 },
-        { x: -117.03, y: 9.8, z: -42.94, stationM: 9.82, distM: 1.78, timeSec: 375.23, speedKmh: 321 },
-      ];
-      const result = buildEffectiveBaselinePoints(baseline, 5724.1);
-      expect(result).toHaveLength(3);
-      expect(result[0].stationM).toBe(0);
-      expect(result[0].distM).toBe(0);
-      expect(result[0].timeSec).toBeCloseTo(375.12, 1);
-      expect(result[0].x).toBeCloseTo(-111.07, 1);
-      expect(result[0].z).toBeCloseTo(-35.11, 1);
-      expect(result[1]).toBe(baseline[0]);
-    });
-
-    it('leaves baseline unchanged when it already begins at or before the start line', () => {
-      const baseline: ReplayTelemetryPoint[] = [
-        { x: -111.0, y: 9.8, z: -35.0, stationM: 0.5, distM: 0, timeSec: 0, speedKmh: 300 },
-        { x: -113.0, y: 9.8, z: -38.0, stationM: 4.0, distM: 3.5, timeSec: 0.04, speedKmh: 302 },
-      ];
-      const result = buildEffectiveBaselinePoints(baseline, 5724.1);
-      expect(result).toHaveLength(2);
-      expect(result).toBe(baseline);
-    });
-  });
-
   describe('computeGhostPosition station-domain matching', () => {
     it('aligns ghost position side-by-side using canonical station rather than divergent odometer distances', () => {
       const primary: ReplayTelemetryPoint[] = [
         { x: -111.03, y: 0, z: -36.83, stationM: 1.36, distM: 0, timeSec: 0, speedKmh: 320 },
         { x: -113.13, y: 0, z: -39.70, stationM: 4.91, distM: 3.56, timeSec: 0.04, speedKmh: 320 },
       ];
-      // Baseline starts 8m downstream, shifted laterally across the track width
+      // Baseline sliced 8 m downstream, shifted laterally across the track width, and extended back
+      // to the line by the server (its first sample, station 0).
       const baseline: ReplayTelemetryPoint[] = [
-        { x: -115.95, y: 0, z: -41.52, stationM: 8.04, distM: 0, timeSec: 375.21, speedKmh: 320 },
-        { x: -117.03, y: 0, z: -42.94, stationM: 9.82, distM: 1.78, timeSec: 375.23, speedKmh: 321 },
+        { x: -111.07, y: 0, z: -35.11, stationM: 0, distM: 0, timeSec: 375.12, speedKmh: 320 },
+        { x: -115.95, y: 0, z: -41.52, stationM: 8.04, distM: 8.06, timeSec: 375.21, speedKmh: 320 },
+        { x: -117.03, y: 0, z: -42.94, stationM: 9.82, distM: 9.84, timeSec: 375.23, speedKmh: 321 },
       ];
 
       const bounds = { minX: -200, maxX: 200, spanX: 400, minZ: -200, maxZ: 200, spanZ: 400 };
       const ghost = computeGhostPosition(
-        [1.36, 4.91],
-        [8.04, 9.82],
+        getTrajectoryDistances(primary, 5724.1),
+        getDistancesInReferenceFrame(baseline, primary, 5724.1),
         baseline,
         0, // Primary at station 1.36
         bounds,
         800,
-        60,
-        5724.1,
-        primary
+        60
       );
 
       expect(ghost).not.toBeNull();
-      // At station 1.36m, ghost is extrapolated backwards from station 8.04m, placing it side-by-side with primary car
+      // At station 1.36 m the ghost sits between the line and station 8.04 m, side by side with the primary car
       const dist = Math.hypot(primary[0].x - ghost!.point.x, primary[0].z - ghost!.point.z);
       expect(dist).toBeLessThan(3.0);
     });
   });
 
-  describe('computeBaselineDeltaByIdx station matching', () => {
-    it('samples delta correctly when station matching is active', () => {
-      const primary: ReplayTelemetryPoint[] = [
-        { x: 0, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1 },
-        { x: 0, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2 },
-      ];
-      const baseline: ReplayTelemetryPoint[] = [
-        { x: 2, y: 0, z: 0, stationM: 10, distM: 0, timeSec: 1.1 },
-        { x: 2, y: 0, z: 10, stationM: 20, distM: 10, timeSec: 2.2 },
-      ];
-      const deltas = computeBaselineDeltaByIdx(
-        [-0.1, -0.2],
-        baseline,
-        [10, 20],
-        [10, 20],
-        100,
-        primary
-      );
-      expect(deltas).toEqual([-0.1, -0.2]);
+  describe('computeBaselineDeltaByIdx', () => {
+    it('colours each baseline sample with the primary delta at the same distance (primary frame)', () => {
+      // Baseline samples at primary-frame distances 9, 21 and 40 m.
+      expect(computeBaselineDeltaByIdx([-0.1, -0.2, -0.3], [10, 20, 30], [9, 21, 40])).toEqual([-0.1, -0.2, -0.3]);
+      expect(computeBaselineDeltaByIdx(null, [10], [10])).toBeNull();
     });
   });
 });

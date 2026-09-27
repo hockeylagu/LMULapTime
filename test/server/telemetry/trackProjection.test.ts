@@ -120,6 +120,26 @@ describe('trackProjection utility', () => {
       expect(res.stations[2]).toBeGreaterThan(res.stations[1]);
     });
 
+    it('keeps the station continuous for a car near the centre of a hairpin', () => {
+      // Straight along +x, a 20 m radius hairpin around (0, 20) in 2.5 m segments, straight back.
+      const arc: Array<[number, number]> = [];
+      for (let k = 0; k <= 25; k++) {
+        const a = -Math.PI / 2 + (Math.PI * k) / 25;
+        arc.push([20 * Math.cos(a), 20 + 20 * Math.sin(a)]);
+      }
+      const straightOut: Array<[number, number]> = Array.from({ length: 40 }, (_, k) => [-100 + k * 2.5, 0]);
+      const straightBack: Array<[number, number]> = Array.from({ length: 40 }, (_, k) => [-2.5 - k * 2.5, 40]);
+      const centerline = [...straightOut, ...arc, ...straightBack];
+      // The car cuts across just below the corner's centre in 0.2 m steps: the nearest point of the
+      // arc swings from its entry towards its apex as the car passes the centre.
+      const points: ReplayTrajectoryPoint[] = Array.from({ length: 31 }, (_, k) => ({ x: -3 + k * 0.2, y: 0, z: 19.9, speedKmh: 30 }));
+
+      const { stations } = projectTrajectoryToCenterline(points, centerline);
+      const steps = stations.slice(1).map((s, i) => s - stations[i]);
+      expect(Math.min(...steps)).toBeGreaterThan(-1);
+      expect(Math.max(...steps)).toBeLessThan(3);
+    });
+
     it('maintains monotonicity across the finish line seam', () => {
       const loopCenter: Array<[number, number]> = [
         [0, 0],

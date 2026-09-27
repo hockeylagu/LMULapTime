@@ -146,6 +146,13 @@ export function createReplayRouter(context: ServerContext): Router {
       } catch (error: unknown) {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
       }
+      // One point per this many metres of the lap; takes precedence over maxPoints.
+      const pointSpacingParam = req.query.pointSpacingM;
+      let pointSpacingM: number | undefined;
+      if (pointSpacingParam !== undefined) {
+        pointSpacingM = typeof pointSpacingParam === 'string' && /^\d+(\.\d+)?$/.test(pointSpacingParam) ? Number(pointSpacingParam) : NaN;
+        if (!(pointSpacingM >= 0.25 && pointSpacingM <= 100)) return res.status(400).json({ error: 'Invalid pointSpacingM' });
+      }
 
       if (
         !fs.existsSync(filePath) &&
@@ -166,6 +173,7 @@ export function createReplayRouter(context: ServerContext): Router {
         driverName,
         lapNumber,
         maxPoints,
+        pointSpacingM,
         allowDuckDb,
       });
 

@@ -3,6 +3,12 @@ import { render, fireEvent } from '@testing-library/react';
 import { GpsTrackSegments } from '../../../../src/components/replay/map/GpsTrackSegments.js';
 import type { ProjectedPoint } from '../../../../src/components/replay/map/replayMapUtils.js';
 
+/** jsdom has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
+function withIdentityCtm(el: Element): Element {
+  Object.assign(el, { getScreenCTM: () => ({ inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) }) });
+  return el;
+}
+
 describe('GpsTrackSegments', () => {
   const mockPrimaryPoints: ProjectedPoint[] = [
     { sx: 100, sy: 100, idx: 0, x: 10, y: 0, z: 10, speedKmh: 100, throttle: 100, brake: 0, timeSec: 0 },
@@ -15,65 +21,70 @@ describe('GpsTrackSegments', () => {
     { sx: 115, sy: 115, idx: 1, x: 13, y: 0, z: 13, speedKmh: 130, throttle: 100, brake: 0, timeSec: 0.5 },
   ];
 
-  it('renders primary solid lines and triggers onSelectIndex on click', () => {
+  it('renders one solid path per colour run and selects the nearest sample on click', () => {
     const onSelectIndex = vi.fn();
     const { container } = render(
       <svg>
-        <GpsTrackSegments
-          svgPoints={mockPrimaryPoints}
-          colorBy="speed"
-          onSelectIndex={onSelectIndex}
-        />
+        <GpsTrackSegments svgPoints={mockPrimaryPoints} colorBy="speed" onSelectIndex={onSelectIndex} />
       </svg>
     );
 
-    const primaryLines = container.querySelectorAll('line[data-track-line="primary"]');
-    expect(primaryLines).toHaveLength(2);
+    // 120 and 140 km/h are different speed colours: two runs.
+    const primaryPaths = container.querySelectorAll('path[data-track-line="primary"]');
+    expect(primaryPaths).toHaveLength(2);
+    expect(primaryPaths[0]).toHaveAttribute('d', 'M 100.00 100.00 L 110.00 110.00');
+    expect(primaryPaths[0]).toHaveAttribute('vector-effect', 'non-scaling-stroke');
+    expect(primaryPaths[0]).toHaveAttribute('stroke-width', '2');
 
-    expect(primaryLines[0]).toHaveAttribute('vector-effect', 'non-scaling-stroke');
-    expect(primaryLines[0]).toHaveAttribute('stroke-width', '2');
-
-    fireEvent.click(primaryLines[0]);
+    fireEvent.click(withIdentityCtm(primaryPaths[0]), { clientX: 108, clientY: 109 });
     expect(onSelectIndex).toHaveBeenCalledWith(1);
+    fireEvent.click(withIdentityCtm(primaryPaths[1]), { clientX: 119, clientY: 121 });
+    expect(onSelectIndex).toHaveBeenLastCalledWith(2);
   });
 
-  it('renders baseline dashed lines with strokeDasharray="8 6" when baselineSvgPoints are passed', () => {
+  it('merges consecutive segments of the same colour into one path', () => {
+    const fullThrottle: ProjectedPoint[] = [0, 1, 2, 3].map(i => (
+      { sx: 100 + 10 * i, sy: 100, idx: i, x: 2 * i, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, timeSec: i }
+    ));
+    const { container } = render(<svg><GpsTrackSegments svgPoints={fullThrottle} colorBy="pedal" /></svg>);
+    const paths = container.querySelectorAll('path[data-track-line="primary"]');
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toHaveAttribute('d', 'M 100.00 100.00 L 110.00 100.00 L 120.00 100.00 L 130.00 100.00');
+  });
+
+  it('renders baseline dashed paths with strokeDasharray="8 6" when baselineSvgPoints are passed', () => {
     const { container } = render(
       <svg>
-        <GpsTrackSegments
-          svgPoints={mockPrimaryPoints}
-          baselineSvgPoints={mockBaselinePoints}
-          colorBy="pedal"
-          baselineOpacity={0.7}
-        />
+        <GpsTrackSegments svgPoints={mockPrimaryPoints} baselineSvgPoints={mockBaselinePoints} colorBy="pedal" baselineOpacity={0.7} />
       </svg>
     );
 
-    const baselineLines = container.querySelectorAll('line[data-track-line="baseline"]');
-    expect(baselineLines).toHaveLength(1);
-
-    expect(baselineLines[0]).toHaveAttribute('stroke-dasharray', '8 6');
-    expect(baselineLines[0]).toHaveAttribute('stroke-width', '1.8');
-    expect(Number(baselineLines[0].getAttribute('stroke-opacity'))).toBeCloseTo(0.9 * 0.7);
+    const baselinePaths = container.querySelectorAll('path[data-track-line="baseline"]');
+    expect(baselinePaths).toHaveLength(1);
+    expect(baselinePaths[0]).toHaveAttribute('stroke-dasharray', '8 6');
+    expect(baselinePaths[0]).toHaveAttribute('stroke-width', '1.8');
+    expect(Number(baselinePaths[0].getAttribute('stroke-opacity'))).toBeCloseTo(0.9 * 0.7);
   });
 
-  it('filters out teleport points and distant discontinuities', () => {
+  it('breaks the line at teleports and distant discontinuities', () => {
     const teleportPoints: ProjectedPoint[] = [
       { sx: 100, sy: 100, idx: 0, x: 10, y: 0, z: 10, speedKmh: 100, throttle: 100, brake: 0, timeSec: 0 },
       { sx: 500, sy: 500, idx: 1, x: 200, y: 0, z: 200, isTeleport: true, speedKmh: 0, throttle: 0, brake: 0, timeSec: 1 },
     ];
+    const { container } = render(<svg><GpsTrackSegments svgPoints={teleportPoints} colorBy="speed" /></svg>);
+    expect(container.querySelectorAll('path[data-track-line="primary"]')).toHaveLength(0);
+  });
 
-    const { container } = render(
-      <svg>
-        <GpsTrackSegments
-          svgPoints={teleportPoints}
-          colorBy="speed"
-        />
-      </svg>
-    );
-
-    const lines = container.querySelectorAll('line[data-track-line="primary"]');
-    expect(lines).toHaveLength(0);
+  it('starts a new path after a gap even when the colour is unchanged', () => {
+    const gapped: ProjectedPoint[] = [
+      { sx: 100, sy: 100, idx: 0, x: 0, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, timeSec: 0 },
+      { sx: 110, sy: 100, idx: 1, x: 2, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, timeSec: 1 },
+      { sx: 200, sy: 100, idx: 2, x: 100, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, timeSec: 2 },
+      { sx: 210, sy: 100, idx: 3, x: 102, y: 0, z: 0, speedKmh: 200, throttle: 100, brake: 0, timeSec: 3 },
+    ];
+    const { container } = render(<svg><GpsTrackSegments svgPoints={gapped} colorBy="pedal" /></svg>);
+    const paths = container.querySelectorAll('path[data-track-line="primary"]');
+    expect([...paths].map(p => p.getAttribute('d'))).toEqual(['M 100.00 100.00 L 110.00 100.00', 'M 200.00 100.00 L 210.00 100.00']);
   });
 
   it('dims non-selected track segments outside highlightDistRange', () => {
@@ -96,14 +107,14 @@ describe('GpsTrackSegments', () => {
       </svg>
     );
 
-    const lines = container.querySelectorAll('line[data-track-line="primary"]');
-    expect(lines).toHaveLength(2);
-    // Line 0->1 is at dist 150 (inside 100..200 range): highlighted with bold stroke & width 3.2
-    expect(lines[0]).toHaveAttribute('stroke-width', '3.2');
-    expect(Number(lines[0].getAttribute('stroke-opacity'))).toBe(1);
-    // Line 1->2 is at dist 250 (outside 100..200 range): dimmed racing line with width 1.4 and opacity 0.45
-    expect(lines[1]).toHaveAttribute('stroke-width', '1.4');
-    expect(Number(lines[1].getAttribute('stroke-opacity'))).toBeCloseTo(0.45);
-    expect(lines[1].getAttribute('stroke')).not.toBe('#334155');
+    const paths = container.querySelectorAll('path[data-track-line="primary"]');
+    expect(paths).toHaveLength(2);
+    // Segment 0->1 ends at 150 m (inside 100..200): highlighted, bold 3.2 stroke
+    expect(paths[0]).toHaveAttribute('stroke-width', '3.2');
+    expect(Number(paths[0].getAttribute('stroke-opacity'))).toBe(1);
+    // Segment 1->2 ends at 250 m (outside): dimmed, 1.4 stroke at 0.45 opacity
+    expect(paths[1]).toHaveAttribute('stroke-width', '1.4');
+    expect(Number(paths[1].getAttribute('stroke-opacity'))).toBeCloseTo(0.45);
+    expect(paths[1].getAttribute('stroke')).not.toBe('#334155');
   });
 });

@@ -1,5 +1,12 @@
-import { ReplayTrajectoryPoint, ReplaySummary } from '../../shared/types/index.js';
-import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
+import {
+  canAlignByStation,
+  computeStartFinishOffset,
+  getMonotonicStations,
+  getTrajectoryDistances,
+  interpolateScalarAtDistance,
+  rawTrajectoryDistances,
+} from './lapAlignment.js';
 
 // Neutral (0) / reverse (-1) are clamped to 1 for chart/comparison display.
 function resolveGearValue(p: ReplayTrajectoryPoint): number {
@@ -53,217 +60,6 @@ export interface PointComparison {
   primaryLateralOffsetM?: number;
   baselineLateralOffsetM?: number;
   deltaLateralOffsetM?: number;
-}
-
-/**
- * Finds the point index whose cumulative distance is closest to targetDist (binary search).
- * Useful for jumping the playback scrubber to a distance-based marker (e.g. a detected corner).
- */
-export function findIndexAtDistance(cumDists: number[], targetDist: number): number {
-  if (cumDists.length === 0) return 0;
-  let low = 0;
-  let high = cumDists.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (cumDists[mid] < targetDist) low = mid + 1;
-    else high = mid - 1;
-  }
-  const idx = Math.max(0, Math.min(cumDists.length - 1, low));
-  if (idx > 0 && Math.abs(cumDists[idx - 1] - targetDist) < Math.abs(cumDists[idx] - targetDist)) return idx - 1;
-  return idx;
-}
-
-/**
- * Computes cumulative distance in meters along the trajectory path,
- * filtering out teleport / pit-lane jump anomalies.
- */
-export function computeCumulativeDistances(points: ReplayTrajectoryPoint[]): number[] {
-  if (!points || points.length === 0) return [];
-  const dists: number[] = [0];
-
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const cur = points[i];
-    const d = Math.hypot(cur.x - prev.x, cur.z - prev.z);
-    dists.push(dists[i - 1] + (d < 60 ? d : 0));
-  }
-
-  return dists;
-}
-
-export interface StartFinishCrossing {
-  /** The distM value (this lap's own cumulative-distance metric) at the true S/F crossing. */
-  distMOffset: number;
-  /** Timestamp in seconds (this lap's own time metric) at the true S/F crossing. */
-  timeSecOffset: number;
-  /** World-space position of the crossing, interpolated/extrapolated along the recorded path. */
-  worldX: number;
-  worldZ: number;
-}
-
-// Two independently-trimmed recordings of "the same lap" rarely start at the exact physical
-// line - if the drift looks bigger than this, the array likely isn't actually split at the
-// line at all, so we bail rather than risk a bogus correction.
-const MAX_START_FINISH_CORRECTION_M = 25;
-
-/** Raw (unaligned) distances - same logic as getTrajectoryDistances minus the S/F correction,
- * kept separate so computeStartFinishOffset can interpolate against it without recursing. */
-function rawTrajectoryDistances(points: ReplayTrajectoryPoint[]): number[] {
-  if (!points || points.length === 0) return [];
-  if (points[0]?.distM !== undefined) {
-    return points.map(p => p.distM ?? 0);
-  }
-  return computeCumulativeDistances(points);
-}
-
-/**
- * Finds where this lap's own recorded path crosses the canonical start/finish station
- * (stationM === 0, set server-side from the track's timing-gate geometry) by scanning a
- * bounded boundary window for the zero-crossing (or backward linear extrapolation if trimmed
- * slightly late). Returns null when canonical stationM isn't available (unrecognized track) or
- * the drift is too large to trust as a simple trim offset.
- *
- * This is the single source of truth for "where is the real line" relative to a specific
- * recording's own frame - used both to draw the S/F line and to re-zero distance and time
- * so two different recordings of the same track are matched against the same physical reference.
- */
-export function computeStartFinishOffset(
-  points: ReplayTrajectoryPoint[],
-  trackLengthM?: number
-): StartFinishCrossing | null {
-  if (!points || points.length < 2) return null;
-
-  const hasStation = points[0]?.stationM !== undefined && points[1]?.stationM !== undefined;
-  if (!hasStation) return null;
-
-  const rawDists = rawTrajectoryDistances(points);
-  const n = points.length;
-  const unwrapStation = (s: number) => (trackLengthM && s > trackLengthM / 2 ? s - trackLengthM : s);
-
-  // Search window (first 60 points or 10% of lap) to find where station crosses from <= 0 to >= 0
-  let kCrossing = -1;
-  const searchLimit = Math.min(n - 1, 60);
-  for (let i = 0; i < searchLimit; i++) {
-    const s0 = unwrapStation(points[i].stationM ?? 0);
-    const s1 = unwrapStation(points[i + 1].stationM ?? 0);
-    if (s0 <= 0 && s1 >= 0 && (s0 < 0 || s1 > 0)) {
-      kCrossing = i;
-      break;
-    }
-  }
-
-  let p0: ReplayTrajectoryPoint;
-  let p1: ReplayTrajectoryPoint;
-  let d0: number;
-  let d1: number;
-  let t: number;
-
-  if (kCrossing >= 0) {
-    p0 = points[kCrossing];
-    p1 = points[kCrossing + 1];
-    d0 = rawDists[kCrossing];
-    d1 = rawDists[kCrossing + 1];
-    const s0 = unwrapStation(p0.stationM ?? 0);
-    const s1 = unwrapStation(p1.stationM ?? 0);
-    const ds = s1 - s0;
-    t = ds > 1e-6 ? -s0 / ds : 0;
-  } else {
-    // If no explicit <=0 to >=0 crossing in window (e.g. lap sliced slightly after the line):
-    p0 = points[0];
-    p1 = points[1];
-    d0 = rawDists[0];
-    d1 = rawDists[1];
-    const s0 = unwrapStation(p0.stationM ?? 0);
-    const s1 = unwrapStation(p1.stationM ?? 0);
-
-    if (Math.abs(s0) > MAX_START_FINISH_CORRECTION_M) return null;
-    let ds = s1 - s0;
-    if (trackLengthM) {
-      if (ds > trackLengthM / 2) ds -= trackLengthM;
-      else if (ds < -trackLengthM / 2) ds += trackLengthM;
-    }
-    if (!Number.isFinite(ds) || Math.abs(ds) < 1e-6) return null;
-    t = -s0 / ds;
-  }
-
-  const time0 = p0.timeSec || 0;
-  const time1 = p1.timeSec || 0;
-  const distMOffset = d0 + t * (d1 - d0);
-  if (Math.abs(distMOffset) > MAX_START_FINISH_CORRECTION_M) return null;
-
-  return {
-    distMOffset,
-    timeSecOffset: time0 + t * (time1 - time0),
-    worldX: p0.x + t * (p1.x - p0.x),
-    worldZ: p0.z + t * (p1.z - p0.z),
-  };
-}
-
-/**
- * Returns canonical non-decreasing stations unwrapping the start/finish seam
- * for robust spatial indexing and station-domain interpolation.
- */
-export function getMonotonicStations(points: ReplayTrajectoryPoint[], trackLengthM: number): number[] {
-  const n = points.length;
-  if (n === 0) return [];
-  const stations: number[] = [];
-
-  let s0 = points[0].stationM ?? 0;
-  if (s0 > trackLengthM * 0.75) {
-    s0 -= trackLengthM;
-  }
-  stations.push(s0);
-  let wrapOffset = s0 - (points[0].stationM ?? 0);
-  let prevRaw = points[0].stationM ?? 0;
-  let prevMonotonic = s0;
-
-  for (let i = 1; i < n; i++) {
-    const raw = points[i].stationM ?? 0;
-    const delta = raw - prevRaw;
-    if (delta < -trackLengthM / 2) {
-      wrapOffset += trackLengthM;
-    } else if (delta > trackLengthM / 2) {
-      wrapOffset -= trackLengthM;
-    }
-    prevRaw = raw;
-    let unwrapped = raw + wrapOffset;
-    if (unwrapped < prevMonotonic) {
-      unwrapped = prevMonotonic;
-    }
-    prevMonotonic = unwrapped;
-    stations.push(unwrapped);
-  }
-  return stations;
-}
-
-/**
- * Returns the canonical lap elapsed time (seconds) along the trajectory, re-zeroed so that
- * 0 always means the true physical start/finish line crossing (see computeStartFinishOffset).
- * Falls back to elapsed time from points[0] when canonical start/finish is unavailable.
- */
-export function getNormalizedTrajectoryTimes(points: ReplayTrajectoryPoint[], trackLengthM?: number): number[] {
-  if (!points || points.length === 0) return [];
-  const crossing = computeStartFinishOffset(points, trackLengthM);
-  const baseT = crossing ? crossing.timeSecOffset : (points[0].timeSec || 0);
-  return points.map(p => (p.timeSec || 0) - baseT);
-}
-
-/**
- * Returns the canonical lap distance index (meters) along the trajectory, re-zeroed so that
- * 0 always means the true physical start/finish crossing (see computeStartFinishOffset) -
- * this is what makes distance-matched comparisons between two independently recorded laps
- * (brake points, corner deltas, pedal markers) refer to the same physical spot on track
- * instead of wherever each recording happened to be trimmed.
- * Prioritizes the server-provided distM as the single source of truth,
- * falling back to computeCumulativeDistances if distM is not yet populated.
- */
-export function getTrajectoryDistances(points: ReplayTrajectoryPoint[], trackLengthM?: number): number[] {
-  const dists = rawTrajectoryDistances(points);
-  if (dists.length === 0) return dists;
-
-  const crossing = computeStartFinishOffset(points, trackLengthM);
-  if (!crossing || crossing.distMOffset === 0) return dists;
-  return dists.map(d => d - crossing.distMOffset);
 }
 
 /**
@@ -427,14 +223,15 @@ function blendTelemetryPoints(
 }
 
 /**
- * Interpolates a telemetry point at a given distance along a trajectory.
+ * Interpolates a telemetry point at a given distance along a trajectory. Before the first or
+ * past the last sample the end sample is held: the server puts both ends of a lap on the
+ * start/finish line (see LapEndCut), so there is nothing to extrapolate on a lap.
  */
 export function interpolatePointAtDistance(
   points: ReplayTrajectoryPoint[],
   cumDists: number[],
   targetDist: number,
-  startTimeOverride?: number,
-  extrapolateBoundary = false
+  startTimeOverride?: number
 ): InterpolatedPoint {
   if (points.length === 0) {
     return {
@@ -452,49 +249,13 @@ export function interpolatePointAtDistance(
 
   const startTime0 = startTimeOverride !== undefined ? startTimeOverride : (points[0].timeSec || 0);
 
-
   if (points.length === 1 || targetDist <= cumDists[0]) {
-    if (extrapolateBoundary && points.length >= 2 && cumDists[1] > cumDists[0]) {
-      // Before the first sample (e.g. primary starts on the line, baseline a few metres later):
-      // extrapolate time/speed/position linearly, hold every other channel at the first sample.
-      const p0 = points[0];
-      const p1 = points[1];
-      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
-      const t = (clampedDist - cumDists[0]) / (cumDists[1] - cumDists[0]);
-      const extrapolated = blendTelemetryPoints(p0, p1, t, startTime0);
-      return {
-        ...blendTelemetryPoints(p0, p0, 0, startTime0),
-        timeSec: extrapolated.timeSec,
-        speedKmh: Math.max(0, extrapolated.speedKmh),
-        x: extrapolated.x,
-        y: extrapolated.y,
-        z: extrapolated.z,
-      };
-    }
     return blendTelemetryPoints(points[0], points[0], 0, startTime0);
   }
 
   const maxDist = cumDists[cumDists.length - 1];
   if (targetDist >= maxDist) {
     const pLast = points[points.length - 1];
-    if (extrapolateBoundary && points.length >= 2) {
-      const p0 = points[points.length - 2];
-      const span = maxDist - cumDists[cumDists.length - 2];
-      if (span > 1e-6) {
-        // Past the last sample: extrapolate time/speed/position, hold the rest at the last sample.
-        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
-        const t = (clampedDist - cumDists[cumDists.length - 2]) / span;
-        const extrapolated = blendTelemetryPoints(p0, pLast, t, startTime0);
-        return {
-          ...blendTelemetryPoints(pLast, pLast, 0, startTime0),
-          timeSec: extrapolated.timeSec,
-          speedKmh: Math.max(0, extrapolated.speedKmh),
-          x: extrapolated.x,
-          y: extrapolated.y,
-          z: extrapolated.z,
-        };
-      }
-    }
     const held = blendTelemetryPoints(pLast, pLast, 0, startTime0);
     return { ...held, timeSec: Math.max(0, held.timeSec) };
   }
@@ -514,7 +275,6 @@ export function interpolatePointAtDistance(
   const idx0 = Math.max(0, low - 1);
   const idx1 = Math.min(points.length - 1, low);
 
-
   if (idx0 === idx1) {
     const held = blendTelemetryPoints(points[idx0], points[idx0], 0, startTime0);
     return { ...held, timeSec: Math.max(0, held.timeSec) };
@@ -526,51 +286,102 @@ export function interpolatePointAtDistance(
 }
 
 /**
- * Interpolates a scalar value (e.g. lateral offset) at a given distance along a trajectory.
+ * Elapsed time (from `startT`) at which a lap reaches the finish line (station L). On a lap the
+ * server put on the line the first sample at L is the line itself; otherwise it can be beyond it
+ * (the server clamps stations past the line to L), so the line is placed along the driven
+ * distance from the last sample before it. Null if the lap never reaches the line (its finish is
+ * away from it, see LapEndCut) or sits on it entirely.
  */
-export function interpolateScalarAtDistance(
-  values: number[],
-  cumDists: number[],
-  targetDist: number,
-  extrapolateBoundary = false
-): number {
-  if (values.length === 0) return 0;
-  if (values.length === 1 || targetDist <= cumDists[0]) {
-    if (extrapolateBoundary && values.length >= 2 && cumDists[1] > cumDists[0]) {
-      const span = cumDists[1] - cumDists[0];
-      const clampedDist = Math.max(cumDists[0] - MAX_START_FINISH_CORRECTION_M, targetDist);
-      const t = (clampedDist - cumDists[0]) / span;
-      return Number((values[0] + t * (values[1] - values[0])).toFixed(2));
-    }
-    return values[0];
-  }
-  const maxDist = cumDists[cumDists.length - 1];
-  if (targetDist >= maxDist) {
-    if (extrapolateBoundary && values.length >= 2) {
-      const n = values.length;
-      const span = cumDists[n - 1] - cumDists[n - 2];
-      if (span > 1e-6) {
-        const clampedDist = Math.min(maxDist + MAX_START_FINISH_CORRECTION_M, targetDist);
-        const t = (clampedDist - cumDists[n - 2]) / span;
-        return Number((values[n - 2] + t * (values[n - 1] - values[n - 2])).toFixed(2));
-      }
-    }
-    return values[values.length - 1];
-  }
+function timeAtFinishLine(
+  points: ReplayTrajectoryPoint[],
+  stations: number[],
+  trackLengthM: number,
+  startT: number
+): number | null {
+  const j = stations.findIndex(st => st >= trackLengthM);
+  if (j <= 0) return null;
+  const dists = rawTrajectoryDistances(points);
+  const lineDist = dists[j - 1] + (trackLengthM - stations[j - 1]);
+  const span = dists[j] - dists[j - 1];
+  const t = span > 1e-6 ? Math.min(1, Math.max(0, (lineDist - dists[j - 1]) / span)) : 1;
+  const t0 = points[j - 1].timeSec || 0;
+  return t0 + t * ((points[j].timeSec || 0) - t0) - startT;
+}
 
-  let low = 0;
-  let high = cumDists.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (cumDists[mid] < targetDist) low = mid + 1;
-    else high = mid - 1;
+interface LapReferenceCoords {
+  canMatchByStation: boolean;
+  primaryRefCoords: number[];
+  baselineRefCoords: number[];
+  totalBaselineRef: number;
+}
+
+/** Where each sample of both laps is on the common axis: track station, else distance driven. */
+function lapReferenceCoords(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  trackLengthM: number | undefined,
+  primaryDists: number[],
+  baselineDists: number[],
+): LapReferenceCoords {
+  const canMatchByStation = canAlignByStation(primaryPoints, baselinePoints, trackLengthM);
+  if (canMatchByStation && trackLengthM) {
+    return {
+      canMatchByStation,
+      primaryRefCoords: getMonotonicStations(primaryPoints, trackLengthM),
+      baselineRefCoords: getMonotonicStations(baselinePoints, trackLengthM),
+      totalBaselineRef: trackLengthM,
+    };
   }
-  const idx0 = Math.max(0, low - 1);
-  const idx1 = Math.min(values.length - 1, low);
-  if (idx0 === idx1) return values[idx0];
-  const span = cumDists[idx1] - cumDists[idx0];
-  const t = span > 0 ? (targetDist - cumDists[idx0]) / span : 0;
-  return Number((values[idx0] + t * (values[idx1] - values[idx0])).toFixed(2));
+  return {
+    canMatchByStation,
+    primaryRefCoords: primaryDists,
+    baselineRefCoords: baselineDists,
+    totalBaselineRef: Math.max(1, baselineDists[baselineDists.length - 1]),
+  };
+}
+
+/** A baseline sample placed on the primary lap's chart axis. */
+export interface BaselineChartSample {
+  /** Position in the frame of `primaryAxis` (the strip's x-axis distances). */
+  distance: number;
+  point: InterpolatedPoint;
+}
+
+/**
+ * The baseline lap's own samples, each placed where it is on the track in the frame of the
+ * primary lap's chart axis (`primaryAxis`, one value per primary sample).
+ *
+ * computeLapComparisons reads the baseline at the primary's samples, which the server keeps where
+ * the PRIMARY's traces change: on the primary's full-throttle straight they are up to ~8 m apart,
+ * so a baseline that brakes there was drawn as a straight ramp and its brake point lost. Charts
+ * draw the baseline traces from these samples instead.
+ */
+export function computeBaselineChartSamples(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  trackLengthM: number | undefined,
+  primaryAxis: number[],
+): BaselineChartSample[] {
+  if (primaryPoints.length === 0 || baselinePoints.length === 0 || primaryAxis.length !== primaryPoints.length) return [];
+  const { primaryRefCoords, baselineRefCoords } = lapReferenceCoords(
+    primaryPoints, baselinePoints, trackLengthM,
+    getTrajectoryDistances(primaryPoints, trackLengthM), getTrajectoryDistances(baselinePoints, trackLengthM),
+  );
+  const baselineCrossing = computeStartFinishOffset(baselinePoints, trackLengthM);
+  const baselineStartT = baselineCrossing ? baselineCrossing.timeSecOffset : (baselinePoints[0].timeSec || 0);
+  const first = primaryRefCoords[0];
+  const last = primaryRefCoords[primaryRefCoords.length - 1];
+  const samples: BaselineChartSample[] = [];
+  baselinePoints.forEach((bp, j) => {
+    const ref = baselineRefCoords[j];
+    // Outside the primary lap there is no axis to place it on.
+    if (ref < first || ref > last) return;
+    samples.push({
+      distance: interpolateScalarAtDistance(primaryAxis, primaryRefCoords, ref),
+      point: blendTelemetryPoints(bp, bp, 0, baselineStartT),
+    });
+  });
+  return samples;
 }
 
 /**
@@ -605,25 +416,18 @@ export function computeLapComparisons(
   const baselineTotalLapTime = Math.max(0, (baselinePoints[baselinePoints.length - 1].timeSec || 0) - baselineStartT);
   const finishLineDelta = primaryTotalLapTime - baselineTotalLapTime;
 
-  // Determine whether to match by canonical track station or normalized distance
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
+  const { canMatchByStation, primaryRefCoords, baselineRefCoords, totalBaselineRef } =
+    lapReferenceCoords(primaryPoints, baselinePoints, trackLengthM, primaryDists, baselineDists);
 
-  let primaryRefCoords: number[];
-  let baselineRefCoords: number[];
-  let totalBaselineRef: number;
-
-  if (canMatchByStation && trackLengthM) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baselineRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-    totalBaselineRef = trackLengthM;
-  } else {
-    primaryRefCoords = primaryDists;
-    baselineRefCoords = baselineDists;
-    totalBaselineRef = Math.max(1, baselineDists[baselineDists.length - 1]);
-  }
+  // At and past the finish line (samples clamped to station L) the delta is the lap delta at the
+  // line itself - not a gap that keeps growing while the primary runs on past it.
+  const lineDelta = canMatchByStation && trackLengthM
+    ? (() => {
+        const primaryLineT = timeAtFinishLine(primaryPoints, primaryRefCoords, trackLengthM, primaryStartT);
+        const baselineLineT = timeAtFinishLine(baselinePoints, baselineRefCoords, trackLengthM, baselineStartT);
+        return primaryLineT === null || baselineLineT === null ? null : Number((primaryLineT - baselineLineT).toFixed(3));
+      })()
+    : null;
 
   const hasLateralOffsets = primaryPoints[0]?.lateralOffsetM !== undefined && baselinePoints[0]?.lateralOffsetM !== undefined;
   const baselineOffsets = hasLateralOffsets ? baselinePoints.map(p => p.lateralOffsetM ?? 0) : null;
@@ -631,13 +435,7 @@ export function computeLapComparisons(
   return primaryPoints.map((p, i) => {
     // Match on the same canonical reference coordinate (station or distance)
     const targetBaselineRef = Math.min(primaryRefCoords[i], totalBaselineRef);
-    const basePoint = interpolatePointAtDistance(
-      baselinePoints,
-      baselineRefCoords,
-      targetBaselineRef,
-      baselineStartT,
-      true
-    );
+    const basePoint = interpolatePointAtDistance(baselinePoints, baselineRefCoords, targetBaselineRef, baselineStartT);
 
     const primaryRelativeT = (p.timeSec || 0) - primaryStartT;
 
@@ -645,8 +443,10 @@ export function computeLapComparisons(
     if (i === 0 && Math.abs(primaryRefCoords[0]) < 1.0) {
       // Start line boundary: elapsed time is identically 0 for both laps at s ≈ 0
       deltaTimeSec = 0;
-    } else if (i === n - 1 && targetBaselineRef >= totalBaselineRef) {
-      // Finish line boundary: exact difference in total lap times
+    } else if (lineDelta !== null && primaryRefCoords[i] >= totalBaselineRef) {
+      deltaTimeSec = lineDelta;
+    } else if (!canMatchByStation && i === n - 1 && targetBaselineRef >= totalBaselineRef) {
+      // Distance matching (no track stations): the recordings' last samples are taken as the line.
       deltaTimeSec = Number(finishLineDelta.toFixed(3));
     } else {
       const rawDelta = primaryRelativeT - basePoint.timeSec;
@@ -664,12 +464,7 @@ export function computeLapComparisons(
 
     if (hasLateralOffsets && baselineOffsets) {
       primaryLateralOffsetM = p.lateralOffsetM;
-      baselineLateralOffsetM = interpolateScalarAtDistance(
-        baselineOffsets,
-        baselineRefCoords,
-        targetBaselineRef,
-        true
-      );
+      baselineLateralOffsetM = Number(interpolateScalarAtDistance(baselineOffsets, baselineRefCoords, targetBaselineRef).toFixed(2));
       deltaLateralOffsetM = Number(((primaryLateralOffsetM ?? 0) - baselineLateralOffsetM).toFixed(2));
     }
 
@@ -686,41 +481,6 @@ export function computeLapComparisons(
       baselineLateralOffsetM,
       deltaLateralOffsetM,
     };
-  });
-}
-
-/**
- * Filters replays sharing the same track and vehicle class for cross-session lap comparisons.
- */
-export function filterCompatibleReplays(
-  allReplays: ReplaySummary[],
-  currentTrackName?: string,
-  currentCarClass?: string,
-  excludeReplayName?: string
-): ReplaySummary[] {
-  if (!allReplays || allReplays.length === 0 || !currentTrackName) {
-    return [];
-  }
-
-  return allReplays.filter(r => {
-    if (excludeReplayName && r.name === excludeReplayName) return false;
-    if (!r.trackName) return false;
-
-    // Track matching rule
-    if (!matchesTrack(r.trackName, currentTrackName, '')) return false;
-
-    // Vehicle class rule (if vehicle class specified)
-    if (currentCarClass && currentCarClass !== 'All') {
-      const isClassMatch =
-        (r.carClass || r.carModel)
-          ? matchesCarClass(r.carClass || '', r.carModel || '', currentCarClass)
-          : matchesCarClass(r.eventTitle || '', '', currentCarClass);
-      if (!isClassMatch) {
-        return false;
-      }
-    }
-
-    return true;
   });
 }
 

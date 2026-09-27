@@ -365,7 +365,7 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       expect(downsampleReplayTrajectory(full, 1000)).toBe(full);
     });
 
-    it('decimates points to at most maxPoints and rescales sector frames proportionally', () => {
+    it('decimates points to at most maxPoints and points sector frames at the kept sample nearest the sector', () => {
       const full = buildFullTrajectory(1000);
       const result = downsampleReplayTrajectory(full, 100);
 
@@ -374,10 +374,12 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       expect(result.pointsCount).toBe(100);
       expect(result.maxPoints).toBe(100);
       expect(result.isFullResolution).toBe(false);
-      expect(result.sectors?.s1Frame).toBeCloseTo(33, 0);
-      expect(result.sectors?.s2Frame).toBeCloseTo(67, 0);
+      // The full trajectory's sector samples are at x = 333 and 667 (one sample per metre).
+      expect(Math.abs(result.points[result.sectors?.s1Frame ?? 0].x - 333)).toBeLessThanOrEqual(10);
+      expect(Math.abs(result.points[result.sectors?.s2Frame ?? 0].x - 667)).toBeLessThanOrEqual(10);
+      // The first and last samples (the line crossings of a cut lap) are always kept.
       expect(result.points[0].x).toBe(0);
-      expect(result.points[result.points.length - 1].x).toBeLessThan(1000);
+      expect(result.points[result.points.length - 1].x).toBe(999);
     });
 
     it('does not mutate the original full-resolution trajectory', () => {

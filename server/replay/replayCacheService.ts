@@ -2,6 +2,7 @@ import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './replayParser.js';
 import { extractReplayTrajectory } from './replayTrajectory.js';
+import { lapEdgesFromNeighbours } from './replayLapPoints.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 
 export interface ReplayCacheServiceOptions {
@@ -59,7 +60,7 @@ export class ReplayCacheService {
 
     if (!fs.existsSync(filePath)) {
       const stored = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey, { allowFallback: true });
-      if (stored) return stored;
+      if (stored) return this.withLapEdges(replayName, stored);
       throw new Error(`Replay file and cached trajectory not found: ${replayName}`);
     }
 
@@ -73,7 +74,7 @@ export class ReplayCacheService {
       stat.size,
       filePath,
     );
-    if (cached) return cached;
+    if (cached) return this.withLapEdges(replayName, cached);
 
     const trajectory = extractReplayTrajectory(filePath, {
       driverSlot: resolvedSlot,
@@ -99,6 +100,23 @@ export class ReplayCacheService {
         this.sessionDb.setReplayTrajectoryDefaults(replayName, -1, storedLapKey, finalSlotKey);
       }
     }
-    return trajectory;
+    return this.withLapEdges(replayName, trajectory);
+  }
+
+  /**
+   * Attaches the recording either side of the lap (leadInPoints / leadOutPoints) from the stored
+   * rows of the neighbouring laps, so the lap can be cut exactly at the start/finish line. Read
+   * from the database only: it works for replays LMU has deleted, and never decodes a file.
+   */
+  private withLapEdges(replayName: string, trajectory: ReplayTrajectoryData): ReplayTrajectoryData {
+    if (typeof trajectory.currentLap !== 'number') return trajectory;
+    const slotKey = typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : -1;
+    const { previous, next } = this.sessionDb.getAdjacentLapTrajectories(replayName, slotKey, trajectory.currentLap);
+    const { leadIn, leadOut } = lapEdgesFromNeighbours(trajectory.points, previous?.points, next?.points);
+    return {
+      ...trajectory,
+      leadInPoints: leadIn.length > 0 ? leadIn : undefined,
+      leadOutPoints: leadOut.length > 0 ? leadOut : undefined,
+    };
   }
 }

@@ -4,49 +4,16 @@ import {
   LapData,
   ReplayLapSummary,
   ReplayTrajectoryData,
-  ReplayTrajectoryPoint,
 } from '../core/types.js';
 import { downsampleReplayTrajectory } from './replayParser.js';
 import { enrichTrajectoryWithTrackGeometry } from '../tracks/serverTrackSync.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 
-export function cloneTrajectoryPoint(point: ReplayTrajectoryPoint): ReplayTrajectoryPoint {
-  return { ...point };
-}
-
-export function cloneTrajectoryLap(lap: ReplayLapSummary): ReplayLapSummary {
-  return { ...lap };
-}
-
-export function cloneReplayTrajectory(trajectory: ReplayTrajectoryData): ReplayTrajectoryData {
-  const cloned: ReplayTrajectoryData = {
-    ...trajectory,
-    points: trajectory.points ? trajectory.points.map(cloneTrajectoryPoint) : [],
-    laps: trajectory.laps ? trajectory.laps.map(cloneTrajectoryLap) : undefined,
-    sectors: trajectory.sectors ? { ...trajectory.sectors } : undefined,
-    bounds: trajectory.bounds ? { ...trajectory.bounds } : { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
-    validation: trajectory.validation
-      ? {
-          ...trajectory.validation,
-          officialLaps: Array.isArray(trajectory.validation.officialLaps)
-            ? trajectory.validation.officialLaps.map(lap => ({ ...lap }))
-            : [],
-        }
-      : undefined,
-    allLapsData: Array.isArray(trajectory.allLapsData)
-      ? trajectory.allLapsData.map(cloneReplayTrajectory)
-      : undefined,
-  };
-
-  return cloned;
-}
-
 export function downsampleTrajectoryResponse(
   trajectory: ReplayTrajectoryData,
   maxPoints: number | undefined
 ): ReplayTrajectoryData {
-  const copy = cloneReplayTrajectory(trajectory);
-  return downsampleReplayTrajectory(copy, maxPoints);
+  return downsampleReplayTrajectory({ ...trajectory }, maxPoints);
 }
 
 export function enrichTrajectoryGeometryResponse(
@@ -57,9 +24,8 @@ export function enrichTrajectoryGeometryResponse(
   sceneDesc?: string | null,
   trackLengthMeters?: number | null
 ): ReplayTrajectoryData {
-  const copy = cloneReplayTrajectory(trajectory);
   return enrichTrajectoryWithTrackGeometry(
-    copy,
+    { ...trajectory },
     venue,
     course,
     replayName,

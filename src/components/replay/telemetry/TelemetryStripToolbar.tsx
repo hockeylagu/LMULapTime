@@ -3,6 +3,7 @@ import { Play, ZoomIn, Activity, ChevronLeft, ChevronRight } from 'lucide-react'
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
+import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution } from './telemetryResolution.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -13,8 +14,8 @@ export interface TelemetryStripToolbarProps {
   spanTimeSec?: number;
   onResetZoom: () => void;
   onStepIndex?: (delta: number) => void;
-  telemetryResolution?: number;
-  onChangeResolution?: (res: number) => void;
+  telemetryResolution?: TelemetryResolution;
+  onChangeResolution?: (res: TelemetryResolution) => void;
   pointsCount?: number;
   rawPointsCount?: number;
   rawSampleRateHz?: number;
@@ -170,11 +171,11 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 setIsResPopoverOpen(prev => !prev);
               }}
               className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
-                telemetryResolution === 1200 && !isFullResolution
+                telemetryResolution === 'standard' && !isFullResolution
                   ? isResPopoverOpen
                     ? 'bg-sky-500/30 border-sky-400/70 text-sky-200 font-bold shadow-[0_0_10px_rgba(56,189,248,0.4)]'
                     : 'bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20'
-                  : telemetryResolution === 2400 && !isFullResolution
+                  : telemetryResolution === 'high' && !isFullResolution
                   ? isResPopoverOpen
                     ? 'bg-emerald-500/30 border-emerald-400/70 text-emerald-200 font-bold shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                     : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
@@ -185,14 +186,14 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
               <Activity className={`w-2.5 h-2.5 ${
-                telemetryResolution === 1200 && !isFullResolution
+                telemetryResolution === 'standard' && !isFullResolution
                   ? 'text-sky-400'
-                  : telemetryResolution === 2400 && !isFullResolution
+                  : telemetryResolution === 'high' && !isFullResolution
                   ? 'text-emerald-400'
                   : 'text-purple-400'
               }`} />
               <span className="whitespace-nowrap">
-                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 0 ? 'Full Raw' : `${(pointsCount || telemetryResolution || 0).toLocaleString()} pts`}
+                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 'full' ? 'Full Raw' : `${(pointsCount || 0).toLocaleString()} pts`}
               </span>
             </button>
 
@@ -200,7 +201,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               <TelemetryResolutionPopover
                 isOpen={isResPopoverOpen}
                 onClose={() => setIsResPopoverOpen(false)}
-                telemetryResolution={telemetryResolution ?? 2400}
+                telemetryResolution={telemetryResolution ?? DEFAULT_TELEMETRY_RESOLUTION}
                 onChangeResolution={onChangeResolution ?? (() => {})}
                 pointsCount={pointsCount ?? 0}
                 rawPointsCount={rawPointsCount}

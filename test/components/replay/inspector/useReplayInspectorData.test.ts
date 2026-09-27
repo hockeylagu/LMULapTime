@@ -65,11 +65,33 @@ describe('useReplayInspectorData', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.selectedDriverSlot).toBe(2);
     expect(result.current.selectedDriver?.name).toBe('Player Driver');
-    expect(result.current.currentPoint?.speedKmh).toBe(127);
-    expect(result.current.maxSpeed).toBe(153);
+    // Speed smoothing is a centred time window, so the recording's end samples keep their values.
+    expect(result.current.currentPoint?.speedKmh).toBe(100);
+    expect(result.current.maxSpeed).toBe(180);
     expect(result.current.currentLapSummary?.lapTimeSec).toBe(100);
     expect(onLapChange).toHaveBeenCalledWith(2);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'));
+  });
+
+  it('asks for one point every 2 m by default, and every sample at full resolution', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response(trajectory);
+    });
+    const trajectoryUrls = () => fetchMock.mock.calls.map(([input]) => String(input)).filter(url => url.includes('/trajectory?'));
+    const lastTrajectoryUrl = () => trajectoryUrls()[trajectoryUrls().length - 1];
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.telemetryResolution).toBe('high');
+    expect(trajectoryUrls()[0]).toContain('trajectory?pointSpacingM=2&');
+
+    act(() => result.current.handleChangeResolution('full'));
+    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?maxPoints=0&'));
+    act(() => result.current.handleChangeResolution('standard'));
+    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?pointSpacingM=4&'));
   });
 
   it('reports metadata load failures and resets data when closed', async () => {
@@ -117,6 +139,105 @@ describe('useReplayInspectorData', () => {
     act(() => result.current.handleRemoveCompare());
     expect(result.current.isCompareMode).toBe(false);
     expect(result.current.baselineReplayName).toBeNull();
+  });
+
+  it("offers comparison laps of the inspected driver's car class, not the replay player's", async () => {
+    const multiclass: ReplayMetadata = {
+      ...metadata,
+      carClass: 'Hyper',
+      drivers: [
+        { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '93_26_PEUG27100541', carModel: 'Peugeot 9X8', carClass: 'LMH' },
+        { slot: 3, name: 'GT3 Driver', vehicleId: '92_25_MANT9651C55B', carModel: 'Porsche 911 GT3 R', carClass: 'LMGT3' },
+      ],
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(multiclass);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response(trajectory);
+    });
+    const compareClasses = () => fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter(url => url.includes('/compare/laps'))
+      .map(url => new URL(url).searchParams.get('carClass'));
+
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true, replayName: multiclass.filename,
+    }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(compareClasses().slice(-1)[0]).toBe('LMH'));
+
+    act(() => result.current.handleSelectDriver(3));
+    await waitFor(() => expect(compareClasses().slice(-1)[0]).toBe('LMGT3'));
+  });
+
+  it('never compares against a lap of another car class', async () => {
+    const multiclass: ReplayMetadata = {
+      ...metadata,
+      drivers: [
+        { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '93_26_PEUG27100541', carModel: 'Peugeot 9X8', carClass: 'LMH' },
+        { slot: 3, name: 'Other Hypercar', vehicleId: '397_26_VLMDH', carModel: 'Cadillac V-Series.R', carClass: 'LMH' },
+        { slot: 4, name: 'GT3 Driver', vehicleId: '92_25_MANT9651C55B', carModel: 'Porsche 911 GT3 R', carClass: 'LMGT3' },
+      ],
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(multiclass);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('driverName=Other')) return response({ ...trajectory, driverName: 'Other Hypercar', driverSlot: 3 });
+      return response(trajectory);
+    });
+
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true,
+      replayName: multiclass.filename,
+      initialCompareMode: true,
+      initialBaselineReplayName: multiclass.filename,
+      initialBaselineLapNumber: 2,
+      initialBaselineDriverName: 'Other Hypercar',
+    }), { wrapper });
+    await waitFor(() => expect(result.current.baselineTrajectory?.driverName).toBe('Other Hypercar'));
+    expect(result.current.baselineError).toBeNull();
+
+    act(() => result.current.handleSelectDriver(4));
+    await waitFor(() => expect(result.current.baselineTrajectory).toBeNull());
+    expect(result.current.baselineError).toContain('same car class');
+    expect(result.current.lapDeltas).toBeNull();
+
+    act(() => result.current.handleSelectDriver(2));
+    await waitFor(() => expect(result.current.baselineTrajectory?.driverName).toBe('Other Hypercar'));
+    expect(result.current.baselineError).toBeNull();
+  });
+
+  it('opens a comparison from the same replay with one request each, the baseline asked with its driver', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({ ...trajectory, currentLap: Number(new URL(url).searchParams.get('lap')) });
+    });
+    fetchMock.mockClear();
+    const urls = () => fetchMock.mock.calls.map(([input]) => String(input));
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true,
+      replayName: metadata.filename,
+      initialLapNumber: 2,
+      initialCompareMode: true,
+      initialBaselineReplayName: metadata.filename,
+      initialBaselineLapNumber: 1,
+      initialBaselineDriverName: 'Other Driver',
+    }), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
+    await waitFor(() => expect(urls().filter(url => url.includes('/compare/laps')).length).toBeGreaterThan(0));
+
+    expect(urls().filter(url => url.includes('/compare/laps'))).toHaveLength(1);
+    expect(urls().filter(url => url.includes('/metadata'))).toHaveLength(1);
+    const baselineUrls = urls().filter(url => url.includes('&lap=1'));
+    expect(baselineUrls).toHaveLength(1);
+    expect(baselineUrls[0]).toContain('driverName=Other%20Driver');
+    expect(new URL(urls().find(url => url.includes('/compare/laps')) ?? '').searchParams.get('carClass')).toBeTruthy();
   });
 
   it('initializes baseline replay, lap, and driver directly from comparison props', async () => {

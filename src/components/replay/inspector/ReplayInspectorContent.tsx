@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
-import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
 import { filterCornerConsistencyStats } from '../../../utils/cornerConsistency.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
@@ -169,7 +169,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   }, [trajectory]);
 
   const primaryDists = useMemo(
-    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points) : []),
+    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []),
     [trajectory]
   );
 

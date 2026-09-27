@@ -115,6 +115,19 @@ describe('paceCategory utility', () => {
   });
 
   describe('matchesTrack - Comprehensive Track Matching', () => {
+    it('strictly isolates track layouts (Monza Curva Grande, Bahrain Outer/Paddock, Paul Ricard Short)', () => {
+      const replayTrackNames = [
+        'Autodromo Nazionale Monza', 'Monza Curva Grande Circuit',
+        'Bahrain International Circuit', 'Bahrain Outer Circuit', 'Bahrain Paddock Circuit',
+        'Circuit Paul Ricard', 'Paul Ricard - 1A-V2-Short',
+      ];
+      const matching = (current: string) => replayTrackNames.filter(name => matchesTrack(name, current, ''));
+      expect(matching('Autodromo Nazionale Monza (Curva Grande Circuit)')).toEqual(['Monza Curva Grande Circuit']);
+      expect(matching('Bahrain International Circuit (Outer Circuit)')).toEqual(['Bahrain Outer Circuit']);
+      expect(matching('Bahrain International Circuit (Paddock Circuit)')).toEqual(['Bahrain Paddock Circuit']);
+      expect(matching('Paul Ricard Circuit (1A V2 Short)')).toEqual(['Paul Ricard - 1A-V2-Short']);
+    });
+
     it('matches exact and normalized track names regardless of layout or prefix', () => {
       expect(matchesTrack('Spa', 'Circuit de Spa-Francorchamps', 'GP')).toBe(true);
       expect(matchesTrack('Circuit de Spa-Francorchamps', 'Spa', '')).toBe(true);

@@ -20,6 +20,15 @@ export function interpolateAngle(a0: number, a1: number, alpha: number): number 
 }
 
 /**
+ * VCR time at which the DuckDB lap clock starts: VCR samples carry session time, DuckDB samples
+ * lap time. A VCR lap already on lap time (it starts within the lap) is left as it is.
+ */
+export function vcrLapBaseTime(duckLap: DuckDbLapTelemetry, vcrPoints: ReplayTrajectoryPoint[]): number {
+  const first = vcrPoints[0]?.timeSec;
+  return first !== undefined && first > duckLap.lapTimeSec + 5 ? first : 0;
+}
+
+/**
  * Fuses native 100 Hz DuckDB telemetry channels (pedals, steering, speed, RPM,
  * gear, 4-wheel dynamics) with the VCR replay trajectory's 2D world coordinates
  * (x, y, z, yaw) to provide pristine driving inputs with an intact GPS track map.
@@ -40,10 +49,7 @@ export function fuseDuckDbWithVcrTrajectory(
     };
   }
 
-  const vcrBaseTime =
-    vcrPoints[0]?.timeSec !== undefined && vcrPoints[0].timeSec > (duckLap.lapTimeSec + 5)
-      ? vcrPoints[0].timeSec
-      : 0;
+  const vcrBaseTime = vcrLapBaseTime(duckLap, vcrPoints);
   const vcrMaxTime =
     ((vcrPoints[vcrPoints.length - 1].timeSec ?? duckLap.lapTimeSec) - vcrBaseTime) || duckLap.lapTimeSec;
   const duckPoints = duckLap.points;
@@ -128,11 +134,24 @@ export function fuseDuckDbWithVcrTrajectory(
       p.regenRate !== undefined
   );
 
+  // The VCR recording either side of the lap, on the DuckDB lap clock, so the fused lap can be
+  // cut at the line too (positions are what matters there; the inputs are the VCR ones).
+  const firstDuckTime = fusedPoints[0]?.timeSec ?? 0;
+  const lastDuckTime = fusedPoints[fusedPoints.length - 1]?.timeSec ?? 0;
+  const onDuckClock = (edge: ReplayTrajectoryPoint[] | undefined, keep: (t: number) => boolean) => {
+    const retimed = (edge ?? [])
+      .map(p => ({ ...p, timeSec: Number(((p.timeSec ?? 0) - vcrBaseTime).toFixed(3)) }))
+      .filter(p => keep(p.timeSec));
+    return retimed.length > 0 ? retimed : undefined;
+  };
+
   return {
     ...vcrTrajectory,
     source: 'duckdb',
     duckdbFilename,
     points: fusedPoints,
+    leadInPoints: onDuckClock(vcrTrajectory.leadInPoints, t => t < firstDuckTime),
+    leadOutPoints: onDuckClock(vcrTrajectory.leadOutPoints, t => t > lastDuckTime),
     pointsCount: fusedPoints.length,
     rawPointsCount: fusedPoints.length,
     rawSampleRateHz: duckLap.sampleRateHz,

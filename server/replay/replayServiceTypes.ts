@@ -7,6 +7,8 @@ export interface ReplayTrajectoryRequest {
   driverName?: string;
   lapNumber?: number;
   maxPoints: number;
+  /** When set, the lap is served at one point per this many metres instead of `maxPoints`. */
+  pointSpacingM?: number;
   allowDuckDb: boolean;
 }
 

@@ -11,7 +11,7 @@ describe('serverTrackSync', () => {
     const def = getTrackDefinition('monza_gp');
     expect(def).not.toBeNull();
     expect(def?.layoutKey).toBe('monza_gp');
-    expect(def?.lengthM).toBeGreaterThan(5000);
+    expect(def?.spatialIndex.totalLengthM).toBeGreaterThan(5000);
     expect(def?.timingGates?.startFinish).toBeDefined();
     // Sector 1/2 gates are only emitted when telemetry-derived detection is plausible (see
     // buildAllTrackBoundaries.ts's isPlausibleSectorStation) - monza_gp's happened to be
@@ -126,6 +126,8 @@ describe('serverTrackSync', () => {
     );
 
     expect(enriched.layoutKey).toBeUndefined();
+    expect(enriched.stationSource).toBe('odometer');
+    expect(enriched.lineCut).toEqual({ start: 'none', end: 'none' });
     expect(enriched.trackLengthM).toBe(300); // 100m + 200m
     expect(enriched.points[0].distM).toBe(0);
     expect(enriched.points[1].distM).toBe(100);
@@ -171,5 +173,80 @@ describe('serverTrackSync', () => {
     const elapsedMs = performance.now() - start;
 
     expect(elapsedMs).toBeLessThan(350);
+  });
+
+  describe('cutting the lap at the start/finish line', () => {
+    // Samples along Monza's own centreline around the line, 0.1 s apart; the timing loop
+    // sliced the lap three samples after the line (a late remote timing event).
+    const lapAroundTheLine = () => {
+      const centerline = getTrackDefinition('monza_gp')?.centerline ?? [];
+      const at = (i: number): ReplayTrajectoryPoint => {
+        const [x, z] = centerline[(i + centerline.length) % centerline.length];
+        return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
+      };
+      const leadIn = [-4, -3, -2, -1, 0, 1, 2].map(at);
+      const lap = [3, 4, 5, 6, 7, 8, 9, 10].map(at);
+      const trajectory: ReplayTrajectoryData = {
+        replayName: 'Monza_Test.Vcr',
+        pointsCount: lap.length,
+        points: lap,
+        leadInPoints: leadIn,
+        leadOutPoints: [11, 12].map(at),
+        bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      };
+      return trajectory;
+    };
+
+    it('ends a full lap exactly at the track length it reports', () => {
+      const centerline = getTrackDefinition('monza_gp')?.centerline ?? [];
+      const m = centerline.length;
+      const at = (i: number): ReplayTrajectoryPoint => {
+        const [x, z] = centerline[((i % m) + m) % m];
+        return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
+      };
+      const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => at(from + k));
+      const trajectory: ReplayTrajectoryData = {
+        replayName: 'Monza_Test.Vcr',
+        pointsCount: m,
+        points: range(3, m + 3),
+        leadInPoints: range(-4, 2),
+        leadOutPoints: range(m + 4, m + 6),
+        bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      };
+      const enriched = enrichTrajectoryWithTrackGeometry(trajectory, 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      expect(enriched.lineCut).toEqual({ start: 'line', end: 'line' });
+      expect(enriched.points[enriched.points.length - 1].stationM).toBe(enriched.trackLengthM);
+    });
+
+    it('starts a late-sliced lap exactly at the line, using the recording before the slice', () => {
+      const enriched = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      const [x0, z0] = getTrackDefinition('monza_gp')?.centerline[0] ?? [NaN, NaN];
+      expect(enriched.points[0].stationM).toBe(0);
+      expect(enriched.points[0].distM).toBe(0);
+      expect(enriched.points[0].x).toBeCloseTo(x0, 1);
+      expect(enriched.points[0].z).toBeCloseTo(z0, 1);
+      expect(enriched.points[0].timeSec).toBeCloseTo(100, 2);
+      expect(enriched.stationSource).toBe('track');
+      expect(enriched.lineCut).toEqual({ start: 'line', end: 'none' }); // the lap stops hundreds of metres short of the line
+    });
+
+    it('extends a start with no recording before it back to the line, and says so', () => {
+      const trajectory = lapAroundTheLine();
+      delete trajectory.leadInPoints;
+      const enriched = enrichTrajectoryWithTrackGeometry(trajectory, 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      expect(enriched.lineCut).toEqual({ start: 'extrapolated', end: 'none' });
+      expect(enriched.points[0].stationM).toBe(0);
+      expect(enriched.points[0].timeSec).toBeCloseTo(100, 1); // along Monza's start straight
+    });
+
+    it('never returns the recording either side of the lap', () => {
+      const known = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Autodromo Nazionale Monza', 'Monza GP', 'Monza_Test.Vcr');
+      const unknown = enrichTrajectoryWithTrackGeometry(lapAroundTheLine(), 'Unknown Venue', 'Unknown', 'Unknown.Vcr');
+      for (const t of [known, unknown]) {
+        expect(t.leadInPoints).toBeUndefined();
+        expect(t.leadOutPoints).toBeUndefined();
+      }
+      expect(unknown.points).toHaveLength(8);
+    });
   });
 });

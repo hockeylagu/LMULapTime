@@ -401,7 +401,7 @@ describe('replayParser - trajectory & timing', () => {
       }));
 
       const traj = extractReplayTrajectory(speedPath, { driverSlot: 1, maxPoints: 0 });
-      expect(traj.points.map(point => point.speedKmh)).toEqual([101, 101, 101]);
+      expect(traj.points.map(point => point.speedKmh)).toEqual([100.81, 100.81, 100.81]);
 
       fs.unlinkSync(speedPath);
     });

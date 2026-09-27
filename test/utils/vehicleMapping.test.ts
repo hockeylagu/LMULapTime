@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
+  resolveDriverCarClass,
+  areComparableCarClasses,
 } from '../../shared/domain/vehicleMapping.js';
 
 describe('vehicleMapping utility', () => {
@@ -103,6 +105,30 @@ describe('vehicleMapping utility', () => {
     it('correctly classifies safety cars and returns empty string for unknown classes', () => {
       expect(mapVehicleIdToClass('992S_PC', 'Porsche 992 (Safety Car)')).toBe('Safety Car');
       expect(mapVehicleIdToClass('Custom_Kart_99', 'Kart')).toBe('');
+    });
+  });
+
+  describe('comparison car class', () => {
+    it('resolves a driver class from the entry, else from its vehicle', () => {
+      expect(resolveDriverCarClass({ carClass: 'Hyper', vehicleId: '92_25_MANT9651C55B' })).toBe('Hyper');
+      expect(resolveDriverCarClass({ vehicleId: '777_DSTATI5BFA7EF3', carModel: 'Aston Martin Vantage AMR' })).toBe('GTE');
+      expect(resolveDriverCarClass({ vehicleId: '85_IRONDAM1563682E', carModel: 'Lamborghini Huracan GT3 Evo2' })).toBe('LMGT3');
+      expect(resolveDriverCarClass(null)).toBe('');
+    });
+
+    it('only allows comparing laps within one class, matching class aliases', () => {
+      expect(areComparableCarClasses('Hyper', 'LMH')).toBe(true);
+      expect(areComparableCarClasses('GT3', 'LMGT3')).toBe(true);
+      expect(areComparableCarClasses('GTE', 'LMGT3')).toBe(false);
+      expect(areComparableCarClasses('LMGT3', 'GTE')).toBe(false);
+      expect(areComparableCarClasses('LMH', 'LMGT3')).toBe(false);
+      expect(areComparableCarClasses('LMP2', 'LMP2elms')).toBe(false);
+      expect(areComparableCarClasses('LMP3', 'LMP2')).toBe(false);
+    });
+
+    it('does not block a comparison when a class is unknown', () => {
+      expect(areComparableCarClasses('', 'LMGT3')).toBe(true);
+      expect(areComparableCarClasses('LMGT3', undefined)).toBe(true);
     });
   });
 });

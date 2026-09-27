@@ -1,3 +1,5 @@
+import { matchesCarClass } from './paceCategory.js';
+
 // Friendly car name mapping from known LMU skin/vehicle ID tokens
 // NOTE: Specific tokens (RSR, 499P, DSTATI) must be checked BEFORE generic substrings
 // (911, 296) to prevent false matches on vehicle IDs like "911_RSR".
@@ -161,4 +163,23 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
   }
 
   return '';
+}
+
+/**
+ * A driver's car class: the class recorded for the entry, else derived from its vehicle.
+ * Returns '' when the car is not recognised (e.g. an unknown mod).
+ */
+export function resolveDriverCarClass(driver?: { carClass?: string; vehicleId?: string; carModel?: string } | null): string {
+  if (!driver) return '';
+  return driver.carClass || mapVehicleIdToClass(driver.vehicleId, driver.carModel);
+}
+
+/**
+ * Whether two laps may be compared: laps are only ever compared within one car class.
+ * Class names are matched through their aliases (Hyper/LMH/LMDh, GT3/LMGT3, ...). An unknown
+ * class ('') cannot be checked and does not block the comparison.
+ */
+export function areComparableCarClasses(a?: string, b?: string): boolean {
+  if (!a || !b) return true;
+  return matchesCarClass(a, '', b) && matchesCarClass(b, '', a);
 }

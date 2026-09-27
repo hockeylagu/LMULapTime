@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReplayInspectorSidebar } from '../../../../src/components/replay/inspector/ReplayInspectorSidebar.js';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis.js';
+import { CornerApexChart } from '../../../../src/components/replay/analysis/CornerApexChart.js';
+
+// Spy on the real chart (it still renders) to check the distances it is given.
+vi.mock('../../../../src/components/replay/analysis/CornerApexChart.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../src/components/replay/analysis/CornerApexChart.js')>();
+  return { ...actual, CornerApexChart: vi.fn(actual.CornerApexChart) };
+});
 
 describe('ReplayInspectorSidebar', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -193,6 +200,36 @@ describe('ReplayInspectorSidebar', () => {
     const aiBtn = screen.getByRole('button', { name: /AI Report/i });
     fireEvent.click(aiBtn);
     expect(setActiveTab).toHaveBeenCalledWith('map');
+  });
+
+  it('gives the corner chart baseline distances in the primary lap frame (matched by track station)', () => {
+    // Straight road where station == x. The baseline is trimmed 11 m after the S/F line and
+    // drives a 5% longer line, so its own driven distance drifts away from the primary's.
+    const lap = (firstStation: number, lineFactor: number): ReplayTrajectoryData => ({
+      ...trajectory,
+      pointsCount: 0,
+      points: Array.from({ length: 21 }, (_, i) => {
+        const station = firstStation + i * 2;
+        return { x: station, y: 0, z: 0, stationM: station, distM: (station - firstStation) * lineFactor, speedKmh: 150, throttle: 100, brake: 0, timeSec: i * 0.05 };
+      }),
+    });
+    const primary = lap(0, 1);
+    const baseline = lap(11, 1.05);
+    vi.mocked(CornerApexChart).mockClear();
+    render(
+      <ReplayInspectorSidebar
+        {...baseProps}
+        trajectory={primary}
+        baselineTrajectory={baseline}
+        isCompareMode={true}
+        isSelfAnalysis={false}
+        selectedCornerNumber={1}
+      />
+    );
+
+    const props = vi.mocked(CornerApexChart).mock.calls.slice(-1)[0]?.[0];
+    const k = baseline.points.findIndex(p => p.stationM === 31);
+    expect(props?.baselineDists?.[k]).toBeCloseTo(31, 1); // its own frame would say ~32.6 m
   });
 
   it('renders ConsistencyPanel when cornerSubView is consistency', () => {

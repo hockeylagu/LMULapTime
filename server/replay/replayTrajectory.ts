@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import {
   ReplayTrajectoryData,
-  ReplayTrajectoryPoint,
   ReplayPenaltyEvent,
   ReplayPitEvent,
   ReplayFlagEvent,
@@ -15,8 +14,9 @@ import {
   VcrTimingEvent,
   DetectedLapInternal,
   detectLapsFromTelemetry,
-  isTimeInIntervals,
 } from './replayLapBuilder.js';
+import { buildTrajectoryPoints } from './replayLapPoints.js';
+import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import {
   ReplayProgressTracker,
   ReplayProgressCallback,
@@ -299,9 +299,9 @@ export function extractReplayTrajectory(
                 x,
                 y,
                 z,
-                rotX: Number(rotX.toFixed(3)),
+                rotX: Number(rotX.toFixed(4)),
                 rotY,
-                rotZ: Number(rotZ.toFixed(3)),
+                rotZ: Number(rotZ.toFixed(4)),
                 steerYaw,
                 rawThrottle,
                 rawBrake,
@@ -343,7 +343,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: pText || 'Penalty',
                 action: 'given',
               });
@@ -352,7 +352,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: `Served ${pType}`,
                 penaltyType: pType,
                 action: 'served',
@@ -361,7 +361,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: 'Penalty removed by admin',
                 action: 'removed',
               });
@@ -375,7 +375,7 @@ export function extractReplayTrajectory(
             const sectorMask = buf[eventSp + 5 + 1];
             const driverFlag = buf[eventSp + 5 + 2];
             replayFlagEvents.push({
-              timeSec: Number(sTime.toFixed(2)),
+              timeSec: Number(sTime.toFixed(4)),
               flagState,
               flagName: FLAG_NAMES[flagState] || `Unknown (${flagState})`,
               sectorMask,
@@ -389,7 +389,7 @@ export function extractReplayTrajectory(
               for (let i = 0; i < count; i++) {
                 order.push(buf[eventSp + 5 + 21 + i]);
               }
-              standingsHistory.push({ timeSec: Number(sTime.toFixed(2)), order });
+              standingsHistory.push({ timeSec: Number(sTime.toFixed(4)), order });
             }
           } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
                      (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
@@ -413,7 +413,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: 49,
                   action: 'entered pit / garage',
                   isGarage: true,
@@ -434,7 +434,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: pCode,
                   action: pitCodeEntry.action,
                   isGarage: pitCodeEntry.isGarage,
@@ -445,7 +445,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: pCode,
                   action: `pit action ${pCode}`,
                 });
@@ -534,74 +534,18 @@ export function extractReplayTrajectory(
         ? Math.round((rawPointsCount - 1) / lapDuration)
         : 0;
 
-      let downsampled = lapRawPts;
-      if (maxPoints > 0 && lapRawPts.length > maxPoints) {
-        const step = lapRawPts.length / maxPoints;
-        downsampled = [];
-        for (let i = 0; i < maxPoints; i++) {
-          downsampled.push(lapRawPts[Math.min(lapRawPts.length - 1, Math.floor(i * step))]);
-        }
-      }
+      const lapPoints = buildTrajectoryPoints(lapRawPts, garageIntervals, pitIntervals);
+      const selected = maxPoints > 0 && lapPoints.length > maxPoints ? selectFeatureSamples(lapPoints, maxPoints) : null;
+      const finalPoints = selected ? selected.map(i => lapPoints[i]) : lapPoints;
 
       const lapSpan = Math.max(1, chosenLap.endIdx - chosenLap.startIdx);
-      const s1Fraction = (chosenLap.s1Idx - chosenLap.startIdx) / lapSpan;
-      const s2Fraction = (chosenLap.s2Idx - chosenLap.startIdx) / lapSpan;
-      const targetFrames = downsampled.length;
-      const s1Frame = Math.min(targetFrames - 1, Math.round(s1Fraction * targetFrames));
-      const s2Frame = Math.min(targetFrames - 1, Math.round(s2Fraction * targetFrames));
-
-      const MAX_PLAUSIBLE_SPEED_KMH = 400;
-      const rawSpeeds: number[] = [];
-      for (let i = 0; i < downsampled.length; i++) {
-        const cur = downsampled[i];
-        let speed = 0;
-        if (i > 0) {
-          const prev = downsampled[i - 1];
-          const dt = cur.sTime - prev.sTime;
-          const dist = Math.hypot(cur.x - prev.x, cur.z - prev.z);
-          if (dt > 0.005 && dist < 60) {
-            speed = Math.min((dist / dt) * 3.6, MAX_PLAUSIBLE_SPEED_KMH);
-          }
-        }
-        const packetSpeed = downsampled[i].speedKmhRaw;
-        rawSpeeds.push(packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH ? packetSpeed : speed);
-      }
-
-      const finalPoints: ReplayTrajectoryPoint[] = [];
-      for (let i = 0; i < downsampled.length; i++) {
-        const cur = downsampled[i];
-        const rawSpeed = rawSpeeds[i];
-        const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
-          (garageIntervals.length === 0 && Boolean(cur.inPit) && rawSpeed < 1);
-        const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
-
-        finalPoints.push({
-          x: Number(cur.x.toFixed(2)),
-          y: Number(cur.y.toFixed(2)),
-          z: Number(cur.z.toFixed(2)),
-          rotX: cur.rotX,
-          rotY: Number(cur.rotY.toFixed(3)),
-          rotZ: cur.rotZ,
-          speedKmh: Math.round(rawSpeed),
-          throttle: cur.rawThrottle ?? 0,
-          brake: cur.rawBrake ?? 0,
-          steerYaw: cur.steerYaw ?? 0,
-          gear: cur.gearRaw,
-          inPit,
-          isOffTrack: cur.isOffTrack,
-          inGarage,
-          isTeleport: false,
-          timeSec: Number(cur.sTime.toFixed(2)),
-          tcActive: cur.tcActive,
-          absActive: cur.absActive,
-          pitLimiter: cur.pitLimiter,
-          detachablePartState: cur.detachablePartState,
-          engineRpm: cur.engineRpm,
-          wheelSpeeds: cur.wheelSpeeds,
-          brakeTemps: cur.brakeTemps,
-          fuel: cur.fuel,
-        });
-      }
+      const sectorFrame = (sectorIdx: number): number => {
+        if (selected) return nearestSelectedIndex(selected, sectorIdx - chosenLap.startIdx);
+        const fraction = (sectorIdx - chosenLap.startIdx) / lapSpan;
+        return Math.min(finalPoints.length - 1, Math.round(fraction * finalPoints.length));
+      };
+      const s1Frame = sectorFrame(chosenLap.s1Idx);
+      const s2Frame = sectorFrame(chosenLap.s2Idx);
 
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const p of finalPoints) {
@@ -628,12 +572,12 @@ export function extractReplayTrajectory(
         laps: lapsSummary,
         sectors: { s1Frame, s2Frame },
         bounds: {
-          minX: Number(minX.toFixed(2)),
-          maxX: Number(maxX.toFixed(2)),
-          minZ: Number(minZ.toFixed(2)),
-          maxZ: Number(maxZ.toFixed(2)),
-          spanX: Number((maxX - minX).toFixed(2)),
-          spanZ: Number((maxZ - minZ).toFixed(2)),
+          minX: Number(minX.toFixed(4)),
+          maxX: Number(maxX.toFixed(4)),
+          minZ: Number(minZ.toFixed(4)),
+          maxZ: Number(maxZ.toFixed(4)),
+          spanX: Number((maxX - minX).toFixed(4)),
+          spanZ: Number((maxZ - minZ).toFixed(4)),
         },
         points: finalPoints,
         penalties: replayPenalties.length > 0 ? replayPenalties : undefined,

@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { getTrajectoryDistances, computeLapComparisons } from '../../../utils/replayComparison.js';
+import { computeLapComparisons } from '../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame } from '../../../utils/lapAlignment.js';
 import {
   projectTrajectoryPoints,
   projectBoundaryPoints,
@@ -11,19 +12,19 @@ import {
   computeEffectiveBounds,
   computeBaselineDeltaByIdx,
   projectStartFinishGate,
-  buildEffectiveBaselinePoints,
 } from './replayMapUtils.js';
 import { MapControlsOverlay } from './MapControlsOverlay.js';
 import { HeatmapLegendBar } from './HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
+import { GpsSceneCarMarkers } from './GpsSceneCarMarkers.js';
 import { useGpsMapPanZoom } from './useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from './GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
 import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
-import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { MAP_COLORS } from '../../../utils/themeColors.js';
 
 import type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
 
@@ -36,7 +37,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
-    trackVenue, trackCourse, layoutKey, replayName, trackGeometry,
+    trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM,
   } = props;
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
@@ -49,10 +50,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   });
   const effectiveGeometry = trackGeometry ?? fetchedGeometry;
 
-  const effectiveBaselinePoints = useMemo(
-    () => buildEffectiveBaselinePoints(baselinePoints, effectiveGeometry?.lengthM),
-    [baselinePoints, effectiveGeometry]
-  );
+  const effectiveBaselinePoints = useMemo(() => baselinePoints ?? [], [baselinePoints]);
 
   const effectiveBounds = useMemo(
     () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, effectiveBaselinePoints),
@@ -101,20 +99,22 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
 
-  const primaryDists = useMemo(() => getTrajectoryDistances(points, effectiveGeometry?.lengthM), [points, effectiveGeometry]);
+  const primaryDists = useMemo(() => getTrajectoryDistances(points, trackLengthM), [points, trackLengthM]);
+  // Baseline distances in the PRIMARY lap's frame (station-matched), the same frame corner
+  // analysis reports baseline brake/throttle points and corner ranges in.
   const baselineDists = useMemo(
-    () => (effectiveBaselinePoints.length > 0 ? getTrajectoryDistances(effectiveBaselinePoints, effectiveGeometry?.lengthM) : []),
-    [effectiveBaselinePoints, effectiveGeometry]
+    () => (effectiveBaselinePoints.length > 0 ? getDistancesInReferenceFrame(effectiveBaselinePoints, points, trackLengthM) : []),
+    [effectiveBaselinePoints, points, trackLengthM]
   );
 
   const deltaByIdx = useMemo(() => {
     if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
-    return computeLapComparisons(points, baselinePoints, effectiveGeometry?.lengthM).map(c => c.deltaTimeSec);
-  }, [colorBy, points, baselinePoints, effectiveGeometry]);
+    return computeLapComparisons(points, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
+  }, [colorBy, points, baselinePoints, trackLengthM]);
 
   const baselineDeltaByIdx = useMemo(
-    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, effectiveBaselinePoints, primaryDists, baselineDists, effectiveGeometry?.lengthM, points) : null),
-    [colorBy, deltaByIdx, effectiveBaselinePoints, baselineDists, primaryDists, effectiveGeometry, points]
+    () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists) : null),
+    [colorBy, deltaByIdx, baselineDists, primaryDists]
   );
   const baselineGhostPos = useMemo(() => {
     return computeGhostPosition(
@@ -124,11 +124,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       currentIndex,
       effectiveBounds,
       VIEWBOX_SIZE,
-      PADDING,
-      effectiveGeometry?.lengthM,
-      points
+      PADDING
     );
-  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds, effectiveGeometry, points]);
+  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds]);
 
   const pedalMarkerPoints = useMemo(
     () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints),
@@ -136,8 +134,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   );
 
   const cornerMarkers = useMemo(
-    () => computeDispersedCornerMarkers(corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints),
-    [corners, primaryDists, baselineDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
+    () => computeDispersedCornerMarkers(corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints),
+    [corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
   );
 
   const lastSelectedCornerRef = useRef<number | null>(null);
@@ -193,95 +191,70 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         />
       )}
 
-      <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md">
-        <defs>
-          <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor={TELEMETRY_COLORS.primary} floodOpacity="0.9" />
-          </filter>
-          <filter id="ghostGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={TELEMETRY_COLORS.baseline} floodOpacity="0.9" />
-          </filter>
-        </defs>
+      <div className="relative w-full h-full">
+        {/* Static scene on its own layer: the minimap and car markers above it move every frame. */}
+        <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md will-change-transform">
+          {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
+            <GpsTrackRoadRibbon
+              leftSvgPoints={leftSvgPoints}
+              rightSvgPoints={rightSvgPoints}
+              centerlineSvgPoints={centerlineSvgPoints}
+            />
+          ) : (
+            <>
+              <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            </>
+          )}
 
-        {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
-          <GpsTrackRoadRibbon
-            leftSvgPoints={leftSvgPoints}
-            rightSvgPoints={rightSvgPoints}
-            centerlineSvgPoints={centerlineSvgPoints}
+          <GpsTrackSegments
+            svgPoints={svgPoints}
+            baselineSvgPoints={baselineSvgPoints}
+            colorBy={colorBy}
+            deltaByIdx={deltaByIdx}
+            baselineDeltaByIdx={baselineDeltaByIdx}
+            primaryOpacity={primaryOpacity}
+            baselineOpacity={baselineOpacity}
+            onSelectIndex={onSelectIndex}
+            highlightDistRange={highlightDistRange}
+            primaryDists={primaryDists}
+            baselineDists={baselineDists}
+            dimNonSelectedTrack={dimNonSelectedTrack}
           />
-        ) : (
-          <>
-            <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          </>
-        )}
 
-        <GpsTrackSegments
-          svgPoints={svgPoints}
-          baselineSvgPoints={baselineSvgPoints}
-          colorBy={colorBy}
-          deltaByIdx={deltaByIdx}
-          baselineDeltaByIdx={baselineDeltaByIdx}
+          <GpsStartFinishLine
+            svgPoints={svgPoints}
+            zoomLevel={zoomLevel}
+            markerScale={markerScale}
+            cornerMarkers={cornerMarkers}
+            pedalMarkers={pedalMarkerPoints}
+            gateLeftSvg={gateLeftSvg}
+            gateRightSvg={gateRightSvg}
+          />
+
+          <GpsSceneMarkers
+            cornerMarkers={cornerMarkers}
+            pedalMarkers={pedalMarkerPoints}
+            selectedCornerNumber={selectedCornerNumber}
+            onSelectCornerNumber={onSelectCornerNumber}
+            onSelectIndex={onSelectIndex}
+            markerScale={markerScale}
+            zoomLevel={zoomLevel}
+            primaryOpacity={primaryOpacity}
+            baselineOpacity={baselineOpacity}
+            dimNonSelectedTrack={dimNonSelectedTrack}
+            showCornerFlags={showCornerFlags}
+          />
+        </svg>
+        <GpsSceneCarMarkers
+          viewBox={currentViewBox}
+          currentPos={currentPos}
+          baselineGhostPos={baselineGhostPos}
+          markerScale={markerScale}
           primaryOpacity={primaryOpacity}
           baselineOpacity={baselineOpacity}
-          onSelectIndex={onSelectIndex}
-          highlightDistRange={highlightDistRange}
-          primaryDists={primaryDists}
-          baselineDists={baselineDists}
-          dimNonSelectedTrack={dimNonSelectedTrack}
         />
-
-        <GpsStartFinishLine
-          svgPoints={svgPoints}
-          zoomLevel={zoomLevel}
-          markerScale={markerScale}
-          cornerMarkers={cornerMarkers}
-          pedalMarkers={pedalMarkerPoints}
-          gateLeftSvg={gateLeftSvg}
-          gateRightSvg={gateRightSvg}
-        />
-
-        <GpsSceneMarkers
-          cornerMarkers={cornerMarkers}
-          pedalMarkers={pedalMarkerPoints}
-          selectedCornerNumber={selectedCornerNumber}
-          onSelectCornerNumber={onSelectCornerNumber}
-          onSelectIndex={onSelectIndex}
-          markerScale={markerScale}
-          zoomLevel={zoomLevel}
-          primaryOpacity={primaryOpacity}
-          baselineOpacity={baselineOpacity}
-          dimNonSelectedTrack={dimNonSelectedTrack}
-          showCornerFlags={showCornerFlags}
-        />
-
-        {currentPos && baselineGhostPos && (
-          <line
-            x1={currentPos.sx}
-            y1={currentPos.sy}
-            x2={baselineGhostPos.sx}
-            y2={baselineGhostPos.sy}
-            stroke={TELEMETRY_COLORS.baseline}
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-            opacity={0.75 * baselineOpacity}
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
-        {baselineGhostPos && (
-          <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)}) scale(${markerScale})`} opacity={baselineOpacity}>
-            <circle r="11" fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
-            <circle r="6" fill={TELEMETRY_COLORS.baseline} stroke={CHART_COLORS.white} strokeWidth="2" filter="url(#ghostGlow)" />
-          </g>
-        )}
-
-        {currentPos && (
-          <g transform={`translate(${currentPos.sx}, ${currentPos.sy}) scale(${markerScale})`} opacity={primaryOpacity}>
-            <circle r="12" fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" className="animate-ping opacity-50" />
-            <circle r="6.5" fill={TELEMETRY_COLORS.primary} stroke={CHART_COLORS.white} strokeWidth="2.2" filter="url(#carGlow)" />
-          </g>
-        )}
-      </svg>
+      </div>
 
       <GpsSceneHudOverlay isStationary={isStationary} />
 
