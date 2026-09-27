@@ -1,11 +1,8 @@
-import fs from 'fs';
-import { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
-import { SessionDatabase } from '../core/db.js';
-import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
+import { DetailedSession, DuckDbLapTelemetry, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import { SessionDatabase, TelemetryMetadataRecord } from '../core/db.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';
-import { matchDuckDbToReplay, matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
+import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
-import { matchesTrack } from '../../shared/domain/paceCategory.js';
 
 export interface TelemetryEnrichmentInput {
   replayName: string;
@@ -25,18 +22,69 @@ export interface TelemetryEnrichmentResult {
   fused: boolean;
 }
 
-export class ReplayTelemetryService {
-  public constructor(
-    private readonly sessionDb: SessionDatabase,
-    private readonly telemetryCatalog: TelemetryCatalog
-  ) {}
+interface FoundLap {
+  file: TelemetryMetadataRecord;
+  lap: DuckDbLapTelemetry;
+}
 
-  public getFiles() {
-    return this.telemetryCatalog.getFiles();
+export class ReplayTelemetryService {
+  public constructor(private readonly sessionDb: SessionDatabase) {}
+
+  /** A lap cached from any of the session's files (by an older reader too, with `anyVersion`). */
+  private cachedLap(files: TelemetryMetadataRecord[], lapNumber: number, anyVersion = false): FoundLap | null {
+    for (const file of files) {
+      const lap = this.sessionDb.getTelemetryLapCache(file.filename, lapNumber, { anyVersion });
+      if (lap) return { file, lap };
+    }
+    return null;
   }
 
-  public getTelemetryMeta() {
-    return this.sessionDb.getTelemetryMetadata();
+  /**
+   * Reads the lap from the session's files. LMU numbers laps across all of a session's files, so the
+   * file holding a lap with this number and lap time wins; failing that, the first file with a lap of
+   * this time (the single-file rule of DuckDbReader.getLapTelemetry). DuckDB counts the out-lap as
+   * lap 0, one below the replay's numbering, so either number is accepted.
+   */
+  private async readLap(files: TelemetryMetadataRecord[], lapNumber: number, lapTimeSec?: number): Promise<FoundLap | null> {
+    // A file that fails to open is reported once, not once per pass.
+    const failed = new Set<string>();
+    const exact = await this.firstLap(files, failed, async reader => {
+      const laps = await reader.getLapList();
+      const gap = (lap: { lapTimeSec: number }) => (lapTimeSec ? Math.abs(lap.lapTimeSec - lapTimeSec) : 0);
+      // The closer lap time wins when both numbers qualify (two laps within 0.5 s of each other).
+      const numbered = laps
+        .filter(lap => (lap.lapNumber === lapNumber || lap.lapNumber === lapNumber - 1) && gap(lap) <= 0.5)
+        .sort((left, right) => gap(left) - gap(right) || right.lapNumber - left.lapNumber)[0];
+      return numbered ? reader.getLapTelemetry(numbered.lapNumber) : null;
+    });
+    return exact ?? this.firstLap(files, failed, reader => reader.getLapTelemetry(lapNumber, lapTimeSec));
+  }
+
+  private async firstLap(
+    files: TelemetryMetadataRecord[],
+    failed: Set<string>,
+    read: (reader: DuckDbReader) => Promise<DuckDbLapTelemetry | null>
+  ): Promise<FoundLap | null> {
+    for (const file of files) {
+      if (failed.has(file.filename)) continue;
+      const reader = new DuckDbReader(file.filePath);
+      try {
+        await reader.open();
+        const lap = await read(reader);
+        if (lap) return { file, lap };
+      } catch (error) {
+        failed.add(file.filename);
+        console.warn(`[DuckDB] Failed to read ${file.filename}:`, error);
+        this.sessionDb.recordIngestError('duckdb', file.filePath, error);
+      } finally {
+        try {
+          await reader.close();
+        } catch (error) {
+          console.warn(`[DuckDB] Failed to close ${file.filename}:`, error);
+        }
+      }
+    }
+    return null;
   }
 
   public async enrichWithTelemetry(input: TelemetryEnrichmentInput): Promise<TelemetryEnrichmentResult> {
@@ -49,65 +97,36 @@ export class ReplayTelemetryService {
     }
 
     try {
-      let fileMtime: number | undefined;
-      if (fs.existsSync(input.filePath)) {
-        try {
-          fileMtime = fs.statSync(input.filePath).mtime.getTime();
-        } catch {
-          // Ignore stat failure
-        }
-      }
-      if (fileMtime === undefined) {
-        fileMtime = this.sessionDb.getStoredReplayFileInfo(input.replayName)?.file_mtime;
-      }
+      // The stored matches only (see telemetry/telemetryLinks): the session's files, else the replay's.
+      const links = TelemetryLinks.load(this.sessionDb);
+      const files = links.filesForReplay(input.replayName, input.matchedSession)
+        .map(filename => links.row(filename))
+        .filter((row): row is TelemetryMetadataRecord => Boolean(row));
 
-      const files = this.telemetryCatalog.getFiles();
-      const telemetryMeta = this.sessionDb.getTelemetryMetadata();
-      const matchedSessionId = input.matchedSession?.id;
-      const sessionMatchedFilename = matchedSessionId
-        ? telemetryMeta.find(item => item.matchedSessionId === matchedSessionId)?.filename
-        : undefined;
-      const sessionMatchedFile = sessionMatchedFilename
-        ? files.find(file => file.filename === sessionMatchedFilename)
-        : null;
-      const isSessionMatchValid = sessionMatchedFile && input.matchedSession ? (
-        matchesTrack(sessionMatchedFile.trackName, input.matchedSession.trackVenue, input.matchedSession.trackCourse)
-      ) : false;
-
-      const matchedDuck =
-        matchDuckDbToReplay(files, input.metadata, fileMtime) ||
-        (input.matchedSession ? matchDuckDbToSession(files, input.matchedSession) : null) ||
-        (isSessionMatchValid ? sessionMatchedFile : null);
-
-      if (matchedDuck) {
-        this.sessionDb.upsertTelemetryMetadata(matchedDuck, input.matchedSession?.id, input.replayName);
-        trajectory.duckdbFilename = matchedDuck.filename;
+      if (files.length > 0) {
+        trajectory.duckdbFilename = links.forReplay(input.replayName, input.matchedSession);
 
         const chosenLapNum = trajectory.currentLap || input.lapNumber || 1;
         const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNum)?.lapTimeSec;
 
-        let duckLap = this.sessionDb.getTelemetryLapCache(matchedDuck.filename, chosenLapNum);
-        if (!duckLap) {
-          const duckReader = new DuckDbReader(matchedDuck.filePath);
-          try {
-            await duckReader.open();
-            duckLap = await duckReader.getLapTelemetry(chosenLapNum, targetLapTimeSec);
-            if (duckLap) {
-              this.sessionDb.upsertTelemetryLapCache(matchedDuck.filename, chosenLapNum, duckLap);
-            }
-          } catch (error) {
-            console.warn(`[DuckDB] Failed to extract lap ${chosenLapNum} from ${matchedDuck.filename}:`, error);
-            this.sessionDb.recordIngestError('duckdb', matchedDuck.filePath, error);
-          } finally {
-            try {
-              await duckReader.close();
-            } catch (error) {
-              console.warn(`[DuckDB] Failed to close ${matchedDuck.filename}:`, error);
-            }
+        let found = this.cachedLap(files, chosenLapNum);
+        if (!found) {
+          const onDisk = files.filter(file => links.isOnDisk(file.filename));
+          if (onDisk.length > 0) {
+            found = await this.readLap(onDisk, chosenLapNum, targetLapTimeSec);
+            if (found) this.sessionDb.upsertTelemetryLapCache(found.file.filename, chosenLapNum, found.lap);
+          }
+          // A lap cached by an older reader is the only copy left once its file is deleted.
+          found ??= this.cachedLap(files.filter(file => !links.isOnDisk(file.filename)), chosenLapNum, true);
+          if (!found && onDisk.length === 0) {
+            duckdbUnavailableReason = 'The DuckDB file of this session was deleted before this lap was read; using Native VCR data.';
           }
         }
+        const duckLap = found?.lap ?? null;
+        const matchedDuck = found?.file;
+        if (matchedDuck) trajectory.duckdbFilename = matchedDuck.filename;
 
-        if (duckLap) {
+        if (duckLap && matchedDuck) {
           trajectory.duckdbRawPointsCount = duckLap.pointsCount;
           trajectory.duckdbRawSampleRateHz = duckLap.sampleRateHz;
 

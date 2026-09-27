@@ -21,8 +21,6 @@ import {
   minValidTime,
 } from '../../shared/domain/formatters.js';
 import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
-import { matchesTrack } from '../../shared/domain/paceCategory.js';
-import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
@@ -32,6 +30,7 @@ import {
 } from './sessionXmlTypes.js';
 import { parseStreamEvents } from './sessionXmlStream.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
+import { findMatchingReplay } from './replayMatching.js';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -80,7 +79,8 @@ export class LmuParser {
       if (
         existing.mtime !== entry.mtime ||
         existing.sizeBytes !== entry.sizeBytes ||
-        existing.durationSec !== entry.durationSec
+        existing.durationSec !== entry.durationSec ||
+        existing.sceneDesc !== entry.sceneDesc
       ) {
         this.replayIndexRevision++;
       }
@@ -490,9 +490,11 @@ export class LmuParser {
 
     // Best Laps & Sectors - Strictly calculated from valid completed laps (before any inference)
     const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
-    const bestLapTime: number | null = validLaps.length > 0
-      ? Math.min(...validLaps.map(l => l.lapTime as number))
+    const bestLap = validLaps.length > 0
+      ? validLaps.reduce((best, cur) => ((cur.lapTime as number) < (best.lapTime as number) ? cur : best))
       : null;
+    const bestLapTime: number | null = bestLap ? (bestLap.lapTime as number) : null;
+    const bestLapNum: number | null = bestLap ? bestLap.lapNum : null;
 
     let bestS1: number | null = null;
     let bestS2: number | null = null;
@@ -652,6 +654,7 @@ export class LmuParser {
       finishGapToLeaderString,
       bestLapTime,
       bestLapTimeString: formatTime(bestLapTime),
+      bestLapNum,
       bestS1,
       bestS2,
       bestS3,
@@ -789,75 +792,7 @@ export class LmuParser {
     xmlFileMtimeMs: number
   ): ReplayFileEntry | undefined {
     if (this.replaysMap.length === 0) return undefined;
-
-    const normSession = (sessionCode || '').toLowerCase();
-
-    const matchesSessionCode = (vCodeRaw: string, sCodeRaw: string): boolean => {
-      const vCode = vCodeRaw.toLowerCase();
-      const sCode = sCodeRaw.toLowerCase();
-      if (vCode === sCode) return true;
-      if ((sCode === 'practice' || sCode.startsWith('p')) && vCode.startsWith('p')) return true;
-      if ((sCode === 'qualifying' || sCode.startsWith('q')) && vCode.startsWith('q')) return true;
-      if ((sCode === 'race' || sCode.startsWith('r')) && vCode.startsWith('r')) return true;
-      return false;
-    };
-
-    const getMinDiff = (v: ReplayFileEntry) => {
-      // A replay's mtime is when the VCR was saved, i.e. the END of the recorded session, so it
-      // is compared with the XML mtime (also written at session end); start-to-start uses the
-      // replay duration. Comparing replay end with session start is only a fallback for replays
-      // without a known duration: in back-to-back races it lands on the PREVIOUS race's replay,
-      // which ends minutes before the next race starts.
-      const diffEnd = Math.abs(v.mtime - xmlFileMtimeMs);
-      if (!v.durationSec) {
-        return Math.min(diffEnd, Math.abs(v.mtime - sessionTimestampMs));
-      }
-      const replayStart = v.mtime - Math.round(v.durationSec * 1000);
-      return Math.min(diffEnd, Math.abs(replayStart - sessionTimestampMs));
-    };
-
-    const sessionScoped = this.replaysMap.filter(v => matchesSessionCode(v.sessionCode, normSession) && getMinDiff(v) <= 600000);
-
-    // 1. Exact track/layout match takes priority whenever one exists.
-    const exactCandidates = sessionScoped.filter(v => matchesTrack(v.trackName, trackVenue, trackCourse));
-    if (exactCandidates.length > 0) {
-      exactCandidates.sort((a, b) => {
-        const aExactCode = a.sessionCode.toLowerCase() === normSession ? 0 : 1;
-        const bExactCode = b.sessionCode.toLowerCase() === normSession ? 0 : 1;
-        if (aExactCode !== bExactCode) return aExactCode - bExactCode;
-        return getMinDiff(a) - getMinDiff(b);
-      });
-      return exactCandidates[0];
-    }
-
-    // 2. Fall back to generic-vs-specific same-circuit matches only when no exact-layout
-    // replay is available
-    const fallbackCandidates = sessionScoped.filter(v => {
-      const qSpec = getCircuitSpecification(v.trackName);
-      const sSpec = getCircuitSpecification(trackVenue, trackCourse);
-
-      if (qSpec.layoutKey !== 'unknown' && sSpec.layoutKey !== 'unknown') {
-        if (qSpec.circuitId !== sSpec.circuitId) return false;
-        return Boolean(qSpec.isDefaultLayout || sSpec.isDefaultLayout);
-      }
-
-      if (qSpec.layoutKey === 'unknown' && sSpec.layoutKey === 'unknown') {
-        const normVcrTrack = v.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const normXmlCourse = (trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const normXmlVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return (
-          (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
-          (!trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)))
-        );
-      }
-
-      return false;
-    });
-
-    if (fallbackCandidates.length === 0) return undefined;
-
-    fallbackCandidates.sort((a, b) => getMinDiff(a) - getMinDiff(b));
-    return fallbackCandidates[0];
+    return findMatchingReplay(this.replaysMap, { trackVenue, trackCourse, sessionCode, sessionTimestampMs, xmlFileMtimeMs });
   }
 
   private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {

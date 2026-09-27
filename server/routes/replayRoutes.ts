@@ -6,6 +6,7 @@ import { buildReplayListSummaries, composeReplayMetadata } from '../replay/repla
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
+import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 function isSafeFileName(value: string): boolean {
   return value.length > 0 && value !== '.' && value !== '..' && path.basename(value) === value && !value.includes('\0');
@@ -21,7 +22,7 @@ function parseBoundedInteger(value: unknown, name: string, min: number, max: num
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
-  const telemetryService = new ReplayTelemetryService(context.sessionDb, context.telemetryCatalog);
+  const telemetryService = new ReplayTelemetryService(context.sessionDb);
   const trajectoryService = new ReplayTrajectoryService(
     context.replaysDir,
     context.replayCache,
@@ -32,11 +33,34 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/replays/cache', (_req, res) => {
     try {
-      res.json(context.sessionDb.getReplayCacheList());
+      res.json(context.sessionDb.getReplayCacheList(context.replaysDir));
     } catch (error: unknown) {
       console.error('Failed to list cached replays:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list cached replays' });
     }
+  });
+
+  // The on-disk replays still to be decoded again at the current parser version, and the job doing it.
+  router.get('/replays/upgrade', (_req, res) => {
+    const upgrade = context.replayUpgrade;
+    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
+    const backlog = upgrade.getBacklog(context.replaysDir);
+    res.json({
+      status: upgrade.getStatus(),
+      pendingReplays: backlog.length,
+      pendingDrivers: backlog.reduce((sum, replay) => sum + replay.driverSlots.length, 0),
+      backlog: backlog.map(({ filename, metadataOutdated, driverSlots }) => ({ filename, metadataOutdated, driverSlots })),
+    });
+  });
+
+  router.post('/replays/upgrade', (req, res) => {
+    const upgrade = context.replayUpgrade;
+    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
+    const enabled: unknown = req.body?.enabled;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'Expected { enabled: boolean }' });
+    upgrade.setEnabled(enabled);
+    if (enabled) context.startReplayUpgradeWhenIdle();
+    res.json({ status: upgrade.getStatus() });
   });
 
   router.get('/replays', (_req, res) => {
@@ -45,16 +69,13 @@ export function createReplayRouter(context: ServerContext): Router {
         .filter(file => file.toLowerCase().endsWith('.vcr'));
       const storedReplays = context.sessionDb.getAllStoredReplayFiles();
       const sessions = context.loadSessions();
-      const duckFiles = context.telemetryCatalog.getFiles();
-      const telemetryMeta = context.sessionDb.getTelemetryMetadata();
 
       const summaries = buildReplayListSummaries({
         diskFiles,
         storedReplays,
         replaysDir: context.replaysDir,
         sessions,
-        duckFiles,
-        telemetryMeta,
+        telemetryLinks: TelemetryLinks.load(context.sessionDb),
         getMetadata: (filePath, filename) => context.replayCache.getMetadata(filePath, filename),
       });
 
@@ -67,7 +88,7 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/telemetry', (_req, res) => res.json(context.telemetryCatalog.getFiles()));
 
-  router.get('/replays/:name/metadata', (req, res) => {
+  router.get('/replays/:name/metadata', async (req, res) => {
     try {
       const replayName = req.params.name;
       if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
@@ -82,34 +103,19 @@ export function createReplayRouter(context: ServerContext): Router {
       const sessions = context.loadSessions();
       const matchedSession = sessions.find(session => session.matchingReplayFile?.name === replayName);
 
-      let fileMtime: number | undefined;
-      if (fs.existsSync(filePath)) {
-        try {
-          fileMtime = fs.statSync(filePath).mtime.getTime();
-        } catch {
-          // Ignore stat failure
-        }
-      }
-      if (fileMtime === undefined) {
-        fileMtime = context.sessionDb.getStoredReplayFileInfo(replayName)?.file_mtime;
-      }
-
-      const duckFiles = context.telemetryCatalog.getFiles();
-      const telemetryMeta = context.sessionDb.getTelemetryMetadata();
+      // Metadata without laps borrows them from the player's trajectory (decoded in the worker if needed).
+      const fallbackLaps = rawMetadata.laps?.length
+        ? undefined
+        : await context.replayCache.getFullTrajectory(filePath, replayName, { playerName: context.currentParser.configuredPlayerName })
+          .then(trajectory => trajectory.laps)
+          .catch(() => undefined);
 
       const metadata = composeReplayMetadata({
         metadata: rawMetadata,
         replayName,
         matchedSession,
-        fallbackTrajectoryLaps: () => {
-          const trajectory = context.replayCache.getFullTrajectory(filePath, replayName, {
-            playerName: context.currentParser.configuredPlayerName,
-          });
-          return trajectory.laps;
-        },
-        duckFiles,
-        telemetryMeta,
-        fileMtime,
+        fallbackTrajectoryLaps: () => fallbackLaps,
+        duckdbFilename: TelemetryLinks.load(context.sessionDb).forReplay(replayName, matchedSession),
       });
 
       res.json(metadata);

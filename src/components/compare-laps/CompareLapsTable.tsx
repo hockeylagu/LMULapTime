@@ -3,7 +3,7 @@ import { Gauge, ChevronDown, ChevronUp } from 'lucide-react';
 import { ComparableLap } from '../../../shared/types/index.js';
 import { AvailableLapsSortOption } from './useCompareLapsData';
 import { CompareLapsTableRow } from './CompareLapsTableRow';
-import { HideEmptyToggle, SortDropdown } from '../common/index.js';
+import { HideEmptyToggle, SortDropdown, LoadingState } from '../common/index.js';
 
 export interface CompareLapsTableProps {
   selectedTrack: string;
@@ -84,10 +84,12 @@ export const CompareLapsTable: React.FC<CompareLapsTableProps> = ({
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-lmu-muted">
-          <div className="inline-block animate-spin w-6 h-6 border-2 border-lmu-accent border-t-transparent rounded-full mb-2" />
-          <p className="text-xs font-medium">Scanning sessions on {selectedTrack}...</p>
-        </div>
+        <LoadingState
+          size="compact"
+          title="Scanning Circuit Laps"
+          subtitle={`Scanning sessions on ${selectedTrack}...`}
+          dataTestId="compare-laps-loading"
+        />
       ) : displayLaps.length === 0 ? (
         <div className="py-8 text-center text-lmu-muted text-xs">
           <p>No completed laps found for {selectedTrack} in {selectedCarClass}.</p>

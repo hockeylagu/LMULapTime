@@ -4,20 +4,11 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession } from './types.js';
 import { SyncResult, SessionSyncProgress } from './dbSchema.js';
 import { StoredReplayFileInfo } from './dbReplayMetadataStore.js';
+import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
+import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
 
 export interface SessionXmlSyncParser {
-  addReplayEntry(entry: {
-    name: string;
-    path: string;
-    sizeBytes: number;
-    trackName: string;
-    sessionCode: string;
-    mtime: number;
-    durationSec?: number;
-    eventTitle?: string;
-    splitNo?: number;
-    eventType?: string;
-  }): void;
+  addReplayEntry(entry: ReplayFileEntry): void;
   parseSessionXml(filePath: string): DetailedSession | null;
 }
 
@@ -54,7 +45,7 @@ export function *syncSessionsIterator(
 
   // Get existing cached session file info
   const db = host.getDb();
-  const existingRows = versionMismatch ? [] : (db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
+  const existingRows = (db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
     id: string;
     file_path: string;
     file_mtime: number;
@@ -68,32 +59,17 @@ export function *syncSessionsIterator(
 
   // Seed parser's replay index with stored DB replays so deleted VCR files still match
   const storedReplays = host.getAllStoredReplayFiles();
-  for (const r of storedReplays) {
-    const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
-    const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
-    const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
-    parser.addReplayEntry({
-      name: r.filename,
-      path: r.file_path,
-      sizeBytes: r.file_size,
-      trackName,
-      sessionCode,
-      mtime: r.file_mtime,
-      eventTitle: r.metadata.eventInfo?.eventTitle,
-      splitNo: r.metadata.eventInfo?.splitNo,
-      eventType: r.metadata.eventInfo?.eventType,
-      durationSec: r.metadata.durationSec,
-    });
-  }
+  for (const r of storedReplays) parser.addReplayEntry(replayIndexEntryFromStored(r));
 
   const files = fs.readdirSync(resultsDir).filter(f => f.endsWith('.xml'));
   let added = 0;
   let updated = 0;
 
-  // Keep the previous parser-version cache readable until its complete replacement is ready.
+  // A new parser version re-parses every XML on disk and replaces those rows in one transaction.
+  // Rows whose XML is gone are kept as they are: they are the only copy of that session left.
+  const reparseAll = forceReparse || versionMismatch;
   const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
     if (versionMismatch) {
-      db.exec('DELETE FROM sessions');
       host.setMetadata('parser_version', DB_PARSER_VERSION);
       host.invalidateSessionCache();
     }
@@ -114,7 +90,7 @@ export function *syncSessionsIterator(
       const cached = cacheMap.get(normalizedPath);
 
       // Check if file is already cached and unmodified
-      if (!forceReparse && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+      if (!reparseAll && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
         continue;
       }
 

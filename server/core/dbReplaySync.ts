@@ -5,6 +5,7 @@ import { ReplaySyncProgress, ReplaySyncResult } from './dbSchema.js';
 import { parseReplayMetadata } from '../replay/replayParser.js';
 import { extractReplayTrajectory } from '../replay/replayTrajectory.js';
 import { extractReplayTrajectoryInWorker } from '../replay/replayTrajectoryWorkerClient.js';
+import { isReplayDriverSettled, ReplayDriverIngest, ReplayDriverIngestStatus } from './dbReplayIngestStore.js';
 
 export interface ReplaySyncHost {
   getMetadata(key: string): string | null;
@@ -17,6 +18,10 @@ export interface ReplaySyncHost {
   setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
+  /** Replaces a driver's whole lap set in one transaction and records it as stored. */
+  replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
+  getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
+  recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void;
 }
 
 /**
@@ -50,6 +55,21 @@ export function cacheAllLapsForDriver(
   // No numbered row covers the chosen lap, so it must still be stored under the -1 key.
   const { allLapsData: _unused2, ...defaultSingle } = trajectory;
   host.upsertReplayTrajectoryCache(filename, driverSlotKey, -1, mtime, size, defaultSingle, filePath);
+}
+
+/**
+ * Whether a driver still has to be decoded for this file version: not when this build already stored
+ * it or failed to (a failure is retried only after the parser version changes), nor when compatible
+ * rows are already stored. Slot -1 stands for the player's decode, which picks the slot itself.
+ */
+function driverNeedsDecode(host: ReplaySyncHost, filename: string, driverSlot: number, mtime: number, size: number, filePath: string): boolean {
+  if (isReplayDriverSettled(host.getReplayDriverIngest(filename, driverSlot), mtime, size)) return false;
+  return !host.hasValidReplayTrajectoryCache(filename, driverSlot, -1, mtime, size, filePath);
+}
+
+function recordDriverFailure(host: ReplaySyncHost, filename: string, filePath: string, driverSlot: number, mtime: number, size: number, error: unknown): void {
+  host.recordIngestError('vcr', filePath, error);
+  host.recordReplayDriverIngest(filename, driverSlot, mtime, size, 'failed', error instanceof Error ? error.message : String(error));
 }
 
 /**
@@ -109,7 +129,7 @@ export function* syncReplaysIterator(
       let anyTrajectoryNewlyCached = false;
 
       let defaultDriverSlot: number | undefined;
-      if (!host.hasValidReplayTrajectoryCache(f, -1, -1, mtime, size, filePath)) {
+      if (driverNeedsDecode(host, f, -1, mtime, size, filePath)) {
         try {
           const trajectory = extractReplayTrajectory(filePath, {
             playerName: options.playerName,
@@ -122,13 +142,12 @@ export function* syncReplaysIterator(
           defaultDriverSlot = trajectory.driverSlot;
           yield { processed: i, total: files.length, currentFile: f, stage: 'Persisting trajectory cache', filePercent: 95 };
           const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
-          cacheAllLapsForDriver(host, f, filePath, mtime, size, primarySlot, trajectory);
-          host.setReplayTrajectoryDefaults(f, -1, trajectory.currentLap ?? null, primarySlot);
+          host.replaceReplayDriverLaps(f, filePath, mtime, size, primarySlot, trajectory, true);
           anyTrajectoryNewlyCached = true;
           const totalLaps = trajectory.allLapsData?.length || trajectory.laps?.length || 1;
           console.log(`[SQLite Cache] [7/7] Cached ${totalLaps} laps for primary driver (${trajectory.driverName || 'Player'}) in ${f}`);
         } catch (err) {
-          host.recordIngestError('vcr', filePath, err);
+          recordDriverFailure(host, f, filePath, -1, mtime, size, err);
         }
         yield { processed: i, total: files.length, currentFile: f, stage: 'Completed primary driver', filePercent: 100 };
       }
@@ -139,7 +158,7 @@ export function* syncReplaysIterator(
           break;
         }
         if (typeof driver.slot !== 'number' || driver.slot === defaultDriverSlot) continue;
-        if (host.hasValidReplayTrajectoryCache(f, driver.slot, -1, mtime, size, filePath)) continue;
+        if (!driverNeedsDecode(host, f, driver.slot, mtime, size, filePath)) continue;
         try {
           const driverTrajectory = extractReplayTrajectory(filePath, {
             driverSlot: driver.slot,
@@ -147,12 +166,12 @@ export function* syncReplaysIterator(
             maxPoints: 0,
             allLaps: true,
           });
-          cacheAllLapsForDriver(host, f, filePath, mtime, size, driver.slot, driverTrajectory);
+          host.replaceReplayDriverLaps(f, filePath, mtime, size, driver.slot, driverTrajectory, false);
           anyTrajectoryNewlyCached = true;
           const totalLaps = driverTrajectory.allLapsData?.length || driverTrajectory.laps?.length || 1;
           console.log(`[SQLite Cache] [7/7] Cached ${totalLaps} laps for driver slot ${driver.slot} (${driver.name}) in ${f}`);
         } catch (err) {
-          host.recordIngestError('vcr', filePath, err);
+          recordDriverFailure(host, f, filePath, driver.slot, mtime, size, err);
         }
         yield { processed: i, total: files.length, currentFile: f, stage: `Cached driver ${driver.name}`, filePercent: 100 };
       }
@@ -232,7 +251,7 @@ export async function* syncReplaysAsyncIterator(
 
       let trajectoryCached = false;
       let defaultDriverSlot: number | undefined;
-      if (!host.hasValidReplayTrajectoryCache(filename, -1, -1, mtime, size, filePath)) {
+      if (driverNeedsDecode(host, filename, -1, mtime, size, filePath)) {
         try {
           const extraction = extractReplayTrajectoryInWorker(filePath, {
             playerName: options.playerName,
@@ -254,11 +273,10 @@ export async function* syncReplaysAsyncIterator(
           defaultDriverSlot = trajectory.driverSlot;
           yield { processed: index, total: files.length, currentFile: filename, stage: 'Persisting trajectory cache', filePercent: 95 };
           const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
-          cacheAllLapsForDriver(host, filename, filePath, mtime, size, primarySlot, trajectory);
-          host.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, primarySlot);
+          host.replaceReplayDriverLaps(filename, filePath, mtime, size, primarySlot, trajectory, true);
           trajectoryCached = true;
         } catch (error) {
-          host.recordIngestError('vcr', filePath, error);
+          recordDriverFailure(host, filename, filePath, -1, mtime, size, error);
         }
       }
 
@@ -268,7 +286,7 @@ export async function* syncReplaysAsyncIterator(
           break;
         }
         if (typeof driver.slot !== 'number' || driver.slot === defaultDriverSlot) continue;
-        if (host.hasValidReplayTrajectoryCache(filename, driver.slot, -1, mtime, size, filePath)) continue;
+        if (!driverNeedsDecode(host, filename, driver.slot, mtime, size, filePath)) continue;
         try {
           const extraction = extractReplayTrajectoryInWorker(filePath, {
             driverSlot: driver.slot,
@@ -287,10 +305,10 @@ export async function* syncReplaysAsyncIterator(
             };
             step = await extraction.next();
           }
-          cacheAllLapsForDriver(host, filename, filePath, mtime, size, driver.slot, step.value);
+          host.replaceReplayDriverLaps(filename, filePath, mtime, size, driver.slot, step.value, false);
           trajectoryCached = true;
         } catch (error) {
-          host.recordIngestError('vcr', filePath, error);
+          recordDriverFailure(host, filename, filePath, driver.slot, mtime, size, error);
         }
       }
 

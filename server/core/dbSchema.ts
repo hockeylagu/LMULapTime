@@ -18,7 +18,9 @@ export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
 export function isCompatibleReplayCacheVersion(version: string): boolean {
   return COMPATIBLE_REPLAY_CACHE_VERSIONS.has(version);
 }
-export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v9';
+// v10: pedals and tyre wear are scaled to percent once per channel, not per sample (v9 turned a
+// pedal passing through 0-1 % into a 0-100 % spike).
+export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v10';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a
@@ -211,6 +213,31 @@ export function initDbSchema(db: DatabaseType): void {
       first_seen_at INTEGER NOT NULL,
       last_seen_at INTEGER NOT NULL,
       PRIMARY KEY (source_type, source_path)
+    );
+
+    -- The outcome of decoding one driver of a replay file, for that file version and parser version:
+    -- a driver already stored or that failed is not decoded again until either changes.
+    CREATE TABLE IF NOT EXISTS replay_ingest_drivers (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      file_mtime INTEGER NOT NULL,
+      file_size INTEGER NOT NULL,
+      parser_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      attempted_at INTEGER NOT NULL,
+      PRIMARY KEY (filename, driver_slot)
+    );
+
+    -- Session -> replay links withdrawn because the replay fails the matching rules. The session row
+    -- no longer names the replay; previous_link_json keeps what it held, so a withdrawal can be undone.
+    CREATE TABLE IF NOT EXISTS rejected_replay_links (
+      session_id TEXT NOT NULL,
+      replay_filename TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      previous_link_json TEXT NOT NULL,
+      rejected_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, replay_filename)
     );
   `);
 

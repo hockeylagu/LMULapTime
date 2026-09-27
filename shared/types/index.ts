@@ -316,6 +316,9 @@ export interface ReplayCacheSummary {
   durationSec?: number;
   eventTitle?: string;
   trajectoriesCached: number;
+  parserVersion?: string;
+  replayVersion?: string;
+  isOnDisk?: boolean;
 }
 
 export interface DriverData {
@@ -427,6 +430,18 @@ export interface SessionMetadata {
   };
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
+}
+
+/**
+ * Why a replay cannot be a session's recording. 'owned-by-other-session': LMU saved one replay for
+ * a run of sessions and it records a different one of them.
+ */
+export type ReplayLinkRejectionReason = 'session-type' | 'time-window' | 'layout' | 'owned-by-other-session';
+
+export interface RejectedReplayLink {
+  replayName: string;
+  reason: ReplayLinkRejectionReason;
+  rejectedAt: number;
 }
 
 export interface DetailedSession extends SessionMetadata {
@@ -552,8 +567,27 @@ export interface ReferenceLaptimeRefreshStatus {
   error: string | null;
 }
 
+/** Background re-decode of on-disk replays whose stored rows are behind the current parser version. */
+export interface ReplayUpgradeStatus {
+  enabled: boolean;
+  running: boolean;
+  processed: number;
+  total: number;
+  currentFile: string | null;
+  currentStage: string | null;
+  filePercent: number | null;
+  /** Drivers decoded (stored or failed) in this run, of the drivers in the backlog it started with. */
+  driversDone: number;
+  driversTotal: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  result: { replays: number; upgraded: number; failed: number; interrupted: boolean } | null;
+  error: string | null;
+}
+
 export interface ScanStatus extends ReplayScanStatus {
   sessionScan: SessionScanStatus;
+  replayUpgrade?: ReplayUpgradeStatus;
   telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;
   allComplete?: boolean;

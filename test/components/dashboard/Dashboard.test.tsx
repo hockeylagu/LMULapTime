@@ -769,4 +769,58 @@ describe('Dashboard component', () => {
     expect(screen.queryByText('Clean Flying Laps')).not.toBeInTheDocument();
     expect(screen.queryByText('Top Speed Recorded')).not.toBeInTheDocument();
   });
+
+  it('opens replay on the best lap of the session when launch replay button is clicked in dashboard hero', () => {
+    const replaySessions = [
+      {
+        id: 'sess-hero-replay',
+        filename: '2026_06_01_R1.xml',
+        trackVenue: 'Spa',
+        timeString: '2026/06/01 15:00',
+        sessionType: 'Race' as const,
+        sessionName: 'R1',
+        driversCount: 1,
+        matchingReplayFile: { name: 'spa_hero.vcr', path: 'C:\\spa_hero.vcr' },
+        playerDriver: {
+          name: 'Player',
+          carType: 'Ferrari 499P',
+          carClass: 'LMH',
+          bestLapTime: 121.5,
+          bestLapTimeString: '2:01.500',
+          bestLapNum: 3,
+          bestS1: 34.0,
+          bestS2: 41.5,
+          bestS3: 46.0,
+          theoreticalBest: 121.5,
+          theoreticalBestString: '2:01.500',
+          bestLapPaceCategory: 'Alien' as const,
+          bestLapPacePercentage: 100.1,
+          lapsCount: 5,
+          laps: [
+            { lapNum: 1, position: 1, lapTime: 125.0, lapTimeString: '2:05.000', s1: null, s2: null, s3: null, topSpeed: 300, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNum: 2, position: 1, lapTime: 123.0, lapTimeString: '2:03.000', s1: null, s2: null, s3: null, topSpeed: 305, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNum: 3, position: 1, lapTime: 121.5, lapTimeString: '2:01.500', s1: null, s2: null, s3: null, topSpeed: 310, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+          ],
+        },
+      },
+    ];
+
+    render(
+      <Dashboard
+        sessions={replaySessions}
+        onSelectSession={vi.fn()}
+        selectedCarClass="All"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    const replayBtn = screen.getByTestId('hero-launch-replay-btn');
+    expect(replayBtn).toBeInTheDocument();
+    fireEvent.click(replayBtn);
+
+    expect(window.location.hash).toContain('/telemetry?');
+    expect(window.location.hash).toContain('replayName=spa_hero.vcr');
+    expect(window.location.hash).toContain('lap=3');
+  });
 });
+

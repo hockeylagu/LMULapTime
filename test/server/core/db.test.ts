@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
@@ -80,6 +81,26 @@ describe('SessionDatabase (SQLite Cache)', () => {
     iterator.return(undefined as never);
     expect(db.getSessionsCount()).toBe(initialSync.total);
     expect(db.getMetadata('parser_version')).toBe('outdated-parser-version');
+  });
+
+  it('keeps a session whose XML is gone when a new parser version re-parses the rest', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-sync-'));
+    try {
+      const fixture = path.join(resultsDir, '2026_05_28_P1.xml');
+      fs.copyFileSync(fixture, path.join(dir, '2026_05_28_P1.xml'));
+      fs.copyFileSync(fixture, path.join(dir, '2026_05_29_P1.xml'));
+      expect(db.syncSessionsFromDir(dir, parser).added).toBe(2);
+
+      fs.rmSync(path.join(dir, '2026_05_29_P1.xml'));
+      db.setMetadata('parser_version', 'outdated-parser-version');
+      const resync = db.syncSessionsFromDir(dir, parser);
+
+      expect(resync).toMatchObject({ added: 0, updated: 1, total: 2 });
+      expect(db.getSessionById('2026_05_29_P1')).not.toBeNull();
+      expect(db.getMetadata('parser_version')).not.toBe('outdated-parser-version');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('skips parsing unchanged files during subsequent sync (delta sync)', () => {
@@ -190,13 +211,21 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getStoredReplayTrajectory('Deleted_Replay_P1.Vcr', -1, -1)?.points).toHaveLength(3);
   });
 
-  it('falls back to default slot and lap when requested specific keys are missing if allowFallback is enabled', () => {
+  it('falls back to the same driver\'s default lap when the requested lap is missing if allowFallback is enabled', () => {
     const trajectory = buildTrajectory();
-    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', -1, -1, 1000, 12345, trajectory);
+    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', 2, -1, 1000, 12345, trajectory);
 
     expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4)).toBeNull();
     const fallbackResult = db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4, { allowFallback: true });
     expect(fallbackResult?.points).toHaveLength(3);
+  });
+
+  it('never falls back to another driver\'s laps', () => {
+    // Only the player's laps are stored: an opponent's request must not get them.
+    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', -1, -1, 1000, 12345, buildTrajectory());
+
+    expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4, { allowFallback: true })).toBeNull();
+    expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, -1, { allowFallback: true })).toBeNull();
   });
 
   it('invalidates replay metadata cache when mtime or size changes', () => {
@@ -273,6 +302,9 @@ describe('SessionDatabase replay cache', () => {
     expect(primary?.trajectoriesCached).toBe(2);
     expect(primary?.compressedSizeBytes).toBeGreaterThan(0);
     expect(primary?.replayDateMs).toBe(1000);
+    expect(primary?.replayVersion).toBe('v5');
+    expect(primary?.parserVersion).toBe('v5');
+    expect(primary?.isOnDisk).toBe(false);
 
     const other = list.find(r => r.filename === 'Other_Replay_P2.Vcr');
     expect(other?.trackName).toBe('Spa');
@@ -649,9 +681,14 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getIngestErrors()).toHaveLength(0);
 
     db.upsertTelemetryLapCache(fileInfo.filename, 3, mockLapData);
-    db.pruneTelemetryLapCache(365 * 24 * 60 * 60 * 1000, 1);
+    db.upsertTelemetryLapCache('Deleted_P.duckdb', 1, mockLapData);
+    db.pruneTelemetryLapCache(new Set([fileInfo.filename]), 365 * 24 * 60 * 60 * 1000, 1);
     expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
     expect(db.getTelemetryLapCache(fileInfo.filename, 3)).toBeNull();
+    // A lap of a file no longer on disk is the only copy left: it is never trimmed.
+    expect(db.getTelemetryLapCache('Deleted_P.duckdb', 1)).not.toBeNull();
+    db.pruneTelemetryLapCache(new Set([fileInfo.filename]), 0, 0);
+    expect(db.getTelemetryLapCache('Deleted_P.duckdb', 1)).not.toBeNull();
 
     // Verify clearTelemetryCache clears data
     db.clearTelemetryCache();
@@ -659,7 +696,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
   });
 
-  it('replaces stale replay and session associations when a newer telemetry file is matched', () => {
+  it('keeps every file matched to one session: LMU can write several for a session', () => {
     const staleFile = {
       filename: 'Daytona_Stale.duckdb',
       filePath: 'C:\\Telemetry\\Daytona_Stale.duckdb',
@@ -683,12 +720,9 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     db.upsertTelemetryMetadata(currentFile, 'session-daytona', 'Daytona_R.Vcr');
 
     const metadata = db.getTelemetryMetadata();
-    expect(metadata.filter(item => item.matchedSessionId === 'session-daytona')).toEqual([
-      expect.objectContaining({ filename: currentFile.filename }),
-    ]);
-    expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toEqual([
-      expect.objectContaining({ filename: currentFile.filename }),
-    ]);
+    expect(metadata.filter(item => item.matchedSessionId === 'session-daytona').map(item => item.filename).sort())
+      .toEqual([currentFile.filename, staleFile.filename]);
+    expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toHaveLength(2);
   });
 
   it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
@@ -705,16 +739,16 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     db.upsertTelemetryMetadata(file);
     expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
 
-    // A match moving to another file and back is written each time.
+    // A second file of the same session is written; the first keeps its match.
     db.upsertTelemetryMetadata(other, 'session-spa');
     db.upsertTelemetryMetadata(file, 'session-spa');
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
-    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename)).toEqual([file.filename]);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 2);
+    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename).sort()).toEqual([other.filename, file.filename]);
 
     db.upsertTelemetryMetadata({ ...file, fileMtimeMs: 2000 });
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
     db.clearTelemetryCache();
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 5);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
   });
 
   it('changes the replay metadata revision on every replay metadata write', () => {

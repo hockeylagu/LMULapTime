@@ -6,6 +6,7 @@ import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
+import { ReplayUpgradeCard } from './ReplayUpgradeCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
 import { clearSessionDetailCache } from '../session-detail/useSessionDetailData.js';
 
@@ -204,6 +205,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       />
 
       <ReplayCacheCard replayScanStatus={replayScanStatus} />
+
+      <ReplayUpgradeCard replayScanStatus={replayScanStatus} />
 
       <AISettingsCard />
 

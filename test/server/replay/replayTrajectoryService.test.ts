@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
@@ -15,7 +14,6 @@ import type {
 
 describe('ReplayTrajectoryService', () => {
   let db: SessionDatabase;
-  let catalog: TelemetryCatalog;
   let replayCache: ReplayCacheService;
   let telemetryService: ReplayTelemetryService;
   let trajectoryService: ReplayTrajectoryService;
@@ -53,9 +51,8 @@ describe('ReplayTrajectoryService', () => {
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
-    catalog = new TelemetryCatalog(db);
     replayCache = new ReplayCacheService(db);
-    telemetryService = new ReplayTelemetryService(db, catalog);
+    telemetryService = new ReplayTelemetryService(db);
     sessions = [];
 
     trajectoryService = new ReplayTrajectoryService(
@@ -68,7 +65,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('retrieves full trajectory and downsamples to requested maxPoints', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({
@@ -86,7 +83,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     // Spaced over the Daytona road course's length (5724 m): 2000 m spacing is 3 points, whatever
@@ -106,7 +103,7 @@ describe('ReplayTrajectoryService', () => {
       return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
     };
     const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => at(from + k));
-    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue({
+    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue({
       ...mockFullTrajectory,
       replayName: 'Monza.Vcr',
       points: range(3, 60),
@@ -132,7 +129,7 @@ describe('ReplayTrajectoryService', () => {
 
   it('resolves driver slot from driverName parameter', async () => {
     vi.spyOn(replayCache, 'resolveDriverSlot').mockReturnValue(1);
-    const getFullTrajSpy = vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue({
+    const getFullTrajSpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue({
       ...mockFullTrajectory,
       driverSlot: 1,
       driverName: 'Other Driver',
@@ -161,7 +158,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('applies official lap validation when matched session exists', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     const session = {
@@ -195,7 +192,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('standardizes layoutKey from circuitSpec when geometry lookup completes', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({
@@ -209,7 +206,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('rejects a named driver who is not in the replay instead of falling back to the player', async () => {
-    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     await expect(trajectoryService.getTrajectory({
@@ -223,7 +220,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('resolves a named non-player driver present in the replay to their slot', async () => {
-    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockReturnValue(mockFullTrajectory);
+    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
 
     await trajectoryService.getTrajectory({

@@ -12,6 +12,8 @@ import {
   ReplayTrajectoryData,
   ReplayCacheSummary,
   AiReportHistoryEntry,
+  RejectedReplayLink,
+  ReplayLinkRejectionReason,
   DuckDbLapTelemetry,
 } from './types.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
@@ -27,8 +29,16 @@ import {
   syncReplaysAsyncIterator as runSyncReplaysAsyncIterator,
   syncReplaysIterator as runSyncReplaysIterator,
   syncReplaysFromDir as runSyncReplaysFromDir,
+  cacheAllLapsForDriver,
   ReplaySyncHost,
 } from './dbReplaySync.js';
+import {
+  deleteReplayDriverLaps,
+  getReplayDriverIngest,
+  recordReplayDriverIngest,
+  ReplayDriverIngest,
+  ReplayDriverIngestStatus,
+} from './dbReplayIngestStore.js';
 import {
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
@@ -68,7 +78,11 @@ import {
   upsertTelemetryLapCache,
   pruneTelemetryLapCache,
   clearTelemetryCache,
+  linkTelemetryFiles,
+  clearTelemetryLinks,
+  getTelemetryLapCacheFilenames,
   TelemetryMetadataRecord,
+  TelemetryLink,
 } from './dbTelemetryStore.js';
 import {
   saveReferenceLaptimes,
@@ -85,6 +99,16 @@ import {
   getSessionsCount as fetchSessionsCount,
   clearSessionCache,
 } from './dbSessionStore.js';
+import { getRejectedReplayLinks, rejectSessionReplayLink } from './dbReplayLinkStore.js';
+import { archiveReplacedRecording } from './dbReplayIdentity.js';
+import {
+  listReplayUpgradeBacklog,
+  upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
+  ReplayUpgradeCandidate,
+  ReplayUpgradeHost,
+  ReplayUpgradeProgress,
+  ReplayUpgradeResult,
+} from './dbReplayUpgrade.js';
 import {
   SessionXmlSyncParser,
   SessionSyncHost,
@@ -102,9 +126,13 @@ export type {
   SessionXmlSyncParser,
   IngestErrorEntry,
   TelemetryMetadataRecord,
+  TelemetryLink,
+  ReplayUpgradeCandidate,
+  ReplayUpgradeProgress,
+  ReplayUpgradeResult,
 };
 
-export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
+export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayUpgradeHost {
   private db: DatabaseType;
   private dbPath: string;
   private replayMetadataRevision = 0;
@@ -199,7 +227,17 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return this.replayMetadataRevision;
   }
 
+  /**
+   * Stores `filename` as the recording described here. When the stored rows under that name hold a
+   * different recording, they are renamed first (see dbReplayIdentity), never overwritten.
+   */
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
+    const archivedAs = archiveReplacedRecording(this.db, filename, { mtime, size, metadata });
+    if (archivedAs) {
+      console.log(`[SQLite Cache] ${filename} now holds another recording; the stored one is kept as ${archivedAs}`);
+      this.allSessionsCache = null;
+      this.telemetryMetadataRevision++;
+    }
     upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
     this.replayMetadataRevision++;
   }
@@ -230,12 +268,59 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     setTrajectoryDefaults(this.db, filename, driverSlot, defaultLapKey, resolvedDriverSlot);
   }
 
+  /**
+   * Replaces a driver's whole lap set in one transaction: a crash never leaves half a set, and laps
+   * the new decode no longer has do not linger. The player's decode (isPrimary) also points the
+   * "no driver requested" alias (-1) at its slot.
+   */
+  public replaceReplayDriverLaps(
+    filename: string,
+    filePath: string,
+    mtime: number,
+    size: number,
+    driverSlotKey: number,
+    trajectory: ReplayTrajectoryData,
+    isPrimary: boolean
+  ): void {
+    this.db.transaction(() => {
+      deleteReplayDriverLaps(this.db, filename, driverSlotKey);
+      cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
+      recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
+      if (isPrimary) {
+        // Rows stored under the alias itself (from a decode that could not name the slot) are superseded.
+        if (driverSlotKey !== -1) deleteReplayDriverLaps(this.db, filename, -1);
+        this.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, driverSlotKey);
+        if (driverSlotKey !== -1) recordReplayDriverIngest(this.db, filename, -1, mtime, size, 'stored');
+      }
+    })();
+  }
+
+  public getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null {
+    return getReplayDriverIngest(this.db, filename, driverSlot);
+  }
+
+  public recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void {
+    recordReplayDriverIngest(this.db, filename, driverSlot, mtime, size, status, error);
+  }
+
+  /** On-disk replays whose stored rows are behind the current parser version (see dbReplayUpgrade). */
+  public listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[] {
+    return listReplayUpgradeBacklog(this.db, replaysDir);
+  }
+
+  public upgradeReplaysAsyncIterator(
+    replaysDir: string,
+    options: { playerName?: string; shouldStop?: () => boolean } = {}
+  ): AsyncGenerator<ReplayUpgradeProgress, ReplayUpgradeResult, void> {
+    return runUpgradeReplaysAsyncIterator(this, replaysDir, options);
+  }
+
   public getReplaysCount(): number {
     return getReplaysCount(this.db);
   }
 
-  public getReplayCacheList(): ReplayCacheSummary[] {
-    return getReplayCacheList(this.db);
+  public getReplayCacheList(replaysDir?: string): ReplayCacheSummary[] {
+    return getReplayCacheList(this.db, replaysDir);
   }
 
   public syncReplaysIterator(
@@ -291,16 +376,38 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return getTelemetryMetadata(this.db);
   }
 
-  public getTelemetryLapCache(filename: string, lapNumber: number): DuckDbLapTelemetry | null {
-    return getTelemetryLapCache(this.db, filename, lapNumber);
+  public getTelemetryLapCache(filename: string, lapNumber: number, options: { anyVersion?: boolean } = {}): DuckDbLapTelemetry | null {
+    return getTelemetryLapCache(this.db, filename, lapNumber, options.anyVersion);
   }
 
   public upsertTelemetryLapCache(filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {
     upsertTelemetryLapCache(this.db, filename, lapNumber, lapData);
   }
 
-  public pruneTelemetryLapCache(maxAgeMs = 30 * 24 * 60 * 60 * 1000, maxBytes = 512 * 1024 * 1024): void {
-    pruneTelemetryLapCache(this.db, maxAgeMs, maxBytes);
+  public pruneTelemetryLapCache(onDiskFilenames: ReadonlySet<string>, maxAgeMs = 30 * 24 * 60 * 60 * 1000, maxBytes = 512 * 1024 * 1024): void {
+    pruneTelemetryLapCache(this.db, onDiskFilenames, maxAgeMs, maxBytes);
+  }
+
+  public linkTelemetryFiles(links: readonly TelemetryLink[]): void {
+    if (links.length > 0 && linkTelemetryFiles(this.db, links) > 0) this.telemetryMetadataRevision++;
+  }
+
+  /**
+   * Clears every stored telemetry match once per matching rule, so the matches stored under an
+   * earlier rule are decided again. Returns whether it cleared them.
+   */
+  public resetTelemetryLinksForRule(rule: string): boolean {
+    if (getMetadata(this.db, 'telemetry_link_rule') === rule) return false;
+    this.db.transaction(() => {
+      clearTelemetryLinks(this.db);
+      setMetadata(this.db, 'telemetry_link_rule', rule);
+    })();
+    this.telemetryMetadataRevision++;
+    return true;
+  }
+
+  public getTelemetryLapCacheFilenames(): Set<string> {
+    return getTelemetryLapCacheFilenames(this.db);
   }
 
   public clearTelemetryCache(): void {
@@ -350,6 +457,22 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
       const cached = this.allSessionsCache.find(s => s.id === sessionId);
       if (cached) cached.matchingReplayFile = matchingReplayFile;
     }
+  }
+
+  /** Withdraws the session's replay link (see dbReplayLinkStore); the cached session loses it too. */
+  public rejectSessionReplayLink(
+    sessionId: string,
+    link: NonNullable<SessionMetadata['matchingReplayFile']>,
+    reason: ReplayLinkRejectionReason
+  ): RejectedReplayLink | null {
+    const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
+    const cached = rejected ? this.allSessionsCache?.find(s => s.id === sessionId) : undefined;
+    if (cached) delete cached.matchingReplayFile;
+    return rejected;
+  }
+
+  public getRejectedReplayLinks(): Map<string, RejectedReplayLink[]> {
+    return getRejectedReplayLinks(this.db);
   }
 
   public *syncSessionsIterator(

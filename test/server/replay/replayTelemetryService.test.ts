@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { DuckDbReader } from '../../../server/telemetry/duckdbReader.js';
-import * as telemetryMatcher from '../../../server/telemetry/telemetryMatcher.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
 import type {
   DetailedSession,
@@ -14,7 +14,7 @@ import type {
 
 describe('ReplayTelemetryService', () => {
   let db: SessionDatabase;
-  let catalog: TelemetryCatalog;
+  let tempDir: string;
   let service: ReplayTelemetryService;
 
   const mockDuckFile: DuckDbFileInfo = {
@@ -65,25 +65,37 @@ describe('ReplayTelemetryService', () => {
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
-    catalog = new TelemetryCatalog(db);
-    service = new ReplayTelemetryService(db, catalog);
+    service = new ReplayTelemetryService(db);
+    tempDir = fs.mkdtempSync(path.join(process.cwd(), 'test', 'fixtures', 'replay-telemetry-'));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('exposes catalog files and telemetry metadata accessors', () => {
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
-    db.upsertTelemetryMetadata(mockDuckFile, 'session-123', 'Daytona.Vcr');
+  const onDisk = (file: DuckDbFileInfo): DuckDbFileInfo => {
+    const filePath = path.join(tempDir, file.filename);
+    fs.writeFileSync(filePath, '');
+    return { ...file, filePath };
+  };
 
-    expect(service.getFiles()).toHaveLength(1);
-    expect(service.getFiles()[0].filename).toBe(mockDuckFile.filename);
-
-    const meta = service.getTelemetryMeta();
-    expect(meta).toHaveLength(1);
-    expect(meta[0].matchedReplayFilename).toBe('Daytona.Vcr');
+  const request = (overrides: Partial<Parameters<ReplayTelemetryService['enrichWithTelemetry']>[0]> = {}) => service.enrichWithTelemetry({
+    replayName: 'Daytona.Vcr',
+    filePath: '/replays/Daytona.Vcr',
+    isPlayer: true,
+    allowDuckDb: true,
+    metadata: mockMetadata,
+    fullTrajectory: mockVcrTraj,
+    // The service writes into the trajectory it is given.
+    currentTrajectory: { ...mockVcrTraj },
+    lapNumber: 1,
+    ...overrides,
   });
+
+  const session = { id: 'session-456', trackVenue: 'Daytona International Speedway', trackCourse: 'Road Course' } as DetailedSession;
+
 
   it('skips DuckDB telemetry fusion when not player or allowDuckDb is false', async () => {
     const notPlayer = await service.enrichWithTelemetry({
@@ -111,81 +123,142 @@ describe('ReplayTelemetryService', () => {
     expect(disallowed.trajectory.source).toBe('vcr');
   });
 
-  it('does not use a replay-name cache association when live matching cannot validate it', async () => {
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(null);
-    db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
-    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
-
-    const result = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
-      isPlayer: true,
-      allowDuckDb: true,
-      metadata: mockMetadata,
-      fullTrajectory: mockVcrTraj,
-      currentTrajectory: mockVcrTraj,
-      lapNumber: 1,
-    });
-
-    expect(result.fused).toBe(false);
-    expect(result.trajectory.source).toBe('vcr');
-    expect(result.trajectory.duckdbFilename).toBeUndefined();
-  });
-
-  it('does not use metadata.duckdbFilename when live matching cannot validate it', async () => {
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(null);
-    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
-
-    const metaWithDuck = {
-      ...mockMetadata,
-      duckdbFilename: mockDuckFile.filename,
-    } as ReplayMetadata;
-
-    const result = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
-      isPlayer: true,
-      allowDuckDb: true,
-      metadata: metaWithDuck,
-      fullTrajectory: mockVcrTraj,
-      currentTrajectory: mockVcrTraj,
-      lapNumber: 1,
-    });
-
-    expect(result.fused).toBe(false);
-    expect(result.trajectory.source).toBe('vcr');
-    expect(result.trajectory.duckdbFilename).toBeUndefined();
-  });
-
-  it('uses a session-bound cache association when live matching cannot disambiguate it', async () => {
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(null);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToSession').mockReturnValue(null);
+  it('fuses the lap of the file stored for the session of the replay', async () => {
     db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);
     db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
 
-    const session = {
-      id: 'session-456',
-      trackVenue: 'Daytona International Speedway',
-      trackCourse: 'Road Course',
-    } as DetailedSession;
-
-    const result = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
-      isPlayer: true,
-      allowDuckDb: true,
-      metadata: mockMetadata,
-      matchedSession: session,
-      fullTrajectory: mockVcrTraj,
-      currentTrajectory: mockVcrTraj,
-      lapNumber: 1,
-    });
+    const result = await request({ matchedSession: session });
 
     expect(result.fused).toBe(true);
     expect(result.trajectory.source).toBe('duckdb');
+    expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+  });
+
+  it('fuses the lap of the file stored for a replay with no session', async () => {
+    db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
+    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+
+    const result = await request();
+
+    expect(result.fused).toBe(true);
+    expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+  });
+
+  it('reads the file of the session before the file of the replay', async () => {
+    const replayFile = { ...mockDuckFile, filename: 'Daytona_R_other.duckdb' };
+    db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);
+    db.upsertTelemetryMetadata(replayFile, undefined, 'Daytona.Vcr');
+    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+    db.upsertTelemetryLapCache(replayFile.filename, 1, mockDuckLap);
+
+    const result = await request({ matchedSession: session });
+
+    expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+  });
+
+  it('never matches a file on its own, and writes nothing, when no match is stored', async () => {
+    // Catalogued, on the same track and session type, but matched to nothing.
+    db.upsertTelemetryMetadata(onDisk(mockDuckFile));
+    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+    const revision = db.getTelemetryMetadataRevision();
+
+    const result = await request({ matchedSession: session, metadata: { ...mockMetadata, duckdbFilename: mockDuckFile.filename } as ReplayMetadata });
+
+    expect(result.fused).toBe(false);
+    expect(result.trajectory.source).toBe('vcr');
+    expect(result.trajectory.duckdbFilename).toBeUndefined();
+    expect(db.getTelemetryMetadataRevision()).toBe(revision);
+    expect(db.getTelemetryMetadata()[0]).toMatchObject({ matchedSessionId: null, matchedReplayFilename: null });
+  });
+
+  it('reads a lap from the file of the session that holds it, not a lap of the same time in another file', async () => {
+    // LMU numbers laps across a session's files (from 0, one below the replay): the car went out again,
+    // and replay lap 6 is DuckDB lap 5, in the second file.
+    const first = onDisk({ ...mockDuckFile, filename: 'Algarve_Q_2026-09-23T19_19_18Z.duckdb', lapsCount: 3 });
+    const second = onDisk({ ...mockDuckFile, filename: 'Algarve_Q_2026-09-23T19_25_40Z.duckdb', lapsCount: 2 });
+    db.upsertTelemetryMetadata(first, 'session-456');
+    db.upsertTelemetryMetadata(second, 'session-456');
+    const lapsByFile: Record<string, Array<{ lapNumber: number; lapTimeSec: number }>> = {
+      [first.filePath]: [{ lapNumber: 0, lapTimeSec: 125 }, { lapNumber: 1, lapTimeSec: 96.2 }, { lapNumber: 2, lapTimeSec: 96.1 }],
+      [second.filePath]: [{ lapNumber: 4, lapTimeSec: 120 }, { lapNumber: 5, lapTimeSec: 96.0 }],
+    };
+    const pathOf = (reader: DuckDbReader) => (reader as unknown as { filePath: string }).filePath;
+    vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'getLapList').mockImplementation(async function (this: DuckDbReader) {
+      return lapsByFile[pathOf(this)].map(lap => ({ ...lap, startTs: 0, endTs: lap.lapTimeSec }));
+    });
+    const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockImplementation(async function (this: DuckDbReader, lapNumber: number) {
+      const lap = lapsByFile[pathOf(this)].find(item => item.lapNumber === lapNumber);
+      return lap ? { ...mockDuckLap, lapNumber, lapTimeSec: lap.lapTimeSec } : null;
+    });
+    const lap6 = { ...mockVcrTraj, currentLap: 6, laps: [{ lapNumber: 6, lapTimeSec: 96.0, s1Sec: 30, s2Sec: 36, s3Sec: 30 }] } as ReplayTrajectoryData;
+
+    const result = await request({ matchedSession: session, lapNumber: 6, currentTrajectory: lap6, fullTrajectory: lap6 });
+
+    expect(result.fused).toBe(true);
+    expect(result.trajectory.duckdbFilename).toBe(second.filename);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(db.getTelemetryLapCache(second.filename, 6)).not.toBeNull();
+    expect(db.getTelemetryLapCache(first.filename, 6)).toBeNull();
+  });
+
+  it('serves a cached lap after the DuckDB file is deleted', async () => {
+    // mockDuckFile.filePath is not on disk.
+    db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);
+    db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+    const open = vi.spyOn(DuckDbReader.prototype, 'open');
+
+    const result = await request({ matchedSession: session });
+
+    expect(result.fused).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  describe('a lap cached by an older reader', () => {
+    const ageCachedLaps = () => (db as unknown as { db: { exec(sql: string): void } }).db.exec("UPDATE telemetry_lap_cache SET cache_version = 'v9'");
+
+    it('is read again from the file while it is on disk', async () => {
+      const file = onDisk(mockDuckFile);
+      db.upsertTelemetryMetadata(file, 'session-456');
+      db.upsertTelemetryLapCache(file.filename, 1, { ...mockDuckLap, lapTimeSec: 1 });
+      ageCachedLaps();
+      vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+      vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+      vi.spyOn(DuckDbReader.prototype, 'getLapList').mockResolvedValue([{ lapNumber: 1, lapTimeSec: 96, startTs: 0, endTs: 96 }]);
+      const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockResolvedValue(mockDuckLap);
+
+      const result = await request({ matchedSession: session });
+
+      expect(read).toHaveBeenCalled();
+      expect(result.fused).toBe(true);
+      expect(db.getTelemetryLapCache(file.filename, 1)?.lapTimeSec).toBe(96);
+    });
+
+    it('is still served once the file is deleted: it is the only copy left', async () => {
+      db.upsertTelemetryMetadata(mockDuckFile, 'session-456');
+      db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
+      ageCachedLaps();
+      expect(db.getTelemetryLapCache(mockDuckFile.filename, 1)).toBeNull();
+
+      const result = await request({ matchedSession: session });
+
+      expect(result.fused).toBe(true);
+      expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+    });
+  });
+
+  it('reports a lap that was never read before the DuckDB file was deleted', async () => {
+    db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);
+    db.upsertTelemetryLapCache(mockDuckFile.filename, 2, { ...mockDuckLap, lapNumber: 2 });
+    const open = vi.spyOn(DuckDbReader.prototype, 'open');
+
+    const result = await request({ matchedSession: session });
+
+    expect(result.fused).toBe(false);
+    expect(result.trajectory.source).toBe('vcr');
+    expect(result.duckdbUnavailableReason).toContain('was deleted');
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('marks duckdbAvailable as false when lap telemetry is incomplete', async () => {
@@ -193,7 +266,6 @@ describe('ReplayTelemetryService', () => {
       ...mockDuckLap,
       lapTimeSec: 10.0, // Expected is 96.0s
     };
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
     db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
     db.upsertTelemetryLapCache(mockDuckFile.filename, 1, incompleteLap);
 
@@ -215,85 +287,15 @@ describe('ReplayTelemetryService', () => {
   });
 
   it('logs ingest error and leaves source as vcr when DuckDbReader throws', async () => {
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([mockDuckFile]);
-    db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
+    const file = onDisk(mockDuckFile);
+    db.upsertTelemetryMetadata(file, undefined, 'Daytona.Vcr');
     vi.spyOn(DuckDbReader.prototype, 'open').mockRejectedValueOnce(new Error('DuckDB parse error'));
     const ingestSpy = vi.spyOn(db, 'recordIngestError');
 
-    const result = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
-      isPlayer: true,
-      allowDuckDb: true,
-      metadata: mockMetadata,
-      fullTrajectory: mockVcrTraj,
-      currentTrajectory: mockVcrTraj,
-      lapNumber: 1,
-    });
+    const result = await request();
 
     expect(result.fused).toBe(false);
     expect(result.trajectory.source).toBe('vcr');
-    expect(ingestSpy).toHaveBeenCalledWith('duckdb', mockDuckFile.filePath, expect.any(Error));
-  });
-
-  it('prefers valid current replay match over a stale cached DuckDB association', async () => {
-    const staleDuckFile: DuckDbFileInfo = {
-      filename: 'Daytona_R_stale.duckdb',
-      filePath: '/telemetry/Daytona_R_stale.duckdb',
-      fileMtimeMs: 10000,
-      fileSizeBytes: 2048,
-      trackName: 'Daytona International Speedway',
-      sessionType: 'R',
-      timestampStr: '2026-09-01T12:00:00Z',
-      timestampEpochMs: 10000,
-    };
-
-    const currentDuckFile: DuckDbFileInfo = {
-      filename: 'Daytona_R_current.duckdb',
-      filePath: '/telemetry/Daytona_R_current.duckdb',
-      fileMtimeMs: 200000,
-      fileSizeBytes: 2048,
-      trackName: 'Daytona International Speedway',
-      sessionType: 'R',
-      timestampStr: '2026-09-25T22:42:51Z',
-      timestampEpochMs: 200000,
-    };
-
-    // Stale association previously stored in DB
-    db.upsertTelemetryMetadata(staleDuckFile, undefined, 'Daytona.Vcr');
-    db.upsertTelemetryLapCache(currentDuckFile.filename, 1, mockDuckLap);
-
-    vi.spyOn(catalog, 'getFiles').mockReturnValue([staleDuckFile, currentDuckFile]);
-
-    // Replay file mtime matches currentDuckFile (200000)
-    db.upsertReplayMetadataCache('Daytona.Vcr', '/replays/Daytona.Vcr', 200000, 4096, mockMetadata);
-
-    const metaWithStaleDuck = {
-      ...mockMetadata,
-      sessionType: 'R',
-      trackVenue: 'Daytona International Speedway',
-      duckdbFilename: staleDuckFile.filename, // Stale filename on metadata
-    } as ReplayMetadata;
-
-    const result = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
-      isPlayer: true,
-      allowDuckDb: true,
-      metadata: metaWithStaleDuck,
-      fullTrajectory: mockVcrTraj,
-      currentTrajectory: mockVcrTraj,
-      lapNumber: 1,
-    });
-
-    expect(result.fused).toBe(true);
-    expect(result.trajectory.source).toBe('duckdb');
-    // Crucial: current live replay match must win over the stale cached association
-    expect(result.trajectory.duckdbFilename).toBe(currentDuckFile.filename);
-    expect(result.trajectory.duckdbFilename).not.toBe(staleDuckFile.filename);
-
-    // Ensure database cache was updated to the fresh match
-    const updatedMeta = db.getTelemetryMetadata().find(m => m.matchedReplayFilename === 'Daytona.Vcr');
-    expect(updatedMeta?.filename).toBe(currentDuckFile.filename);
+    expect(ingestSpy).toHaveBeenCalledWith('duckdb', file.filePath, expect.any(Error));
   });
 });

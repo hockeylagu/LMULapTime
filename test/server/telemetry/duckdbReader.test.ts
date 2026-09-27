@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import duckdb from 'duckdb';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { DuckDbReader, normalizeDuckDbGForces } from '../../../server/telemetry/duckdbReader.js';
 
 describe('DuckDbReader', () => {
@@ -13,13 +14,24 @@ describe('DuckDbReader', () => {
     });
   });
 
-  const testDbDir = path.join(process.cwd(), 'test', 'fixtures', 'telemetry');
+  // A fresh folder per run, outside the repository: the duckdb binding keeps a database file
+  // locked until it is garbage-collected, even once closed, so reusing or deleting a fixed path
+  // failed at random. Removing it is best effort; the next run sweeps what was left.
+  const TEMP_PREFIX = 'lmu-duckdb-reader-';
+  const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX));
+  const removeQuietly = (dir: string) => {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Still locked: left for a later run.
+    }
+  };
   const testDbPath = path.join(testDbDir, 'Bahrain_Test_P_2026-09-13T20_33_32Z.duckdb');
 
   beforeAll(async () => {
-    fs.mkdirSync(testDbDir, { recursive: true });
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
+    for (const entry of fs.readdirSync(os.tmpdir())) {
+      const dir = path.join(os.tmpdir(), entry);
+      if (entry.startsWith(TEMP_PREFIX) && dir !== testDbDir) removeQuietly(dir);
     }
 
     // Create fixture DuckDB file with representative schema
@@ -188,7 +200,6 @@ describe('DuckDbReader', () => {
 
   it('supports continuous TC channel, hasColumn detection, and lap time alignment', async () => {
     const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
-    if (fs.existsSync(multiRateDbPath)) fs.unlinkSync(multiRateDbPath);
 
     const db = new duckdb.Database(multiRateDbPath);
     await new Promise<void>((resolve, reject) => {
@@ -265,16 +276,43 @@ describe('DuckDbReader', () => {
     await reader.close();
   });
 
-  afterAll(() => {
-    const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
-    for (const file of [testDbPath, multiRateDbPath]) {
-      if (fs.existsSync(file)) {
-        try {
-          fs.unlinkSync(file);
-        } catch {
-          // Ignore EBUSY on Windows file locks
-        }
-      }
-    }
+  it('keeps a percent pedal in percent while it passes through 0-1 %', async () => {
+    // LMU stores pedals in percent. Deciding the scale per sample turned 0.8 % into 80 %: a spike
+    // each time the brake was pressed or released (Le Mans R1 41, 2026-09-25).
+    const percentDbPath = path.join(testDbDir, 'Sarthe_Percent_R_2026-09-25T16_59_48Z.duckdb');
+    const db = new duckdb.Database(percentDbPath);
+    await new Promise<void>((resolve, reject) => {
+      db.exec(`
+        CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
+        INSERT INTO channelsList VALUES ('GPS Time', 100, 's'), ('Ground Speed', 100, 'km/h'),
+          ('Throttle Pos', 100, '%'), ('Brake Pos', 100, '%');
+        CREATE TABLE "GPS Time" (value FLOAT);
+        CREATE TABLE "Ground Speed" (value FLOAT);
+        CREATE TABLE "Throttle Pos" (value FLOAT);
+        CREATE TABLE "Brake Pos" (value FLOAT);
+        CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
+        INSERT INTO "Lap" VALUES (0.0, 1), (10.0, 2);
+        INSERT INTO "GPS Time" SELECT (i * 0.01)::FLOAT FROM range(1100) t(i);
+        INSERT INTO "Ground Speed" SELECT 200.0::FLOAT FROM range(1100) t(i);
+        -- Brake: 0, a press through 0.4 and 0.8 %, then 100 %, then a release through 0.8 %.
+        INSERT INTO "Brake Pos" SELECT (CASE WHEN i = 300 THEN 0.4 WHEN i = 301 THEN 0.8 WHEN i > 301 AND i < 500 THEN 100.0 WHEN i = 500 THEN 0.8 ELSE 0.0 END)::FLOAT FROM range(1100) t(i);
+        INSERT INTO "Throttle Pos" SELECT (CASE WHEN i < 300 THEN 100.0 WHEN i = 600 THEN 0.7 WHEN i > 600 THEN 100.0 ELSE 0.0 END)::FLOAT FROM range(1100) t(i);
+      `, (err) => (err ? reject(err) : resolve()));
+    });
+    await new Promise<void>((resolve, reject) => db.close(err => (err ? reject(err) : resolve())));
+
+    const reader = new DuckDbReader(percentDbPath);
+    await reader.open();
+    const lap = await reader.getLapTelemetry(1);
+    await reader.close();
+
+    const brakeAt = (index: number) => lap!.points[index].brake;
+    expect([brakeAt(300), brakeAt(301), brakeAt(302), brakeAt(500)]).toEqual([
+      expect.closeTo(0.4, 3), expect.closeTo(0.8, 3), 100, expect.closeTo(0.8, 3),
+    ]);
+    expect(lap!.points[600].throttle).toBeCloseTo(0.7, 3);
+    expect(Math.max(...lap!.points.filter((_, index) => index < 300 || index >= 500).map(point => point.brake ?? 0))).toBeLessThan(1);
   });
+
+  afterAll(() => removeQuietly(testDbDir));
 });

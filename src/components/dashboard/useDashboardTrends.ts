@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getDisplayTrackName, isSessionEmpty } from '../../../shared/domain/formatters.js';
+import { getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 import type { SessionSummary } from './dashboardTypes.js';
@@ -25,6 +25,7 @@ export interface LatestOutingInfo {
   carClass?: string;
   bestLapTimeString: string;
   bestLapTime: number | null;
+  bestLapNum?: number | null;
   pacePercentage?: number | null;
   paceCategory?: PaceCategory | null;
   position?: number;
@@ -184,6 +185,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         carClass: p.carClass,
         bestLapTimeString: p.bestLapTimeString,
         bestLapTime: p.bestLapTime,
+        bestLapNum: getBestLapNumber(p),
         pacePercentage: p.bestLapPacePercentage,
         paceCategory: p.bestLapPaceCategory,
         position: p.position,

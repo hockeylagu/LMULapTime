@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
 import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
@@ -8,20 +9,18 @@ import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../../util
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 
 describe('replayParser - trajectory & timing', () => {
-  const tempDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_temp_traj');
+  // A fresh folder per run, outside the repository, removed once at the end: on Windows a
+  // just-written file can stay locked for a moment (antivirus, indexer), so deleting each
+  // synthetic replay right after its test failed at random under load.
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-replay-traj-'));
   const tempVcrPath = path.join(tempDir, 'Test_Replay_P1.Vcr');
 
   beforeAll(() => {
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
     fs.writeFileSync(tempVcrPath, createMockVcrBuffer());
   });
 
   afterAll(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
   describe('extractReplayTrajectory', () => {
@@ -104,7 +103,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.points[3].isOffTrack).toBe(false);
       expect(traj.points[3].pitLimiter).toBe(false);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('decodes gear directly from the vehicle pose event eventType field (forward, neutral, reverse)', () => {
@@ -128,7 +126,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.points[3].gear).toBe(-1);
       expect(traj.points[4].gear).toBe(-1);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('ignores a 65-byte event whose type is not a vehicle pose type', () => {
@@ -140,7 +137,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 0 });
       expect(traj.points).toHaveLength(0);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('passes gear through raw/unfiltered - neutral bridging is a frontend post-processing concern', () => {
@@ -160,7 +156,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
       expect(traj.points.map(p => p.gear)).toEqual([2, 2, 0, 0, 3, 3]);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('leaves a long neutral stretch (parked / coasting) untouched', () => {
@@ -175,7 +170,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 20 });
       expect(traj.points.every(p => p.gear === 0)).toBe(true);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('passes a momentary gear flicker through raw/unfiltered', () => {
@@ -194,7 +188,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 1, maxPoints: 10 });
       expect(traj.points.map(p => p.gear)).toEqual([3, 3, 2, 3, 3]);
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('calculates rawSampleRateHz and supports uncompressed full raw trajectory (maxPoints: 0)', () => {
@@ -223,7 +216,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(rawTraj.isFullResolution).toBe(true);
       expect(rawTraj.points.length).toBe(4);
 
-      fs.unlinkSync(resVcrPath);
     });
 
     it('selects rival driver trajectory by driverSlot and driverName', () => {
@@ -250,7 +242,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(trajByName.driverName).toBe('Rival Driver');
       expect(trajByName.points[0].x).toBe(80);
 
-      fs.unlinkSync(multiDriverPath);
     });
 
     it('handles non-existent driver slot gracefully without crashing', () => {
@@ -268,7 +259,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.laps?.length).toBe(1);
       expect(traj.laps?.[0].isBest).toBeFalsy();
 
-      fs.unlinkSync(sliceVcrPath);
     });
 
     it('does not filter downshift rev-match throttle blips - raw pedal input is preserved for the frontend to filter', () => {
@@ -286,7 +276,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(filterPath, { driverSlot: 1, maxPoints: 10 });
       expect(traj.points[2].throttle).toBeGreaterThan(0);
 
-      fs.unlinkSync(filterPath);
     });
 
     it('does not interpolate upshift ignition cuts - raw pedal input is preserved for the frontend to filter', () => {
@@ -304,7 +293,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(cutPath, { driverSlot: 1, maxPoints: 10 });
       expect(traj.points[2].throttle).toBeLessThan(20);
 
-      fs.unlinkSync(cutPath);
     });
 
     it('gracefully falls back when requested lapNumber does not exist', () => {
@@ -336,7 +324,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.bounds.maxZ).toBeCloseTo(-99.3, 0);
       expect(traj.bounds.spanX).toBeCloseTo(0, 1);
       expect(traj.bounds.spanZ).toBeCloseTo(0, 1);
-      fs.unlinkSync(singlePtPath);
     });
 
     it('keeps each driver trajectory independent in multi-driver overlapping slices', () => {
@@ -362,7 +349,6 @@ describe('replayParser - trajectory & timing', () => {
       // Driver 2 coordinates should all be ~500-520
       expect(traj2.points.every(p => p.x >= 499 && p.x <= 521)).toBe(true);
 
-      fs.unlinkSync(multiPath);
     });
 
     it('calculates plausible speed from position deltas', () => {
@@ -387,7 +373,6 @@ describe('replayParser - trajectory & timing', () => {
         expect(s).toBeLessThan(400);
       }
 
-      fs.unlinkSync(speedPath);
     });
 
     it('uses embedded packet speed when pose coordinates do not advance', () => {
@@ -403,7 +388,6 @@ describe('replayParser - trajectory & timing', () => {
       const traj = extractReplayTrajectory(speedPath, { driverSlot: 1, maxPoints: 0 });
       expect(traj.points.map(point => point.speedKmh)).toEqual([100.81, 100.81, 100.81]);
 
-      fs.unlinkSync(speedPath);
     });
 
 
@@ -423,7 +407,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.pointsCount).toBe(2);
       expect(traj.points.every(p => Math.abs(p.x) < 20000 && Math.abs(p.z) < 20000)).toBe(true);
 
-      fs.unlinkSync(extremePath);
     });
 
     it('sets inPit from info1 bit 17, not the status byte bit 7', () => {
@@ -454,7 +437,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.points[0].inPit).toBeFalsy();
       expect(traj.points[1].inPit).toBe(true);
 
-      fs.unlinkSync(pitPath);
     });
   });
 
@@ -520,7 +502,6 @@ describe('replayParser - trajectory & timing', () => {
       // Lap 3 is the fastest lap (99.1s)
       expect(traj.laps![2].isBest).toBe(true);
 
-      fs.unlinkSync(tmpVcr);
     });
 
     it('ignores aborted incomplete laps flushed at session end with negative splitSec and small distance', () => {
@@ -549,7 +530,6 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.laps!.length).toBe(1);
       expect(traj.laps![0].lapTimeSec).toBeCloseTo(100.0, 1);
 
-      fs.unlinkSync(tmpVcr);
     });
   });
 
@@ -766,7 +746,6 @@ describe('replayParser - trajectory & timing', () => {
         const traj = extractReplayTrajectory(noTimingVcr, { driverSlot: 1 });
         expect(traj.laps!.length).toBe(1);
         expect(traj.laps![0].lapNumber).toBe(1);
-        fs.unlinkSync(noTimingVcr);
       });
 
       it('notifies onProgress callback in chronological order across parsing stages', () => {
