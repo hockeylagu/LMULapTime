@@ -363,10 +363,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
   ): RejectedReplayLink | null {
     const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
     const cached = rejected ? this.allSessionsCache?.find(s => s.id === sessionId) : undefined;
-    if (cached && rejected) {
-      delete cached.matchingReplayFile;
-      cached.rejectedReplayLink = rejected;
-    }
+    if (cached) delete cached.matchingReplayFile;
     return rejected;
   }
 

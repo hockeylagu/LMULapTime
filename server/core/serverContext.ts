@@ -223,9 +223,8 @@ export class ServerContext {
     const stored = session.matchingReplayFile;
     if (!stored) return;
     console.log(`[ServerContext] Withdrew replay ${stored.name} from session ${session.id} (${reason})`);
-    const rejected = this.sessionDb.rejectSessionReplayLink(session.id, stored, reason);
+    this.sessionDb.rejectSessionReplayLink(session.id, stored, reason);
     delete session.matchingReplayFile;
-    if (rejected) session.rejectedReplayLink = rejected;
   }
 
   /**
@@ -286,16 +285,6 @@ export class ServerContext {
         }
       }
       this.enforceOneSessionPerReplay(sessions, replaysByName);
-      // Tells the UI why a session has no replay when one was withdrawn from it.
-      for (const session of sessions) {
-        const withdrawals = rejectedLinks.get(session.id);
-        // The session's own field holds a withdrawal made during this pass, newer than the table read.
-        const rejected = session.matchingReplayFile
-          ? undefined
-          : session.rejectedReplayLink ?? withdrawals?.[withdrawals.length - 1];
-        if (rejected) session.rejectedReplayLink = rejected;
-        else delete session.rejectedReplayLink;
-      }
 
       const duckFiles = this.telemetryCatalog.getFiles();
       const telemetryMeta = this.sessionDb.getTelemetryMetadata();

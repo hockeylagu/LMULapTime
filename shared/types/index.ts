@@ -425,8 +425,6 @@ export interface SessionMetadata {
     hasDuckDbTelemetry?: boolean;
     duckdbFilename?: string;
   };
-  /** Set when a stored replay link was withdrawn: the session has no replay of its own. */
-  rejectedReplayLink?: RejectedReplayLink;
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
 }
