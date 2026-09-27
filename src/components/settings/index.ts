@@ -1,6 +1,7 @@
 export * from './Settings.js';
 export * from './CacheSettingsCard.js';
 export * from './ReplayCacheCard.js';
+export * from './ReplayUpgradeCard.js';
 export * from './AISettingsCard.js';
 export * from './AiReportsHistoryCard.js';
 export * from './ReferenceLaptimesCard.js';

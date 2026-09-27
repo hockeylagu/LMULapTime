@@ -26,6 +26,11 @@ export interface ReplayUpgradeCandidate {
   primarySlot: number | null;
 }
 
+export interface ReplayUpgradeProgress extends ReplaySyncProgress {
+  driversDone: number;
+  driversTotal: number;
+}
+
 export interface ReplayUpgradeResult {
   replays: number;
   upgraded: number;
@@ -100,8 +105,10 @@ export async function* upgradeReplaysAsyncIterator(
   host: ReplayUpgradeHost,
   replaysDir: string,
   options: { playerName?: string; shouldStop?: () => boolean } = {}
-): AsyncGenerator<ReplaySyncProgress, ReplayUpgradeResult, void> {
+): AsyncGenerator<ReplayUpgradeProgress, ReplayUpgradeResult, void> {
   const backlog = host.listReplayUpgradeBacklog(replaysDir);
+  const driversTotal = backlog.reduce((sum, candidate) => sum + candidate.driverSlots.length, 0);
+  const progress = (fields: ReplaySyncProgress): ReplayUpgradeProgress => ({ ...fields, driversDone: upgraded + failed, driversTotal });
   let upgraded = 0;
   let failed = 0;
   let interrupted = false;
@@ -112,7 +119,7 @@ export async function* upgradeReplaysAsyncIterator(
     if (!isFileUnchanged(candidate)) continue;
 
     if (candidate.metadataOutdated) {
-      yield { processed: index, total: backlog.length, currentFile: filename, stage: 'Upgrading metadata', filePercent: 0 };
+      yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: 'Upgrading metadata', filePercent: 0 });
       try {
         host.upsertReplayMetadataCache(filename, filePath, mtime, size, parseReplayMetadata(filePath, { playerName: options.playerName }));
       } catch (error) {
@@ -136,7 +143,7 @@ export async function* upgradeReplaysAsyncIterator(
         });
         let step = await extraction.next();
         while (!step.done) {
-          yield { processed: index, total: backlog.length, currentFile: filename, stage: `Upgrading driver ${slot}: ${step.value.stageDescription}`, filePercent: step.value.percent };
+          yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: ${step.value.stageDescription}`, filePercent: step.value.percent });
           step = await extraction.next();
         }
         // LMU may have rewritten the file while it was decoded: leave it to the next sync.
@@ -153,6 +160,6 @@ export async function* upgradeReplaysAsyncIterator(
     }
   }
 
-  yield { processed: backlog.length, total: backlog.length, currentFile: '' };
+  yield progress({ processed: backlog.length, total: backlog.length, currentFile: '' });
   return { replays: backlog.length, upgraded, failed, interrupted };
 }

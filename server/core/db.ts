@@ -102,6 +102,7 @@ import {
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
   ReplayUpgradeCandidate,
   ReplayUpgradeHost,
+  ReplayUpgradeProgress,
   ReplayUpgradeResult,
 } from './dbReplayUpgrade.js';
 import {
@@ -122,6 +123,7 @@ export type {
   IngestErrorEntry,
   TelemetryMetadataRecord,
   ReplayUpgradeCandidate,
+  ReplayUpgradeProgress,
   ReplayUpgradeResult,
 };
 
@@ -304,7 +306,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   public upgradeReplaysAsyncIterator(
     replaysDir: string,
     options: { playerName?: string; shouldStop?: () => boolean } = {}
-  ): AsyncGenerator<ReplaySyncProgress, ReplayUpgradeResult, void> {
+  ): AsyncGenerator<ReplayUpgradeProgress, ReplayUpgradeResult, void> {
     return runUpgradeReplaysAsyncIterator(this, replaysDir, options);
   }
 

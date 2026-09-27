@@ -572,6 +572,10 @@ export interface ReplayUpgradeStatus {
   total: number;
   currentFile: string | null;
   currentStage: string | null;
+  filePercent: number | null;
+  /** Drivers decoded (stored or failed) in this run, of the drivers in the backlog it started with. */
+  driversDone: number;
+  driversTotal: number;
   startedAt: string | null;
   finishedAt: string | null;
   result: { replays: number; upgraded: number; failed: number; interrupted: boolean } | null;
