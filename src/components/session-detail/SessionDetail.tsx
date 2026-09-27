@@ -7,6 +7,7 @@ import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
 import { DetailedSession, SessionProgressionPoint } from '../../../shared/types/index.js';
+import { LoadingState } from '../common/index.js';
 
 export interface SessionDetailProps {
   sessionId: string;
@@ -58,10 +59,11 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
-        <div className="inline-block animate-spin w-8 h-8 border-4 border-lmu-accent border-t-transparent rounded-full mb-3" />
-        <p className="text-sm font-medium">Loading session telemetry and lap data...</p>
-      </div>
+      <LoadingState
+        title="Loading Session Telemetry"
+        subtitle="Loading session telemetry and lap data..."
+        dataTestId="session-detail-loading"
+      />
     );
   }
 

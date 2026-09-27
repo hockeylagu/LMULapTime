@@ -9,6 +9,7 @@ import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
+import { LoadingState } from '../common/index.js';
 
 export type { TrackDetailSortOption };
 
@@ -55,10 +56,11 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
-        <div className="inline-block animate-spin w-8 h-8 border-4 border-lmu-accent border-t-transparent rounded-full mb-3" />
-        <p className="text-sm font-medium">Loading circuit telemetry and benchmark targets...</p>
-      </div>
+      <LoadingState
+        title="Loading Circuit Intelligence"
+        subtitle="Loading circuit telemetry and benchmark targets..."
+        dataTestId="track-detail-loading"
+      />
     );
   }
 
