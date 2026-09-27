@@ -159,9 +159,9 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                   <thead>
                     <tr className="text-lmu-muted uppercase tracking-wider text-[10px]">
                       <th className="px-2 py-1.5 text-left">Type</th>
-                      <th className="px-2 py-1.5 text-right" title="Value on this corner's best-time lap">Best</th>
+                      <th className="px-2 py-1.5 text-right" title="Value on your fastest pass through this corner">Fastest pass</th>
                       <th className="px-2 py-1.5 text-right">Avg</th>
-                      <th className="px-2 py-1.5 text-right" title="Value on this corner's worst-time lap">Worst</th>
+                      <th className="px-2 py-1.5 text-right" title="Value on your slowest pass through this corner">Slowest pass</th>
                       <th className="px-2 py-1.5 text-right">Std Dev</th>
                       <th className="px-2 py-1.5 text-right">Variance</th>
                     </tr>

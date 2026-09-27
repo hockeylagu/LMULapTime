@@ -216,6 +216,9 @@ describe('ConsistencyPanel', () => {
     expect(cornerHeaders.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Turn-In Pt')).toBeInTheDocument();
     expect(screen.getByText('Rot% @ Gas')).toBeInTheDocument();
+    // Metric values are read on the fastest and slowest pass, not each metric's own extremes.
+    expect(screen.getByText('Fastest pass')).toBeInTheDocument();
+    expect(screen.getByText('Slowest pass')).toBeInTheDocument();
 
     // Select corner
     fireEvent.click(cornerHeaders[cornerHeaders.length - 1]);
@@ -227,5 +230,28 @@ describe('ConsistencyPanel', () => {
 
     // Clicking time row again collapses it
     fireEvent.click(timeRow);
+  });
+
+  it('labels the laps the session parser left out, which start unticked', () => {
+    render(
+      <ConsistencyPanel
+        stats={baseStats}
+        formatLapTime={formatLapTime}
+        availableLaps={[
+          { lapNumber: 8, lapTimeSec: 97.131, isValid: true },
+          { lapNumber: 9, lapTimeSec: 100.358, isValid: true, nonRepresentativeReason: 'contact' },
+          { lapNumber: 10, lapTimeSec: 99.9, isValid: true, nonRepresentativeReason: 'offPace' },
+        ]}
+        excludedLaps={new Set([9, 10])}
+        onToggleLapExclusion={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText('1/3 laps included'));
+
+    expect(screen.getByText('Contact')).toBeInTheDocument();
+    expect(screen.getByText('Off pace')).toBeInTheDocument();
+    const lap9 = screen.getByText('Lap 9').closest('label')!;
+    expect(lap9.querySelector('input')).not.toBeChecked();
   });
 });
