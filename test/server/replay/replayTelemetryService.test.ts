@@ -171,6 +171,38 @@ describe('ReplayTelemetryService', () => {
     expect(db.getTelemetryMetadata()[0]).toMatchObject({ matchedSessionId: null, matchedReplayFilename: null });
   });
 
+  it('reads a lap from the file of the session that holds it, not a lap of the same time in another file', async () => {
+    // LMU numbers laps across a session's files (from 0, one below the replay): the car went out again,
+    // and replay lap 6 is DuckDB lap 5, in the second file.
+    const first = onDisk({ ...mockDuckFile, filename: 'Algarve_Q_2026-09-23T19_19_18Z.duckdb', lapsCount: 3 });
+    const second = onDisk({ ...mockDuckFile, filename: 'Algarve_Q_2026-09-23T19_25_40Z.duckdb', lapsCount: 2 });
+    db.upsertTelemetryMetadata(first, 'session-456');
+    db.upsertTelemetryMetadata(second, 'session-456');
+    const lapsByFile: Record<string, Array<{ lapNumber: number; lapTimeSec: number }>> = {
+      [first.filePath]: [{ lapNumber: 0, lapTimeSec: 125 }, { lapNumber: 1, lapTimeSec: 96.2 }, { lapNumber: 2, lapTimeSec: 96.1 }],
+      [second.filePath]: [{ lapNumber: 4, lapTimeSec: 120 }, { lapNumber: 5, lapTimeSec: 96.0 }],
+    };
+    const pathOf = (reader: DuckDbReader) => (reader as unknown as { filePath: string }).filePath;
+    vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'getLapList').mockImplementation(async function (this: DuckDbReader) {
+      return lapsByFile[pathOf(this)].map(lap => ({ ...lap, startTs: 0, endTs: lap.lapTimeSec }));
+    });
+    const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockImplementation(async function (this: DuckDbReader, lapNumber: number) {
+      const lap = lapsByFile[pathOf(this)].find(item => item.lapNumber === lapNumber);
+      return lap ? { ...mockDuckLap, lapNumber, lapTimeSec: lap.lapTimeSec } : null;
+    });
+    const lap6 = { ...mockVcrTraj, currentLap: 6, laps: [{ lapNumber: 6, lapTimeSec: 96.0, s1Sec: 30, s2Sec: 36, s3Sec: 30 }] } as ReplayTrajectoryData;
+
+    const result = await request({ matchedSession: session, lapNumber: 6, currentTrajectory: lap6, fullTrajectory: lap6 });
+
+    expect(result.fused).toBe(true);
+    expect(result.trajectory.duckdbFilename).toBe(second.filename);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(db.getTelemetryLapCache(second.filename, 6)).not.toBeNull();
+    expect(db.getTelemetryLapCache(first.filename, 6)).toBeNull();
+  });
+
   it('serves a cached lap after the DuckDB file is deleted', async () => {
     // mockDuckFile.filePath is not on disk.
     db.upsertTelemetryMetadata(mockDuckFile, 'session-456', undefined);

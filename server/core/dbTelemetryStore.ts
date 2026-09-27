@@ -12,6 +12,7 @@ export interface TelemetryMetadataRecord {
   filePath: string;
   matchedSessionId: string | null;
   matchedReplayFilename: string | null;
+  lapsCount: number;
 }
 
 export function upsertTelemetryMetadata(
@@ -20,8 +21,8 @@ export function upsertTelemetryMetadata(
   matchedSessionId?: string,
   matchedReplayFilename?: string
 ): boolean {
-  // Every session list and trajectory request re-asserts its matches: rewriting an identical row
-  // cost ~1 ms each. A row that already holds a match is the only one holding it.
+  // The catalog upserts every file on each refresh: rewriting an identical row cost ~1 ms each.
+  // A session or replay can own several files (see telemetry/telemetryLinks).
   const metadataJson = JSON.stringify(info);
   const existing = db.prepare('SELECT metadata_json, matched_session_id, matched_replay_filename FROM telemetry_metadata WHERE filename = ?')
     .get(info.filename) as { metadata_json: string; matched_session_id: string | null; matched_replay_filename: string | null } | undefined;
@@ -55,36 +56,20 @@ export function upsertTelemetryMetadata(
       updated_at = excluded.updated_at
   `);
 
-  db.transaction(() => {
-    if (matchedSessionId) {
-      db.prepare(`
-        UPDATE telemetry_metadata
-        SET matched_session_id = NULL
-        WHERE matched_session_id = ? AND filename <> ?
-      `).run(matchedSessionId, info.filename);
-    }
-    if (matchedReplayFilename) {
-      db.prepare(`
-        UPDATE telemetry_metadata
-        SET matched_replay_filename = NULL
-        WHERE matched_replay_filename = ? AND filename <> ?
-      `).run(matchedReplayFilename, info.filename);
-    }
-    upsert.run({
-      filename: info.filename,
-      filePath: info.filePath,
-      fileMtime: info.fileMtimeMs,
-      fileSize: info.fileSizeBytes,
-      trackName: info.trackName,
-      sessionType: info.sessionType,
-      sessionTimestamp: info.timestampStr,
-      lapsCount: info.lapsCount || 0,
-      metadataJson,
-      matchedSessionId: matchedSessionId || null,
-      matchedReplayFilename: matchedReplayFilename || null,
-      updatedAt: Date.now(),
-    });
-  })();
+  upsert.run({
+    filename: info.filename,
+    filePath: info.filePath,
+    fileMtime: info.fileMtimeMs,
+    fileSize: info.fileSizeBytes,
+    trackName: info.trackName,
+    sessionType: info.sessionType,
+    sessionTimestamp: info.timestampStr,
+    lapsCount: info.lapsCount || 0,
+    metadataJson,
+    matchedSessionId: matchedSessionId || null,
+    matchedReplayFilename: matchedReplayFilename || null,
+    updatedAt: Date.now(),
+  });
 
   return true;
 }
@@ -96,18 +81,20 @@ export function getTelemetryFiles(db: DatabaseType): DuckDbFileInfo[] {
 
 export function getTelemetryMetadata(db: DatabaseType): TelemetryMetadataRecord[] {
   const rows = db.prepare(
-    'SELECT filename, file_path, matched_session_id, matched_replay_filename FROM telemetry_metadata'
+    'SELECT filename, file_path, matched_session_id, matched_replay_filename, laps_count FROM telemetry_metadata'
   ).all() as Array<{
     filename: string;
     file_path: string;
     matched_session_id: string | null;
     matched_replay_filename: string | null;
+    laps_count: number;
   }>;
   return rows.map((r) => ({
     filename: r.filename,
     filePath: r.file_path,
     matchedSessionId: r.matched_session_id,
     matchedReplayFilename: r.matched_replay_filename,
+    lapsCount: r.laps_count,
   }));
 }
 

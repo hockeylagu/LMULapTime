@@ -329,9 +329,10 @@ export class ServerContext {
    */
   private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[]): void {
     if (this.sessionDb.resetTelemetryLinksForRule(TELEMETRY_LINK_RULE)) {
-      console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again, one file per session');
+      console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again: each file goes to the session it was recorded in');
     }
     this.sessionDb.linkTelemetryFiles(decideTelemetryLinks({
+      sessionEndMs: session => this.getXmlMtime(session),
       files: this.sessionDb.getTelemetryFiles(),
       stored: this.sessionDb.getTelemetryMetadata(),
       sessions,

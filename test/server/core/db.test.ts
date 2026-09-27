@@ -696,7 +696,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
   });
 
-  it('replaces stale replay and session associations when a newer telemetry file is matched', () => {
+  it('keeps every file matched to one session: LMU can write several for a session', () => {
     const staleFile = {
       filename: 'Daytona_Stale.duckdb',
       filePath: 'C:\\Telemetry\\Daytona_Stale.duckdb',
@@ -720,12 +720,9 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     db.upsertTelemetryMetadata(currentFile, 'session-daytona', 'Daytona_R.Vcr');
 
     const metadata = db.getTelemetryMetadata();
-    expect(metadata.filter(item => item.matchedSessionId === 'session-daytona')).toEqual([
-      expect.objectContaining({ filename: currentFile.filename }),
-    ]);
-    expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toEqual([
-      expect.objectContaining({ filename: currentFile.filename }),
-    ]);
+    expect(metadata.filter(item => item.matchedSessionId === 'session-daytona').map(item => item.filename).sort())
+      .toEqual([currentFile.filename, staleFile.filename]);
+    expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toHaveLength(2);
   });
 
   it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
@@ -742,16 +739,16 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     db.upsertTelemetryMetadata(file);
     expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
 
-    // A match moving to another file and back is written each time.
+    // A second file of the same session is written; the first keeps its match.
     db.upsertTelemetryMetadata(other, 'session-spa');
     db.upsertTelemetryMetadata(file, 'session-spa');
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
-    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename)).toEqual([file.filename]);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 2);
+    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename).sort()).toEqual([other.filename, file.filename]);
 
     db.upsertTelemetryMetadata({ ...file, fileMtimeMs: 2000 });
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
     db.clearTelemetryCache();
-    expect(db.getTelemetryMetadataRevision()).toBe(start + 5);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
   });
 
   it('changes the replay metadata revision on every replay metadata write', () => {
