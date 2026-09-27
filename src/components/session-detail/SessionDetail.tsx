@@ -27,6 +27,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
   const {
     session,
     loading,
+    loadError,
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
@@ -70,7 +71,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
   if (!session) {
     return (
       <div className="py-12 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
-        <p className="text-lg font-bold text-white mb-3">Session Not Found</p>
+        <p className="text-lg font-bold text-white mb-3">{loadError ? 'Could Not Load Session' : 'Session Not Found'}</p>
+        {loadError && <p role="alert" className="text-sm text-rose-400 mb-4">{loadError}</p>}
         <button
           onClick={onBack}
           className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase"
