@@ -10,7 +10,7 @@ import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 export type { TimeRangeFilter, ImprovementMetric };
 
 export { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';
-import { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';
+import { buildPersonalBestSeries, calculateLapPrDelta, formatSessionAxisLabel } from './improvementChartUtils.js';
 
 export interface SessionProgressionPoint {
   sessionId: string;
@@ -179,6 +179,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
     return {
       chartKey: uniqueKey,
       shortSession,
+      axisLabel: formatSessionAxisLabel(p.dateString, shortSession),
       fullDate: p.dateString,
       sessionId: p.sessionId,
       session: p.sessionName ? `${p.sessionType} (${p.sessionName})` : p.sessionType,

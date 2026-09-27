@@ -131,7 +131,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             dy={chartData.length > 5 ? 4 : 0}
             tickFormatter={(val) => {
               const item = chartData.find((c) => c.chartKey === val);
-              return item ? item.shortSession : val;
+              return item ? item.axisLabel ?? item.shortSession : val;
             }}
           />
           <YAxis
