@@ -7,17 +7,10 @@ import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
+import { parseBoundedInteger, queryString } from './queryParams.js';
 
 function isSafeFileName(value: string): boolean {
   return value.length > 0 && value !== '.' && value !== '..' && path.basename(value) === value && !value.includes('\0');
-}
-
-function parseBoundedInteger(value: unknown, name: string, min: number, max: number): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !/^-?\d+$/.test(value)) throw new Error(`Invalid ${name}`);
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) throw new Error(`Invalid ${name}`);
-  return parsed;
 }
 
 export function createReplayRouter(context: ServerContext): Router {
@@ -141,7 +134,7 @@ export function createReplayRouter(context: ServerContext): Router {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid trajectory parameters' });
       }
 
-      const maxPointsParam = req.query.maxPoints as string | undefined;
+      const maxPointsParam = queryString(req.query.maxPoints);
       let maxPoints = 1200;
       try {
         if (maxPointsParam !== undefined) {
@@ -169,9 +162,9 @@ export function createReplayRouter(context: ServerContext): Router {
       }
 
       const driverSlot = requestedDriverSlot >= 0 ? requestedDriverSlot : undefined;
-      const driverName = (req.query.driverName as string | undefined) || (!req.query.driverSlot ? context.currentParser.configuredPlayerName : undefined);
+      const driverName = queryString(req.query.driverName) || (!req.query.driverSlot ? context.currentParser.configuredPlayerName : undefined);
       const lapNumber = requestedLapKey >= 0 ? requestedLapKey : undefined;
-      const allowDuckDb = (req.query.source as string | undefined)?.toLowerCase() !== 'vcr';
+      const allowDuckDb = queryString(req.query.source)?.toLowerCase() !== 'vcr';
 
       const trajectory = await trajectoryService.getTrajectory({
         replayName,

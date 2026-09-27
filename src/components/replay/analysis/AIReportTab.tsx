@@ -3,6 +3,7 @@ import { BrainCircuit, RefreshCw, Sparkles } from 'lucide-react';
 import { AiAnalyzeResponse, AiErrorCode, ReplayLapSummary, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { buildAiLapEvidence } from '../../../utils/aiReportPayload.js';
+import { ApiError, fetchJson, isAbortError, postJson } from '../../../api/apiClient.js';
 
 interface AIReportTabProps {
   trajectory: ReplayTrajectoryData | null;
@@ -26,6 +27,16 @@ const errorMessages: Record<AiErrorCode, string> = {
   upstream_error: 'Gemini could not complete the report.',
   malformed_model_response: 'Gemini returned a report in an unsupported format.',
 };
+
+/** The error code and detail line of a failed analyze-lap request (see server/routes/aiRoutes.ts). */
+function describeAiFailure(cause: unknown): { code: AiErrorCode; detail: string | null } {
+  if (!(cause instanceof ApiError)) return { code: 'upstream_error', detail: null };
+  const body = cause.body && typeof cause.body === 'object' ? cause.body as Record<string, unknown> : {};
+  const code = typeof body.errorCode === 'string' && body.errorCode in errorMessages ? body.errorCode as AiErrorCode : 'upstream_error';
+  const detail = typeof body.error === 'string' ? body.error : null;
+  const requestId = typeof body.requestId === 'string' ? body.requestId : null;
+  return { code, detail: requestId ? `${detail || 'Request failed.'} (Request ID: ${requestId})` : detail };
+}
 
 export const AIReportTab: React.FC<AIReportTabProps> = ({
   trajectory,
@@ -67,8 +78,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
     setReport(null);
     setErrorCode(null);
     setErrorMessage(null);
-    void fetch('/api/ai/settings')
-      .then(response => response.json())
+    void fetchJson<{ configured?: boolean }>('/api/ai/settings')
       .then(data => { if (!cancelled) setConfigured(Boolean(data.configured)); })
       .catch(() => { if (!cancelled) setConfigured(false); });
     return () => {
@@ -86,25 +96,12 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
     setErrorCode(null);
     setErrorMessage(null);
     try {
-      const response = await fetch('/api/ai/analyze-lap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forceRegenerate, evidence }),
-        signal: controller.signal,
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        const requestError = new Error(data.errorCode || 'upstream_error') as Error & { detail?: string };
-        requestError.detail = typeof data.error === 'string' ? data.error : undefined;
-        if (data.requestId) requestError.detail = `${requestError.detail || 'Request failed.'} (Request ID: ${data.requestId})`;
-        throw requestError;
-      }
-      setReport(data as AiAnalyzeResponse);
+      setReport(await postJson<AiAnalyzeResponse>('/api/ai/analyze-lap', { forceRegenerate, evidence }, { signal: controller.signal }));
     } catch (cause) {
-      if (cause instanceof DOMException && cause.name === 'AbortError') return;
-      const code = cause instanceof Error && cause.message in errorMessages ? cause.message as AiErrorCode : 'upstream_error';
-      setErrorCode(code);
-      setErrorMessage(cause instanceof Error && 'detail' in cause ? (cause as Error & { detail?: string }).detail || null : null);
+      if (isAbortError(cause)) return;
+      const failure = describeAiFailure(cause);
+      setErrorCode(failure.code);
+      setErrorMessage(failure.detail);
     } finally {
       if (!controller.signal.aborted) setIsLoading(false);
     }

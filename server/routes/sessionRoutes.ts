@@ -8,6 +8,7 @@ import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
 import { DetailedSession } from '../core/types.js';
+import { queryString } from './queryParams.js';
 
 export interface SessionFilterOptions {
   track?: string;
@@ -20,11 +21,11 @@ export interface SessionFilterOptions {
 
 export function parseSessionFilters(query: Record<string, unknown>): SessionFilterOptions {
   return {
-    track: query.track as string | undefined,
-    car: query.car as string | undefined,
-    carClass: query.carClass as string | undefined,
-    driver: query.driver as string | undefined,
-    sessionType: query.sessionType as string | undefined,
+    track: queryString(query.track),
+    car: queryString(query.car),
+    carClass: queryString(query.carClass),
+    driver: queryString(query.driver),
+    sessionType: queryString(query.sessionType),
     hideEmpty: query.hideEmpty === 'true' || query.filterEmpty === 'true',
   };
 }
@@ -105,7 +106,8 @@ export function createSessionRouter(context: ServerContext): Router {
   });
 
   router.get('/track/:trackName', (req, res) => {
-    const decoded = decodeURIComponent(req.params.trackName);
+    // Express has already decoded the path parameter; decoding it again breaks a name with '%'.
+    const decoded = req.params.trackName;
     const allSessions = context.loadSessions();
     const trackSessions = allSessions.filter(session => matchesTrack(decoded, session.trackVenue, session.trackCourse));
     const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
@@ -124,14 +126,14 @@ export function createSessionRouter(context: ServerContext): Router {
   });
 
   router.get('/compare/laps', (req, res) => {
-    const track = req.query.track as string | undefined;
+    const track = queryString(req.query.track);
     const refCache = loadReferenceLaptimesFromCache();
     const comparisonData = extractComparableLaps(context.loadSessions(), {
       trackName: track,
-      carClass: req.query.carClass as string | undefined,
-      carModel: req.query.carModel as string | undefined,
-      driverName: req.query.driver as string | undefined,
-      sessionId: req.query.sessionId as string | undefined,
+      carClass: queryString(req.query.carClass),
+      carModel: queryString(req.query.carModel),
+      driverName: queryString(req.query.driver),
+      sessionId: queryString(req.query.sessionId),
       playerOnly: req.query.playerOnly !== 'false',
     });
 

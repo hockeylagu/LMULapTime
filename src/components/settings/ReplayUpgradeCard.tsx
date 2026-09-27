@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpCircle } from 'lucide-react';
 import { ReplayScanStatus, ReplayUpgradeStatus } from '../../../shared/types/index.js';
+import { fetchJson, postJson } from '../../api/apiClient.js';
 
 // Progress of the background re-decode of on-disk replays stored by an older parser version.
 // The job can run for hours, long after the app's scan polling has stopped, so the card polls
@@ -32,9 +33,8 @@ export const ReplayUpgradeCard: React.FC<ReplayUpgradeCardProps> = ({ replayScan
 
   const load = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
-    fetch('/api/replays/upgrade')
-      .then(res => res.json())
-      .then((data: unknown) => {
+    fetchJson<unknown>('/api/replays/upgrade')
+      .then((data) => {
         if (!isOverview(data)) return;
         setOverview(data);
         setError(null);
@@ -59,11 +59,7 @@ export const ReplayUpgradeCard: React.FC<ReplayUpgradeCardProps> = ({ replayScan
   const toggle = () => {
     if (!overview) return;
     setIsToggling(true);
-    fetch('/api/replays/upgrade', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: !overview.status.enabled }),
-    })
+    postJson<unknown>('/api/replays/upgrade', { enabled: !overview.status.enabled })
       .then(() => load())
       .catch(() => setError('Unable to change the replay upgrade setting.'))
       .finally(() => setIsToggling(false));

@@ -39,7 +39,7 @@ export function *syncSessionsIterator(
     };
   }
 
-  const DB_PARSER_VERSION = '2.11_accurate_fixed_setups_and_tire_warmers';
+  const DB_PARSER_VERSION = '2.12_out_laps_after_inferred_in_laps';
   const cachedVersion = host.getMetadata('parser_version');
   const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
 

@@ -8,7 +8,7 @@ import { CompareSectorChart } from './CompareSectorChart.js';
 import { CompareLapsTable } from './CompareLapsTable.js';
 import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
 import { ReplaySummary } from '../../../shared/types/index.js';
-import { matchesTrack } from '../../../shared/domain/paceCategory.js';
+import { fetchJson } from '../../api/apiClient.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };
@@ -108,17 +108,12 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       if (sess?.matchingReplayFile?.name) {
         return sess.matchingReplayFile.name;
       }
+      // Only the replay linked to the lap's own session records it: another replay of the track is
+      // another session (or layout), and would show someone else's lap.
       try {
-        const res = await fetch('/api/replays');
-        if (res.ok) {
-          const replays: ReplaySummary[] = await res.json();
-          const match = replays.find((r: ReplaySummary) => r.matchedSessionId === lap.sessionId);
-          if (match?.name) return match.name;
-          const trackMatch = replays.find(
-            (r: ReplaySummary) => r.trackName && selectedTrack && matchesTrack(r.trackName, selectedTrack, '')
-          );
-          if (trackMatch?.name) return trackMatch.name;
-        }
+        const replays = await fetchJson<ReplaySummary[]>('/api/replays');
+        const match = replays.find((r) => r.matchedSessionId === lap.sessionId);
+        if (match?.name) return match.name;
       } catch (err) {
         console.error('Failed to locate replay for lap:', err);
       }

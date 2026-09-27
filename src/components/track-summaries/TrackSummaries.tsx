@@ -3,6 +3,7 @@ import { findReferenceEntry, getPaceCategoryFromPercentage } from '../../../shar
 import { aggregateTrackSummaries, TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
 import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../shared/types/index.js';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
+import { loadReferenceLaptimes } from '../../api/referenceApi.js';
 import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
 
 export type { TracksSortOption, TrackSessionSummary };
@@ -25,8 +26,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   const [sortBy, setSortBy] = useState<TracksSortOption>('name-asc');
 
   useEffect(() => {
-    fetch('/api/reference-laptimes')
-      .then(res => res.json())
+    loadReferenceLaptimes()
       .then(data => setRefCache(data))
       .catch(err => console.error('Failed to load reference laptimes in TrackSummaries:', err));
   }, []);

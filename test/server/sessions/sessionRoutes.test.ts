@@ -142,6 +142,13 @@ describe('sessionRoutes and filterSessions', () => {
       expect(filters.hideEmpty).toBe(true);
     });
 
+    it('treats a repeated or nested parameter as absent', () => {
+      const filters = parseSessionFilters({ track: ['Spa', 'Monza'], driver: { name: 'Alpha' }, carClass: 'Hypercar' });
+      expect(filters.track).toBeUndefined();
+      expect(filters.driver).toBeUndefined();
+      expect(filters.carClass).toBe('Hypercar');
+    });
+
     it('handles filterEmpty alias and undefined fields', () => {
       const filters = parseSessionFilters({ filterEmpty: 'true' });
       expect(filters.hideEmpty).toBe(true);
@@ -210,6 +217,18 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body).toHaveLength(1);
       expect(res.body[0].id).toBe('sess_1');
       expect(res.body[0].drivers).toBeUndefined();
+    });
+
+    it('GET /api/sessions answers a repeated filter instead of failing', async () => {
+      const res = await request(app).get('/api/sessions?track=Spa&track=Monza&driver=Alpha&driver=Beta');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('GET /api/track/:trackName reads a name containing % as sent', async () => {
+      const res = await request(app).get(`/api/track/${encodeURIComponent('Spa 100%')}`);
+      expect(res.status).toBe(200);
+      expect(res.body.trackName).toBe('Spa 100%');
     });
 
     it('GET /api/progression applies shared session filters and computes progression', async () => {

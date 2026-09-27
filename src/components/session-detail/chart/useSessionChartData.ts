@@ -88,11 +88,7 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
 
       driversOnLap.forEach((item, classIdx) => {
         const classPos = isMultiClass ? classIdx + 1 : item.overallPos;
-        const prevLap = item.driver.laps?.find((ol) => ol.lapNum === lapNum - 1);
-        const prevIsValidPitStop = Boolean(
-          prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0
-        );
-        const isOutLap = Boolean(item.lap.isOutLap || prevIsValidPitStop);
+        const isOutLap = Boolean(item.lap.isOutLap);
         point[item.driver.name] = classPos;
         point[`${item.driver.name}_isPit`] = item.lap.isPitStop;
         point[`${item.driver.name}_isOutLap`] = isOutLap;
@@ -106,33 +102,12 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
   }, [maxClassLaps, driversToPlot, isMultiClass]);
 
   const sessionChartData = useMemo(() => {
-    return (selectedDriver.laps || []).map((l, idx, arr) => {
-      const prevLap = idx > 0 ? arr[idx - 1] : null;
-      const prevIsValidPitStop = Boolean(
-        prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0
-      );
-      const isOutLap = Boolean(l.isOutLap || prevIsValidPitStop);
-
-      let resolvedLapTime = l.lapTime;
-      let resolvedLapTimeString = l.lapTimeString;
-      let isInferred = Boolean(l.isInferred);
-
-      if (
-        (resolvedLapTime === null || resolvedLapTime <= 0) &&
-        l.elapsedSeconds !== null &&
-        l.elapsedSeconds !== undefined
-      ) {
-        if (prevLap?.elapsedSeconds !== null && prevLap?.elapsedSeconds !== undefined) {
-          const deltaEt = parseFloat((l.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
-          const knownSectors = (l.s1 || 0) + (l.s2 || 0) + (l.s3 || 0);
-          const maxAllowed = selectedDriver.bestLapTime ? Math.max(selectedDriver.bestLapTime * 3.5, 300) : 600;
-          if (deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed) {
-            resolvedLapTime = deltaEt;
-            resolvedLapTimeString = formatTime(deltaEt);
-            isInferred = true;
-          }
-        }
-      }
+    return (selectedDriver.laps || []).map((l) => {
+      // The parser infers a missing lap time from the elapsed time and marks out-laps.
+      const isOutLap = Boolean(l.isOutLap);
+      const resolvedLapTime = l.lapTime;
+      const resolvedLapTimeString = l.lapTimeString;
+      const isInferred = Boolean(l.isInferred);
 
       return {
         lapNum: `Lap ${l.lapNum}`,
