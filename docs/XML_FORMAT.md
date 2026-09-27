@@ -199,7 +199,7 @@ Each completed or attempted lap by a driver is recorded as a `<Lap>` element wit
 | `@_ve` | Float | `0.000`–`1.000` | Virtual Energy (VE) stint budget fraction remaining (BoP rule). |
 | `@_veUsed` | Float | MegaJoules / % | Virtual Energy consumed during this lap. |
 | `@_pit` | Integer | `0` or `1` | In-lap pit flag: `1` indicates the vehicle entered the pit lane. |
-| `@_et` | Float | Seconds | Session elapsed time at lap completion (`"--.---"` if incomplete). |
+| `@_et` | Float | Seconds | Session elapsed time when the lap **starts**, i.e. the previous lap's timing-line crossing (`"--.---"` if incomplete). Every car's lap 1 shares the race start time; lap $n+1$'s `et` ≈ lap $n$'s `et` + lap time, except around a pit stop. The parser compares all cars' crossings to find gaps on the road and overtakes (`shared/domain/raceTraffic.ts`). |
 
 ---
 

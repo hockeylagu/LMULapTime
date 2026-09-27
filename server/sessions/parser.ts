@@ -32,6 +32,7 @@ import { parseStreamEvents } from './sessionXmlStream.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
 import { isCompletedPitStop, isRacingLap } from '../../shared/domain/lapComparison.js';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
+import { annotateLapTraffic } from '../../shared/domain/raceTraffic.js';
 import { findMatchingReplay } from './replayMatching.js';
 
 const xmlParser = new XMLParser({
@@ -243,8 +244,9 @@ export class LmuParser {
         this.parseStreamEvents(streamNode, drivers);
       }
 
-      // With contacts attached to their laps, mark the laps that do not show the driver's pace
-      // and leave them out of the clean-lap average.
+      // With contacts and the cars met on track attached to their laps, mark the laps that do not
+      // show the driver's pace and leave them out of the clean-lap average.
+      annotateLapTraffic(drivers);
       drivers.forEach(d => {
         markNonRepresentativeLaps(d.laps);
         d.avgLapTime = computeAverageLapTime(d.laps);
