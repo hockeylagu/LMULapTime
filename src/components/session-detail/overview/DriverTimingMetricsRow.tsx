@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common';
+import { SectorsMetricBox } from './SectorsMetricBox.js';
 
 export interface DriverTimingMetricsRowProps {
   session?: DetailedSession;
@@ -74,7 +75,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
 
   return (
     <div
-      className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 ${
+      className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 ${
         isRaceSession ? 'border-t border-lmu-border/40 pt-2.5' : ''
       }`}
     >
@@ -162,7 +163,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             <p className="text-[10px] text-lmu-muted uppercase font-semibold">Session Lap Average</p>
             {consistencyScore !== null && (
               <span
-                className={`text-[9px] font-bold font-mono px-1.5 py-0.2 rounded border ${
+                className={`text-[9px] font-bold font-mono px-1.5 py-0.2 rounded border whitespace-nowrap ${
                   consistencyScore >= 99
                     ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
                     : consistencyScore >= 97
@@ -228,27 +229,12 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         </p>
       </div>
 
-      {/* 5. Best Sectors (S1 / S2 / S3) & Averages */}
-      <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
-        <p className="text-[10px] text-lmu-muted uppercase font-semibold">Sectors (Best / Avg)</p>
-        <div className="mt-1 space-y-0.5 text-xs font-mono">
-          <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
-            <span className="text-lmu-muted text-[10px] font-semibold">S1:</span>
-            <strong className="text-lmu-gold font-bold">{formatTime(selectedDriver.bestS1)}</strong>
-            <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS1)})</span>
-          </div>
-          <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
-            <span className="text-lmu-muted text-[10px] font-semibold">S2:</span>
-            <strong className="text-lmu-blue font-bold">{formatTime(selectedDriver.bestS2)}</strong>
-            <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS2)})</span>
-          </div>
-          <div className="grid grid-cols-[20px_auto_1fr] items-center gap-2">
-            <span className="text-lmu-muted text-[10px] font-semibold">S3:</span>
-            <strong className="text-lmu-green font-bold">{formatTime(selectedDriver.bestS3)}</strong>
-            <span className="text-lmu-muted text-[11px] text-right">({formatTime(avgS3)})</span>
-          </div>
-        </div>
-      </div>
+      {/* 5. Best and average sectors against the same car */}
+      <SectorsMetricBox
+        selectedDriver={selectedDriver}
+        drivers={session?.drivers ?? []}
+        averages={{ s1: avgS1, s2: avgS2, s3: avgS3, lap: avgLapTime }}
+      />
     </div>
   );
 };
