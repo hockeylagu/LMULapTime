@@ -3,6 +3,8 @@ import { BrainCircuit, RefreshCw, Sparkles } from 'lucide-react';
 import { AiAnalyzeResponse, AiErrorCode, ReplayLapSummary, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { buildAiLapEvidence } from '../../../utils/aiReportPayload.js';
+import type { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
+import { comparisonConfidence, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { ApiError, fetchJson, isAbortError, postJson } from '../../../api/apiClient.js';
 
 interface AIReportTabProps {
@@ -13,7 +15,12 @@ interface AIReportTabProps {
   carClass?: string;
   carModel?: string;
   currentLapSummary?: ReplayLapSummary | null;
+  /** The replay's laps timed through each corner, for how often each corner is lost. */
+  cornerStats?: CornerConsistencyStat[];
 }
+
+/** The report explains at most this many ranked corners. */
+const AI_PRIORITY_LIMIT = 4;
 
 const errorMessages: Record<AiErrorCode, string> = {
   not_configured: 'Add a Gemini API key in Settings before generating a report.',
@@ -46,6 +53,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
   currentLapSummary,
   carClass,
   carModel,
+  cornerStats,
 }) => {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [report, setReport] = useState<AiAnalyzeResponse | null>(null);
@@ -58,6 +66,10 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
   const evidence = useMemo(() => {
     if (!trajectory) return null;
     const baselineLapSummary = baselineTrajectory?.laps?.find(lap => lap.lapNumber === (baselineLapNumber ?? baselineTrajectory.currentLap));
+    // The app ranks the corners (AGENTS.md rule C); the report only explains them.
+    const priorities = baselineTrajectory
+      ? rankDebriefCorners(segments, cornerStats?.length ? cornerStats : null, comparisonConfidence(trajectory, baselineTrajectory), AI_PRIORITY_LIMIT)
+      : undefined;
     try {
       return buildAiLapEvidence({
         trajectory,
@@ -67,11 +79,12 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
         segments,
         carClass,
         carModel,
+        priorities,
       });
     } catch {
       return null;
     }
-  }, [trajectory, baselineTrajectory, baselineLapNumber, currentLapSummary, segments, carClass, carModel]);
+  }, [trajectory, baselineTrajectory, baselineLapNumber, currentLapSummary, segments, carClass, carModel, cornerStats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +153,10 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
         <section className="space-y-2">
           <h4 className="text-xs font-bold uppercase tracking-wider text-lmu-accent">Key Improvements</h4>
           {report.report.improvements.map((item, index) => <article key={`${item.title}-${index}`} className="rounded-xl border border-lmu-border bg-lmu-card/60 p-4">
-            <h5 className="text-sm font-bold text-white">{item.title}</h5>
+            <h5 className="text-sm font-bold text-white">
+              {item.cornerNumber !== undefined && <span className="mr-1.5 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-amber-300">#{index + 1} T{item.cornerNumber}</span>}
+              {item.title}
+            </h5>
             <div className="mt-3 space-y-2 text-sm leading-relaxed">
               <p><strong className="text-emerald-300">Action:</strong> <span className="text-white">{item.action}</span></p>
               <p><strong className="text-lmu-accent">Why:</strong> <span className="text-lmu-muted">{item.why}</span></p>

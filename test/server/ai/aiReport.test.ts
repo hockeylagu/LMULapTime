@@ -115,4 +115,45 @@ describe('Gemini AI adapter', () => {
       message: expect.stringContaining('model overloaded'),
     });
   });
+
+  describe('app-ranked priorities', () => {
+    const ranked: AiLapEvidence = {
+      ...evidence,
+      segments: [
+        { segmentIndex: 1, type: 'corner', cornerNumber: 1, timeDeltaSec: 0.37 },
+        { segmentIndex: 9, type: 'corner', cornerNumber: 5, timeDeltaSec: 0.77 },
+      ],
+      priorities: [
+        { rank: 1, cornerNumber: 5, timeLossSec: 0.766, lapsLosing: 21, lapsSampled: 22, confidence: 0.8 },
+        { rank: 2, cornerNumber: 1, timeLossSec: 0.37, lapsLosing: 6, lapsSampled: 22, confidence: 0.8 },
+      ],
+    };
+    const improvement = (cornerNumber: number) => ({
+      title: `T${cornerNumber}`, action: 'Brake 10 m later.', why: 'Braking is earlier.', executionCue: 'Use the board.', verify: 'Check the apex speed.', evidence: [], cornerNumber,
+    });
+
+    it('asks the model to explain the ranked corners in order, and keeps the app order', async () => {
+      generateContentMock.mockResolvedValue({ text: JSON.stringify({ overallSummary: 'Two corners.', improvements: [improvement(1), improvement(5)] }) });
+
+      const result = await analyzeLap({ evidence: ranked, forceRegenerate: true });
+
+      expect(result.report.improvements.map(i => i.cornerNumber)).toEqual([5, 1]);
+      const request = generateContentMock.mock.calls[0][0] as { config: { systemInstruction: string } };
+      expect(request.config.systemInstruction).toContain('never add, drop, merge, or reorder corners');
+    });
+
+    it('rejects a report about a corner the app did not rank', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      generateContentMock.mockResolvedValue({ text: JSON.stringify({ overallSummary: 'Off list.', improvements: [improvement(5), improvement(3)] }) });
+
+      await expect(analyzeLap({ evidence: ranked, forceRegenerate: true })).rejects.toMatchObject({ code: 'malformed_model_response' });
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('refuses evidence with a malformed priorities list', async () => {
+      const bad = { ...ranked, priorities: [{ rank: 1, cornerNumber: 5.5, timeLossSec: 0.7, confidence: 1 }] };
+
+      await expect(analyzeLap({ evidence: bad, forceRegenerate: true })).rejects.toMatchObject({ code: 'invalid_request' });
+    });
+  });
 });

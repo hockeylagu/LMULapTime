@@ -244,6 +244,8 @@ export interface AiLapEvidence {
     stats: Array<{ label: string; avgSec: number; stdDevSec: number; consistencyPct: number }>;
   };
   trackLimits?: { available: boolean; incidents: Array<{ description: string; lapNum?: number; warningPoints?: number }> };
+  /** The corners to explain, already ranked by the app (time lost x repeatability x confidence). */
+  priorities?: Array<{ rank: number; cornerNumber: number; timeLossSec: number; lapsLosing?: number; lapsSampled?: number; confidence: number }>;
 }
 
 export interface AiReportSection {
@@ -254,6 +256,8 @@ export interface AiReportSection {
   verify: string;
   evidence?: string[];
   estimatedGainSec?: number;
+  /** The ranked corner this improvement explains, when the evidence carried priorities. */
+  cornerNumber?: number;
 }
 
 export interface AiLapReport {

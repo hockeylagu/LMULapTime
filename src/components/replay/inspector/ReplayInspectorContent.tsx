@@ -130,7 +130,10 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   );
 
   const { cornerStats: rawCornerConsistencyStats, isLoading: isCornerConsistencyLoading } =
-    useCornerConsistency(activeTab === 'corners' && cornerSubView === 'consistency', activeReplayName, metadata, selectedDriverSlot, trajectory);
+    useCornerConsistency(
+      (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
+      activeReplayName, metadata, selectedDriverSlot, trajectory
+    );
 
   const cornerConsistencyStats = useMemo(
     () => filterCornerConsistencyStats(rawCornerConsistencyStats, excludedConsistencyLaps),
