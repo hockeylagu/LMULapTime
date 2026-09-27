@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { suggestReferenceLap } from '../../../../src/components/replay/inspector/suggestReferenceLap.js';
 import { ReplayCompareButton } from '../../../../src/components/replay/inspector/ReplayCompareButton.js';
 import type { ComparableLap, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
@@ -36,25 +35,6 @@ const laps = [
   // Faster, but in another car at this track: never the suggestion.
   lap(PRACTICE, 3, 94.9, { carType: 'Porsche 963' }),
 ];
-
-describe('suggestReferenceLap', () => {
-  it('suggests the driver fastest lap in the same car when it beats the lap on screen', () => {
-    expect(suggestReferenceLap(laps, RACE, ME, 20, 95.894)?.id).toBe(`${PRACTICE}_24`);
-  });
-
-  it('suggests nothing when the lap on screen is already the best', () => {
-    expect(suggestReferenceLap(laps, PRACTICE, ME, 24, 95.658)).toBeNull();
-  });
-
-  it('skips laps the parser marked non-representative', () => {
-    const marked = laps.map(l => (l.id === `${PRACTICE}_24` ? { ...l, nonRepresentativeReason: 'offPace' as const } : l));
-    expect(suggestReferenceLap(marked, RACE, ME, 20, 95.894)?.id).toBe(`${QUALI}_7`);
-  });
-
-  it('suggests nothing for a driver without laps in this replay', () => {
-    expect(suggestReferenceLap(laps, RACE, 'Alexandr Malynych', 20, 95.746)).toBeNull();
-  });
-});
 
 describe('ReplayCompareButton', () => {
   it('compares with the suggested lap in one click', () => {

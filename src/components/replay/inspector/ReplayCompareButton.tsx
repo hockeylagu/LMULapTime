@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Scale, Sparkles } from 'lucide-react';
 import type { ComparableLap, ReplayTrajectoryData } from '../../../../shared/types/index.js';
-import { suggestReferenceLap } from './suggestReferenceLap.js';
+import { suggestReferenceLap } from '../../../utils/referenceLaps.js';
 
 export interface ReplayCompareButtonProps {
   replayName: string | null;
