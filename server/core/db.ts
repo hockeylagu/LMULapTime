@@ -29,8 +29,16 @@ import {
   syncReplaysAsyncIterator as runSyncReplaysAsyncIterator,
   syncReplaysIterator as runSyncReplaysIterator,
   syncReplaysFromDir as runSyncReplaysFromDir,
+  cacheAllLapsForDriver,
   ReplaySyncHost,
 } from './dbReplaySync.js';
+import {
+  deleteReplayDriverLaps,
+  getReplayDriverIngest,
+  recordReplayDriverIngest,
+  ReplayDriverIngest,
+  ReplayDriverIngestStatus,
+} from './dbReplayIngestStore.js';
 import {
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
@@ -242,6 +250,39 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
 
   public setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void {
     setTrajectoryDefaults(this.db, filename, driverSlot, defaultLapKey, resolvedDriverSlot);
+  }
+
+  /**
+   * Replaces a driver's whole lap set in one transaction: a crash never leaves half a set, and laps
+   * the new decode no longer has do not linger. The player's decode (isPrimary) also points the
+   * "no driver requested" alias (-1) at its slot.
+   */
+  public replaceReplayDriverLaps(
+    filename: string,
+    filePath: string,
+    mtime: number,
+    size: number,
+    driverSlotKey: number,
+    trajectory: ReplayTrajectoryData,
+    isPrimary: boolean
+  ): void {
+    this.db.transaction(() => {
+      deleteReplayDriverLaps(this.db, filename, driverSlotKey);
+      cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
+      recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
+      if (isPrimary) {
+        this.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, driverSlotKey);
+        if (driverSlotKey !== -1) recordReplayDriverIngest(this.db, filename, -1, mtime, size, 'stored');
+      }
+    })();
+  }
+
+  public getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null {
+    return getReplayDriverIngest(this.db, filename, driverSlot);
+  }
+
+  public recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void {
+    recordReplayDriverIngest(this.db, filename, driverSlot, mtime, size, status, error);
   }
 
   public getReplaysCount(): number {

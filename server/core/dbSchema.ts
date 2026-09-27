@@ -213,6 +213,20 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (source_type, source_path)
     );
 
+    -- The outcome of decoding one driver of a replay file, for that file version and parser version:
+    -- a driver already stored or that failed is not decoded again until either changes.
+    CREATE TABLE IF NOT EXISTS replay_ingest_drivers (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      file_mtime INTEGER NOT NULL,
+      file_size INTEGER NOT NULL,
+      parser_version TEXT NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      attempted_at INTEGER NOT NULL,
+      PRIMARY KEY (filename, driver_slot)
+    );
+
     -- Session -> replay links withdrawn because the replay fails the matching rules. The session row
     -- no longer names the replay; previous_link_json keeps what it held, so a withdrawal can be undone.
     CREATE TABLE IF NOT EXISTS rejected_replay_links (
