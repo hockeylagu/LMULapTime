@@ -50,6 +50,7 @@ export function applyPureOfficialLapValidation(
     s2Sec: lap.s2,
     s3Sec: lap.s3,
     isValid: lap.isValid,
+    nonRepresentativeReason: lap.nonRepresentativeReason,
   }));
 
   const clonedLaps = trajectory.laps
@@ -63,6 +64,7 @@ export function applyPureOfficialLapValidation(
             validatedS2Sec: typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null,
             validatedS3Sec: typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null,
             timeDiffSec: Number((lap.lapTimeSec - match.lapTimeSec).toFixed(3)),
+            ...(match.nonRepresentativeReason ? { nonRepresentativeReason: match.nonRepresentativeReason } : {}),
           };
         }
         return { ...lap };

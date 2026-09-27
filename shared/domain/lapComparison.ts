@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry, ComparableLap } from '../types/index.js';
+import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason } from '../types/index.js';
 import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 
@@ -7,6 +7,7 @@ export interface LapSelectionInput {
   isValid?: boolean;
   isPitStop?: boolean;
   isOutLap?: boolean;
+  nonRepresentativeReason?: NonRepresentativeReason;
   lapNum?: number;
   s1?: number | null;
   s2?: number | null;
@@ -29,7 +30,8 @@ export function isRacingLap(lap: Pick<LapSelectionInput, 'isValid' | 'isPitStop'
 /**
  * Selects the laps used for clean-lap averages and consistency metrics.
  * Evaluates valid flying laps completed at racing speed, excluding pit stops,
- * out-laps, and start laps (lap 1 when multiple laps exist).
+ * out-laps, start laps (lap 1 when multiple laps exist), and laps the parser marked
+ * non-representative (a slow lap with contact, or far off the median).
  */
 export function selectCleanLapCandidates<T extends LapSelectionInput>(
   laps: T[],
@@ -42,6 +44,7 @@ export function selectCleanLapCandidates<T extends LapSelectionInput>(
     (lap.isValid ?? true) &&
     !lap.isPitStop &&
     !lap.isOutLap &&
+    !lap.nonRepresentativeReason &&
     !isAfterPitStop(index) &&
     (!hasMultiple || (lap.lapNum ?? 2) > 1)
   );

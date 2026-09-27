@@ -31,6 +31,7 @@ import {
 import { parseStreamEvents } from './sessionXmlStream.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
 import { isCompletedPitStop, isRacingLap } from '../../shared/domain/lapComparison.js';
+import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
 import { findMatchingReplay } from './replayMatching.js';
 
 const xmlParser = new XMLParser({
@@ -241,6 +242,14 @@ export class LmuParser {
       if (streamNode) {
         this.parseStreamEvents(streamNode, drivers);
       }
+
+      // With contacts attached to their laps, mark the laps that do not show the driver's pace
+      // and leave them out of the clean-lap average.
+      drivers.forEach(d => {
+        markNonRepresentativeLaps(d.laps);
+        d.avgLapTime = computeAverageLapTime(d.laps);
+        d.avgLapTimeString = formatTime(d.avgLapTime);
+      });
 
       // Identify Player driver dynamically
       const targetName = this.configuredPlayerName.toLowerCase().trim();

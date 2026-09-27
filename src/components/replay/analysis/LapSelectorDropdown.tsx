@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import type { NonRepresentativeReason } from '../../../../shared/types/index.js';
 
 export interface LapConsistencyOption {
   lapNumber: number;
   lapTimeSec: number;
   isValid: boolean;
+  // Set by the session parser: the lap starts excluded, with this reason shown.
+  nonRepresentativeReason?: NonRepresentativeReason;
 }
+
+const REASON_LABELS: Record<NonRepresentativeReason, { label: string; title: string }> = {
+  contact: { label: 'Contact', title: 'Slower than your median lap, with contact or damage' },
+  offPace: { label: 'Off pace', title: 'More than 3% slower than your median lap' },
+};
 
 export interface LapSelectorDropdownProps {
   availableLaps: LapConsistencyOption[];
@@ -45,7 +53,7 @@ export function LapSelectorDropdown({
       </button>
       {isOpen && (
         <div className="absolute top-8 left-0 z-30 w-52 max-h-64 overflow-y-auto rounded-lg bg-lmu-card border border-lmu-border shadow-2xl py-1">
-          {availableLaps.map(({ lapNumber, lapTimeSec, isValid }) => {
+          {availableLaps.map(({ lapNumber, lapTimeSec, isValid, nonRepresentativeReason }) => {
             const isExcluded = excludedLaps.has(lapNumber);
             return (
               <label
@@ -62,6 +70,14 @@ export function LapSelectorDropdown({
                 {!isValid && (
                   <span className="px-1 rounded bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[9px] font-bold uppercase">
                     Invalid
+                  </span>
+                )}
+                {isValid && nonRepresentativeReason && (
+                  <span
+                    title={REASON_LABELS[nonRepresentativeReason].title}
+                    className="px-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase"
+                  >
+                    {REASON_LABELS[nonRepresentativeReason].label}
                   </span>
                 )}
                 <span className={`ml-auto ${isExcluded ? 'text-lmu-muted line-through' : 'text-lmu-muted'}`}>{formatLapTime(lapTimeSec)}</span>

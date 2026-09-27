@@ -56,6 +56,19 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
         <LapStatusBadge isValid={l.isValid} isInferred={isInferredLap} incompleteTooltip={incompleteTooltip} />
       )}
 
+      {l.nonRepresentativeReason && (
+        <span
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 cursor-help"
+          title={
+            l.nonRepresentativeReason === 'contact'
+              ? 'Slower than your median lap, with contact or damage: left out of the average and consistency'
+              : 'More than 3% slower than your median lap: left out of the average and consistency'
+          }
+        >
+          {l.nonRepresentativeReason === 'contact' ? 'Contact' : 'Off pace'}
+        </span>
+      )}
+
       {/* Compact Incident & Penalty Badges */}
       {hasLapIncidents && (
         <span

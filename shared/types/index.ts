@@ -70,6 +70,9 @@ export interface TireWear {
   avg: number; // 4-wheel average wear % remaining (0-100)
 }
 
+/** Why a racing lap does not show the driver's pace: contact or damage, or far off their median lap. */
+export type NonRepresentativeReason = 'contact' | 'offPace';
+
 export interface LapIncident {
   type: 'contact' | 'damage' | 'other';
   description: string;
@@ -126,6 +129,7 @@ export interface LapData {
   gapToLeaderString?: string; // Formatted gap (e.g. "+4.215s" or "LEADER")
   isPitStop: boolean;
   isOutLap?: boolean; // Out-lap immediately following a pit stop
+  nonRepresentativeReason?: NonRepresentativeReason; // Set by the parser; left out of averages and consistency
   isValid: boolean;
   isInferred?: boolean; // Inferred from session elapsed time for incomplete laps
   paceCategory?: PaceCategory | null;
@@ -643,6 +647,7 @@ export interface ComparableLap {
   gapToLeaderString?: string;
   isPitStop?: boolean;
   isOutLap?: boolean;
+  nonRepresentativeReason?: NonRepresentativeReason;
   isValid: boolean;
   isInferred?: boolean;
   paceCategory?: PaceCategory | null;
@@ -829,6 +834,7 @@ export interface ReplayLapSummary {
   validatedS2Sec?: number | null;
   validatedS3Sec?: number | null;
   timeDiffSec?: number | null;
+  nonRepresentativeReason?: NonRepresentativeReason;
 }
 
 export interface ReplayTrajectoryValidation {
@@ -845,6 +851,7 @@ export interface ReplayTrajectoryValidation {
     s2Sec?: number | null;
     s3Sec?: number | null;
     isValid?: boolean;
+    nonRepresentativeReason?: NonRepresentativeReason;
   }>;
 }
 
