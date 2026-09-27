@@ -5,15 +5,15 @@ import { SessionLapTable } from '../../../src/components/session-detail/table/Se
 import { mockDetailedSession } from './mockSessionDetail.js';
 
 describe('SessionLapTable inferred timing', () => {
-  it('displays a valid elapsed-time estimate and sorts unavailable laps last', () => {
+  it('marks the elapsed-time estimate from the parser and sorts unavailable laps last', () => {
     const selectedDriver = {
       ...mockDetailedSession.playerDriver,
       bestLapTime: 100,
       laps: [
         { ...mockDetailedSession.playerDriver.laps[0], lapNum: 1, lapTime: 110, lapTimeString: '1:50.000', elapsedSeconds: 110 },
         {
-          ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, lapTime: null, lapTimeString: '--:--.---',
-          elapsedSeconds: 213, s1: 30, s2: 34, s3: 39, isInferred: false,
+          ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, lapTime: 103, lapTimeString: '1:43.000',
+          elapsedSeconds: 213, s1: 30, s2: 34, s3: 39, isInferred: true,
         },
         { ...mockDetailedSession.playerDriver.laps[2], lapNum: 3, lapTime: null, lapTimeString: '--:--.---', elapsedSeconds: null },
       ],

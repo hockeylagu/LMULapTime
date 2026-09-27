@@ -13,6 +13,19 @@ export interface LapSelectionInput {
   s3?: number | null;
 }
 
+/** A pit stop the car completed a lap on (the in-lap): the lap after it is an out-lap. */
+export function isCompletedPitStop(lap: LapSelectionInput | null | undefined): boolean {
+  return Boolean(lap?.isPitStop && lap.lapTime !== null && lap.lapTime > 0);
+}
+
+/**
+ * A valid lap driven at racing speed: neither a pit in-lap nor an out-lap. The parser marks
+ * out-laps (isOutLap) once, so every view reads the flag instead of deriving it again.
+ */
+export function isRacingLap(lap: Pick<LapSelectionInput, 'isValid' | 'isPitStop' | 'isOutLap'>): boolean {
+  return Boolean(lap.isValid) && !lap.isPitStop && !lap.isOutLap;
+}
+
 /**
  * Selects the laps used for clean-lap averages and consistency metrics.
  * Evaluates valid flying laps completed at racing speed, excluding pit stops,
@@ -24,10 +37,7 @@ export function selectCleanLapCandidates<T extends LapSelectionInput>(
 ): T[] {
   const completed = laps.filter((l) => l.lapTime !== null && l.lapTime > 0);
   const hasMultiple = completed.length > 1;
-  const isAfterPitStop = (index: number): boolean => {
-    const previousLap = index > 0 ? completed[index - 1] : null;
-    return Boolean(previousLap?.isPitStop && previousLap.lapTime !== null && previousLap.lapTime > 0);
-  };
+  const isAfterPitStop = (index: number): boolean => index > 0 && isCompletedPitStop(completed[index - 1]);
   const validFlying = completed.filter((lap, index) =>
     (lap.isValid ?? true) &&
     !lap.isPitStop &&

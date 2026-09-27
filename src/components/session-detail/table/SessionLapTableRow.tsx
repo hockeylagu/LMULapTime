@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
-import { computeLapToLapDelta } from '../../../../shared/domain/lapComparison.js';
+import { computeLapToLapDelta, isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
@@ -40,44 +40,24 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  let displayLapTime = l.lapTime;
-  let displayLapTimeString = l.lapTimeString;
-  let isInferredLap = !!l.isInferred;
-  const prevIsValidPitStop = Boolean(
-    prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0
-  );
-  const isOutLap = Boolean(l.isOutLap || prevIsValidPitStop);
-
-  if (
-    (displayLapTime === null || displayLapTime <= 0) &&
-    l.elapsedSeconds !== null &&
-    l.elapsedSeconds !== undefined
-  ) {
-    if (prevLap?.elapsedSeconds !== null && prevLap?.elapsedSeconds !== undefined) {
-      const deltaEt = parseFloat((l.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
-      const knownSectors = (l.s1 || 0) + (l.s2 || 0) + (l.s3 || 0);
-      const maxAllowed = bestLap ? Math.max(bestLap * 3.5, 300) : 600;
-      if (deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed) {
-        displayLapTime = deltaEt;
-        displayLapTimeString = formatTime(deltaEt);
-        isInferredLap = true;
-      }
-    }
-  }
+  // The parser infers a missing lap time from the elapsed time and marks out-laps (isOutLap).
+  const displayLapTime = l.lapTime;
+  const displayLapTimeString = l.lapTimeString;
+  const isInferredLap = Boolean(l.isInferred);
+  const isOutLap = Boolean(l.isOutLap);
+  const isRacing = isRacingLap(l);
 
   const isSessionBest =
     displayLapTime !== null &&
     bestLap !== null &&
     Math.abs(displayLapTime - bestLap) < 0.0005 &&
-    l.isValid &&
-    !l.isPitStop &&
-    !isOutLap;
+    isRacing;
   const isLapAllTimePB = isSessionBest && isCurrentSessionAllTimePB;
 
   let deltaStr = '--';
   if (displayLapTime && bestLap) {
     const delta = displayLapTime - bestLap;
-    if (Math.abs(delta) < 0.0005 && l.isValid && !l.isPitStop && !isOutLap) {
+    if (Math.abs(delta) < 0.0005 && isRacing) {
       deltaStr = isLapAllTimePB ? '⭐ Personal Best' : '★ Session Best';
     } else {
       deltaStr = `+${delta.toFixed(3)}s`;
@@ -87,7 +67,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const lapToLap = computeLapToLapDelta(prevLap?.lapTime, displayLapTime);
 
   const theoGapLap =
-    l.isValid && !isSessionBest && !l.isPitStop && !isOutLap
+    isRacing && !isSessionBest
       ? computeTheoreticalGap(displayLapTime, theoBest)
       : null;
 
@@ -179,7 +159,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         {isInferredLap ? `~${displayLapTimeString}` : displayLapTimeString}
       </td>
       <td className="px-3 py-2.5 text-center font-sans">
-        {l.isValid && !l.isPitStop && !isOutLap && l.paceCategory ? (
+        {isRacing && l.paceCategory ? (
           <PaceBadge
             category={l.paceCategory}
             percentage={l.pacePercentage}

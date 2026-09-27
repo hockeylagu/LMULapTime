@@ -286,6 +286,38 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(driver?.avgLapTime).toBe(215.585);
     });
 
+    it('marks the lap after a pit in-lap whose time was inferred as an out-lap', () => {
+      const xmlPitStop = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Race</Setting>
+    <TrackVenue>Circuit de Spa-Francorchamps</TrackVenue>
+    <TrackCourse>Grand Prix</TrackCourse>
+    <TrackLength>7004.0</TrackLength>
+    <TimeString>2026/05/28 16:00</TimeString>
+    <Driver>
+      <Name>Pit Driver</Name>
+      <CarType>Porsche 911 GT3 R</CarType>
+      <CarClass>LMGT3</CarClass>
+      <isPlayer>1</isPlayer>
+      <Position>1</Position>
+      <Lap num="1" p="1" et="120.000" s1="35.000" s2="40.000" s3="45.000">120.000</Lap>
+      <Lap num="2" p="1" et="241.000" s1="35.500" s2="40.000" s3="45.500">121.000</Lap>
+      <Lap num="3" p="1" et="380.000" pit="1">--.----</Lap>
+      <Lap num="4" p="1" et="500.500" s1="35.000" s2="40.000" s3="45.500">120.500</Lap>
+    </Driver>
+  </RaceResults>
+</rFactorXML>`;
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xmlPitStop);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+
+      const laps = parser.parseSessionXml('pit_inferred.xml')!.drivers[0].laps;
+      expect(laps[2]).toMatchObject({ isPitStop: true, isInferred: true, lapTime: 139 });
+      expect(laps[3].isOutLap).toBe(true);
+      expect(laps[1].isOutLap).toBeUndefined();
+    });
+
     it('does not mark lap 2 as an out-lap in Qualifying when lap 1 is start lap, and treats lap 2 as valid', () => {
       const xmlQualiStart = `<?xml version="1.0" encoding="utf-8"?>
 <rFactorXML version="1.0">
