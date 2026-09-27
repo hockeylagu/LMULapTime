@@ -2,10 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayCacheSummary } from './types.js';
+import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
+import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from './dbSchema.js';
 
 // Replay metadata rows, one per .Vcr file. They outlive the file: LMU deletes old replays, and
 // the stored row is then the only copy of the metadata.
+
+
+// Each driver's car is re-derived from its vehicle id on read, so a corrected vehicle mapping
+// reaches every stored row, including replays LMU has deleted, without a cache version bump.
+function readMetadataRow(row: { parser_version: string; metadata_br: Buffer }): ReplayMetadata {
+  return resolveRosterVehicles(upgradeStoredReplayMetadata(decompressJson<ReplayMetadata>(row.metadata_br), row.parser_version));
+}
 
 export interface StoredReplayFileInfo {
   file_path: string;
@@ -21,7 +30,7 @@ export function getReplayMetadataCache(db: DatabaseType, filename: string, mtime
   if (!row || row.file_mtime !== mtime || row.file_size !== size || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
     return null;
   }
-  return decompressJson<ReplayMetadata>(row.metadata_br);
+  return readMetadataRow(row);
 }
 
 /** Returns stored metadata even when LMU has deleted the source .Vcr. */
@@ -30,7 +39,7 @@ export function getStoredReplayMetadata(db: DatabaseType, filename: string): Rep
     'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
   ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
   if (!row) return null;
-  return decompressJson<ReplayMetadata>(row.metadata_br);
+  return readMetadataRow(row);
 }
 
 /** Returns stored file attributes and metadata for a cached replay file. */
@@ -43,7 +52,7 @@ export function getStoredReplayFileInfo(db: DatabaseType, filename: string): Sto
     file_path: row.file_path,
     file_mtime: row.file_mtime,
     file_size: row.file_size,
-    metadata: decompressJson<ReplayMetadata>(row.metadata_br),
+    metadata: readMetadataRow(row),
   };
 }
 
@@ -57,7 +66,7 @@ export function getAllStoredReplayFiles(db: DatabaseType): Array<StoredReplayFil
     file_path: row.file_path,
     file_mtime: row.file_mtime,
     file_size: row.file_size,
-    metadata: decompressJson<ReplayMetadata>(row.metadata_br),
+    metadata: readMetadataRow(row),
   }));
 }
 
@@ -110,7 +119,7 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
   }[];
 
   return rows.map(row => {
-    const meta = decompressJson<ReplayMetadata>(row.metadata_br);
+    const meta = readMetadataRow(row);
     const onDisk = Boolean(
       (row.file_path && fs.existsSync(row.file_path)) ||
       (replaysDir && fs.existsSync(path.join(replaysDir, row.filename)))

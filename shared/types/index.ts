@@ -787,6 +787,16 @@ export interface ReplayTrajectoryPoint {
   rainIntensity?: number;
   ambientTemp?: number;
   trackTemp?: number;
+  tireCompoundIndices?: [number, number, number, number];
+}
+
+export interface ReplayContactEvent {
+  driverSlot: number;
+  driverName?: string;
+  timeSec: number;
+  impactMagnitude: number;
+  otherParty?: number;
+  otherPartyName?: string;
 }
 
 export interface ReplayPenaltyEvent {
@@ -795,7 +805,9 @@ export interface ReplayPenaltyEvent {
   timeSec: number;
   penaltyText: string;
   penaltyType?: string;
-  action: 'given' | 'served' | 'removed';
+  /** Time penalty length; only on 'given'. */
+  penaltySeconds?: number;
+  action: 'given' | 'served';
 }
 
 export interface ReplayPitEvent {
@@ -908,6 +920,7 @@ export interface ReplayTrajectoryData {
   leadInPoints?: ReplayTrajectoryPoint[];
   leadOutPoints?: ReplayTrajectoryPoint[];
   penalties?: ReplayPenaltyEvent[];
+  contacts?: ReplayContactEvent[];
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];
   flagEvents?: ReplayFlagEvent[];
@@ -916,6 +929,7 @@ export interface ReplayTrajectoryData {
   maxRainIntensity?: number;
   ambientTemp?: number;
   trackTemp?: number;
+  tireCompounds?: [number, number, number, number];
   standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;

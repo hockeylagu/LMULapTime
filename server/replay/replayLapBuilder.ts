@@ -22,10 +22,10 @@ export interface RawTrajectoryPoint {
   engineRpm?: number;
   wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
-  fuel?: number;
+  virtualEnergy?: number;
   rainIntensity?: number;
   ambientTemp?: number;
-  trackTemp?: number;
+  tireCompoundIndices?: [number, number, number, number];
 }
 
 export interface VcrTimingEvent {

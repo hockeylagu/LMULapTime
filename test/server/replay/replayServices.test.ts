@@ -97,6 +97,40 @@ describe('Replay domain services and transforms', () => {
       expect(original.trackVenue).toBeUndefined();
     });
 
+    it('takes each roster car from the linked session log, matched by driver name', () => {
+      const original: ReplayMetadata = {
+        filename: 'Monza R1 15.Vcr',
+        filePath: '/replays/Monza R1 15.Vcr',
+        fileSizeBytes: 2000,
+        mtimeMs: 5000,
+        timeSliceCount: 50,
+        totalEvents: 2,
+        durationSec: 60,
+        drivers: [
+          { slot: 0, name: 'Samuel Lague', vehicleId: '4_25_DKR_E8E7FBE8C', carModel: 'Oreca 07 LMP2', carClass: 'LMP2', isPlayer: true },
+          { slot: 1, name: 'Jules Wadoux', vehicleId: 'NEW_LIVERY_2027' },
+        ],
+      };
+      const session = {
+        id: 'session-monza-r1',
+        trackVenue: 'Autodromo Nazionale Monza',
+        trackCourse: 'Grand Prix',
+        sessionType: 'Race',
+        drivers: [
+          { name: 'Samuel Lague', carClass: 'LMP3', carType: 'Ginetta G61-LT-P325 Evo', laps: [] },
+          { name: 'Jules Wadoux', carClass: 'LMP3', carType: 'Duqueine D09 P3', laps: [] },
+        ],
+      } as unknown as DetailedSession;
+
+      const composed = composeReplayMetadata({ metadata: original, replayName: 'Monza R1 15.Vcr', matchedSession: session });
+
+      expect(composed.drivers.map(driver => [driver.carModel, driver.carClass])).toEqual([
+        ['Ginetta G61-LT-P325 Evo', 'LMP3'],
+        ['Duqueine D09 P3', 'LMP3'],
+      ]);
+      expect(original.drivers[0].carClass).toBe('LMP2');
+    });
+
     it('falls back to filename track tokens when no matched session exists', () => {
       const original: ReplayMetadata = {
         filename: 'Spa-Francorchamps P1.Vcr',
