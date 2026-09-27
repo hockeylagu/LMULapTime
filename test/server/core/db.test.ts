@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
@@ -80,6 +81,26 @@ describe('SessionDatabase (SQLite Cache)', () => {
     iterator.return(undefined as never);
     expect(db.getSessionsCount()).toBe(initialSync.total);
     expect(db.getMetadata('parser_version')).toBe('outdated-parser-version');
+  });
+
+  it('keeps a session whose XML is gone when a new parser version re-parses the rest', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-sync-'));
+    try {
+      const fixture = path.join(resultsDir, '2026_05_28_P1.xml');
+      fs.copyFileSync(fixture, path.join(dir, '2026_05_28_P1.xml'));
+      fs.copyFileSync(fixture, path.join(dir, '2026_05_29_P1.xml'));
+      expect(db.syncSessionsFromDir(dir, parser).added).toBe(2);
+
+      fs.rmSync(path.join(dir, '2026_05_29_P1.xml'));
+      db.setMetadata('parser_version', 'outdated-parser-version');
+      const resync = db.syncSessionsFromDir(dir, parser);
+
+      expect(resync).toMatchObject({ added: 0, updated: 1, total: 2 });
+      expect(db.getSessionById('2026_05_29_P1')).not.toBeNull();
+      expect(db.getMetadata('parser_version')).not.toBe('outdated-parser-version');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('skips parsing unchanged files during subsequent sync (delta sync)', () => {
