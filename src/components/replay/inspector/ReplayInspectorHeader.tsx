@@ -1,9 +1,10 @@
 import React from 'react';
 import {
-  X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, Scale, ArrowLeftRight, Users,
+  X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, ArrowLeftRight, Users,
 } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
+import { ReplayCompareButton } from './ReplayCompareButton.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -166,15 +167,15 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         )}
 
         {!isCompareMode ? (
-          <button
-            type="button"
-            onClick={onToggleCompare}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-bold text-xs border transition-all cursor-pointer bg-lmu-card hover:bg-white/10 border-lmu-border text-lmu-muted hover:text-white"
-            title="Choose a lap for telemetry comparison"
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>Compare</span>
-          </button>
+          <ReplayCompareButton
+            replayName={replayName}
+            driverName={drivers.find(d => d.slot === selectedDriverSlot)?.name ?? trajectory?.driverName ?? null}
+            trajectory={trajectory}
+            availableCompareLaps={availableCompareLaps}
+            onToggleCompare={onToggleCompare}
+            onSelectCompareLap={onSelectCompareLap}
+            formatLapTime={formatLapTime}
+          />
         ) : !isComparePickerOpen && (
           <div className="flex items-center gap-1.5">
             <button
