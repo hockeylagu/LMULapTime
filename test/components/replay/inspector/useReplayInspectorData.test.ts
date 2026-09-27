@@ -94,6 +94,29 @@ describe('useReplayInspectorData', () => {
     await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?pointSpacingM=4&'));
   });
 
+  it('finishes opening when a lap is picked before the replay has loaded', async () => {
+    let releaseOpening: () => void = () => undefined;
+    const opening = new Promise<void>(resolve => { releaseOpening = resolve; });
+    let trajectoryRequests = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('/metadata')) { await opening; return response(metadata); }
+      // The opening request waits; the lap picked meanwhile answers at once.
+      if (++trajectoryRequests === 1) { await opening; return response(trajectory); }
+      return response({ ...trajectory, currentLap: 3 });
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+
+    act(() => result.current.handleSelectLap(3));
+    await waitFor(() => expect(result.current.trajectory?.currentLap).toBe(3));
+    await act(async () => releaseOpening());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.metadata?.filename).toBe(metadata.filename);
+    expect(result.current.trajectory?.currentLap).toBe(3);
+  });
+
   it('reports metadata load failures and resets data when closed', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(response(null, false));
     const { result, rerender } = renderHook(
@@ -159,7 +182,7 @@ describe('useReplayInspectorData', () => {
     const compareClasses = () => fetchMock.mock.calls
       .map(([input]) => String(input))
       .filter(url => url.includes('/compare/laps'))
-      .map(url => new URL(url).searchParams.get('carClass'));
+      .map(url => new URL(url, 'http://localhost').searchParams.get('carClass'));
 
     const { result } = renderHook(() => useReplayInspectorData({
       isOpen: true, replayName: multiclass.filename,
@@ -214,7 +237,7 @@ describe('useReplayInspectorData', () => {
       const url = String(input);
       if (url.includes('/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
-      return response({ ...trajectory, currentLap: Number(new URL(url).searchParams.get('lap')) });
+      return response({ ...trajectory, currentLap: Number(new URL(url, 'http://localhost').searchParams.get('lap')) });
     });
     fetchMock.mockClear();
     const urls = () => fetchMock.mock.calls.map(([input]) => String(input));
@@ -237,7 +260,7 @@ describe('useReplayInspectorData', () => {
     const baselineUrls = urls().filter(url => url.includes('&lap=1'));
     expect(baselineUrls).toHaveLength(1);
     expect(baselineUrls[0]).toContain('driverName=Other%20Driver');
-    expect(new URL(urls().find(url => url.includes('/compare/laps')) ?? '').searchParams.get('carClass')).toBeTruthy();
+    expect(new URL(urls().find(url => url.includes('/compare/laps')) ?? '', 'http://localhost').searchParams.get('carClass')).toBeTruthy();
   });
 
   it('initializes baseline replay, lap, and driver directly from comparison props', async () => {

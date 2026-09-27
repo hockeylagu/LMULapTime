@@ -95,6 +95,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   selectedDriverSlot,
   isLoading,
   isTrajLoading,
+  error,
   isCompareMode,
   handleToggleCompare,
   baselineReplayName,
@@ -195,6 +196,12 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onSelectPlaybackSpeed={setPlaybackSpeed}
         formatLapTime={formatLapTime}
       />
+
+      {error && (
+        <div role="alert" className="px-4 py-1.5 text-xs text-rose-300 bg-rose-950/40 border-b border-rose-900/60">
+          {error}
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         <div className="flex-1 min-w-0 flex flex-col bg-lmu-deep p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
