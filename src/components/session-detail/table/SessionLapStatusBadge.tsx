@@ -1,12 +1,12 @@
 import React from 'react';
-import { AlertTriangle, Ban, Flag, ShieldAlert, Users } from 'lucide-react';
-import { LapData } from '../../../../shared/types/index.js';
-import { LapStatusBadge } from '../../common/index.js';
 import {
-  getWorstTrackLimitSeverity,
-  getTrackLimitBadgeClasses,
-} from '../../../utils/trackLimits.js';
-import { NON_REPRESENTATIVE_LABELS, describeLapGaps, describeLapTraffic } from '../../../utils/lapTrafficText.js';
+  AlertTriangle, Ban, CarFront, CircleAlert, Clock, Flag, LogOut, ShieldAlert, ShieldCheck, Snail, Users, Wrench,
+  type LucideIcon,
+} from 'lucide-react';
+import { LapData, NonRepresentativeReason } from '../../../../shared/types/index.js';
+import { resolveLapStatus } from '../../common/lapStatus.js';
+import { getWorstTrackLimitSeverity, getTrackLimitBadgeClasses } from '../../../utils/trackLimits.js';
+import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
 
 export interface SessionLapStatusBadgeProps {
   lap: LapData;
@@ -17,6 +17,38 @@ export interface SessionLapStatusBadgeProps {
   incompleteTooltip: string;
 }
 
+interface StatusIconProps {
+  icon: LucideIcon;
+  /** Read by screen readers and tests; the icon alone is shown. */
+  label: string;
+  title: string;
+  className: string;
+  count?: number;
+}
+
+function StatusIcon({ icon: Icon, label, title, className, count }: StatusIconProps) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 cursor-help ${className}`} title={title}>
+      <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+      {count !== undefined && <span className="text-[10px] font-bold">{count}</span>}
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
+const REASON_ICONS: Record<NonRepresentativeReason, LucideIcon> = {
+  traffic: Users,
+  contact: CarFront,
+  offPace: Snail,
+};
+
+const badge = 'px-1 py-0.5 rounded border';
+
+/**
+ * The lap's status as a row of icons, each explained by its tooltip: valid, start, pit, out-lap or
+ * incomplete; why it is left out of the average; incidents, track limits and penalties. The details
+ * are in the lap's expanded row.
+ */
 export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   lap: l,
   isPitStop,
@@ -25,87 +57,55 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   isInferredLap,
   incompleteTooltip,
 }) => {
-  const hasLapIncidents = Boolean(l.incidentCount && l.incidentCount > 0);
-  const hasLapTrackLimits = Boolean(l.trackLimitCount && l.trackLimitCount > 0);
-  const hasLapPenalties = Boolean(l.penaltyCount && l.penaltyCount > 0);
-
-  const tlSeverity = getWorstTrackLimitSeverity(l.trackLimits);
-  const tlBadgeClass = getTrackLimitBadgeClasses(tlSeverity);
-  const trafficEvents = describeLapTraffic(l.traffic);
-  const trafficLines = [...trafficEvents, ...describeLapGaps(l.traffic)];
+  const status = isPitStop && l.lapTime !== null && l.lapTime > 0
+    ? 'pit'
+    : isOutLap
+    ? 'outlap'
+    : l.lapNum === 1
+    ? 'start'
+    : resolveLapStatus({ isValid: l.isValid, isInferred: isInferredLap });
+  const reason = l.nonRepresentativeReason;
 
   return (
-    <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
-      {isPitStop && l.lapTime !== null && l.lapTime > 0 ? (
-        <LapStatusBadge
-          isPitStop
-          pitTooltip={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : undefined}
-        />
-      ) : isOutLap ? (
-        <LapStatusBadge isOutLap />
-      ) : l.lapNum === 1 ? (
-        <span
-          className="inline-flex items-center gap-1 text-amber-400 text-xs font-medium"
-          title={
-            isRaceSession
-              ? 'Race Start Lap (Standing/Rolling start on cold tires — excluded from average flying pace)'
-              : 'Session Start Lap (Pit exit / out-lap from garage — excluded from average flying pace)'
-          }
-        >
-          <Flag className="w-3.5 h-3.5" />
-          Start Lap
-        </span>
-      ) : (
-        <LapStatusBadge isValid={l.isValid} isInferred={isInferredLap} incompleteTooltip={incompleteTooltip} />
+    <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+      {status === 'pit' && (
+        <StatusIcon icon={Wrench} label="Pit Stop" className="text-lmu-accent"
+          title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : 'Pit stop'} />
       )}
+      {status === 'outlap' && (
+        <StatusIcon icon={LogOut} label="Out Lap" className="text-cyan-400"
+          title="Out lap (rejoining the track from the pit lane, left out of flying pace)" />
+      )}
+      {status === 'start' && (
+        <StatusIcon icon={Flag} label="Start Lap" className="text-amber-400"
+          title={isRaceSession
+            ? 'Race start lap (standing or rolling start on cold tyres, left out of flying pace)'
+            : 'Session start lap (out of the garage, left out of flying pace)'} />
+      )}
+      {status === 'valid' && <StatusIcon icon={ShieldCheck} label="Valid" className="text-lmu-green" title="Valid lap" />}
+      {status === 'inferred' && <StatusIcon icon={Clock} label="Incomplete" className="text-amber-400" title={incompleteTooltip} />}
+      {status === 'invalid' && <StatusIcon icon={CircleAlert} label="Incomplete" className="text-lmu-gold" title={incompleteTooltip} />}
 
-      {l.nonRepresentativeReason && (
-        <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 cursor-help"
-          title={[
-            `${NON_REPRESENTATIVE_LABELS[l.nonRepresentativeReason].title}: left out of the average and consistency`,
-            ...trafficLines,
-          ].join('\n')}
-        >
-          {NON_REPRESENTATIVE_LABELS[l.nonRepresentativeReason].label}
-        </span>
+      {reason && (
+        <StatusIcon icon={REASON_ICONS[reason]} label={NON_REPRESENTATIVE_LABELS[reason].label}
+          className={`${badge} bg-amber-500/15 text-amber-300 border-amber-500/40`}
+          title={`${NON_REPRESENTATIVE_LABELS[reason].title}: left out of the average and consistency`} />
       )}
-      {trafficEvents.length > 0 && (
-        <span
-          data-testid="lap-traffic"
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/30 cursor-help whitespace-nowrap"
-          title={trafficLines.join('\n')}
-        >
-          <Users className="w-3 h-3" /> {trafficEvents.join(' · ')}
-        </span>
+      {Boolean(l.incidentCount) && (
+        <StatusIcon icon={ShieldAlert} label="Incidents" count={l.incidentCount}
+          className={`${badge} bg-rose-500/20 text-rose-300 border-rose-500/40`}
+          title={l.incidents?.map((i) => i.description).join('\n') ?? 'Incidents'} />
       )}
-
-      {/* Compact Incident & Penalty Badges */}
-      {hasLapIncidents && (
-        <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-help"
-          title={l.incidents?.map((i) => i.description).join('\n')}
-        >
-          <ShieldAlert className="w-3 h-3" /> {l.incidentCount}
-        </span>
+      {Boolean(l.trackLimitCount) && (
+        <StatusIcon icon={AlertTriangle} label="Track limits" count={l.trackLimitCount}
+          className={`${badge} ${getTrackLimitBadgeClasses(getWorstTrackLimitSeverity(l.trackLimits))}`}
+          title={l.trackLimits?.map((tl) => tl.description).join('\n') ?? 'Track limits'} />
       )}
-      {hasLapTrackLimits && (
-        <span
-          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-help ${tlBadgeClass}`}
-          title={l.trackLimits?.map((tl) => tl.description).join('\n')}
-        >
-          <AlertTriangle className="w-3 h-3" /> {l.trackLimitCount}
-        </span>
-      )}
-      {hasLapPenalties && (
-        <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-help"
-          title={l.penalties?.map((p) => p.description).join('\n')}
-        >
-          <Ban className="w-3 h-3" /> {l.penalties?.[0]?.penalty || 'Pen'}
-        </span>
+      {Boolean(l.penaltyCount) && (
+        <StatusIcon icon={Ban} label={l.penalties?.[0]?.penalty || 'Penalty'}
+          className={`${badge} bg-rose-500/20 text-rose-300 border-rose-500/40`}
+          title={l.penalties?.map((p) => p.description).join('\n') ?? 'Penalty'} />
       )}
     </div>
   );
 };
-

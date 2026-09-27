@@ -75,9 +75,24 @@ describe('SessionLapTable traffic', () => {
       />
     );
 
-    const chip = screen.getByTestId('lap-traffic');
-    expect(chip).toHaveTextContent('Passed Rui Paiva (GT3)');
-    expect(chip.getAttribute('title')).toContain('Ahead on the road: Rui Paiva (GT3) 2.00s');
-    expect(screen.getByText('Traffic').getAttribute('title')).toMatch(/^Slower than your median lap, spent overtaking/);
+    // The status column only carries icons; the reason is in the icon's tooltip.
+    expect(screen.getByText('Traffic').closest('[title]')?.getAttribute('title')).toMatch(/^Slower than your median lap, spent overtaking/);
+    expect(screen.queryByTestId('lap-details-2')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show what happened on lap 1' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show what happened on lap 2' }));
+
+    const details = screen.getByTestId('lap-details-2');
+    expect(details).toHaveTextContent('Left out of average');
+    expect(details).toHaveTextContent('Around youPassed Rui Paiva (GT3) · Ahead on the road: Rui Paiva (GT3) 2.00s');
+    // Expanding does not open the telemetry.
+    expect(window.location.hash).not.toContain('telemetry');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide what happened on lap 2' }));
+    expect(screen.queryByTestId('lap-details-2')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Show lap details/ }));
+    expect(screen.getByTestId('lap-details-2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hide lap details/ })).toBeInTheDocument();
   });
 });

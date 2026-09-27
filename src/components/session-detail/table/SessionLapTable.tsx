@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowDown, ArrowLeftRight, ArrowUp, Clock } from 'lucide-react';
+import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Clock } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { computeLapToLapDelta } from '../../../../shared/domain/lapComparison.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
+import { lapDetailSections } from './lapDetailSections.js';
 
 type SortableLapColumn = 'lap' | 'position' | 'lapTime' | 'delta' | 'prevDelta' | 's1' | 's2' | 's3' | 'topSpeed';
 
@@ -72,6 +73,16 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
       ? -result
       : result;
   });
+  const [expandedLaps, setExpandedLaps] = React.useState<ReadonlySet<number>>(() => new Set());
+  const lapsWithDetails = lapEntries.filter(({ lap }) => lapDetailSections(lap).length > 0).map(({ lap }) => lap.lapNum);
+  const allExpanded = lapsWithDetails.length > 0 && lapsWithDetails.every((lapNum) => expandedLaps.has(lapNum));
+  const toggleLap = (lapNum: number) => setExpandedLaps((current) => {
+    const next = new Set(current);
+    if (next.has(lapNum)) next.delete(lapNum);
+    else next.add(lapNum);
+    return next;
+  });
+  const columnCount = 13 + (hasTireWearData ? 1 : 0) + (hasFuelData ? 1 : 0);
   const sortHeader = (column: SortableLapColumn, label: string, alignment = 'text-left', title?: string) => (
     <th className={`px-3 py-3 ${alignment}`} title={title}>
       <button
@@ -108,6 +119,17 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
 
         {/* Open the lap comparison view */}
         <div className="flex items-center gap-2">
+          {lapsWithDetails.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpandedLaps(allExpanded ? new Set() : new Set(lapsWithDetails))}
+              className="px-3 py-1.5 rounded-xl bg-lmu-bg/60 hover:bg-white/5 border border-lmu-border text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
+              title="Show or hide traffic, incidents, track limits and penalties under every lap"
+            >
+              {allExpanded ? <ChevronsDownUp className="w-3.5 h-3.5" /> : <ChevronsUpDown className="w-3.5 h-3.5" />}
+              <span>{allExpanded ? 'Hide lap details' : 'Show lap details'}</span>
+            </button>
+          )}
           <button
             onClick={() => {
               const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
@@ -165,6 +187,9 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
                 isMultiClass={isMultiClass}
                 hasTireWearData={hasTireWearData}
                 hasFuelData={hasFuelData}
+                isExpanded={expandedLaps.has(l.lapNum)}
+                onToggleExpanded={toggleLap}
+                columnCount={columnCount}
               />
             ))}
           </tbody>
