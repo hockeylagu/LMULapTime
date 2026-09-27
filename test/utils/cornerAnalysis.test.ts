@@ -7,7 +7,37 @@ import {
   computeCornerConsistencyStats,
   filterCornerConsistencyStats,
 } from '../../src/utils/cornerConsistency.js';
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import fs from 'fs';
+import path from 'path';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
+
+/** Loads a lap captured from the replay cache by tools/analysis/captureCachedLapFixture.ts. */
+function loadCachedLapFixture(name: string): ReplayTrajectoryData {
+  const file = path.resolve(process.cwd(), 'test', 'fixtures', 'replays', `${name}.json`);
+  const fixture = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+    replayName: string;
+    driverName: string;
+    currentLap: number;
+    columns: Record<string, Array<number | null>>;
+  };
+  const fields = Object.keys(fixture.columns);
+  const points = fixture.columns[fields[0]].map((_, i) => {
+    const point: Record<string, number> = {};
+    for (const field of fields) {
+      const value = fixture.columns[field][i];
+      if (value !== null) point[field] = value;
+    }
+    return point as unknown as ReplayTrajectoryPoint;
+  });
+  return {
+    replayName: fixture.replayName,
+    driverName: fixture.driverName,
+    currentLap: fixture.currentLap,
+    pointsCount: points.length,
+    points,
+  } as ReplayTrajectoryData;
+}
 
 describe('computeLapSegmentComparisons', () => {
   // Speed trace with genuine turning points at both ends (100->200->minSpeed->200->100),
@@ -484,22 +514,17 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.exitSpaceDeltaM).toBe(-1.5); // 0.5 - 2.0 = -1.5m (wide lap used 1.5m more track)
   });
 
-  it('accurately computes apex margin on realistic real-world corner (Algarve Turn 9)', async () => {
-    const Database = (await import('better-sqlite3')).default;
-    const { decompressTrajectory } = await import('../../server/core/replayTrajectoryCodec.js');
-    const db = new Database('server/lmu_cache.db');
-    const row = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? AND lap_key = ?').get('Algarve International Circuit R1 19.Vcr', 5) as { trajectory_br: Buffer } | undefined;
-    if (!row) return;
-    const traj = decompressTrajectory(row.trajectory_br);
-    const { enrichTrajectoryWithTrackGeometry } = await import('../../server/tracks/serverTrackSync.js');
-    enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', 'Algarve International Circuit R1 19.Vcr');
+  it('accurately computes apex margin on realistic real-world corner (Algarve Turn 9)', () => {
+    const traj = loadCachedLapFixture('algarve-r1-19-player-lap5');
+    expect(traj.driverName).toBe('Samuel Lague');
+    enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', traj.replayName);
 
     const segments = computeLapSegmentComparisons(traj.points, traj.points, 6, traj.trackLengthM, 14.0);
     const corners = segments.filter(s => s.type === 'corner');
     const c9 = corners.find(c => c.cornerNumber === 9);
     expect(c9).toBeDefined();
     expect(c9?.turnDirection).toBe('right');
-    // Car is in realistic proximity to inside curb (2.3m at min speed, down from corrupted 8.8m)
+    // Car is in realistic proximity to inside curb (1.5m at min speed on the v5 decode, 2.3m on v3; down from corrupted 8.8m)
     expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeLessThanOrEqual(3.0);
     expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeGreaterThanOrEqual(0.0);
   });

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import Database from 'better-sqlite3';
 import {
   computeLapComparisons,
 } from '../../../src/utils/replayComparison.js';
@@ -9,17 +8,15 @@ import {
   computeStartFinishOffset,
 } from '../../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
-import { decompressTrajectory } from '../../../server/core/replayTrajectoryCodec.js';
 import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../../server/tracks/serverTrackSync.js';
 import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
+import { LAP_PAIRS, loadLapPair } from '../../utils/lapAlignment/lapPairFixture.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 const steamReplaysDir = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
 
 describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
-  const dbPath = path.resolve(process.cwd(), 'server', 'lmu_cache.db');
-  const hasDb = fs.existsSync(dbPath);
 
   describe('Synthetic Bullet-Proof Cross-Driver Scenarios', () => {
     const trackLengthM = 5000;
@@ -133,110 +130,22 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
     });
   });
 
-  describe('Real Database Telemetry Cross-Tests (from server/lmu_cache.db)', () => {
-    if (!hasDb) {
-      it.skip('Skipping real DB tests because lmu_cache.db is not present in test environment', () => {});
-      return;
+  // Real laps as the server serves them (cut at the line), captured into test/fixtures/replays/
+  // so the suite never opens the live cache. Each pair is two drivers of one class in one session.
+  describe('Real Replay Lap Pairs Cross-Tests (test/fixtures/replays)', () => {
+    for (const name of LAP_PAIRS) {
+      it(`Same session, different driver: ${name} starts both laps on the line with no delta jump`, () => {
+        const { primary, baseline, trackLengthM } = loadLapPair(name);
+        expect(primary.driverName).not.toBe(baseline.driverName);
+
+        expect(computeStartFinishOffset(primary.points, trackLengthM)).not.toBeNull();
+        expect(computeStartFinishOffset(baseline.points, trackLengthM)).not.toBeNull();
+
+        const comparisons = computeLapComparisons(primary.points, baseline.points, trackLengthM);
+        expect(comparisons.length).toBe(primary.points.length);
+        expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
+      });
     }
-
-    const db = new Database(dbPath, { readonly: true });
-
-    function loadCachedLap(vcrNameLike: string, slotId: number, lapNumber: number): ReplayTrajectoryData | null {
-      let row = db.prepare(`
-        SELECT trajectory_br FROM replay_trajectories
-        WHERE filename LIKE ? AND driver_slot = ? AND lap_key = ?
-        LIMIT 1
-      `).get(`%${vcrNameLike}%`, slotId, lapNumber) as { trajectory_br: Buffer } | undefined;
-
-      // After the dedup migration the -1 alias is a pointer rather than a stored copy.
-      if (!row && slotId === -1) {
-        const defaults = db.prepare(`
-          SELECT resolved_driver_slot FROM replay_trajectory_defaults
-          WHERE filename LIKE ? AND driver_slot = -1 LIMIT 1
-        `).get(`%${vcrNameLike}%`) as { resolved_driver_slot: number | null } | undefined;
-        if (typeof defaults?.resolved_driver_slot === 'number') {
-          row = db.prepare(`
-            SELECT trajectory_br FROM replay_trajectories
-            WHERE filename LIKE ? AND driver_slot = ? AND lap_key = ?
-            LIMIT 1
-          `).get(`%${vcrNameLike}%`, defaults.resolved_driver_slot, lapNumber) as { trajectory_br: Buffer } | undefined;
-        }
-      }
-
-      if (!row || !row.trajectory_br) return null;
-      try {
-        return decompressTrajectory(row.trajectory_br);
-      } catch {
-        return null;
-      }
-    }
-
-    it('Scenario 1 (Real): Same session, same driver (Samuel Lague Lap 2 vs Lap 3 in Daytona R1 4)', () => {
-      const lap2 = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 2);
-      const lap3 = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 3);
-
-      if (!lap2 || !lap3) {
-        return; // Cache row not found in current environment
-      }
-
-      const comparisons = computeLapComparisons(lap3.points, lap2.points, lap3.trackLengthM);
-      expect(comparisons.length).toBe(lap3.points.length);
-
-      // Delta at Start/Finish line must be 0.000s
-      expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
-    }, 15000);
-
-    it('Scenario 2 (Real): Different session, same driver (Samuel Lague Daytona R1 4 vs Daytona R1 5)', () => {
-      const r1_4 = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 2);
-      const r1_5 = loadCachedLap('Daytona International Speedway R1 5.Vcr', -1, 2);
-
-      if (!r1_4 || !r1_5) {
-        return;
-      }
-
-      const comparisons = computeLapComparisons(r1_5.points, r1_4.points, r1_5.trackLengthM);
-      expect(comparisons.length).toBe(r1_5.points.length);
-
-      // Delta at Start/Finish line must be <= 0.005s
-      expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
-    });
-
-    it('Scenario 3 (Real): Same session, different driver (Samuel Lague vs Slot 0 in Daytona R1 4)', () => {
-      const samuel = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 2);
-      const opponent = loadCachedLap('Daytona International Speedway R1 4.Vcr', 0, 2);
-
-      if (!samuel || !opponent) {
-        return;
-      }
-
-      // Check crossing metrics
-      const samuelOffset = computeStartFinishOffset(samuel.points, samuel.trackLengthM);
-      const opponentOffset = computeStartFinishOffset(opponent.points, opponent.trackLengthM);
-      expect(samuelOffset).not.toBeNull();
-      expect(opponentOffset).not.toBeNull();
-
-      const comparisons = computeLapComparisons(samuel.points, opponent.points, samuel.trackLengthM);
-      expect(comparisons.length).toBe(samuel.points.length);
-
-      // Critical Test: In the previous implementation, this produced a +82ms to +111ms jump!
-      // Now, with canonical reference alignment, initial delta jump must be eliminated (<= 0.005s)
-      expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
-    });
-
-    it('Scenario 4 (Real): Different session, different driver (Samuel Lague R1 4 vs Opponent R1 5)', () => {
-      const samuel = loadCachedLap('Daytona International Speedway R1 4.Vcr', -1, 2);
-      const opponent = loadCachedLap('Daytona International Speedway R1 5.Vcr', 0, 2);
-
-      if (!samuel || !opponent) {
-        return;
-      }
-
-      const comparisons = computeLapComparisons(samuel.points, opponent.points, samuel.trackLengthM);
-      expect(comparisons.length).toBe(samuel.points.length);
-
-      // Initial delta jump at Start/Finish line must be eliminated (<= 0.005s)
-      expect(Math.abs(comparisons[0].deltaTimeSec)).toBeLessThanOrEqual(0.005);
-    });
   });
 
   describe.skipIf(!runRealReplayTests)('Real Binary VCR File Extraction & Cross-Driver Matching (RUN_REAL_REPLAY_TESTS=1)', () => {
