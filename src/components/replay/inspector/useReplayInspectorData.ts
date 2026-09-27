@@ -4,6 +4,8 @@ import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap 
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
+import { apiErrorMessage, fetchJson } from '../../../api/apiClient.js';
+import { fetchReplayMetadata, fetchReplayTrajectory } from '../../../api/replayApi.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
@@ -105,21 +107,37 @@ export function useReplayInspectorData({
 
     let isMounted = true;
     const requestId = ++trajectoryRequestIdRef.current;
+    // Another replay's metadata and lap must not stay on screen under this replay's name.
+    setMetadata(null);
+    setTrajectory(null);
     setIsLoading(true);
     setError(null);
     const requestedLap = pendingLapNumber ?? initialLapNumber;
-    const lapQuery = requestedLap && requestedLap > 0 ? `&lap=${requestedLap}` : '';
     const requestedDriverName = pendingDriverName ?? initialDriverName;
-    const driverQuery = requestedDriverName ? `&driverName=${encodeURIComponent(requestedDriverName)}` : '';
+    let metadataError: string | null = null;
 
     Promise.all([
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/metadata`).then(r => (r.ok ? r.json() : null)),
-      fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}${lapQuery}${driverQuery}&source=${selectedSource}`).then(r => (r.ok ? r.json() : null)),
+      fetchReplayMetadata(activeReplayName).catch((err: unknown) => {
+        metadataError = `Could not load metadata for replay ${activeReplayName}: ${apiErrorMessage(err, 'request failed')}`;
+        return null;
+      }),
+      // Without a trajectory the inspector still opens on the metadata (its driver list).
+      fetchReplayTrajectory(activeReplayName, {
+        resolutionQuery: trajectoryResolutionQuery(telemetryResolution),
+        lap: requestedLap,
+        driverName: requestedDriverName,
+        source: selectedSource,
+      }).catch(() => null),
     ])
       .then(([metaData, rawTrajData]) => {
-        if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
-        if (!metaData) setError(`Could not load metadata for replay ${activeReplayName}`);
-        else setMetadata(metaData);
+        if (!isMounted) return;
+        if (metaData) setMetadata(metaData);
+        else setError(metadataError);
+        setIsLoading(false);
+        setPendingDriverName(null);
+        setPendingLapNumber(null);
+        // A lap or driver picked while this was loading asked for its own trajectory: that one is shown.
+        if (requestId !== trajectoryRequestIdRef.current) return;
 
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (trajData) {
@@ -138,13 +156,10 @@ export function useReplayInspectorData({
           const player = metaData.drivers.find((d: ReplayDriverEntry) => d.isPlayer) || metaData.drivers[0];
           if (player && typeof player.slot === 'number') setSelectedDriverSlot(player.slot);
         }
-        setPendingDriverName(null);
-        setPendingLapNumber(null);
-        setIsLoading(false);
       })
-      .catch(err => {
-        if (!isMounted || requestId !== trajectoryRequestIdRef.current) return;
-        setError(err instanceof Error ? err.message : 'Failed to load replay data');
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setError(apiErrorMessage(err, 'Failed to load replay data'));
         setIsLoading(false);
       });
 
@@ -175,8 +190,7 @@ export function useReplayInspectorData({
     });
     if (carClass) query.set('carClass', carClass);
 
-    fetch(`http://localhost:3001/api/compare/laps?${query.toString()}`)
-      .then(r => (r.ok ? r.json() : null))
+    fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query.toString()}`)
       .then(data => {
         const laps = Array.isArray(data?.laps) ? data.laps : [];
         setAvailableCompareLaps(laps.filter((lap: ComparableLap) =>
@@ -267,20 +281,18 @@ export function useReplayInspectorData({
     setBaselineError(null);
     const targetReplay = baselineReplayName;
     const targetLap = baselineLapNumber ?? 1;
-    const driverQuery = baselineDriverName ? `&driverName=${encodeURIComponent(baselineDriverName)}` : '';
 
     // A baseline from the inspected replay uses its metadata; only another replay's is fetched.
     const fetchMeta = targetReplay === activeReplayName
       ? Promise.resolve(null)
-      : fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/metadata`).then(r => (r.ok ? r.json() : null));
+      : fetchReplayMetadata(targetReplay).catch(() => null);
 
-    const fetchTraj = fetch(`http://localhost:3001/api/replays/${encodeURIComponent(targetReplay)}/trajectory?${trajectoryResolutionQuery(telemetryResolution)}&lap=${targetLap}${driverQuery}&source=${selectedSource}`)
-      .then(async r => {
-        if (r.ok) return r.json() as Promise<ReplayTrajectoryData | null>;
-        const body: unknown = await r.json().catch(() => null);
-        const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : null;
-        throw new Error(message || `Failed to load comparison lap (HTTP ${r.status})`);
-      });
+    const fetchTraj = fetchReplayTrajectory(targetReplay, {
+      resolutionQuery: trajectoryResolutionQuery(telemetryResolution),
+      lap: targetLap,
+      driverName: baselineDriverName,
+      source: selectedSource,
+    });
 
     Promise.all([fetchMeta, fetchTraj])
       .then(([meta, rawTraj]: [ReplayMetadata | null, ReplayTrajectoryData | null]) => {
@@ -296,7 +308,7 @@ export function useReplayInspectorData({
       .catch((err: unknown) => {
         if (!isMounted) return;
         setBaselineTrajectory(null);
-        setBaselineError(err instanceof Error ? err.message : 'Failed to load comparison lap');
+        setBaselineError(apiErrorMessage(err, 'Failed to load comparison lap'));
         setIsBaselineLoading(false);
       });
 
@@ -321,10 +333,13 @@ export function useReplayInspectorData({
     setIsTrajLoading(true);
     const targetLap = lapNum ?? trajectory?.currentLap ?? initialLapNumber ?? 1;
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
-    const slotParam = typeof targetSlot === 'number' ? `&driverSlot=${targetSlot}` : '';
-    const sourceParam = `&source=${src}`;
-    fetch(`http://localhost:3001/api/replays/${encodeURIComponent(activeReplayName)}/trajectory?${trajectoryResolutionQuery(res)}&lap=${targetLap}${slotParam}${sourceParam}`)
-      .then(r => (r.ok ? r.json() : null))
+    setError(null);
+    fetchReplayTrajectory(activeReplayName, {
+      resolutionQuery: trajectoryResolutionQuery(res),
+      lap: targetLap,
+      driverSlot: targetSlot,
+      source: src,
+    })
       .then(rawTrajData => {
         if (requestId !== trajectoryRequestIdRef.current) return;
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
@@ -338,8 +353,11 @@ export function useReplayInspectorData({
         }
         setIsTrajLoading(false);
       })
-      .catch(() => {
-        if (requestId === trajectoryRequestIdRef.current) setIsTrajLoading(false);
+      .catch((err: unknown) => {
+        if (requestId !== trajectoryRequestIdRef.current) return;
+        // The lap on screen stays; say why the requested one is not shown.
+        setError(apiErrorMessage(err, `Failed to load lap ${targetLap}`));
+        setIsTrajLoading(false);
       });
   };
 
