@@ -219,6 +219,19 @@ export class DuckDbReader {
     return summaries;
   }
 
+  /**
+   * The factor that turns a channel into percent: 100 when the whole channel holds 0-1 fractions,
+   * 1 when it is already in percent. Decided once per channel from its largest value, never per
+   * sample: in a percent channel a pedal passing through 0-1 % would otherwise read as 0-100 %.
+   */
+  public async percentScale(tableName: string | null, columns: string[] = ['value']): Promise<number> {
+    if (!tableName) return 1;
+    const largest = columns.map(column => `MAX(ABS("${column}"))`).join(', ');
+    const rows = await this.queryAll<Record<string, number | null>>(`SELECT ${largest} FROM "${tableName}"`);
+    const max = Math.max(0, ...Object.values(rows[0] ?? {}).map(value => Number(value ?? 0)));
+    return max > 1.01 ? 1 : 100;
+  }
+
   public async getLapTelemetry(lapNumber: number, targetLapTimeSec?: number): Promise<DuckDbLapTelemetry | null> {
     const laps = await this.getLapList();
     if (laps.length === 0) return null;
@@ -566,6 +579,12 @@ export class DuckDbReader {
       ? channels.find((c) => c.channelName.toLowerCase() === steerTable.toLowerCase())
       : null;
     const steerUnit = steerChannel?.unit?.toLowerCase() || '';
+    const [throttleScale, brakeScale, tireWearScale] = await Promise.all([
+      this.percentScale(throttleTable),
+      this.percentScale(brakeTable),
+      this.percentScale(tireWearTable, ['value1', 'value2', 'value3', 'value4']),
+    ]);
+    const wearPercent = (value: number) => parseFloat((value * tireWearScale).toFixed(1));
 
     for (let i = 0; i < rowCount; i++) {
       const globalIdx = startIdx + i;
@@ -615,11 +634,11 @@ export class DuckDbReader {
 
       const throttleRow = getChannelRow(throttleData, i);
       const rawThrottle = throttleRow?.value ?? 0;
-      const throttle = rawThrottle <= 1.01 ? rawThrottle * 100 : rawThrottle;
+      const throttle = rawThrottle * throttleScale;
 
       const brakeRow = getChannelRow(brakeData, i);
       const rawBrake = brakeRow?.value ?? 0;
-      const brake = rawBrake <= 1.01 ? rawBrake * 100 : rawBrake;
+      const brake = rawBrake * brakeScale;
 
       const steerRow = getChannelRow(steerData, i);
       const rawSteer = steerRow?.value ?? 0;
@@ -678,10 +697,10 @@ export class DuckDbReader {
       const tireWearRow = getChannelRow(tireWearData, i);
       const tireWear: [number, number, number, number] | undefined = tireWearRow
         ? [
-            tireWearRow.value1 <= 1.01 ? parseFloat((tireWearRow.value1 * 100).toFixed(1)) : parseFloat(tireWearRow.value1.toFixed(1)),
-            tireWearRow.value2 <= 1.01 ? parseFloat((tireWearRow.value2 * 100).toFixed(1)) : parseFloat(tireWearRow.value2.toFixed(1)),
-            tireWearRow.value3 <= 1.01 ? parseFloat((tireWearRow.value3 * 100).toFixed(1)) : parseFloat(tireWearRow.value3.toFixed(1)),
-            tireWearRow.value4 <= 1.01 ? parseFloat((tireWearRow.value4 * 100).toFixed(1)) : parseFloat(tireWearRow.value4.toFixed(1)),
+            wearPercent(tireWearRow.value1),
+            wearPercent(tireWearRow.value2),
+            wearPercent(tireWearRow.value3),
+            wearPercent(tireWearRow.value4),
           ]
         : undefined;
 

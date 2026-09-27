@@ -1,4 +1,3 @@
-import fs from 'fs';
 import path from 'path';
 import { DetailedSession, DriverData, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 import { ReplayCacheService } from './replayCacheService.js';
@@ -73,7 +72,7 @@ export class ReplayTrajectoryService {
       // Ignore session lookup errors
     }
 
-    const fullTrajectory = this.replayCache.getFullTrajectory(filePath, request.replayName, {
+    const fullTrajectory = await this.replayCache.getFullTrajectory(filePath, request.replayName, {
       driverSlot,
       driverName,
       lapNumber: request.lapNumber,
@@ -91,21 +90,10 @@ export class ReplayTrajectoryService {
     let metadata: ReplayMetadata | undefined;
     try {
       const rawMetadata = this.replayCache.getMetadata(filePath, request.replayName, configuredPlayer);
-      let fileMtime: number | undefined;
-      if (fs.existsSync(filePath)) {
-        try {
-          fileMtime = fs.statSync(filePath).mtime.getTime();
-        } catch {
-          // Ignore stat failure
-        }
-      }
       metadata = composeReplayMetadata({
         metadata: rawMetadata,
         replayName: request.replayName,
         matchedSession,
-        duckFiles: this.telemetryService.getFiles(),
-        telemetryMeta: this.telemetryService.getTelemetryMeta(),
-        fileMtime,
       });
     } catch {
       // Ignore metadata read failure

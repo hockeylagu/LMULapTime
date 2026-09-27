@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import {
   parseReplayMetadata,
@@ -14,18 +15,12 @@ import { MockSlice, createSliceVcrBuffer } from '../../utils/mockVcr.js';
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 
 describe('replayParser - extended format & pit info', () => {
-  const tempDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_temp_ext');
-
-  beforeAll(() => {
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-  });
+  // A fresh folder per run, outside the repository, removed once at the end (see
+  // replayParserTrajectory.test.ts: deleting each file right after its test failed at random).
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-replays-temp-ext-'));
 
   afterAll(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
     describe('extended VCR format features', () => {
@@ -35,7 +30,6 @@ describe('replayParser - extended format & pit info', () => {
         const meta = parseReplayMetadata(filePath);
         expect(meta.modUid).toBe('hash_123');
         expect(meta.trackPath).toBe('C:\\Tracks\\Test');
-        fs.unlinkSync(filePath);
       });
 
       it('decodes sessionType and privateSession flag from session byte in metadata', () => {
@@ -86,7 +80,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(meta.privateSession).toBe(true);
         expect(meta.modUid).toBe('uid_456');
         expect(meta.trackPath).toBe('C:\\Tracks\\Portimao');
-        fs.unlinkSync(filePath);
       });
 
       it('parses deterministic structured driver table with entryTime and exitTime', () => {
@@ -176,7 +169,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(meta.drivers[1].name).toBe('Vincenzo Maggio');
         expect(meta.drivers[1].carNumber).toBe('86');
         expect(meta.drivers[1].exitTime).toBe(250.0);
-        fs.unlinkSync(filePath);
       });
 
       it('extracts rotX, rotZ, and detachablePartState in trajectory points', () => {
@@ -256,7 +248,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(pt.rotX).toBe(-0.05);
         expect(pt.rotZ).toBe(0.02);
         expect(pt.detachablePartState).toBe(42);
-        fs.unlinkSync(filePath);
       });
 
       it('extracts penalties and pit lane events from slice streams', () => {
@@ -353,7 +344,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.pitEvents?.length).toBe(1);
         expect(traj.pitEvents?.[0].code).toBe(34);
         expect(traj.pitEvents?.[0].action).toBe('entered pit lane');
-        fs.unlinkSync(filePath);
       });
 
       it('extracts structured fuelAddedLiters from a service-complete pit event (code 37)', () => {
@@ -414,7 +404,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.pitEvents?.[0].code).toBe(37);
         expect(traj.pitEvents?.[0].fuelAddedLiters).toBeCloseTo(62.5, 1);
         expect(traj.pitEvents?.[0].details).toBe('Fuel: 62.5L');
-        fs.unlinkSync(filePath);
       });
 
       const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';
@@ -545,7 +534,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(lap2?.isValid).toBe(false);
         expect(lap2?.lapTimeSec).toBeCloseTo(94.0, 0);
 
-        fs.unlinkSync(vcrPath);
       });
 
       const p1_41_File = path.join(steamReplays, 'Algarve International Circuit P1 41.Vcr');
@@ -864,7 +852,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.points[1].engineRpm).toBeCloseTo(8006, -1);
         expect(traj.points[2].engineRpm).toBeUndefined();
 
-        fs.unlinkSync(rpmVcrPath);
       });
 
       it('decodes track flag status events (Class 3 Type 10)', () => {
@@ -886,7 +873,6 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.flagEvents?.[1]).toMatchObject({ flagState: 0, flagName: 'Green' });
         expect(traj.flagEvents?.[2]).toMatchObject({ flagState: 8, flagName: 'Checkered' });
 
-        fs.unlinkSync(flagVcrPath);
       });
 
       it('decodes live standings snapshots (Type 48) into running-order history', () => {
@@ -908,7 +894,6 @@ describe('replayParser - extended format & pit info', () => {
         // sessionRunningOrder reflects the most recent snapshot
         expect(traj.sessionRunningOrder).toEqual([1, 2, 3]);
 
-        fs.unlinkSync(standingsVcrPath);
       });
     });
 

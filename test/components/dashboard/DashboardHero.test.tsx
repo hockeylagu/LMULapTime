@@ -131,7 +131,8 @@ describe('DashboardHero', () => {
     expect(replayBtn.className).toContain('border-emerald-500/30');
 
     fireEvent.click(replayBtn);
-    expect(onOpenReplay).toHaveBeenCalledWith('session-new');
+    expect(onOpenReplay).toHaveBeenCalledWith('session-new', 2);
+    expect(replayBtn).toHaveAttribute('title', 'Open telemetry for Best Lap (Lap 2)');
 
     const detailsBtn = screen.getByTestId('hero-inspect-session-btn');
     fireEvent.click(detailsBtn);

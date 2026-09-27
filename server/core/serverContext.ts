@@ -2,12 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
+import { pickReplayOwner, replayIndexEntryFromStored, replayLinkRejection, ReplayMatchTarget } from '../sessions/replayMatching.js';
+import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
-import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
+import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
+import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -33,6 +35,7 @@ export class ServerContext {
   private readonly replayMatchCheckedAt = new Map<string, number>();
   // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
   private readonly xmlMtimeCache = new Map<string, number | null>();
+  private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
   private replayScanStatus: ReplayScanStatus = {
     running: false,
     processed: 0,
@@ -81,8 +84,23 @@ export class ServerContext {
   public get telemetryDir(): string { return this.currentTelemetryDir; }
   public get currentParser(): LmuParser { return this.parser; }
 
+  /** Null when the database cannot run the upgrade (test doubles). */
+  public get replayUpgrade(): ReplayUpgradeRunner | null {
+    if (!this.replayUpgradeRunner && typeof this.sessionDb.upgradeReplaysAsyncIterator === 'function') {
+      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb);
+    }
+    return this.replayUpgradeRunner;
+  }
+
+  // The upgrade is the lowest-priority work: it runs only once no scan is running.
+  public startReplayUpgradeWhenIdle(): boolean {
+    if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
+  }
+
   public configureDirectories(values: { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown }): boolean {
     if (this.hasActiveFileScan()) return false;
+    this.replayUpgrade?.stop();
 
     if (typeof values.resultsDir === 'string' && fs.existsSync(values.resultsDir)) this.currentResultsDir = values.resultsDir;
     if (typeof values.replaysDir === 'string' && fs.existsSync(values.replaysDir)) this.currentReplaysDir = values.replaysDir;
@@ -120,23 +138,7 @@ export class ServerContext {
     if (this.replayIndexLoadedFor?.[0] === this.parser && this.replayIndexLoadedFor[1] === revision) return;
     try {
       const stored = this.sessionDb.getAllStoredReplayFiles();
-      for (const r of stored) {
-        const match = r.filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
-        const trackName = match ? match[1].trim() : (r.metadata.trackVenue || r.metadata.trackCourse || r.metadata.trackName || r.filename.replace(/\.vcr$/i, ''));
-        const sessionCode = match ? match[2].toUpperCase() : (r.metadata.sessionType || '');
-        this.parser.addReplayEntry({
-          name: r.filename,
-          path: r.file_path,
-          sizeBytes: r.file_size,
-          trackName,
-          sessionCode,
-          mtime: r.file_mtime,
-          eventTitle: r.metadata.eventInfo?.eventTitle,
-          splitNo: r.metadata.eventInfo?.splitNo,
-          eventType: r.metadata.eventInfo?.eventType,
-          durationSec: r.metadata.durationSec,
-        });
-      }
+      for (const r of stored) this.parser.addReplayEntry(replayIndexEntryFromStored(r));
       this.replayIndexLoadedFor = [this.parser, revision];
     } catch (err) {
       console.warn('[ServerContext] Error populating replay index from DB:', err);
@@ -169,11 +171,31 @@ export class ServerContext {
     return session.timestamp + Math.round(maxElapsed * 1000);
   }
 
+  private toReplayLink(replay: ReplayFileEntry): NonNullable<DetailedSession['matchingReplayFile']> {
+    return {
+      name: replay.name,
+      path: replay.path,
+      sizeBytes: replay.sizeBytes,
+      eventTitle: replay.eventTitle,
+      splitNo: replay.splitNo,
+      eventType: replay.eventType,
+      durationSec: replay.durationSec,
+    };
+  }
+
+  private relinkSession(session: DetailedSession, replay: ReplayFileEntry): void {
+    console.log(`[ServerContext] Re-matched session ${session.id}: ${session.matchingReplayFile?.name} -> ${replay.name}`);
+    session.matchingReplayFile = this.toReplayLink(replay);
+    this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+  }
+
   /**
-   * A stored match can be stale when the session XML was parsed before its own replay was
-   * cached (the replay sync runs after the session sync, so the index only learns about it later).
-   * LMU saves both files within about a second of each other at session end, so a replay saved
-   * within SAME_SAVE_WINDOW_MS of the XML replaces a stored match that was not.
+   * Re-validates a stored match against the current matching rules, which older builds did not
+   * enforce (e.g. every session of a practice run linked to the one replay LMU saved at its end).
+   * A match that fails them is replaced by the session's own replay when there is one, and withdrawn
+   * otherwise (recorded in rejected_replay_links). A valid match is only replaced by a replay saved
+   * within SAME_SAVE_WINDOW_MS of the XML: LMU saves both within about a second at session end, and
+   * the stored match can predate that replay being cached (the replay sync runs after the session sync).
    */
   private recheckStoredReplayMatch(session: DetailedSession, replaysByName: Map<string, ReplayFileEntry>): void {
     const SAME_SAVE_WINDOW_MS = 60_000;
@@ -183,38 +205,79 @@ export class ServerContext {
     if (this.replayMatchCheckedAt.get(session.id) === revision) return;
     this.replayMatchCheckedAt.set(session.id, revision);
 
+    // Without the replay's timing or the XML's mtime the match cannot be judged: keep it.
     const current = replaysByName.get(stored.name);
     const xmlMtime = this.getXmlMtime(session);
     if (!current || xmlMtime === undefined) return;
-    if (Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
+
+    const target = this.matchTarget(session, xmlMtime);
+    const rejection = replayLinkRejection(current, target);
+    if (!rejection && Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
 
     const candidate = this.parser.findMatchingReplay(
-      session.trackVenue,
-      session.trackCourse,
-      session.sessionName || session.sessionType,
-      session.timestamp,
-      xmlMtime
+      target.trackVenue, target.trackCourse, target.sessionCode, target.sessionTimestampMs, target.xmlFileMtimeMs
     );
-    if (!candidate || candidate.name === stored.name) return;
-    if (Math.abs(candidate.mtime - xmlMtime) > SAME_SAVE_WINDOW_MS) return;
+    const isOwnReplay = candidate && candidate.name !== stored.name &&
+      (rejection || Math.abs(candidate.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS);
+    if (candidate && isOwnReplay) {
+      this.relinkSession(session, candidate);
+      return;
+    }
+    if (rejection) this.withdrawReplayLink(session, rejection);
+  }
 
-    console.log(`[ServerContext] Re-matched session ${session.id}: ${stored.name} -> ${candidate.name}`);
-    session.matchingReplayFile = {
-      name: candidate.name,
-      path: candidate.path,
-      sizeBytes: candidate.sizeBytes,
-      eventTitle: candidate.eventTitle,
-      splitNo: candidate.splitNo,
-      eventType: candidate.eventType,
-      durationSec: candidate.durationSec,
+  private matchTarget(session: DetailedSession, xmlFileMtimeMs: number): ReplayMatchTarget {
+    return {
+      trackVenue: session.trackVenue,
+      trackCourse: session.trackCourse,
+      sessionCode: session.sessionName || session.sessionType,
+      sessionTimestampMs: session.timestamp,
+      xmlFileMtimeMs,
     };
-    this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+  }
+
+  private withdrawReplayLink(session: DetailedSession, reason: ReplayLinkRejectionReason): void {
+    const stored = session.matchingReplayFile;
+    if (!stored) return;
+    console.log(`[ServerContext] Withdrew replay ${stored.name} from session ${session.id} (${reason})`);
+    this.sessionDb.rejectSessionReplayLink(session.id, stored, reason);
+    delete session.matchingReplayFile;
+  }
+
+  /**
+   * A replay records one session. LMU can save a single replay for a run of sessions (restarting a
+   * practice keeps the file), so several sessions can each pass the matching rules against it: the
+   * closest one keeps it and the others lose it. A replay the index does not know cannot be judged.
+   */
+  private enforceOneSessionPerReplay(sessions: DetailedSession[], replaysByName: Map<string, ReplayFileEntry>): void {
+    const claimsByReplay = new Map<string, DetailedSession[]>();
+    for (const session of sessions) {
+      const name = session.matchingReplayFile?.name;
+      if (!name) continue;
+      const claims = claimsByReplay.get(name) ?? [];
+      claims.push(session);
+      claimsByReplay.set(name, claims);
+    }
+    for (const [name, claims] of claimsByReplay) {
+      const replay = replaysByName.get(name);
+      if (claims.length < 2 || !replay) continue;
+      const ownerId = pickReplayOwner(replay, claims.map(session => ({
+        id: session.id,
+        target: this.matchTarget(session, this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)),
+      })));
+      for (const session of claims) {
+        if (session.id !== ownerId) this.withdrawReplayLink(session, 'owned-by-other-session');
+      }
+    }
   }
 
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
     try {
       this.populateReplayIndexFromDb();
       const replaysByName = new Map(this.parser.getReplaysList().map(r => [r.name, r] as const));
+      const rejectedLinks = typeof this.sessionDb.getRejectedReplayLinks === 'function'
+        ? this.sessionDb.getRejectedReplayLinks()
+        : new Map<string, RejectedReplayLink[]>();
 
       for (const session of sessions) {
         if (session.matchingReplayFile) {
@@ -230,61 +293,52 @@ export class ServerContext {
             session.timestamp,
             this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)
           );
-          if (matchedReplay) {
-            session.matchingReplayFile = {
-              name: matchedReplay.name,
-              path: matchedReplay.path,
-              sizeBytes: matchedReplay.sizeBytes,
-              eventTitle: matchedReplay.eventTitle,
-              splitNo: matchedReplay.splitNo,
-              eventType: matchedReplay.eventType,
-              durationSec: matchedReplay.durationSec,
-            };
+          // A replay withdrawn from this session is never linked to it again.
+          const withdrawn = rejectedLinks.get(session.id)?.some(link => link.replayName === matchedReplay?.name);
+          if (matchedReplay && !withdrawn) {
+            session.matchingReplayFile = this.toReplayLink(matchedReplay);
             this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
           }
         }
       }
+      this.enforceOneSessionPerReplay(sessions, replaysByName);
 
-      const duckFiles = this.telemetryCatalog.getFiles();
-      const telemetryMeta = this.sessionDb.getTelemetryMetadata();
-      const telemetryBySessionId = new Map<string, string>();
-      const telemetryByReplay = new Map<string, string>();
-
-      for (const metadata of telemetryMeta) {
-        if (metadata.matchedSessionId) telemetryBySessionId.set(metadata.matchedSessionId, metadata.filename);
-        if (metadata.matchedReplayFilename) telemetryByReplay.set(metadata.matchedReplayFilename, metadata.filename);
-      }
-
+      this.storeNewTelemetryLinks(sessions, [...replaysByName.values()]);
+      const links = TelemetryLinks.load(this.sessionDb);
       for (const session of sessions) {
-        session.hasDuckDbTelemetry = false;
-        delete session.duckdbFilename;
-        if (session.matchingReplayFile) {
-          session.matchingReplayFile.hasDuckDbTelemetry = false;
-          delete session.matchingReplayFile.duckdbFilename;
-        }
-        const replayName = session.matchingReplayFile?.name;
-        const matched = duckFiles.length > 0 ? matchDuckDbToSession(duckFiles, session) : null;
-        let matchedDuckFilename = matched?.filename;
-        if (matched) {
-          this.sessionDb.upsertTelemetryMetadata(matched, session.id, replayName);
-        } else {
-          matchedDuckFilename = telemetryBySessionId.get(session.id) ||
-            (replayName ? telemetryByReplay.get(replayName) : undefined);
-        }
-
-        if (matchedDuckFilename) {
-          session.hasDuckDbTelemetry = true;
-          session.duckdbFilename = matchedDuckFilename;
-          if (session.matchingReplayFile) {
-            session.matchingReplayFile.hasDuckDbTelemetry = true;
-            session.matchingReplayFile.duckdbFilename = matchedDuckFilename;
-            this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
-          }
-        }
+        const filename = links.forSession(session);
+        session.hasDuckDbTelemetry = Boolean(filename);
+        if (filename) session.duckdbFilename = filename;
+        else delete session.duckdbFilename;
+        const replayLink = session.matchingReplayFile;
+        if (!replayLink) continue;
+        const changed = Boolean(replayLink.hasDuckDbTelemetry) !== Boolean(filename) || replayLink.duckdbFilename !== filename;
+        replayLink.hasDuckDbTelemetry = Boolean(filename);
+        if (filename) replayLink.duckdbFilename = filename;
+        else delete replayLink.duckdbFilename;
+        if (changed) this.sessionDb.updateSessionMatchingReplay(session.id, replayLink);
       }
     } catch (error) {
       console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', error);
     }
+  }
+
+  /**
+   * Decides the DuckDB matches of files, sessions and replays that have none yet and stores them.
+   * Matches are decided once: a stored match is only read afterwards.
+   */
+  private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[]): void {
+    if (this.sessionDb.resetTelemetryLinksForRule(TELEMETRY_LINK_RULE)) {
+      console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again: each file goes to the session it was recorded in');
+    }
+    this.sessionDb.linkTelemetryFiles(decideTelemetryLinks({
+      sessionEndMs: session => this.getXmlMtime(session),
+      files: this.sessionDb.getTelemetryFiles(),
+      stored: this.sessionDb.getTelemetryMetadata(),
+      sessions,
+      replays,
+      loadReplayMetadata: replayName => this.sessionDb.getStoredReplayMetadata(replayName),
+    }));
   }
 
   public loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
@@ -330,6 +384,7 @@ export class ServerContext {
 
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
+    this.replayUpgrade?.stop();
     this.replayScanStatus = {
       running: true,
       processed: 0,
@@ -362,6 +417,7 @@ export class ServerContext {
             console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
           }
           this.runPendingForcedSessionReparse();
+          this.startReplayUpgradeWhenIdle();
           return;
         }
         this.replayScanStatus.processed = value.processed;
@@ -378,6 +434,7 @@ export class ServerContext {
         this.replayScanStatus.currentStage = null;
         this.replayScanStatus.filePercent = null;
         this.runPendingForcedSessionReparse();
+        this.startReplayUpgradeWhenIdle();
       }
     };
     setImmediate(() => { void step(); });
@@ -392,6 +449,7 @@ export class ServerContext {
 
   public runSessionSyncInBackground(forceReparse = false): boolean {
     if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    this.replayUpgrade?.stop();
     this.sessionScanStatus = {
       running: true,
       processed: 0,
@@ -505,6 +563,7 @@ export class ServerContext {
     return {
       ...this.replayScanStatus,
       sessionScan: this.sessionScanStatus,
+      replayUpgrade: this.replayUpgrade?.getStatus(),
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
       allComplete,
