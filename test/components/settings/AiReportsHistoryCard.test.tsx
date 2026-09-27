@@ -8,7 +8,7 @@ describe('AiReportsHistoryCard', () => {
   });
 
   it('shows an empty state when no AI reports have been generated', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
     render(<AiReportsHistoryCard />);
 
@@ -20,6 +20,7 @@ describe('AiReportsHistoryCard', () => {
 
   it('renders report history entries with summary, model and tokens used', async () => {
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve([
         {
           cacheKey: 'key-1',
@@ -55,7 +56,7 @@ describe('AiReportsHistoryCard', () => {
   });
 
   it('reloads the list when the refresh button is clicked', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
     global.fetch = fetchMock;
 
     render(<AiReportsHistoryCard />);

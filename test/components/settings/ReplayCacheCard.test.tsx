@@ -8,7 +8,7 @@ describe('ReplayCacheCard', () => {
   });
 
   it('shows an empty state when no replays are cached', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
     render(<ReplayCacheCard />);
 
@@ -22,6 +22,7 @@ describe('ReplayCacheCard', () => {
     const updatedAt = new Date('2026-02-20T12:00:00Z').getTime();
     const replayDateMs = new Date('2026-01-15T12:00:00Z').getTime();
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve([
         {
           filename: 'Spa_R1.Vcr',
@@ -59,6 +60,7 @@ describe('ReplayCacheCard', () => {
 
   it('renders "Not on Disk" badge when replay file is deleted from disk', async () => {
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve([
         {
           filename: 'Deleted_P1.Vcr',
@@ -94,7 +96,7 @@ describe('ReplayCacheCard', () => {
   });
 
   it('reloads the list when the refresh button is clicked', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
     global.fetch = fetchMock;
 
     render(<ReplayCacheCard />);
@@ -105,7 +107,7 @@ describe('ReplayCacheCard', () => {
   });
 
   it('shows a progress bar while a background replay scan is running', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
     render(<ReplayCacheCard replayScanStatus={{
       running: true,
@@ -126,7 +128,7 @@ describe('ReplayCacheCard', () => {
   });
 
   it('reloads the cached list once a running scan finishes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
     global.fetch = fetchMock;
 
     const { rerender } = render(<ReplayCacheCard replayScanStatus={{

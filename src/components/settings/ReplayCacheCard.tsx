@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Film, RefreshCw, HardDrive, Archive } from 'lucide-react';
 import { ReplayCacheSummary, ReplayScanStatus } from '../../../shared/types/index.js';
+import { fetchJson } from '../../api/apiClient.js';
 
 export interface ReplayCacheCardProps {
   replayScanStatus?: ReplayScanStatus | null;
@@ -14,8 +15,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
   const loadReplays = () => {
     setIsLoading(true);
     setError(null);
-    fetch('/api/replays/cache')
-      .then(res => res.json())
+    fetchJson<ReplayCacheSummary[]>('/api/replays/cache')
       .then(data => setReplays(Array.isArray(data) ? data : []))
       .catch(() => setError('Unable to load cached replays.'))
       .finally(() => setIsLoading(false));
