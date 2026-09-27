@@ -27,12 +27,16 @@ export interface LapLineCut {
   end: LapEndCut;
 }
 
-/** Linear interpolation of every measured channel between two consecutive samples. */
+/**
+ * Linear interpolation of every measured channel between two consecutive samples. A channel only
+ * one of them carries is taken from it: on a DuckDB lap the recording either side of the lap is
+ * the replay file's, without the DuckDB-only channels (tyres, ride height, wear...).
+ */
 function interpolatePoint(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, f: number): ReplayTrajectoryPoint {
   const from = a as unknown as Record<string, unknown>;
   const to = b as unknown as Record<string, unknown>;
-  const out: Record<string, unknown> = { ...(f < 0.5 ? from : to) };
-  for (const key of Object.keys(from)) {
+  const out = f < 0.5 ? withMissingChannels(from, to) : withMissingChannels(to, from);
+  for (const key of Object.keys(out)) {
     const va = from[key];
     const vb = to[key];
     if (typeof va !== 'number' || typeof vb !== 'number' || DISCRETE_FIELDS.has(key)) continue;
@@ -40,6 +44,15 @@ function interpolatePoint(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, f:
     out[key] = Number(value.toFixed(3));
   }
   return out as unknown as ReplayTrajectoryPoint;
+}
+
+/** `point` with every channel it lacks taken from `source`. */
+function withMissingChannels(point: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...point };
+  for (const key of Object.keys(source)) {
+    if (out[key] === undefined) out[key] = source[key];
+  }
+  return out;
 }
 
 /**
@@ -93,8 +106,18 @@ export function cutLapAtLine(
   const startK = findCrossing(0, lapStartIdx, 0);
   const endK = findCrossing(L, lapEndIdx, startK >= 0 ? startK + 1 : lapStartIdx);
 
+  // A sample of the recording before or after the lap holds the channels it lacks at the lap's
+  // nearest end, so a DuckDB lap's tyre and corner traces run up to the line without a gap.
+  const sampleAt = (i: number): ReplayTrajectoryPoint => {
+    const lapEnd = i < lapStartIdx ? lapStartIdx : i > lapEndIdx ? lapEndIdx : -1;
+    if (lapEnd < 0) return samples[i];
+    return withMissingChannels(
+      samples[i] as unknown as Record<string, unknown>,
+      samples[lapEnd] as unknown as Record<string, unknown>,
+    ) as unknown as ReplayTrajectoryPoint;
+  };
   const withProjection = (i: number): ReplayTrajectoryPoint => ({
-    ...samples[i],
+    ...sampleAt(i),
     // Uncut ends keep the previous convention: wrapped before the line, pinned at L past it.
     stationM: Number((u[i] < 0 ? u[i] + L : Math.min(u[i], L)).toFixed(2)),
     lateralOffsetM: Number((lateralOffsets[i] ?? 0).toFixed(2)),
@@ -102,7 +125,7 @@ export function cutLapAtLine(
   const boundary = (k: number, target: number): ReplayTrajectoryPoint => {
     const f = (target - u[k]) / (u[k + 1] - u[k]);
     return {
-      ...interpolatePoint(samples[k], samples[k + 1], f),
+      ...interpolatePoint(sampleAt(k), sampleAt(k + 1), f),
       stationM: Number(target.toFixed(2)),
       lateralOffsetM: Number((lateralOffsets[k] + f * (lateralOffsets[k + 1] - lateralOffsets[k])).toFixed(2)),
     };
