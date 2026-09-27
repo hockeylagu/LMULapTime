@@ -255,16 +255,6 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 2000, 12345)).toBeNull();
   });
 
-  it('clears both replay tables via clearReplayCache', () => {
-    db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', 'C:\\replays\\Test_Replay_P1.Vcr', 1000, 12345, buildMetadata());
-    db.upsertReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 1000, 12345, buildTrajectory());
-    expect(db.getReplaysCount()).toBe(1);
-
-    db.clearReplayCache();
-    expect(db.getReplaysCount()).toBe(0);
-    expect(db.getReplayMetadataCache('Test_Replay_P1.Vcr', 1000, 12345)).toBeNull();
-    expect(db.getReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 1000, 12345)).toBeNull();
-  });
 
   it('lists cached replays with a trajectory count from the joined table', () => {
     db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', 'C:\\replays\\Test_Replay_P1.Vcr', 1000, 12345, buildMetadata());

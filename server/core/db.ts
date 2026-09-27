@@ -263,10 +263,6 @@ export class SessionDatabase {
     setTrajectoryDefaults(this.db, filename, driverSlot, defaultLapKey, resolvedDriverSlot);
   }
 
-  public clearReplayCache(): void {
-    this.db.exec('DELETE FROM replay_metadata; DELETE FROM replay_trajectories; DELETE FROM replay_trajectory_defaults;');
-  }
-
   private telemetryMetadataRevision = 0;
 
   /** Changes whenever a telemetry_metadata row does: callers cache what they derive from the rows. */
