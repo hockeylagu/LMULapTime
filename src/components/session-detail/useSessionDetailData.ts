@@ -3,7 +3,7 @@ import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
-import { fetchJson, isAbortError } from '../../api/apiClient.js';
+import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
 export interface UseSessionDetailDataParams {
@@ -47,6 +47,8 @@ export function useSessionDetailData({
     initialSessions || []
   );
   const [loading, setLoading] = useState<boolean>(!cachedInitial);
+  // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDriverName, setSelectedDriverName] = useState<string>(() => {
     if (cachedInitial?.playerDriver) return cachedInitial.playerDriver.name;
     if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
@@ -84,6 +86,7 @@ export function useSessionDetailData({
     const abortController = new AbortController();
     const { signal } = abortController;
     const memCached = clientSessionCache.get(sessionId);
+    setLoadError(null);
     if (memCached) {
       setSession(memCached);
       if (memCached.playerDriver) {
@@ -112,6 +115,9 @@ export function useSessionDetailData({
       .catch((err) => {
         if (!isCurrent || isAbortError(err)) return;
         console.error('Failed to load session detail data:', err);
+        if (!(err instanceof ApiError && err.status === 404)) {
+          setLoadError(apiErrorMessage(err, 'The session could not be loaded.'));
+        }
         setLoading(false);
       });
 
@@ -366,6 +372,7 @@ export function useSessionDetailData({
   return {
     session,
     loading,
+    loadError,
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
