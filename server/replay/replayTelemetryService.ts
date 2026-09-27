@@ -30,10 +30,10 @@ interface FoundLap {
 export class ReplayTelemetryService {
   public constructor(private readonly sessionDb: SessionDatabase) {}
 
-  /** A lap cached from any of the session's files. */
-  private cachedLap(files: TelemetryMetadataRecord[], lapNumber: number): FoundLap | null {
+  /** A lap cached from any of the session's files (by an older reader too, with `anyVersion`). */
+  private cachedLap(files: TelemetryMetadataRecord[], lapNumber: number, anyVersion = false): FoundLap | null {
     for (const file of files) {
-      const lap = this.sessionDb.getTelemetryLapCache(file.filename, lapNumber);
+      const lap = this.sessionDb.getTelemetryLapCache(file.filename, lapNumber, { anyVersion });
       if (lap) return { file, lap };
     }
     return null;
@@ -112,11 +112,14 @@ export class ReplayTelemetryService {
         let found = this.cachedLap(files, chosenLapNum);
         if (!found) {
           const onDisk = files.filter(file => links.isOnDisk(file.filename));
-          if (onDisk.length === 0) {
-            duckdbUnavailableReason = 'The DuckDB file of this session was deleted before this lap was read; using Native VCR data.';
-          } else {
+          if (onDisk.length > 0) {
             found = await this.readLap(onDisk, chosenLapNum, targetLapTimeSec);
             if (found) this.sessionDb.upsertTelemetryLapCache(found.file.filename, chosenLapNum, found.lap);
+          }
+          // A lap cached by an older reader is the only copy left once its file is deleted.
+          found ??= this.cachedLap(files.filter(file => !links.isOnDisk(file.filename)), chosenLapNum, true);
+          if (!found && onDisk.length === 0) {
+            duckdbUnavailableReason = 'The DuckDB file of this session was deleted before this lap was read; using Native VCR data.';
           }
         }
         const duckLap = found?.lap ?? null;

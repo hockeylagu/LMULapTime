@@ -376,8 +376,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getTelemetryMetadata(this.db);
   }
 
-  public getTelemetryLapCache(filename: string, lapNumber: number): DuckDbLapTelemetry | null {
-    return getTelemetryLapCache(this.db, filename, lapNumber);
+  public getTelemetryLapCache(filename: string, lapNumber: number, options: { anyVersion?: boolean } = {}): DuckDbLapTelemetry | null {
+    return getTelemetryLapCache(this.db, filename, lapNumber, options.anyVersion);
   }
 
   public upsertTelemetryLapCache(filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {
