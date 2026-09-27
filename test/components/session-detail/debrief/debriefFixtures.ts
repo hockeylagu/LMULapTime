@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { ComparableLap, DetailedSession, DriverData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData, ReplayTrafficResponse, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 export const MY_REPLAY = 'Daytona International Speedway Road Course R1 10.Vcr';
 export const REF_REPLAY = 'Daytona International Speedway Road Course Q1 7.Vcr';
@@ -46,13 +46,28 @@ export const referenceLap = {
   s1: null, s2: null, s3: null, topSpeed: null, isValid: true, matchingReplayFile: REF_REPLAY,
 } as ComparableLap;
 
-/** Serves the compare-laps list and each lap's trajectory, with the analysed lap 0.4 s down in the corner. */
-export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap]) {
-  const stepByLap: Record<string, number> = { [`${MY_REPLAY}|20`]: 0.35, [`${MY_REPLAY}|16`]: 0.34, [`${MY_REPLAY}|18`]: 0.3, [`${REF_REPLAY}|3`]: 0.3 };
+/**
+ * A lap about 0.5% faster than the analysed 95.894 (target 95.415): the realistic reference.
+ * It is 0.24 s faster than the analysed lap through the corner; Catani's lap is 0.4 s faster.
+ */
+export const realisticLap = {
+  ...referenceLap, id: 'near', driverName: 'Near Rival', lapNum: 5, lapTime: 95.41, lapTimeString: '1:35.410',
+} as ComparableLap;
+
+const NO_TRAFFIC: ReplayTrafficResponse = { available: false, reason: 'This layout has no track centreline to place the cars on.', laps: [] };
+
+/** Serves the compare-laps list, each lap's trajectory (the analysed lap 0.4 s down in the corner) and the replay's traffic. */
+export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap], traffic: ReplayTrafficResponse = NO_TRAFFIC) {
+  const stepByLap: Record<string, number> = {
+    [`${MY_REPLAY}|20`]: 0.35, [`${MY_REPLAY}|16`]: 0.34, [`${MY_REPLAY}|18`]: 0.3, [`${REF_REPLAY}|3`]: 0.3, [`${REF_REPLAY}|5`]: 0.32,
+  };
   const fetchMock = vi.fn((input: string) => {
     const url = decodeURIComponent(String(input));
     if (url.startsWith('/api/compare/laps')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: compareLaps }) });
+    }
+    if (url.includes('/traffic?')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(traffic) });
     }
     const match = /\/api\/replays\/(.+?)\/trajectory\?.*lap=(\d+)/.exec(url);
     const step = match ? stepByLap[`${match[1]}|${match[2]}`] : undefined;

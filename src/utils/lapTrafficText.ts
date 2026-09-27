@@ -1,4 +1,4 @@
-import type { LapTraffic, NonRepresentativeReason, TrafficCar, TrafficGap } from '../../shared/types/index.js';
+import type { LapTraffic, NonRepresentativeReason, TrafficCar, TrafficGap, TrafficSpell } from '../../shared/types/index.js';
 import { OFF_PACE_RATIO } from '../../shared/domain/lapRepresentativeness.js';
 
 const offPacePercent = Math.round((OFF_PACE_RATIO - 1) * 100);
@@ -28,6 +28,16 @@ export function describeLapTraffic(traffic: LapTraffic | undefined): string[] {
   if (traffic.passedBy.length > 0) lines.push(`Passed by ${describeCars(traffic.passedBy)}`);
   if (traffic.following && traffic.ahead) lines.push(`Followed ${describeGap(traffic.ahead)}`);
   return lines;
+}
+
+/** A traffic spell from the replay in words, e.g. "Attacking Vinicius Ares" or "Behind Rui Paiva (GT3)". */
+export function describeTrafficSpell(spell: TrafficSpell): string {
+  switch (spell.kind) {
+    case 'battle': return spell.direction === 'ahead' ? `Attacking ${spell.carName}` : `Defending from ${spell.carName}`;
+    case 'lapping': return `Lapping ${spell.carName}`;
+    case 'beingLapped': return `Being lapped by ${spell.carName}`;
+    case 'multiclass': return `Behind ${spell.carName}${spell.carClass ? ` (${spell.carClass})` : ''}`;
+  }
 }
 
 /** The on-road gaps when the lap started, for a tooltip. */

@@ -3,6 +3,7 @@ import {
   comparisonConfidence,
   describeCornerEvidence,
   rankDebriefCorners,
+  spellCoversCorner,
 } from '../../src/utils/sessionDebrief.js';
 import type { CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis.js';
 import type { CornerConsistencyStat } from '../../src/utils/cornerConsistency.js';
@@ -95,6 +96,52 @@ describe('rankDebriefCorners', () => {
     ], null, 1);
 
     expect(ranked.worstPhase).toBe('exit');
+  });
+
+  it('describes the corner as the technique lap drives it, and says what it costs against that lap', () => {
+    const technique = [corner(1, 12.5, 0.9, { brakingPointDeltaM: -28 })];
+
+    const [ranked] = rankDebriefCorners([corner(1, 12.5, 0.3)], null, 1, undefined, { technique });
+
+    expect(ranked).toMatchObject({ timeLossSec: 0.3, techniqueLossSec: 0.9, evidence: ['Brakes 28 m earlier'] });
+    expect(rankDebriefCorners([corner(1, 12.5, 0.3)], null, 1)[0].techniqueLossSec).toBeNull();
+  });
+
+  it('leaves passes in traffic out of repeatability and ranks a corner of the analysed lap in traffic lower', () => {
+    // Corner 1 runs 1000-1200 m. Laps 2-5 are timed there; lap 3 had a car in front through it,
+    // lap 4 only after it. The analysed lap 20 had one at the corner entry.
+    const spell = (startStationM: number, endStationM: number) => ({
+      carName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass' as const, direction: 'ahead' as const,
+      startSec: 0, endSec: 4, startStationM, endStationM, closestGapSec: 0.3,
+    });
+    const traffic = new Map([[3, [spell(1150, 1400)]], [4, [spell(1300, 1500)]], [20, [spell(900, 1010)]]]);
+    const stats = [lapTimes(1, [12.5, 12.6, 12.0, 12.7])];
+
+    const [clean] = rankDebriefCorners([corner(1, 12.5, 0.4)], stats, 1, undefined, { traffic, lapNumber: 7 });
+    const [inTraffic] = rankDebriefCorners([corner(1, 12.5, 0.4)], stats, 1, undefined, { traffic, lapNumber: 20 });
+
+    expect(clean).toMatchObject({ lapsSampled: 3, lapsLosing: 2, lapsInTraffic: 1, confidence: 1, traffic: null });
+    expect(inTraffic.confidence).toBe(0.5);
+    expect(inTraffic.traffic?.carName).toBe('Rui Paiva');
+    expect(inTraffic.priority).toBeCloseTo(clean.priority / 2, 3);
+  });
+});
+
+describe('spellCoversCorner', () => {
+  const spell = (startStationM: number, endStationM: number) => ({
+    carName: 'A', kind: 'battle' as const, direction: 'ahead' as const, startSec: 0, endSec: 3, startStationM, endStationM, closestGapSec: 0.5,
+  });
+
+  it('matches a spell overlapping any part of the corner window', () => {
+    expect(spellCoversCorner(spell(100, 200), 150, 300)).toBe(true);
+    expect(spellCoversCorner(spell(100, 200), 200, 300)).toBe(true);
+    expect(spellCoversCorner(spell(100, 200), 250, 300)).toBe(false);
+  });
+
+  it('handles a spell across the timing line', () => {
+    expect(spellCoversCorner(spell(5600, 100), 50, 200)).toBe(true);
+    expect(spellCoversCorner(spell(5600, 100), 5650, 5700)).toBe(true);
+    expect(spellCoversCorner(spell(5600, 100), 300, 500)).toBe(false);
   });
 });
 

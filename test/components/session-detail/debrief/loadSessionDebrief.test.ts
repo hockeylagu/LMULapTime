@@ -4,7 +4,7 @@ import {
   DebriefUnavailableError,
   loadSessionDebrief,
 } from '../../../../src/components/session-detail/debrief/loadSessionDebrief.js';
-import { me, mockDebriefServer, MY_REPLAY, REF_REPLAY, referenceLap, session } from './debriefFixtures.js';
+import { me, mockDebriefServer, MY_REPLAY, realisticLap, REF_REPLAY, referenceLap, session } from './debriefFixtures.js';
 
 describe('loadSessionDebrief', () => {
   it('ranks the best lap corners against the fastest same-car lap, with how often each is lost', async () => {
@@ -13,7 +13,8 @@ describe('loadSessionDebrief', () => {
     const debrief = await loadSessionDebrief(session, me);
 
     // The reference comes from the same car on this layout, any driver.
-    const compareQuery = new URLSearchParams(String(fetchMock.mock.calls[0][0]).split('?')[1]);
+    const compareCall = fetchMock.mock.calls.map(([url]) => String(url)).find(url => url.startsWith('/api/compare/laps'));
+    const compareQuery = new URLSearchParams(String(compareCall).split('?')[1]);
     expect(compareQuery.get('carModel')).toBe('Peugeot 9x8');
     expect(compareQuery.get('carClass')).toBe('Hyper');
     expect(compareQuery.get('playerOnly')).toBe('false');
@@ -77,6 +78,46 @@ describe('loadSessionDebrief', () => {
 
     expect(debrief.caveats).toContain('Your lap was run in traffic (Passed Rui Paiva (GT3)): a tow or a pass changes the numbers.');
     expect(debrief.lapsTimed).toBe(2);
+  });
+
+  it('ranks against the lap about 0.5% faster, and takes the technique from the fastest', async () => {
+    const tooClose = { ...realisticLap, id: 'close', driverName: 'Close Rival', lapTime: 95.8 };
+    mockDebriefServer([referenceLap, tooClose, realisticLap]);
+
+    const debrief = await loadSessionDebrief(session, me);
+
+    expect(debrief.reference.driverName).toBe('Near Rival');
+    expect(debrief.technique?.driverName).toBe('Davide Catani');
+    expect(debrief.lapDeltaSec).toBe(0.484);
+    expect(debrief.techniqueDeltaSec).toBe(1.92);
+    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, timeLossSec: 0.24, techniqueLossSec: 0.4 });
+    expect(new URLSearchParams(debriefCornerLink(debrief, 1, 'technique').split('?')[1]).get('compareDriver')).toBe('Davide Catani');
+    expect(new URLSearchParams(debriefCornerLink(debrief, 1).split('?')[1]).get('compareDriver')).toBe('Near Rival');
+  });
+
+  it('leaves out the corner passes run in traffic, times laps flagged for traffic, and ranks a corner of this lap in traffic lower', async () => {
+    const spell = (startStationM: number, endStationM: number) => ({
+      carName: 'Vinicius Ares', carClass: 'Hyper', kind: 'battle' as const, direction: 'ahead' as const,
+      startSec: 0, endSec: 5, startStationM, endStationM, closestGapSec: 0.4,
+    });
+    mockDebriefServer([referenceLap], {
+      available: true,
+      laps: [
+        { lapNumber: 16, spells: [spell(60, 90)] }, // through the corner (30-110 m)
+        { lapNumber: 18, spells: [spell(120, 140)] }, // after it: the lap's corner still counts
+        { lapNumber: 20, spells: [spell(100, 20)] }, // across the line and into the corner
+      ],
+    });
+    const flagged = { ...me, laps: me.laps.map(l => (l.lapNum === 18 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
+
+    const debrief = await loadSessionDebrief(session, flagged);
+
+    expect(debrief.trafficKnown).toBe(true);
+    expect(debrief.lapsTimed).toBe(3);
+    // Lap 20 (analysed) and 16 ran the corner in traffic: only lap 18 is left, too few to sample.
+    expect(debrief.corners[0]).toMatchObject({ lapsInTraffic: 2, lapsSampled: null, confidence: 0.4 });
+    expect(debrief.corners[0].traffic?.carName).toBe('Vinicius Ares');
+    expect(debrief.caveats.some(c => c.includes('run in traffic'))).toBe(false);
   });
 
   it('still ranks the corners when the other laps cannot be loaded', async () => {
