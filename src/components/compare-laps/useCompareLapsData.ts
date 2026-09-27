@@ -107,13 +107,14 @@ export function useCompareLapsData({
   const [baselineLapId, setBaselineLapId] = useState<string>('');
 
   const initializedScopeRef = useRef<string>('');
-  const hasFetchedRef = useRef<boolean>(false);
+  // The track and class the laps in apiData were loaded for: laps are only picked from data of the current selection.
+  const [loadedScope, setLoadedScope] = useState<string>('');
+  const lapScope = `${selectedTrack}__${selectedCarClass}`;
 
   const setSelectedTrack = (track: string) => {
     setSelectedLaps([]);
     setBaselineLapId('');
     initializedScopeRef.current = '';
-    hasFetchedRef.current = false;
     updateSearchParams(searchParams, setSearchParams, { track, model: null });
   };
 
@@ -121,7 +122,6 @@ export function useCompareLapsData({
     setSelectedLaps([]);
     setBaselineLapId('');
     initializedScopeRef.current = '';
-    hasFetchedRef.current = false;
     updateSearchParams(searchParams, setSearchParams, { carClass, model: null });
   };
 
@@ -151,7 +151,7 @@ export function useCompareLapsData({
     fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then((data) => {
         setApiData(data);
-        hasFetchedRef.current = true;
+        setLoadedScope(lapScope);
         setLoading(false);
       })
       .catch((err) => {
@@ -159,6 +159,7 @@ export function useCompareLapsData({
         console.error('Failed to fetch compare laps:', err);
         // Never leave the previous track's or layout's laps under the new selection.
         setApiData(NO_COMPARE_LAPS);
+        setLoadedScope(lapScope);
         setLoadError(apiErrorMessage(err, 'The laps for this track could not be loaded.'));
         setLoading(false);
       });
@@ -166,7 +167,7 @@ export function useCompareLapsData({
     return () => {
       controller.abort();
     };
-  }, [selectedTrack, selectedCarClass, playerOnly]);
+  }, [selectedTrack, selectedCarClass, playerOnly, lapScope]);
 
   const targetSessionId = searchParams.get('sessionId') || initialSessionId || undefined;
   const targetLapNum =
@@ -181,7 +182,9 @@ export function useCompareLapsData({
       : initialCompareLapNum;
 
   useEffect(() => {
-    if (!hasFetchedRef.current) return;
+    // Until the laps of a newly selected track or class arrive (the URL can change it, not only the
+    // selector), apiData still holds the previous selection's laps: never pick from those.
+    if (loadedScope !== lapScope) return;
 
     const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNum ?? ''}__${targetCompareSessionId || ''}__${targetCompareDriver || ''}__${targetCompareLapNum ?? ''}`;
 
@@ -252,7 +255,7 @@ export function useCompareLapsData({
     setSelectedLaps(initialSlice);
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
     initializedScopeRef.current = currentScope;
-  }, [apiData, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
+  }, [apiData, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
 
   const availableCarModels = useMemo(() => {
     const set = new Set<string>();
