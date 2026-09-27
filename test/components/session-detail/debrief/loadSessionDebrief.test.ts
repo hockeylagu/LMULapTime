@@ -61,6 +61,24 @@ describe('loadSessionDebrief', () => {
     await expect(loadSessionDebrief(noReplay, me)).rejects.toThrow('This session has no replay to analyse.');
   });
 
+  it('warns when the analysed lap was run in traffic, and leaves traffic laps out of repeatability', async () => {
+    mockDebriefServer();
+    const gt3 = { name: 'Rui Paiva', carClass: 'GT3', sameClass: false };
+    const inTraffic = {
+      ...me,
+      laps: me.laps.map(l => {
+        if (l.lapNum === 20) return { ...l, traffic: { ahead: null, behind: null, following: false, passed: [gt3], passedBy: [] } };
+        if (l.lapNum === 16) return { ...l, nonRepresentativeReason: 'traffic' as const };
+        return l;
+      }),
+    };
+
+    const debrief = await loadSessionDebrief(session, inTraffic);
+
+    expect(debrief.caveats).toContain('Your lap was run in traffic (Passed Rui Paiva (GT3)): a tow or a pass changes the numbers.');
+    expect(debrief.lapsTimed).toBe(2);
+  });
+
   it('still ranks the corners when the other laps cannot be loaded', async () => {
     mockDebriefServer([{ ...referenceLap }]);
     const onlyBestLap = { ...me, laps: me.laps.filter(l => l.lapNum === 20 || l.lapNum === 1).concat([{ ...me.laps[1], lapNum: 99 }]) };

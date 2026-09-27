@@ -47,3 +47,37 @@ describe('SessionLapTable inferred timing', () => {
     ]);
   });
 });
+
+describe('SessionLapTable traffic', () => {
+  it('shows who the driver met on track, and why a lap is left out of the pace', () => {
+    const gt3 = { name: 'Rui Paiva', carClass: 'GT3', sameClass: false };
+    const selectedDriver = {
+      ...mockDetailedSession.playerDriver,
+      laps: [
+        { ...mockDetailedSession.playerDriver.laps[0], lapNum: 1 },
+        {
+          ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, nonRepresentativeReason: 'traffic',
+          traffic: { ahead: { car: gt3, gapSec: 2 }, behind: null, following: false, passed: [gt3], passedBy: [] },
+        },
+      ],
+    } as unknown as DriverData;
+    const session = { ...mockDetailedSession, playerDriver: selectedDriver, drivers: [selectedDriver] } as unknown as DetailedSession;
+
+    render(
+      <SessionLapTable
+        session={session}
+        selectedDriver={selectedDriver}
+        isMultiClass={false}
+        hasTireWearData={false}
+        hasFuelData={false}
+        hasVirtualEnergyData={false}
+        isCurrentSessionAllTimePB={false}
+      />
+    );
+
+    const chip = screen.getByTestId('lap-traffic');
+    expect(chip).toHaveTextContent('Passed Rui Paiva (GT3)');
+    expect(chip.getAttribute('title')).toContain('Ahead on the road: Rui Paiva (GT3) 2.00s');
+    expect(screen.getByText('Traffic').getAttribute('title')).toMatch(/^Slower than your median lap, spent overtaking/);
+  });
+});

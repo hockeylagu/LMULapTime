@@ -1,4 +1,4 @@
-import type { ComparableLap, DetailedSession, DriverData, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData, LapTraffic, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { getBestLapNumber, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
@@ -8,6 +8,7 @@ import { fetchReplayTrajectory } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput } from '../../../utils/cornerConsistency.js';
 import { pickFastestSameCarLap } from '../../../utils/referenceLaps.js';
+import { describeLapTraffic } from '../../../utils/lapTrafficText.js';
 import { comparisonConfidence, DebriefCorner, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { applyTelemetryPostProcessing, applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, trajectoryResolutionQuery } from '../../replay/telemetry/telemetryResolution.js';
@@ -100,8 +101,14 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     corners: rankDebriefCorners(segments, cornerStats, confidence),
     lapsTimed: timedLaps.length,
     confidence,
-    caveats: describeComparisonCaveats(target, referenceTrajectory),
+    caveats: [...describeComparisonCaveats(target, referenceTrajectory), ...describeLapTrafficCaveat(lap.traffic)],
   };
+}
+
+/** A best lap run in traffic is not a clean read: a tow flatters the straights and a pass costs corners. */
+function describeLapTrafficCaveat(traffic: LapTraffic | undefined): string[] {
+  const events = describeLapTraffic(traffic);
+  return events.length > 0 ? [`Your lap was run in traffic (${events.join('; ')}): a tow or a pass changes the numbers.`] : [];
 }
 
 /** The telemetry view on one debrief corner, with the reference lap loaded as the comparison. */
