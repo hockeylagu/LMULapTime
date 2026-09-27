@@ -5,7 +5,6 @@ import {
   buildReplayListSummaries,
 } from '../../../server/replay/replayMetadataService.js';
 import {
-  cloneReplayTrajectory,
   applyPureOfficialLapValidation,
   downsampleTrajectoryResponse,
 } from '../../../server/replay/replayTransforms.js';
@@ -223,7 +222,7 @@ describe('Replay domain services and transforms', () => {
         laps: [{ lapNum: 1, lapTime: 89.5, s1: 29.8, s2: 30.0, s3: 29.7, isValid: true }],
       } as unknown as DriverData;
 
-      const validated = applyPureOfficialLapValidation(cloneReplayTrajectory(original), session, driver);
+      const validated = applyPureOfficialLapValidation(original, session, driver);
       expect(validated.laps?.[0].validatedTimeSec).toBe(89.5);
       expect(validated.laps?.[0].timeDiffSec).toBe(0.5);
       expect(validated.validation?.driverName).toBe('Official Driver');

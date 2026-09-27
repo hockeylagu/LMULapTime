@@ -7,7 +7,6 @@ import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServ
 import { composeReplayMetadata } from './replayMetadataService.js';
 import {
   applyPureOfficialLapValidation,
-  cloneReplayTrajectory,
   downsampleTrajectoryResponse,
   enrichTrajectoryGeometryResponse,
 } from './replayTransforms.js';
@@ -82,10 +81,12 @@ export class ReplayTrajectoryService {
     });
 
     // Kept at full resolution until the lap has been projected on the track and cut at the line.
-    let trajectory = cloneReplayTrajectory(fullTrajectory);
-    trajectory.source = 'vcr';
-    trajectory.vcrRawPointsCount = fullTrajectory.rawPointsCount ?? fullTrajectory.points.length;
-    trajectory.vcrRawSampleRateHz = fullTrajectory.rawSampleRateHz;
+    let trajectory: ReplayTrajectoryData = {
+      ...fullTrajectory,
+      source: 'vcr',
+      vcrRawPointsCount: fullTrajectory.rawPointsCount ?? fullTrajectory.points.length,
+      vcrRawSampleRateHz: fullTrajectory.rawSampleRateHz,
+    };
 
     let metadata: ReplayMetadata | undefined;
     try {
