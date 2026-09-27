@@ -14,6 +14,11 @@ import {
 } from './components/index.js';
 import { updateSearchParams } from './utils/urlParams';
 import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../shared/types/index.js';
+import { fetchJson, isAbortError } from './api/apiClient.js';
+import { invalidateReferenceLaptimes } from './api/referenceApi.js';
+
+// How long to wait before asking a server that did not answer again.
+const SERVER_RETRY_MS = 2000;
 
 interface SessionRouteProps {
   onBack: () => void;
@@ -128,9 +133,8 @@ export default function App() {
 
     const poll = () => {
       scanAbortRef.current = new AbortController();
-      fetch('/api/scan/status', { signal: scanAbortRef.current.signal })
-        .then((res) => res.json())
-        .then((data: ScanStatus) => {
+      fetchJson<ScanStatus>('/api/scan/status', { signal: scanAbortRef.current.signal })
+        .then((data) => {
           setReplayScanStatus(data);
           const referenceCheckPending = !!data.referenceLaptimes && !data.referenceLaptimes.checked;
           if (
@@ -150,11 +154,14 @@ export default function App() {
             referenceRefresh.completedAt !== referenceRefreshHandledRef.current
           ) {
             referenceRefreshHandledRef.current = referenceRefresh.completedAt;
+            invalidateReferenceLaptimes();
             setReferenceUpdateCount(referenceRefresh.updatedCount);
           }
         })
-        .catch((err) => {
-          if (err?.name === 'AbortError') return;
+        .catch((err: unknown) => {
+          if (isAbortError(err)) return;
+          // The server can be unreachable for a moment (starting, restarting): keep asking.
+          pollTimerRef.current = setTimeout(poll, SERVER_RETRY_MS);
         });
     };
     poll();
@@ -185,30 +192,35 @@ export default function App() {
     updateSearchParams(searchParams, setSearchParams, { carClass });
   };
 
-  const fetchData = useCallback(async (forceRefresh = false) => {
+  const hasLoadedRef = useRef(false);
+  const dataRetryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fetchData = useCallback(async (forceRefresh = false): Promise<void> => {
     setIsRefreshing(true);
     try {
-      const [statusRes, sessionsRes, progRes] = await Promise.all([
-        fetch('/api/status'),
-        fetch(`/api/sessions${forceRefresh ? '?refresh=true' : ''}`),
-        fetch('/api/progression'),
+      const [statusData, sessionsData, progData] = await Promise.all([
+        fetchJson<AppStatus>('/api/status'),
+        fetchJson<DetailedSession[]>(`/api/sessions${forceRefresh ? '?refresh=true' : ''}`),
+        fetchJson<SessionProgressionPoint[]>('/api/progression'),
       ]);
-
-      const statusData = await statusRes.json();
-      const sessionsData = await sessionsRes.json();
-      const progData = await progRes.json();
 
       setStatus(statusData);
       setSessions(sessionsData);
       setProgression(progData);
+      hasLoadedRef.current = true;
       if (forceRefresh) startScanPolling();
     } catch (err) {
       console.error('Error fetching LMU telemetry data:', err);
+      // Before the first load the server may still be starting: keep the loading screen and retry.
+      if (!hasLoadedRef.current) {
+        dataRetryTimerRef.current = setTimeout(() => { void fetchData(forceRefresh); }, SERVER_RETRY_MS);
+      }
     } finally {
-      setLoading(false);
+      if (hasLoadedRef.current) setLoading(false);
       setIsRefreshing(false);
     }
   }, [startScanPolling]);
+
+  useEffect(() => () => clearTimeout(dataRetryTimerRef.current), []);
 
   const scanStateRef = useRef({ replay: false, sessions: false, telemetry: false });
   useEffect(() => {

@@ -54,16 +54,17 @@ describe('App component', () => {
     };
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/status')) {
-        return Promise.resolve({ json: () => Promise.resolve(mockStatus) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockStatus) });
       }
       if (url.includes('/api/sessions')) {
-        return Promise.resolve({ json: () => Promise.resolve(mockSessions) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockSessions) });
       }
       if (url.includes('/api/progression')) {
-        return Promise.resolve({ json: () => Promise.resolve([]) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       if (url.includes('/api/track/')) {
         return Promise.resolve({
+          ok: true,
           json: () =>
             Promise.resolve({
               trackName: 'Spa',
@@ -75,10 +76,11 @@ describe('App component', () => {
         });
       }
       if (url.includes('/api/scan/status')) {
-        return Promise.resolve({ json: () => Promise.resolve(startupScanStatus) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(startupScanStatus) });
       }
       if (url.includes('/api/session/')) {
         return Promise.resolve({
+          ok: true,
           json: () =>
             Promise.resolve({
               ...mockSessions[0],
@@ -87,7 +89,7 @@ describe('App component', () => {
             }),
         });
       }
-      return Promise.resolve({ json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
   });
 
@@ -98,6 +100,23 @@ describe('App component', () => {
       expect(screen.getByText('Driving Overview')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: /LMU Lap Time Analyzer/i })).toBeInTheDocument();
     });
+  });
+
+  it('keeps the loading screen and retries while the server does not answer yet', async () => {
+    const answer = global.fetch as ReturnType<typeof vi.fn>;
+    const defaultAnswer = answer.getMockImplementation() as ((url: string) => unknown) | undefined;
+    let sessionAttempts = 0;
+    answer.mockImplementation((url: string) => {
+      if (url.includes('/api/sessions') && ++sessionAttempts === 1) return Promise.reject(new TypeError('Failed to fetch'));
+      return defaultAnswer?.(url);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('app-loading-state')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Driving Overview')).toBeInTheDocument(), { timeout: 4000 });
+    expect(sessionAttempts).toBe(2);
   });
 
   it('navigates to Tracks and Settings via Navbar tabs', async () => {
