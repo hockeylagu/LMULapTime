@@ -88,6 +88,7 @@ import {
   clearSessionCache,
 } from './dbSessionStore.js';
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './dbReplayLinkStore.js';
+import { archiveReplacedRecording } from './dbReplayIdentity.js';
 import {
   SessionXmlSyncParser,
   SessionSyncHost,
@@ -202,7 +203,17 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return this.replayMetadataRevision;
   }
 
+  /**
+   * Stores `filename` as the recording described here. When the stored rows under that name hold a
+   * different recording, they are renamed first (see dbReplayIdentity), never overwritten.
+   */
   public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
+    const archivedAs = archiveReplacedRecording(this.db, filename, { mtime, size, metadata });
+    if (archivedAs) {
+      console.log(`[SQLite Cache] ${filename} now holds another recording; the stored one is kept as ${archivedAs}`);
+      this.allSessionsCache = null;
+      this.telemetryMetadataRevision++;
+    }
     upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
     this.replayMetadataRevision++;
   }

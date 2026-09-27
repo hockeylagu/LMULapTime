@@ -88,6 +88,33 @@ describe('ReplayCacheService', () => {
     expect(new ReplayDriverNotRecordedError(7, replayName)).toBeInstanceOf(ReplayDriverNotFoundError);
   });
 
+  it('keeps the cached recording when the file on disk is replaced by another recording', () => {
+    const replayName = 'Reused_Name_P1.Vcr';
+    const filePath = path.join(tempDir, replayName);
+    const write = (x: number, savedAtMs: number) => {
+      fs.writeFileSync(filePath, createSliceVcrBuffer({
+        drivers: [{ name: 'Cache Driver', vehicleId: '21_26_AFCO95641716', team: 'Test Team', carNumber: '21' }],
+        slices: [
+          { sTime: 0, driverSlot: 1, x, y: 0, z: 20 },
+          { sTime: 1, driverSlot: 1, x: x + 1, y: 0, z: 21 },
+        ],
+      }));
+      fs.utimesSync(filePath, savedAtMs / 1000, savedAtMs / 1000);
+    };
+    const firstSave = Date.parse('2026-06-28T20:00:00.000Z');
+    write(10, firstSave);
+    const first = service.getFullTrajectory(filePath, replayName, { driverSlot: 1 });
+
+    // Hours later the name is reused for another recording.
+    write(500, firstSave + 3 * 3600_000);
+    const second = service.getFullTrajectory(filePath, replayName, { driverSlot: 1 });
+
+    const archivedName = 'Reused_Name_P1 @2026-06-28T20-00-00Z.Vcr';
+    expect(second.points[0].x).not.toBe(first.points[0].x);
+    expect(db.getStoredReplayTrajectory(archivedName, 1, -1)?.points[0].x).toBe(first.points[0].x);
+    expect(db.getAllStoredReplayFiles().map(r => r.filename).sort()).toEqual([archivedName, replayName].sort());
+  });
+
   it('throws when neither the replay nor cached data exists', () => {
     const filePath = path.join(tempDir, 'missing.vcr');
 

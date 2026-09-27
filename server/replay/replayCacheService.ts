@@ -80,6 +80,9 @@ export class ReplayCacheService {
     );
     if (cached) return this.withLapEdges(replayName, cached);
 
+    // Stores the file's metadata first: if the file is another recording than the stored rows under
+    // its name, those are renamed out of the way before the decoded laps take the name.
+    this.getMetadata(filePath, replayName, options.playerName);
     const trajectory = extractReplayTrajectory(filePath, {
       driverSlot: resolvedSlot,
       driverName: options.driverName,
