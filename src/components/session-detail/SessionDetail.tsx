@@ -2,6 +2,7 @@ import React from 'react';
 import { useSessionDetailData } from './useSessionDetailData.js';
 import { SessionDetailHeader } from './overview/SessionDetailHeader.js';
 import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
+import { SameCarRivalsCard } from './overview/SameCarRivalsCard.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
@@ -104,6 +105,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
         allTimeCategoryTrackPB={allTimeCategoryTrackPB}
       />
+
+      <SameCarRivalsCard session={session} selectedDriver={selectedDriver} />
 
       {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (
         <SessionTelemetryChart

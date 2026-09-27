@@ -116,7 +116,8 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(incidentBadge?.getAttribute('title')).not.toContain('Lap ?');
 
     // Selecting another driver must not add (You) to that opponent
-    const opponentRow = screen.getByText('AI Driver 2');
+    // The same-car card names this driver too; the row to click is in the standings table.
+    const opponentRow = screen.getAllByText('AI Driver 2').find(el => !el.closest('[data-testid="same-car-rivals"]'))!;
     fireEvent.click(opponentRow);
     expect(screen.queryByText(/AI Driver 2\s*\(You\)/i)).not.toBeInTheDocument();
   });
