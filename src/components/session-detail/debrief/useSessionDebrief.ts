@@ -4,10 +4,13 @@ import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
 import { DebriefUnavailableError, loadSessionDebrief, SessionDebrief } from './loadSessionDebrief.js';
 
 export type SessionDebriefState =
+  | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'unavailable'; reason: string }
   | { status: 'error'; message: string }
   | { status: 'ready'; debrief: SessionDebrief };
+
+const IDLE: SessionDebriefState = { status: 'idle' };
 
 // Module-level so leaving and reopening a session does not refetch and re-time every lap.
 const debriefCache = new Map<string, SessionDebriefState>();
@@ -27,16 +30,28 @@ export function clearSessionDebriefCache(): void {
   debriefCache.clear();
 }
 
-/** The debrief of the selected driver's best lap in this session, loaded once per session and driver. */
-export function useSessionDebrief(session: DetailedSession | null, driver: DriverData | undefined): SessionDebriefState {
+/**
+ * The debrief of the selected driver's best lap in this session, built on demand: it stays idle
+ * while `attempt` is 0, unless this session and driver were already debriefed. Raising `attempt`
+ * again retries after an error.
+ */
+export function useSessionDebrief(
+  session: DetailedSession | null,
+  driver: DriverData | undefined,
+  attempt: number
+): SessionDebriefState {
   const key = session && driver ? `${session.id}|${driver.name}` : null;
-  const [state, setState] = useState<SessionDebriefState>(() => (key && debriefCache.get(key)) || { status: 'loading' });
+  const [state, setState] = useState<SessionDebriefState>(() => (key && debriefCache.get(key)) || IDLE);
 
   useEffect(() => {
     if (!session || !driver || !key) return;
     const cached = debriefCache.get(key);
     if (cached) {
       setState(cached);
+      return;
+    }
+    if (attempt === 0) {
+      setState(IDLE);
       return;
     }
     setState({ status: 'loading' });
@@ -57,7 +72,7 @@ export function useSessionDebrief(session: DetailedSession | null, driver: Drive
       });
     return () => controller.abort();
     // The key names the session and driver; the objects themselves change identity on refresh.
-  }, [key]);
+  }, [key, attempt]);
 
   return state;
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Crosshair, Loader2 } from 'lucide-react';
 import type { ComparableLap, DetailedSession, DriverData } from '../../../../shared/types/index.js';
@@ -58,7 +58,12 @@ function ReferenceLines({ debrief }: { debrief: SessionDebrief }) {
  */
 export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session, selectedDriver }) => {
   const navigate = useNavigate();
-  const state = useSessionDebrief(session, selectedDriver);
+  // Building a race debrief reads every car's replay, so it only starts when asked for.
+  const key = `${session.id}|${selectedDriver.name}`;
+  const [request, setRequest] = useState<{ key: string; attempt: number } | null>(null);
+  const attempt = request?.key === key ? request.attempt : 0;
+  const state = useSessionDebrief(session, selectedDriver, attempt);
+  const requestDebrief = () => setRequest({ key, attempt: attempt + 1 });
 
   return (
     <div className="bg-lmu-card/75 backdrop-blur-md p-4 rounded-xl border border-lmu-border/70 space-y-3" data-testid="session-debrief">
@@ -70,13 +75,34 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
         <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
       </div>
 
+      {state.status === 'idle' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
+          <p className="text-xs text-lmu-muted">
+            Ranks the corners of your best lap that cost the most against a realistic {selectedDriver.carType} target, with what the fastest lap does there.
+          </p>
+          <button
+            type="button"
+            onClick={requestDebrief}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25 whitespace-nowrap"
+          >
+            <Crosshair className="w-3.5 h-3.5" /> Show where the time goes
+          </button>
+        </div>
+      )}
       {state.status === 'loading' && (
         <p className="flex items-center gap-2 text-xs text-lmu-muted py-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparing your best lap with other {selectedDriver.carType} laps and placing the traffic (the first time for a race takes a few seconds)...
         </p>
       )}
       {state.status === 'unavailable' && <p className="text-xs text-lmu-muted py-1">{state.reason}</p>}
-      {state.status === 'error' && <p className="text-xs text-rose-400 py-1">{state.message}</p>}
+      {state.status === 'error' && (
+        <div className="flex items-center justify-between gap-2 py-1">
+          <p className="text-xs text-rose-400">{state.message}</p>
+          <button type="button" onClick={requestDebrief} className="text-xs font-bold text-sky-400 hover:text-sky-300 whitespace-nowrap">
+            Try again
+          </button>
+        </div>
+      )}
 
       {state.status === 'ready' && (
         <>

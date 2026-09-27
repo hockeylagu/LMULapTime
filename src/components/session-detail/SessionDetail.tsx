@@ -101,10 +101,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         refEntry={refEntry}
       />
 
-      {selectedDriver && session.matchingReplayFile && (
-        <SessionDebriefCard session={session} selectedDriver={selectedDriver} />
-      )}
-
       <DriverPerformancePanel
         session={session}
         selectedDriver={selectedDriver}
@@ -112,6 +108,10 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
         allTimeCategoryTrackPB={allTimeCategoryTrackPB}
       />
+
+      {selectedDriver && session.matchingReplayFile && (
+        <SessionDebriefCard session={session} selectedDriver={selectedDriver} />
+      )}
 
       <SameCarRivalsCard session={session} selectedDriver={selectedDriver} />
 

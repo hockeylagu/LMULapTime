@@ -1,8 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SessionDebriefCard } from '../../../../src/components/session-detail/debrief/SessionDebriefCard.js';
 import { clearSessionDebriefCache } from '../../../../src/components/session-detail/debrief/useSessionDebrief.js';
 import { me, mockDebriefServer, realisticLap, referenceLap, session } from './debriefFixtures.js';
+
+function renderAndAsk() {
+  const view = render(<SessionDebriefCard session={session} selectedDriver={me} />);
+  fireEvent.click(screen.getByRole('button', { name: /Show where the time goes/ }));
+  return view;
+}
 
 describe('SessionDebriefCard', () => {
   beforeEach(() => {
@@ -10,10 +16,32 @@ describe('SessionDebriefCard', () => {
     window.location.hash = '#/session/R1';
   });
 
+  it('waits to be asked before reading the replays', () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+
+    expect(screen.getByRole('button', { name: /Show where the time goes/ })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a debrief already built without asking again', async () => {
+    mockDebriefServer();
+    const first = renderAndAsk();
+    await screen.findByTestId('debrief-corner-1');
+    first.unmount();
+
+    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+
+    expect(screen.getByTestId('debrief-corner-1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show where the time goes/ })).not.toBeInTheDocument();
+  });
+
   it('lists the corner to work on and opens it in telemetry against the reference', async () => {
     mockDebriefServer();
 
-    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+    renderAndAsk();
 
     expect(screen.getByText(/Comparing your best lap with other Peugeot 9x8 laps/)).toBeInTheDocument();
     const row = await screen.findByTestId('debrief-corner-1');
@@ -39,7 +67,7 @@ describe('SessionDebriefCard', () => {
       }] }],
     });
 
-    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+    renderAndAsk();
 
     const row = await screen.findByTestId('debrief-corner-1');
     expect(row).toHaveTextContent('+0.240s');
@@ -57,16 +85,21 @@ describe('SessionDebriefCard', () => {
   it('explains when there is nothing to compare with yet', async () => {
     mockDebriefServer([]);
 
-    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+    renderAndAsk();
 
     expect(await screen.findByText(/No other Peugeot 9x8 lap with replay data on this layout/)).toBeInTheDocument();
   });
 
-  it('shows why the debrief failed to load', async () => {
+  it('shows why the debrief failed to load and tries again when asked', async () => {
     global.fetch = (() => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'Session store is busy' }) })) as unknown as typeof fetch;
 
-    render(<SessionDebriefCard session={session} selectedDriver={me} />);
+    renderAndAsk();
 
     expect(await screen.findByText('Session store is busy')).toBeInTheDocument();
+
+    mockDebriefServer();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByTestId('debrief-corner-1')).toBeInTheDocument();
   });
 });
