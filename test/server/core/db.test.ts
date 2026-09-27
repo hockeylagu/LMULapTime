@@ -190,13 +190,21 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getStoredReplayTrajectory('Deleted_Replay_P1.Vcr', -1, -1)?.points).toHaveLength(3);
   });
 
-  it('falls back to default slot and lap when requested specific keys are missing if allowFallback is enabled', () => {
+  it('falls back to the same driver\'s default lap when the requested lap is missing if allowFallback is enabled', () => {
     const trajectory = buildTrajectory();
-    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', -1, -1, 1000, 12345, trajectory);
+    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', 2, -1, 1000, 12345, trajectory);
 
     expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4)).toBeNull();
     const fallbackResult = db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4, { allowFallback: true });
     expect(fallbackResult?.points).toHaveLength(3);
+  });
+
+  it('never falls back to another driver\'s laps', () => {
+    // Only the player's laps are stored: an opponent's request must not get them.
+    db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', -1, -1, 1000, 12345, buildTrajectory());
+
+    expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, 4, { allowFallback: true })).toBeNull();
+    expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, -1, { allowFallback: true })).toBeNull();
   });
 
   it('invalidates replay metadata cache when mtime or size changes', () => {

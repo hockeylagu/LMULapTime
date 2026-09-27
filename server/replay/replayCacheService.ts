@@ -3,6 +3,7 @@ import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './replayParser.js';
 import { extractReplayTrajectory } from './replayTrajectory.js';
 import { lapEdgesFromNeighbours } from './replayLapPoints.js';
+import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 
 export interface ReplayCacheServiceOptions {
@@ -61,6 +62,9 @@ export class ReplayCacheService {
     if (!fs.existsSync(filePath)) {
       const stored = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey, { allowFallback: true });
       if (stored) return this.withLapEdges(replayName, stored);
+      if (driverSlotKey !== -1 && this.sessionDb.getStoredReplayMetadata(replayName)) {
+        throw new ReplayDriverNotRecordedError(driverSlotKey, replayName);
+      }
       throw new Error(`Replay file and cached trajectory not found: ${replayName}`);
     }
 
