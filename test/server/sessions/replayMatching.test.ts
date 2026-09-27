@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest';
+import { findMatchingReplay, replayLinkRejection, ReplayMatchTarget } from '../../../server/sessions/replayMatching.js';
+import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.js';
+
+// Real timings from the cache (2026-06-28): LMU saved one replay for a practice run of 7 session
+// XMLs, and the replay records only the last of them (340 s long, saved with the last XML).
+const practiceRunReplay: ReplayFileEntry = {
+  name: 'Bahrain Paddock Circuit P1 18.Vcr',
+  path: 'C:\\replays\\Bahrain Paddock Circuit P1 18.Vcr',
+  sizeBytes: 6863306,
+  trackName: 'Bahrain Paddock Circuit',
+  sessionCode: 'P1',
+  mtime: Date.parse('2026-06-28T23:44:43.122Z'),
+  durationSec: 340.635,
+};
+
+function paddockPractice(startIso: string, xmlIso: string): ReplayMatchTarget {
+  return {
+    trackVenue: 'Bahrain International Circuit',
+    trackCourse: 'Bahrain Paddock Circuit',
+    sessionCode: 'P1',
+    sessionTimestampMs: Date.parse(startIso),
+    xmlFileMtimeMs: Date.parse(xmlIso),
+  };
+}
+
+const firstOfRun = paddockPractice('2026-06-28T22:23:11.101Z', '2026-06-28T22:29:32.478Z');
+const lastOfRun = paddockPractice('2026-06-28T23:38:39.101Z', '2026-06-28T23:44:43.176Z');
+
+describe('replayLinkRejection', () => {
+  it('accepts the replay saved with the session XML', () => {
+    expect(replayLinkRejection(practiceRunReplay, lastOfRun)).toBeNull();
+  });
+
+  it('rejects the replay for an earlier session of the same practice run', () => {
+    expect(replayLinkRejection(practiceRunReplay, firstOfRun)).toBe('time-window');
+  });
+
+  it('rejects a replay of another session type', () => {
+    expect(replayLinkRejection(practiceRunReplay, { ...lastOfRun, sessionCode: 'R1' })).toBe('session-type');
+  });
+
+  it('rejects a replay of another circuit', () => {
+    expect(replayLinkRejection(practiceRunReplay, { ...lastOfRun, trackVenue: 'Fuji Speedway', trackCourse: 'Fuji Speedway' }))
+      .toBe('layout');
+  });
+});
+
+describe('findMatchingReplay', () => {
+  it('finds no replay for an earlier session of a practice run', () => {
+    expect(findMatchingReplay([practiceRunReplay], firstOfRun)).toBeUndefined();
+  });
+
+  it('finds the replay for the session it records', () => {
+    expect(findMatchingReplay([practiceRunReplay], lastOfRun)?.name).toBe(practiceRunReplay.name);
+  });
+});

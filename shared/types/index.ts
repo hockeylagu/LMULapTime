@@ -425,8 +425,22 @@ export interface SessionMetadata {
     hasDuckDbTelemetry?: boolean;
     duckdbFilename?: string;
   };
+  /** Set when a stored replay link was withdrawn: the session has no replay of its own. */
+  rejectedReplayLink?: RejectedReplayLink;
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
+}
+
+/**
+ * Why a replay cannot be a session's recording. 'owned-by-other-session': LMU saved one replay for
+ * a run of sessions and it records a different one of them.
+ */
+export type ReplayLinkRejectionReason = 'session-type' | 'time-window' | 'layout' | 'owned-by-other-session';
+
+export interface RejectedReplayLink {
+  replayName: string;
+  reason: ReplayLinkRejectionReason;
+  rejectedAt: number;
 }
 
 export interface DetailedSession extends SessionMetadata {

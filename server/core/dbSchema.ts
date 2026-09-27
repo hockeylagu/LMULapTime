@@ -212,6 +212,17 @@ export function initDbSchema(db: DatabaseType): void {
       last_seen_at INTEGER NOT NULL,
       PRIMARY KEY (source_type, source_path)
     );
+
+    -- Session -> replay links withdrawn because the replay fails the matching rules. The session row
+    -- no longer names the replay; previous_link_json keeps what it held, so a withdrawal can be undone.
+    CREATE TABLE IF NOT EXISTS rejected_replay_links (
+      session_id TEXT NOT NULL,
+      replay_filename TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      previous_link_json TEXT NOT NULL,
+      rejected_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, replay_filename)
+    );
   `);
 
   const telemetryCacheColumns = db.prepare('PRAGMA table_info(telemetry_lap_cache)').all() as Array<{ name: string }>;
