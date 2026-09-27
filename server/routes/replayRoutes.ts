@@ -39,6 +39,29 @@ export function createReplayRouter(context: ServerContext): Router {
     }
   });
 
+  // The on-disk replays still to be decoded again at the current parser version, and the job doing it.
+  router.get('/replays/upgrade', (_req, res) => {
+    const upgrade = context.replayUpgrade;
+    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
+    const backlog = upgrade.getBacklog(context.replaysDir);
+    res.json({
+      status: upgrade.getStatus(),
+      pendingReplays: backlog.length,
+      pendingDrivers: backlog.reduce((sum, replay) => sum + replay.driverSlots.length, 0),
+      backlog: backlog.map(({ filename, metadataOutdated, driverSlots }) => ({ filename, metadataOutdated, driverSlots })),
+    });
+  });
+
+  router.post('/replays/upgrade', (req, res) => {
+    const upgrade = context.replayUpgrade;
+    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
+    const enabled: unknown = req.body?.enabled;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'Expected { enabled: boolean }' });
+    upgrade.setEnabled(enabled);
+    if (enabled) context.startReplayUpgradeWhenIdle();
+    res.json({ status: upgrade.getStatus() });
+  });
+
   router.get('/replays', (_req, res) => {
     try {
       const diskFiles = (fs.existsSync(context.replaysDir) ? fs.readdirSync(context.replaysDir) : [])

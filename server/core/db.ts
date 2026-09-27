@@ -98,6 +98,13 @@ import {
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './dbReplayIdentity.js';
 import {
+  listReplayUpgradeBacklog,
+  upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
+  ReplayUpgradeCandidate,
+  ReplayUpgradeHost,
+  ReplayUpgradeResult,
+} from './dbReplayUpgrade.js';
+import {
   SessionXmlSyncParser,
   SessionSyncHost,
   syncSessionsIterator as runSyncSessionsIterator,
@@ -114,9 +121,11 @@ export type {
   SessionXmlSyncParser,
   IngestErrorEntry,
   TelemetryMetadataRecord,
+  ReplayUpgradeCandidate,
+  ReplayUpgradeResult,
 };
 
-export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
+export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayUpgradeHost {
   private db: DatabaseType;
   private dbPath: string;
   private replayMetadataRevision = 0;
@@ -271,6 +280,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
       cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
       recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
       if (isPrimary) {
+        // Rows stored under the alias itself (from a decode that could not name the slot) are superseded.
+        if (driverSlotKey !== -1) deleteReplayDriverLaps(this.db, filename, -1);
         this.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, driverSlotKey);
         if (driverSlotKey !== -1) recordReplayDriverIngest(this.db, filename, -1, mtime, size, 'stored');
       }
@@ -283,6 +294,18 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
 
   public recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void {
     recordReplayDriverIngest(this.db, filename, driverSlot, mtime, size, status, error);
+  }
+
+  /** On-disk replays whose stored rows are behind the current parser version (see dbReplayUpgrade). */
+  public listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[] {
+    return listReplayUpgradeBacklog(this.db, replaysDir);
+  }
+
+  public upgradeReplaysAsyncIterator(
+    replaysDir: string,
+    options: { playerName?: string; shouldStop?: () => boolean } = {}
+  ): AsyncGenerator<ReplaySyncProgress, ReplayUpgradeResult, void> {
+    return runUpgradeReplaysAsyncIterator(this, replaysDir, options);
   }
 
   public getReplaysCount(): number {
