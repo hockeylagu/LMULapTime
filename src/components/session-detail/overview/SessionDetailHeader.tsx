@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
+import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap, CloudRain, CloudDrizzle, Sun, Thermometer } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
@@ -176,6 +176,52 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                     {session.sessionName} ({session.sessionType})
                   </span>
                   <span className="text-xs text-lmu-muted">{session.timeString}</span>
+                  {session.matchingReplayFile?.weatherCondition && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded border ${
+                        session.matchingReplayFile.weatherCondition === 'Wet'
+                          ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                          : session.matchingReplayFile.weatherCondition === 'Dynamic Weather'
+                          ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'
+                          : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                      }`}
+                      title={
+                        session.matchingReplayFile.maxRainIntensity
+                          ? `Max Rain: ${session.matchingReplayFile.maxRainIntensity}/25`
+                          : 'Weather Condition'
+                      }
+                    >
+                      {session.matchingReplayFile.weatherCondition === 'Wet' ? (
+                        <>
+                          <CloudRain className="w-3 h-3 text-blue-400" />
+                          <span>Wet Track {session.matchingReplayFile.maxRainIntensity ? `(${session.matchingReplayFile.maxRainIntensity})` : ''}</span>
+                        </>
+                      ) : session.matchingReplayFile.weatherCondition === 'Dynamic Weather' ? (
+                        <>
+                          <CloudDrizzle className="w-3 h-3 text-cyan-400" />
+                          <span>Dynamic Rain {session.matchingReplayFile.maxRainIntensity ? `(${session.matchingReplayFile.maxRainIntensity})` : ''}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sun className="w-3 h-3 text-amber-400" />
+                          <span>Dry Track</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                  {session.matchingReplayFile?.ambientTemp !== undefined && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono font-medium rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300"
+                      title="Atmospheric & Track Temperature"
+                    >
+                      <Thermometer className="w-3 h-3 text-cyan-400" />
+                      <span>
+                        {session.matchingReplayFile.ambientTemp.toFixed(1)}°C Air
+                        {session.matchingReplayFile.trackTemp !== undefined &&
+                          ` · ${session.matchingReplayFile.trackTemp.toFixed(1)}°C Track`}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <h2
                   onClick={() => {

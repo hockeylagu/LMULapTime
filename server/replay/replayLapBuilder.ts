@@ -23,6 +23,9 @@ export interface RawTrajectoryPoint {
   wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   fuel?: number;
+  rainIntensity?: number;
+  ambientTemp?: number;
+  trackTemp?: number;
 }
 
 export interface VcrTimingEvent {

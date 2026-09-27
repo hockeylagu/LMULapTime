@@ -139,4 +139,9 @@ export interface ReplayFileEntry {
   durationSec?: number;
   /** LMU engine scene of the recording (from its metadata): names the exact layout. */
   sceneDesc?: string;
+  hasRain?: boolean;
+  maxRainIntensity?: number;
+  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  ambientTemp?: number;
+  trackTemp?: number;
 }

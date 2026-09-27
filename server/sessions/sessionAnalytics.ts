@@ -80,6 +80,8 @@ export function toComparableLap(
     paceCategory: lap.paceCategory || null,
     pacePercentage: lap.pacePercentage || null,
     matchingReplayFile: replayFile,
+    hasRain: typeof session.matchingReplayFile === 'object' ? session.matchingReplayFile?.hasRain : undefined,
+    weatherCondition: typeof session.matchingReplayFile === 'object' ? session.matchingReplayFile?.weatherCondition : undefined,
     ...overrides,
   };
 }

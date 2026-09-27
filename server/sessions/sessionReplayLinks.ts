@@ -94,6 +94,11 @@ export class SessionReplayLinks {
       splitNo: replay.splitNo,
       eventType: replay.eventType,
       durationSec: replay.durationSec,
+      hasRain: replay.hasRain,
+      maxRainIntensity: replay.maxRainIntensity,
+      weatherCondition: replay.weatherCondition,
+      ambientTemp: replay.ambientTemp,
+      trackTemp: replay.trackTemp,
     };
   }
 

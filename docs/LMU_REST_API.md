@@ -138,6 +138,29 @@ The `/rest/watch` namespace provides real-time race engineering and broadcasting
 | `PUT` | `/rest/watch/replaytime/{time}` | Jump to specific replay timestamp (seconds) |
 | `POST`| `/rest/watch/replay/setReplayUIVisible` | Toggle replay playback control bar visibility |
 
+### 4.1 Behaviour During Replay Playback (observed, build 14200)
+
+Measured on a replay loaded from the main menu. Evidence is in
+[VCR_ANALYSIS.md](VCR_ANALYSIS.md) §2.10.
+
+- **`/rest/watch/sessionInfo` follows the replay timeline** for `raining`, `ambientTemp`,
+  `trackTemp`, `raceCompletion` and `timeRemainingInGamePhase`. `currentEventTime` stays `0.0`,
+  and `averagePathWetness`/`minPathWetness`/`maxPathWetness` stay `0.0` even in rain.
+  `raining` equals the replay's Class 1 Type 10 wetness byte / 255, interpolated between
+  packets.
+- **`/rest/watch/standings` and `/standings/history` are frozen** at a formation-phase snapshot
+  for the whole playback. `carVelocity` and `carAcceleration` are zeros.
+- **`/rest/watch/trackmap` returns static track geometry**, not live car positions: `type 0`
+  reference line, `type 1` pit lane, and two-point markers for pit boxes (types 3–39, 107–144).
+- **`/rest/watch/getIncidentsList/{minTimeBetweenContacts}`** returns the whole race's contact
+  list (`player`, `contactWith`, `et`) without impact magnitude.
+
+> ⚠️ **Crash hazard.** Calling `/rest/garage/*` during replay playback is unsafe:
+> `/rest/garage/getVehicleCondition` hung for about 30 s and LMU crashed, right after
+> `/rest/garage/getPlayerGarageData` had answered. In replay mode, restrict tools to
+> `/rest/watch/*` and `/rest/replay/*` reads, one request at a time at ≤ 1 Hz, and stop on the
+> first non-200 or slow response. Never sweep every endpoint in the Swagger schema.
+
 ---
 
 ## 5. Garage, Car Setup & Pit Menu (`/rest/garage`)

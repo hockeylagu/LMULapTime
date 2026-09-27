@@ -67,6 +67,92 @@ export type {
 export interface ParseReplayMetadataOptions {
   playerName?: string;
   verbose?: boolean;
+  scanWeather?: boolean;
+}
+
+/**
+ * Fast sampling scan for track meteorology & surface wetness across the replay frame stream.
+ * Samples ~30 windows across the stream to detect rain conditions in <25ms.
+ */
+export function scanReplayWeather(fd: number, frameStreamEnd: number): {
+  hasRain: boolean;
+  maxRainIntensity: number;
+  weatherCondition: 'Dry' | 'Wet' | 'Dynamic Weather';
+  ambientTemp?: number;
+  trackTemp?: number;
+} {
+  const SAMPLES = 30;
+  const WINDOW_SIZE = 65536;
+  const streamBytes = Math.max(0, frameStreamEnd - 61);
+  if (streamBytes <= 0) {
+    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry' };
+  }
+
+  let maxRain = 0;
+  let firstAmbientTemp: number | undefined = undefined;
+  let firstTrackTemp: number | undefined = undefined;
+
+  const inspectWeatherPacket = (buf: Buffer, p: number) => {
+    if (firstAmbientTemp === undefined) {
+      const rawTemp = buf[p + 5 + 38];
+      firstAmbientTemp = Number((25.0 - (146 - rawTemp) * 0.176).toFixed(1));
+      const rawTrack = buf[p + 5 + 39];
+      firstTrackTemp = Number((27.3 - (129 - rawTrack) * 0.176).toFixed(1));
+    }
+    for (let ch = 42; ch < 78; ch += 4) {
+      const r = buf[p + 5 + ch];
+      if (r > maxRain) maxRain = r;
+    }
+  };
+
+  if (streamBytes <= WINDOW_SIZE) {
+    const buf = Buffer.alloc(streamBytes);
+    try {
+      fs.readSync(fd, buf, 0, streamBytes, 61);
+      for (let p = 0; p <= buf.length - 85; p++) {
+        const h = buf.readUInt32LE(p);
+        const sz = (h >>> 8) & 0x1ff;
+        const evType = (h >>> 17) & 0x3f;
+        const evClass = (h >>> 29);
+        if (sz === 80 && evType === 10 && evClass === 1) {
+          inspectWeatherPacket(buf, p);
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  } else {
+    const buf = Buffer.alloc(WINDOW_SIZE);
+    for (let i = 0; i < SAMPLES; i++) {
+      const seekPos = Math.floor(61 + (i / SAMPLES) * Math.max(0, streamBytes - WINDOW_SIZE));
+      try {
+        fs.readSync(fd, buf, 0, WINDOW_SIZE, seekPos);
+        for (let p = 0; p <= buf.length - 85; p++) {
+          const h = buf.readUInt32LE(p);
+          const sz = (h >>> 8) & 0x1ff;
+          const evType = (h >>> 17) & 0x3f;
+          const evClass = (h >>> 29);
+          if (sz === 80 && evType === 10 && evClass === 1) {
+            inspectWeatherPacket(buf, p);
+          }
+        }
+      } catch {
+        // Continue sampling
+      }
+    }
+  }
+
+  const hasRain = maxRain > 0;
+  const weatherCondition: 'Dry' | 'Wet' | 'Dynamic Weather' =
+    maxRain > 16 ? 'Wet' : maxRain > 0 ? 'Dynamic Weather' : 'Dry';
+
+  return {
+    hasRain,
+    maxRainIntensity: maxRain,
+    weatherCondition,
+    ambientTemp: firstAmbientTemp,
+    trackTemp: firstTrackTemp,
+  };
 }
 
 /**
@@ -365,6 +451,8 @@ export function parseReplayMetadata(
     const filenameMatch = baseName.match(/^(.+?)\s+([PQR]\d+)\b/i);
     const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
 
+    const weather = options?.scanWeather !== false ? scanReplayWeather(fd, metaOffset) : undefined;
+
     const metadataResult: ReplayMetadata = {
       filename: baseName,
       filePath,
@@ -390,6 +478,11 @@ export function parseReplayMetadata(
       drivers,
       carClass: replayCarClass,
       carModel: replayCarModel,
+      hasRain: weather?.hasRain,
+      maxRainIntensity: weather?.hasRain ? weather.maxRainIntensity : undefined,
+      weatherCondition: weather?.weatherCondition,
+      ambientTemp: weather?.ambientTemp,
+      trackTemp: weather?.trackTemp,
     };
 
     if (options?.verbose) {
