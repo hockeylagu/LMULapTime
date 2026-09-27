@@ -299,9 +299,9 @@ export function extractReplayTrajectory(
                 x,
                 y,
                 z,
-                rotX: Number(rotX.toFixed(3)),
+                rotX: Number(rotX.toFixed(4)),
                 rotY,
-                rotZ: Number(rotZ.toFixed(3)),
+                rotZ: Number(rotZ.toFixed(4)),
                 steerYaw,
                 rawThrottle,
                 rawBrake,
@@ -343,7 +343,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: pText || 'Penalty',
                 action: 'given',
               });
@@ -352,7 +352,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: `Served ${pType}`,
                 penaltyType: pType,
                 action: 'served',
@@ -361,7 +361,7 @@ export function extractReplayTrajectory(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: drvName,
-                timeSec: Number(sTime.toFixed(2)),
+                timeSec: Number(sTime.toFixed(4)),
                 penaltyText: 'Penalty removed by admin',
                 action: 'removed',
               });
@@ -375,7 +375,7 @@ export function extractReplayTrajectory(
             const sectorMask = buf[eventSp + 5 + 1];
             const driverFlag = buf[eventSp + 5 + 2];
             replayFlagEvents.push({
-              timeSec: Number(sTime.toFixed(2)),
+              timeSec: Number(sTime.toFixed(4)),
               flagState,
               flagName: FLAG_NAMES[flagState] || `Unknown (${flagState})`,
               sectorMask,
@@ -389,7 +389,7 @@ export function extractReplayTrajectory(
               for (let i = 0; i < count; i++) {
                 order.push(buf[eventSp + 5 + 21 + i]);
               }
-              standingsHistory.push({ timeSec: Number(sTime.toFixed(2)), order });
+              standingsHistory.push({ timeSec: Number(sTime.toFixed(4)), order });
             }
           } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
                      (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
@@ -413,7 +413,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: 49,
                   action: 'entered pit / garage',
                   isGarage: true,
@@ -434,7 +434,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: pCode,
                   action: pitCodeEntry.action,
                   isGarage: pitCodeEntry.isGarage,
@@ -445,7 +445,7 @@ export function extractReplayTrajectory(
                 replayPitEvents.push({
                   driverSlot: drv,
                   driverName: drvName,
-                  timeSec: Number(sTime.toFixed(2)),
+                  timeSec: Number(sTime.toFixed(4)),
                   code: pCode,
                   action: `pit action ${pCode}`,
                 });
@@ -572,12 +572,12 @@ export function extractReplayTrajectory(
         laps: lapsSummary,
         sectors: { s1Frame, s2Frame },
         bounds: {
-          minX: Number(minX.toFixed(2)),
-          maxX: Number(maxX.toFixed(2)),
-          minZ: Number(minZ.toFixed(2)),
-          maxZ: Number(maxZ.toFixed(2)),
-          spanX: Number((maxX - minX).toFixed(2)),
-          spanZ: Number((maxZ - minZ).toFixed(2)),
+          minX: Number(minX.toFixed(4)),
+          maxX: Number(maxX.toFixed(4)),
+          minZ: Number(minZ.toFixed(4)),
+          maxZ: Number(maxZ.toFixed(4)),
+          spanX: Number((maxX - minX).toFixed(4)),
+          spanZ: Number((maxZ - minZ).toFixed(4)),
         },
         points: finalPoints,
         penalties: replayPenalties.length > 0 ? replayPenalties : undefined,

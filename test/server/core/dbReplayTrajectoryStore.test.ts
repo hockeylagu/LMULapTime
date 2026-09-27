@@ -38,6 +38,10 @@ describe('dbReplayTrajectoryStore', () => {
       setVersion('v4');
       expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
       expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
+
+      setVersion('v3');
+      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
     });
 
     it('treats rows of an unknown version as stale', () => {
