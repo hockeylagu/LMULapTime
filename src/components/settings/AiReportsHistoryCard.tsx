@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { History, RefreshCw } from 'lucide-react';
 import { AiReportHistoryEntry } from '../../../shared/types/index.js';
+import { fetchJson } from '../../api/apiClient.js';
 
 export const AiReportsHistoryCard: React.FC = () => {
   const [reports, setReports] = useState<AiReportHistoryEntry[] | null>(null);
@@ -10,8 +11,7 @@ export const AiReportsHistoryCard: React.FC = () => {
   const loadReports = () => {
     setIsLoading(true);
     setError(null);
-    fetch('/api/ai/reports')
-      .then(res => res.json())
+    fetchJson<AiReportHistoryEntry[]>('/api/ai/reports')
       .then(data => setReports(Array.isArray(data) ? data : []))
       .catch(() => setError('Unable to load AI report history.'))
       .finally(() => setIsLoading(false));

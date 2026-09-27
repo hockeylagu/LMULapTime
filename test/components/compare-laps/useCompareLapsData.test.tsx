@@ -36,6 +36,7 @@ const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 describe('useCompareLapsData selection fallbacks', () => {
   it('derives and adds personal, theoretical, and overall-best comparison laps', async () => {
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({
         laps,
         allTimeBestLap: null,
@@ -72,6 +73,7 @@ describe('useCompareLapsData selection fallbacks', () => {
 
   it('updates comparison scope when the route query changes externally', async () => {
     global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve({
         laps,
         allTimeBestLap: null,

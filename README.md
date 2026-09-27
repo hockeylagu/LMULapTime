@@ -6,7 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/Tests-1060%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-1380%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 A modern, high-performance telemetry analytics suite, lap comparison studio, and race intelligence hub for **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games). Built for sim racers and endurance teams who want to find lap time, master vehicle dynamics, optimize setups, and compare their driving against alien benchmarks.
 
@@ -59,109 +59,76 @@ Plug-and-play with zero manual configuration: automatically indexes native sessi
   - **Pedal Application**: Visualize brake release, trail braking duration, and throttle commitment zones.
   - **Lateral G & Yaw**: Identify high-load cornering phases and car rotation behavior.
 - **Dynamic G-G Friction Circle**: Real-time traction diagram mapping longitudinal vs. lateral acceleration to visualize tire grip utilization and vehicle balance envelope.
+- **Pinpoint Lap Alignment**: Telemetry traces and racing lines are automatically synchronized to the exact same track position for fair, accurate comparisons.
 - **Synchronized Playback Scrubber**: Scrub through any lap with full playback controls, corner apex markers, and a live telemetry HUD.
 - **Mini-Corner Focus**: Dedicated zoomed minimaps that isolate individual turns during deep analysis.
 
 ---
 
 ### 🎯 3. Turn-by-Turn Corner Analysis & Driving Technique
-- **Complete Corner Speed Breakdown**: Detailed table and delta graphs comparing your corner speeds, braking initiation points, and apex speeds against reference laps.
-- **Three-Phase Corner Deconstruction**:
-  - **Entry Phase**: Measures braking point distance, peak brake application, and trail-braking pressure decay rate.
-  - **Rotation Phase**: Measures minimum corner speed, yaw rotation rate, and apex clipping proximity.
-  - **Exit Phase**: Measures throttle pick-up timing relative to apex, throttle ramp rate, and traction stability on corner exit.
-- **Corner Consistency Scoring**: Automatically spots which specific turns cost you time through erratic braking or inconsistent lines across stints.
+- **Corner Speed Breakdown**: Compare apex minimums, braking initiation points, and exit speeds against any reference lap.
+- **Three-Phase Corner Deconstruction**: Analyzes entry trail braking, mid-corner rotation, and exit throttle pick-up for every turn.
+- **Corner Consistency Scoring**: Highlights erratic braking zones and inconsistent racing lines across your stint.
 
 ---
 
 ### 📈 4. High-Precision Multi-Channel Telemetry Studio
-Synchronized multi-metric telemetry traces across distance or elapsed lap time:
+Synchronized telemetry traces across distance or elapsed lap time:
 
 | Telemetry Channel | What It Shows |
 | :--- | :--- |
-| **Speed & Lap Delta** | Speed trace overlaid with live +/- time divergence (green for gains, red for time lost). |
-| **Pedal Inputs** | Throttle and brake pedal positions with active **ABS** and **Traction Control (TC)** cut indicators. |
-| **Steering & Balance** | Steering angle trace with real-time **Understeer / Oversteer** balance detection. |
-| **G-Forces (Accel)** | Longitudinal acceleration (braking/acceleration), Lateral G (cornering load), and Total G vector. |
-| **Dynamics** | Vehicle yaw rate, body slip angle, and lateral racing line offset. |
-| **Suspension** | 4-corner suspension deflection and damper travel (FL, FR, RL, RR) in millimeters. |
-| **Wheel Speeds & Slip** | Individual 4-wheel rotational velocity and dynamic slip to detect lockups and wheelspin. |
-| **Tire Temps & Pressures** | Dynamic 4-wheel tire pressures (kPa) and inner/carcass temperatures (°C). |
-| **Tire Degradation** | Stint tire wear progression (0–100%) for all 4 corners. |
-| **Brake Thermals** | 4-corner brake rotor temperatures (°C) to monitor thermal fade and cooling duct efficiency. |
-| **Hypercar Hybrid Powertrain** | Virtual Energy stint tank, high-voltage State of Charge (SoC), and MGU-K regen rates. |
+| **Speed & Lap Delta** | Speed trace overlaid with live +/- time divergence. |
+| **Pedal Inputs** | Throttle and brake pedal positions with active **ABS** and **TC** indicators. |
+| **Steering & Balance** | Steering angle trace with real-time **Understeer / Oversteer** detection. |
+| **G-Forces (Accel)** | Longitudinal acceleration, Lateral G cornering loads, and Total G vector. |
+| **Dynamics & Slip** | Yaw rate, body slip angle, and individual 4-wheel slip velocity. |
+| **Suspension Travel** | 4-corner damper deflection (FL, FR, RL, RR) in millimeters. |
+| **Tires & Thermals** | Dynamic tire pressures, carcass temperatures, and stint wear degradation. |
+| **Brake Rotor Temps** | 4-corner brake disc temperatures to monitor thermal fade. |
+| **Hypercar Hybrid** | Virtual Energy stint tank, high-voltage State of Charge (SoC), and MGU-K regen. |
 
-- **Customizable Presets**: Switch instantly between layout presets (*Driver Inputs*, *Chassis Dynamics*, *Tires & Thermals*, *Brakes*, *Hybrid Powertrain*, or *All Channels*). Reorder channels, toggle traces, and save your own custom layouts.
-- **Adjustable Resolution**: Toggle high-density downsampling to balance ultra-fine telemetry fidelity with smooth 60fps chart rendering.
+- **Customizable Presets**: Switch instantly between layout presets (*Inputs*, *Dynamics*, *Tires*, *Brakes*, *Hybrid*, or *All Channels*).
+- **Smooth 60 FPS Charts**: High-density downsampling balances fine detail with fluid responsiveness.
 
 ---
 
 ### ⚔️ 5. Head-to-Head Lap Comparison Studio
-- **Lap-to-Lap Battles**: Compare any two laps side-by-side—your personal best, session best, community alien benchmark, or a teammate's lap.
+- **Lap-to-Lap Battles**: Compare any two laps side-by-side—your personal best, session best, community benchmark, or a teammate's lap.
+- **Comparison Accuracy Indicators**: Real-time confidence indicators showing alignment precision and data quality between compared laps.
 - **Micro-Sector Delta Splits**: Color-coded sector-by-sector time differentials ($\pm$s) and speed deltas ($\pm$ km/h).
 - **Interactive Delta Curve**: Pinpoints the exact meter on circuit where time was gained or lost.
-- **Theoretical Optimal Lap Builder**: Synthesizes your best individual sectors ($S1 + S2 + S3$) into an ultimate benchmark target.
-- **Strict Layout Disambiguation**: Guarantees comparisons only happen between identical track configurations (e.g. Monza GP never mixes with Curva Grande; Bahrain GP never mixes with Outer or Paddock).
+- **Theoretical Optimal Lap**: Synthesizes your best individual sectors ($S1 + S2 + S3$) into an ultimate benchmark target.
 
 ---
 
 ### 🤖 6. AI Race Engineer & Automated Driver Coaching
-- **Deterministic Deficit Ranking**:
-  - Automatically identifies and ranks your top driving technique deficits across every corner using deterministic telemetry evidence:
-    $$\text{Priority} = \text{Estimated Time Loss} \times \text{Repeatability} \times \text{Confidence}$$
-  - No AI hallucinations—priorities are rooted purely in physics, telemetry deltas, and repeatability.
-  - **1-Click Drilldown**: Click any coaching finding to immediately zoom into the corner on the GPS track map and overlay telemetry waveforms.
-- **Natural Language Race Engineer Debriefs (Google Gemini)**:
-  - Powered by `@google/genai` to synthesize telemetry into actionable driver debriefs, technique critiques, and garage setup recommendations.
-  - Explains *why* time was lost (e.g. overslowing at apex, oversaturating front tires on entry, hesitating on throttle pick-up) and gives concrete setup tweaks to address car balance.
+- **Objective Deficit Ranking**: Automatically spots and ranks your biggest driving deficits by potential time loss and repeatability.
+- **1-Click Corner Drilldown**: Click any coaching finding to immediately zoom into that turn on the track map and overlay telemetry traces.
+- **Natural Language Debriefs (Google Gemini)**: Explains *why* time was lost and suggests concrete garage setup tweaks to improve car balance.
 - **Historical Coaching Archive**: Saves coaching debriefs so you can track your skill progression over time.
 
 ---
 
 ### 📋 7. Session Intelligence & Race Stewards Ledger
-- **Multiclass Race Classifications**: Full standings with class positions, interval gaps to the leader, finish statuses (Finished, DNF, DNS, DQ), and position changes ($\Delta$).
-- **Clean Flying Lap Filtering**: Automatically separates valid flying laps from standing/rolling starts, garage exits, in-laps, and out-laps.
-- **Race Stewards Incident Ledger**:
-  - Automatically extracts penalties, contact collisions, track limit cuts, and mechanical damage from session logs.
-  - Displays elapsed session time, driver involved, and penalty severity in a dedicated stewards timeline.
-- **Server Rules & Setup Badges**: Inspects server settings (Mechanical Damage, Tire Warmers, Fixed Setups, Parc Fermé, Fuel/Tire Multipliers) directly from session logs.
+- **Multiclass Classifications**: Complete finishing standings, class positions, gap intervals, and position changes.
+- **Clean Flying Lap Filtering**: Automatically isolates clean flying laps from pit out/in-laps and incidents.
+- **Stewards Incident Log**: Full timeline of penalties, track limit cuts, collisions, and damage.
+- **Server Rules & Setup Badges**: Inspects server settings (damage multipliers, tire warmers, fixed setups, fuel usage) directly from session logs.
 
 ---
 
-### 🏁 8. Circuit Database & 32 Layouts
-- **Comprehensive WEC & IMSA Coverage**: Built-in specifications, turn counts, official lengths, elevation profiles, and famous corners for **32 distinct layouts**:
-  - Autodromo Nazionale Monza (GP, Curva Grande)
-  - Circuit de Spa-Francorchamps
-  - Circuit de la Sarthe / Le Mans 24h
-  - Sebring International Raceway (Full, School)
-  - Bahrain International Circuit (GP, Outer, Paddock)
-  - Circuit of the Americas (COTA)
-  - Autódromo José Carlos Pace (Interlagos)
-  - Fuji Speedway (GP, Classic)
-  - Autodromo Internazionale Enzo e Dino Ferrari (Imola)
-  - Lusail International Circuit (Qatar GP, Short)
-  - Autódromo Internacional do Algarve (Portimão WEC)
-  - Silverstone Circuit (GP, National)
-  - Circuit Paul Ricard (1A-V2, Short)
-  - Daytona International Speedway (Road Course)
-  - WeatherTech Raceway Laguna Seca
-  - Circuit de Barcelona-Catalunya
+### 🌐 8. Live Community Alien Benchmarks
+- **Live Google Sheets Sync**: Fetches community alien reference times with 1 click.
+- **Benchmark Update Changelog**: Automatically detects and highlights new benchmarks, updated targets with patch tags, and retired times.
 
 ---
 
-### 🌐 9. Live Community Alien Benchmarks
-- **Live Google Sheets Sync**: Fetches community alien reference times directly into the application with 1 click.
-- **Benchmark Update Changelog**: Built-in diff engine automatically detects and highlights:
-  - 🟢 **New Benchmarks**: Newly added car classes and track combinations.
-  - 🟡 **Updated Targets**: Adjusted reference lap times with game patch tags (e.g. `Patch 1.3 → 1.4+`) and time deltas ($\Delta$).
-  - 🔴 **Retired Targets**: Deprecated or superseded benchmark times.
-
----
-
-### 🔌 10. Seamless Plug & Play Integration
-- **Zero-Configuration Setup**: Automatically detects your Steam installation, session logs (`UserData/LOG/Results/*.xml`), 100 Hz telemetry files (`UserData/Telemetry/*.duckdb`), and replays (`UserData/Replays/*.Vcr`).
-- **Blazing-Fast SQLite WAL Cache**: Uses Write-Ahead Logging for instant queries and non-blocking background replay indexing.
-- **Replay Cache Manager**: In-app management view showing cached replays, memory footprint, and 1-click rescan controls.
+### 🔌 9. Seamless Plug & Play Integration
+- **Zero Configuration**: Automatically detects your Steam installation, session logs, 100 Hz telemetry, and replays.
+- **Endurance & Multi-Stint Ready**: Seamlessly handles long race sessions, driver stints, and multi-file recordings without missing data.
+- **Replay & Cache Manager**: In-app management view to inspect cached replays, track background updates, and trigger 1-click rescans.
+- **Blazing-Fast Local Performance**: High-speed local caching ensures instant page loads and zero lag when scrubbing through telemetry traces.
+- **Polished Cockpit Experience**: Smooth loading screens with motorsport quotes and instant navigation directly to your fastest lap.
 
 ---
 
@@ -240,7 +207,7 @@ To adjust your paths or driver profile:
 | `npm run dev:server` | Starts the backend server using `tsx watch`. |
 | `npm run dev:client` | Starts the Vite development server. |
 | `npm run build` | Validates TypeScript types and compiles the production client bundle. |
-| `npm test` | Runs the automated Vitest test suite (**1,060+ tests across 128 test files**). |
+| `npm test` | Runs the automated Vitest test suite (**1,380+ tests across 159 test files**). |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |

@@ -14,22 +14,8 @@ interface LapTableEntry {
   originalIndex: number;
 }
 
-function getDisplayLapTime(lap: LapData, prevLap: LapData | null, bestLap: number | null): number | null {
-  if (lap.lapTime !== null && lap.lapTime > 0) return lap.lapTime;
-  if (lap.elapsedSeconds === null || lap.elapsedSeconds === undefined || prevLap?.elapsedSeconds === null || prevLap?.elapsedSeconds === undefined) {
-    return null;
-  }
-
-  const deltaEt = parseFloat((lap.elapsedSeconds - prevLap.elapsedSeconds).toFixed(3));
-  const knownSectors = (lap.s1 || 0) + (lap.s2 || 0) + (lap.s3 || 0);
-  const maxAllowed = bestLap ? Math.max(bestLap * 3.5, 300) : 600;
-  return deltaEt > 0 && (knownSectors === 0 || deltaEt >= knownSectors) && deltaEt >= 10 && deltaEt <= maxAllowed
-    ? deltaEt
-    : null;
-}
-
 function getLapSortValue(entry: LapTableEntry, column: SortableLapColumn, bestLap: number | null): number | null {
-  const displayLapTime = getDisplayLapTime(entry.lap, entry.prevLap, bestLap);
+  const displayLapTime = entry.lap.lapTime !== null && entry.lap.lapTime > 0 ? entry.lap.lapTime : null;
   if (column === 'lap') return entry.lap.lapNum;
   if (column === 'position') return entry.lap.position > 0 ? entry.lap.position : null;
   if (column === 'lapTime') return displayLapTime;

@@ -30,6 +30,7 @@ import {
 } from './sessionXmlTypes.js';
 import { parseStreamEvents } from './sessionXmlStream.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
+import { isCompletedPitStop, isRacingLap } from '../../shared/domain/lapComparison.js';
 import { findMatchingReplay } from './replayMatching.js';
 
 const xmlParser = new XMLParser({
@@ -479,15 +480,6 @@ export class LmuParser {
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
     const laps: LapData[] = lapsList.map((l: RawLapXmlNode, idx: number) => this.parseLap(l, idx + 1));
 
-    // Mark out-laps: any lap immediately following a valid pit stop (completed in-lap)
-    for (let i = 0; i < laps.length; i++) {
-      const prevLap = i > 0 ? laps[i - 1] : null;
-      const prevIsValidPitStop = Boolean(prevLap && prevLap.isPitStop && prevLap.lapTime !== null && prevLap.lapTime > 0);
-      if (prevIsValidPitStop && !laps[i].isPitStop) {
-        laps[i].isOutLap = true;
-      }
-    }
-
     // Best Laps & Sectors - Strictly calculated from valid completed laps (before any inference)
     const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
     const bestLap = validLaps.length > 0
@@ -559,6 +551,12 @@ export class LmuParser {
       }
     }
 
+    // Mark out-laps: any lap immediately following a completed pit stop (in-lap). After the
+    // inference above, so an in-lap whose time was inferred still makes the next lap an out-lap.
+    for (let i = 1; i < laps.length; i++) {
+      if (isCompletedPitStop(laps[i - 1]) && !laps[i].isPitStop) laps[i].isOutLap = true;
+    }
+
     // Calculate pit stop loss relative to driver's clean reference lap time
     const refLapTime = avgLapTime || bestLapTime;
     laps.forEach(lap => {
@@ -572,7 +570,7 @@ export class LmuParser {
     });
 
     // Compute Fuel & VE Averages across valid flying laps (exclude pit laps, out laps, and negative/anomalous fuel values)
-    const validFuelLaps = laps.filter(l => l.isValid && !l.isPitStop && !l.isOutLap && l.fuelUsed !== null && l.fuelUsed !== undefined && l.fuelUsed > 0 && l.fuelUsed < 25);
+    const validFuelLaps = laps.filter(l => isRacingLap(l) && l.fuelUsed !== null && l.fuelUsed !== undefined && l.fuelUsed > 0 && l.fuelUsed < 25);
     const avgFuelPerLap = validFuelLaps.length > 0
       ? parseFloat((validFuelLaps.reduce((acc, l) => acc + (l.fuelUsed || 0), 0) / validFuelLaps.length).toFixed(2))
       : null;
@@ -581,7 +579,7 @@ export class LmuParser {
       : null;
 
     // Virtual Energy (VE / NRG) applies to both Hypercar and LMGT3 under FIA WEC BoP stint rules
-    const validVeLaps = laps.filter(l => l.isValid && !l.isPitStop && !l.isOutLap && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
+    const validVeLaps = laps.filter(l => isRacingLap(l) && l.virtualEnergyUsed !== null && l.virtualEnergyUsed !== undefined && l.virtualEnergyUsed > 0 && l.virtualEnergyUsed < 25);
     const avgVePerLap = validVeLaps.length > 0
       ? parseFloat((validVeLaps.reduce((acc, l) => acc + (l.virtualEnergyUsed || 0), 0) / validVeLaps.length).toFixed(2))
       : null;

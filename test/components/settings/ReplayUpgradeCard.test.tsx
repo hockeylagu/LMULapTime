@@ -20,7 +20,7 @@ const status = (overrides: Partial<ReplayUpgradeStatus> = {}): ReplayUpgradeStat
   ...overrides,
 });
 
-const respond = (body: unknown) => ({ json: () => Promise.resolve(body) });
+const respond = (body: unknown) => ({ ok: true, json: () => Promise.resolve(body) });
 
 describe('ReplayUpgradeCard', () => {
   beforeEach(() => {

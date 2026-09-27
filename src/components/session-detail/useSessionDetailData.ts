@@ -3,6 +3,8 @@ import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
+import { fetchJson, isAbortError } from '../../api/apiClient.js';
+import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
 export interface UseSessionDetailDataParams {
   sessionId: string;
@@ -15,7 +17,6 @@ export interface UseSessionDetailDataParams {
 // browsing many sessions in one tab doesn't grow this forever.
 const clientSessionCache = new Map<string, DetailedSession>();
 const MAX_CACHED_SESSIONS = 5;
-let clientRefCache: ReferenceLaptimesCache | null = null;
 
 function storeCachedSession(sessionId: string, session: DetailedSession): void {
   if (clientSessionCache.size >= MAX_CACHED_SESSIONS && !clientSessionCache.has(sessionId)) {
@@ -27,7 +28,7 @@ function storeCachedSession(sessionId: string, session: DetailedSession): void {
 
 export function clearSessionDetailCache() {
   clientSessionCache.clear();
-  clientRefCache = null;
+  invalidateReferenceLaptimes();
 }
 
 export function useSessionDetailData({
@@ -38,7 +39,7 @@ export function useSessionDetailData({
 }: UseSessionDetailDataParams) {
   const cachedInitial = clientSessionCache.get(sessionId) || null;
   const [session, setSession] = useState<DetailedSession | null>(cachedInitial);
-  const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(clientRefCache);
+  const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
   const [progression, setProgression] = useState<SessionProgressionPoint[]>(
     initialProgression || []
   );
@@ -96,43 +97,32 @@ export function useSessionDetailData({
     }
 
     // 1. Fetch Session Telemetry Data (primary critical path)
-    fetch(`/api/session/${sessionId}`, { signal })
-      .then((res) => res.json())
+    fetchJson<DetailedSession>(`/api/session/${encodeURIComponent(sessionId)}`, { signal })
       .then((sessionData) => {
         if (!isCurrent) return;
-        if (sessionData && !sessionData.error) {
-          storeCachedSession(sessionId, sessionData);
-          setSession(sessionData);
-          if (sessionData.playerDriver) {
-            setSelectedDriverName(sessionData.playerDriver.name);
-          } else if (sessionData.drivers && sessionData.drivers.length > 0) {
-            setSelectedDriverName(sessionData.drivers[0].name);
-          }
+        storeCachedSession(sessionId, sessionData);
+        setSession(sessionData);
+        if (sessionData.playerDriver) {
+          setSelectedDriverName(sessionData.playerDriver.name);
+        } else if (sessionData.drivers && sessionData.drivers.length > 0) {
+          setSelectedDriverName(sessionData.drivers[0].name);
         }
         setLoading(false);
       })
       .catch((err) => {
-        if (!isCurrent || err?.name === 'AbortError') return;
+        if (!isCurrent || isAbortError(err)) return;
         console.error('Failed to load session detail data:', err);
         setLoading(false);
       });
 
-    // 2. Fetch Reference Targets (if not yet cached in memory)
-    if (!clientRefCache) {
-      fetch('/api/reference-laptimes', { signal })
-        .then((res) => res.json())
-        .then((refData) => {
-          if (!isCurrent) return;
-          clientRefCache = refData;
-          setRefCache(refData);
-        })
-        .catch(() => null);
-    }
+    // 2. Fetch Reference Targets (shared across views until a benchmark refresh)
+    loadReferenceLaptimes()
+      .then((refData) => { if (isCurrent) setRefCache(refData); })
+      .catch(() => null);
 
     // 3. Fetch Progression in background (if not supplied via props)
     if (!initialProgression || initialProgression.length === 0) {
-      fetch('/api/progression', { signal })
-        .then((res) => res.json())
+      fetchJson<SessionProgressionPoint[]>('/api/progression', { signal })
         .then((progData) => {
           if (!isCurrent) return;
           if (Array.isArray(progData)) {
@@ -145,20 +135,17 @@ export function useSessionDetailData({
     // 4. Fetch session candidates in background (if not supplied via props)
     // Strip heavy driver arrays, lap logs, and setups to minimize heap memory retention
     if (!initialSessions || initialSessions.length === 0) {
-      fetch('/api/sessions', { signal })
-        .then((res) => res.json())
+      fetchJson<DetailedSession[]>('/api/sessions', { signal })
         .then((allSessionsData) => {
           if (!isCurrent) return;
           if (Array.isArray(allSessionsData)) {
             const stripped = allSessionsData.map((s) => ({
               id: s.id,
-              sessionId: s.sessionId || s.id,
               sessionType: s.sessionType,
               sessionName: s.sessionName,
               trackVenue: s.trackVenue,
               trackCourse: s.trackCourse,
               timeString: s.timeString,
-              dateString: s.dateString,
               timestamp: s.timestamp,
             }));
             setAllSessions(stripped as unknown as DetailedSession[]);
