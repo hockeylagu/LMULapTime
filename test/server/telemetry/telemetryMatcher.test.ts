@@ -1,6 +1,33 @@
-import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Stands in for the DuckDB file: what the next reader opened will report, and every reader opened.
+const duckdb = vi.hoisted(() => ({
+  metadata: {} as Record<string, unknown>,
+  laps: [] as Array<{ lapTimeSec: number }>,
+  openError: null as Error | null,
+  opened: [] as Array<{ filePath: string; closed: boolean }>,
+}));
+vi.mock('../../../server/telemetry/duckdbReader.js', () => ({
+  DuckDbReader: class {
+    private readonly handle: { filePath: string; closed: boolean };
+    constructor(filePath: string) {
+      this.handle = { filePath, closed: false };
+      duckdb.opened.push(this.handle);
+    }
+    async open() { if (duckdb.openError) throw duckdb.openError; }
+    async getMetadata() { return duckdb.metadata; }
+    async getLapList() { return duckdb.laps; }
+    async close() { this.handle.closed = true; }
+  },
+}));
+
 import {
   parseDuckDbFilename,
+  scanDuckDbDirectory,
+  enrichDuckDbFileInfo,
   normalizeSessionType,
   matchDuckDbToSession,
   matchDuckDbToReplay,
@@ -331,5 +358,96 @@ describe('telemetryMatcher', () => {
       expect(progressUpdates).toHaveLength(0);
     });
   });
-});
 
+  it('rejects a low-margin replay match instead of silently choosing one candidate', () => {
+    const at = (filename: string, iso: string): DuckDbFileInfo => ({
+      filename, filePath: `C:\\fake\\${filename}`, fileMtimeMs: 0, fileSizeBytes: 1024,
+      trackName: 'Spa', sessionType: 'R', timestampStr: iso, timestampEpochMs: Date.parse(iso),
+    });
+    const replay = { filename: 'Spa R1.Vcr', trackName: 'Spa', sessionType: 'Race', drivers: [] } as unknown as ReplayMetadata;
+    const savedAt = Date.parse('2026-09-14T11:00:00Z');
+
+    expect(matchDuckDbToReplay([at('a.duckdb', '2026-09-14T11:00:10Z'), at('b.duckdb', '2026-09-14T11:00:12Z')], replay, savedAt)).toBeNull();
+    expect(matchDuckDbToReplay([at('a.duckdb', '2026-09-14T11:00:10Z'), at('b.duckdb', '2026-09-14T11:03:00Z')], replay, savedAt)?.filename).toBe('a.duckdb');
+  });
+
+  describe('reading the telemetry folder', () => {
+    let dir: string;
+    const spaName = 'Spa_P_2026-09-13T20_33_32Z.duckdb';
+
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-duckdb-'));
+      duckdb.metadata = {};
+      duckdb.laps = [];
+      duckdb.openError = null;
+      duckdb.opened = [];
+    });
+    afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    it('lists the DuckDB files it can name, with their size and filename time', () => {
+      fs.writeFileSync(path.join(dir, spaName), 'x'.repeat(10));
+      fs.writeFileSync(path.join(dir, 'notes.txt'), '');
+      fs.writeFileSync(path.join(dir, 'unnamed.duckdb'), '');
+
+      const files = scanDuckDbDirectory(dir);
+
+      expect(files).toHaveLength(1);
+      expect(files[0]).toMatchObject({
+        filename: spaName, filePath: path.join(dir, spaName), fileSizeBytes: 10,
+        trackName: 'Spa', sessionType: 'P', timestampEpochMs: Date.parse('2026-09-13T20:33:32Z'),
+      });
+    });
+
+    it('takes the track, session, driver and recording time from inside the file, and remembers them', async () => {
+      fs.writeFileSync(path.join(dir, spaName), '');
+      duckdb.metadata = { trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carName: 'Porsche 963', RecordingTime: '2026-09-13T19_30_00Z' };
+      duckdb.laps = [{ lapTimeSec: 12 }, { lapTimeSec: 139.4 }, { lapTimeSec: 137.9 }];
+
+      const [listed] = scanDuckDbDirectory(dir);
+      const enriched = await enrichDuckDbFileInfo(listed);
+
+      expect(enriched).toMatchObject({
+        trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carName: 'Porsche 963',
+        timestampEpochMs: Date.parse('2026-09-13T19:30:00Z'), lapsCount: 3, bestLapTime: 137.9,
+      });
+      expect(duckdb.opened[0].closed).toBe(true);
+      // A later folder scan keeps what the file said instead of re-reading the filename.
+      expect(scanDuckDbDirectory(dir)[0]).toMatchObject({ trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver' });
+    });
+
+    it('keeps the filename values and records the error when the file cannot be read', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      fs.writeFileSync(path.join(dir, 'Monza_R_2026-09-13T20_33_32Z.duckdb'), '');
+      duckdb.openError = new Error('database is locked');
+
+      const [listed] = scanDuckDbDirectory(dir);
+      const enriched = await enrichDuckDbFileInfo(listed);
+
+      expect(enriched).toMatchObject({ trackName: 'Monza', sessionType: 'R', enrichmentError: 'database is locked' });
+      expect(duckdb.opened[0].closed).toBe(true);
+    });
+
+    it('re-reads only the files that changed or failed last time', async () => {
+      for (const name of ['Spa_P_2026-09-13T20_33_32Z.duckdb', 'Spa_Q_2026-09-13T21_33_32Z.duckdb', 'Spa_R_2026-09-13T22_33_32Z.duckdb']) {
+        fs.writeFileSync(path.join(dir, name), 'data');
+      }
+      const listed = scanDuckDbDirectory(dir);
+      const byType = (type: string) => listed.find(file => file.sessionType === type)!;
+      const cachedFiles = new Map<string, DuckDbFileInfo>([
+        [byType('P').filePath, { ...byType('P'), lapsCount: 7 }],
+        [byType('Q').filePath, { ...byType('Q'), fileSizeBytes: 1 }],
+        [byType('R').filePath, { ...byType('R'), enrichmentError: 'locked' }],
+      ]);
+      const progress: Array<{ currentFile: string; cached: boolean }> = [];
+
+      const results = await enrichDuckDbDirectory(dir, { cachedFiles, onProgress: p => progress.push(p) });
+
+      expect(results).toHaveLength(3);
+      expect(results.find(file => file.sessionType === 'P')?.lapsCount).toBe(7);
+      expect(duckdb.opened.map(reader => path.basename(reader.filePath)).sort()).toEqual([
+        'Spa_Q_2026-09-13T21_33_32Z.duckdb', 'Spa_R_2026-09-13T22_33_32Z.duckdb',
+      ]);
+      expect(progress.filter(p => p.cached).map(p => p.currentFile)).toEqual(['Spa_P_2026-09-13T20_33_32Z.duckdb']);
+    });
+  });
+});

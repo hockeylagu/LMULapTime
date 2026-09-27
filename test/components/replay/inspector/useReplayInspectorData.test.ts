@@ -287,4 +287,80 @@ describe('useReplayInspectorData', () => {
     expect(result.current.baselineDriverName).toBe('Samuel Lague');
     await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
   });
+
+  describe('comparing laps of the same replay and playback', () => {
+    /** Serves the replay; each trajectory is the lap it was asked for, or `failLap`'s server error. */
+    function serveReplay(failLap?: number, points = trajectory.points) {
+      return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.includes('/metadata')) return response(metadata);
+        if (url.includes('/compare/laps')) return response({ laps: [] });
+        const lap = Number(new URL(url, 'http://localhost').searchParams.get('lap') ?? 2);
+        if (lap === failLap) return { ok: false, status: 500, json: async () => ({ error: 'lap 3 is not in the replay cache' }) } as Response;
+        return response({ ...trajectory, points, currentLap: lap });
+      });
+    }
+
+    it("opens another lap of the inspected driver as the baseline, and puts it in the URL", async () => {
+      serveReplay();
+      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.handleSelectBaselineLap(3));
+
+      expect(result.current).toMatchObject({ isCompareMode: true, baselineReplayName: metadata.filename, baselineLapNumber: 3, baselineDriverName: 'Player Driver' });
+      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
+      const params = new URLSearchParams(observedSearch);
+      expect(params.get('baselineReplay')).toBe(metadata.filename);
+      expect(params.get('compareLapNum')).toBe('3');
+      expect(params.get('compareDriver')).toBe('Player Driver');
+    });
+
+    it("shows the server's reason when the baseline lap cannot be loaded", async () => {
+      serveReplay(3);
+      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.handleSelectBaselineLap(3));
+
+      await waitFor(() => expect(result.current.baselineError).toBe('lap 3 is not in the replay cache'));
+      expect(result.current.baselineTrajectory).toBeNull();
+      expect(result.current.isBaselineLoading).toBe(false);
+    });
+
+    it('swaps the inspected lap and the baseline lap', async () => {
+      serveReplay();
+      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename, initialLapNumber: 2 }), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      act(() => result.current.handleSelectBaselineLap(3));
+      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
+
+      act(() => result.current.handleSwapBaseline());
+
+      await waitFor(() => expect(result.current.trajectory?.currentLap).toBe(3));
+      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(2));
+      const params = new URLSearchParams(observedSearch);
+      expect(params.get('lap')).toBe('3');
+      expect(params.get('compareLapNum')).toBe('2');
+    });
+
+    it('plays the lap on its own clock and stops at the end, back on the first sample', async () => {
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 5) as unknown as number);
+      vi.stubGlobal('cancelAnimationFrame', (handle: number) => clearTimeout(handle));
+      serveReplay(undefined, [
+        { x: 0, y: 0, z: 0, speedKmh: 100, timeSec: 0 },
+        { x: 5, y: 0, z: 0, speedKmh: 120, timeSec: 0.02 },
+        { x: 10, y: 0, z: 0, speedKmh: 140, timeSec: 0.2 },
+      ]);
+      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.setIsPlaying(true));
+
+      await waitFor(() => expect(result.current.currentIndex).toBeGreaterThan(0));
+      await waitFor(() => expect(result.current.isPlaying).toBe(false), { timeout: 2000 });
+      expect(result.current.currentIndex).toBe(0);
+      vi.unstubAllGlobals();
+    });
+  });
 });

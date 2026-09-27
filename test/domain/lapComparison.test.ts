@@ -7,6 +7,7 @@ import {
   computeLapToLapDelta,
   computeTopNLapAverage,
   computeConsistencyRating,
+  selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../server/core/types.js';
 
@@ -321,13 +322,13 @@ describe('lapComparison utility', () => {
       expect(res.stdDev).toBeLessThan(0.1);
     });
 
-    it('excludes pit stops and the lap after a pit stop (out-lap) from consistency calculations', () => {
+    it('excludes pit stops and the out-lap the parser marked after them from consistency calculations', () => {
       const laps = [
         { lapNum: 1, lapTime: 125.0, isValid: true }, // Start lap excluded
         { lapNum: 2, lapTime: 120.0, isValid: true }, // Flying lap
         { lapNum: 3, lapTime: 120.1, isValid: true }, // Flying lap
         { lapNum: 4, lapTime: 145.0, isValid: true, isPitStop: true }, // In-lap / Pit Stop -> excluded
-        { lapNum: 5, lapTime: 210.0, isValid: true }, // Out-lap (immediately follows pit stop) -> excluded
+        { lapNum: 5, lapTime: 210.0, isValid: true, isOutLap: true }, // Out-lap (marked by the parser) -> excluded
         { lapNum: 6, lapTime: 120.05, isValid: true }, // Flying lap
       ];
       const res = computeConsistencyRating(laps);
@@ -335,6 +336,15 @@ describe('lapComparison utility', () => {
       expect(res.consistencyScore).toBeGreaterThan(99);
       expect(res.avgLapTime).toBeCloseTo(120.05, 1);
       expect(res.stdDev).toBeLessThan(0.1);
+    });
+
+    it('reads the out-lap flag instead of guessing it from the lap before', () => {
+      const laps = [
+        { lapNum: 2, lapTime: 120.0, isValid: true },
+        { lapNum: 3, lapTime: 145.0, isValid: true, isPitStop: true },
+        { lapNum: 4, lapTime: 120.2, isValid: true }, // not marked as an out-lap: counted
+      ];
+      expect(selectCleanLapCandidates(laps).map(lap => lap.lapNum)).toEqual([2, 4]);
     });
 
     it('does not exclude lap 2 as an out-lap if lap 1 was practice start with no completed lap time', () => {

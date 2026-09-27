@@ -24,10 +24,11 @@ export default defineConfig({
         '**/*.db-*',
       ],
       thresholds: {
-        lines: 80,
-        statements: 80,
-        functions: 75,
-        branches: 70,
+        // Just under the measured coverage (2026-09-27: 93% lines, 91% statements, 92% functions, 81% branches).
+        lines: 90,
+        statements: 90,
+        functions: 90,
+        branches: 80,
       },
     },
   },

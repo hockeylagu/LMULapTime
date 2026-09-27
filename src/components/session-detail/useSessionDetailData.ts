@@ -3,7 +3,7 @@ import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
-import { fetchJson, isAbortError } from '../../api/apiClient.js';
+import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
 export interface UseSessionDetailDataParams {
@@ -40,13 +40,18 @@ export function useSessionDetailData({
   const cachedInitial = clientSessionCache.get(sessionId) || null;
   const [session, setSession] = useState<DetailedSession | null>(cachedInitial);
   const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
-  const [progression, setProgression] = useState<SessionProgressionPoint[]>(
-    initialProgression || []
-  );
-  const [allSessions, setAllSessions] = useState<DetailedSession[]>(
-    initialSessions || []
-  );
+  // Progression and the session list come from the parent when it has them, else are fetched here.
+  // Read from props, never copied into state: a parent passing a new array on each render must not
+  // restart loading (it re-rendered forever).
+  const hasInitialProgression = (initialProgression?.length ?? 0) > 0;
+  const hasInitialSessions = (initialSessions?.length ?? 0) > 0;
+  const [fetchedProgression, setFetchedProgression] = useState<SessionProgressionPoint[]>([]);
+  const [fetchedSessions, setFetchedSessions] = useState<DetailedSession[]>([]);
+  const progression = hasInitialProgression && initialProgression ? initialProgression : fetchedProgression;
+  const allSessions = hasInitialSessions && initialSessions ? initialSessions : fetchedSessions;
   const [loading, setLoading] = useState<boolean>(!cachedInitial);
+  // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDriverName, setSelectedDriverName] = useState<string>(() => {
     if (cachedInitial?.playerDriver) return cachedInitial.playerDriver.name;
     if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
@@ -68,22 +73,11 @@ export function useSessionDetailData({
   };
 
   useEffect(() => {
-    if (initialProgression && initialProgression.length > 0) {
-      setProgression(initialProgression);
-    }
-  }, [initialProgression]);
-
-  useEffect(() => {
-    if (initialSessions && initialSessions.length > 0) {
-      setAllSessions(initialSessions);
-    }
-  }, [initialSessions]);
-
-  useEffect(() => {
     let isCurrent = true;
     const abortController = new AbortController();
     const { signal } = abortController;
     const memCached = clientSessionCache.get(sessionId);
+    setLoadError(null);
     if (memCached) {
       setSession(memCached);
       if (memCached.playerDriver) {
@@ -112,6 +106,9 @@ export function useSessionDetailData({
       .catch((err) => {
         if (!isCurrent || isAbortError(err)) return;
         console.error('Failed to load session detail data:', err);
+        if (!(err instanceof ApiError && err.status === 404)) {
+          setLoadError(apiErrorMessage(err, 'The session could not be loaded.'));
+        }
         setLoading(false);
       });
 
@@ -121,12 +118,12 @@ export function useSessionDetailData({
       .catch(() => null);
 
     // 3. Fetch Progression in background (if not supplied via props)
-    if (!initialProgression || initialProgression.length === 0) {
+    if (!hasInitialProgression) {
       fetchJson<SessionProgressionPoint[]>('/api/progression', { signal })
         .then((progData) => {
           if (!isCurrent) return;
           if (Array.isArray(progData)) {
-            setProgression(progData);
+            setFetchedProgression(progData);
           }
         })
         .catch(() => null);
@@ -134,7 +131,7 @@ export function useSessionDetailData({
 
     // 4. Fetch session candidates in background (if not supplied via props)
     // Strip heavy driver arrays, lap logs, and setups to minimize heap memory retention
-    if (!initialSessions || initialSessions.length === 0) {
+    if (!hasInitialSessions) {
       fetchJson<DetailedSession[]>('/api/sessions', { signal })
         .then((allSessionsData) => {
           if (!isCurrent) return;
@@ -148,7 +145,7 @@ export function useSessionDetailData({
               timeString: s.timeString,
               timestamp: s.timestamp,
             }));
-            setAllSessions(stripped as unknown as DetailedSession[]);
+            setFetchedSessions(stripped as unknown as DetailedSession[]);
           }
         })
         .catch(() => null);
@@ -158,7 +155,7 @@ export function useSessionDetailData({
       isCurrent = false;
       abortController.abort();
     };
-  }, [sessionId, initialProgression, initialSessions]);
+  }, [sessionId, hasInitialProgression, hasInitialSessions]);
 
   const selectedDriver = useMemo(() => {
     if (!session) return undefined;
@@ -366,6 +363,7 @@ export function useSessionDetailData({
   return {
     session,
     loading,
+    loadError,
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
