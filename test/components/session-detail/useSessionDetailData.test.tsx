@@ -60,7 +60,6 @@ describe('useSessionDetailData', () => {
 
   async function loaded(session: DetailedSession, sessionId: string, initialProgression?: SessionProgressionPoint[]) {
     serve({ '/api/session/': { status: 200, body: session } });
-    // Stable props, as the parent passes them: a new array on each render would restart the loading effect.
     const initialSessions = [session];
     const hook = renderHook(() => useSessionDetailData({ sessionId, initialProgression, initialSessions }));
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
@@ -131,5 +130,31 @@ describe('useSessionDetailData', () => {
     act(() => result.current.handleLegendClick({ dataKey: 'avgLapTime' } as never));
     act(() => result.current.handleLegendClick({ dataKey: () => 1 } as never));
     expect(result.current.hiddenSeries).toEqual({ avgLapTime: false });
+  });
+});
+
+describe('useSessionDetailData props', () => {
+  beforeEach(() => clearSessionDetailCache());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('settles when the parent passes new progression and session arrays on every render', async () => {
+    const fetchMock = serve({ '/api/session/': { status: 200, body: mockDetailedSession } });
+    let renders = 0;
+
+    const { result } = renderHook(() => {
+      renders++;
+      if (renders > 50) throw new Error('useSessionDetailData keeps re-rendering');
+      return useSessionDetailData({
+        sessionId: 'inline-props',
+        initialSessions: [mockDetailedSession as unknown as DetailedSession],
+        initialProgression: [{ sessionId: 'old', trackVenue: 'Spa', bestLapTime: 121 } as SessionProgressionPoint],
+      });
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(renders).toBeLessThan(20);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(([url]) => url === '/api/progression' || url === '/api/sessions')).toBe(false);
   });
 });
