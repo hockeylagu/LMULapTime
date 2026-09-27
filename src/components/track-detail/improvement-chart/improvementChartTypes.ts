@@ -3,6 +3,7 @@ import { PaceCategory } from '../../../../shared/types/index.js';
 export interface ImprovementChartPoint {
   chartKey: string;
   shortSession: string;
+  axisLabel?: string; // Date and session, e.g. "09/25 R1"
   fullDate: string;
   sessionId: string;
   session: string;
