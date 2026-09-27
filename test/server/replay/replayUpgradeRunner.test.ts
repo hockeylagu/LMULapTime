@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionDatabase } from '../../../server/core/db.js';
-import type { ReplaySyncProgress } from '../../../server/core/dbSchema.js';
-import type { ReplayUpgradeResult } from '../../../server/core/dbReplayUpgrade.js';
+import type { ReplayUpgradeProgress, ReplayUpgradeResult } from '../../../server/core/dbReplayUpgrade.js';
 import { ReplayUpgradeRunner } from '../../../server/replay/replayUpgradeRunner.js';
 
 // A database double whose upgrade decodes `drivers` drivers, one per step, honouring shouldStop.
@@ -15,12 +14,12 @@ function fakeDb(drivers: number) {
     upgradeReplaysAsyncIterator: (_dir: string, options: { shouldStop?: () => boolean }) => {
       const run = { decoded: 0 };
       runs.push(run);
-      return (async function* (): AsyncGenerator<ReplaySyncProgress, ReplayUpgradeResult, void> {
+      return (async function* (): AsyncGenerator<ReplayUpgradeProgress, ReplayUpgradeResult, void> {
         for (let i = 0; i < drivers; i++) {
           if (options.shouldStop?.()) return { replays: 1, upgraded: run.decoded, failed: 0, interrupted: true };
           await Promise.resolve();
           run.decoded++;
-          yield { processed: 0, total: 1, currentFile: 'A.Vcr' };
+          yield { processed: 0, total: 1, currentFile: 'A.Vcr', driversDone: run.decoded, driversTotal: drivers };
         }
         return { replays: 1, upgraded: run.decoded, failed: 0, interrupted: false };
       })();

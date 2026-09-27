@@ -15,6 +15,9 @@ function idleStatus(enabled: boolean): ReplayUpgradeStatus {
     total: 0,
     currentFile: null,
     currentStage: null,
+    filePercent: null,
+    driversDone: 0,
+    driversTotal: 0,
     startedAt: null,
     finishedAt: null,
     result: null,
@@ -74,6 +77,7 @@ export class ReplayUpgradeRunner {
       this.status.finishedAt = new Date().toISOString();
       this.status.currentFile = null;
       this.status.currentStage = null;
+      this.status.filePercent = null;
       const restart = this.restartPending;
       this.restartPending = null;
       if (restart) this.start(restart.replaysDir, restart.playerName);
@@ -83,6 +87,7 @@ export class ReplayUpgradeRunner {
         const { value, done } = await iterator.next();
         if (done) {
           this.status.result = value;
+          this.status.driversDone = value.upgraded + value.failed;
           if (value.replays > 0) {
             console.log(`[SQLite Cache] Replay upgrade: ${value.upgraded} drivers decoded again, ${value.failed} failed, across ${value.replays} replays${value.interrupted ? ' (paused)' : ''}`);
           }
@@ -93,6 +98,9 @@ export class ReplayUpgradeRunner {
         this.status.total = value.total;
         this.status.currentFile = value.currentFile || null;
         this.status.currentStage = value.stage || null;
+        this.status.filePercent = value.filePercent ?? null;
+        this.status.driversDone = value.driversDone;
+        this.status.driversTotal = value.driversTotal;
         setImmediate(() => { void step(); });
       } catch (error) {
         this.status.error = error instanceof Error ? error.message : String(error);
