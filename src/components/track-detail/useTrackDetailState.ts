@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
+import { fetchJson, isAbortError } from '../../api/apiClient.js';
 import { getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
@@ -91,15 +92,14 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     let isCurrent = true;
     const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
-      .then((res) => res.json())
+    fetchJson<TrackDetailData>(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
       .then((resData) => {
         if (!isCurrent) return;
         setData(resData);
         setLoading(false);
       })
       .catch((err) => {
-        if (!isCurrent || err?.name === 'AbortError') return;
+        if (!isCurrent || isAbortError(err)) return;
         console.error('Failed to fetch track details:', err);
         setLoading(false);
       });

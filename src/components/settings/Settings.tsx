@@ -9,6 +9,14 @@ import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { ReplayUpgradeCard } from './ReplayUpgradeCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
 import { clearSessionDetailCache } from '../session-detail/useSessionDetailData.js';
+import { apiErrorMessage, postJson } from '../../api/apiClient.js';
+import { invalidateReferenceLaptimes } from '../../api/referenceApi.js';
+
+interface ReferenceRefreshResponse {
+  success?: boolean;
+  entriesCount?: number;
+  diff?: ReferenceBenchmarkDiff | null;
+}
 
 export interface SettingsProps {
   status: {
@@ -103,17 +111,12 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
     setIsScanning(true);
     setPathMessage(null);
 
-    fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        resultsDir: resultsDirInput,
-        replaysDir: replaysDirInput,
-        telemetryDir: telemetryDirInput,
-        playerName: playerNameInput,
-      }),
+    postJson<{ success?: boolean; playerName?: string }>('/api/scan', {
+      resultsDir: resultsDirInput,
+      replaysDir: replaysDirInput,
+      telemetryDir: telemetryDirInput,
+      playerName: playerNameInput,
     })
-      .then((res) => res.json())
       .then((data) => {
         setIsScanning(false);
         if (data.success) {
@@ -126,7 +129,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       })
       .catch((err) => {
         setIsScanning(false);
-        setPathMessage(`Error scanning: ${err.message}`);
+        setPathMessage(`Error scanning: ${apiErrorMessage(err, 'request failed')}`);
       });
   };
 
@@ -134,11 +137,11 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
     setIsUpdatingLaptimes(true);
     setLaptimesMessage(null);
 
-    fetch('/api/reference-laptimes/refresh', { method: 'POST' })
-      .then((res) => res.json())
+    postJson<ReferenceRefreshResponse>('/api/reference-laptimes/refresh')
       .then((data) => {
         setIsUpdatingLaptimes(false);
         if (data.success) {
+          invalidateReferenceLaptimes();
           onUpdatePaths();
           if (data.diff) {
             setUpdateDiff(data.diff);
@@ -153,7 +156,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       })
       .catch((err) => {
         setIsUpdatingLaptimes(false);
-        setLaptimesMessage(`Error updating: ${err.message}`);
+        setLaptimesMessage(`Error updating: ${apiErrorMessage(err, 'request failed')}`);
       });
   };
 
@@ -164,8 +167,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
     setIsClearingCache(true);
     setCacheMessage(null);
 
-    fetch('/api/cache/clear', { method: 'POST' })
-      .then((res) => res.json())
+    postJson<{ success?: boolean }>('/api/cache/clear')
       .then((data) => {
         setIsClearingCache(false);
         if (data.success) {
@@ -178,7 +180,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       })
       .catch((err) => {
         setIsClearingCache(false);
-        setCacheMessage(`Error clearing cache: ${err.message}`);
+        setCacheMessage(`Error clearing cache: ${apiErrorMessage(err, 'request failed')}`);
       });
   };
 

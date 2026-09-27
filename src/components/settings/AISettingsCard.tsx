@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BrainCircuit, ExternalLink, KeyRound, Save, Trash2 } from 'lucide-react';
+import { apiErrorMessage, fetchJson, postJson } from '../../api/apiClient.js';
 
 interface AiSettingsResponse {
   configured: boolean;
@@ -17,10 +18,8 @@ export const AISettingsCard: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadSettings = () => {
-    fetch('/api/ai/settings')
-      .then(response => response.json())
-      .then(data => {
-        const nextSettings = data as AiSettingsResponse;
+    fetchJson<AiSettingsResponse>('/api/ai/settings')
+      .then(nextSettings => {
         setSettings(nextSettings);
         setModel(nextSettings.model);
       })
@@ -34,18 +33,12 @@ export const AISettingsCard: React.FC = () => {
     setIsSaving(true);
     setMessage(null);
     try {
-      const response = await fetch('/api/ai/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, model }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Unable to save the key.');
+      const data = await postJson<AiSettingsResponse>('/api/ai/settings', { apiKey, model });
       setApiKey('');
-      setSettings(data as AiSettingsResponse);
+      setSettings(data);
       setMessage('Gemini key is active for this server session.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to save the key.');
+      setMessage(apiErrorMessage(error, 'Unable to save the key.'));
     } finally {
       setIsSaving(false);
     }
@@ -59,13 +52,7 @@ export const AISettingsCard: React.FC = () => {
     if (!window.confirm('Remove the Gemini key and disable AI reports for this server session?')) return;
     setIsSaving(true);
     try {
-      const response = await fetch('/api/ai/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: '' }),
-      });
-      const data = await response.json();
-      setSettings(data as AiSettingsResponse);
+      setSettings(await postJson<AiSettingsResponse>('/api/ai/settings', { apiKey: '' }));
       setMessage('Gemini key removed from the server session.');
     } catch {
       setMessage('Unable to remove the Gemini key.');

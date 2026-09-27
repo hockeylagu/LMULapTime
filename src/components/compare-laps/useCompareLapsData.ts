@@ -11,6 +11,20 @@ import {
   filterLapsByCarCategory,
 } from '../../../shared/domain/lapComparison.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
+import { fetchJson, isAbortError } from '../../api/apiClient.js';
+
+/** The /api/compare/laps response. */
+interface CompareLapsApiData {
+  laps: ComparableLap[];
+  allTimeBestLap: ComparableLap | null;
+  playerBestLap?: ComparableLap | null;
+  overallTrackBestLap?: ComparableLap | null;
+  bestS1: number | null;
+  bestS2: number | null;
+  bestS3: number | null;
+  theoreticalBestSec: number | null;
+  benchmarks: ReferenceLaptimeEntry[];
+}
 
 export type AvailableLapsSortOption =
   | 'lap-asc'
@@ -73,17 +87,7 @@ export function useCompareLapsData({
   const [availableLapsSort, setAvailableLapsSort] = useState<AvailableLapsSortOption>('lap-asc');
   const hideEmpty = searchParams.get('hideEmpty') !== 'false';
 
-  const [apiData, setApiData] = useState<{
-    laps: ComparableLap[];
-    allTimeBestLap: ComparableLap | null;
-    playerBestLap?: ComparableLap | null;
-    overallTrackBestLap?: ComparableLap | null;
-    bestS1: number | null;
-    bestS2: number | null;
-    bestS3: number | null;
-    theoreticalBestSec: number | null;
-    benchmarks: ReferenceLaptimeEntry[];
-  }>({
+  const [apiData, setApiData] = useState<CompareLapsApiData>({
     laps: [],
     allTimeBestLap: null,
     playerBestLap: null,
@@ -139,15 +143,14 @@ export function useCompareLapsData({
       carClass: selectedCarClass,
       playerOnly: String(playerOnly),
     });
-    fetch(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
-      .then((res) => res.json())
+    fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then((data) => {
         setApiData(data);
         hasFetchedRef.current = true;
         setLoading(false);
       })
       .catch((err) => {
-        if (err?.name === 'AbortError') return;
+        if (isAbortError(err)) return;
         console.error('Failed to fetch compare laps:', err);
         setLoading(false);
       });

@@ -146,6 +146,7 @@ LMULapTime/
 ├── public/tracks/                  # Mirrored track boundary JSON files for client map
 ├── src/                            # React 19 frontend
 │   ├── App.tsx                     # Root component, tabs, hash routing & global state
+│   ├── api/                        # The only place the client calls the server (fetchJson/postJson, replay & reference loaders)
 │   ├── components/                 # Modular UI feature packages (<= 300 lines per file)
 │   │   ├── common/                 # Badges, modals, pills, grids, selectors
 │   │   ├── compare-laps/           # Lap-to-lap comparison studio & micro-sector tables
@@ -269,6 +270,12 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - Centralized Color Tokens: Reference `src/utils/themeColors.ts` for uniform visual styling.
   - Badges & Tables: Monospaced numbers (`font-mono`) for lap times, delta times, and telemetry units (km/h, °C, %, sec).
 - Responsive & clean: Provide clear empty states, error fallbacks, and skeleton/loading indicators for async operations.
+
+### API Requests (`src/api/`)
+- Components and hooks call the server through `src/api/apiClient.ts` (`fetchJson`, `postJson`) or a domain loader built on it (`replayApi.ts`, `referenceApi.ts`), never raw `fetch`.
+- Paths are relative (`/api/...`); never hardcode the server origin or port.
+- A non-2xx response rejects with `ApiError` (the server's `{ error }` message, status, body): show the message to the user rather than treating the failure as empty data. Ignore `isAbortError` rejections.
+- Data that only changes on an explicit refresh (the benchmark table) is shared through its loader and invalidated after the refresh.
 
 ### Hash-Based Navigation
 - The client uses React Router's `HashRouter` in `src/main.tsx` and route components in `src/App.tsx`.
