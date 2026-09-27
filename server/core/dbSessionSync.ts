@@ -45,7 +45,7 @@ export function *syncSessionsIterator(
 
   // Get existing cached session file info
   const db = host.getDb();
-  const existingRows = versionMismatch ? [] : (db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
+  const existingRows = (db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
     id: string;
     file_path: string;
     file_mtime: number;
@@ -65,10 +65,11 @@ export function *syncSessionsIterator(
   let added = 0;
   let updated = 0;
 
-  // Keep the previous parser-version cache readable until its complete replacement is ready.
+  // A new parser version re-parses every XML on disk and replaces those rows in one transaction.
+  // Rows whose XML is gone are kept as they are: they are the only copy of that session left.
+  const reparseAll = forceReparse || versionMismatch;
   const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
     if (versionMismatch) {
-      db.exec('DELETE FROM sessions');
       host.setMetadata('parser_version', DB_PARSER_VERSION);
       host.invalidateSessionCache();
     }
@@ -89,7 +90,7 @@ export function *syncSessionsIterator(
       const cached = cacheMap.get(normalizedPath);
 
       // Check if file is already cached and unmodified
-      if (!forceReparse && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+      if (!reparseAll && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
         continue;
       }
 
