@@ -333,3 +333,48 @@ export function compareSessionsBySortOption<T extends SessionComparable>(
   return compareSessions(a, b, 'desc');
 }
 
+export interface DriverLapReference {
+  lapNum: number;
+  lapTime: number | null;
+  isValid?: boolean;
+}
+
+export interface DriverLapSummary {
+  bestLapNum?: number | null;
+  bestLapTime?: number | null;
+  laps?: DriverLapReference[];
+}
+
+/**
+ * Resolves the best lap number for a driver profile or session summary.
+ * Prioritizes explicitly known bestLapNum, then the fastest valid lap,
+ * then any completed lap, and finally defaults to 1.
+ */
+export function getBestLapNumber(driver?: DriverLapSummary | null): number {
+  if (!driver) return 1;
+  if (typeof driver.bestLapNum === 'number' && driver.bestLapNum > 0) {
+    return driver.bestLapNum;
+  }
+  const laps = driver.laps;
+  if (laps && laps.length > 0) {
+    if (typeof driver.bestLapTime === 'number' && driver.bestLapTime > 0) {
+      const matchValid = laps.find(l => l.isValid && l.lapTime === driver.bestLapTime);
+      if (matchValid) return matchValid.lapNum;
+      const matchAny = laps.find(l => l.lapTime === driver.bestLapTime);
+      if (matchAny) return matchAny.lapNum;
+    }
+    const validLaps = laps.filter(l => l.isValid && typeof l.lapTime === 'number' && l.lapTime > 0);
+    if (validLaps.length > 0) {
+      const best = validLaps.reduce((min, cur) => ((cur.lapTime as number) < (min.lapTime as number) ? cur : min));
+      return best.lapNum;
+    }
+    const completedLaps = laps.filter(l => typeof l.lapTime === 'number' && l.lapTime > 0);
+    if (completedLaps.length > 0) {
+      const best = completedLaps.reduce((min, cur) => ((cur.lapTime as number) < (min.lapTime as number) ? cur : min));
+      return best.lapNum;
+    }
+    return laps[0].lapNum || 1;
+  }
+  return 1;
+}
+

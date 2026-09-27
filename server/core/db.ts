@@ -319,8 +319,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getReplaysCount(this.db);
   }
 
-  public getReplayCacheList(): ReplayCacheSummary[] {
-    return getReplayCacheList(this.db);
+  public getReplayCacheList(replaysDir?: string): ReplayCacheSummary[] {
+    return getReplayCacheList(this.db, replaysDir);
   }
 
   public syncReplaysIterator(

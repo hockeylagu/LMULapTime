@@ -302,6 +302,9 @@ describe('SessionDatabase replay cache', () => {
     expect(primary?.trajectoriesCached).toBe(2);
     expect(primary?.compressedSizeBytes).toBeGreaterThan(0);
     expect(primary?.replayDateMs).toBe(1000);
+    expect(primary?.replayVersion).toBe('v5');
+    expect(primary?.parserVersion).toBe('v5');
+    expect(primary?.isOnDisk).toBe(false);
 
     const other = list.find(r => r.filename === 'Other_Replay_P2.Vcr');
     expect(other?.trackName).toBe('Spa');

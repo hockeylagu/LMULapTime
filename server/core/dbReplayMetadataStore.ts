@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayCacheSummary } from './types.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from './dbSchema.js';
@@ -86,19 +88,33 @@ export function getReplaysCount(db: DatabaseType): number {
   return row.count;
 }
 
-export function getReplayCacheList(db: DatabaseType): ReplayCacheSummary[] {
+export function getReplayCacheList(db: DatabaseType, replaysDir?: string): ReplayCacheSummary[] {
   const rows = db.prepare(`
-    SELECT rm.filename, rm.file_size, rm.file_mtime, rm.metadata_br, rm.updated_at,
+    SELECT rm.filename, rm.file_path, rm.file_size, rm.file_mtime, rm.parser_version, rm.metadata_br, rm.updated_at,
            COUNT(rt.filename) as trajectories_cached,
            LENGTH(rm.metadata_br) + COALESCE(SUM(LENGTH(rt.trajectory_br)), 0) as compressed_size
     FROM replay_metadata rm
     LEFT JOIN replay_trajectories rt ON rt.filename = rm.filename
     GROUP BY rm.filename
     ORDER BY rm.file_mtime DESC
-  `).all() as { filename: string; file_size: number; file_mtime: number; metadata_br: Buffer; updated_at: number; trajectories_cached: number; compressed_size: number }[];
+  `).all() as {
+    filename: string;
+    file_path: string;
+    file_size: number;
+    file_mtime: number;
+    parser_version: string;
+    metadata_br: Buffer;
+    updated_at: number;
+    trajectories_cached: number;
+    compressed_size: number;
+  }[];
 
   return rows.map(row => {
     const meta = decompressJson<ReplayMetadata>(row.metadata_br);
+    const onDisk = Boolean(
+      (row.file_path && fs.existsSync(row.file_path)) ||
+      (replaysDir && fs.existsSync(path.join(replaysDir, row.filename)))
+    );
     return {
       filename: row.filename,
       fileSizeBytes: row.file_size,
@@ -110,6 +126,9 @@ export function getReplayCacheList(db: DatabaseType): ReplayCacheSummary[] {
       durationSec: meta.durationSec,
       eventTitle: meta.eventInfo?.eventTitle,
       trajectoriesCached: row.trajectories_cached,
+      parserVersion: row.parser_version,
+      replayVersion: row.parser_version,
+      isOnDisk: onDisk,
     };
   });
 }

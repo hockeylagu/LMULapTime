@@ -33,7 +33,7 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/replays/cache', (_req, res) => {
     try {
-      res.json(context.sessionDb.getReplayCacheList());
+      res.json(context.sessionDb.getReplayCacheList(context.replaysDir));
     } catch (error: unknown) {
       console.error('Failed to list cached replays:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list cached replays' });

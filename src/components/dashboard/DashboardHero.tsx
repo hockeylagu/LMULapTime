@@ -11,7 +11,7 @@ import type { SessionSummary } from './dashboardTypes.js';
 export interface DashboardHeroProps {
   sessions: SessionSummary[];
   onSelectSession: (id: string) => void;
-  onOpenReplay?: (id: string) => void;
+  onOpenReplay?: (id: string, targetLap?: number) => void;
   trackGeometry?: TrackBoundaryGeometry | null;
   className?: string;
 }
@@ -196,13 +196,14 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             {latestOuting.hasReplay && onOpenReplay && (
               <button
                 type="button"
-                onClick={() => onOpenReplay(latestOuting.id)}
+                onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
                 className={`flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer border ${
                   latestOuting.hasDuckDbTelemetry
                     ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 hover:border-amber-500/60'
                     : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50'
                 }`}
                 data-testid="hero-launch-replay-btn"
+                title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}
               >
                 {latestOuting.hasDuckDbTelemetry ? (
                   <>

@@ -116,6 +116,7 @@ describe('parser server module', () => {
       expect(session?.playerDriver?.isPlayer).toBe(true);
       expect(session?.playerDriver?.laps.length).toBe(3);
       expect(session?.playerDriver?.bestLapTime).toBe(122.000);
+      expect(session?.playerDriver?.bestLapNum).toBe(2);
       expect(session?.playerDriver?.bestS1).toBe(34.900);
       expect(session?.playerDriver?.theoreticalBest).toBe(122.000);
       expect(session?.playerDriver?.laps[2].isPitStop).toBe(true);

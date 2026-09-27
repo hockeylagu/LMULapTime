@@ -13,6 +13,7 @@ import {
   getSessionTypeWeight,
   compareSessions,
   compareSessionsBySortOption,
+  getBestLapNumber,
 } from '../../shared/domain/formatters.js';
 
 describe('formatters utility', () => {
@@ -383,6 +384,78 @@ describe('formatters utility', () => {
         })
       );
       expect(sortedByPace.map((s) => s.id)).toEqual(['c1', 'c2']);
+    });
+  });
+
+  describe('getBestLapNumber', () => {
+    it('returns 1 for null or undefined driver', () => {
+      expect(getBestLapNumber(null)).toBe(1);
+      expect(getBestLapNumber(undefined)).toBe(1);
+    });
+
+    it('returns bestLapNum if explicitly provided', () => {
+      expect(getBestLapNumber({ bestLapNum: 4 })).toBe(4);
+    });
+
+    it('finds lapNum matching bestLapTime among valid laps', () => {
+      expect(
+        getBestLapNumber({
+          bestLapTime: 120.5,
+          laps: [
+            { lapNum: 1, lapTime: 125.0, isValid: true },
+            { lapNum: 2, lapTime: 120.5, isValid: true },
+            { lapNum: 3, lapTime: 121.0, isValid: true },
+          ],
+        })
+      ).toBe(2);
+    });
+
+    it('finds lapNum matching bestLapTime among any laps if not valid', () => {
+      expect(
+        getBestLapNumber({
+          bestLapTime: 119.0,
+          laps: [
+            { lapNum: 1, lapTime: 125.0, isValid: false },
+            { lapNum: 2, lapTime: 119.0, isValid: false },
+          ],
+        })
+      ).toBe(2);
+    });
+
+    it('falls back to fastest valid lap if bestLapTime is not matched', () => {
+      expect(
+        getBestLapNumber({
+          bestLapTime: null,
+          laps: [
+            { lapNum: 1, lapTime: 130.0, isValid: true },
+            { lapNum: 2, lapTime: 124.0, isValid: true },
+            { lapNum: 3, lapTime: 128.0, isValid: true },
+          ],
+        })
+      ).toBe(2);
+    });
+
+    it('falls back to fastest completed lap if no valid laps exist', () => {
+      expect(
+        getBestLapNumber({
+          bestLapTime: null,
+          laps: [
+            { lapNum: 1, lapTime: 140.0, isValid: false },
+            { lapNum: 2, lapTime: 135.0, isValid: false },
+          ],
+        })
+      ).toBe(2);
+    });
+
+    it('falls back to first lap if no completed laps have times', () => {
+      expect(
+        getBestLapNumber({
+          bestLapTime: null,
+          laps: [
+            { lapNum: 5, lapTime: null, isValid: false },
+          ],
+        })
+      ).toBe(5);
     });
   });
 });

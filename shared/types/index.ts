@@ -316,6 +316,9 @@ export interface ReplayCacheSummary {
   durationSec?: number;
   eventTitle?: string;
   trajectoriesCached: number;
+  parserVersion?: string;
+  replayVersion?: string;
+  isOnDisk?: boolean;
 }
 
 export interface DriverData {
