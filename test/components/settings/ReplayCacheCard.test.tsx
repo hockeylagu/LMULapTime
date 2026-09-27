@@ -33,6 +33,8 @@ describe('ReplayCacheCard', () => {
           driversCount: 24,
           durationSec: 125,
           trajectoriesCached: 3,
+          replayVersion: 'v5',
+          isOnDisk: true,
         },
       ]),
     });
@@ -42,6 +44,10 @@ describe('ReplayCacheCard', () => {
     await waitFor(() => {
       expect(screen.getByText('Spa_R1.Vcr')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('replay-on-disk-badge')).toHaveAttribute('aria-label', 'On Disk');
+    expect(screen.getByText('Disk')).toBeInTheDocument();
+    expect(screen.getByText('Version')).toBeInTheDocument();
+    expect(screen.getByText('v5')).toBeInTheDocument();
     expect(screen.getByText('24')).toBeInTheDocument();
     expect(screen.getByText('2:05')).toBeInTheDocument();
     expect(screen.getByText('2.00 MB')).toBeInTheDocument();
@@ -49,6 +55,32 @@ describe('ReplayCacheCard', () => {
     expect(screen.getByText('Jan 15, 2026')).toBeInTheDocument();
     expect(screen.getByText('1 Cached')).toBeInTheDocument();
     expect(screen.queryByText('Spa-Francorchamps')).not.toBeInTheDocument();
+  });
+
+  it('renders "Not on Disk" badge when replay file is deleted from disk', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve([
+        {
+          filename: 'Deleted_P1.Vcr',
+          fileSizeBytes: 1024 * 1024,
+          compressedSizeBytes: 256 * 1024,
+          updatedAt: Date.now(),
+          replayDateMs: Date.now(),
+          driversCount: 1,
+          durationSec: 60,
+          trajectoriesCached: 1,
+          replayVersion: 'v5',
+          isOnDisk: false,
+        },
+      ]),
+    });
+
+    render(<ReplayCacheCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Deleted_P1.Vcr')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('replay-not-on-disk-badge')).toHaveAttribute('aria-label', 'Not on Disk');
   });
 
   it('shows an error message when the fetch fails', async () => {

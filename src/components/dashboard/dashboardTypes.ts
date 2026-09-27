@@ -21,6 +21,7 @@ export interface SessionSummary {
     carClass?: string;
     bestLapTime: number | null;
     bestLapTimeString: string;
+    bestLapNum?: number | null;
     bestS1: number | null;
     bestS2: number | null;
     bestS3: number | null;

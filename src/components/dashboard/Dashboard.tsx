@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { SessionList } from '../session-list/SessionList.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
+import { getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';
@@ -44,12 +45,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
-  const handleOpenReplay = (id: string) => {
+  const handleOpenReplay = (id: string, targetLap?: number) => {
     const session = sessions.find(item => item.id === id);
     if (!session?.matchingReplayFile) return;
     const replayParams = new URLSearchParams(searchParams);
     replayParams.set('replayName', session.matchingReplayFile.name);
-    replayParams.set('lap', '1');
+    const resolvedLap = targetLap || getBestLapNumber(session.playerDriver);
+    replayParams.set('lap', String(resolvedLap));
     navigate(`/telemetry?${replayParams.toString()}`);
   };
   const selectedTrack = searchParams.get('track') || initialSelectedTrack;

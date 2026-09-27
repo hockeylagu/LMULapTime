@@ -490,9 +490,11 @@ export class LmuParser {
 
     // Best Laps & Sectors - Strictly calculated from valid completed laps (before any inference)
     const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
-    const bestLapTime: number | null = validLaps.length > 0
-      ? Math.min(...validLaps.map(l => l.lapTime as number))
+    const bestLap = validLaps.length > 0
+      ? validLaps.reduce((best, cur) => ((cur.lapTime as number) < (best.lapTime as number) ? cur : best))
       : null;
+    const bestLapTime: number | null = bestLap ? (bestLap.lapTime as number) : null;
+    const bestLapNum: number | null = bestLap ? bestLap.lapNum : null;
 
     let bestS1: number | null = null;
     let bestS2: number | null = null;
@@ -652,6 +654,7 @@ export class LmuParser {
       finishGapToLeaderString,
       bestLapTime,
       bestLapTimeString: formatTime(bestLapTime),
+      bestLapNum,
       bestS1,
       bestS2,
       bestS3,

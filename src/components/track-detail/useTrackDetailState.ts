@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
+import { getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta } from './trackDetailHelpers.js';
@@ -42,7 +43,8 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     if (!session?.matchingReplayFile) return;
     const replayParams = new URLSearchParams(searchParams);
     replayParams.set('replayName', session.matchingReplayFile.name);
-    replayParams.set('lap', '1');
+    const bestLap = getBestLapNumber(session.playerDriver);
+    replayParams.set('lap', String(bestLap));
     navigate(`/telemetry?${replayParams.toString()}`);
   };
 
