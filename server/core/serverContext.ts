@@ -10,6 +10,7 @@ import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../te
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
+import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -385,59 +386,26 @@ export class ServerContext {
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
     this.replayUpgrade?.stop();
-    this.replayScanStatus = {
-      running: true,
-      processed: 0,
-      total: 0,
-      currentFile: null,
-      currentStage: null,
-      filePercent: null,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      result: null,
-      error: null,
-    };
-
-    const iterator = this.sessionDb.syncReplaysAsyncIterator(this.currentReplaysDir, { playerName: this.parser.configuredPlayerName });
-    const step = async (): Promise<void> => {
-      try {
-        const { value, done } = await iterator.next();
-        if (done) {
-          this.replayScanStatus.result = value;
-          console.log(`[SQLite Cache] Cached ${value.total} replays (${value.added} new, ${value.updated} updated, ${value.skipped} skipped) from ${this.currentReplaysDir}`);
-          this.replayScanStatus.running = false;
-          this.replayScanStatus.finishedAt = new Date().toISOString();
-          this.replayScanStatus.currentStage = null;
-          this.replayScanStatus.filePercent = null;
-          try {
-            if (typeof this.sessionDb?.getAllSessions === 'function') {
-              this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
-            }
-          } catch (err) {
-            console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
+    this.replayScanStatus = startedScanStatus();
+    const replaysDir = this.currentReplaysDir;
+    const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, { playerName: this.parser.configuredPlayerName });
+    pumpScanInBackground(iterator, this.replayScanStatus, outcome => {
+      if ('result' in outcome) {
+        const { total, added, updated, skipped } = outcome.result;
+        console.log(`[SQLite Cache] Cached ${total} replays (${added} new, ${updated} updated, ${skipped} skipped) from ${replaysDir}`);
+        try {
+          if (typeof this.sessionDb?.getAllSessions === 'function') {
+            this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
           }
-          this.runPendingForcedSessionReparse();
-          this.startReplayUpgradeWhenIdle();
-          return;
+        } catch (err) {
+          console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
         }
-        this.replayScanStatus.processed = value.processed;
-        this.replayScanStatus.total = value.total;
-        this.replayScanStatus.currentFile = value.currentFile || null;
-        this.replayScanStatus.currentStage = value.stage || null;
-        this.replayScanStatus.filePercent = value.filePercent ?? null;
-        setImmediate(() => { void step(); });
-      } catch (error) {
-        this.replayScanStatus.error = error instanceof Error ? error.message : String(error);
-        console.warn('[SQLite Cache] Replay sync warning:', error);
-        this.replayScanStatus.running = false;
-        this.replayScanStatus.finishedAt = new Date().toISOString();
-        this.replayScanStatus.currentStage = null;
-        this.replayScanStatus.filePercent = null;
-        this.runPendingForcedSessionReparse();
-        this.startReplayUpgradeWhenIdle();
+      } else {
+        console.warn('[SQLite Cache] Replay sync warning:', outcome.error);
       }
-    };
-    setImmediate(() => { void step(); });
+      this.runPendingForcedSessionReparse();
+      this.startReplayUpgradeWhenIdle();
+    });
     return true;
   }
 
@@ -450,52 +418,22 @@ export class ServerContext {
   public runSessionSyncInBackground(forceReparse = false): boolean {
     if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
     this.replayUpgrade?.stop();
-    this.sessionScanStatus = {
-      running: true,
-      processed: 0,
-      total: 0,
-      currentFile: null,
-      currentStage: null,
-      filePercent: null,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-      result: null,
-      error: null,
-    };
-
-    const iterator = this.sessionDb.syncSessionsAsyncIterator(this.currentResultsDir, this.parser, forceReparse);
-    const step = async (): Promise<void> => {
-      try {
-        const { value, done } = await iterator.next();
-        if (done) {
-          this.sessionScanStatus.result = value;
-          this.sessionScanStatus.processed = value.total;
-          this.sessionScanStatus.total = value.total;
-          console.log(`[SQLite Cache] Loaded ${value.total} sessions (${value.added} new, ${value.updated} updated) from ${this.currentResultsDir}`);
-          this.sessionScanStatus.running = false;
-          this.sessionScanStatus.finishedAt = new Date().toISOString();
-          this.sessionScanStatus.currentStage = null;
-          this.sessionScanStatus.filePercent = null;
-          this.runReplaySyncInBackground();
-          return;
-        }
-        this.sessionScanStatus.processed = value.processed;
-        this.sessionScanStatus.total = value.total;
-        this.sessionScanStatus.currentFile = value.currentFile || null;
-        this.sessionScanStatus.currentStage = value.stage || null;
-        this.sessionScanStatus.filePercent = value.filePercent ?? null;
-        setImmediate(() => { void step(); });
-      } catch (error: unknown) {
-        this.sessionScanStatus.error = error instanceof Error ? error.message : String(error);
-        console.warn('[SQLite Cache] Initial sync warning:', error);
-        this.sessionScanStatus.running = false;
-        this.sessionScanStatus.finishedAt = new Date().toISOString();
-        this.sessionScanStatus.currentStage = null;
-        this.sessionScanStatus.filePercent = null;
-        this.runReplaySyncInBackground();
+    const status: SessionScanStatus = startedScanStatus();
+    this.sessionScanStatus = status;
+    const resultsDir = this.currentResultsDir;
+    const iterator = this.sessionDb.syncSessionsAsyncIterator(resultsDir, this.parser, forceReparse);
+    pumpScanInBackground(iterator, status, outcome => {
+      if ('result' in outcome) {
+        const { total, added, updated } = outcome.result;
+        status.processed = total;
+        status.total = total;
+        console.log(`[SQLite Cache] Loaded ${total} sessions (${added} new, ${updated} updated) from ${resultsDir}`);
+      } else {
+        console.warn('[SQLite Cache] Initial sync warning:', outcome.error);
       }
-    };
-    setImmediate(() => { void step(); });
+      // Replays are matched against the sessions: their sync always follows.
+      this.runReplaySyncInBackground();
+    });
     return true;
   }
 
