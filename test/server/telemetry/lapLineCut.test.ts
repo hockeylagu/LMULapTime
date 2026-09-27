@@ -55,6 +55,23 @@ describe('cutLapAtLine', () => {
     expect(result.points.every(p => (p.stationM ?? -1) >= 0 && (p.stationM ?? Infinity) <= L)).toBe(true);
   });
 
+  it('keeps the lap-only channels of a DuckDB lap up to the line at both ends', () => {
+    // The lap itself is fused with DuckDB (tyre temps, ride height); the recording either side is
+    // the replay file's, without them. The slice starts 11 m late and ends 1 m early.
+    const lapEndIdx = samples.findIndex(p => Math.abs((p.throttle ?? 0) - 199) < 1e-9);
+    const fused = samples.map((p, i) => (i >= sliceStart && i <= lapEndIdx
+      ? { ...p, tireTemps: [80, 81, 82, i], rideHeight: [0.05, 0.05, 0.06, 0.06] } as ReplayTrajectoryPoint
+      : p));
+    const result = cut(fused, sliceStart, lapEndIdx);
+    expect([result.start, result.end]).toEqual(['line', 'line']);
+    expect(result.points.every(p => Array.isArray(p.tireTemps) && Array.isArray(p.rideHeight))).toBe(true);
+    // Held at the lap's nearest end.
+    expect(result.points[0].tireTemps).toEqual([80, 81, 82, sliceStart]);
+    expect(result.points[result.points.length - 1].tireTemps).toEqual([80, 81, 82, lapEndIdx]);
+    // The replay-file channels are still the recording's own.
+    expect(result.points[0].throttle).toBeCloseTo(0, 6);
+  });
+
   it('does not blend state channels such as the gear', () => {
     const result = cut(samples, sliceStart, sliceEnd);
     expect(result.points[0].gear).toBe(4);
