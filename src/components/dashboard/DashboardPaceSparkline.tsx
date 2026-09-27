@@ -71,8 +71,9 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
               : 'bg-sky-950/60 text-sky-400 border border-sky-500/30'
           }`}
         >
-          {paceTrendDirection === 'improving' && `+${paceDelta}% Gain ↗`}
-          {paceTrendDirection === 'declining' && `${paceDelta}% Delta ↘`}
+          {/* paceDelta is the drop in benchmark %, so positive is faster. */}
+          {paceTrendDirection === 'improving' && paceDelta !== null && `${paceDelta.toFixed(2)}% faster ↗`}
+          {paceTrendDirection === 'declining' && paceDelta !== null && `${Math.abs(paceDelta).toFixed(2)}% slower ↘`}
           {paceTrendDirection === 'steady' && 'Steady Pace →'}
         </span>
       </div>

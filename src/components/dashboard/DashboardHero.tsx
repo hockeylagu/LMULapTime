@@ -6,6 +6,7 @@ import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
 import { PACE_CATEGORY_STYLES } from '../../utils/paceCategoryStyles.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import type { SessionSummary } from './dashboardTypes.js';
 
 export interface DashboardHeroProps {
@@ -31,6 +32,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
     recentPaceTrend,
     paceDelta,
     paceTrendDirection,
+    paceTrendClass,
     recentCleanRate,
     recentConsistency,
     recentNetPositions,
@@ -237,7 +239,9 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
               <span className="text-xs font-mono font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
                 <Trophy className="w-3.5 h-3.5" /> Recent Form & Momentum
               </span>
-              <span className="text-[11px] font-mono text-lmu-muted">Last {recentPaceTrend.length} Stints</span>
+              <span className="text-[11px] font-mono text-lmu-muted">
+                Last {recentPaceTrend.length} Stints{paceTrendClass ? ` · ${VEHICLE_CLASS_OPTIONS.find(o => o.id === paceTrendClass)?.label ?? paceTrendClass}` : ''}
+              </span>
             </div>
 
             <DashboardPaceSparkline
