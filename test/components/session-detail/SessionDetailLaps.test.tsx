@@ -117,7 +117,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     // Selecting another driver must not add (You) to that opponent
     // The same-car card names this driver too; the row to click is in the standings table.
-    const opponentRow = screen.getAllByText('AI Driver 2').find(el => !el.closest('[data-testid="same-car-rivals"]'))!;
+    const opponentRow = screen.getAllByText('AI Driver 2').find(el => !el.closest('[data-testid="sectors-metric"]'))!;
     fireEvent.click(opponentRow);
     expect(screen.queryByText(/AI Driver 2\s*\(You\)/i)).not.toBeInTheDocument();
   });
@@ -127,7 +127,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Session Lap Average')).toBeInTheDocument();
-      expect(screen.getByText('Sectors (Best / Avg)')).toBeInTheDocument();
+      expect(screen.getByTestId('sectors-metric')).toHaveTextContent('SectorsBestAvg');
     });
 
     // Check that average lap time across 3 laps (123.0 + 122.0 + 135.0)/3 = 126.666 -> '2:06.666' or '2:06.667'

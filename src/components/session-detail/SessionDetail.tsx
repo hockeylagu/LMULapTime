@@ -2,7 +2,6 @@ import React from 'react';
 import { useSessionDetailData } from './useSessionDetailData.js';
 import { SessionDetailHeader } from './overview/SessionDetailHeader.js';
 import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
-import { SameCarRivalsCard } from './overview/SameCarRivalsCard.js';
 import { SessionDebriefCard } from './debrief/SessionDebriefCard.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
@@ -112,8 +111,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
       {selectedDriver && session.matchingReplayFile && (
         <SessionDebriefCard session={session} selectedDriver={selectedDriver} />
       )}
-
-      <SameCarRivalsCard session={session} selectedDriver={selectedDriver} />
 
       {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (
         <SessionTelemetryChart
