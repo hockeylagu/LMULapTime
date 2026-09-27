@@ -525,6 +525,8 @@ describe('ServerContext replay scan progress', () => {
         getAllStoredReplayFiles: vi.fn(() => storedReplays),
         getTelemetryMetadata: vi.fn(() => []),
         updateSessionMatchingReplay: vi.fn(),
+        rejectSessionReplayLink: vi.fn((_id: string, link: { name: string }, reason: string) => ({ replayName: link.name, reason, rejectedAt: 1 })),
+        getRejectedReplayLinks: vi.fn(() => new Map()),
       } as unknown as SessionDatabase;
       const context = new ServerContext({
         resultsDir: '',
@@ -561,13 +563,41 @@ describe('ServerContext replay scan progress', () => {
       );
     });
 
-    it('keeps a stale match when no replay was saved alongside the session XML', () => {
+    it('withdraws a match to the previous race when the session has no replay of its own', () => {
+      // The previous race ended ~50 minutes before this race's XML: outside the match window.
       const { context, sessionDb, session } = setup([previousRace], previousRace.filename);
 
       context.enrichSessionsWithTelemetry([session]);
 
-      expect(session.matchingReplayFile?.name).toBe(previousRace.filename);
+      expect(session.matchingReplayFile).toBeUndefined();
+      expect(session.rejectedReplayLink).toEqual({ replayName: previousRace.filename, reason: 'time-window', rejectedAt: 1 });
+      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledWith(
+        '2026_09_03_14_41_14-69R1',
+        expect.objectContaining({ name: previousRace.filename }),
+        'time-window'
+      );
       expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+    });
+
+    it('keeps a match to a replay that is no longer in the index: it cannot be judged', () => {
+      const { context, sessionDb, session } = setup([ownRace], 'Circuit de la Sarthe R1 26.Vcr');
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile?.name).toBe('Circuit de la Sarthe R1 26.Vcr');
+      expect(sessionDb.rejectSessionReplayLink).not.toHaveBeenCalled();
+    });
+
+    it('tells the UI why a session has no replay after a restart', () => {
+      const { context, sessionDb, session } = setup([], '');
+      Object.assign(session, { matchingReplayFile: undefined });
+      const withdrawal = { replayName: previousRace.filename, reason: 'time-window', rejectedAt: 5 };
+      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, withdrawal]]) as never);
+
+      context.enrichSessionsWithTelemetry([session]);
+
+      expect(session.matchingReplayFile).toBeUndefined();
+      expect(session.rejectedReplayLink).toEqual(withdrawal);
     });
 
     it('keeps a match saved alongside the session XML without searching again', () => {

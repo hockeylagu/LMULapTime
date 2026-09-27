@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
+import { replayLinkRejection } from '../sessions/replayMatching.js';
+import { DetailedSession, RejectedReplayLink, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
 import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
@@ -169,11 +170,31 @@ export class ServerContext {
     return session.timestamp + Math.round(maxElapsed * 1000);
   }
 
+  private toReplayLink(replay: ReplayFileEntry): NonNullable<DetailedSession['matchingReplayFile']> {
+    return {
+      name: replay.name,
+      path: replay.path,
+      sizeBytes: replay.sizeBytes,
+      eventTitle: replay.eventTitle,
+      splitNo: replay.splitNo,
+      eventType: replay.eventType,
+      durationSec: replay.durationSec,
+    };
+  }
+
+  private relinkSession(session: DetailedSession, replay: ReplayFileEntry): void {
+    console.log(`[ServerContext] Re-matched session ${session.id}: ${session.matchingReplayFile?.name} -> ${replay.name}`);
+    session.matchingReplayFile = this.toReplayLink(replay);
+    this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+  }
+
   /**
-   * A stored match can be stale when the session XML was parsed before its own replay was
-   * cached (the replay sync runs after the session sync, so the index only learns about it later).
-   * LMU saves both files within about a second of each other at session end, so a replay saved
-   * within SAME_SAVE_WINDOW_MS of the XML replaces a stored match that was not.
+   * Re-validates a stored match against the current matching rules, which older builds did not
+   * enforce (e.g. every session of a practice run linked to the one replay LMU saved at its end).
+   * A match that fails them is replaced by the session's own replay when there is one, and withdrawn
+   * otherwise (recorded in rejected_replay_links). A valid match is only replaced by a replay saved
+   * within SAME_SAVE_WINDOW_MS of the XML: LMU saves both within about a second at session end, and
+   * the stored match can predate that replay being cached (the replay sync runs after the session sync).
    */
   private recheckStoredReplayMatch(session: DetailedSession, replaysByName: Map<string, ReplayFileEntry>): void {
     const SAME_SAVE_WINDOW_MS = 60_000;
@@ -183,38 +204,45 @@ export class ServerContext {
     if (this.replayMatchCheckedAt.get(session.id) === revision) return;
     this.replayMatchCheckedAt.set(session.id, revision);
 
+    // Without the replay's timing or the XML's mtime the match cannot be judged: keep it.
     const current = replaysByName.get(stored.name);
     const xmlMtime = this.getXmlMtime(session);
     if (!current || xmlMtime === undefined) return;
-    if (Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
+
+    const target = {
+      trackVenue: session.trackVenue,
+      trackCourse: session.trackCourse,
+      sessionCode: session.sessionName || session.sessionType,
+      sessionTimestampMs: session.timestamp,
+      xmlFileMtimeMs: xmlMtime,
+    };
+    const rejection = replayLinkRejection(current, target);
+    if (!rejection && Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
 
     const candidate = this.parser.findMatchingReplay(
-      session.trackVenue,
-      session.trackCourse,
-      session.sessionName || session.sessionType,
-      session.timestamp,
-      xmlMtime
+      target.trackVenue, target.trackCourse, target.sessionCode, target.sessionTimestampMs, target.xmlFileMtimeMs
     );
-    if (!candidate || candidate.name === stored.name) return;
-    if (Math.abs(candidate.mtime - xmlMtime) > SAME_SAVE_WINDOW_MS) return;
+    const isOwnReplay = candidate && candidate.name !== stored.name &&
+      (rejection || Math.abs(candidate.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS);
+    if (candidate && isOwnReplay) {
+      this.relinkSession(session, candidate);
+      return;
+    }
+    if (!rejection) return;
 
-    console.log(`[ServerContext] Re-matched session ${session.id}: ${stored.name} -> ${candidate.name}`);
-    session.matchingReplayFile = {
-      name: candidate.name,
-      path: candidate.path,
-      sizeBytes: candidate.sizeBytes,
-      eventTitle: candidate.eventTitle,
-      splitNo: candidate.splitNo,
-      eventType: candidate.eventType,
-      durationSec: candidate.durationSec,
-    };
-    this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
+    console.log(`[ServerContext] Withdrew replay ${stored.name} from session ${session.id} (${rejection})`);
+    const rejected = this.sessionDb.rejectSessionReplayLink(session.id, stored, rejection);
+    delete session.matchingReplayFile;
+    if (rejected) session.rejectedReplayLink = rejected;
   }
 
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
     try {
       this.populateReplayIndexFromDb();
       const replaysByName = new Map(this.parser.getReplaysList().map(r => [r.name, r] as const));
+      const rejectedLinks = typeof this.sessionDb.getRejectedReplayLinks === 'function'
+        ? this.sessionDb.getRejectedReplayLinks()
+        : new Map<string, RejectedReplayLink>();
 
       for (const session of sessions) {
         if (session.matchingReplayFile) {
@@ -231,18 +259,14 @@ export class ServerContext {
             this.getXmlMtime(session) ?? this.estimateSessionEndMs(session)
           );
           if (matchedReplay) {
-            session.matchingReplayFile = {
-              name: matchedReplay.name,
-              path: matchedReplay.path,
-              sizeBytes: matchedReplay.sizeBytes,
-              eventTitle: matchedReplay.eventTitle,
-              splitNo: matchedReplay.splitNo,
-              eventType: matchedReplay.eventType,
-              durationSec: matchedReplay.durationSec,
-            };
+            session.matchingReplayFile = this.toReplayLink(matchedReplay);
             this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
           }
         }
+        // Tells the UI why a session has no replay when one was withdrawn from it.
+        const rejected = session.matchingReplayFile ? undefined : rejectedLinks.get(session.id) ?? session.rejectedReplayLink;
+        if (rejected) session.rejectedReplayLink = rejected;
+        else delete session.rejectedReplayLink;
       }
 
       const duckFiles = this.telemetryCatalog.getFiles();

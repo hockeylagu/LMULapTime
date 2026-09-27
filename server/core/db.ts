@@ -12,6 +12,8 @@ import {
   ReplayTrajectoryData,
   ReplayCacheSummary,
   AiReportHistoryEntry,
+  RejectedReplayLink,
+  ReplayLinkRejectionReason,
   DuckDbLapTelemetry,
 } from './types.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
@@ -85,6 +87,7 @@ import {
   getSessionsCount as fetchSessionsCount,
   clearSessionCache,
 } from './dbSessionStore.js';
+import { getRejectedReplayLinks, rejectSessionReplayLink } from './dbReplayLinkStore.js';
 import {
   SessionXmlSyncParser,
   SessionSyncHost,
@@ -350,6 +353,25 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
       const cached = this.allSessionsCache.find(s => s.id === sessionId);
       if (cached) cached.matchingReplayFile = matchingReplayFile;
     }
+  }
+
+  /** Withdraws the session's replay link (see dbReplayLinkStore); the cached session loses it too. */
+  public rejectSessionReplayLink(
+    sessionId: string,
+    link: NonNullable<SessionMetadata['matchingReplayFile']>,
+    reason: ReplayLinkRejectionReason
+  ): RejectedReplayLink | null {
+    const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
+    const cached = rejected ? this.allSessionsCache?.find(s => s.id === sessionId) : undefined;
+    if (cached && rejected) {
+      delete cached.matchingReplayFile;
+      cached.rejectedReplayLink = rejected;
+    }
+    return rejected;
+  }
+
+  public getRejectedReplayLinks(): Map<string, RejectedReplayLink> {
+    return getRejectedReplayLinks(this.db);
   }
 
   public *syncSessionsIterator(
