@@ -29,7 +29,7 @@ export function isRacingLap(lap: Pick<LapSelectionInput, 'isValid' | 'isPitStop'
 /**
  * Selects the laps used for clean-lap averages and consistency metrics.
  * Evaluates valid flying laps completed at racing speed, excluding pit stops,
- * out-laps, and start laps (lap 1 when multiple laps exist).
+ * out-laps (as marked by the parser), and start laps (lap 1 when multiple laps exist).
  */
 export function selectCleanLapCandidates<T extends LapSelectionInput>(
   laps: T[],
@@ -37,12 +37,10 @@ export function selectCleanLapCandidates<T extends LapSelectionInput>(
 ): T[] {
   const completed = laps.filter((l) => l.lapTime !== null && l.lapTime > 0);
   const hasMultiple = completed.length > 1;
-  const isAfterPitStop = (index: number): boolean => index > 0 && isCompletedPitStop(completed[index - 1]);
-  const validFlying = completed.filter((lap, index) =>
+  const validFlying = completed.filter((lap) =>
     (lap.isValid ?? true) &&
     !lap.isPitStop &&
     !lap.isOutLap &&
-    !isAfterPitStop(index) &&
     (!hasMultiple || (lap.lapNum ?? 2) > 1)
   );
 

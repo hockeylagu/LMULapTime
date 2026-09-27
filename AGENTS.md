@@ -210,7 +210,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - **Out-Laps**: Laps exiting the pit box / pit lane (excluded from flying averages).
   - **Incomplete / Partial Laps**: Crashed or disconnected laps (display estimated/partial time where possible; never treat as clean flying laps).
 - **Rule**: True Pace (e.g. Top 3 Clean Lap Average) and Consistency Ratings **must only** include valid, clean flying laps.
-- **One classification**: the session parser (`server/sessions/parser.ts`) infers missing lap times (`isInferred`) and marks out-laps (`isOutLap`) once. Views and analytics read those flags through `isRacingLap` / `isCompletedPitStop` in `shared/domain/lapComparison.ts`; never re-derive them from neighbouring laps. Changing a rule means bumping `DB_PARSER_VERSION` so stored sessions are re-parsed.
+- **One classification**: the session parser (`server/sessions/parser.ts`) infers missing lap times (`isInferred`) and marks out-laps (`isOutLap`) once. Views and analytics read those flags (`isRacingLap`, `selectCleanLapCandidates` in `shared/domain/lapComparison.ts`); never re-derive them from neighbouring laps (`isCompletedPitStop` is the parser's rule). Changing a rule means bumping `DB_PARSER_VERSION` so stored sessions are re-parsed.
 
 ### C. Deterministic Logic First (AI Is Secondary)
 - Calculations of deltas, telemetry traces, sector rankings, tire wear, pace categories, handling balance (understeer/oversteer), and coaching deficits **must be 100% deterministic**.
