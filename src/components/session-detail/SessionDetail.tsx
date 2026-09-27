@@ -3,6 +3,7 @@ import { useSessionDetailData } from './useSessionDetailData.js';
 import { SessionDetailHeader } from './overview/SessionDetailHeader.js';
 import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
 import { SameCarRivalsCard } from './overview/SameCarRivalsCard.js';
+import { SessionDebriefCard } from './debrief/SessionDebriefCard.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
@@ -99,6 +100,10 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         handleExportCsv={handleExportCsv}
         refEntry={refEntry}
       />
+
+      {selectedDriver && session.matchingReplayFile && (
+        <SessionDebriefCard session={session} selectedDriver={selectedDriver} />
+      )}
 
       <DriverPerformancePanel
         session={session}
