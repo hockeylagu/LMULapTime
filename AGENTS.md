@@ -75,6 +75,7 @@ LMULapTime/
 │   │   ├── db.ts                   # SQLite instance, transactions, schema initialization
 │   │   ├── dbAiReportStore.ts      # AI race engineer coaching reports
 │   │   ├── dbMetadataStore.ts      # Key-value system cache metadata & version tags
+│   │   ├── dbRacePositionStore.ts  # Per-replay race positions index (built from the stored laps)
 │   │   ├── dbReferenceLaptimeStore.ts # Community alien benchmark targets cache
 │   │   ├── dbReplayIdentity.ts     # Replay file fingerprinting, versioning & collision protection
 │   │   ├── dbReplayIngestStore.ts  # Atomic replay lap ingest operations
@@ -127,6 +128,7 @@ LMULapTime/
 │   │   ├── telemetryFusion.ts      # Merges DuckDB channels with VCR coordinates
 │   │   ├── telemetryLinks.ts       # Persistent session DuckDB links & multi-file mapping
 │   │   └── telemetryMatcher.ts     # Matches session XMLs with telemetry files
+│   ├── traffic/                    # Every car's 5 Hz track position per replay (worker-built index) and traffic spells: battles, lapping, multiclass
 │   ├── tracks/                     # Server track projection & timing loop geometry
 │   │   ├── lapLineCut.ts           # Timing loop boundary interpolation & channel preservation
 │   │   ├── serverTrackSync.ts      # Disk to DB track geometry sync

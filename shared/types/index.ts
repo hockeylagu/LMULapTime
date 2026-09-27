@@ -1,6 +1,8 @@
 import type { LapTraffic } from './raceTraffic.js';
 
-export type { LapTraffic, TrafficCar, TrafficGap } from './raceTraffic.js';
+export type {
+  LapTraffic, ReplayLapTraffic, ReplayTrafficResponse, TrafficCar, TrafficGap, TrafficSpell, TrafficSpellKind,
+} from './raceTraffic.js';
 
 export type PaceCategory = 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
 
