@@ -25,6 +25,10 @@ export class ServerContext {
   private currentTelemetryDir: string;
   private parser: LmuParser;
   private pendingForcedSessionReparse = false;
+  // What the cached session list was last enriched against (see loadSessions).
+  private enrichedInputs: unknown[] | null = null;
+  // The parser and replay_metadata revision the replay index was last loaded for.
+  private replayIndexLoadedFor: [LmuParser, number] | null = null;
   // Session id -> replay index revision at which its stored replay match was last re-checked.
   private readonly replayMatchCheckedAt = new Map<string, number>();
   // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
@@ -110,6 +114,10 @@ export class ServerContext {
   }
 
   public populateReplayIndexFromDb(): void {
+    // Reading the stored replays decompresses every one's metadata (~20 ms for 325 replays), and
+    // every session list, metadata and trajectory request asks: reload only when rows changed.
+    const revision = typeof this.sessionDb.getReplayMetadataRevision === 'function' ? this.sessionDb.getReplayMetadataRevision() : NaN;
+    if (this.replayIndexLoadedFor?.[0] === this.parser && this.replayIndexLoadedFor[1] === revision) return;
     try {
       const stored = this.sessionDb.getAllStoredReplayFiles();
       for (const r of stored) {
@@ -129,6 +137,7 @@ export class ServerContext {
           durationSec: r.metadata.durationSec,
         });
       }
+      this.replayIndexLoadedFor = [this.parser, revision];
     } catch (err) {
       console.warn('[ServerContext] Error populating replay index from DB:', err);
     }
@@ -284,8 +293,26 @@ export class ServerContext {
       if (!started && forceReparse) this.pendingForcedSessionReparse = true;
     }
     const sessions = this.sessionDb.getAllSessions();
+    // getAllSessions returns the same cached objects until sessions change, and enrichment writes
+    // its results into them: it only needs to run again when one of its inputs changed. It cost
+    // ~340 ms, paid by every session list, metadata and trajectory request.
+    this.populateReplayIndexFromDb();
+    const inputs = this.enrichmentInputs(sessions);
+    if (this.enrichedInputs && inputs.every((input, i) => input === this.enrichedInputs?.[i])) return sessions;
     this.enrichSessionsWithTelemetry(sessions);
+    // Enrichment itself records the matches it finds; key on the state it leaves behind.
+    this.enrichedInputs = this.enrichmentInputs(sessions);
     return sessions;
+  }
+
+  private enrichmentInputs(sessions: DetailedSession[]): unknown[] {
+    return [
+      sessions,
+      this.parser,
+      typeof this.parser.getReplayIndexRevision === 'function' ? this.parser.getReplayIndexRevision() : NaN,
+      typeof this.telemetryCatalog?.getFiles === 'function' ? this.telemetryCatalog.getFiles() : NaN,
+      typeof this.sessionDb.getTelemetryMetadataRevision === 'function' ? this.sessionDb.getTelemetryMetadataRevision() : NaN,
+    ];
   }
 
   public parseAndCacheFile(filePath: string): DetailedSession | null {

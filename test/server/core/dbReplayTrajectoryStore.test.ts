@@ -1,0 +1,81 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import Database, { Database as DatabaseType } from 'better-sqlite3';
+import { initDbSchema, REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
+import {
+  getAdjacentLapTrajectories,
+  getReplayTrajectoryCache,
+  hasValidReplayTrajectoryCache,
+  upsertReplayTrajectoryCache,
+} from '../../../server/core/dbReplayTrajectoryStore.js';
+import { ReplayTrajectoryData } from '../../../server/core/types.js';
+
+const lap = (lapNumber: number): ReplayTrajectoryData => ({
+  replayName: 'Spa_R1.Vcr',
+  pointsCount: 2,
+  currentLap: lapNumber,
+  bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+  points: [
+    { x: lapNumber * 100, y: 0, z: 0, timeSec: lapNumber * 100 },
+    { x: lapNumber * 100 + 50, y: 0, z: 0, timeSec: lapNumber * 100 + 50 },
+  ],
+});
+
+describe('dbReplayTrajectoryStore', () => {
+  let db: DatabaseType;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    initDbSchema(db);
+  });
+
+  afterEach(() => db.close());
+
+  const setVersion = (version: string) => db.prepare('UPDATE replay_trajectories SET parser_version = ?').run(version);
+
+  describe('cache versions', () => {
+    it('keeps rows of a compatible version valid, so the replay is not decoded again', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
+      setVersion('v4');
+      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
+
+      setVersion('v3');
+      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
+    });
+
+    it('treats rows of an unknown version as stale', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
+      setVersion('v2');
+      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(false);
+    });
+
+    it('writes the current version', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
+      const row = db.prepare('SELECT parser_version FROM replay_trajectories').get() as { parser_version: string };
+      expect(row.parser_version).toBe(REPLAY_CACHE_VERSION);
+    });
+  });
+
+  describe('getAdjacentLapTrajectories', () => {
+    it('returns the stored laps either side of a lap, whatever their version (the replay may be deleted)', () => {
+      for (const n of [3, 4, 5]) upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, n, 1000, 5000, lap(n));
+      setVersion('v2');
+      const { previous, next } = getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4);
+      expect(previous?.currentLap).toBe(3);
+      expect(next?.currentLap).toBe(5);
+    });
+
+    it('only uses laps of the same driver and the same recording', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 7, 3, 1000, 5000, lap(3));
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 5, 2000, 5000, lap(5));
+      expect(getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4)).toEqual({ previous: null, next: null });
+    });
+
+    it('returns nothing for a lap that is not stored', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 3, 1000, 5000, lap(3));
+      expect(getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4)).toEqual({ previous: null, next: null });
+    });
+  });
+});

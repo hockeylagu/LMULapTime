@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeTelemetryChartPaths, DeltaGradientStop } from '../../../../src/components/replay/index.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { PointComparison } from '../../../../src/utils/replayComparison.js';
+import { getTrajectoryDistances } from '../../../../src/utils/lapAlignment.js';
 
 describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
   const createMockPoint = (timeSec: number, speedKmh: number = 180): ReplayTrajectoryPoint => ({
@@ -36,7 +37,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
   });
 
   it('returns empty result when points array is empty', () => {
-    const result = computeTelemetryChartPaths([], [], 0, 0);
+    const result = computeTelemetryChartPaths([], [], 0, 0, []);
     expect(result.deltaTimePath).toBe('');
     expect(result.deltaGradientStops).toEqual([]);
     expect(result.deltaGainArea).toBe('');
@@ -55,7 +56,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, getTrajectoryDistances(points));
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Active stops should be emerald green with high opacity (> 0.4)
@@ -79,7 +80,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, getTrajectoryDistances(points));
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     const activeStops = result.deltaGradientStops.filter((s: DeltaGradientStop) => s.opacity > 0.4);
@@ -102,7 +103,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 30);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 30, getTrajectoryDistances(points));
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // All stops in the flat zone should be faded to 0 opacity
@@ -127,7 +128,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       comparisons.push(createMockComparison(pt, dt));
     }
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 20);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 20, getTrajectoryDistances(points));
     expect(result.deltaGradientStops.length).toBeGreaterThan(0);
 
     // Verify there are both green stops (during gain) and red stops (during loss)
@@ -152,7 +153,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       createMockComparison(p2, -0.3),
     ];
 
-    const result = computeTelemetryChartPaths(points, comparisons, 0, 2);
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 2, getTrajectoryDistances(points));
     expect(result.deltaTimeArea).toContain('50 Z');
     expect(result.deltaTimeArea).toMatch(/^M \d+\.\d+ \d+\.\d+ L .* L \d+\.\d+ 50 L \d+\.\d+ 50 Z$/);
   });
@@ -214,7 +215,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       },
     };
 
-    const result = computeTelemetryChartPaths([ptA, ptB], [compA, compB], 0, 1);
+    const result = computeTelemetryChartPaths([ptA, ptB], [compA, compB], 0, 1, getTrajectoryDistances([ptA, ptB]));
 
     // Verify all corner paths exist for both primary and baseline
     (['fl', 'fr', 'rl', 'rr'] as const).forEach((corner) => {
@@ -266,7 +267,7 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
       createMockComparison(rightPoint, 0),
     ];
 
-    const result = computeTelemetryChartPaths([leftPoint, centerPoint, rightPoint], comparisons, 0, 2);
+    const result = computeTelemetryChartPaths([leftPoint, centerPoint, rightPoint], comparisons, 0, 2, getTrajectoryDistances([leftPoint, centerPoint, rightPoint]));
     // Parse SVG Y coordinates from result.steerPath: "M 0.0 10.0 L 500.0 50.0 L 1000.0 90.0 "
     const tokens = result.steerPath.trim().split(/\s+/);
     const y1 = parseFloat(tokens[2]); // left

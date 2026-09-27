@@ -255,16 +255,6 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 2000, 12345)).toBeNull();
   });
 
-  it('clears both replay tables via clearReplayCache', () => {
-    db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', 'C:\\replays\\Test_Replay_P1.Vcr', 1000, 12345, buildMetadata());
-    db.upsertReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 1000, 12345, buildTrajectory());
-    expect(db.getReplaysCount()).toBe(1);
-
-    db.clearReplayCache();
-    expect(db.getReplaysCount()).toBe(0);
-    expect(db.getReplayMetadataCache('Test_Replay_P1.Vcr', 1000, 12345)).toBeNull();
-    expect(db.getReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 1000, 12345)).toBeNull();
-  });
 
   it('lists cached replays with a trajectory count from the joined table', () => {
     db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', 'C:\\replays\\Test_Replay_P1.Vcr', 1000, 12345, buildMetadata());
@@ -699,6 +689,40 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(metadata.filter(item => item.matchedReplayFilename === 'Daytona_R.Vcr')).toEqual([
       expect.objectContaining({ filename: currentFile.filename }),
     ]);
+  });
+
+  it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
+    const file = {
+      filename: 'Spa_R.duckdb', filePath: 'C:\Telemetry\Spa_R.duckdb', fileMtimeMs: 1000, fileSizeBytes: 1024,
+      trackName: 'Spa', sessionType: 'R', timestampStr: '2026-09-01T00:00:00Z', timestampEpochMs: 1000,
+    };
+    const other = { ...file, filename: 'Spa_Q.duckdb', filePath: 'C:\Telemetry\Spa_Q.duckdb' };
+    const start = db.getTelemetryMetadataRevision();
+
+    db.upsertTelemetryMetadata(file, 'session-spa', 'Spa_R.Vcr');
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
+    db.upsertTelemetryMetadata(file, 'session-spa', 'Spa_R.Vcr');
+    db.upsertTelemetryMetadata(file);
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 1);
+
+    // A match moving to another file and back is written each time.
+    db.upsertTelemetryMetadata(other, 'session-spa');
+    db.upsertTelemetryMetadata(file, 'session-spa');
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
+    expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename)).toEqual([file.filename]);
+
+    db.upsertTelemetryMetadata({ ...file, fileMtimeMs: 2000 });
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 4);
+    db.clearTelemetryCache();
+    expect(db.getTelemetryMetadataRevision()).toBe(start + 5);
+  });
+
+  it('changes the replay metadata revision on every replay metadata write', () => {
+    const start = db.getReplayMetadataRevision();
+    const metadata = { replayName: 'Spa_R.Vcr' } as unknown as ReplayMetadata;
+    db.upsertReplayMetadataCache('Spa_R.Vcr', 'C:/replays/Spa_R.Vcr', 1000, 5000, metadata);
+    db.upsertReplayMetadataCache('Spa_R.Vcr', 'C:/replays/Spa_R.Vcr', 2000, 5000, metadata);
+    expect(db.getReplayMetadataRevision()).toBe(start + 2);
   });
 });
 

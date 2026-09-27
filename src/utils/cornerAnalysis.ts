@@ -1,10 +1,14 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import {
   InterpolatedPoint,
+  computeLapComparisons,
   interpolatePointAtDistance,
-  getTrajectoryDistances,
-  getMonotonicStations,
 } from './replayComparison.js';
+import {
+  interpolateScalarAtDistance,
+  getTrajectoryDistances,
+  getDistancesInReferenceFrame,
+} from './lapAlignment.js';
 import { unwrapAngle } from './computedTelemetry.js';
 
 interface BaseSegmentComparison {
@@ -208,6 +212,10 @@ function findSpeedTurningPoints(
 export const SEGMENT_SCAN_STEP_M = 2;
 export const BRAKE_ON_THRESHOLD_PCT = 10;
 export const THROTTLE_ON_THRESHOLD_PCT = 90;
+// Throttle counts as on once its mean over this long after the crossing (or until the corner's
+// exit) is at/over the threshold. A single sample over 90% - a VCR quantisation spike, a stab the driver takes
+// back - is not the pick-up, and whether one such sample survives depends on the resolution.
+export const THROTTLE_ON_MIN_HOLD_SEC = 0.4;
 const MIN_STRAIGHT_LENGTH_M = 5;
 
 // A steering reversal only counts as "genuine" if the lock built up to at least this fraction
@@ -226,9 +234,40 @@ function computeMaxAbsSteer(points: ReplayTrajectoryPoint[]): number {
   return maxAbs;
 }
 
+// How far before a corner's entry (speed peak) a brake application may have started. A lap
+// compared against another lap's corner windows can brake before that lap's speed peak.
+export const BRAKE_ONSET_LOOKBACK_M = 150;
+
 /**
- * Scans forward from fromDist to toDist (in fixed steps) and returns the distance where the
- * sampled channel first reaches `threshold`, or null if it never does within the window.
+ * Throttle pick-up is searched from the apex, but a lap can be back on the throttle before
+ * the (other lap's) apex - look back as far as the corner entry, never into the straight before.
+ */
+export function throttleOnsetLookbackM(entryDistM: number, apexDistM: number): number {
+  return Math.max(0, apexDistM - entryDistM);
+}
+
+function firstIndexAbove(dists: number[], d: number): number {
+  let low = 0;
+  let high = dists.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (dists[mid] <= d) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+/**
+ * Returns the distance where the channel first reaches `threshold` between fromDist and
+ * toDist, linearly interpolated between recorded samples, or null if it never does.
+ *
+ * When the channel is already at/over the threshold at fromDist and `lookbackM` > 0, the
+ * application started before the window: samples are walked backwards (up to lookbackM) to
+ * where it began, instead of reporting the window start as the onset. If it never drops below
+ * the threshold within the lookback (e.g. a corner taken flat), the window start is returned.
+ *
+ * With `minHoldSec` > 0 a crossing only counts if the channel's mean over that long after it
+ * (cut short at toDist) is at/over the threshold; crossings that fall back sooner are skipped.
  */
 export function findThresholdCrossingDistM(
   points: ReplayTrajectoryPoint[],
@@ -236,13 +275,88 @@ export function findThresholdCrossingDistM(
   fromDist: number,
   toDist: number,
   getValue: (p: InterpolatedPoint) => number,
-  threshold: number
+  threshold: number,
+  lookbackM = 0,
+  minHoldSec = 0
 ): number | null {
-  if (toDist <= fromDist) return null;
-  for (let d = fromDist; d < toDist; d += SEGMENT_SCAN_STEP_M) {
-    if (getValue(interpolatePointAtDistance(points, dists, d)) >= threshold) return Math.round(d);
+  if (toDist <= fromDist || points.length === 0) return null;
+  const valueAt = (d: number) => getValue(interpolatePointAtDistance(points, dists, d));
+  const crossingBetween = (d0: number, v0: number, d1: number, v1: number) =>
+    Math.round(v1 === v0 ? d1 : d0 + ((threshold - v0) / (v1 - v0)) * (d1 - d0));
+  const timeAt = (d: number) => interpolatePointAtDistance(points, dists, d).timeSec;
+  const holds = (d: number) => holdsAboveThreshold(points, dists, d, Math.min(timeAt(d) + minHoldSec, timeAt(toDist)), valueAt, threshold);
+
+  const startValue = valueAt(fromDist);
+  const firstAfterStart = firstIndexAbove(dists, fromDist);
+
+  if (startValue >= threshold && (minHoldSec <= 0 || holds(fromDist))) {
+    if (lookbackM <= 0) return Math.round(fromDist);
+    const limit = fromDist - lookbackM;
+    let laterD = fromDist;
+    let laterV = startValue;
+    for (let k = firstAfterStart - 1; k >= 0 && dists[k] >= limit; k--) {
+      if (dists[k] >= laterD) continue;
+      const v = valueAt(dists[k]);
+      if (v < threshold) return crossingBetween(dists[k], v, laterD, laterV);
+      laterD = dists[k];
+      laterV = v;
+    }
+    return Math.round(fromDist);
   }
-  return getValue(interpolatePointAtDistance(points, dists, toDist)) >= threshold ? Math.round(toDist) : null;
+
+  let prevD = fromDist;
+  let prevV = startValue;
+  for (let k = firstAfterStart; k < dists.length && dists[k] < toDist; k++) {
+    if (dists[k] <= prevD) continue;
+    const v = valueAt(dists[k]);
+    if (v >= threshold && prevV < threshold) {
+      const crossing = crossingBetween(prevD, prevV, dists[k], v);
+      if (minHoldSec <= 0 || holds(crossing)) return crossing;
+    }
+    prevD = dists[k];
+    prevV = v;
+  }
+  const endValue = valueAt(toDist);
+  return endValue >= threshold ? crossingBetween(prevD, prevV, toDist, endValue) : null;
+}
+
+/**
+ * Whether the channel's mean, from distance fromD until lap time untilSec, is at/over the
+ * threshold. The mean is taken over time on the linearly interpolated trace, so a single
+ * sample dipping just under it doesn't fail the hold, a single spike doesn't pass it, and the
+ * answer doesn't depend on how densely the lap is sampled. Laps without timestamps cannot
+ * measure a hold, so they always pass.
+ */
+function holdsAboveThreshold(
+  points: ReplayTrajectoryPoint[],
+  dists: number[],
+  fromD: number,
+  untilSec: number,
+  valueAt: (d: number) => number,
+  threshold: number
+): boolean {
+  const t0 = points[0].timeSec ?? 0;
+  const timeOf = (k: number) => (points[k].timeSec ?? 0) - t0;
+  if (timeOf(points.length - 1) <= 0) return true;
+  const startSec = interpolatePointAtDistance(points, dists, fromD).timeSec;
+  if (untilSec - startSec <= 1e-6) return true;
+  let prevT = startSec;
+  let prevV = valueAt(fromD);
+  let area = 0;
+  for (let k = firstIndexAbove(dists, fromD); k < points.length && prevT < untilSec; k++) {
+    const t = timeOf(k);
+    if (t <= prevT) continue;
+    let v = valueAt(dists[k]);
+    let segEnd = t;
+    if (t > untilSec) {
+      v = prevV + ((untilSec - prevT) / (t - prevT)) * (v - prevV);
+      segEnd = untilSec;
+    }
+    area += ((prevV + v) / 2) * (segEnd - prevT);
+    prevT = segEnd;
+    prevV = v;
+  }
+  return area / (prevT - startSec || 1) >= threshold;
 }
 
 /**
@@ -268,27 +382,11 @@ export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: num
   return Math.atan2(dx, dz);
 }
 
-function interpolateCoordinateAtDistance(dists: number[], coordinates: number[], targetDistM: number): number {
-  if (dists.length === 0 || coordinates.length === 0) return targetDistM;
-  if (targetDistM <= dists[0]) return coordinates[0];
-  const lastIndex = dists.length - 1;
-  if (targetDistM >= dists[lastIndex]) return coordinates[lastIndex];
-
-  for (let index = 1; index < dists.length; index++) {
-    if (dists[index] < targetDistM) continue;
-    const distanceSpan = dists[index] - dists[index - 1];
-    if (distanceSpan <= 0) return coordinates[index];
-    const ratio = (targetDistM - dists[index - 1]) / distanceSpan;
-    return coordinates[index - 1] + ratio * (coordinates[index] - coordinates[index - 1]);
-  }
-
-  return coordinates[lastIndex];
-}
-
 /**
- * Detects corners (braking -> apex -> acceleration) from the baseline lap's speed trace and
+ * Detects corners (braking -> apex -> acceleration) from the PRIMARY lap's speed trace and
  * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
- * them) comparing primary vs baseline. Each segment's `timeDeltaSec` isolates the time
+ * them) comparing primary vs baseline. All distances are in the primary lap's frame; corner
+ * numbering can therefore change when the primary lap changes. Each segment's `timeDeltaSec` isolates the time
  * gained/lost across just that stretch (not cumulative drift from earlier on), so the full
  * list sums to the lap's total time delta - together this explains where the overall gap
  * comes from, not just how big it is.
@@ -315,10 +413,12 @@ export function computeLapSegmentComparisons(
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
-  // Both laps are re-zeroed to the SAME physical start/finish crossing (not just each
-  // recording's own point[0]) - critical so brake/throttle distances below are comparable.
+  // Every segment window and pedal point below is in the PRIMARY lap's distance frame. The
+  // baseline's distances are expressed in that same frame (matched on track station, like the
+  // telemetry channels) so its brake/throttle points refer to the same physical spot - its own
+  // driven distance drifts metres away from the primary's by mid-lap.
   const primaryDists = getTrajectoryDistances(primaryPoints, trackLengthM);
-  const baselineDists = getTrajectoryDistances(baselinePoints, trackLengthM);
+  const baselineDists = getDistancesInReferenceFrame(baselinePoints, primaryPoints, trackLengthM);
   const primaryMinSteerAmplitude = computeMaxAbsSteer(primaryPoints) * STEER_REVERSAL_FRACTION;
   const turningPoints = findSpeedTurningPoints(primaryPoints, primaryDists, minProminenceKmh, primaryMinSteerAmplitude);
   const totalDistM = primaryDists[primaryDists.length - 1] || 0;
@@ -340,34 +440,13 @@ export function computeLapSegmentComparisons(
     turningPoints.push({ index: primaryPoints.length - 1, distM: totalDistM, type: 'max' });
   }
 
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
+  // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
+  // delta channel shows (each lap timed from its own S/F crossing), so the segments add up to the lap delta and never disagree with the chart. The
+  // trace has one value per primary sample, so it is read at primary-frame distances directly.
+  const channelDeltas = computeLapComparisons(primaryPoints, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
+  const deltaAt = (distM: number): number => interpolateScalarAtDistance(channelDeltas, primaryDists, distM);
 
-  let primaryRefCoords: number[];
-  let baselineRefCoords: number[];
-
-  if (canMatchByStation && trackLengthM) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baselineRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-  } else {
-    primaryRefCoords = primaryDists;
-    baselineRefCoords = baselineDists;
-  }
-
-  const deltaAt = (stationOrDistM: number): number => {
-    const p = interpolatePointAtDistance(primaryPoints, primaryRefCoords, stationOrDistM);
-    const b = interpolatePointAtDistance(baselinePoints, baselineRefCoords, stationOrDistM);
-    return p.timeSec - b.timeSec;
-  };
-
-  const buildStraight = (
-    fromDist: number,
-    toDist: number,
-    fromCoord: number,
-    toCoord: number
-  ): StraightSegmentComparison | null => {
+  const buildStraight = (fromDist: number, toDist: number): StraightSegmentComparison | null => {
     if (toDist - fromDist < MIN_STRAIGHT_LENGTH_M) return null;
     const primaryAtEntry = interpolatePointAtDistance(primaryPoints, primaryDists, fromDist);
     const primaryAtExit = interpolatePointAtDistance(primaryPoints, primaryDists, toDist);
@@ -387,7 +466,7 @@ export function computeLapSegmentComparisons(
       primaryExitSpeedKmh: Math.round(primaryAtExit.speedKmh),
       baselineExitSpeedKmh: Math.round(baselineAtExit),
       exitSpeedDeltaKmh: Math.round(primaryAtExit.speedKmh - baselineAtExit),
-      timeDeltaSec: Number((deltaAt(toCoord) - deltaAt(fromCoord)).toFixed(3)),
+      timeDeltaSec: Number((deltaAt(toDist) - deltaAt(fromDist)).toFixed(3)),
     };
   };
 
@@ -399,10 +478,11 @@ export function computeLapSegmentComparisons(
     const baselineAtMin = interpolatePointAtDistance(baselinePoints, baselineDists, min.distM);
     const baselineAtExit = interpolatePointAtDistance(baselinePoints, baselineDists, exit.distM);
 
-    const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
-    const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT);
-    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
-    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT);
+    const primaryBrakingDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
+    const baselineBrakingDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, entry.distM, min.distM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
+    const throttleLookbackM = throttleOnsetLookbackM(entry.distM, min.distM);
+    const primaryThrottleOnDistM = findThresholdCrossingDistM(primaryPoints, primaryDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
+    const baselineThrottleOnDistM = findThresholdCrossingDistM(baselinePoints, baselineDists, min.distM, exit.distM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
 
     // --- Enhanced Technique & Geometry Metrics ---
     const hEntry = getHeadingAtDistance(primaryPoints, primaryDists, entry.distM);
@@ -495,12 +575,8 @@ export function computeLapSegmentComparisons(
       ? primaryTurnInDistM - primaryBrakingDistM
       : null;
 
-    const coordinateAtDistance = (distanceM: number): number =>
-      canMatchByStation
-        ? interpolateCoordinateAtDistance(primaryDists, primaryRefCoords, distanceM)
-        : distanceM;
     const phaseDelta = (startDistM: number, endDistM: number): number =>
-      Number((deltaAt(coordinateAtDistance(endDistM)) - deltaAt(coordinateAtDistance(startDistM))).toFixed(3));
+      Number((deltaAt(endDistM) - deltaAt(startDistM)).toFixed(3));
     const rotationStartDistM = primaryTurnInDistM ?? entry.distM;
     const phaseTiming: CornerPhaseTiming = {
       entry: primaryTurnInDistM !== null
@@ -535,7 +611,8 @@ export function computeLapSegmentComparisons(
       min.distM,
       exit.distM,
       p => p.throttle,
-      15
+      15,
+      throttleLookbackM
     ) ?? primaryThrottleOnDistM;
 
     const initialBaselineThrottleDistM = findThresholdCrossingDistM(
@@ -544,7 +621,8 @@ export function computeLapSegmentComparisons(
       min.distM,
       exit.distM,
       p => p.throttle,
-      15
+      15,
+      throttleLookbackM
     ) ?? baselineThrottleOnDistM;
 
     let primaryRotationAtThrottlePct: number | null = null;
@@ -723,13 +801,7 @@ export function computeLapSegmentComparisons(
         : bchordSagittaM,
     };
 
-    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
-      ? primaryRefCoords[entry.index]
-      : entry.distM;
-    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
-      ? primaryRefCoords[exit.index]
-      : exit.distM;
-    const timeDeltaSec = Number((deltaAt(exitCoord) - deltaAt(entryCoord)).toFixed(3));
+    const timeDeltaSec = Number((deltaAt(exit.distM) - deltaAt(entry.distM)).toFixed(3));
 
     const typeSpecificDetails: CornerTypeSpecificDetails = {
       steeringScrubDeg: maxUndersteerDeg > 0 ? Number(maxUndersteerDeg.toFixed(1)) : undefined,
@@ -795,7 +867,6 @@ export function computeLapSegmentComparisons(
   const segments: LapSegmentComparison[] = [];
   let cornerNumber = 0;
   let prevBoundaryDist = startDistM;
-  let prevBoundaryCoord = canMatchByStation && primaryRefCoords[0] !== undefined ? primaryRefCoords[0] : startDistM;
 
   for (let i = 1; i < turningPoints.length - 1; i++) {
     const min = turningPoints[i];
@@ -803,26 +874,15 @@ export function computeLapSegmentComparisons(
     const exit = turningPoints[i + 1];
     if (min.type !== 'min' || entry.type !== 'max' || exit.type !== 'max') continue;
 
-    const entryCoord = canMatchByStation && primaryRefCoords[entry.index] !== undefined
-      ? primaryRefCoords[entry.index]
-      : entry.distM;
-    const exitCoord = canMatchByStation && primaryRefCoords[exit.index] !== undefined
-      ? primaryRefCoords[exit.index]
-      : exit.distM;
-
-    const straight = buildStraight(prevBoundaryDist, entry.distM, prevBoundaryCoord, entryCoord);
+    const straight = buildStraight(prevBoundaryDist, entry.distM);
     if (straight) segments.push(straight);
 
     cornerNumber++;
     segments.push(buildCorner(cornerNumber, entry, min, exit));
     prevBoundaryDist = exit.distM;
-    prevBoundaryCoord = exitCoord;
   }
 
-  const trailingCoord = canMatchByStation && primaryRefCoords[primaryRefCoords.length - 1] !== undefined
-    ? primaryRefCoords[primaryRefCoords.length - 1]
-    : totalDistM;
-  const trailing = buildStraight(prevBoundaryDist, totalDistM, prevBoundaryCoord, trailingCoord);
+  const trailing = buildStraight(prevBoundaryDist, totalDistM);
   if (trailing) segments.push(trailing);
 
   segments.forEach((s, idx) => { s.segmentIndex = idx; });

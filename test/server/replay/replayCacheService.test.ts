@@ -74,4 +74,24 @@ describe('ReplayCacheService', () => {
     expect(() => service.getMetadata(filePath, 'missing.vcr')).toThrow('Replay file and cached metadata not found');
     expect(() => service.getFullTrajectory(filePath, 'missing.vcr', {})).toThrow('Replay file and cached trajectory not found');
   });
+
+  it('attaches the recording either side of a lap from the stored neighbouring laps, even once the replay is deleted', () => {
+    const replayName = 'Deleted_Edges_R1.Vcr';
+    const lap = (n: number) => ({
+      replayName,
+      pointsCount: 11,
+      currentLap: n,
+      driverSlot: 3,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      // 10 s laps sampled every second at 5 m/s, back to back.
+      points: Array.from({ length: 11 }, (_, i) => ({ x: (n * 10 + i) * 5, y: 0, z: 0, timeSec: n * 10 + i })),
+    });
+    for (const n of [3, 4, 5]) db.upsertReplayTrajectoryCache(replayName, 3, n, 1000, 5000, lap(n));
+
+    const trajectory = service.getFullTrajectory(path.join(tempDir, replayName), replayName, { driverSlot: 3, lapNumber: 4 });
+
+    expect(trajectory.currentLap).toBe(4);
+    expect(trajectory.leadInPoints?.map(p => p.timeSec)).toEqual([38, 39]);
+    expect(trajectory.leadOutPoints?.map(p => p.timeSec)).toEqual([51, 52]);
+  });
 });

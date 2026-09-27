@@ -4,10 +4,10 @@ import { fileURLToPath } from 'url';
 import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
+import { cutLapAtLine } from './lapLineCut.js';
 
 interface CachedTrackDefinition {
   layoutKey: string;
-  lengthM: number;
   timingGates?: TrackTimingGates;
   centerline: Array<[number, number]>;
   spatialIndex: CenterlineSpatialIndex;
@@ -52,7 +52,6 @@ export function getTrackDefinition(layoutKey: string): CachedTrackDefinition | n
     const spatialIndex = buildCenterlineSpatialIndex(parsed.centerline);
     const def: CachedTrackDefinition = {
       layoutKey,
-      lengthM: parsed.lengthM || spatialIndex.totalLengthM,
       timingGates: parsed.timingGates,
       centerline: parsed.centerline,
       spatialIndex,
@@ -122,10 +121,25 @@ function applyCanonicalProjection(
   trajectory: ReplayTrajectoryData,
   trackDef: CachedTrackDefinition
 ): void {
-  const { stations, lateralOffsets } = projectTrajectoryToCenterline(
-    trajectory.points,
-    trackDef.spatialIndex
+  // Project the lap with the recording either side of it, then cut it at the line: the
+  // timing-loop slice starts and ends wherever the (possibly late) timing event landed.
+  const leadIn = trajectory.leadInPoints ?? [];
+  const samples = [...leadIn, ...trajectory.points, ...(trajectory.leadOutPoints ?? [])];
+  const { stations, lateralOffsets } = projectTrajectoryToCenterline(samples, trackDef.spatialIndex, { clampSeam: false });
+  const cut = cutLapAtLine(
+    samples,
+    stations,
+    lateralOffsets,
+    trackDef.spatialIndex.totalLengthM,
+    leadIn.length,
+    leadIn.length + trajectory.points.length - 1
   );
+  stripLapEdgeSamples(trajectory);
+  trajectory.points = cut.points;
+  if (trajectory.sectors) {
+    const shifted = (frame: number) => Math.max(0, Math.min(cut.points.length - 1, frame + cut.indexShift));
+    trajectory.sectors = { s1Frame: shifted(trajectory.sectors.s1Frame), s2Frame: shifted(trajectory.sectors.s2Frame) };
+  }
 
   const n = trajectory.points.length;
   let runningDist = 0;
@@ -139,17 +153,27 @@ function applyCanonicalProjection(
       runningDist += (d < 1000 ? d : 0);
     }
     pt.distM = Number(runningDist.toFixed(2));
-    pt.stationM = Number((stations[i] ?? 0).toFixed(2));
-    pt.lateralOffsetM = Number((lateralOffsets[i] ?? 0).toFixed(2));
   }
 
   trajectory.layoutKey = trackDef.layoutKey;
-  trajectory.trackLengthM = Number(trackDef.lengthM.toFixed(2));
+  // The centreline's own length, where stations wrap and where the cut lap ends: the layout's
+  // published lengthM is the same length rounded to 0.1 m, which leaves every lap a few
+  // centimetres short of (or past) the track length.
+  trajectory.trackLengthM = Number(trackDef.spatialIndex.totalLengthM.toFixed(2));
   trajectory.lapDistMeters = Number(runningDist.toFixed(2));
   trajectory.timingGates = trackDef.timingGates;
+  trajectory.stationSource = 'track';
+  trajectory.lineCut = { start: cut.start, end: cut.end };
+}
+
+/** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */
+export function stripLapEdgeSamples(trajectory: ReplayTrajectoryData): void {
+  delete trajectory.leadInPoints;
+  delete trajectory.leadOutPoints;
 }
 
 function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
+  stripLapEdgeSamples(trajectory);
   const points = trajectory.points;
   const n = points.length;
   let runningDist = 0;
@@ -173,6 +197,8 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
   trajectory.trackLengthM = totalLength;
   trajectory.lapDistMeters = totalLength;
   trajectory.layoutKey = undefined;
+  trajectory.stationSource = 'odometer';
+  trajectory.lineCut = { start: 'none', end: 'none' };
 
   // Build synthetic timingGates from sector frame markers or third-splits
   const s1Idx = trajectory.sectors?.s1Frame !== undefined && trajectory.sectors.s1Frame >= 0 && trajectory.sectors.s1Frame < n

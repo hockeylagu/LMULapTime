@@ -229,6 +229,64 @@ describe('ServerContext background session sync', () => {
 });
 
 describe('ServerContext configuration and telemetry enrichment', () => {
+  it('enriches the cached session list again only when one of its inputs changed', () => {
+    const sessions: DetailedSession[] = [];
+    let telemetryRevision = 0;
+    let files: unknown[] = [];
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => sessions),
+      getTelemetryMetadata: vi.fn(() => []),
+      getTelemetryMetadataRevision: vi.fn(() => telemetryRevision),
+    } as unknown as SessionDatabase;
+    const context = new ServerContext({
+      resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(), sessionDb,
+      telemetryCatalog: { getFiles: vi.fn(() => files) } as unknown as TelemetryCatalog,
+      replayCache: {} as ReplayCacheService,
+    });
+    const enrich = vi.spyOn(context, 'enrichSessionsWithTelemetry');
+
+    context.loadSessions();
+    context.loadSessions();
+    expect(enrich).toHaveBeenCalledTimes(1);
+
+    telemetryRevision++;
+    context.loadSessions();
+    files = [];
+    context.loadSessions();
+    context.currentParser.addReplayEntry({ name: 'Spa P1.Vcr', path: 'C:\replays\Spa P1.Vcr', sizeBytes: 1, sessionCode: 'P1', trackName: 'Spa', mtime: 1 });
+    context.loadSessions();
+    expect(enrich).toHaveBeenCalledTimes(4);
+    context.loadSessions();
+    expect(enrich).toHaveBeenCalledTimes(4);
+  });
+
+  it('reloads the replay index from the database only when replay rows changed', () => {
+    let replayRevision = 0;
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      getReplayMetadataRevision: vi.fn(() => replayRevision),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+    const reads = vi.mocked(sessionDb.getAllStoredReplayFiles);
+    expect(reads).toHaveBeenCalledTimes(1);
+
+    context.loadSessions();
+    context.loadSessions();
+    expect(reads).toHaveBeenCalledTimes(1);
+
+    replayRevision++;
+    context.loadSessions();
+    context.loadSessions();
+    expect(reads).toHaveBeenCalledTimes(2);
+
+    // A new parser (directories reconfigured) starts from an empty index.
+    context.configureDirectories({});
+    expect(reads).toHaveBeenCalledTimes(3);
+  });
+
   it('uses valid configured directories and persists the telemetry directory', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-context-'));
     const resultsDir = path.join(root, 'results');

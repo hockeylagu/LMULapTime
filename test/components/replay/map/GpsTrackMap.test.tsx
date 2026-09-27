@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMap, projectTrajectoryPoints } from '../../../../src/components/replay/index.js';
-import { computeCumulativeDistances } from '../../../../src/utils/replayComparison.js';
+import { computeCumulativeDistances } from '../../../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 describe('GpsTrackMap', () => {
@@ -391,10 +391,10 @@ describe('GpsTrackMap', () => {
     expect(followBtn).toHaveAttribute('title', 'Follow Car (Active)');
   });
 
-  it('rescales a corner\'s baseline-lap distance onto the primary lap so the marker lands on the same physical corner', () => {
-    // minDistM (5) is measured along a much shorter baseline lap (total 10m); on the ~107.7m
-    // primary lap that same 50%-of-lap point falls near primary point index 1, not index 0
-    // (which is where a naive un-rescaled lookup of raw distance 5 would land).
+  it('anchors a corner flag at its distance on the primary lap, whatever the baseline lap length', () => {
+    // Corner distances are in the primary lap's frame: minDistM 50 is primary point index 1
+    // (~53.9 m). A much shorter baseline (10 m) must not move it - rescaling by the lap-length
+    // ratio would send it past the end of the lap (index 2).
     const shortBaselinePoints: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },
       { x: 10, y: 0, z: 0, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.1 },
@@ -407,7 +407,7 @@ describe('GpsTrackMap', () => {
         bounds={mockBounds}
         currentIndex={0}
         baselinePoints={shortBaselinePoints}
-        corners={[{ cornerNumber: 1, minDistM: 5 }]}
+        corners={[{ cornerNumber: 1, minDistM: 50 }]}
         onSelectIndex={onSelectIndex}
       />
     );
@@ -922,12 +922,38 @@ describe('GpsTrackMap', () => {
     const primLine = primaryLines[0];
     const baseLine = baselineLines[0];
 
-    const pX1 = parseFloat(primLine.getAttribute('x1') || '0');
-    const bX1 = parseFloat(baseLine.getAttribute('x1') || '0');
+    // Each line is drawn as paths starting "M x y": compare the start x.
+    const startX = (el: Element) => parseFloat((el.getAttribute('d') || 'M 0').split(' ')[1]);
+    const pX1 = startX(primLine);
+    const bX1 = startX(baseLine);
 
     const svgDiff = Math.abs(bX1 - pX1);
     expect(svgDiff).toBeGreaterThan(0);
     expect(svgDiff).toBeLessThan(30);
+  });
+
+  it('aligns baseline pedal points by station with the trajectory track length (no boundary geometry)', () => {
+    // Primary along +x with station = x; the baseline starts at station 11 and its odometer
+    // reads 5% long, so only station alignment puts its 30 m brake point at x = 30.
+    const line = (fromX: number, distScale: number): ReplayTrajectoryPoint[] =>
+      Array.from({ length: 101 - fromX }, (_, i) => ({
+        x: fromX + i, y: 0, z: 50, stationM: fromX + i, distM: i * distScale, timeSec: i * 0.02, speedKmh: 180,
+      }));
+    const bounds = { minX: 0, maxX: 100, spanX: 100, minZ: 0, maxZ: 100, spanZ: 100 };
+    const { container } = render(
+      <GpsTrackMap
+        points={line(0, 1)}
+        baselinePoints={line(11, 1.05)}
+        bounds={bounds}
+        currentIndex={0}
+        trackLengthM={1000}
+        pedalMarkers={[{ cornerNumber: 1, distM: 30, kind: 'brake', isBaseline: true }]}
+        showPedalMarkers={true}
+      />
+    );
+    const expectedSx = projectTrajectoryPoints([{ x: 30, y: 0, z: 50 }], bounds, 800, 60)[0].sx;
+    const dot = container.querySelector('[data-testid="pedal-marker-baseline-brake-1"] circle[r="2.8"]');
+    expect(Number(dot?.getAttribute('cx'))).toBeCloseTo(expectedSx, 0);
   });
 });
 

@@ -48,7 +48,6 @@ export async function* extractReplayTrajectoryInWorker(
   const messages: WorkerMessage[] = [];
   let notify: (() => void) | undefined;
   let workerError: Error | undefined;
-  let completed = false;
   let resultReceived = false;
 
   const wake = (): void => {
@@ -83,13 +82,14 @@ export async function* extractReplayTrajectoryInWorker(
       if (message.type === 'progress') {
         yield message.progress;
       } else if (message.type === 'result') {
-        completed = true;
         return message.trajectory;
       } else {
         throw new Error(message.message);
       }
     }
   } finally {
-    if (!completed) worker.terminate();
+    // The worker exits by itself after posting its result; terminating also covers a consumer
+    // that stops early or a worker that lingers, so no thread outlives its extraction.
+    void worker.terminate();
   }
 }

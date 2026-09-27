@@ -438,7 +438,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
 
   it('passes native acceleration telemetry through the channel renderer', () => {
     const point = { ...mockPoint, accelLatG: 1.2 };
-    const paths = computeTelemetryChartPaths([], [], 0, 0);
+    const paths = computeTelemetryChartPaths([], [], 0, 0, []);
 
     render(
       <TelemetryChannelRenderer
@@ -463,7 +463,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
       accelLonG: -0.4,
       accelTotalG: 1.3,
     };
-    const paths = computeTelemetryChartPaths([], [], 0, 0);
+    const paths = computeTelemetryChartPaths([], [], 0, 0, []);
     const shared = {
       currentPoint: point,
       currentComparison: null,
@@ -514,7 +514,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
   it('renders all 6 wheel/tire/suspension channels via TelemetryChannelRenderer', async () => {
     const { TelemetryChannelRenderer } = await import('../../../../src/components/replay/telemetry/TelemetryChannelRenderer.js');
     const { computeTelemetryChartPaths } = await import('../../../../src/components/replay/telemetry/telemetryChartPaths.js');
-    const mockPaths = computeTelemetryChartPaths([mockPoint], [], 0, 0);
+    const mockPaths = computeTelemetryChartPaths([mockPoint], [], 0, 0, [0]);
 
     const { rerender } = render(
       <TelemetryChannelRenderer
@@ -650,7 +650,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
       soc: 85.0,
       regenRate: 180.5,
     };
-    const energyPaths = computeTelemetryChartPaths([energyPoint], [], 0, 0);
+    const energyPaths = computeTelemetryChartPaths([energyPoint], [], 0, 0, [0]);
 
     const { rerender } = render(
       <TelemetryChannelRenderer

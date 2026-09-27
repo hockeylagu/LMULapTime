@@ -1,6 +1,7 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
 import { ReplayTrajectoryData, ReplayLapSummary } from '../../../../shared/types/index.js';
+import { ComparisonAccuracyNotice } from './ComparisonAccuracyNotice.js';
 
 export interface ReplayPerformanceHeaderProps {
   currentLap: number;
@@ -9,6 +10,7 @@ export interface ReplayPerformanceHeaderProps {
   bestS2Sec?: number | null;
   bestS3Sec?: number | null;
   isCompareMode: boolean;
+  trajectory?: ReplayTrajectoryData | null;
   baselineTrajectory: ReplayTrajectoryData | null;
   lapDeltas: {
     lapDelta: number | null;
@@ -26,6 +28,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
   bestS2Sec,
   bestS3Sec,
   isCompareMode,
+  trajectory,
   baselineTrajectory,
   lapDeltas,
   formatLapTime,
@@ -117,6 +120,8 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           )}
         </div>
       </div>
+
+      {isCompareMode && <ComparisonAccuracyNotice trajectory={trajectory} baselineTrajectory={baselineTrajectory} />}
     </div>
   );
 });

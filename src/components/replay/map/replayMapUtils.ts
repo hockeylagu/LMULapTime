@@ -1,7 +1,9 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
-import { findIndexAtDistance, interpolatePointAtDistance, getMonotonicStations, computeStartFinishOffset } from '../../../utils/replayComparison.js';
+import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
+import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 
@@ -17,8 +19,15 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Colour steps per gradient. The racing line is drawn as one path per run of equal colour
+ * (buildTrackLineRuns), so a continuous gradient would give every sample its own path; 32 steps
+ * (~9 km/h each in speed mode) look continuous on a 2 px line.
+ */
+const GRADIENT_LEVELS = 32;
+
 function sampleGradient(stops: Array<[number, [number, number, number]]>, t: number): string {
-  const clamped = Math.min(1, Math.max(0, t));
+  const clamped = Math.round(Math.min(1, Math.max(0, t)) * GRADIENT_LEVELS) / GRADIENT_LEVELS;
   for (let i = 0; i < stops.length - 1; i++) {
     const [t0, c0] = stops[i];
     const [t1, c1] = stops[i + 1];
@@ -55,9 +64,11 @@ export function getHeatmapColor(
   if (colorBy === 'pedal') {
     const th = p.throttle || 0;
     const brk = p.brake || 0;
-    // Braking dominates when both are non-trivial (trail-braking overlap).
-    if (brk > 5 && brk >= th) {
-      return sampleGradient([[0, [71, 85, 105]], [1, [239, 68, 68]]], brk / 100);
+    // Braking dominates when both are non-trivial (trail-braking overlap). It starts at the
+    // same threshold as the brake markers and at a clearly red tone (not the coast grey), so a
+    // gradual brake build-up is visible exactly where the brake marker says braking begins.
+    if (brk >= BRAKE_ON_THRESHOLD_PCT && brk >= th) {
+      return sampleGradient([[0, [153, 27, 27]], [1, [239, 68, 68]]], (brk - BRAKE_ON_THRESHOLD_PCT) / (100 - BRAKE_ON_THRESHOLD_PCT));
     }
     if (th > 5) {
       return sampleGradient([[0, [71, 85, 105]], [1, [16, 185, 129]]], th / 100);
@@ -116,10 +127,7 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
     if (i === 0) {
       d += `M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
     } else {
-      const prev = svgPoints[i - 1];
-      const dist = Math.hypot(p.sx - prev.sx, p.sy - prev.sy);
-      const worldDist = Math.hypot(p.x - prev.x, p.z - prev.z);
-      if (p.isTeleport || worldDist > 20 || dist > 30) {
+      if (isLineBreak(svgPoints[i - 1], p)) {
         d += ` M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
       } else {
         d += ` L ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
@@ -127,6 +135,67 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
     }
   }
   return d;
+}
+
+/** True where the line must not be drawn from `prev` to `p` (a teleport or a recording gap). */
+export function isLineBreak(prev: { sx: number; sy: number; x: number; z: number }, p: { sx: number; sy: number; x: number; z: number; isTeleport?: boolean }): boolean {
+  return Boolean(p.isTeleport) || Math.hypot(p.x - prev.x, p.z - prev.z) > 20 || Math.hypot(p.sx - prev.sx, p.sy - prev.sy) > 30;
+}
+
+export interface TrackLineRun {
+  /** SVG path through the run's vertices. */
+  d: string;
+  color: string;
+  isHighlighted: boolean;
+  /** Positions in the projected points of the run's first and last vertex. */
+  from: number;
+  to: number;
+}
+
+/**
+ * The racing line as runs of consecutive segments sharing a colour and highlight state, one path
+ * each, instead of one SVG element per sample (tens of thousands at full resolution, which the
+ * browser re-rasterises on every pan or zoom). A segment takes the style of its end sample.
+ */
+export function buildTrackLineRuns(
+  points: ProjectedPoint[],
+  colorOf: (p: ProjectedPoint) => string,
+  isHighlightedAt: (p: ProjectedPoint) => boolean
+): TrackLineRun[] {
+  const runs: TrackLineRun[] = [];
+  let run: TrackLineRun | null = null;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const p = points[i];
+    if (isLineBreak(prev, p)) {
+      run = null;
+      continue;
+    }
+    const color = colorOf(p);
+    const isHighlighted = isHighlightedAt(p);
+    if (run && run.to === i - 1 && run.color === color && run.isHighlighted === isHighlighted) {
+      run.d += ` L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`;
+      run.to = i;
+    } else {
+      run = { d: `M ${prev.sx.toFixed(2)} ${prev.sy.toFixed(2)} L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`, color, isHighlighted, from: i - 1, to: i };
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/** Position (in `points`, between `from` and `to`) of the vertex nearest to (sx, sy). */
+export function nearestRunVertex(points: ProjectedPoint[], from: number, to: number, sx: number, sy: number): number {
+  let best = from;
+  let bestDistSq = Infinity;
+  for (let i = from; i <= to; i++) {
+    const dSq = (points[i].sx - sx) ** 2 + (points[i].sy - sy) ** 2;
+    if (dSq < bestDistSq) {
+      bestDistSq = dSq;
+      best = i;
+    }
+  }
+  return best;
 }
 
 export function projectBoundaryPoints(
@@ -200,46 +269,24 @@ export function computeTrackBoundaryPathD(
 
 
 /**
- * Ensures baseline trajectory points begin cleanly at the start/finish gate line.
- * If baseline begins downstream of the line (e.g. VCR slice boundary latency),
- * prepends the extrapolated start/finish line crossing so the trajectory ribbon
- * starts right on the line without longitudinal offset.
+ * Where the baseline car is when the primary car is at `currentIndex`: the baseline sampled at
+ * the primary's distance, with `baselineDists` already in the primary lap's frame (matched on
+ * track station - see getDistancesInReferenceFrame). Both laps start on the line (the server puts
+ * them there), so the ghost does too.
  */
-export function buildEffectiveBaselinePoints(
-  baselinePoints?: ReplayTelemetryPoint[],
-  trackLengthM?: number
-): ReplayTelemetryPoint[] {
-  if (!baselinePoints || baselinePoints.length < 2) return baselinePoints || [];
-  const crossing = trackLengthM ? computeStartFinishOffset(baselinePoints, trackLengthM) : null;
-  if (crossing && (baselinePoints[0].stationM ?? 0) > 1.0) {
-    const startPt: ReplayTelemetryPoint = {
-      ...baselinePoints[0],
-      x: crossing.worldX,
-      z: crossing.worldZ,
-      stationM: 0,
-      distM: 0,
-      timeSec: crossing.timeSecOffset,
-    };
-    return [startPt, ...baselinePoints];
-  }
-  return baselinePoints;
-}
-
 export function computeGhostPosition(
   primaryDists: number[],
-  baseDists: number[],
+  baselineDists: number[],
   baselinePoints: ReplayTelemetryPoint[],
   currentIndex: number,
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
-  padding: number,
-  trackLengthM?: number,
-  primaryPoints?: ReplayTelemetryPoint[]
+  padding: number
 ) {
   if (
     !baselinePoints || baselinePoints.length === 0 ||
     !primaryDists || primaryDists.length === 0 ||
-    !baseDists || baseDists.length === 0
+    !baselineDists || baselineDists.length === 0
   ) {
     return null;
   }
@@ -250,30 +297,8 @@ export function computeGhostPosition(
   const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints?.[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
-
-  let primaryRefCoords: number[];
-  let baseRefCoords: number[];
-  let totalBase: number;
-
-  if (canMatchByStation && trackLengthM && primaryPoints) {
-    primaryRefCoords = getMonotonicStations(primaryPoints, trackLengthM);
-    baseRefCoords = getMonotonicStations(baselinePoints, trackLengthM);
-    totalBase = trackLengthM;
-  } else {
-    primaryRefCoords = primaryDists;
-    baseRefCoords = baseDists;
-    totalBase = Math.max(1, baseDists[baseDists.length - 1]);
-  }
-
-  const safeIdx = Math.max(0, Math.min(currentIndex, primaryRefCoords.length - 1));
-  const currentDist = primaryRefCoords[safeIdx];
-  // Match on the same absolute track distance/station, with extrapolateBoundary=true to seamlessly extrapolate back to the start line
-  const targetDist = Math.min(totalBase, currentDist);
-  const ghostPt = interpolatePointAtDistance(baselinePoints, baseRefCoords, targetDist, undefined, true);
+  const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
+  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, primaryDists[safeIdx]);
 
   return {
     sx: offsetX + (ghostPt.x - minX) * scale,
@@ -321,12 +346,19 @@ export function computePedalMarkerPoints(
       const idx = findIndexAtDistance(dists, m.distM);
       const pt = pts[Math.min(idx, pts.length - 1)];
       if (!pt) return null;
+      // Place the marker at the exact distance along the line, not the nearest sample.
+      const lo = dists[pt.idx] <= m.distM ? pt.idx : Math.max(0, pt.idx - 1);
+      const hi = Math.min(pts.length - 1, lo + 1);
+      const span = (dists[hi] ?? 0) - (dists[lo] ?? 0);
+      const t = span > 0 ? Math.min(1, Math.max(0, (m.distM - dists[lo]) / span)) : 0;
+      const sx = pts[lo].sx + t * (pts[hi].sx - pts[lo].sx);
+      const sy = pts[lo].sy + t * (pts[hi].sy - pts[lo].sy);
       const prev = pts[Math.max(0, pt.idx - 2)] ?? pt;
       const next = pts[Math.min(pts.length - 1, pt.idx + 2)] ?? pt;
       const dx = next.sx - prev.sx;
       const dy = next.sy - prev.sy;
       const headingLen = Math.hypot(dx, dy) || 1;
-      return { ...m, sx: pt.sx, sy: pt.sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
+      return { ...m, sx, sy, nx: -dy / headingLen, ny: dx / headingLen, isStaggered: false };
     })
     .filter((m): m is MappedPedalMarker => m !== null);
 
@@ -370,27 +402,24 @@ function distanceToPolyline(
 /**
  * Calculates corner flag positions on the 2D map with trajectory clearance checking
  * so flags are never placed on top of either the primary racing line or the baseline racing line.
+ * Corner apex distances are in the primary lap's frame (see computeLapSegmentComparisons), so
+ * each flag is anchored on the primary line at that distance, whatever the baseline.
  */
 export function computeDispersedCornerMarkers(
   corners: Array<{ cornerNumber: number; minDistM: number }> | undefined,
   primaryDists: number[],
-  baselineDists: number[],
   svgPoints: ProjectedPoint[],
   baselineSvgPoints?: ProjectedPoint[],
   pedalMarkers?: Array<{ sx: number; sy: number; nx?: number; ny?: number; isStaggered?: boolean }>
 ): DispersedCornerMarker[] {
   if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
-  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
 
   const markers: DispersedCornerMarker[] = [];
   const candidateDistances = [38, 46, 54, 62, 70];
 
   for (let i = 0; i < corners.length; i++) {
     const c = corners[i];
-    const targetDist = canRescale ? (c.minDistM / totalBaselineDist) * totalPrimaryDist : c.minDistM;
-    const idx = findIndexAtDistance(primaryDists, targetDist);
+    const idx = findIndexAtDistance(primaryDists, c.minDistM);
     const pt = svgPoints[Math.min(idx, svgPoints.length - 1)];
     if (!pt) continue;
 
@@ -553,40 +582,17 @@ export function computeEffectiveBounds(
 }
 
 
+/**
+ * Delta colouring for the baseline line: each baseline sample takes the delta of the primary
+ * sample at the same distance, `baselineDists` being in the primary lap's frame.
+ */
 export function computeBaselineDeltaByIdx(
   deltaByIdx: number[] | null,
-  baselinePoints?: ReplayTelemetryPoint[],
-  primaryDists?: number[],
-  baselineDists?: number[],
-  trackLengthM?: number,
-  primaryPoints?: ReplayTelemetryPoint[]
+  primaryDists: number[],
+  baselineDists: number[]
 ): number[] | null {
-  if (!deltaByIdx || !baselinePoints || baselinePoints.length === 0 || !primaryDists || !baselineDists) {
-    return null;
-  }
-
-  const canMatchByStation =
-    Boolean(trackLengthM && trackLengthM > 0) &&
-    primaryPoints?.[0]?.stationM !== undefined &&
-    baselinePoints[0]?.stationM !== undefined;
-
-  if (canMatchByStation && trackLengthM && primaryPoints) {
-    const pStations = getMonotonicStations(primaryPoints, trackLengthM);
-    const bStations = getMonotonicStations(baselinePoints, trackLengthM);
-    return bStations.map(s => {
-      const idx = findIndexAtDistance(pStations, s);
-      return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
-    });
-  }
-
-  const totalPrimaryDist = primaryDists[primaryDists.length - 1] || 0;
-  const totalBaselineDist = baselineDists[baselineDists.length - 1] || 0;
-  const canRescale = totalPrimaryDist > 0 && totalBaselineDist > 0;
-  return baselineDists.map(d => {
-    const targetDist = canRescale ? (d / totalBaselineDist) * totalPrimaryDist : d;
-    const idx = findIndexAtDistance(primaryDists, targetDist);
-    return deltaByIdx[Math.min(idx, deltaByIdx.length - 1)];
-  });
+  if (!deltaByIdx || deltaByIdx.length === 0 || primaryDists.length === 0 || baselineDists.length === 0) return null;
+  return baselineDists.map(d => deltaByIdx[Math.min(findIndexAtDistance(primaryDists, d), deltaByIdx.length - 1)]);
 }
 
 export interface GpsStartFinishGateProjection {

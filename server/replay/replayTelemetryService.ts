@@ -6,7 +6,6 @@ import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { matchDuckDbToReplay, matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
-import { downsampleTrajectoryResponse } from './replayTransforms.js';
 
 export interface TelemetryEnrichmentInput {
   replayName: string;
@@ -18,7 +17,6 @@ export interface TelemetryEnrichmentInput {
   fullTrajectory: ReplayTrajectoryData;
   currentTrajectory: ReplayTrajectoryData;
   lapNumber?: number;
-  maxPoints?: number;
 }
 
 export interface TelemetryEnrichmentResult {
@@ -119,7 +117,8 @@ export class ReplayTelemetryService {
 
           if (!expectedLapTimeSec || expectedLapTimeSec <= 0 || duckLap.lapTimeSec >= expectedLapTimeSec - 0.5) {
             const fusedTrajectory = fuseDuckDbWithVcrTrajectory(duckLap, input.fullTrajectory, matchedDuck.filename);
-            trajectory = downsampleTrajectoryResponse(fusedTrajectory, input.maxPoints);
+            // Full resolution: the caller projects and cuts the lap before downsampling it.
+            trajectory = fusedTrajectory;
             trajectory.vcrRawPointsCount = input.fullTrajectory.rawPointsCount ?? input.fullTrajectory.points.length;
             trajectory.vcrRawSampleRateHz = input.fullTrajectory.rawSampleRateHz;
             trajectory.duckdbRawPointsCount = duckLap.pointsCount;
