@@ -17,6 +17,7 @@ export const ReplayInspectorPage: React.FC = () => {
   const lap = searchParams.get('lap');
   const baselineLap = searchParams.get('compareLapNum') || searchParams.get('baselineLap');
   const baselineReplay = searchParams.get('baselineReplay');
+  const corner = searchParams.get('corner');
 
   return (
     <ReplayInspectorContent
@@ -30,6 +31,7 @@ export const ReplayInspectorPage: React.FC = () => {
       initialBaselineReplayName={baselineReplay}
       initialBaselineLapNumber={baselineLap ? parseInt(baselineLap, 10) : undefined}
       initialBaselineDriverName={searchParams.get('compareDriver')}
+      initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
     />
   );
 };

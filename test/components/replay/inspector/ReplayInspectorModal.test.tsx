@@ -833,5 +833,27 @@ describe('ReplayInspectorModal', () => {
       expect(requestedUrls.some(u => u.includes('source=duckdb'))).toBe(true);
     });
   });
-});
 
+  it('opens the corner a deep link asks for once the lap is loaded', async () => {
+    // One real corner: 200 km/h down to 100 at 70 m and back up (entry 30 m, exit 110 m).
+    const speeds = [100, 150, 200, 200, 180, 150, 100, 100, 150, 180, 200, 200, 180, 150, 100];
+    const cornerLap = {
+      ...mockTraj,
+      pointsCount: speeds.length,
+      currentLap: 20,
+      points: speeds.map((speedKmh, i) => ({ x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3 })),
+    };
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      if (url.includes('/trajectory')) return Promise.resolve({ ok: true, json: () => Promise.resolve(cornerLap) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [] }) });
+    });
+
+    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" initialLapNumber={20} initialCornerNumber={1} />);
+
+    await waitFor(() => {
+      const row = screen.getAllByText('T1').map(el => el.closest('tr')).find(Boolean);
+      expect(row).toHaveClass('bg-lmu-accent/15');
+    });
+  });
+});

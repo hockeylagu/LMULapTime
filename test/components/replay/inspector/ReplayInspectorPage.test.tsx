@@ -11,6 +11,7 @@ interface MockInspectorProps {
   initialBaselineReplayName: string | null;
   initialBaselineLapNumber?: number;
   initialBaselineDriverName: string | null;
+  initialCornerNumber?: number;
   onClose: () => void;
   onLapChange: (lapNumber: number) => void;
 }
@@ -25,6 +26,7 @@ vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js',
       <span data-testid="baseline-replay">{props.initialBaselineReplayName ?? 'none'}</span>
       <span data-testid="baseline-lap">{props.initialBaselineLapNumber ?? 'none'}</span>
       <span data-testid="baseline-driver">{props.initialBaselineDriverName ?? 'none'}</span>
+      <span data-testid="initial-corner">{props.initialCornerNumber ?? 'none'}</span>
       <button type="button" onClick={() => props.onLapChange(8)}>Change lap</button>
       <button type="button" onClick={props.onClose}>Close</button>
     </div>
@@ -78,5 +80,12 @@ describe('ReplayInspectorPage', () => {
     expect(screen.getByTestId('baseline-replay')).toHaveTextContent('Daytona International Speedway Road Course Q1 8.Vcr');
     expect(screen.getByTestId('baseline-lap')).toHaveTextContent('5');
     expect(screen.getByTestId('baseline-driver')).toHaveTextContent('Samuel Lague');
+  });
+
+  it('forwards the corner the session debrief links to', () => {
+    window.location.hash = '#/telemetry?replayName=Daytona_R1.Vcr&lap=20&baselineReplay=Daytona_Q1.Vcr&compareLapNum=3&compareDriver=Davide+Catani&corner=5';
+    render(<ReplayInspectorPage />);
+
+    expect(screen.getByTestId('initial-corner')).toHaveTextContent('5');
   });
 });
