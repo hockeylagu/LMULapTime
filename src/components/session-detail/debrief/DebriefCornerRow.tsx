@@ -59,7 +59,7 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
         )}
         {corner.evidence.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
-            {hasTechnique && <span className="text-[11px] text-lmu-muted">You vs the fastest:</span>}
+            <span className="text-[11px] text-lmu-muted">To match the {hasTechnique ? 'fastest' : 'reference'}:</span>
             {corner.evidence.map((item) => (
               <span key={item} className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[11px] text-slate-200">
                 {item}

@@ -103,7 +103,7 @@ describe('rankDebriefCorners', () => {
 
     const [ranked] = rankDebriefCorners([corner(1, 12.5, 0.3)], null, 1, undefined, { technique });
 
-    expect(ranked).toMatchObject({ timeLossSec: 0.3, techniqueLossSec: 0.9, evidence: ['Brakes 28 m earlier'] });
+    expect(ranked).toMatchObject({ timeLossSec: 0.3, techniqueLossSec: 0.9, evidence: ['Brake 28 m later'] });
     expect(rankDebriefCorners([corner(1, 12.5, 0.3)], null, 1)[0].techniqueLossSec).toBeNull();
   });
 
@@ -146,8 +146,8 @@ describe('spellCoversCorner', () => {
 });
 
 describe('describeCornerEvidence', () => {
-  it('quotes braking, apex, throttle and exit differences in the order they happen', () => {
-    // Daytona T5 against a faster Peugeot: brake 28 m earlier, 12 km/h slower at the apex.
+  it('says what to change for braking, apex, throttle and exit, in the order they happen', () => {
+    // Daytona T5 against a faster Peugeot: braked 28 m earlier and was 12 km/h slower at the apex.
     const evidence = describeCornerEvidence(corner(5, 28.8, 0.77, {
       brakingPointDeltaM: -28,
       minSpeedDeltaKmh: -12,
@@ -156,10 +156,24 @@ describe('describeCornerEvidence', () => {
     }));
 
     expect(evidence).toEqual([
-      'Brakes 28 m earlier',
-      '12 km/h slower at the apex',
-      'Full throttle 38 m later',
-      '2 km/h slower on exit',
+      'Brake 28 m later',
+      'Carry 12 km/h more to the apex',
+      'Full throttle 38 m earlier',
+      'Exit 2 km/h faster',
+    ]);
+  });
+
+  it('turns the other way when the driver overdid it', () => {
+    expect(describeCornerEvidence(corner(5, 28.8, 0.4, {
+      brakingPointDeltaM: 15,
+      minSpeedDeltaKmh: 6,
+      throttleOnDeltaM: -20,
+      exitSpeedDeltaKmh: 4,
+    }))).toEqual([
+      'Brake 15 m earlier',
+      'Carry 6 km/h less to the apex',
+      'Full throttle 20 m later',
+      'Exit 4 km/h slower',
     ]);
   });
 
