@@ -504,5 +504,54 @@ describe('Non-representative laps', () => {
         statSpy.mockRestore();
       }
     });
+
+    it('marks a slow lap spent passing a car from the line crossings of every driver', () => {
+      // The GT3 starts its lap 3 at 300 s, 8 s ahead of the Hypercar's lap 4, and finishes it
+      // at 410 s, after the Hypercar crossed the line at 405.2 s.
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Daytona</TrackVenue>
+    <Race>
+      <Driver>
+        <Name>Player Driver</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Peugeot 9x8</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" et="10.0">106.0</Lap>
+        <Lap num="2" p="1" et="116.0">96.0</Lap>
+        <Lap num="3" p="1" et="212.0">96.2</Lap>
+        <Lap num="4" p="1" et="308.2">97.0</Lap>
+        <Lap num="5" p="1" et="405.2">96.1</Lap>
+        <Lap num="6" p="1" et="501.3">96.3</Lap>
+      </Driver>
+      <Driver>
+        <Name>GT3 Driver</Name>
+        <CarType>Porsche 911 GT3 R LMGT3</CarType>
+        <CarClass>GT3</CarClass>
+        <Lap num="1" p="2" et="10.0">180.0</Lap>
+        <Lap num="2" p="2" et="190.0">110.0</Lap>
+        <Lap num="3" p="2" et="300.0">110.0</Lap>
+        <Lap num="4" p="2" et="410.0">110.0</Lap>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(xml);
+      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+      try {
+        const session = parser.parseSessionXml('traffic.xml');
+        const player = session?.drivers.find(d => d.name === 'Player Driver');
+
+        expect(player?.laps[3].traffic?.passed).toEqual([{ name: 'GT3 Driver', carClass: 'GT3', sameClass: false }]);
+        expect(player?.laps[3].traffic?.ahead?.gapSec).toBe(8.2);
+        expect(player?.laps[3].nonRepresentativeReason).toBe('traffic');
+        expect(player?.laps.filter(l => l.nonRepresentativeReason)).toHaveLength(1);
+      } finally {
+        readSpy.mockRestore();
+        statSpy.mockRestore();
+      }
+    });
   });
 });

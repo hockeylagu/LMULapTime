@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { NonRepresentativeReason } from '../../../../shared/types/index.js';
+import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
 
 export interface LapConsistencyOption {
   lapNumber: number;
@@ -9,11 +10,6 @@ export interface LapConsistencyOption {
   // Set by the session parser: the lap starts excluded, with this reason shown.
   nonRepresentativeReason?: NonRepresentativeReason;
 }
-
-const REASON_LABELS: Record<NonRepresentativeReason, { label: string; title: string }> = {
-  contact: { label: 'Contact', title: 'Slower than your median lap, with contact or damage' },
-  offPace: { label: 'Off pace', title: 'More than 3% slower than your median lap' },
-};
 
 export interface LapSelectorDropdownProps {
   availableLaps: LapConsistencyOption[];
@@ -74,10 +70,10 @@ export function LapSelectorDropdown({
                 )}
                 {isValid && nonRepresentativeReason && (
                   <span
-                    title={REASON_LABELS[nonRepresentativeReason].title}
+                    title={NON_REPRESENTATIVE_LABELS[nonRepresentativeReason].title}
                     className="px-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase"
                   >
-                    {REASON_LABELS[nonRepresentativeReason].label}
+                    {NON_REPRESENTATIVE_LABELS[nonRepresentativeReason].label}
                   </span>
                 )}
                 <span className={`ml-auto ${isExcluded ? 'text-lmu-muted line-through' : 'text-lmu-muted'}`}>{formatLapTime(lapTimeSec)}</span>

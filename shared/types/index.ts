@@ -1,3 +1,7 @@
+import type { LapTraffic } from './raceTraffic.js';
+
+export type { LapTraffic, TrafficCar, TrafficGap } from './raceTraffic.js';
+
 export type PaceCategory = 'Alien' | 'Competitive' | 'Good' | 'Midpack' | 'Tail-ender' | 'Offline';
 
 export interface PaceCategoryInfo {
@@ -70,8 +74,8 @@ export interface TireWear {
   avg: number; // 4-wheel average wear % remaining (0-100)
 }
 
-/** Why a racing lap does not show the driver's pace: contact or damage, or far off their median lap. */
-export type NonRepresentativeReason = 'contact' | 'offPace';
+/** Why a racing lap does not show the driver's pace: contact or damage, overtaking or following, or far off their median lap. */
+export type NonRepresentativeReason = 'contact' | 'traffic' | 'offPace';
 
 export interface LapIncident {
   type: 'contact' | 'damage' | 'other';
@@ -121,7 +125,7 @@ export interface LapData {
   fuelUsed?: number | null; // Fuel consumed in lap %
   virtualEnergy?: number | null; // Remaining Virtual Energy % (0-100) for Hypercar
   virtualEnergyUsed?: number | null; // Virtual Energy consumed in lap %
-  elapsedSeconds?: number | null; // Session elapsed seconds at lap finish (et)
+  elapsedSeconds?: number | null; // Session elapsed seconds when the lap starts (et): the previous lap's line crossing
   elapsedTimeString?: string; // Formatted MM:SS or HH:MM:SS
   pitStopDuration?: number | null; // Estimated pit lane / stop time in seconds
   pitStopDurationString?: string; // Formatted pit duration (e.g. "32.4s")
@@ -130,6 +134,7 @@ export interface LapData {
   isPitStop: boolean;
   isOutLap?: boolean; // Out-lap immediately following a pit stop
   nonRepresentativeReason?: NonRepresentativeReason; // Set by the parser; left out of averages and consistency
+  traffic?: LapTraffic; // Set by the parser from every car's line crossings
   isValid: boolean;
   isInferred?: boolean; // Inferred from session elapsed time for incomplete laps
   paceCategory?: PaceCategory | null;

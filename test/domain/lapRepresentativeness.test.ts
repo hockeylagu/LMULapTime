@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
 import { selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
-import type { LapIncident, NonRepresentativeReason } from '../../shared/types/index.js';
+import type { LapIncident, LapTraffic, NonRepresentativeReason, TrafficCar } from '../../shared/types/index.js';
 
 interface TestLap {
   lapNum: number;
@@ -10,11 +10,17 @@ interface TestLap {
   isPitStop: boolean;
   isOutLap?: boolean;
   incidents?: LapIncident[];
+  traffic?: LapTraffic;
   nonRepresentativeReason?: NonRepresentativeReason;
 }
 
 const contact: LapIncident = { type: 'contact', description: 'Contact with another car (326N)' };
 const damage: LapIncident = { type: 'damage', description: 'New front wing damage reported' };
+const gt3: TrafficCar = { name: 'Rui Paiva', carClass: 'GT3', sameClass: false };
+
+const trafficWith = (traffic: Partial<LapTraffic>): LapTraffic => ({
+  ahead: null, behind: null, following: false, passed: [], passedBy: [], ...traffic,
+});
 
 // Lap times from a 25-lap Hypercar race at Daytona: lap 9 and lap 15 had contact.
 const daytonaTimes = [
@@ -85,6 +91,38 @@ describe('markNonRepresentativeLaps', () => {
     markNonRepresentativeLaps(laps);
 
     expect(laps.some(l => l.nonRepresentativeReason)).toBe(false);
+  });
+
+  it('marks a slow lap spent in traffic, and keeps a fast one', () => {
+    const laps = lapsFrom([100, 100, 100, 100, 100.6, 99.8, 100.4]);
+    laps[4].traffic = trafficWith({ passed: [gt3] });
+    laps[5].traffic = trafficWith({ passed: [gt3] });
+    laps[6].traffic = trafficWith({ following: true });
+
+    markNonRepresentativeLaps(laps);
+
+    expect(laps[4].nonRepresentativeReason).toBe('traffic');
+    expect(laps[5].nonRepresentativeReason).toBeUndefined();
+    expect(laps[6].nonRepresentativeReason).toBe('traffic');
+  });
+
+  it('calls a slow lap with contact contact even when there was traffic too', () => {
+    const laps = lapsFrom([100, 100, 100, 100, 104]);
+    laps[4].incidents = [contact];
+    laps[4].traffic = trafficWith({ passedBy: [gt3] });
+
+    markNonRepresentativeLaps(laps);
+
+    expect(laps[4].nonRepresentativeReason).toBe('contact');
+  });
+
+  it('does not count cars merely nearby on the road as traffic', () => {
+    const laps = lapsFrom([100, 100, 100, 100, 100.6]);
+    laps[4].traffic = trafficWith({ ahead: { car: gt3, gapSec: 0.4 } });
+
+    markNonRepresentativeLaps(laps);
+
+    expect(laps[4].nonRepresentativeReason).toBeUndefined();
   });
 
   it('clears a mark left from an earlier pass', () => {
