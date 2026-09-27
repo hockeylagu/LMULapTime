@@ -9,6 +9,15 @@ export interface CenterlineSpatialIndex {
   totalLengthM: number;
 }
 
+/** A station step backwards up to this is centreline noise, not penalised. */
+const CONTINUITY_BACK_SLACK_M = 0.5;
+/** Free station advance beyond the stretched distance driven. */
+const CONTINUITY_FORWARD_SLACK_M = 2;
+/** How much faster than the car the station may advance (inside of a tight corner). */
+const CONTINUITY_STRETCH = 3;
+/** Samples further apart than this are a teleport: no continuity is enforced across them. */
+const CONTINUITY_MAX_STEP_M = 60;
+
 export interface ProjectedTrajectory {
   stations: number[];
   lateralOffsets: number[];
@@ -174,6 +183,7 @@ export function projectTrajectoryToCenterline(
   // [-8, +30] segments around last best segment.
   const lookback = 8;
   const lookahead = 30;
+  let prevStation: number | undefined;
 
   for (let i = 0; i < points.length; i++) {
     const pt = points[i];
@@ -201,7 +211,24 @@ export function projectTrajectoryToCenterline(
       }
     }
 
+    // Continuity with the previous sample: the station may not run backwards, nor advance much
+    // further than the car drove (up to CONTINUITY_STRETCH times, the inside of a tight corner).
+    // Without it, a car on the inside of a hairpin - near the corner's centre, where the whole
+    // arc of centreline is about as close - hopped 20-50 m along the arc between two samples.
+    const prevPt = i > 0 ? points[i - 1] : undefined;
+    const driven = prevPt ? Math.hypot(pt.x - prevPt.x, pt.z - prevPt.z) : Infinity;
+    const continuityPenalty = (s: number): number => {
+      if (prevStation === undefined || driven >= CONTINUITY_MAX_STEP_M) return 0;
+      let ds = s - prevStation;
+      if (ds < -totalLength / 2) ds += totalLength;
+      else if (ds > totalLength / 2) ds -= totalLength;
+      const excess = Math.max(0, -ds - CONTINUITY_BACK_SLACK_M) +
+        Math.max(0, ds - driven * CONTINUITY_STRETCH - CONTINUITY_FORWARD_SLACK_M);
+      return excess * excess;
+    };
+
     // Local sliding window search
+    let bestDistSq = Infinity;
     for (let offset = -lookback; offset <= lookahead; offset++) {
       const k = (((lastBestK + offset) % m) + m) % m;
       const proj = projectOntoSegment(pt.x, pt.z, k);
@@ -215,16 +242,17 @@ export function projectTrajectoryToCenterline(
         }
       }
 
-      const score = proj.distSq + headingPenalty;
+      const score = proj.distSq + headingPenalty + continuityPenalty(proj.s);
       const isTie = bestProj && Math.abs(score - bestProj.distSq) < 1e-4;
       if (!bestProj || score < bestProj.distSq || (isTie && i === 0 && proj.s < bestProj.s)) {
         bestProj = { ...proj, distSq: score };
+        bestDistSq = proj.distSq;
         bestK = k;
       }
     }
 
     // If local window didn't find a close segment (e.g. major teleport / pit cut), fallback to global search
-    if (bestProj && bestProj.distSq > 2500) {
+    if (bestProj && bestDistSq > 2500) {
       for (let k = 0; k < m; k++) {
         const proj = projectOntoSegment(pt.x, pt.z, k);
         let headingPenalty = 0;
@@ -242,6 +270,7 @@ export function projectTrajectoryToCenterline(
     }
 
     lastBestK = bestK;
+    prevStation = bestProj?.s;
 
     let s = bestProj ? Math.max(0, Math.min(totalLength, bestProj.s)) : 0;
     // Round to millimeter precision
