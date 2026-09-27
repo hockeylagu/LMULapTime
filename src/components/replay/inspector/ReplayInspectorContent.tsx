@@ -9,6 +9,7 @@ import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
+import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
 
 export interface ReplayInspectorContentProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export interface ReplayInspectorContentProps {
   initialBaselineReplayName?: string | null;
   initialBaselineLapNumber?: number | null;
   initialBaselineDriverName?: string | null;
+  /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
+  initialCornerNumber?: number | null;
 }
 
 export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
@@ -34,6 +37,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   initialBaselineReplayName,
   initialBaselineLapNumber,
   initialBaselineDriverName,
+  initialCornerNumber,
 }) => {
   const {
     metadata,
@@ -97,16 +101,11 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
-  const [excludedConsistencyLaps, setExcludedConsistencyLaps] = useState<Set<number>>(new Set());
-
-  const toggleConsistencyLap = (lapNumber: number) => {
-    setExcludedConsistencyLaps(prev => {
-      const next = new Set(prev);
-      if (next.has(lapNumber)) next.delete(lapNumber);
-      else next.add(lapNumber);
-      return next;
-    });
-  };
+  const { availableConsistencyLaps, excludedConsistencyLaps, toggleConsistencyLap } =
+    useConsistencyLapSelection(trajectory, metadata, activeReplayName, selectedDriverSlot);
+  // A corner asked for in the URL (the session debrief links to one) opens once the laps it
+  // belongs to are loaded; corner numbers come from the lap and its comparison.
+  const pendingCornerRef = useRef<number | null>(initialCornerNumber ?? null);
 
   useEffect(() => {
     if (colorBy === 'delta' && (!isCompareMode || !baselineTrajectory)) {
@@ -138,32 +137,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     [rawCornerConsistencyStats, excludedConsistencyLaps]
   );
 
-  const availableConsistencyLaps = useMemo(() => {
-    const laps = (trajectory?.laps || metadata?.laps || []).filter(l => l.lapTimeSec > 0);
-    return laps
-      .map(l => ({
-        lapNumber: l.lapNumber,
-        lapTimeSec: l.lapTimeSec,
-        isValid: l.isValid !== false && !l.isOutlap,
-        nonRepresentativeReason: l.nonRepresentativeReason,
-      }))
-      .sort((a, b) => a.lapNumber - b.lapNumber);
-  }, [metadata, trajectory]);
-
-  const initializedExclusionKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!activeReplayName || availableConsistencyLaps.length === 0) return;
-    const key = `${activeReplayName}|${selectedDriverSlot ?? 'x'}`;
-    if (initializedExclusionKeyRef.current === key) return;
-    initializedExclusionKeyRef.current = key;
-    // Invalid laps and the laps the session parser marked non-representative (contact, off pace)
-    // start excluded; the driver can tick them back in.
-    const excludedByDefault = availableConsistencyLaps
-      .filter(l => !l.isValid || l.nonRepresentativeReason)
-      .map(l => l.lapNumber);
-    setExcludedConsistencyLaps(new Set(excludedByDefault));
-  }, [activeReplayName, selectedDriverSlot, availableConsistencyLaps]);
-
   const bestSectors = useMemo(() => {
     let s1: number | null = null;
     let s2: number | null = null;
@@ -185,6 +158,15 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   useEffect(() => {
     setSelectedCornerNumber(null);
   }, [trajectory, baselineTrajectory]);
+
+  useEffect(() => {
+    const pending = pendingCornerRef.current;
+    if (pending === null || (initialCompareMode && !baselineTrajectory)) return;
+    if (!cornerSegments.some(s => s.cornerNumber === pending)) return;
+    pendingCornerRef.current = null;
+    setActiveTab('corners');
+    setSelectedCornerNumber(pending);
+  }, [cornerSegments, baselineTrajectory, initialCompareMode]);
 
   const selectedCorner = useMemo(
     () => cornerSegments.find(s => s.cornerNumber === selectedCornerNumber) || null,
