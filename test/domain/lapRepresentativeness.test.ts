@@ -63,8 +63,8 @@ describe('markNonRepresentativeLaps', () => {
     expect(laps[3].nonRepresentativeReason).toBe('contact');
   });
 
-  it('marks a lap more than 3% off the median as off pace, and one just inside it not at all', () => {
-    const laps = lapsFrom([100, 100, 100, 100, 103.1, 102.9]);
+  it('marks a lap more than 2% off the median as off pace, and one just inside it not at all', () => {
+    const laps = lapsFrom([100, 100, 100, 100, 102.1, 101.9]);
 
     markNonRepresentativeLaps(laps);
 

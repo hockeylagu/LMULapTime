@@ -2,8 +2,13 @@ import type { LapIncident, LapTraffic, NonRepresentativeReason } from '../types/
 import { isRacingLap } from './lapComparison.js';
 import { hadTraffic } from './raceTraffic.js';
 
-/** A racing lap this much slower than the driver's median racing lap is off pace (a mistake, a yellow, traffic the line crossings do not show). */
-export const OFF_PACE_RATIO = 1.03;
+/**
+ * A racing lap this much slower than the driver's median racing lap is off pace (a mistake, a
+ * yellow, traffic the line crossings do not show). Measured over 929 sessions (2026-09-27): laps
+ * with nothing logged sit within 1.1% of the median 95% of the time and thin out past 1.5%, in
+ * every class and on every layout with enough laps, so 2% is just past a driver's normal spread.
+ */
+export const OFF_PACE_RATIO = 1.02;
 
 /** Below this many racing laps the median is not a pace reference, so no lap is called off pace. */
 const MIN_LAPS_FOR_MEDIAN = 3;

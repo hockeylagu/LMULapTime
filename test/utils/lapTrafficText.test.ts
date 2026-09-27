@@ -55,7 +55,7 @@ describe('describeTrafficSpell', () => {
 
 describe('NON_REPRESENTATIVE_LABELS', () => {
   it('states the off-pace cutoff the parser uses', () => {
-    expect(NON_REPRESENTATIVE_LABELS.offPace.title).toBe('More than 3% slower than your median lap');
+    expect(NON_REPRESENTATIVE_LABELS.offPace.title).toBe('More than 2% slower than your median lap');
     expect(NON_REPRESENTATIVE_LABELS.traffic.label).toBe('Traffic');
   });
 });
