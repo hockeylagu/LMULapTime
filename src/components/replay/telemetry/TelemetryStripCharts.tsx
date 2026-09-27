@@ -9,6 +9,7 @@ import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActive
 import { TelemetryPresetModal } from './presets/TelemetryPresetModal.js';
 import { useTelemetryStripInteraction } from './useTelemetryStripInteraction.js';
 import { TelemetryResolution } from './telemetryResolution.js';
+import { LoadingState } from '../../common/index.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -131,10 +132,13 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   };
 
   if (isLoading) return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 text-lmu-muted text-sm">
-      <div className="w-6 h-6 border-2 border-lmu-accent border-t-transparent rounded-full animate-spin" />
-      Loading telemetry...
-    </div>
+    <LoadingState
+      size="compact"
+      title="Loading Telemetry"
+      subtitle="Synchronizing high-frequency channels..."
+      dataTestId="telemetry-strip-loading"
+      className="h-full"
+    />
   );
   if (points.length === 0) return <div className="flex items-center justify-center h-full text-lmu-muted text-sm">No telemetry frames recorded for this car.</div>;
 
