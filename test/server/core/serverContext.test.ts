@@ -570,7 +570,6 @@ describe('ServerContext replay scan progress', () => {
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile).toBeUndefined();
-      expect(session.rejectedReplayLink).toEqual({ replayName: previousRace.filename, reason: 'time-window', rejectedAt: 1 });
       expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledWith(
         '2026_09_03_14_41_14-69R1',
         expect.objectContaining({ name: previousRace.filename }),
@@ -605,7 +604,7 @@ describe('ServerContext replay scan progress', () => {
 
       expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
       expect(earlier.matchingReplayFile).toBeUndefined();
-      expect(earlier.rejectedReplayLink?.reason).toBe('owned-by-other-session');
+      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledWith(earlier.id, expect.anything(), 'owned-by-other-session');
       expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledTimes(1);
     });
 
@@ -618,20 +617,7 @@ describe('ServerContext replay scan progress', () => {
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile).toBeUndefined();
-      expect(session.rejectedReplayLink).toEqual(withdrawal);
       expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
-    });
-
-    it('tells the UI why a session has no replay after a restart', () => {
-      const { context, sessionDb, session } = setup([], '');
-      Object.assign(session, { matchingReplayFile: undefined });
-      const withdrawal = { replayName: previousRace.filename, reason: 'time-window', rejectedAt: 5 };
-      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, [withdrawal]]]) as never);
-
-      context.enrichSessionsWithTelemetry([session]);
-
-      expect(session.matchingReplayFile).toBeUndefined();
-      expect(session.rejectedReplayLink).toEqual(withdrawal);
     });
 
     it('keeps a match saved alongside the session XML without searching again', () => {

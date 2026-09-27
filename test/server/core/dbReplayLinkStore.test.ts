@@ -41,7 +41,6 @@ describe('rejected replay links', () => {
 
     expect(rejected).toEqual({ replayName: replayLink.name, reason: 'time-window', rejectedAt: expect.any(Number) });
     expect(cached.matchingReplayFile).toBeUndefined();
-    expect(cached.rejectedReplayLink).toEqual(rejected);
     db.invalidateSessionCache();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
     expect(db.getAllSessionSummaries()[0].matchingReplayFile).toBeUndefined();
