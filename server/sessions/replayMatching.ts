@@ -111,6 +111,11 @@ export function replayIndexEntryFromStored(stored: StoredReplayFileInfo & { file
     eventType: metadata.eventInfo?.eventType,
     durationSec: metadata.durationSec,
     sceneDesc: metadata.sceneDesc || metadata.eventInfo?.sceneDesc || undefined,
+    hasRain: metadata.hasRain,
+    maxRainIntensity: metadata.maxRainIntensity,
+    weatherCondition: metadata.weatherCondition,
+    ambientTemp: metadata.ambientTemp,
+    trackTemp: metadata.trackTemp,
   };
 }
 

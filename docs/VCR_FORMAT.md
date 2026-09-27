@@ -62,7 +62,12 @@ Immediately following String 6 (`trackPath`):
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
   - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
-- **Next 67 bytes**: Session conditions block. Layout not established.
+- **Next 67 bytes**: Session rules and game settings block (mirrors XML results flags):
+  - `+8` (4 bytes, UInt32LE): `DamageMult` (e.g. `100` = `0x64`).
+  - `+16` (4 bytes, UInt32LE): `FuelMult` (e.g. `1` = `0x01`).
+  - `+20` (4 bytes, UInt32LE): `TireMult` (e.g. `1` = `0x01`).
+  - `+32` (4 bytes, UInt32LE): `RaceTime` in minutes (e.g. `20` = `0x14`, `30` = `0x1E`).
+  *(Note: This block stores static session rules; live weather and track precipitation are broadcast continuously in Class 1 Type 10 packets).*
 
 ### 2.3 Structured Driver Roster
 Located immediately after the 67-byte session conditions block:
@@ -206,10 +211,50 @@ Each 10-byte corner block contains:
 
 *Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle. Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
 
-- **Type 10**: payload size and layout not established (a documented single-byte `startLightsCode`
-  variant has not been observed).
+#### Type 10 (`eventSize === 80`): Track Meteorology, Rain Intensity & Surface Condition Broadcast
+Emitted periodically at ~0.5 Hz (every 1.5–2 seconds) across all sessions. Broadcast with `driverSlot === 255` (`0xFF`) to report global track meteorology, surface precipitation, and ambient temperature:
+
+| Offset in Payload | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `0..3` | 4 bytes | Float32LE | **Simulation Time**: Game physics clock in seconds (advances in 3.333s / 10/3 intervals). |
+| `6..9` | 4 bytes | Float32LE | **Solar Progression Factor**: Solar heading and progression angle (increases monotonically from ~0.6 to 2.4+). |
+| `10..13` | 4 bytes | Float32LE | **Track Condition Baseline Factor**: Base track condition scale. |
+| `14..37` | 24 bytes | Binary | Cloud coverage and atmospheric state parameters. |
+| `38` | 1 byte | UInt8 | **Ambient Temperature Metric**: Inverted thermal index (`0x92` = 25.0°C down to `0x81` = 22.0°C, formula: `25.0 - (146 - val) * 0.176`). |
+| `39` | 1 byte | UInt8 | **Track Surface Temperature Candidate**: Road surface thermal baseline (`0x81` = 129, corresponding to ~27.3°C track temperature in Sebring). |
+| `40..41` | 2 bytes | Binary | Atmospheric state and barometric pressure indices. |
+| `42..77` | 36 bytes | Binary | **9 Sector / Path Rain & Surface Wetness Channels**: Structured as 9 discrete 4-byte blocks (`[wetness, wetness, wetness, 0x00]`): <br>• `0x00`: Bone-dry road surface <br>• `0x01..0x03`: Light drizzle / trace dampness <br>• `0x04..0x10`: Steady rain <br>• `0x11..0x18`: Heavy rain <br>• `0x19+`: Torrential rain / standing water |
+
+*Grid Scope: Global broadcast packet (`driverSlot === 255`). Recorded in both online multiplayer and offline practice sessions.*
+
 - **Type 23**: payload size and layout not established (a documented 4-byte countdown variant has
   not been observed).
+
+---
+
+### Class 3: High-Frequency Wheel Dynamics & Chassis Physics
+
+#### Type 24 (`eventSize === 40`): 4-Corner Wheel Dynamics & Braking Packet
+Emitted continuously at up to ~50–100 Hz per car (`eventClass === 3`). Contains granular per-wheel physics structured as **4 discrete 10-byte corner blocks**:
+- **Front-Left (FL)**: Bytes `0..9`
+- **Front-Right (FR)**: Bytes `10..19`
+- **Rear-Left (RL)**: Bytes `20..29`
+- **Rear-Right (RR)**: Bytes `30..39`
+
+Each 10-byte corner block contains:
+
+| Relative Offset | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `+0` | 1 byte | UInt8 | Unestablished corner state byte. |
+| `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure. |
+| `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). Does not vary with wheel rotation or speed; wheel speeds are not recorded in this packet. |
+| `+7..8` | 2 bytes | Int16LE | Unestablished corner dynamics field. |
+| `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag. |
+
+*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle. Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
+
+#### Type 25 (`eventSize === 34`): High-Frequency Physics Sub-Tick Sync Packet
+Emitted continuously alongside Type 24 for the local player. Byte 3 steps sequentially across sub-ticks (e.g. stepping by 13 cycles).
 
 ---
 
@@ -264,15 +309,16 @@ ASCII string (Class 7, length matches the session name exactly, e.g. `"Race"`) b
 session start confirming the current session name. A separate single-byte variant of Type 19
 also occurs repeatedly through a session; its meaning is not established.
 
-#### Type 48 (`eventSize === 41`): Live Leaderboard / Standings Matrix
-Emitted periodically (Class 7) to broadcast the official real-time session running order:
-- `+0`: 1 byte count: Number of active cars ranked.
-- `+1..20`: 20 bytes, meaning not established.
-- `+21..40`: Array of up to 20 driver slot bytes in track order:
+#### Type 48 (`eventSize = 21 + vehicleCount`): Live Leaderboard / Standings Matrix
+Emitted periodically (`Class 7`) to broadcast the official real-time session running order across the grid.
+The payload length is **dynamic** based on the active car count (`eventSize = 21 + count`, e.g. 40 bytes for 19 cars, 41 for 20 cars, 46 for 25 cars):
+- `+0`: 1 byte count: Number of active cars ranked ($N$).
+- `+1..20`: 20 bytes classification / status flags.
+- `+21..(21 + N - 1)`: Array of $N$ driver slot bytes in exact track order:
   - Byte `21` = P1 leader slot
   - Byte `22` = P2 slot
-  - Byte `21+n-1` = Pn slot
-Enables 100% accurate running position, leader interval, and position-over-time charts without post-hoc sorting or interpolation.
+  - Byte `21 + n - 1` = Pn slot
+Enables 100% accurate running position, leader intervals, and position-over-time charts without post-hoc sorting or interpolation.
 
 #### Type 49 (`eventSize === 1`): Pit & Garage Transitions
 - 1 byte code: `3` = Entered pit lane / Returned to garage. Emitted synchronously with pit entry and garage return beacons.

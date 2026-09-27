@@ -70,6 +70,8 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
           ? 'border-fuchsia-500/70 bg-fuchsia-500/15 shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse'
           : currentPoint?.isOffTrack
           ? 'border-amber-500/70 bg-amber-500/15 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+          : (currentPoint?.rainIntensity ?? 0) > 0
+          ? 'border-blue-500/70 bg-blue-500/15 shadow-[0_0_8px_rgba(59,130,246,0.25)]'
           : currentPoint?.inPit
           ? 'border-blue-500/50 bg-blue-500/10'
           : 'border-lmu-border'
@@ -80,14 +82,34 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
             ? 'text-fuchsia-300'
             : currentPoint?.isOffTrack
             ? 'text-amber-300'
+            : (currentPoint?.rainIntensity ?? 0) > 0
+            ? 'text-blue-300'
             : currentPoint?.inPit
             ? 'text-blue-300'
             : 'text-lmu-muted'
         }`}>
-          {currentPoint?.pitLimiter ? 'LIMITER' : currentPoint?.isOffTrack ? 'OFF TRACK' : currentPoint?.inPit ? 'PIT LANE' : 'ON TRACK'}
+          {currentPoint?.pitLimiter
+            ? 'LIMITER'
+            : currentPoint?.isOffTrack
+            ? 'OFF TRACK'
+            : (currentPoint?.rainIntensity ?? 0) > 0
+            ? `WET (${currentPoint?.rainIntensity})`
+            : currentPoint?.inPit
+            ? 'PIT LANE'
+            : 'ON TRACK'}
         </span>
         <span className="text-[8px] text-lmu-muted">
-          {currentPoint?.pitLimiter ? '60 km/h' : currentPoint?.isOffTrack ? 'limits cut' : currentPoint?.inPit ? 'in pits' : 'green'}
+          {currentPoint?.pitLimiter
+            ? '60 km/h'
+            : currentPoint?.isOffTrack
+            ? 'limits cut'
+            : (currentPoint?.rainIntensity ?? 0) > 0
+            ? `${currentPoint?.ambientTemp ? `${currentPoint.ambientTemp.toFixed(1)}°C` : 'wet'}${currentPoint?.trackTemp ? ` / ${currentPoint.trackTemp.toFixed(1)}°C` : ''}`
+            : currentPoint?.inPit
+            ? 'in pits'
+            : currentPoint?.ambientTemp
+            ? `${currentPoint.ambientTemp.toFixed(1)}°C air`
+            : 'green'}
         </span>
       </div>
     </div>

@@ -47,6 +47,9 @@ correlation before pairing samples.
   buffer is never populated and the scoring buffer is frozen (`mCurrentET` stays 0, version
   counters stop, all vehicle geometry zeroed). Only static session strings survive. All
   shared-memory capture must come from actually driving.
+- **The REST API only partly fills that gap.** During playback `/rest/watch/sessionInfo`
+  follows the replay (weather, temps), but `/rest/watch/standings` stays a frozen snapshot, so
+  per-car channels still need a driven capture (§2.10).
 - **Track geometry fields are scoring-only**, i.e. 5 Hz: `mLapDist`, `mPathLateral`, `mTrackEdge`
   are `rF2VehicleScoring` members, not telemetry members.
 
@@ -325,6 +328,237 @@ The empirical scan confirms the following netcode distribution rules:
 
 **Key Takeaway**: In online multiplayer events, dedicated servers broadcast vehicle kinematics (`Class 0 Type 8..14`) and brake rotor temperatures (`Class 2 Type 15`) for the entire multi-car grid, but restrict high-frequency 4-corner wheel dynamics (`Class 1 Type 24`) and fuel levels (`Class 0 Type 51`) strictly to the client's own vehicle to conserve network bandwidth and prevent real-time telemetry snooping.
 
+### 2.9 Ground-Truth Discovery: Track Meteorology, Rain Intensity & Wetness (`Class 1 Type 10`, `sz === 80`)
+
+#### A. Discovery Methodology via LMU Embedded REST API Ground Truth
+The question of whether `.Vcr` binary replay streams store ambient weather, dynamic rain onset, or track surface wetness was resolved empirically using **Le Mans Ultimate's internal embedded REST API (`http://localhost:6397`)**.
+
+While playing back `Sebring International Raceway R1 17.Vcr` in-game, we commanded the simulation timeline via `PUT /rest/watch/replaytime/{time}` in 60-second steps and queried `/rest/watch/sessionInfo` to capture the internal simulation engine's live ground-truth weather state:
+
+| Simulation Time | Ground-Truth Raining (`raining`) | Path Wetness (`averagePathWetness`) | Ambient Temp (`ambientTemp`) | Observed Track Conditions |
+|---|---|---|---|---|
+| **0s – 420s** | 0.00% (0.0) | 0.00% | 25.02°C | Bone-dry track, optimal baseline grip |
+| **480s** (8 min) | 0.35% (0.00348) | 0.00% | 23.91°C | First raindrops begin to fall |
+| **600s** (10 min) | 0.70% (0.00705) | 0.00% | 23.29°C | Rain rate climbing steadily (+0.001787 / min) |
+| **720s** (12 min) | 1.92% (0.01920) | 0.00% | 23.02°C | Visible precipitation across all sectors |
+| **900s** (15 min) | 4.31% (0.04315) | 0.00% | 22.02°C | Wet tarmac, grip loss, TC duty cycles triple |
+| **1140s** (19 min) | 6.85% (0.06848) | 0.00% | 22.02°C | Approaching peak precipitation intensity |
+| **1200s** (20 min) | 7.03% (0.07029) | 0.00% | 22.02°C | Maximum wetness at race finish |
+
+#### B. Isolating the Binary Meteorology Broadcast Packet
+Correlating this temporal profile against candidate packet streams across the 130 MB replay file definitively isolated the dedicated environment broadcast packet:
+- **`eventClass === 1`**, **`eventType === 10`**, **`eventSize === 80`**
+- **`driverSlot === 255` (`0xFF`)**: Universal track broadcast channel (not tied to any vehicle).
+- **Frequency**: Emitted continuously at **~0.5 Hz** (once every 1.5–2.0 seconds; exactly 600 packets across a 1,200s race).
+
+#### C. Binary Payload Layout & Calibration
+Inspecting packets sampled at `sTime` 411s, 511s, 614s, 720s, 821s, 921s, 1024s, 1128s, 1231s, 1331s, and 1435s established the exact 80-byte binary structure:
+
+```
+Offset   Type        Field Description & Calibrated Meaning
+------------------------------------------------------------------------------------------------------
++0..3    Float32LE   Simulation game clock (seconds; ticks in 3.333s / 10/3 intervals).
++6..9    Float32LE   Solar progression factor (monotonically climbs from ~0.68 at start to 2.36 at end).
++10..13  Float32LE   Track condition baseline scale (monotonically climbs from 0.27 to 1.92).
++14..37  Binary      24-byte atmospheric state, sky coverage and cloud density parameters.
++38      UInt8       Ambient temperature scale (0x92 = 146 down to 0x81 = 129, tracking 25.0°C -> 22.0°C).
++42..77  36 bytes    9 discrete 4-byte sector/track path surface wetness channels ([val, val, val, 0x00]).
+```
+
+#### D. Behavior of the Surface Wetness Channels (`Bytes 42..77`)
+In `Sebring International Raceway R1 17.Vcr`, the 9 sector wetness channels track the rain curve with exact integer fidelity:
+- **`sTime 511s` (Dry)**: `00000000 00000000 00000000 ...` (All zeroes across all 9 sectors)
+- **`sTime 614s` (Rain onset)**: `02020200 02020200 ...` (`0x02` across all sectors)
+- **`sTime 720s` (Building)**: `05050500 05050500 ...` (`0x05`)
+- **`sTime 821s`**: `06060600 06060600 ...` (`0x06`)
+- **`sTime 921s`**: `0d0d0d00 0d0d0d00 ...` (`0x0D` = 13)
+- **`sTime 1024s`**: `0f0f0f00 0f0f0f00 ...` (`0x0F` = 15)
+- **`sTime 1128s` (Peak rain)**: `11111100 11111100 ...` (`0x11` = 17)
+- **`sTime 1331s` (Rain eases)**: `09090900 09090900 ...` (`0x09` = 9)
+- **`sTime 1435s` (Tapering)**: `07070700 07070700 ...` (`0x07` = 7)
+
+#### E. Ambient vs. Track Surface Temperature (`Bytes 38..39`)
+Cross-referencing `/rest/watch/sessionInfo` across the timeline revealed how LMU handles road thermodynamics:
+- **Ambient Air Temperature (`ambientTemp`)**:
+  - The live API reports ambient air starting at **25.02°C** in dry air, falling steadily to **22.02°C** under dense cloud cover and sustained rain.
+  - **Byte 38** tracks this drop identically: starting at raw `153` / `146` (`0x92`) and cooling down to `129` (`0x81`).
+  - Empirical formula: $T_{\text{ambient}} = 25.0 - (146 - \text{val}) \times 0.176$.
+- **Track Surface Temperature (`trackTemp`)**:
+  - The live API reports road surface temperature starting at **27.33°C** and slowly cooling to **27.21°C** as rain accumulates over 20 minutes.
+  - **Byte 39** holds the track surface baseline thermal index: `129` (`0x81`), corresponding directly to the ~27.3°C road baseline.
+  - Unlike ambient air which drops rapidly by ~3.0°C during rain, track thermal inertia keeps asphalt temperatures elevated, decaying slowly as standing water accumulates.
+
+#### F. Additional API & Stream Discoveries
+1. **Dynamic Grid Size in Standings Matrix (Class 7 Type 48)**:
+   - Comparing `/rest/watch/standings` against the frame stream revealed that `Type 48` event sizes are **dynamic**, scaling with the active vehicle count: $\text{eventSize} = 21 + N$.
+   - A hardcoded check for `sz === 41` (which assumed exactly 20 cars) broke standings snapshots on 19-car or 25-car grids. Updating to `sz >= 22` with dynamic driver count $N = \text{payload}[0]$ allows 100% reliable position tracking for grids of any size.
+2. **Track Collisions & Incidents Ledger (`/rest/watch/getIncidentsList/0`)**:
+   - The live API provides 44 contact events with timestamps and driver pairings (e.g. `{ contactWith: "Nicholas Moreno", et: 141.56, player: "Michal Kazmierczak" }`).
+   - In the VCR stream, the physics engine responds to these contacts with burst frames (`Class 7 Type 9` and `Class 7 Type 11`) at those exact fractions of a second, accompanied by penalty assessments (`Class 2 Type 5`) where applicable.
+
+#### G. Cross-Validation Across 88 Real Race Replays
+An exhaustive sweep across all 88 race replays on disk proved the fidelity of this packet:
+1. **Bone-Dry Sessions**: In `Autodromo Enzo e Dino Ferrari R1 6..10.Vcr` (5 full races, >4,000 meteorology packets), bytes `+42..77` were **100% zeroes** without a single non-zero byte from green flag to checkered flag.
+2. **Confirmed Rain Replays on Disk**:
+   - `Sebring International Raceway R1 15.Vcr`: Max rain intensity **23** (Rain started at 504.3s; lap times collapsed from 127.2s to 161.1s, a massive +33.9s blowout).
+   - `Sebring International Raceway R1 14.Vcr`: Max rain intensity **22** (Rain started at 277.7s; lap times dropped by +8.6s).
+   - `Sebring International Raceway R1 17.Vcr`: Max rain intensity **18** (Rain started at 534.4s; lap times dropped by +17.5s).
+   - `Sebring International Raceway R1 13.Vcr`: Max rain intensity **16** (Rain started at 297.8s; lap times dropped by +6.5s).
+   - `Sebring International Raceway R1 16.Vcr`: Max rain intensity **14** (Rain started at 517.3s; lap times dropped by +5.1s).
+   - `Circuit de Spa-Francorchamps R1 35.Vcr`: Max rain intensity **3** (Light mid-race drizzle starting at 487.3s).
+
+### 2.10 REST API as ground truth during replay playback (Sebring R1 15, 20260927)
+
+**Question:** can the embedded REST API (`:6397`, see [LMU_REST_API.md](LMU_REST_API.md)) act
+as a ground-truth source while a replay plays, the way the shared-memory recorder does while
+driving (§1)? If it could, every `.Vcr` on disk would become a paired capture.
+
+**Setup:** `Sebring International Raceway R1 15.Vcr` (API replay id 128, `LMGT3 Fixed`, split 2;
+XML `2026_08_24_16_23_16-21R1.xml`) loaded from the main menu and played at 1×. `standings`
+and `sessionInfo` were polled alternately at 1 request/s for 45 cycles (~135 s wall), and every
+field was diffed between consecutive samples. The replay's own Class 1 Type 10 packets were
+dumped offline for comparison. Build 14200.
+
+**Short answer: partially.** Only the global session and weather state follows the replay
+timeline. Per-car state is a frozen snapshot, and the only other replay-mode data is static.
+
+#### A. What each endpoint returns during replay
+
+| Endpoint | Follows replay timeline? | Content | Value for VCR work |
+|---|---|---|---|
+| `GET /rest/watch/sessionInfo` | **Yes** (weather/temps) | `raining`, `ambientTemp`, `trackTemp`, `raceCompletion`, `timeRemainingInGamePhase` tick with playback and freeze while paused. `currentEventTime` stays `0.0`. `averagePathWetness`/`min`/`max` stay `0.0` even in heavy rain. `darkCloud` and `windSpeed` stay 0. | Ground truth for the weather packet (see B) |
+| `GET /rest/watch/standings` | **No**: zero field changes across 45 samples of all 20 cars | Rich per-car schema (`lapDistance`, `pathLateral`, `trackEdge`, `carPosition`, `fuelFraction`, `veFraction`, `pitState`, `penalties`, `headlights`, `upgradePack`, gaps). Frozen at a `gamePhase: "FORMATION"` snapshot: `lapsCompleted` 0, best times −1. `carVelocity`/`carAcceleration` are all zeros. | None as a time series. The schema lists fields worth searching for in the binary (see D) |
+| `GET /rest/watch/standings/history` | No | One entry per slot, the same formation snapshot | None |
+| `GET /rest/watch/trackmap` | Static | **1672 track-geometry points, not car positions.** `type 0`: 1176 pts, 5798 m polyline. `type 1`: 346 pts (pit lane). Types 3–39 and 107–144: two points each (pit boxes / garage stalls). | Reference line in LMU local coordinates (see C) |
+| `GET /rest/watch/getIncidentsList/0` | Static (whole race) | 44 `{player, contactWith, et}` contacts, et 141.56–1445.58 s | Adds nothing over the XML: it has 49 `<Incident>` rows *with* impact magnitude. API `et` resolution is 0.02 s against 0.1 s in the XML |
+| `GET /rest/watch/focus` | — | `10` (the local player's slot) | — |
+| `GET /rest/replay/CameraController/getCameraInfo` | — | `{"cameraName":"COCKPIT","currentCameraGroup":"Driving"}` | — |
+| `GET /rest/watch/getBookmarkedTimestamps` | — | `[]` | — |
+| `GET /rest/watch/replays` | Static | Per-file `eventId`, `eventTitle`, `eventType`, `seriesId`, `session`, `splitNo`, `sceneDesc`, `size`, `timestamp` (73 of 229 files carry no `eventId`) | Already decoded from the VCR event JSON (`replayParser.ts`), so nothing new |
+
+`/rest/sessions/weather`, `opponents`, `getTracksAll` and `getAllVehicles` answer from the main
+menu too. They describe the session setup and the content catalogue, not replay state.
+
+#### B. Rain byte = engine `raining` × 255 (lossless)
+
+Distinct `sessionInfo.raining` values seen during playback, compared with the VCR wetness byte
+(Class 1 Type 10, payload `+42`):
+
+| API `raining` | × 255 | VCR byte step (clock) |
+|---|---|---|
+| 0.0784314 | **20.0000** | `0x14` from 1286.7 s |
+| 0.0761253 | 19.41 | *(between packets)* |
+| 0.0745098 | **19.0000** | `0x13` from 1296.7 s |
+| 0.0729028 | 18.59 | *(between packets)* |
+| 0.0705882 | **18.0000** | `0x12` from 1310.0 s |
+| 0.0666667 | **17.0000** | `0x11` from 1346.7 s (to end, 1510 s) |
+
+- At packet instants the API value is **exactly** `byte / 255`. Between packets the engine
+  interpolates linearly. The step order and spacing (API ≈ 9 s → 12 s → 25 s wall time; VCR
+  10.0 → 13.3 → 36.7 s) confirm the alignment. The API's first sample sat at replay ET ≈ 1287 s.
+- So the VCR byte *is* the simulation's rain state quantised to 1/255, and the API exposes no
+  extra precision. The practical scale is `rain = byte / 255`, which replaces the qualitative
+  bands in VCR_FORMAT.md §4 (at most 23/255 = 0.090 in R1 15).
+- **All 9 channels were byte-identical in every packet after 1100 s.** In this replay the 9
+  blocks carry one global value, not per-sector wetness. Per-sector variation would need a
+  replay with localised rain to prove.
+- `ambientTemp` 22.022 °C agrees with byte `+38` = 129 through the documented formula
+  (22.008 °C).
+- **Byte `+39` weakened as the track-temp candidate:** it stayed at 129 while the API's
+  `trackTemp` drifted 26.000 → 25.887 °C, and 129 is not ~26 °C under the §2.9 scaling.
+- `raceCompletion` is **not** the replay clock: 0.968 at ET ≈ 1287 s, and it saturated at 1.0
+  while playback continued. `timeRemainingInGamePhase` (38 → 0) belongs to the post-race phase
+  (`gamePhase` 9).
+
+#### C. `trackmap` reference line matches our geometry frame
+
+The `type 0` polyline was measured against `server/data/tracks/sebring_full.json`
+(`centerline`, 2348 pts). Nearest-point distance: **p50 2.47 m, p90 6.05 m, p99 13.46 m,
+max 17.27 m**. Polyline length is 5798 m against our `lengthM` 5861.3 m. The two share the LMU
+local (x, z) frame with no rotation or offset. The typical 2–6 m lateral offset (largest in
+corners) fits a racing / AI line rather than a centreline. This is not replay data, but it is a
+checks for new layouts before any laps have been driven, plus a pit-lane polyline.
+
+#### D. Per-car fields worth hunting in the binary (leads, not findings)
+
+`standings` shows which scoring quantities the engine tracks per car. Because the endpoint is
+frozen during playback, it can't validate them against the VCR. Candidates not yet located in
+the replay stream: `veFraction` (virtual energy), `fuelFraction` (compare with Class 0 Type 51,
+§2.8 C), `headlights`, `penalties` count, `pitState`, `upgradePack`, and `lapDistance` /
+`pathLateral` / `trackEdge` (§3 derives these from geometry today). Validating any of them
+still needs a driven shared-memory capture (§1) or a way to refresh `standings` in replay mode
+(see §7 item 6).
+
+#### E. Hazard: garage endpoints can crash LMU in replay mode
+
+A blind sweep of every parameterless `GET` crashed the game during this investigation.
+`/rest/garage/getPlayerGarageData` returned (40 KB), then `/rest/garage/getVehicleCondition`
+hung for about 30 s and LMU went down, restarting to the main menu (`gameState: "Setup"`).
+Keep replay-mode probing to `/rest/watch/*` and `/rest/replay/*` reads: one request at a time,
+≤ 1 Hz, stopping on the first non-200 or slow response. Details in
+[LMU_REST_API.md](LMU_REST_API.md) §4.1.
+
+### 2.11 Packet census & newly decoded events (Sebring R1 15, 20260927)
+
+A full slice walk of `Sebring International Raceway R1 15.Vcr` (75,514 slices, 137.6 MB)
+counted every event by its **raw header bits** (`class = h>>>29`, `type = (h>>>17)&0x3F`).
+Section headings elsewhere in this document and in VCR_FORMAT.md sometimes use other class
+numbers for the same packets (e.g. poses are raw class 1, documented as "Class 0"). The parser
+mostly gates on type/size, so this has not mattered so far.
+
+#### A. Census: what is decoded, and what is not
+
+| Raw class/type | Size | Count | Share of stream | Slots | Status |
+|---|---|---|---|---|---|
+| 1/7..15 | 65 | ~1.58 M | 81.7 % | all cars | Decoded (pose, inputs, gear, RPM) |
+| **7/9** | **192–360, variable** | 48,152 | **8.7 %** | 255 | **Undecoded.** Exactly 32 Hz (4800 per 150 s), high-entropy payload, first bytes look like a counter. Probably a compressed or bit-packed state stream. The biggest unknown in the file |
+| 1/15 | 24 / 37 | 252,436 | 5.3 % | all cars | Decoded (brake rotor temps, §2.8 B) |
+| 3/24 | 40 | 74,449 | 2.4 % | player | **Documented but not parsed.** Per-corner brake line pressure leads, r ≈ 0.87–0.93 (§2.8 A) |
+| 3/25 | 34 | 74,449 | 2.1 % | player | Sub-tick sync (VCR_FORMAT.md) |
+| 1/51 | 3 | 74,449 | 0.4 % | player | Decoded (fuel) |
+| 7/11 | 341–377 | 519 | 0.1 % | 255 | Undecoded. Only in the first 0.7–67 s (load/grid), so likely per-car initial-state keyframes |
+| 1/22 | 30 → 0 | 4,076 | <0.1 % | 255 | Undecoded. Slot list with `0xFE` separators, grouped in pairs (`02 · 05 11 · 0c 09 · …`), from 67 s on. Looks like the two-by-two formation grid order; the payload later empties |
+| **1/17** | **33** | **48** | — | reporter | **Decoded here: contact events (B)** |
+| **1/16** | **4** | **648** | — | all cars | **Decoded here: tyre compound per wheel (C)** |
+| 7/32 | 4 | 627 | — | all cars | Lead: compound-related (C) |
+| 7/28 | 4 | 141 | — | per car | Lead: a per-car counter in byte 2 stepping by 8 (`07, 0f, 17 … 4f`, low 3 bits always `111`), one step roughly every 1–3 laps. Bytes 0–1 are sometimes non-zero (`01 01`, `03 03`, `0c`, `0e`). Possibly tyre age or wear buckets. Not validated |
+| 7/36 | 13 | 335 | — | 18 cars | Undecoded. Mostly `0xFF` masks, a few bits cleared near the start |
+| 3/11 | 22 | 487 | — | — | Undecoded. First byte varies, rest near-constant |
+| 3/4, 3/2, 1/19, 1/26, 1/29–31, 7/52 … | small | < 250 each | — | — | Undecoded, too rare to matter for telemetry |
+
+#### B. Class 1 Type 17 (`sz === 33`): contact / collision event, confirmed
+
+Matched against the session XML (`2026_08_24_16_23_16-21R1.xml`): **48 of the 49 `<Incident>`
+rows match** on time (±0.1 s), reporting slot and impact magnitude to two decimals. The one miss
+is a duplicate "Sign" hit in the same 0.1 s. No VCR contact lacks an XML counterpart.
+
+| Field | Location | Evidence |
+|---|---|---|
+| Reporting car | header `driverSlot` | Matches the XML `Name(slot)` in 48/48 |
+| Impact magnitude | payload `+8` Float32LE | e.g. 95.48, 273.86, 3949.99, identical to the XML `reported contact (x)` |
+| Other party | payload `+32` UInt8 | Other car's slot for vehicle contacts. `112` = `Immovable` (walls), `107` = `Sign` |
+| Other-object identity | payload `+12..31` | Constant per object type (the same 20 bytes on every `Immovable` hit except the last byte, `4a/4b/4c`). Probably an object hash / id |
+| Unknown | payload `+0..7` | Four Int16LE values that vary per hit. Candidates: contact point or relative velocity. Unconfirmed |
+| Time | slice `sTime` | 0.02 s resolution, finer than the XML's 0.1 s |
+
+Why it matters: contacts can be placed on the track map by joining `sTime` to the pose stream.
+They also stay available for replays whose XML is missing (the replay DB outlives the files).
+The API's `getIncidentsList` (§2.10) is a lossy view of this same data.
+
+#### C. Class 1 Type 16 (`sz === 4`): tyre compound index per wheel, confirmed
+
+Bytes `[FL, FR, RL, RR]` hold the compound index from the car's tyre file. Checked against the
+XML `fcompound`/`rcompound` (`0,Medium` / `1,Wet`): **20 of 20 drivers match**. That includes a
+mid-race change: slot 17 (Jason Williams) goes `00000000` → `01010101` at 1141.6 s, inside its
+pit sequence (pit events at 1119–1170 s), and the XML shows Medium → Wet. Packets arrive when
+the car loads onto the grid and again after tyre changes. The index-to-name mapping is per car
+and per tyre file, so name resolution still needs the XML or the vehicle catalogue.
+
+**Class 7 Type 32 (`sz === 4`)** also carries a repeated per-wheel byte that follows the same
+changes (slot 17 `03` → `02` at 1141.7 s), but with a different code. Medium runners end on
+`00` or `03`, wet runners on `02`, and `01` shows up only briefly during grid setup. Candidate
+meaning: tyre set, or the compound selected in the garage. Not confirmed.
+
 ---
 
 ## 4. Cross-validation suites
@@ -364,8 +598,8 @@ floating-point precision.
 | **Engine RPM** | Implemented (`extractReplayTrajectory`) | Bits 53-62 (§2.1), scale 10.9228, saturation guard at raw10 === 1023. |
 | **Pit Events & Strategy** | Implemented (`extractReplayTrajectory`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. Exposed via the trajectory's `pitEvents` field. |
 | **Track Flags & Safety Car** | Implemented (`extractReplayTrajectory`), partially confirmed | Class **3** (not 2) Type 10, always 3 bytes. `flagState` confirmed (§2.6); other 2 bytes decoded but unconfirmed. |
-| **Live Standings** | Implemented (`extractReplayTrajectory`), partially confirmed | Class 7 Type 48. Count + slot array confirmed at the corrected offset (§2.6); 20-byte gap between them still unconfirmed. |
-| **Weather & Track Grip** | **Disproved, removed from parser** | The documented 67-byte float32 block does not match ground-truth ambient/track temp anywhere in the file (§2.6). Needs re-derivation via the correlation methodology, not offset guessing. |
+| **Live Standings** | Implemented (`extractReplayTrajectory`) | Class 7 Type 48. Dynamic grid size (`eventSize = 21 + count`), count + slot array in exact running order (§2.6, §2.9). |
+| **Weather & Track Meteorology** | Implemented (`parseReplayMetadata`, `extractReplayTrajectory`) | Class 1 Type 10 (80 bytes, driverSlot 255). Ambient temp (byte 38), track temp baseline (byte 39), and 9-channel sector rain wetness (§2.9). |
 
 **Unrelated defect noticed:** ~20 of 45 drivers in the Imola race replay have `carClass`
 unresolved (`?`), falling back to raw vehicleId strings like `99_25_AO_E58B41E50`. This will
@@ -387,10 +621,11 @@ Specification-ready material not yet surfaced in the app.
   instead of end-of-session approximations.
 - **Brake rotor temperatures (°C)** at offsets `+24..31` when `eventSize === 37`.
 
-### 6.2 Track meteorology & evolution (metadata session conditions block)
-Ambient and track temperature, rain intensity, surface wetness, standing water depth, rubber
-grip saturation, wind speed/direction, and the time acceleration multiplier. Layout in
-VCR_FORMAT.md §2.2.
+### 6.2 Track meteorology, precipitation & wetness (Class 1 Type 10) [ESTABLISHED]
+> **Resolution Note:** The earlier hypothesis that dynamic track meteorology was stored in the metadata 67-byte session block was superseded; that block stores static session rule multipliers (Damage, Fuel, Tire, Session Length). Dynamic track meteorology, precipitation, and sector surface wetness are fully established in **Class 1 Type 10 (`eventSize === 80`)**, detailed in §2.9 and [VCR_FORMAT.md](VCR_FORMAT.md) §4.
+- **Ambient temperature index** at byte 38 (`0x92` to `0x81` scaling $25^\circ\text{C}$ to $22^\circ\text{C}$).
+- **9 sector track wetness / precipitation intensity channels** at bytes 42..77 (zero when dry, positive integers `0x01` to `0x18+` scaling with rainfall rate).
+- Enables real-time rain timeline charts and automatic wet-session classification in Replay Studio.
 
 ### 6.3 Live race control, flags & safety car (Class 2 Type 10, Class 1 Type 10)
 Track condition flags (green through checkered, including FCY/SC/VSC), the sector hazard mask,
@@ -423,6 +658,21 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
   braking and kerb strikes to validate unknown corner-state fields (§2.3).
 4. **Extend the track model** to more circuits: 2 edge laps each, per §3.
 5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** **[COMPLETED]** Verified via paired capture on Bahrain P1 19 (§2.7, §2.8). Proved that dynamic rubber wear counters and 12-point tire carcass/tread temperatures are universally omitted across both multiplayer and offline practice replays. Simultaneously confirmed individual brake line pressures ($r = 0.930$) in Class 1 Type 24 and brake rotor disc temperature ($r = 1.000$) in Class 2 Type 15.
+6. **Does a timeline seek refresh `/rest/watch/standings`?** It stays frozen during normal
+   playback (§2.10 A). Test once, under user supervision: `PUT /rest/watch/replaytime/{t}`, then
+   read `standings`. If it refreshes, seek-and-sample would turn every `.Vcr` into a paired
+   capture for `veFraction`, `fuelFraction`, `pitState`, `lapDistance` and `pathLateral`.
+7. **Per-sector wetness.** Find a replay whose 9 Class 1 Type 10 wetness blocks ever differ.
+   If none do, collapse them to a single `rain = byte / 255` value (§2.10 B).
+8. **Re-derive track temperature.** Byte `+39` did not follow the API's `trackTemp`
+   (§2.10 B). Sweep the `+14..41` bytes against a `sessionInfo.trackTemp` series taken over a
+   long, temperature-varying replay.
+9. **Crack Class 7 Type 9** (32 Hz, 8.7 % of the stream, §2.11 A). Test first for a known
+   compression (zlib/LZ4 magic, entropy per byte). Then check whether the per-packet size
+   tracks field activity (overtakes, pit windows).
+10. **Wire up the confirmed events:** contacts (1/17) as map markers and a replay incident
+    ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C). Parse the
+    3/24 brake-pressure lead for the player car once it has been calibrated.
 
 ---
 

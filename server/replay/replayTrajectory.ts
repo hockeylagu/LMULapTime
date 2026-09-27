@@ -7,6 +7,7 @@ import {
   ReplayFlagEvent,
   ReplayStandingsSnapshot,
   ReplayLapSummary,
+  ReplayWeatherEvent,
 } from '../core/types.js';
 import { detectPlayerName, parseReplayMetadata } from './replayParser.js';
 import {
@@ -180,6 +181,11 @@ export function extractReplayTrajectory(
     const replayPitEvents: ReplayPitEvent[] = [];
     const replayFlagEvents: ReplayFlagEvent[] = [];
     const standingsHistory: ReplayStandingsSnapshot[] = [];
+    const replayWeatherEvents: ReplayWeatherEvent[] = [];
+    let currentAmbientTemp: number | undefined = undefined;
+    let currentTrackTemp: number | undefined = undefined;
+    let currentRainIntensity: number | undefined = undefined;
+    let maxSessionRain = 0;
     const driverWheelTelemetry = new Map<number, {
       wheelSpeeds?: [number, number, number, number];
       brakeTemps?: [number, number, number, number];
@@ -317,6 +323,9 @@ export function extractReplayTrajectory(
                 wheelSpeeds: latestWheel?.wheelSpeeds ? [...latestWheel.wheelSpeeds] : undefined,
                 brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
                 fuel: driverFuel.get(drv),
+                rainIntensity: currentRainIntensity,
+                ambientTemp: currentAmbientTemp,
+                trackTemp: currentTrackTemp,
               };
 
               if (targetSlot !== undefined) {
@@ -382,15 +391,38 @@ export function extractReplayTrajectory(
               driverSlot: drv,
               driverFlag,
             });
-          } else if (evType === 48 && (evClass === 3 || evClass === 6 || evClass === 7) && sz === 41 && eventSp + 5 + sz <= activeLen) {
+          } else if (evType === 48 && (evClass === 3 || evClass === 6 || evClass === 7) && sz >= 22 && eventSp + 5 + sz <= activeLen) {
             const count = buf[eventSp + 5];
-            if (count > 0 && count <= 20 && 21 + count <= sz) {
+            if (count > 0 && 21 + count <= sz) {
               const order: number[] = [];
               for (let i = 0; i < count; i++) {
                 order.push(buf[eventSp + 5 + 21 + i]);
               }
               standingsHistory.push({ timeSec: Number(sTime.toFixed(4)), order });
             }
+          } else if (evClass === 1 && evType === 10 && sz === 80 && eventSp + 5 + 78 <= activeLen) {
+            const rawTemp = buf[eventSp + 5 + 38];
+            const ambientTempC = Number((25.0 - (146 - rawTemp) * 0.176).toFixed(1));
+            const rawTrack = buf[eventSp + 5 + 39];
+            const trackTempC = Number((27.3 - (129 - rawTrack) * 0.176).toFixed(1));
+            let maxRainChannel = 0;
+            for (let ch = 42; ch < 78; ch += 4) {
+              const r = buf[eventSp + 5 + ch];
+              if (r > maxRainChannel) maxRainChannel = r;
+            }
+            currentAmbientTemp = ambientTempC;
+            currentTrackTemp = trackTempC;
+            currentRainIntensity = maxRainChannel;
+            if (maxRainChannel > maxSessionRain) {
+              maxSessionRain = maxRainChannel;
+            }
+            replayWeatherEvents.push({
+              timeSec: Number(sTime.toFixed(4)),
+              ambientTemp: ambientTempC,
+              trackTemp: trackTempC,
+              rainIntensity: maxRainChannel,
+              rainPercent: Math.min(100, Math.round((maxRainChannel / 25) * 100)),
+            });
           } else if (((evType === 2 && (evClass === 0 || evClass === 1 || evClass === 5)) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
                      (evType === 49 && (evClass === 2 || evClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
             const pCode = buf[eventSp + 5];
@@ -587,6 +619,11 @@ export function extractReplayTrajectory(
         sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
         wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
         energyTelemetryAvailable: Boolean(finalPoints.some(p => p.fuel !== undefined)),
+        weatherEvents: replayWeatherEvents.length > 0 ? replayWeatherEvents : undefined,
+        weatherCondition: maxSessionRain > 16 ? 'Wet' : maxSessionRain > 0 ? 'Dynamic Weather' : 'Dry',
+        maxRainIntensity: maxSessionRain > 0 ? maxSessionRain : undefined,
+        ambientTemp: currentAmbientTemp,
+        trackTemp: currentTrackTemp,
       };
     }
 
