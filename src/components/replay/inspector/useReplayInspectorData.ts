@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
+import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson } from '../../../api/apiClient.js';
@@ -194,7 +195,7 @@ export function useReplayInspectorData({
       .then(data => {
         const laps = Array.isArray(data?.laps) ? data.laps : [];
         setAvailableCompareLaps(laps.filter((lap: ComparableLap) =>
-          Boolean(lap.matchingReplayFile) && Boolean(lap.isValid) && !lap.isPitStop && !lap.isOutLap &&
+          Boolean(lap.matchingReplayFile) && isRacingLap(lap) &&
           typeof lap.lapTime === 'number' && lap.lapTime > 0
         ));
         setIsCompareLapsLoading(false);
