@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayDriverNotFoundError, ReplayDriverNotRecordedError } from '../../../server/replay/replayServiceTypes.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 
 describe('ReplayCacheService', () => {
@@ -66,6 +67,25 @@ describe('ReplayCacheService', () => {
     fs.rmSync(filePath);
 
     expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 1 })).toEqual(trajectory);
+  });
+
+  it('reports a driver with no stored laps once the replay is deleted, instead of serving the player\'s lap', () => {
+    const replayName = 'Missing_Driver_P1.Vcr';
+    const filePath = path.join(tempDir, replayName);
+    fs.writeFileSync(filePath, createSliceVcrBuffer({
+      drivers: [{ name: 'Cache Driver', vehicleId: '21_26_AFCO95641716', team: 'Test Team', carNumber: '21' }],
+      slices: [
+        { sTime: 0, driverSlot: 1, x: 10, y: 0, z: 20 },
+        { sTime: 1, driverSlot: 1, x: 11, y: 0, z: 21 },
+      ],
+    }));
+    service.getMetadata(filePath, replayName, 'Cache Driver');
+    service.getFullTrajectory(filePath, replayName, { driverName: 'Cache Driver' });
+    fs.rmSync(filePath);
+
+    expect(() => service.getFullTrajectory(filePath, replayName, { driverSlot: 7 })).toThrow(ReplayDriverNotRecordedError);
+    // The trajectory route answers 404 for ReplayDriverNotFoundError and its subclasses.
+    expect(new ReplayDriverNotRecordedError(7, replayName)).toBeInstanceOf(ReplayDriverNotFoundError);
   });
 
   it('throws when neither the replay nor cached data exists', () => {

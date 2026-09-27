@@ -70,3 +70,12 @@ export class ReplayDriverNotFoundError extends Error {
     this.name = 'ReplayDriverNotFoundError';
   }
 }
+
+/** Thrown when LMU has deleted the replay and the cache holds no laps for the requested driver. */
+export class ReplayDriverNotRecordedError extends ReplayDriverNotFoundError {
+  public constructor(driverSlot: number, replayName: string) {
+    super(`slot ${driverSlot}`, replayName);
+    this.message = `Driver slot ${driverSlot} has no recorded laps in replay "${replayName}", and the replay file has been deleted`;
+    this.name = 'ReplayDriverNotRecordedError';
+  }
+}

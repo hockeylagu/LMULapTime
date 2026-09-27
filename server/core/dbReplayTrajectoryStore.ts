@@ -125,16 +125,12 @@ export function getStoredReplayTrajectory(
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
   if (row) return decompressTrajectory(row.trajectory_br);
 
-  if (options?.allowFallback) {
-    if (lapKey !== -1) {
-      const rowFallbackLap = selectResolvedRow(db, filename, driverSlot, -1);
-      if (rowFallbackLap) return decompressTrajectory(rowFallbackLap.trajectory_br);
-    }
-    if (driverSlot !== -1) {
-      const rowFallbackSlot = selectResolvedRow(db, filename, -1, lapKey)
-        || selectResolvedRow(db, filename, -1, -1);
-      if (rowFallbackSlot) return decompressTrajectory(rowFallbackSlot.trajectory_br);
-    }
+  // A missing lap falls back to the same driver's default lap, which reports itself as currentLap
+  // (the on-disk decode does the same). A missing driver never falls back to another driver: that
+  // would serve the player's lap under the requested driver's name.
+  if (options?.allowFallback && lapKey !== -1) {
+    const rowFallbackLap = selectResolvedRow(db, filename, driverSlot, -1);
+    if (rowFallbackLap) return decompressTrajectory(rowFallbackLap.trajectory_br);
   }
 
   return null;
