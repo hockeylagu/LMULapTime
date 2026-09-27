@@ -26,9 +26,9 @@ export default defineConfig({
       thresholds: {
         // Just under the measured coverage (2026-09-27: 93% lines, 91% statements, 92% functions, 81% branches).
         lines: 90,
-        statements: 89,
+        statements: 90,
         functions: 90,
-        branches: 78,
+        branches: 80,
       },
     },
   },
