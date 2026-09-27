@@ -1,5 +1,5 @@
 import { DetailedSession, DriverData, ReplayDriverEntry, ReplayTrajectoryData } from '../core/types.js';
-import type { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
+import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 export interface ReplayTrajectoryRequest {
   replayName: string;
@@ -54,12 +54,8 @@ export interface ReplaySummarySourceData {
   }>;
   replaysDir: string;
   sessions: DetailedSession[];
-  duckFiles: DuckDbFileInfo[];
-  telemetryMeta: Array<{
-    filename: string;
-    matchedReplayFilename?: string | null;
-    matchedSessionId?: string | null;
-  }>;
+  /** The stored DuckDB matches (TelemetryLinks). */
+  telemetryLinks: Pick<TelemetryLinks, 'forReplay'>;
   getMetadata: (filePath: string, filename: string) => import('../core/types.js').ReplayMetadata | null;
 }
 

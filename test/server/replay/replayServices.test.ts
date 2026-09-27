@@ -159,8 +159,7 @@ describe('Replay domain services and transforms', () => {
         ],
         replaysDir: '/mock/dir',
         sessions: [],
-        duckFiles: [],
-        telemetryMeta: [],
+        telemetryLinks: { forReplay: () => undefined },
         getMetadata: () => null,
       });
 

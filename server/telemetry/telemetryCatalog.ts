@@ -146,7 +146,7 @@ export class TelemetryCatalog {
           }
         }
         if (typeof this.sessionDb?.pruneTelemetryLapCache === 'function') {
-          this.sessionDb.pruneTelemetryLapCache();
+          this.sessionDb.pruneTelemetryLapCache(new Set(files.map(file => file.filename)));
         }
         if (typeof this.sessionDb?.clearIngestError === 'function') {
           this.sessionDb.clearIngestError('duckdb-directory', directory);

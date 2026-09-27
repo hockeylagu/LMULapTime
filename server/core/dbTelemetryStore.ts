@@ -131,29 +131,66 @@ export function upsertTelemetryLapCache(db: DatabaseType, filename: string, lapN
   `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), DUCKDB_TELEMETRY_CACHE_VERSION, Date.now());
 }
 
+/** A match decided for one telemetry file (see telemetry/telemetryLinks). */
+export interface TelemetryLink {
+  filename: string;
+  sessionId: string | null;
+  replayName: string | null;
+}
+
+/**
+ * Stores decided matches. A match already stored is never replaced: each file, session and replay
+ * is decided once.
+ */
+export function linkTelemetryFiles(db: DatabaseType, links: readonly TelemetryLink[]): number {
+  const update = db.prepare(`
+    UPDATE telemetry_metadata SET
+      matched_session_id = COALESCE(matched_session_id, ?),
+      matched_replay_filename = COALESCE(matched_replay_filename, ?)
+    WHERE filename = ?
+  `);
+  let changed = 0;
+  db.transaction(() => {
+    for (const link of links) changed += update.run(link.sessionId, link.replayName, link.filename).changes;
+  })();
+  return changed;
+}
+
+export function clearTelemetryLinks(db: DatabaseType): void {
+  db.exec('UPDATE telemetry_metadata SET matched_session_id = NULL, matched_replay_filename = NULL');
+}
+
+/** The telemetry files with at least one lap cached at the current version. */
+export function getTelemetryLapCacheFilenames(db: DatabaseType): Set<string> {
+  const rows = db.prepare('SELECT DISTINCT filename FROM telemetry_lap_cache WHERE cache_version = ?')
+    .all(DUCKDB_TELEMETRY_CACHE_VERSION) as Array<{ filename: string }>;
+  return new Set(rows.map(row => row.filename));
+}
+
+/**
+ * Trims the lap cache by age, then by size, oldest first. Only laps of files still on disk are
+ * trimmed, since they can be read again: a lap of a deleted file is the only copy left.
+ */
 export function pruneTelemetryLapCache(
   db: DatabaseType,
+  onDiskFilenames: ReadonlySet<string>,
   maxAgeMs = 30 * 24 * 60 * 60 * 1000,
   maxBytes = 512 * 1024 * 1024
 ): void {
   const cutoff = Date.now() - maxAgeMs;
-  db.prepare('DELETE FROM telemetry_lap_cache WHERE updated_at < ?').run(cutoff);
-  const sizeRow = db.prepare('SELECT COALESCE(SUM(LENGTH(telemetry_br)), 0) AS bytes FROM telemetry_lap_cache').get() as { bytes: number };
-  if (sizeRow.bytes <= maxBytes) return;
-
-  const deleteOldest = db.prepare('DELETE FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?');
-  const oldestRows = db.prepare(
-    'SELECT filename, lap_number, LENGTH(telemetry_br) AS bytes FROM telemetry_lap_cache ORDER BY updated_at ASC'
-  ).all() as Array<{ filename: string; lap_number: number; bytes: number }>;
-  let currentBytes = sizeRow.bytes;
-  const prune = db.transaction(() => {
-    for (const row of oldestRows) {
-      if (currentBytes <= maxBytes) break;
-      deleteOldest.run(row.filename, row.lap_number);
+  const rows = db.prepare(
+    'SELECT filename, lap_number, LENGTH(telemetry_br) AS bytes, updated_at FROM telemetry_lap_cache ORDER BY updated_at ASC'
+  ).all() as Array<{ filename: string; lap_number: number; bytes: number; updated_at: number }>;
+  let currentBytes = rows.reduce((sum, row) => sum + row.bytes, 0);
+  const deleteLap = db.prepare('DELETE FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      if (!onDiskFilenames.has(row.filename)) continue;
+      if (row.updated_at >= cutoff && currentBytes <= maxBytes) break;
+      deleteLap.run(row.filename, row.lap_number);
       currentBytes -= row.bytes;
     }
-  });
-  prune();
+  })();
 }
 
 export function clearTelemetryCache(db: DatabaseType): void {

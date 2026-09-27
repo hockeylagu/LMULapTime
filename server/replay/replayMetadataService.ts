@@ -7,9 +7,7 @@ import {
   ReplayMetadata,
   ReplaySummary,
 } from '../core/types.js';
-import type { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
-import { matchDuckDbToReplay, matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
 import { ReplaySummarySourceData } from './replayServiceTypes.js';
 
 export function cloneReplayMetadata(metadata: ReplayMetadata): ReplayMetadata {
@@ -30,13 +28,8 @@ export interface ComposeReplayMetadataOptions {
   replayName: string;
   matchedSession?: DetailedSession;
   fallbackTrajectoryLaps?: () => ReplayLapSummary[] | undefined;
-  duckFiles?: DuckDbFileInfo[];
-  telemetryMeta?: Array<{
-    filename: string;
-    matchedReplayFilename?: string | null;
-    matchedSessionId?: string | null;
-  }>;
-  fileMtime?: number;
+  /** The stored DuckDB match of the replay (TelemetryLinks.forReplay). */
+  duckdbFilename?: string;
 }
 
 export function composeReplayMetadata(options: ComposeReplayMetadataOptions): ReplayMetadata {
@@ -93,21 +86,9 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     }
   }
 
-  try {
-    const duckFiles = options.duckFiles || [];
-    const telemetryMeta = options.telemetryMeta || [];
-    const matchedDuckFilename =
-      matchDuckDbToReplay(duckFiles, metadata, options.fileMtime)?.filename ||
-      (matchedSession ? matchDuckDbToSession(duckFiles, matchedSession)?.filename : undefined) ||
-      telemetryMeta.find(item => item.matchedReplayFilename === options.replayName)?.filename ||
-      (matchedSession ? telemetryMeta.find(item => item.matchedSessionId === matchedSession.id)?.filename : undefined);
-
-    if (matchedDuckFilename) {
-      metadata.hasDuckDbTelemetry = true;
-      metadata.duckdbFilename = matchedDuckFilename;
-    }
-  } catch {
-    // Ignore optional telemetry matching errors
+  if (options.duckdbFilename) {
+    metadata.hasDuckDbTelemetry = true;
+    metadata.duckdbFilename = options.duckdbFilename;
   }
 
   return metadata;
@@ -169,11 +150,7 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
         ? getDisplayTrackName(matched.trackVenue, matched.trackCourse)
         : (metadata.displayTrack || filenameTrack || metadata.trackName);
 
-      const matchedDuckFilename =
-        input.telemetryMeta.find(item => item.matchedReplayFilename === filename)?.filename ||
-        (matched ? input.telemetryMeta.find(item => item.matchedSessionId === matched.id)?.filename : undefined) ||
-        matchDuckDbToReplay(input.duckFiles, metadata, mtime)?.filename ||
-        (matched ? matchDuckDbToSession(input.duckFiles, matched)?.filename : undefined);
+      const matchedDuckFilename = input.telemetryLinks.forReplay(filename, matched);
 
       summaries.push({
         name: filename,

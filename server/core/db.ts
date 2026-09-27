@@ -78,7 +78,11 @@ import {
   upsertTelemetryLapCache,
   pruneTelemetryLapCache,
   clearTelemetryCache,
+  linkTelemetryFiles,
+  clearTelemetryLinks,
+  getTelemetryLapCacheFilenames,
   TelemetryMetadataRecord,
+  TelemetryLink,
 } from './dbTelemetryStore.js';
 import {
   saveReferenceLaptimes,
@@ -122,6 +126,7 @@ export type {
   SessionXmlSyncParser,
   IngestErrorEntry,
   TelemetryMetadataRecord,
+  TelemetryLink,
   ReplayUpgradeCandidate,
   ReplayUpgradeProgress,
   ReplayUpgradeResult,
@@ -379,8 +384,30 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     upsertTelemetryLapCache(this.db, filename, lapNumber, lapData);
   }
 
-  public pruneTelemetryLapCache(maxAgeMs = 30 * 24 * 60 * 60 * 1000, maxBytes = 512 * 1024 * 1024): void {
-    pruneTelemetryLapCache(this.db, maxAgeMs, maxBytes);
+  public pruneTelemetryLapCache(onDiskFilenames: ReadonlySet<string>, maxAgeMs = 30 * 24 * 60 * 60 * 1000, maxBytes = 512 * 1024 * 1024): void {
+    pruneTelemetryLapCache(this.db, onDiskFilenames, maxAgeMs, maxBytes);
+  }
+
+  public linkTelemetryFiles(links: readonly TelemetryLink[]): void {
+    if (links.length > 0 && linkTelemetryFiles(this.db, links) > 0) this.telemetryMetadataRevision++;
+  }
+
+  /**
+   * Clears every stored telemetry match once per matching rule, so the matches stored under an
+   * earlier rule are decided again. Returns whether it cleared them.
+   */
+  public resetTelemetryLinksForRule(rule: string): boolean {
+    if (getMetadata(this.db, 'telemetry_link_rule') === rule) return false;
+    this.db.transaction(() => {
+      clearTelemetryLinks(this.db);
+      setMetadata(this.db, 'telemetry_link_rule', rule);
+    })();
+    this.telemetryMetadataRevision++;
+    return true;
+  }
+
+  public getTelemetryLapCacheFilenames(): Set<string> {
+    return getTelemetryLapCacheFilenames(this.db);
   }
 
   public clearTelemetryCache(): void {
