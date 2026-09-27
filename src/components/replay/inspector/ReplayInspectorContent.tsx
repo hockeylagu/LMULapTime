@@ -141,7 +141,12 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const availableConsistencyLaps = useMemo(() => {
     const laps = (trajectory?.laps || metadata?.laps || []).filter(l => l.lapTimeSec > 0);
     return laps
-      .map(l => ({ lapNumber: l.lapNumber, lapTimeSec: l.lapTimeSec, isValid: l.isValid !== false && !l.isOutlap }))
+      .map(l => ({
+        lapNumber: l.lapNumber,
+        lapTimeSec: l.lapTimeSec,
+        isValid: l.isValid !== false && !l.isOutlap,
+        nonRepresentativeReason: l.nonRepresentativeReason,
+      }))
       .sort((a, b) => a.lapNumber - b.lapNumber);
   }, [metadata, trajectory]);
 
@@ -151,8 +156,12 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     const key = `${activeReplayName}|${selectedDriverSlot ?? 'x'}`;
     if (initializedExclusionKeyRef.current === key) return;
     initializedExclusionKeyRef.current = key;
-    const invalidLapNumbers = availableConsistencyLaps.filter(l => !l.isValid).map(l => l.lapNumber);
-    setExcludedConsistencyLaps(new Set(invalidLapNumbers));
+    // Invalid laps and the laps the session parser marked non-representative (contact, off pace)
+    // start excluded; the driver can tick them back in.
+    const excludedByDefault = availableConsistencyLaps
+      .filter(l => !l.isValid || l.nonRepresentativeReason)
+      .map(l => l.lapNumber);
+    setExcludedConsistencyLaps(new Set(excludedByDefault));
   }, [activeReplayName, selectedDriverSlot, availableConsistencyLaps]);
 
   const bestSectors = useMemo(() => {

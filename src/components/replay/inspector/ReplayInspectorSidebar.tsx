@@ -8,7 +8,7 @@ import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayMapContainer } from '../map/ReplayMapContainer.js';
 import { AIReportTab } from '../analysis/AIReportTab.js';
 import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
-import { ConsistencyPanel } from '../analysis/ConsistencyPanel.js';
+import { ConsistencyPanel, type LapConsistencyOption } from '../analysis/ConsistencyPanel.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 
@@ -40,7 +40,7 @@ export interface ReplayInspectorSidebarProps {
   isCornerConsistencyLoading: boolean;
   handleSelectBaselineLap: (lapNumber: number) => void;
   formatLapTime: (sec?: number | null) => string;
-  availableConsistencyLaps: { lapNumber: number; lapTimeSec: number; isValid: boolean }[];
+  availableConsistencyLaps: LapConsistencyOption[];
   excludedConsistencyLaps: Set<number>;
   toggleConsistencyLap: (lapNumber: number) => void;
   trackVenue?: string;

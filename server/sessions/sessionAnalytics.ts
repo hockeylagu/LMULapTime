@@ -75,6 +75,7 @@ export function toComparableLap(
     gapToLeaderString: lap.gapToLeaderString,
     isPitStop: lap.isPitStop,
     isOutLap: lap.isOutLap || false,
+    nonRepresentativeReason: lap.nonRepresentativeReason,
     isValid: lap.isValid,
     isInferred: lap.isInferred || false,
     paceCategory: lap.paceCategory || null,

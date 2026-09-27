@@ -3,6 +3,7 @@ import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryDa
 import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
+import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
@@ -64,7 +65,7 @@ export interface ReplayInspectorModalBodyProps {
   consistencyStats: LapConsistencyStats;
   cornerConsistencyStats: CornerConsistencyStat[];
   isCornerConsistencyLoading: boolean;
-  availableConsistencyLaps: { lapNumber: number; lapTimeSec: number; isValid: boolean }[];
+  availableConsistencyLaps: LapConsistencyOption[];
   excludedConsistencyLaps: Set<number>;
   toggleConsistencyLap: (lapNumber: number) => void;
   selectedCornerNumber: number | null;

@@ -461,4 +461,48 @@ describe('parser server module - stream events and timing timestamps', () => {
       }
     });
   });
+describe('Non-representative laps', () => {
+    it('marks a slow lap with contact and leaves it out of the driver average', () => {
+      // A lap's et is when the lap starts; the contact at 450s is on lap 5.
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <TrackVenue>Daytona</TrackVenue>
+    <Race>
+      <Stream>
+        <Incident et="450.0">Player Driver(1) reported contact (326.00) with another vehicle AI Rival(2)</Incident>
+      </Stream>
+      <Driver>
+        <Name>Player Driver</Name>
+        <isPlayer>1</isPlayer>
+        <CarType>Peugeot 9x8</CarType>
+        <CarClass>Hypercar</CarClass>
+        <Lap num="1" p="1" s1="30.0" s2="43.0" s3="33.0" et="10.0">106.0</Lap>
+        <Lap num="2" p="1" s1="25.0" s2="42.0" s3="29.0" et="116.0">96.0</Lap>
+        <Lap num="3" p="1" s1="25.2" s2="42.0" s3="29.0" et="212.0">96.2</Lap>
+        <Lap num="4" p="1" s1="25.1" s2="42.0" s3="29.0" et="308.2">96.1</Lap>
+        <Lap num="5" p="1" s1="28.0" s2="43.0" s3="29.3" et="404.3">100.3</Lap>
+        <Lap num="6" p="1" s1="25.3" s2="42.0" s3="29.0" et="504.6">96.3</Lap>
+      </Driver>
+    </Race>
+  </RaceResults>
+</rFactorXML>`;
+
+      const readSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(xml);
+      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+      try {
+        const session = parser.parseSessionXml('non_representative.xml');
+        const player = session?.drivers.find(d => d.name === 'Player Driver');
+
+        expect(player?.laps[4].incidentCount).toBe(1);
+        expect(player?.laps[4].nonRepresentativeReason).toBe('contact');
+        expect(player?.laps.filter(l => l.nonRepresentativeReason)).toHaveLength(1);
+        // Laps 2, 3, 4 and 6: lap 1 is the start lap and lap 5 had contact.
+        expect(player?.avgLapTime).toBe(96.15);
+      } finally {
+        readSpy.mockRestore();
+        statSpy.mockRestore();
+      }
+    });
+  });
 });
