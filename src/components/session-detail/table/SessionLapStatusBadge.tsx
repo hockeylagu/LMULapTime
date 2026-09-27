@@ -1,11 +1,12 @@
 import React from 'react';
-import { AlertTriangle, Ban, Flag, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Ban, Flag, ShieldAlert, Users } from 'lucide-react';
 import { LapData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/index.js';
 import {
   getWorstTrackLimitSeverity,
   getTrackLimitBadgeClasses,
 } from '../../../utils/trackLimits.js';
+import { NON_REPRESENTATIVE_LABELS, describeLapGaps, describeLapTraffic } from '../../../utils/lapTrafficText.js';
 
 export interface SessionLapStatusBadgeProps {
   lap: LapData;
@@ -30,6 +31,8 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
 
   const tlSeverity = getWorstTrackLimitSeverity(l.trackLimits);
   const tlBadgeClass = getTrackLimitBadgeClasses(tlSeverity);
+  const trafficEvents = describeLapTraffic(l.traffic);
+  const trafficLines = [...trafficEvents, ...describeLapGaps(l.traffic)];
 
   return (
     <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
@@ -59,13 +62,21 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       {l.nonRepresentativeReason && (
         <span
           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 cursor-help"
-          title={
-            l.nonRepresentativeReason === 'contact'
-              ? 'Slower than your median lap, with contact or damage: left out of the average and consistency'
-              : 'More than 3% slower than your median lap: left out of the average and consistency'
-          }
+          title={[
+            `${NON_REPRESENTATIVE_LABELS[l.nonRepresentativeReason].title}: left out of the average and consistency`,
+            ...trafficLines,
+          ].join('\n')}
         >
-          {l.nonRepresentativeReason === 'contact' ? 'Contact' : 'Off pace'}
+          {NON_REPRESENTATIVE_LABELS[l.nonRepresentativeReason].label}
+        </span>
+      )}
+      {trafficEvents.length > 0 && (
+        <span
+          data-testid="lap-traffic"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/30 cursor-help whitespace-nowrap"
+          title={trafficLines.join('\n')}
+        >
+          <Users className="w-3 h-3" /> {trafficEvents.join(' · ')}
         </span>
       )}
 
