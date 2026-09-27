@@ -6,6 +6,7 @@ import { buildReplayListSummaries, composeReplayMetadata } from '../replay/repla
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
+import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 function isSafeFileName(value: string): boolean {
   return value.length > 0 && value !== '.' && value !== '..' && path.basename(value) === value && !value.includes('\0');
@@ -21,7 +22,7 @@ function parseBoundedInteger(value: unknown, name: string, min: number, max: num
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
-  const telemetryService = new ReplayTelemetryService(context.sessionDb, context.telemetryCatalog);
+  const telemetryService = new ReplayTelemetryService(context.sessionDb);
   const trajectoryService = new ReplayTrajectoryService(
     context.replaysDir,
     context.replayCache,
@@ -68,16 +69,13 @@ export function createReplayRouter(context: ServerContext): Router {
         .filter(file => file.toLowerCase().endsWith('.vcr'));
       const storedReplays = context.sessionDb.getAllStoredReplayFiles();
       const sessions = context.loadSessions();
-      const duckFiles = context.telemetryCatalog.getFiles();
-      const telemetryMeta = context.sessionDb.getTelemetryMetadata();
 
       const summaries = buildReplayListSummaries({
         diskFiles,
         storedReplays,
         replaysDir: context.replaysDir,
         sessions,
-        duckFiles,
-        telemetryMeta,
+        telemetryLinks: TelemetryLinks.load(context.sessionDb),
         getMetadata: (filePath, filename) => context.replayCache.getMetadata(filePath, filename),
       });
 
@@ -105,21 +103,6 @@ export function createReplayRouter(context: ServerContext): Router {
       const sessions = context.loadSessions();
       const matchedSession = sessions.find(session => session.matchingReplayFile?.name === replayName);
 
-      let fileMtime: number | undefined;
-      if (fs.existsSync(filePath)) {
-        try {
-          fileMtime = fs.statSync(filePath).mtime.getTime();
-        } catch {
-          // Ignore stat failure
-        }
-      }
-      if (fileMtime === undefined) {
-        fileMtime = context.sessionDb.getStoredReplayFileInfo(replayName)?.file_mtime;
-      }
-
-      const duckFiles = context.telemetryCatalog.getFiles();
-      const telemetryMeta = context.sessionDb.getTelemetryMetadata();
-
       // Metadata without laps borrows them from the player's trajectory (decoded in the worker if needed).
       const fallbackLaps = rawMetadata.laps?.length
         ? undefined
@@ -132,9 +115,7 @@ export function createReplayRouter(context: ServerContext): Router {
         replayName,
         matchedSession,
         fallbackTrajectoryLaps: () => fallbackLaps,
-        duckFiles,
-        telemetryMeta,
-        fileMtime,
+        duckdbFilename: TelemetryLinks.load(context.sessionDb).forReplay(replayName, matchedSession),
       });
 
       res.json(metadata);

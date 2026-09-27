@@ -6,7 +6,7 @@ import { pickReplayOwner, replayIndexEntryFromStored, replayLinkRejection, Repla
 import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
-import { matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
+import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
@@ -303,46 +303,41 @@ export class ServerContext {
       }
       this.enforceOneSessionPerReplay(sessions, replaysByName);
 
-      const duckFiles = this.telemetryCatalog.getFiles();
-      const telemetryMeta = this.sessionDb.getTelemetryMetadata();
-      const telemetryBySessionId = new Map<string, string>();
-      const telemetryByReplay = new Map<string, string>();
-
-      for (const metadata of telemetryMeta) {
-        if (metadata.matchedSessionId) telemetryBySessionId.set(metadata.matchedSessionId, metadata.filename);
-        if (metadata.matchedReplayFilename) telemetryByReplay.set(metadata.matchedReplayFilename, metadata.filename);
-      }
-
+      this.storeNewTelemetryLinks(sessions, [...replaysByName.values()]);
+      const links = TelemetryLinks.load(this.sessionDb);
       for (const session of sessions) {
-        session.hasDuckDbTelemetry = false;
-        delete session.duckdbFilename;
-        if (session.matchingReplayFile) {
-          session.matchingReplayFile.hasDuckDbTelemetry = false;
-          delete session.matchingReplayFile.duckdbFilename;
-        }
-        const replayName = session.matchingReplayFile?.name;
-        const matched = duckFiles.length > 0 ? matchDuckDbToSession(duckFiles, session) : null;
-        let matchedDuckFilename = matched?.filename;
-        if (matched) {
-          this.sessionDb.upsertTelemetryMetadata(matched, session.id, replayName);
-        } else {
-          matchedDuckFilename = telemetryBySessionId.get(session.id) ||
-            (replayName ? telemetryByReplay.get(replayName) : undefined);
-        }
-
-        if (matchedDuckFilename) {
-          session.hasDuckDbTelemetry = true;
-          session.duckdbFilename = matchedDuckFilename;
-          if (session.matchingReplayFile) {
-            session.matchingReplayFile.hasDuckDbTelemetry = true;
-            session.matchingReplayFile.duckdbFilename = matchedDuckFilename;
-            this.sessionDb.updateSessionMatchingReplay(session.id, session.matchingReplayFile);
-          }
-        }
+        const filename = links.forSession(session);
+        session.hasDuckDbTelemetry = Boolean(filename);
+        if (filename) session.duckdbFilename = filename;
+        else delete session.duckdbFilename;
+        const replayLink = session.matchingReplayFile;
+        if (!replayLink) continue;
+        const changed = Boolean(replayLink.hasDuckDbTelemetry) !== Boolean(filename) || replayLink.duckdbFilename !== filename;
+        replayLink.hasDuckDbTelemetry = Boolean(filename);
+        if (filename) replayLink.duckdbFilename = filename;
+        else delete replayLink.duckdbFilename;
+        if (changed) this.sessionDb.updateSessionMatchingReplay(session.id, replayLink);
       }
     } catch (error) {
       console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', error);
     }
+  }
+
+  /**
+   * Decides the DuckDB matches of files, sessions and replays that have none yet and stores them.
+   * Matches are decided once: a stored match is only read afterwards.
+   */
+  private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[]): void {
+    if (this.sessionDb.resetTelemetryLinksForRule(TELEMETRY_LINK_RULE)) {
+      console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again, one file per session');
+    }
+    this.sessionDb.linkTelemetryFiles(decideTelemetryLinks({
+      files: this.sessionDb.getTelemetryFiles(),
+      stored: this.sessionDb.getTelemetryMetadata(),
+      sessions,
+      replays,
+      loadReplayMetadata: replayName => this.sessionDb.getStoredReplayMetadata(replayName),
+    }));
   }
 
   public loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {

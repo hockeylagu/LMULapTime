@@ -147,28 +147,39 @@ function shouldReplaceMatch(
   return candidateDeltaSec < currentDeltaSec;
 }
 
+/** A matched DuckDB file and its distance in time from the session or replay (Infinity when untimed). */
+export interface DuckDbMatch {
+  file: DuckDbFileInfo;
+  deltaSec: number;
+}
+
+/** The session's start in epoch ms, or 0 when its timestamp can't be read. */
+export function sessionEpochMs(session: DetailedSession): number {
+  if (!session.timestamp) return 0;
+  const d = new Date(session.timestamp);
+  if (!isNaN(d.getTime())) return d.getTime();
+  const asNum = Number(session.timestamp);
+  if (!isNaN(asNum) && asNum > 1000000000) return asNum > 1000000000000 ? asNum : asNum * 1000;
+  return 0;
+}
+
 export function matchDuckDbToSession(
   duckdbFiles: DuckDbFileInfo[],
   session: DetailedSession,
   maxTimeDeltaSec = 3600
 ): DuckDbFileInfo | null {
+  return findDuckDbForSession(duckdbFiles, session, maxTimeDeltaSec)?.file ?? null;
+}
+
+export function findDuckDbForSession(
+  duckdbFiles: DuckDbFileInfo[],
+  session: DetailedSession,
+  maxTimeDeltaSec = 3600
+): DuckDbMatch | null {
   if (duckdbFiles.length === 0) return null;
 
   const sessionTypeNorm = normalizeSessionType(session.sessionType || session.sessionName);
-
-  // Parse session timestamp
-  let sessionEpochMs = 0;
-  if (session.timestamp) {
-    const d = new Date(session.timestamp);
-    if (!isNaN(d.getTime())) {
-      sessionEpochMs = d.getTime();
-    } else {
-      const asNum = Number(session.timestamp);
-      if (!isNaN(asNum) && asNum > 1000000000) {
-        sessionEpochMs = asNum > 1000000000000 ? asNum : asNum * 1000;
-      }
-    }
-  }
+  const sessionStartMs = sessionEpochMs(session);
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
@@ -193,8 +204,8 @@ export function matchDuckDbToSession(
     }
 
     // 3. Check time delta if timestamps are available
-    if (sessionEpochMs > 0 && duck.timestampEpochMs > 0) {
-      const deltaSec = Math.abs(duck.timestampEpochMs - sessionEpochMs) / 1000;
+    if (sessionStartMs > 0 && duck.timestampEpochMs > 0) {
+      const deltaSec = Math.abs(duck.timestampEpochMs - sessionStartMs) / 1000;
       if (deltaSec <= maxTimeDeltaSec) {
         timedCandidateDeltas.push(deltaSec);
         if (shouldReplaceMatch(duck, deltaSec, bestMatch, smallestTimeDelta)) {
@@ -218,7 +229,7 @@ export function matchDuckDbToSession(
     return null;
   }
 
-  return bestMatch;
+  return bestMatch ? { file: bestMatch, deltaSec: Number.isFinite(smallestTimeDelta) ? smallestTimeDelta : Infinity } : null;
 }
 
 export function matchDuckDbToReplay(
@@ -227,6 +238,15 @@ export function matchDuckDbToReplay(
   replayMtimeMs?: number,
   maxTimeDeltaSec = 300
 ): DuckDbFileInfo | null {
+  return findDuckDbForReplay(duckdbFiles, replay, replayMtimeMs, maxTimeDeltaSec)?.file ?? null;
+}
+
+export function findDuckDbForReplay(
+  duckdbFiles: DuckDbFileInfo[],
+  replay: ReplayMetadata,
+  replayMtimeMs?: number,
+  maxTimeDeltaSec = 300
+): DuckDbMatch | null {
   if (duckdbFiles.length === 0) return null;
 
   const replayTypeNorm = normalizeSessionType(replay.sessionType || replay.eventInfo?.session || '');
@@ -284,7 +304,7 @@ export function matchDuckDbToReplay(
     return null;
   }
 
-  return bestMatch;
+  return bestMatch ? { file: bestMatch, deltaSec: Number.isFinite(smallestTimeDelta) ? smallestTimeDelta : Infinity } : null;
 }
 
 export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDbFileInfo> {

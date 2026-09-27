@@ -678,9 +678,14 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getIngestErrors()).toHaveLength(0);
 
     db.upsertTelemetryLapCache(fileInfo.filename, 3, mockLapData);
-    db.pruneTelemetryLapCache(365 * 24 * 60 * 60 * 1000, 1);
+    db.upsertTelemetryLapCache('Deleted_P.duckdb', 1, mockLapData);
+    db.pruneTelemetryLapCache(new Set([fileInfo.filename]), 365 * 24 * 60 * 60 * 1000, 1);
     expect(db.getTelemetryLapCache(fileInfo.filename, 2)).toBeNull();
     expect(db.getTelemetryLapCache(fileInfo.filename, 3)).toBeNull();
+    // A lap of a file no longer on disk is the only copy left: it is never trimmed.
+    expect(db.getTelemetryLapCache('Deleted_P.duckdb', 1)).not.toBeNull();
+    db.pruneTelemetryLapCache(new Set([fileInfo.filename]), 0, 0);
+    expect(db.getTelemetryLapCache('Deleted_P.duckdb', 1)).not.toBeNull();
 
     // Verify clearTelemetryCache clears data
     db.clearTelemetryCache();

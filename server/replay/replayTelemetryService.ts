@@ -1,11 +1,8 @@
-import fs from 'fs';
 import { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 import { SessionDatabase } from '../core/db.js';
-import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';
-import { matchDuckDbToReplay, matchDuckDbToSession } from '../telemetry/telemetryMatcher.js';
+import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
-import { matchesTrack } from '../../shared/domain/paceCategory.js';
 
 export interface TelemetryEnrichmentInput {
   replayName: string;
@@ -26,18 +23,7 @@ export interface TelemetryEnrichmentResult {
 }
 
 export class ReplayTelemetryService {
-  public constructor(
-    private readonly sessionDb: SessionDatabase,
-    private readonly telemetryCatalog: TelemetryCatalog
-  ) {}
-
-  public getFiles() {
-    return this.telemetryCatalog.getFiles();
-  }
-
-  public getTelemetryMeta() {
-    return this.sessionDb.getTelemetryMetadata();
-  }
+  public constructor(private readonly sessionDb: SessionDatabase) {}
 
   public async enrichWithTelemetry(input: TelemetryEnrichmentInput): Promise<TelemetryEnrichmentResult> {
     let trajectory = input.currentTrajectory;
@@ -49,45 +35,21 @@ export class ReplayTelemetryService {
     }
 
     try {
-      let fileMtime: number | undefined;
-      if (fs.existsSync(input.filePath)) {
-        try {
-          fileMtime = fs.statSync(input.filePath).mtime.getTime();
-        } catch {
-          // Ignore stat failure
-        }
-      }
-      if (fileMtime === undefined) {
-        fileMtime = this.sessionDb.getStoredReplayFileInfo(input.replayName)?.file_mtime;
-      }
-
-      const files = this.telemetryCatalog.getFiles();
-      const telemetryMeta = this.sessionDb.getTelemetryMetadata();
-      const matchedSessionId = input.matchedSession?.id;
-      const sessionMatchedFilename = matchedSessionId
-        ? telemetryMeta.find(item => item.matchedSessionId === matchedSessionId)?.filename
-        : undefined;
-      const sessionMatchedFile = sessionMatchedFilename
-        ? files.find(file => file.filename === sessionMatchedFilename)
-        : null;
-      const isSessionMatchValid = sessionMatchedFile && input.matchedSession ? (
-        matchesTrack(sessionMatchedFile.trackName, input.matchedSession.trackVenue, input.matchedSession.trackCourse)
-      ) : false;
-
-      const matchedDuck =
-        matchDuckDbToReplay(files, input.metadata, fileMtime) ||
-        (input.matchedSession ? matchDuckDbToSession(files, input.matchedSession) : null) ||
-        (isSessionMatchValid ? sessionMatchedFile : null);
+      // The stored match only (see telemetry/telemetryLinks): the session's file, else the replay's.
+      const links = TelemetryLinks.load(this.sessionDb);
+      const matchedFilename = links.forReplay(input.replayName, input.matchedSession);
+      const matchedDuck = matchedFilename ? links.row(matchedFilename) : undefined;
 
       if (matchedDuck) {
-        this.sessionDb.upsertTelemetryMetadata(matchedDuck, input.matchedSession?.id, input.replayName);
         trajectory.duckdbFilename = matchedDuck.filename;
 
         const chosenLapNum = trajectory.currentLap || input.lapNumber || 1;
         const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNum)?.lapTimeSec;
 
         let duckLap = this.sessionDb.getTelemetryLapCache(matchedDuck.filename, chosenLapNum);
-        if (!duckLap) {
+        if (!duckLap && !links.isOnDisk(matchedDuck.filename)) {
+          duckdbUnavailableReason = 'The DuckDB file of this session was deleted before this lap was read; using Native VCR data.';
+        } else if (!duckLap) {
           const duckReader = new DuckDbReader(matchedDuck.filePath);
           try {
             await duckReader.open();

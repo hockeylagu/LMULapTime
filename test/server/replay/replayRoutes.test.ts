@@ -8,7 +8,6 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { createReplayRouter } from '../../../server/routes/replayRoutes.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
-import * as telemetryMatcher from '../../../server/telemetry/telemetryMatcher.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
 import type { DetailedSession, DuckDbLapTelemetry } from '../../../server/core/types.js';
 import { DuckDbReader } from '../../../server/telemetry/duckdbReader.js';
@@ -165,8 +164,7 @@ describe('Replay routes', () => {
         { x: 0, y: 0, z: 0, timeSec: 1, speedKmh: 121, throttle: 100 },
       ],
     };
-    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    db.upsertTelemetryMetadata(duckFile, undefined, 'Route_Test_P1.Vcr');
     db.upsertTelemetryLapCache(duckFile.filename, 1, duckLap);
 
     const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');
@@ -287,8 +285,8 @@ describe('Replay routes', () => {
       timestampStr: '2026-09-23T00:00:00Z',
       timestampEpochMs: Date.now(),
     };
-    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    fs.writeFileSync(duckFile.filePath, '');
+    db.upsertTelemetryMetadata(duckFile, undefined, 'Route_Test_P1.Vcr');
     vi.spyOn(DuckDbReader.prototype, 'open').mockRejectedValueOnce(new Error('Corrupted duckdb header'));
     const ingestSpy = vi.spyOn(db, 'recordIngestError');
 
@@ -319,8 +317,7 @@ describe('Replay routes', () => {
         { x: 0, y: 0, z: 0, timeSec: 0.1, speedKmh: 105 },
       ],
     };
-    vi.spyOn(telemetryCatalog, 'getFiles').mockReturnValue([duckFile]);
-    vi.spyOn(telemetryMatcher, 'matchDuckDbToReplay').mockReturnValue(duckFile);
+    db.upsertTelemetryMetadata(duckFile, undefined, 'Route_Test_P1.Vcr');
     db.upsertTelemetryLapCache(duckFile.filename, 1, incompleteDuckLap);
 
     const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/trajectory?driverSlot=1');

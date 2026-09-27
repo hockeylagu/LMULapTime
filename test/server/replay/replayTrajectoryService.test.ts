@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
@@ -15,7 +14,6 @@ import type {
 
 describe('ReplayTrajectoryService', () => {
   let db: SessionDatabase;
-  let catalog: TelemetryCatalog;
   let replayCache: ReplayCacheService;
   let telemetryService: ReplayTelemetryService;
   let trajectoryService: ReplayTrajectoryService;
@@ -53,9 +51,8 @@ describe('ReplayTrajectoryService', () => {
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
-    catalog = new TelemetryCatalog(db);
     replayCache = new ReplayCacheService(db);
-    telemetryService = new ReplayTelemetryService(db, catalog);
+    telemetryService = new ReplayTelemetryService(db);
     sessions = [];
 
     trajectoryService = new ReplayTrajectoryService(

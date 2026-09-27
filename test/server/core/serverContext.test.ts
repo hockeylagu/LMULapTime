@@ -21,6 +21,15 @@ const benchmarkDiff: ReferenceBenchmarkDiff = {
   removed: [],
 };
 
+// The SessionDatabase members telemetry enrichment uses to decide and read the stored matches.
+const storedTelemetryLinks = {
+  resetTelemetryLinksForRule: vi.fn(() => false),
+  getTelemetryFiles: vi.fn(() => []),
+  getStoredReplayMetadata: vi.fn(() => null),
+  linkTelemetryFiles: vi.fn(),
+  getTelemetryLapCacheFilenames: vi.fn(() => new Set<string>()),
+};
+
 function createContext(sessionDb: SessionDatabase = {
     getAllStoredReplayFiles: vi.fn(() => []),
   } as unknown as SessionDatabase): ServerContext {
@@ -335,6 +344,9 @@ describe('ServerContext configuration and telemetry enrichment', () => {
         matchedSessionId: null,
         matchedReplayFilename: 'Spa P1.Vcr',
       }]),
+      ...storedTelemetryLinks,
+      // Not on disk: its cached laps keep serving it.
+      getTelemetryLapCacheFilenames: vi.fn(() => new Set(['Spa_P1.duckdb'])),
       updateSessionMatchingReplay: vi.fn(),
     } as unknown as SessionDatabase;
     const telemetryCatalog = {
@@ -377,6 +389,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryMetadata: vi.fn(() => []),
+      ...storedTelemetryLinks,
       updateSessionMatchingReplay: vi.fn(),
     } as unknown as SessionDatabase;
     const telemetryCatalog = { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog;
@@ -413,6 +426,43 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     expect(session.duckdbFilename).toBeUndefined();
     expect(session.matchingReplayFile).toMatchObject({ hasDuckDbTelemetry: false });
     expect(session.matchingReplayFile?.duckdbFilename).toBeUndefined();
+  });
+
+  it('stores one session per DuckDB file and shows its telemetry on that session only', () => {
+    const sessionDb = new SessionDatabase(':memory:');
+    const telemetryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-telemetry-links-'));
+    try {
+      const filename = 'Circuit de la Sarthe_P_2026-09-14T18_37_49Z.duckdb';
+      const filePath = path.join(telemetryDir, filename);
+      fs.writeFileSync(filePath, '');
+      const recordedAt = Date.parse('2026-09-14T18:37:49Z');
+      sessionDb.upsertTelemetryMetadata({
+        filename, filePath, fileMtimeMs: recordedAt, fileSizeBytes: 1024, trackName: 'Circuit de la Sarthe',
+        sessionType: 'P', timestampStr: '2026-09-14T18:37:49Z', timestampEpochMs: recordedAt,
+      });
+      const context = createContext(sessionDb);
+      const practice = (id: string, iso: string) => ({
+        id, timestamp: Date.parse(iso), trackVenue: 'Circuit de la Sarthe', trackCourse: 'Circuit de la Sarthe',
+        sessionType: 'Practice', sessionName: 'P1', drivers: [],
+      } as unknown as DetailedSession);
+      // The practice the file records, and a 0-lap session LMU saved 9 minutes later.
+      const recorded = practice('14_46_14-22P1', '2026-09-14T18:37:31Z');
+      const empty = practice('14_48_31-61P1', '2026-09-14T18:46:32Z');
+
+      context.enrichSessionsWithTelemetry([empty, recorded]);
+
+      expect(recorded).toMatchObject({ hasDuckDbTelemetry: true, duckdbFilename: filename });
+      expect(empty.hasDuckDbTelemetry).toBe(false);
+      expect(sessionDb.getTelemetryMetadata()[0].matchedSessionId).toBe('14_46_14-22P1');
+
+      // Decided once: reading again with the sessions in another order changes nothing.
+      context.enrichSessionsWithTelemetry([recorded, empty]);
+      expect(empty.hasDuckDbTelemetry).toBe(false);
+      expect(sessionDb.getTelemetryMetadata()[0].matchedSessionId).toBe('14_46_14-22P1');
+    } finally {
+      sessionDb.close();
+      fs.rmSync(telemetryDir, { recursive: true, force: true });
+    }
   });
 });
 
