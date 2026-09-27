@@ -1,5 +1,6 @@
 import { AiLapEvidence, ReplayLapSummary, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { LapSegmentComparison } from './cornerAnalysis.js';
+import type { DebriefCorner } from './sessionDebrief.js';
 
 const round = (value: number): number => Number(value.toFixed(3));
 const optionalRound = (value: number | null | undefined): number | undefined => value == null ? undefined : round(value);
@@ -12,6 +13,8 @@ export interface BuildAiLapEvidenceOptions {
   segments: LapSegmentComparison[];
   carClass?: string;
   carModel?: string;
+  /** The corners ranked by rankDebriefCorners: the report explains these, in this order. */
+  priorities?: DebriefCorner[];
 }
 
 export function buildAiLapEvidence({
@@ -22,16 +25,21 @@ export function buildAiLapEvidence({
   segments,
   carClass,
   carModel,
+  priorities,
 }: BuildAiLapEvidenceOptions): AiLapEvidence {
   const lap = currentLapSummary || trajectory.laps?.find(item => item.lapNumber === trajectory.currentLap) || trajectory.laps?.[0];
   if (!lap) throw new Error('No lap summary is available for AI analysis.');
   const hasBaseline = Boolean(baselineTrajectory && baselineLapSummary);
+  // The ranked corners always travel with their measurements, ahead of the other notable segments.
+  const priorityRank = new Map((hasBaseline ? priorities ?? [] : []).map((corner, index) => [corner.cornerNumber, index]));
+  const rankOf = (segment: LapSegmentComparison) =>
+    segment.type === 'corner' ? priorityRank.get(segment.cornerNumber) ?? Infinity : Infinity;
 
   const notable = segments
-    .filter(segment => hasBaseline
+    .filter(segment => rankOf(segment) !== Infinity || (hasBaseline
       ? segment.type === 'corner' ? Math.abs(segment.timeDeltaSec) > 0.05 : Math.abs(segment.topSpeedDeltaKmh) > 1
-      : segment.type === 'corner')
-    .sort((a, b) => Math.abs(b.timeDeltaSec) - Math.abs(a.timeDeltaSec))
+      : segment.type === 'corner'))
+    .sort((a, b) => rankOf(a) - rankOf(b) || Math.abs(b.timeDeltaSec) - Math.abs(a.timeDeltaSec))
     .slice(0, 8)
     .map(segment => segment.type === 'corner'
       ? {
@@ -136,6 +144,17 @@ export function buildAiLapEvidence({
     },
     segments: notable,
   };
+
+  if (hasBaseline && priorities && priorities.length > 0) {
+    evidence.priorities = priorities.map((corner, index) => ({
+      rank: index + 1,
+      cornerNumber: corner.cornerNumber,
+      timeLossSec: round(corner.timeLossSec),
+      lapsLosing: corner.lapsLosing ?? undefined,
+      lapsSampled: corner.lapsSampled ?? undefined,
+      confidence: round(corner.confidence),
+    }));
+  }
 
   if (baselineTrajectory && baselineLapSummary) {
     evidence.baseline = {
