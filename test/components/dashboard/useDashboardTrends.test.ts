@@ -272,4 +272,43 @@ describe('useDashboardTrends', () => {
     expect(result.current.latestOuting?.id).toBe('sess-r1');
     expect(result.current.latestOuting?.sessionType).toBe('Race');
   });
+
+  it('draws the pace trend in the latest outing car class only', () => {
+    const session = (id: string, timeString: string, carType: string, carClass: string, pace: number): SessionSummary => ({
+      id,
+      filename: `${id}.xml`,
+      trackVenue: 'Bahrain International Circuit',
+      timeString,
+      sessionType: 'Race',
+      sessionName: 'R1',
+      driversCount: 20,
+      playerDriver: {
+        name: 'Samuel Lague',
+        carType,
+        carClass,
+        bestLapTime: 120,
+        bestLapTimeString: '2:00.000',
+        bestS1: null,
+        bestS2: null,
+        bestS3: null,
+        theoreticalBest: null,
+        theoreticalBestString: '',
+        bestLapPacePercentage: pace,
+        lapsCount: 10,
+      },
+    });
+    const sessions = [
+      session('hy-old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hypercar', 104.0),
+      session('gt3-mid', '2026/09/22 10:00:00', 'BMW M4 LMGT3', 'LMGT3', 101.0),
+      session('hy-new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.4),
+    ];
+
+    const { result } = renderHook(() => useDashboardTrends(sessions));
+
+    expect(result.current.paceTrendClass).toBe('LMH');
+    expect(result.current.recentPaceTrend.map(p => p.id)).toEqual(['hy-old', 'hy-new']);
+    // 104.0% down to 103.4%: faster, with the GT3 101.0% left out of the comparison.
+    expect(result.current.paceDelta).toBe(0.6);
+    expect(result.current.paceTrendDirection).toBe('improving');
+  });
 });

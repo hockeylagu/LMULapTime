@@ -64,7 +64,7 @@ describe('DashboardPaceSparkline component', () => {
 
     // Title and badge
     expect(screen.getByText('Pace Trajectory')).toBeInTheDocument();
-    expect(screen.getByText('+1.1% Gain ↗')).toBeInTheDocument();
+    expect(screen.getByText('1.10% faster ↗')).toBeInTheDocument();
 
     // Range axis labels
     expect(screen.getByText('103.5% (Past)')).toBeInTheDocument();
@@ -95,7 +95,8 @@ describe('DashboardPaceSparkline component', () => {
     const { rerender } = render(
       <DashboardPaceSparkline points={points} paceDelta={-1.5} paceTrendDirection="declining" />
     );
-    expect(screen.getByText('-1.5% Delta ↘')).toBeInTheDocument();
+    // 102.0% then 103.5% of the benchmark: slower, said in words rather than a signed delta.
+    expect(screen.getByText('1.50% slower ↘')).toBeInTheDocument();
 
     rerender(
       <DashboardPaceSparkline points={points} paceDelta={0.05} paceTrendDirection="steady" />

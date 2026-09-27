@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
+import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 import type { SessionSummary } from './dashboardTypes.js';
 
@@ -52,6 +53,8 @@ export interface DashboardTrendsResult {
   recentPaceTrend: RecentPacePoint[];
   paceDelta: number | null;
   paceTrendDirection: 'improving' | 'declining' | 'steady' | 'none';
+  // The car class the pace trend is drawn in (the latest outing's), e.g. 'LMH'.
+  paceTrendClass: string | null;
   recentCleanRate: number | null;
   recentConsistency: number | null;
   recentNetPositions: number;
@@ -68,6 +71,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         recentPaceTrend: [],
         paceDelta: null,
         paceTrendDirection: 'none',
+        paceTrendClass: null,
         recentCleanRate: null,
         recentConsistency: null,
         recentNetPositions: 0,
@@ -226,10 +230,15 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
       }
     }
 
-    // Recent pace progression points (chronological order: oldest -> newest, max 6 points)
+    // Recent pace progression points (chronological order: oldest -> newest, max 6 points), in the
+    // latest outing's car class only: a GT3 lap and a Hypercar lap are not one progression.
+    const trendClass = latestRaw?.playerDriver
+      ? normalizeCarClass(latestRaw.playerDriver.carClass, latestRaw.playerDriver.carType)
+      : '';
     const recentWithPace: RecentPacePoint[] = [];
     for (const s of sorted) {
-      if (s.playerDriver?.bestLapPacePercentage && s.playerDriver.bestLapPacePercentage > 0) {
+      const inTrendClass = !trendClass || normalizeCarClass(s.playerDriver?.carClass, s.playerDriver?.carType) === trendClass;
+      if (inTrendClass && s.playerDriver?.bestLapPacePercentage && s.playerDriver.bestLapPacePercentage > 0) {
         recentWithPace.push({
           id: s.id,
           trackName: getDisplayTrackName(s.trackVenue, s.trackCourse),
@@ -295,6 +304,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
       recentPaceTrend: chronologicalPace,
       paceDelta,
       paceTrendDirection,
+      paceTrendClass: trendClass || null,
       recentCleanRate,
       recentConsistency,
       recentNetPositions,
