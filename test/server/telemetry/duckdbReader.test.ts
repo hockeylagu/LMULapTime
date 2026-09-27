@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import duckdb from 'duckdb';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { DuckDbReader, normalizeDuckDbGForces } from '../../../server/telemetry/duckdbReader.js';
 
 describe('DuckDbReader', () => {
@@ -13,13 +14,24 @@ describe('DuckDbReader', () => {
     });
   });
 
-  const testDbDir = path.join(process.cwd(), 'test', 'fixtures', 'telemetry');
+  // A fresh folder per run, outside the repository: the duckdb binding keeps a database file
+  // locked until it is garbage-collected, even once closed, so reusing or deleting a fixed path
+  // failed at random. Removing it is best effort; the next run sweeps what was left.
+  const TEMP_PREFIX = 'lmu-duckdb-reader-';
+  const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX));
+  const removeQuietly = (dir: string) => {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Still locked: left for a later run.
+    }
+  };
   const testDbPath = path.join(testDbDir, 'Bahrain_Test_P_2026-09-13T20_33_32Z.duckdb');
 
   beforeAll(async () => {
-    fs.mkdirSync(testDbDir, { recursive: true });
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
+    for (const entry of fs.readdirSync(os.tmpdir())) {
+      const dir = path.join(os.tmpdir(), entry);
+      if (entry.startsWith(TEMP_PREFIX) && dir !== testDbDir) removeQuietly(dir);
     }
 
     // Create fixture DuckDB file with representative schema
@@ -188,7 +200,6 @@ describe('DuckDbReader', () => {
 
   it('supports continuous TC channel, hasColumn detection, and lap time alignment', async () => {
     const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
-    if (fs.existsSync(multiRateDbPath)) fs.unlinkSync(multiRateDbPath);
 
     const db = new duckdb.Database(multiRateDbPath);
     await new Promise<void>((resolve, reject) => {
@@ -265,16 +276,5 @@ describe('DuckDbReader', () => {
     await reader.close();
   });
 
-  afterAll(() => {
-    const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
-    for (const file of [testDbPath, multiRateDbPath]) {
-      if (fs.existsSync(file)) {
-        try {
-          fs.unlinkSync(file);
-        } catch {
-          // Ignore EBUSY on Windows file locks
-        }
-      }
-    }
-  });
+  afterAll(() => removeQuietly(testDbDir));
 });
