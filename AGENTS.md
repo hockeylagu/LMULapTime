@@ -89,6 +89,7 @@ LMULapTime/
 │   │   ├── dbTelemetryStore.ts     # Columnar 100 Hz DuckDB telemetry persistence
 │   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
 │   │   ├── serverContext.ts        # Background scanner lifecycle and state coordinator
+│   │   ├── backgroundScan.ts       # Drains a sync iterator one step per event-loop turn into its scan status
 │   │   └── types.ts                # Core shared domain interfaces and telemetry models
 │   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index.json
 │   ├── replay/                     # Binary .Vcr parser, downsampler & worker thread decoder
@@ -116,6 +117,7 @@ LMULapTime/
 │   ├── sessions/                   # XML session results parsing & analytics
 │   │   ├── parser.ts               # LmuParser class and driver profile detector
 │   │   ├── replayMatching.ts       # Deterministic session-to-replay correlation & validation
+│   │   ├── sessionReplayLinks.ts   # Applies the matching rules to stored links: link, re-check, withdraw, one session per replay
 │   │   ├── sessionAnalytics.ts     # True Pace, sector averages, fuel/tire curves
 │   │   ├── sessionXmlStream.ts     # Streaming XML parser
 │   │   └── sessionXmlTypes.ts      # Raw XML schema interfaces
@@ -224,7 +226,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ### F. Telemetry & Replay Ingestion Integrity
 - **Multi-File Session Ownership**: Sessions may generate multiple DuckDB telemetry files over long multi-stint sessions. A session owns all corresponding DuckDB files (`telemetryLinks.ts`), and every lap must resolve directly to the specific file containing its timestamp range.
-- **Strict Session-to-Replay Matching & Link Withdrawal**: Replays must be matched strictly against session metadata (layout, driver, timestamp constraints). Any invalid or mismatched link must be withdrawn (`replayMatching.ts`, `dbReplayLinkStore.ts`), never guessed.
+- **Strict Session-to-Replay Matching & Link Withdrawal**: Replays must be matched strictly against session metadata (layout, driver, timestamp constraints). Any invalid or mismatched link must be withdrawn (`replayMatching.ts` rules, applied by `sessionReplayLinks.ts`, recorded by `dbReplayLinkStore.ts`), never guessed.
 - **Replay Identity Collision Protection**: Reused replay filenames must never overwrite existing cached sessions. Name collisions must be detected and archived with versioned timestamps (`dbReplayIdentity.ts`).
 - **Timing Line-Crossing Continuity**: Laps cut at the start/finish line must be smoothly interpolated across boundary crossing points without losing 4-corner channels (tires, brakes, dampers) or inserting zeroed points (`lapLineCut.ts`).
 - **Asynchronous Worker Decoding & Upgrades**: CPU-heavy replay decoding—both on-demand for uncached laps and in the background for legacy replay upgrades (`replayUpgradeRunner.ts`)—must execute in worker threads to prevent blocking the Node.js event loop.
