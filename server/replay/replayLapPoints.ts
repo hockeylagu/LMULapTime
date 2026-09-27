@@ -58,6 +58,9 @@ export function buildTrajectoryPoints(
       wheelSpeeds: cur.wheelSpeeds,
       brakeTemps: cur.brakeTemps,
       fuel: cur.fuel,
+      rainIntensity: cur.rainIntensity,
+      ambientTemp: cur.ambientTemp,
+      trackTemp: cur.trackTemp,
     };
   });
 }

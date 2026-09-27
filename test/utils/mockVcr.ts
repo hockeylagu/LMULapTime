@@ -24,6 +24,7 @@ export interface MockSlice {
   rpmRaw10?: number;
   flag?: { flagState: number; sectorMask: number; driverFlag: number };
   standings?: number[];
+  weather?: { ambientTemp?: number; trackTemp?: number; rainIntensity?: number };
 }
 
 export function createMockVcrBuffer(): Buffer {
@@ -94,7 +95,8 @@ export function createSliceVcrBuffer(options?: {
     const hasWheel = Boolean(sl.wheel);
     const hasFlag = Boolean(sl.flag);
     const hasStandings = Boolean(sl.standings);
-    const eventCount = 1 + (hasTiming ? 1 : 0) + (hasWheel ? 1 : 0) + (hasFlag ? 1 : 0) + (hasStandings ? 1 : 0);
+    const hasWeather = Boolean(sl.weather);
+    const eventCount = 1 + (hasTiming ? 1 : 0) + (hasWheel ? 1 : 0) + (hasFlag ? 1 : 0) + (hasStandings ? 1 : 0) + (hasWeather ? 1 : 0);
     sBuf.writeUInt16LE(eventCount, 4);
 
     sliceBufs.push(sBuf);
@@ -193,6 +195,26 @@ export function createSliceVcrBuffer(options?: {
       stData[0] = sl.standings.length;
       sl.standings.forEach((slot, i) => { stData[21 + i] = slot; });
       sliceBufs.push(stHdr, Buffer.from([0]), stData);
+    }
+
+    if (sl.weather) {
+      // Class 1 Type 10, size 80, slot 255
+      const wHdr = Buffer.alloc(4);
+      wHdr.writeUInt32LE(((1 << 29) | (10 << 17) | (80 << 8) | 255) >>> 0, 0);
+      const wData = Buffer.alloc(80);
+      const temp = sl.weather.ambientTemp ?? 25.0;
+      const rawTemp = Math.round(146 - ((25.0 - temp) / 0.176));
+      wData[38] = Math.max(0, Math.min(255, rawTemp));
+      const trackTemp = sl.weather.trackTemp ?? 27.3;
+      const rawTrack = Math.round(129 - ((27.3 - trackTemp) / 0.176));
+      wData[39] = Math.max(0, Math.min(255, rawTrack));
+      const rain = sl.weather.rainIntensity ?? 0;
+      for (let ch = 42; ch < 78; ch += 4) {
+        wData[ch] = rain;
+        wData[ch + 1] = rain;
+        wData[ch + 2] = rain;
+      }
+      sliceBufs.push(wHdr, Buffer.from([0]), wData);
     }
   }
 

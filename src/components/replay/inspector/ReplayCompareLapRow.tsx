@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../shared/types/index.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 
@@ -25,8 +25,17 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
       }`}
     >
       <span className="min-w-0">
-        <span className="block truncate font-semibold text-white">
-          {lap.sessionName || 'Session'} ({lap.sessionType || 'Session'})
+        <span className="flex items-center gap-1.5 truncate font-semibold text-white">
+          <span className="truncate">{lap.sessionName || 'Session'} ({lap.sessionType || 'Session'})</span>
+          {Boolean(lap.hasRain || lap.weatherCondition === 'Wet' || lap.weatherCondition === 'Dynamic Weather') && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0"
+              title={lap.weatherCondition || 'Wet Session'}
+            >
+              <CloudRain className="w-2.5 h-2.5" />
+              <span>WET</span>
+            </span>
+          )}
         </span>
         <span className="block truncate text-[11px] text-lmu-muted">
           {lap.dateString} | {lap.matchingReplayFile}

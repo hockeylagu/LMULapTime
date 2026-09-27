@@ -416,6 +416,11 @@ export class LmuParser {
         playerDriver,
         bestSessionLap,
         matchingReplayFile: matchingReplay ? (() => {
+          let hasRain = matchingReplay.hasRain;
+          let maxRainIntensity = matchingReplay.maxRainIntensity;
+          let weatherCondition = matchingReplay.weatherCondition;
+          let ambientTemp = matchingReplay.ambientTemp;
+          let trackTemp = matchingReplay.trackTemp;
           if (!matchingReplay.eventTitle && !matchingReplay.durationSec) {
             try {
               if (fs.existsSync(matchingReplay.path)) {
@@ -426,6 +431,11 @@ export class LmuParser {
                   matchingReplay.eventType = rMeta.eventInfo.eventType;
                 }
                 matchingReplay.durationSec = rMeta.durationSec;
+                hasRain = rMeta.hasRain;
+                maxRainIntensity = rMeta.maxRainIntensity;
+                weatherCondition = rMeta.weatherCondition;
+                ambientTemp = rMeta.ambientTemp;
+                trackTemp = rMeta.trackTemp;
               }
             } catch {
               // ignore
@@ -439,6 +449,11 @@ export class LmuParser {
             splitNo: matchingReplay.splitNo,
             eventType: matchingReplay.eventType,
             durationSec: matchingReplay.durationSec,
+            hasRain,
+            maxRainIntensity,
+            weatherCondition,
+            ambientTemp,
+            trackTemp,
           };
         })() : undefined,
       };

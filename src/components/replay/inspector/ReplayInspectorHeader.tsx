@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   X, Play, Pause, RotateCcw, Video, Clock, HardDrive, Flag, ArrowLeft, ArrowLeftRight, Users,
+  CloudRain, CloudDrizzle, Sun, Thermometer,
 } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './ReplayCompareLapPicker.js';
@@ -84,6 +85,39 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
                   {typeof metadata.eventInfo.splitNo === 'number' && ` (Split ${metadata.eventInfo.splitNo})`}
                 </span>
               )}
+              {(trajectory?.weatherCondition || metadata?.weatherCondition) && (
+                <span
+                  className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold text-[10px] shrink-0 border ${
+                    (trajectory?.weatherCondition || metadata?.weatherCondition) === 'Wet'
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                      : (trajectory?.weatherCondition || metadata?.weatherCondition) === 'Dynamic Weather'
+                      ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                  }`}
+                  title={
+                    trajectory?.maxRainIntensity || metadata?.maxRainIntensity
+                      ? `Max Rain Intensity: ${trajectory?.maxRainIntensity ?? metadata?.maxRainIntensity}/25`
+                      : 'Track Weather Condition'
+                  }
+                >
+                  {(trajectory?.weatherCondition || metadata?.weatherCondition) === 'Wet' ? (
+                    <>
+                      <CloudRain className="w-3 h-3 text-blue-400" />
+                      <span>Wet Track {trajectory?.maxRainIntensity ? `(${trajectory.maxRainIntensity})` : ''}</span>
+                    </>
+                  ) : (trajectory?.weatherCondition || metadata?.weatherCondition) === 'Dynamic Weather' ? (
+                    <>
+                      <CloudDrizzle className="w-3 h-3 text-cyan-400" />
+                      <span>Dynamic Rain {trajectory?.maxRainIntensity ? `(${trajectory.maxRainIntensity})` : ''}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sun className="w-3 h-3 text-amber-400" />
+                      <span>Dry Track</span>
+                    </>
+                  )}
+                </span>
+              )}
             </div>
             <div className="hidden lg:flex items-center gap-3 text-[11px] text-lmu-muted">
               {(metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName) && (
@@ -104,6 +138,19 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
                   {formatBytes(metadata.fileSizeBytes)}
                 </span>
               ) : null}
+              {(trajectory?.ambientTemp !== undefined || metadata?.ambientTemp !== undefined) && (
+                <span
+                  className="flex items-center gap-1 font-mono text-cyan-300"
+                  title="Session Atmospheric & Track Temperature"
+                >
+                  <Thermometer className="w-3 h-3 text-cyan-400" />
+                  <span>
+                    {(trajectory?.ambientTemp ?? metadata?.ambientTemp)?.toFixed(1)}°C Air
+                    {(trajectory?.trackTemp !== undefined || metadata?.trackTemp !== undefined) &&
+                      ` · ${(trajectory?.trackTemp ?? metadata?.trackTemp)?.toFixed(1)}°C Track`}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
         </div>

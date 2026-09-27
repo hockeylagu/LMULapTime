@@ -442,6 +442,11 @@ export interface SessionMetadata {
     durationSec?: number;
     hasDuckDbTelemetry?: boolean;
     duckdbFilename?: string;
+    hasRain?: boolean;
+    maxRainIntensity?: number;
+    weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+    ambientTemp?: number;
+    trackTemp?: number;
   };
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
@@ -672,6 +677,8 @@ export interface ComparableLap {
   isPlayer?: boolean;
   tag?: string;
   matchingReplayFile?: string;
+  hasRain?: boolean;
+  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
 }
 
 export interface ReplayEventInfo {
@@ -729,6 +736,11 @@ export interface ReplayMetadata {
   carModel?: string;
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
+  hasRain?: boolean;
+  maxRainIntensity?: number;
+  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  ambientTemp?: number;
+  trackTemp?: number;
 }
 
 export interface TimingGateGeometry {
@@ -788,6 +800,9 @@ export interface ReplayTrajectoryPoint {
   virtualEnergy?: number;
   soc?: number;
   regenRate?: number;
+  rainIntensity?: number;
+  ambientTemp?: number;
+  trackTemp?: number;
 }
 
 export interface ReplayPenaltyEvent {
@@ -818,6 +833,14 @@ export interface ReplayFlagEvent {
   sectorMask?: number;
   driverSlot?: number;
   driverFlag?: number;
+}
+
+export interface ReplayWeatherEvent {
+  timeSec: number;
+  rainIntensity: number;
+  rainPercent?: number;
+  ambientTemp?: number;
+  trackTemp?: number;
 }
 
 export interface ReplayStandingsSnapshot {
@@ -906,6 +929,11 @@ export interface ReplayTrajectoryData {
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];
   flagEvents?: ReplayFlagEvent[];
+  weatherEvents?: ReplayWeatherEvent[];
+  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  maxRainIntensity?: number;
+  ambientTemp?: number;
+  trackTemp?: number;
   standingsHistory?: ReplayStandingsSnapshot[];
   validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
@@ -956,4 +984,9 @@ export interface ReplaySummary {
   carClasses?: string[];
   hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
+  hasRain?: boolean;
+  maxRainIntensity?: number;
+  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  ambientTemp?: number;
+  trackTemp?: number;
 }
