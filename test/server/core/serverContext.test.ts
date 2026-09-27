@@ -261,6 +261,32 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     expect(enrich).toHaveBeenCalledTimes(4);
   });
 
+  it('reloads the replay index from the database only when replay rows changed', () => {
+    let replayRevision = 0;
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      getReplayMetadataRevision: vi.fn(() => replayRevision),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+    const reads = vi.mocked(sessionDb.getAllStoredReplayFiles);
+    expect(reads).toHaveBeenCalledTimes(1);
+
+    context.loadSessions();
+    context.loadSessions();
+    expect(reads).toHaveBeenCalledTimes(1);
+
+    replayRevision++;
+    context.loadSessions();
+    context.loadSessions();
+    expect(reads).toHaveBeenCalledTimes(2);
+
+    // A new parser (directories reconfigured) starts from an empty index.
+    context.configureDirectories({});
+    expect(reads).toHaveBeenCalledTimes(3);
+  });
+
   it('uses valid configured directories and persists the telemetry directory', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-context-'));
     const resultsDir = path.join(root, 'results');
