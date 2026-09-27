@@ -52,3 +52,8 @@ export function getRejectedReplayLinks(db: DatabaseType): Map<string, RejectedRe
   }
   return bySession;
 }
+
+/** Whether this replay was withdrawn from this session. */
+export function isReplayLinkWithdrawn(db: DatabaseType, sessionId: string, replayName: string): boolean {
+  return db.prepare('SELECT 1 FROM rejected_replay_links WHERE session_id = ? AND replay_filename = ?').get(sessionId, replayName) !== undefined;
+}
