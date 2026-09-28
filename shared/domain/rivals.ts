@@ -102,7 +102,11 @@ export function resolveRival(
   let current = active;
   if (current?.kind === 'driver') {
     const rivalTime = board.entries.find((e) => e.driverName === current?.driverName)?.bestLap.lapTime;
-    if (rivalTime !== undefined && rivalTime !== current.targetTime) {
+    if (rivalTime === undefined) {
+      // Their laps left the board (sessions removed, or now wet): there is nobody left to chase.
+      resolution.replaced = { id: current.id, endedAt: now };
+      current = null;
+    } else if (rivalTime !== current.targetTime) {
       resolution.retimed = { id: current.id, targetTime: rivalTime };
       current = { ...current, targetTime: rivalTime };
     }

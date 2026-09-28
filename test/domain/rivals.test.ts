@@ -87,6 +87,13 @@ describe('resolveRival', () => {
     expect(chosen).toMatchObject({ replaced: null, created: null, active: { id: 7, targetTime: 99.2 } });
   });
 
+  it('picks again when the rival, even a chosen one, is no longer on the board', () => {
+    for (const pinned of [false, true]) {
+      const r = resolveRival(board({ Me: 100, Near: 99.7 }), target({ pinned }), 50);
+      expect(r).toMatchObject({ retimed: null, replaced: { id: 7, endedAt: 50 }, created: { driverName: 'Near' } });
+    }
+  });
+
   it('measures the step in seconds, whatever the lap length', () => {
     const leMans = board({ Me: 240, Percent: 239.28, Seconds: 239.7 });
     expect(pickRivalEntry(leMans)?.driverName).toBe('Seconds');
