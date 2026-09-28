@@ -83,12 +83,14 @@ describe('CompareLapsPage', () => {
   });
 
   it('compares the player best lap with a driver of the board, here or in telemetry', async () => {
-    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    const defaultFetch = fetchMock.getMockImplementation()!;
-    fetchMock.mockImplementation((url: string) =>
-      url.startsWith('/api/leaderboard?')
-        ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) })
-        : defaultFetch(url));
+    const fetchMock = vi.mocked(global.fetch);
+    const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      return url.startsWith('/api/leaderboard?')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
+        : defaultFetch(url);
+    });
     render(<CompareLapsPage sessions={[]} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
