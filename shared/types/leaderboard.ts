@@ -84,3 +84,52 @@ export interface LeaderboardLayout {
   lastCarClass: string;
   classes: LeaderboardLayoutClass[];
 }
+
+export type RivalKind = 'driver' | 'ghost';
+export type RivalTargetStatus = 'active' | 'beaten' | 'skipped' | 'replaced';
+
+/** A rival target as stored: a real driver to beat, or a ghost time when nobody is close enough. */
+export interface RivalTarget {
+  id: number;
+  kind: RivalKind;
+  driverName: string | null;
+  /** The lap time to beat: the rival's best lap, or the ghost time. */
+  targetTime: number;
+  /** The player's best when the target was set: where the progress bar starts. */
+  startTime: number;
+  pinned: boolean;
+  status: RivalTargetStatus;
+  setAt: number;
+  endedAt: number | null;
+  /** The player's lap that beat the target. */
+  beatenTime: number | null;
+  beatenSessionId: string | null;
+}
+
+/** One of the player's sessions on the board, with its best lap and the gap to the current target. */
+export interface RivalGapPoint {
+  sessionId: string;
+  sessionName: string;
+  timestamp: number;
+  best: number;
+  gap: number;
+}
+
+/** The player's rival on a board, and how the chase is going. */
+export interface RivalStatus {
+  rival: RivalTarget | null;
+  /** The rival driver's line on the board (their lap, replay and sectors); null for a ghost. */
+  rivalEntry: LeaderboardEntry | null;
+  /** Player best - target: the time still to find (negative once beaten). */
+  gap: number | null;
+  /** 0 when the target was set, 1 at the target. */
+  progress: number | null;
+  /** Player theoretical best - target: negative when the best sectors already beat the rival. */
+  theoreticalGap: number | null;
+  /** Rivals beaten on this board, the latest first. */
+  beaten: RivalTarget[];
+  /** The drivers just ahead of the rival: the next rungs of the ladder. */
+  nextUp: LeaderboardEntry[];
+  /** The player's last sessions here, with each one's gap to the current target. */
+  trend: RivalGapPoint[];
+}

@@ -79,6 +79,17 @@ import {
   saveAiReport,
 } from './dbAiReportStore.js';
 import {
+  RivalScope,
+  applyRivalResolution,
+  endActiveRival,
+  getActiveRival,
+  getBeatenRivals,
+  getSkippedRivalDrivers,
+  pinRival,
+} from './dbRivalStore.js';
+import type { RivalTarget } from '../../shared/types/leaderboard.js';
+import type { NewRivalTarget, RivalResolution } from '../../shared/domain/rivals.js';
+import {
   upsertTelemetryMetadata,
   getTelemetryFiles,
   getTelemetryMetadata,
@@ -209,6 +220,32 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public saveAiReport(record: AiReportRecord): void {
     saveAiReport(this.db, record);
+  }
+
+  // --- Rivals (user state, kept when the cache is cleared) ---
+
+  public getActiveRival(scope: RivalScope): RivalTarget | null {
+    return getActiveRival(this.db, scope);
+  }
+
+  public getBeatenRivals(scope: RivalScope): RivalTarget[] {
+    return getBeatenRivals(this.db, scope);
+  }
+
+  public getSkippedRivalDrivers(scope: RivalScope): Set<string> {
+    return getSkippedRivalDrivers(this.db, scope);
+  }
+
+  public applyRivalResolution(scope: RivalScope, resolution: RivalResolution): number | null {
+    return applyRivalResolution(this.db, scope, resolution);
+  }
+
+  public endActiveRival(scope: RivalScope, status: 'skipped' | 'replaced', now: number): void {
+    endActiveRival(this.db, scope, status, now);
+  }
+
+  public pinRival(scope: RivalScope, target: NewRivalTarget): number {
+    return pinRival(this.db, scope, target);
   }
 
   // --- Replays & Trajectories ---

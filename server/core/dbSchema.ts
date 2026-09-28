@@ -158,6 +158,27 @@ export function initDbSchema(db: DatabaseType): void {
       generated_at INTEGER NOT NULL
     );
 
+    -- The player's rival on a layout, per class (car_type '' ) or per car: a real driver about
+    -- 0.3% ahead, or a ghost time. A target stays until it is beaten, skipped or replaced, so the
+    -- ended rows are the ladder the player climbed. User state, not a cache: never cleared.
+    CREATE TABLE IF NOT EXISTS rival_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      car_type TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL,
+      driver_name TEXT,
+      target_time REAL NOT NULL,
+      start_time REAL NOT NULL,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      set_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      beaten_time REAL,
+      beaten_session_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rival_targets_scope ON rival_targets(layout_key, car_class, car_type, status);
+
     CREATE TABLE IF NOT EXISTS replay_metadata (
       filename TEXT PRIMARY KEY,
       file_path TEXT NOT NULL,
