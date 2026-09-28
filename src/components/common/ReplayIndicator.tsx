@@ -1,5 +1,5 @@
 import React from 'react';
-import { Video, Zap, CloudRain } from 'lucide-react';
+import { Video, Zap } from 'lucide-react';
 
 export interface ReplayIndicatorProps {
   replay?: {
@@ -33,21 +33,14 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
 
   const isDuckDb = Boolean(hasDuckDbTelemetry || replay.hasDuckDbTelemetry);
   const activeDuckFilename = duckdbFilename || replay.duckdbFilename;
-  const isWet = Boolean(replay.hasRain || replay.weatherCondition === 'Wet' || replay.weatherCondition === 'Dynamic Weather');
 
   const indicatorClassName = isDuckDb
     ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/40 shrink-0 ${className}`
-    : isWet
-    ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/40 shrink-0 ${className}`
     : `inline-flex p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20 shrink-0 ${className}`;
 
-  const rainSuffix = isWet
-    ? ` | 🌧️ ${replay.weatherCondition || 'Wet'} (Rain: ${replay.maxRainIntensity ?? 'Yes'})`
-    : '';
-
   const title = isDuckDb
-    ? `⚡ 100Hz DuckDB Telemetry & Replay: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}${rainSuffix}`
-    : `Replay VCR: ${replay.name}${rainSuffix}`;
+    ? `⚡ 100Hz DuckDB Telemetry & Replay: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}`
+    : `Replay VCR: ${replay.name}`;
 
   if (onClick) {
     return (
@@ -57,7 +50,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
           event.stopPropagation();
           onClick();
         }}
-        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-amber-500/25' : isWet ? 'hover:bg-blue-500/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
+        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-amber-500/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
         title={`${title} - Open telemetry`}
         aria-label="Open replay telemetry"
       >
@@ -69,7 +62,6 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
         ) : (
           <Video className="w-4 h-4" />
         )}
-        {isWet && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
       </button>
     );
   }
@@ -84,7 +76,6 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
       ) : (
         <Video className="w-4 h-4" />
       )}
-      {isWet && <CloudRain className="w-3.5 h-3.5 text-blue-400" />}
     </span>
   );
 };
