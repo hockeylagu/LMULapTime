@@ -29,6 +29,7 @@ This document provides architectural standards, domain rules, coding conventions
 - **Synchronized Multi-Channel Telemetry Studio**: Full spectrum of telemetry traces including speed, lap delta, pedals (throttle/brake with ABS/TC indicators), steering angle with real-time understeer/oversteer detection overlay, G-forces (Lat/Lon/Total Accel), yaw rate, body slip angle, 4-corner damper deflection, 4-wheel rotational speeds & slip, dynamic tire pressures & temps, stint tire wear degradation, 4-corner brake rotor thermals, and Hypercar hybrid powertrain (SoC, Virtual Energy, Regen).
 - **G-G Traction Circle (Friction Diagram)**: Visualizes tire grip limits, combined braking/cornering forces, and traction envelopes.
 - **Community Benchmark Tracking**: Synchronizes alien reference targets from Google Sheets with automated diff calculation (new, updated, and deprecated targets with patch version tracking).
+- **Leaderboard & Rivals**: Ranks the real drivers met on each layout per car class (dry representative laps only, AI of offline sessions left out), and keeps a rival per board about 0.3 s ahead (or a ghost time) until it is beaten, with where the time is against it.
 - **Deterministic Coaching Engine**: Ranks driving technique deficits (braking points, trail braking release, throttle application, apex speeds) using deterministic evidence (`priority = estimatedTimeLoss * repeatability * confidence`).
 - **AI Race Engineer Reports**: Natural language coaching analysis and garage setup recommendations powered by Google Gemini (`@google/genai`).
 
@@ -76,6 +77,7 @@ LMULapTime/
 │   │   ├── dbAiReportStore.ts      # AI race engineer coaching reports
 │   │   ├── dbMetadataStore.ts      # Key-value system cache metadata & version tags
 │   │   ├── dbReferenceLaptimeStore.ts # Community alien benchmark targets cache
+│   │   ├── dbRivalStore.ts         # The player's rival per board (layout, class, car): user state, never cleared
 │   │   ├── replay/                 # Replay cache stores (one row per driver lap, plus replay-wide facts)
 │   │   │   ├── dbRacePositionStore.ts # Per-replay race positions index (built from the stored laps)
 │   │   │   ├── dbReplayIdentity.ts # Replay file fingerprinting, versioning & collision protection
@@ -115,6 +117,7 @@ LMULapTime/
 │   │   └── trajectoryDownsampler.ts # Feature-preserving trajectory downsampling
 │   ├── routes/                     # Domain-scoped Express routers
 │   │   ├── aiRoutes.ts             # /api/ai/* endpoints
+│   │   ├── leaderboardRoutes.ts    # /api/leaderboard/* and /api/rivals/* endpoints
 │   │   ├── referenceRoutes.ts      # /api/reference-laptimes/* endpoints
 │   │   ├── replayRoutes.ts         # /api/replays/* endpoints
 │   │   ├── sessionRoutes.ts        # /api/sessions/* endpoints
@@ -138,6 +141,7 @@ LMULapTime/
 │   │   ├── lapLineCut.ts           # Timing loop boundary interpolation & channel preservation
 │   │   ├── serverTrackSync.ts      # Disk to DB track geometry sync
 │   │   ├── stationGlitches.ts      # Lap distance glitch repair & monotonic enforcement
+│   │   ├── trackOutline.ts         # Small SVG outline of each layout for the track ribbon
 │   │   └── trackProjection.ts      # Local coordinate transform utilities
 │   └── index.ts                    # Express application entry point & router mounting
 ├── shared/                         # Pure domain logic & shared TypeScript types
@@ -148,16 +152,22 @@ LMULapTime/
 │       ├── formatters.ts           # Lap time formatters & math
 │       ├── lapComparison.ts        # Delta interpolation, sector calculations & consistency
 │       ├── lapConditions.ts        # Wet tyres / rain per lap (dry is the default)
+│       ├── leaderboard.ts          # Real drivers met on each layout, ranked per class on their dry representative laps
 │       ├── paceCategory.ts         # Pace percentages & vehicle class matching
+│       ├── rivals.ts               # Rival picking (about 0.3 s ahead, or a ghost time), beating & progress
 │       ├── trackSummaryUtils.ts    # Multi-session track aggregation helpers
 │       └── vehicleMapping.ts       # Car class categorization & model identification
 ├── public/tracks/                  # Mirrored track boundary JSON files for client map
 ├── src/                            # React 19 frontend
 │   ├── App.tsx                     # Root component, tabs, hash routing & global state
-│   ├── api/                        # The only place the client calls the server (fetchJson/postJson, replay & reference loaders)
+│   ├── api/                        # The only place the client calls the server (fetchJson/postJson, replay, reference & leaderboard loaders)
 │   ├── components/                 # Modular UI feature packages (<= 300 lines per file)
 │   │   ├── common/                 # Badges, modals, pills, grids, selectors
-│   │   ├── compare-laps/           # Lap-to-lap comparison studio & micro-sector tables
+│   │   ├── compare-laps/           # Leaderboard page: track ribbon, leaderboard, rival card & two-lap comparison
+│   │   │   ├── debrief/            # Where one lap loses time to another: sector gaps & corner debrief
+│   │   │   ├── leaderboard/        # Leaderboard rows, standing header & board actions
+│   │   │   ├── ribbon/             # Track ribbon of the layouts driven, with class pills
+│   │   │   └── rivals/             # Rival card, ladder of rivals beaten & gap trend
 │   │   ├── dashboard/              # Cockpit hero, driving overview, sparklines, car/track summaries
 │   │   ├── navbar/                 # Navigation header & background scan badge
 │   │   ├── replay/                 # Replay studio, track map & telemetry strip
@@ -257,7 +267,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
 - WAL mode is mandatory: `PRAGMA journal_mode = WAL;`.
-- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`), with the replay cache stores in `server/core/replay/` (`dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReplaySync.ts`, `dbRacePositionStore.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
+- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`, `dbRivalStore.ts`), with the replay cache stores in `server/core/replay/` (`dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReplaySync.ts`, `dbRacePositionStore.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
 - Use columnar tables for high-frequency telemetry data to maintain sub-millisecond query performance and compact storage.
 - Always use parameterized queries (`stmt.run(arg1, arg2)`) to guard against SQL injection and handle player/track names containing special characters or apostrophes.
 - Wrap bulk operations (e.g., scanning hundreds of XML files or saving hundreds of benchmark rows) in transactions: `db.transaction(...)`.
@@ -282,7 +292,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Responsive & clean: Provide clear empty states, error fallbacks, and skeleton/loading indicators for async operations.
 
 ### API Requests (`src/api/`)
-- Components and hooks call the server through `src/api/apiClient.ts` (`fetchJson`, `postJson`) or a domain loader built on it (`replayApi.ts`, `referenceApi.ts`), never raw `fetch`.
+- Components and hooks call the server through `src/api/apiClient.ts` (`fetchJson`, `postJson`) or a domain loader built on it (`replayApi.ts`, `referenceApi.ts`, `leaderboardApi.ts`), never raw `fetch`.
 - Paths are relative (`/api/...`); never hardcode the server origin or port.
 - A non-2xx response rejects with `ApiError` (the server's `{ error }` message, status, body): show the message to the user rather than treating the failure as empty data. Ignore `isAbortError` rejections.
 - Data that only changes on an explicit refresh (the benchmark table) is shared through its loader and invalidated after the refresh.
