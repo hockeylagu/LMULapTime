@@ -52,10 +52,7 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
           ) : null}
         </div>
       </div>
-      <div className="mt-2 text-xs font-bold text-white truncate">
-        {layout.outlinePath && layout.flagEmoji ? `${layout.flagEmoji} ` : ''}
-        {layout.trackName}
-      </div>
+      <div className="mt-2 text-xs font-bold text-white truncate">{layout.circuitName}</div>
       <div className="text-[11px] text-lmu-muted truncate">{layout.layoutName}</div>
       {latest && (
         <div className="mt-1.5 flex items-center justify-between text-[11px]">

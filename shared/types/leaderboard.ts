@@ -75,6 +75,8 @@ export interface LeaderboardLayout {
   layoutName: string;
   /** The track name the rest of the app uses for this layout (sessions, benchmarks). */
   trackName: string;
+  /** The circuit's name, without the layout (layoutName says which one). */
+  circuitName: string;
   countryCode: string;
   flagEmoji: string;
   lastDriven: number;

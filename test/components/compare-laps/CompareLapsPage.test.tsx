@@ -8,6 +8,7 @@ const layout = (layoutKey: string, trackName: string, lastDriven: number, classe
   layoutKey,
   layoutName: `${trackName} layout`,
   trackName,
+  circuitName: trackName.replace(/ \(.*\)$/, ''),
   countryCode: 'IT',
   flagEmoji: '🇮🇹',
   lastDriven,
@@ -63,7 +64,9 @@ describe('CompareLapsPage', () => {
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
     expect(urlParams().get('carClass')).toBe('LMH');
     const cards = screen.getAllByRole('button', { pressed: true });
-    expect(cards[0]).toHaveTextContent('Daytona International Speedway (Road Course)');
+    // The circuit, then the layout: never the layout twice, nor a flag.
+    expect(cards[0]).toHaveTextContent('Daytona International SpeedwayDaytona International Speedway (Road Course) layout');
+    expect(cards[0]).not.toHaveTextContent('🇮🇹');
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Leaderboard · Hypercar/ })).toBeInTheDocument();
