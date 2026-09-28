@@ -3,6 +3,7 @@ import { Flag, ArrowLeftRight } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { CompareLapCard } from './CompareLapCard';
+import { MAX_COMPARED_LAPS } from './useCompareLapsData.js';
 
 export interface CompareLapsDeckProps {
   selectedLaps: ComparableLap[];
@@ -54,7 +55,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Flag className="w-4 h-4 text-lmu-accent" />
-            Side-by-Side Lap Telemetry Comparison ({selectedLaps.length}/4)
+            Side-by-Side Lap Telemetry Comparison ({selectedLaps.length}/{MAX_COMPARED_LAPS})
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
             Set any lap as the <strong className="text-lmu-accent">Baseline</strong> for instant sector and velocity delta calculations.
@@ -85,7 +86,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
       </div>
 
       {/* Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {selectedLaps.map((lap, index) => {
           const isBaseline = lap.id === baselineLap?.id;
           const deltas = baselineLap ? computeLapDeltas(baselineLap, lap) : null;
