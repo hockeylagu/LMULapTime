@@ -14,10 +14,16 @@ export interface TrackRibbonProps {
 export const TrackRibbon: React.FC<TrackRibbonProps> = ({ layouts, selectedLayoutKey, loading, error, onSelect }) => {
   const stripRef = useRef<HTMLDivElement>(null);
 
-  // Keep the selected card in view when the selection comes from the URL.
+  // Keep the selected card in view when the selection comes from the URL. Only the strip scrolls:
+  // scrollIntoView would scroll the page too.
   useEffect(() => {
-    const card = stripRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    card?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    const strip = stripRef.current;
+    const card = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!strip || !card) return;
+    const left = card.offsetLeft; // the strip is the offset parent (relative)
+    if (left < strip.scrollLeft || left + card.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = Math.max(0, left - 8);
+    }
   }, [selectedLayoutKey, layouts]);
 
   if (error) {
@@ -51,7 +57,7 @@ export const TrackRibbon: React.FC<TrackRibbonProps> = ({ layouts, selectedLayou
       ref={stripRef}
       role="toolbar"
       aria-label="Your tracks"
-      className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1"
+      className="relative flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1"
     >
       {layouts.map((layout) => (
         <TrackRibbonCard
