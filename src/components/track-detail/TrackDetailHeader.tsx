@@ -58,7 +58,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
           type="button"
           onClick={() => {
             const carClass = selectedClass !== 'All' ? selectedClass : 'LMGT3';
-            navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
+            navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
           }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-accent transition-all"
           title="Compare laps on this track"

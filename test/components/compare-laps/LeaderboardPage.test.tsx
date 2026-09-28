@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { CompareLapsPage, findLayoutForTrack } from '../../../src/components/compare-laps/index.js';
+import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/compare-laps/index.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import { board } from './leaderboard/leaderboardFixtures.js';
 
@@ -36,9 +36,9 @@ const EMPTY_LAPS = {
 
 const urlParams = () => new URLSearchParams(window.location.hash.split('?')[1] ?? '');
 
-describe('CompareLapsPage', () => {
+describe('LeaderboardPage', () => {
   beforeEach(() => {
-    window.location.hash = '#/compare';
+    window.location.hash = '#/leaderboard';
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.startsWith('/api/leaderboard/layouts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(LAYOUTS) });
       if (url.startsWith('/api/compare/laps')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_LAPS) });
@@ -59,7 +59,7 @@ describe('CompareLapsPage', () => {
   });
 
   it('opens on the layout driven last, in the class driven last there', async () => {
-    render(<CompareLapsPage sessions={[]} />);
+    render(<LeaderboardPage sessions={[]} />);
 
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
     expect(urlParams().get('carClass')).toBe('LMH');
@@ -74,8 +74,8 @@ describe('CompareLapsPage', () => {
   });
 
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
-    window.location.hash = '#/compare?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3&sessionId=s1&lapNum=4';
-    render(<CompareLapsPage sessions={[]} />);
+    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3&sessionId=s1&lapNum=4';
+    render(<LeaderboardPage sessions={[]} />);
 
     const daytona = await screen.findByRole('button', { name: /Daytona International Speedway \(Road Course\)/ });
     expect(screen.getByRole('button', { name: /Monza layout/ })).toHaveAttribute('aria-pressed', 'true');
@@ -99,7 +99,7 @@ describe('CompareLapsPage', () => {
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
         : defaultFetch(url);
     });
-    render(<CompareLapsPage sessions={[]} />);
+    render(<LeaderboardPage sessions={[]} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
     expect(await screen.findByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument();
@@ -124,7 +124,7 @@ describe('CompareLapsPage', () => {
         : defaultFetch(url);
     });
     const onSelectSession = vi.fn();
-    render(<CompareLapsPage sessions={[]} onSelectSession={onSelectSession} />);
+    render(<LeaderboardPage sessions={[]} onSelectSession={onSelectSession} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open the session of your best lap' }));
     expect(onSelectSession).toHaveBeenCalledWith('s-Me');
@@ -145,7 +145,7 @@ describe('CompareLapsPage', () => {
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
         : defaultFetch(url);
     });
-    render(<CompareLapsPage sessions={[]} />);
+    render(<LeaderboardPage sessions={[]} />);
 
     fireEvent.click(await screen.findByRole('button', { name: "Pick Driver 1's lap to compare" }));
     fireEvent.click(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" }));
@@ -171,7 +171,7 @@ describe('CompareLapsPage', () => {
       if (url.startsWith('/api/rivals')) return Promise.resolve({ ok: true, json: () => Promise.resolve(rivalStatus) } as Response);
       return defaultFetch(url, init);
     });
-    render(<CompareLapsPage sessions={[]} />);
+    render(<LeaderboardPage sessions={[]} />);
 
     expect(await screen.findByRole('region', { name: 'Your rival' })).toHaveTextContent('Driver 4');
     fireEvent.click(screen.getByRole('button', { name: /Another rival/ }));
@@ -182,7 +182,7 @@ describe('CompareLapsPage', () => {
 
   it('says why when the tracks cannot be loaded', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({ error: 'Database is locked' }) });
-    render(<CompareLapsPage sessions={[]} />);
+    render(<LeaderboardPage sessions={[]} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Database is locked');
   });
 });

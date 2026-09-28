@@ -43,7 +43,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         onClick={() => {
           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
           const carClass = selectedDriver?.carClass || 'LMGT3';
-          navigate(`/compare?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+          navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
             carClass
           )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`);
         }}

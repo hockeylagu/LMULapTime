@@ -7,7 +7,7 @@ import {
   SessionDetail,
   TrackDetail,
   Settings,
-  CompareLapsPage,
+  LeaderboardPage,
   ReplayInspectorPage,
   ReferenceLaptimeUpdateToast,
   LoadingState,
@@ -66,15 +66,21 @@ function DashboardRoute({ sessions, onSelectSession, selectedCarClass, setSelect
   );
 }
 
-interface CompareRouteProps {
+interface LeaderboardRouteProps {
   sessions: DetailedSession[];
   onSelectSession: (id: string) => void;
 }
 
-function CompareRoute({ sessions, onSelectSession }: CompareRouteProps) {
+/** The page was Compare Laps: its links still open the leaderboard, on the same track and laps. */
+function CompareRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/leaderboard', search }} replace />;
+}
+
+function LeaderboardRoute({ sessions, onSelectSession }: LeaderboardRouteProps) {
   const [searchParams] = useSearchParams();
   return (
-    <CompareLapsPage
+    <LeaderboardPage
       sessions={sessions}
       onSelectSession={onSelectSession}
       initialTrack={searchParams.get('track') || undefined}
@@ -294,12 +300,13 @@ export default function App() {
                 setSelectedCarClass={setSelectedCarClass}
               />
             } />
-            <Route path="/compare" element={
-              <CompareRoute
+            <Route path="/leaderboard" element={
+              <LeaderboardRoute
                 sessions={sessions}
                 onSelectSession={handleSelectSession}
               />
             } />
+            <Route path="/compare" element={<CompareRedirect />} />
             <Route path="/settings" element={
               <Settings
                 status={status}

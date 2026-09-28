@@ -42,7 +42,7 @@ This document provides architectural standards, domain rules, coding conventions
 - **Tailwind CSS v4** (`@tailwindcss/postcss` with dark motorsport UI theme)
 - **Recharts** (Pace progression, multi-metric telemetry charts, speed/delta traces, corner speed graphs)
 - **Lucide React** (Iconography)
-- **Routing**: Client-side hash routing (`#session/:id`, `#track/:trackName`, `#compare`, `#settings`, etc.) implemented in `src/utils/urlParams.ts`.
+- **Routing**: Client-side hash routing (`#session/:id`, `#track/:trackName`, `#leaderboard`, `#settings`, etc.) implemented in `src/utils/urlParams.ts`.
 
 ### Backend
 - **Node.js** + **Express 5** (`server/index.ts`) running on port `3001` (dev proxy configured in `vite.config.ts`)
