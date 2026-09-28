@@ -144,6 +144,8 @@ export function useCompareLapsData({
       track: selectedTrack,
       carClass: selectedCarClass,
       playerOnly: String(playerOnly),
+      // The compare page only ever shows real people: offline sessions' other drivers are AI.
+      humansOnly: 'true',
     });
     fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then((data) => {

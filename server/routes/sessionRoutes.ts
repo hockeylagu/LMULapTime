@@ -135,6 +135,7 @@ export function createSessionRouter(context: ServerContext): Router {
       driverName: queryString(req.query.driver),
       sessionId: queryString(req.query.sessionId),
       playerOnly: req.query.playerOnly !== 'false',
+      humansOnly: req.query.humansOnly === 'true',
     });
 
     res.json({

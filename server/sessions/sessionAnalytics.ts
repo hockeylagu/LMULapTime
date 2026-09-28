@@ -17,6 +17,7 @@ import {
   selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
 import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
+import { isHumanDriver } from '../../shared/domain/leaderboard.js';
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
   const candidates = selectCleanLapCandidates(laps);
@@ -179,6 +180,8 @@ export function extractComparableLaps(
     driverName?: string;
     sessionId?: string;
     playerOnly?: boolean;
+    /** Leaves out the AI drivers of offline sessions, for the track records too. */
+    humansOnly?: boolean;
   }
 ): ComparableLapsResult {
   const normTrack = (filters.trackName || '').toLowerCase().trim();
@@ -206,6 +209,7 @@ export function extractComparableLaps(
 
     // Check all drivers in matching sessions to determine overall track record without driver restriction
     (s.drivers || []).forEach(d => {
+      if (filters.humansOnly && !isHumanDriver(s, d)) return;
       if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
         return;
       }
@@ -240,6 +244,7 @@ export function extractComparableLaps(
       : s.drivers;
 
     driversToProcess.forEach(d => {
+      if (filters.humansOnly && !isHumanDriver(s, d)) return;
       if (targetDriver && targetDriver !== 'all' && !d.name.toLowerCase().includes(targetDriver)) {
         return;
       }
