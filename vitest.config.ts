@@ -11,17 +11,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/**', 'server/**', 'shared/**'],
+      include: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'shared/**/*.ts'],
       exclude: [
         'server/test_parser.ts',
         'src/main.tsx',
-        'src/vite-env.d.ts',
         '**/*.d.ts',
-        '**/*.json',
-        '**/*.css',
-        '**/*.html',
-        '**/*.db',
-        '**/*.db-*',
       ],
       thresholds: {
         // Just under the measured coverage (2026-09-27: 93% lines, 91% statements, 92% functions, 81% branches).
