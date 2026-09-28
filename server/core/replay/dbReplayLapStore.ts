@@ -173,9 +173,10 @@ export function renameReplayFacts(db: DatabaseType, filename: string, newName: s
 /**
  * Writes the facts of a new decode of one driver, in the transaction that stores its lap rows: the
  * driver's lap facts, and the replay-wide facts when none are stored at this parser version yet
- * (every driver's decode holds the same replay-wide arrays).
+ * (every driver's decode holds the same replay-wide arrays). Returns true when the replay-wide facts
+ * were written: the sessions linked to the replay then get its conditions.
  */
-export function storeDecodedReplayFacts(db: DatabaseType, filename: string, driverSlotKey: number, trajectory: ReplayTrajectoryData, sourceVersion: string): void {
+export function storeDecodedReplayFacts(db: DatabaseType, filename: string, driverSlotKey: number, trajectory: ReplayTrajectoryData, sourceVersion: string): boolean {
   const perLap = trajectory.allLapsData && trajectory.allLapsData.length > 0 ? trajectory.allLapsData : [trajectory];
   const spans = new Map<number, LapSpan>();
   const storedLaps: number[] = [];
@@ -199,5 +200,7 @@ export function storeDecodedReplayFacts(db: DatabaseType, filename: string, driv
   if (getReplayFactsVersion(db, filename) !== sourceVersion) {
     const lastLapEnd = Math.max(0, ...[...spans.values()].map(s => s.endSec));
     replaceReplayWideFacts(db, filename, replayWideFactsFrom(trajectory, lastLapEnd), sourceVersion);
+    return true;
   }
+  return false;
 }

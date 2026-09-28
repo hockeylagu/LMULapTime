@@ -1,6 +1,7 @@
-import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason } from '../types/index.js';
+import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason, LapConditions } from '../types/index.js';
 import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
+import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
 
 export interface LapSelectionInput {
   lapTime: number | null;
@@ -8,6 +9,7 @@ export interface LapSelectionInput {
   isPitStop?: boolean;
   isOutLap?: boolean;
   nonRepresentativeReason?: NonRepresentativeReason;
+  conditions?: LapConditions;
   lapNum?: number;
   s1?: number | null;
   s2?: number | null;
@@ -322,35 +324,83 @@ export function computeTopNLapAverage(
   return parseFloat((sum / topSlice.length).toFixed(3));
 }
 
+/** A condition group needs this many clean laps to have a spread of its own. */
+const MIN_LAPS_PER_CONDITION = 3;
+
+export interface ConsistencyRating {
+  consistencyScore: number | null;
+  avgLapTime: number | null;
+  stdDev: number | null;
+  sampleCount: number;
+  /** Clean laps per condition, only when the session mixes dry and wet laps. */
+  conditionGroups?: Array<{ group: LapConditionGroup; laps: number }>;
+}
+
+/** Sum of squared deviations from each lap group's own mean, and the laps and time it covers. */
+function spreadWithinGroups(groups: number[][]): { squares: number; count: number; total: number } {
+  let squares = 0;
+  let count = 0;
+  let total = 0;
+  for (const times of groups) {
+    const mean = times.reduce((acc, t) => acc + t, 0) / times.length;
+    for (const t of times) {
+      squares += (t - mean) ** 2;
+      count++;
+      total += t;
+    }
+  }
+  return { squares, count, total };
+}
+
 /**
  * Computes consistency rating (%) and standard deviation across clean flying laps.
  * Excludes pit stop laps (in-laps) and out-laps (laps immediately following a pit stop).
+ *
+ * Consistency is the driver's repeatability, so a change of conditions is not held against it:
+ * when dry and wet laps are mixed, each group with MIN_LAPS_PER_CONDITION laps is measured around
+ * its own mean and the spreads are combined; without such a group, the largest group (dry on a tie)
+ * is measured alone. The average stays the average of every clean lap.
  */
-export function computeConsistencyRating(
-  laps: LapSelectionInput[]
-): { consistencyScore: number | null; avgLapTime: number | null; stdDev: number | null; sampleCount: number } {
+export function computeConsistencyRating(laps: LapSelectionInput[]): ConsistencyRating {
   const candidates = selectCleanLapCandidates(laps);
 
   if (candidates.length === 0) {
     return { consistencyScore: null, avgLapTime: null, stdDev: null, sampleCount: 0 };
   }
 
-  const sum = candidates.reduce((acc, l) => acc + (l.lapTime || 0), 0);
-  const avg = sum / candidates.length;
+  const times = candidates.map((l) => l.lapTime || 0);
+  const avg = times.reduce((acc, t) => acc + t, 0) / times.length;
+  const avgLapTime = parseFloat(avg.toFixed(3));
 
-  if (candidates.length <= 1) {
-    return { consistencyScore: 100, avgLapTime: parseFloat(avg.toFixed(3)), stdDev: 0, sampleCount: candidates.length };
+  const byGroup = new Map<LapConditionGroup, number[]>();
+  candidates.forEach((lap, index) => {
+    const group = lapConditionGroup(lap);
+    byGroup.set(group, [...(byGroup.get(group) ?? []), times[index]]);
+  });
+  const conditionGroups = byGroup.size > 1
+    ? [...byGroup].map(([group, groupTimes]) => ({ group, laps: groupTimes.length }))
+    : undefined;
+
+  let measured = [...byGroup.values()].filter((groupTimes) => byGroup.size === 1 || groupTimes.length >= MIN_LAPS_PER_CONDITION);
+  if (measured.length === 0) {
+    const largest = [...byGroup].sort((a, b) => b[1].length - a[1].length || (a[0] === 'dry' ? -1 : 1))[0][1];
+    measured = [largest];
+  }
+  const { squares, count, total } = spreadWithinGroups(measured);
+
+  if (count <= 1) {
+    return { consistencyScore: 100, avgLapTime, stdDev: 0, sampleCount: candidates.length, ...(conditionGroups ? { conditionGroups } : {}) };
   }
 
-  const variance = candidates.reduce((acc, l) => acc + Math.pow((l.lapTime || 0) - avg, 2), 0) / candidates.length;
-  const stdDev = Math.sqrt(variance);
-  const score = Math.max(0, Math.min(100, (1 - stdDev / avg) * 100));
+  const stdDev = Math.sqrt(squares / count);
+  const score = Math.max(0, Math.min(100, (1 - stdDev / (total / count)) * 100));
 
   return {
     consistencyScore: parseFloat(score.toFixed(1)),
-    avgLapTime: parseFloat(avg.toFixed(3)),
+    avgLapTime,
     stdDev: parseFloat(stdDev.toFixed(3)),
     sampleCount: candidates.length,
+    ...(conditionGroups ? { conditionGroups } : {}),
   };
 }
 
