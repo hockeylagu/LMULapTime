@@ -161,7 +161,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
               {sortHeader('s2', 'Sector 2', 'text-right')}
               {sortHeader('s3', 'Sector 3', 'text-right')}
               {sortHeader('topSpeed', 'Top Speed', 'text-right')}
-              <th className="px-3 py-3 text-center">Tire Compound</th>
+              <th className="px-3 py-3 text-center">Tire</th>
               {hasTireWearData && <th className="px-3 py-3 text-center">Tire Wear</th>}
               {hasFuelData && (
                 <th className="px-3 py-3 text-center">{hasVirtualEnergyData ? 'Fuel & VE' : 'Fuel'}</th>

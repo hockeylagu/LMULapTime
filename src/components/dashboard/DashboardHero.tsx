@@ -57,18 +57,12 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-sky-600/10 border border-sky-400/30 flex items-center justify-center text-sky-400 shadow-inner">
-            <Activity className="w-5 h-5 animate-pulse" />
+            <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-extrabold text-white tracking-tight">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-emerald-400">{driverName}</span>
-              </h2>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                Active Stint
-              </span>
-            </div>
+            <h2 className="text-lg font-extrabold text-white tracking-tight">
+              Welcome back, <span className="text-sky-400">{driverName}</span>
+            </h2>
             <p className="text-xs text-lmu-muted">Here is your latest session telemetry and driving momentum.</p>
           </div>
         </div>
