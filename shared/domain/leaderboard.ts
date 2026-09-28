@@ -35,6 +35,11 @@ const isPlayerDriver = (session: DetailedSession, driver: DriverData) =>
 const isOnlineSession = (session: DetailedSession) =>
   (session.settings?.modeSetting ?? '').trim().toLowerCase() === 'multiplayer';
 
+/** A real person: the player, or anyone in an online session. Other drivers offline are AI. */
+export function isHumanDriver(session: DetailedSession, driver: DriverData): boolean {
+  return isOnlineSession(session) || isPlayerDriver(session, driver);
+}
+
 /** Laps run on wet or intermediate tyres: another race than the dry leaderboard. */
 export function isWetTyreLap(lap: Pick<LapData, 'fCompound' | 'rCompound'>): boolean {
   return /wet|inter/i.test(`${lap.fCompound ?? ''} ${lap.rCompound ?? ''}`);
@@ -95,10 +100,9 @@ function forEachRankedDriver(
   visit: (session: DetailedSession, driver: DriverData, layoutKey: string, carClass: string, laps: LapData[]) => void
 ): void {
   for (const session of sessions) {
-    const online = isOnlineSession(session);
     let layoutKey: string | null = null;
     for (const driver of session.drivers ?? []) {
-      if (!online && !isPlayerDriver(session, driver)) continue;
+      if (!isHumanDriver(session, driver)) continue;
       const laps = selectLeaderboardLaps(driver.laps ?? []);
       if (laps.length === 0) continue;
       layoutKey ??= sessionLayoutKey(session);

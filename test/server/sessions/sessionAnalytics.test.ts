@@ -6,6 +6,7 @@ import {
   toComparableLap,
 } from '../../../server/sessions/sessionAnalytics.js';
 import { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
+import { driver, lap, session } from '../../domain/leaderboardFixtures.js';
 
 describe('sessionAnalytics server module', () => {
   describe('computeAverageLapTime', () => {
@@ -468,5 +469,21 @@ describe('sessionAnalytics server module', () => {
       expect(projected.isOutLap).toBe(false);
       expect(projected.isInferred).toBe(false);
     });
+  });
+});
+
+describe('extractComparableLaps humansOnly', () => {
+  const sessions = [
+    session('offline', [driver('Me', [lap(2, 108)], { isPlayer: true }), driver('AI Bot', [lap(2, 100)])], { online: false }),
+    session('online', [driver('Human', [lap(2, 107)])]),
+  ];
+
+  it('leaves the AI drivers of offline sessions out of the laps and the track record', () => {
+    const humans = extractComparableLaps(sessions, { trackName: 'monza_gp', playerOnly: false, humansOnly: true });
+    expect([...new Set(humans.laps.map((l) => l.driverName))].sort()).toEqual(['Human', 'Me']);
+    expect(humans.overallTrackBestLap?.driverName).toBe('Human');
+
+    const everyone = extractComparableLaps(sessions, { trackName: 'monza_gp', playerOnly: false });
+    expect(everyone.overallTrackBestLap?.driverName).toBe('AI Bot');
   });
 });
