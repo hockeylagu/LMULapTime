@@ -6,7 +6,7 @@ import {
 import { LapData, NonRepresentativeReason } from '../../../../shared/types/index.js';
 import { resolveLapStatus } from '../../common/lapStatus.js';
 import { getWorstTrackLimitSeverity, getTrackLimitBadgeClasses } from '../../../utils/trackLimits.js';
-import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
+import { NON_REPRESENTATIVE_LABELS, describeNonRepresentative } from '../../../utils/lapTrafficText.js';
 import { CONDITIONS_NOTE, describeRain } from './lapDetailSections.js';
 
 export interface SessionLapStatusBadgeProps {
@@ -97,7 +97,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       {reason && (
         <StatusIcon icon={REASON_ICONS[reason]} label={NON_REPRESENTATIVE_LABELS[reason].label}
           className={`${badge} bg-amber-500/15 text-amber-300 border-amber-500/40`}
-          title={`${NON_REPRESENTATIVE_LABELS[reason].title}: left out of the average and consistency`} />
+          title={`${describeNonRepresentative(reason, l.traffic)}: left out of the average and consistency`} />
       )}
       {Boolean(l.incidentCount) && (
         <StatusIcon icon={ShieldAlert} label="Incidents" count={l.incidentCount}

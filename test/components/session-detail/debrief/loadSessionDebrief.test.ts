@@ -76,7 +76,7 @@ describe('loadSessionDebrief', () => {
 
     const debrief = await loadSessionDebrief(session, inTraffic);
 
-    expect(debrief.caveats).toContain('Your lap was run in traffic (Passed Rui Paiva (GT3)): a tow or a pass changes the numbers.');
+    expect(debrief.caveats).toContain('Your lap was run in traffic (Other classes: passed Rui Paiva (GT3)): a tow or a pass changes the numbers.');
     expect(debrief.lapsTimed).toBe(2);
   });
 

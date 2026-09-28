@@ -75,6 +75,17 @@ describe('annotateLapTraffic', () => {
     expect(lap(me, 3)?.following).toBe(false);
   });
 
+  it('marks a lap spent with a car within a second behind at both ends as pressured', () => {
+    const me = driver('Me', 'Hyper', [100, 200, 300, 400]);
+    const behind = driver('Behind', 'Hyper', [100.5, 200.6, 302, 402]);
+
+    annotateLapTraffic([me, behind]);
+
+    expect(lap(me, 1)?.pressured).toBe(true);
+    expect(hadTraffic(lap(me, 1))).toBe(true);
+    expect(lap(me, 2)?.pressured).toBe(false); // 0.6 s at the start, 2 s at the finish
+  });
+
   it('does not call a car on its way into, in or out of the pits an overtake', () => {
     // Each car is on the road ahead when one of Me's laps starts and crosses the line after it ends.
     const me = driver('Me', 'Hyper', [100, 200, 300, 400, 500]);
@@ -113,7 +124,7 @@ describe('annotateLapTraffic', () => {
     annotateLapTraffic([me]);
 
     expect(lap(me, 3)).toBeUndefined();
-    expect(lap(me, 1)).toEqual({ ahead: null, behind: null, following: false, passed: [], passedBy: [] });
+    expect(lap(me, 1)).toEqual({ ahead: null, behind: null, following: false, pressured: false, passed: [], passedBy: [] });
     expect(hadTraffic(lap(me, 1))).toBe(false);
   });
 });

@@ -132,11 +132,15 @@ export function annotateLapTraffic(drivers: TrafficDriver[]): void {
       }
       const ahead = nearestOnRoad(others, start, -1);
       const aheadAtFinish = nearestOnRoad(others, finish, -1);
+      const behind = nearestOnRoad(others, start, 1);
+      const behindAtFinish = nearestOnRoad(others, finish, 1);
       lap.traffic = {
         ahead,
-        behind: nearestOnRoad(others, start, 1),
+        behind,
         following: ahead !== null && ahead.gapSec <= FOLLOW_GAP_SEC
           && aheadAtFinish !== null && aheadAtFinish.gapSec <= FOLLOW_GAP_SEC,
+        pressured: behind !== null && behind.gapSec <= FOLLOW_GAP_SEC
+          && behindAtFinish !== null && behindAtFinish.gapSec <= FOLLOW_GAP_SEC,
         passed,
         passedBy,
       };
@@ -144,7 +148,7 @@ export function annotateLapTraffic(drivers: TrafficDriver[]): void {
   }
 }
 
-/** Whether a lap was spent overtaking, being overtaken or following another car. */
+/** Whether a lap was spent overtaking, being overtaken, following another car or with one right behind. */
 export function hadTraffic(traffic: LapTraffic | undefined): boolean {
-  return !!traffic && (traffic.following || traffic.passed.length > 0 || traffic.passedBy.length > 0);
+  return !!traffic && (traffic.following || traffic.pressured === true || traffic.passed.length > 0 || traffic.passedBy.length > 0);
 }
