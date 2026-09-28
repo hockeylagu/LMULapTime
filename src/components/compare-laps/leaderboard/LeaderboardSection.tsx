@@ -43,7 +43,10 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
 }) => {
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);
-  const rows = useMemo(() => (board ? buildLeaderboardRows(board, sort, !showAll) : []), [board, sort, showAll]);
+  const rows = useMemo(
+    () => (board ? buildLeaderboardRows(board, sort, !showAll, rivalName ?? null) : []),
+    [board, sort, showAll, rivalName]
+  );
   const sortHeader = (column: LeaderboardSort, label: string, title?: string) => (
     <th className="px-3 py-3 text-right" title={title} aria-sort={sort === column ? 'ascending' : undefined}>
       <button

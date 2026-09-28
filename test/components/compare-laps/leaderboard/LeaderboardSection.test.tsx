@@ -38,7 +38,7 @@ describe('LeaderboardSection', () => {
     expect(within(table).getByText('Me')).toBeInTheDocument();
     expect(within(table).getByRole('row', { name: /Alien pace, 100%/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /14 more drivers/ }));
+    fireEvent.click(screen.getByRole('button', { name: /19 more drivers/ }));
     expect(within(table).getByText('Driver 20')).toBeInTheDocument();
   });
 

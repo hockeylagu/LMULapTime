@@ -7,11 +7,10 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { Clock, Activity } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
@@ -34,7 +33,6 @@ export interface CompareSectorChartProps {
   comparedLaps: ComparableLap[];
   baselineLap: ComparableLap | null;
   chartData: CompareSectorChartDataItem[];
-  onCompareTelemetry?: () => void;
 }
 
 export interface CompareSectorTooltipProps {
@@ -130,39 +128,18 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
   comparedLaps,
   baselineLap,
   chartData,
-  onCompareTelemetry,
 }) => {
   if (selectedLaps.length <= 1 || !baselineLap) return null;
 
   return (
     <div className="pt-4 border-t border-lmu-border/60">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-        <div>
-          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-lmu-accent" />
-            Sector Telemetry Breakdown (Time Difference vs Baseline)
-          </h4>
-          <p className="text-[11px] text-lmu-muted mt-0.5">
-            Baseline Reference:{' '}
-            <strong className="text-lmu-gold">
-              {baselineLap.tag || `Lap ${baselineLap.lapNum || '-'}`}
-            </strong>{' '}
-            ({baselineLap.lapTimeString})
-          </p>
-        </div>
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-lmu-accent" />
+          Sector gaps
+        </h4>
 
         <div className="text-[11px] font-mono flex flex-wrap items-center gap-3">
-          {selectedLaps.length === 2 && onCompareTelemetry && (
-            <button
-              type="button"
-              onClick={onCompareTelemetry}
-              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/25 border border-emerald-400/40 cursor-pointer mr-1"
-              title="Compare full telemetry traces (Speed, Throttle, Brake, Delta Time, GPS) for these 2 laps"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              Compare Telemetry
-            </button>
-          )}
           <span className="text-emerald-400 font-semibold flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
             Negative = Faster
@@ -188,8 +165,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
               }
             />
             <Tooltip content={<CompareSectorTooltip chartData={chartData} selectedLaps={selectedLaps} baselineLap={baselineLap} />} />
-            <Legend wrapperStyle={{ paddingTop: 8, fontSize: 11 }} />
-            {comparedLaps.map((lap) => (
+            {comparedLaps.filter((lap) => lap.id !== baselineLap.id).map((lap) => (
               <Bar key={lap.id} dataKey={lap.id} name={lap.tag || `Lap ${lap.lapNum || '-'}`} radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, entryIndex) => {
                   const val = Number(entry[lap.id] || 0);

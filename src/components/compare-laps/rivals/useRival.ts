@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { RivalStatus } from '../../../../shared/types/leaderboard.js';
 import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
-import { LeaderboardRequest, loadRival, pinRival, skipRival } from '../../../api/leaderboardApi.js';
+import { LeaderboardRequest, loadRival, pinRival } from '../../../api/leaderboardApi.js';
 
 export interface RivalState {
   status: RivalStatus | null;
   loading: boolean;
   error: string | null;
-  /** Not this rival: the next one in reach. */
-  skip: () => void;
   /** Makes a driver ahead the rival. */
   pin: (driverName: string) => void;
 }
@@ -46,8 +44,7 @@ export function useRival(request: LeaderboardRequest | null): RivalState {
       .catch((err) => setError(apiErrorMessage(err, 'Your rival could not be changed.')));
   }, [layoutKey, carClass, carType]);
 
-  const skip = useCallback(() => act(skipRival), [act]);
   const pin = useCallback((driverName: string) => act((r) => pinRival(r, driverName)), [act]);
 
-  return { status, loading, error, skip, pin };
+  return { status, loading, error, pin };
 }

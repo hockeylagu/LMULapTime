@@ -25,11 +25,6 @@ export function loadRival(request: LeaderboardRequest, signal?: AbortSignal): Pr
   return fetchJson<RivalStatus>(`/api/rivals?${query.toString()}`, { signal });
 }
 
-/** Not this rival: the next one in reach takes its place. */
-export function skipRival(request: LeaderboardRequest): Promise<RivalStatus> {
-  return postJson<RivalStatus>('/api/rivals/skip', boardBody(request));
-}
-
 /** Makes a driver ahead the player's rival. */
 export function pinRival(request: LeaderboardRequest, driverName: string): Promise<RivalStatus> {
   return postJson<RivalStatus>('/api/rivals/pin', { ...boardBody(request), driverName });

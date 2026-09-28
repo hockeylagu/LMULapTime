@@ -74,7 +74,6 @@ describe('useCompareLapsData selection fallbacks', () => {
       expect(result.current.selectedLaps.map(lap => lap.id)).toContain('overall');
     });
     expect(result.current.chartData).toHaveLength(4);
-    expect(result.current.bestComparedS1).toBe(28);
   });
 
   it('updates comparison scope when the route query changes externally', async () => {

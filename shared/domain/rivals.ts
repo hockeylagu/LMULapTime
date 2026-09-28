@@ -4,7 +4,7 @@ import type { Leaderboard, LeaderboardEntry, RivalKind, RivalStatus, RivalTarget
  * The rival system: a small, attainable step at a time. The rival is the real driver ahead whose
  * best lap is closest to 0.3 s faster than the player's (0.1 s to 0.6 s), preferring drivers whose
  * lap has a replay, so the telemetry can show where the time is. When nobody is in that window, a
- * ghost time 0.2 s under the player's best stands in. A rival stays until it is beaten, skipped or
+ * ghost time 0.2 s under the player's best stands in. A rival stays until it is beaten or
  * replaced: the target does not move each time new laps arrive.
  *
  * The step is in seconds, not a share of the lap: the time is found in the corners, and a long lap
@@ -88,12 +88,11 @@ const asActive = (target: NewRivalTarget): RivalTarget => ({
 /**
  * Brings the stored rival up to date with the board: a driver target follows the rival's current
  * best; a target the player's best lap beats is ended as beaten; and when no target is active a
- * new one is picked, never one of the drivers the player skipped.
+ * new one is picked, never the driver just beaten.
  */
 export function resolveRival(
   board: Leaderboard,
   active: RivalTarget | null,
-  skippedDrivers: ReadonlySet<string>,
   now: number
 ): RivalResolution {
   const resolution: RivalResolution = { beaten: null, retimed: null, replaced: null, created: null, active };
@@ -127,7 +126,7 @@ export function resolveRival(
 
   if (!current) {
     const beatenDriver = resolution.beaten && active?.driverName ? [active.driverName] : [];
-    resolution.created = newTarget(board, new Set([...skippedDrivers, ...beatenDriver]), now);
+    resolution.created = newTarget(board, new Set(beatenDriver), now);
     current = resolution.created ? asActive(resolution.created) : null;
   }
   resolution.active = current;

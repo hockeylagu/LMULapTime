@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CompareLaps, telemetryPair } from '../../../src/components/compare-laps/index.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
 
@@ -76,7 +76,6 @@ describe('CompareLaps component', () => {
     ],
   };
 
-  const title = (count: number) => new RegExp(`Compare Laps \\(${count}/2\\)`, 'i');
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -93,7 +92,7 @@ describe('CompareLaps component', () => {
   it('opens on the personal best, in one card without the lap table or its filters', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
-    await waitFor(() => expect(screen.getByText(title(1))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
     expect(screen.getAllByRole('region', { name: 'Compare laps' })).toHaveLength(1);
     expect(screen.queryByText(/Available Laps/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /All Drivers/i })).not.toBeInTheDocument();
@@ -101,15 +100,65 @@ describe('CompareLaps component', () => {
 
   it('allows adding theoretical optimal and all-time track best laps on demand', async () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
-    await waitFor(() => expect(screen.getByText(title(1))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
 
     fireEvent.click(screen.getByRole('button', { name: /\+ Theoretical Best/i }));
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
     // Two laps are compared at most: the all-time best joins the newest pick, the theoretical best.
     fireEvent.click(screen.getByRole('button', { name: /\+ All-Time Best/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: /\+ Personal Best/i })).toBeInTheDocument());
-    expect(screen.getByText(title(2))).toBeInTheDocument();
+    expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2);
+  });
+
+  it('adds the rival lap from the presets, then hides the preset', async () => {
+    const rivalLap = {
+      ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]),
+      id: 'board_Rival_lap',
+      driverName: 'Rival',
+      isPlayer: false,
+    } as ComparableLap;
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" rivalLap={rivalLap} />);
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ Rival \(2:01\.000\)/ }));
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
+    expect(screen.queryByRole('button', { name: /\+ Rival/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Your rival')).toBeInTheDocument();
+  });
+
+  it('works out where the time is on its own when the page asks to analyse the pair', async () => {
+    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false } as ComparableLap;
+    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true } as ComparableLap;
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa"
+        initialCarClass="LMGT3"
+        compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
+      />
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('has no replay to compare with');
+  });
+
+  it('analyses the requested pair once: putting it back after removing a lap waits for the click', async () => {
+    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false } as ComparableLap;
+    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true } as ComparableLap;
+    render(
+      <CompareLaps
+        sessions={mockSessions}
+        initialTrack="Spa"
+        initialCarClass="LMGT3"
+        rivalLap={rivalLap}
+        compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
+      />
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('has no replay to compare with');
+
+    fireEvent.click(within(screen.getByTestId('compare-baseline')).getByTitle('Remove from comparison'));
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Rival/ }));
+    expect(await screen.findByRole('button', { name: "Where's the time?" })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('clears the comparison and says how to pick laps', async () => {
@@ -125,12 +174,12 @@ describe('CompareLaps component', () => {
     render(
       <CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
-    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Sim Driver — 2:02.500');
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Sim Driver.*2:02\.500/);
     expect(screen.getByTestId('lap-time-delta')).toHaveTextContent('-0.700s');
 
     fireEvent.click(screen.getByRole('button', { name: /Swap baseline/i }));
-    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Sim Driver — 2:01.800');
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Sim Driver.*2:01\.800/);
     expect(screen.getByTestId('lap-time-delta')).toHaveTextContent('+0.700s');
   });
 
@@ -141,7 +190,7 @@ describe('CompareLaps component', () => {
     await waitFor(() => {
       expect(screen.getAllByText('2:02.500').length).toBeGreaterThan(0);
       expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
-      expect(screen.getByText(title(2))).toBeInTheDocument();
+      expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2);
     });
 
     const removeButtons = screen.getAllByTitle('Remove from comparison');
@@ -149,12 +198,12 @@ describe('CompareLaps component', () => {
     fireEvent.click(removeButtons[1]);
 
     await waitFor(() => {
-      expect(screen.getByText(title(1))).toBeInTheDocument();
+      expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1);
       expect(screen.getByRole('button', { name: /\+ Personal Best \(2:01\.800\)/i })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /\+ Personal Best \(2:01\.800\)/i }));
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
   });
 
   it('restores the comparison session, driver, and lap as the active baseline', async () => {
@@ -171,8 +220,8 @@ describe('CompareLaps component', () => {
       />
     );
     await waitFor(() => {
-      expect(screen.getByText(title(2))).toBeInTheDocument();
-      expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Sim Driver — 2:01.800');
+      expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2);
+      expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Sim Driver.*2:01\.800/);
     });
   });
 
@@ -189,7 +238,7 @@ describe('CompareLaps component', () => {
     render(
       <CompareLaps sessions={sessionsWithReplay} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
     const compareTelemetryButtons = screen.getAllByRole('button', { name: /Compare Telemetry/i });
     expect(compareTelemetryButtons).toHaveLength(1);
@@ -213,7 +262,7 @@ describe('CompareLaps component', () => {
     render(
       <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
     fireEvent.click(screen.getByRole('button', { name: /Compare Telemetry/i }));
     await waitFor(() => {
@@ -231,7 +280,7 @@ describe('CompareLaps component', () => {
     render(
       <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
-    await waitFor(() => expect(screen.getByText(title(2))).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
     fireEvent.click(screen.getByRole('button', { name: /Compare Telemetry/i }));
     await waitFor(() => expect(window.location.hash).toContain('replayName=dyn_spa.vcr'));

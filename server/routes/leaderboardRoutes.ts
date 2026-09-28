@@ -37,7 +37,7 @@ export function createLeaderboardRouter(context: ServerContext): Router {
     const board = boardFor(query);
     const scope = scopeOf(board, query);
     const db = context.sessionDb;
-    const resolution = resolveRival(board, db.getActiveRival(scope), db.getSkippedRivalDrivers(scope), Date.now());
+    const resolution = resolveRival(board, db.getActiveRival(scope), Date.now());
     if (resolution.beaten || resolution.retimed || resolution.created) db.applyRivalResolution(scope, resolution);
     return describeRival(board, db.getActiveRival(scope), db.getBeatenRivals(scope), playerSessionBests(context.loadSessions(), query));
   };
@@ -68,15 +68,6 @@ export function createLeaderboardRouter(context: ServerContext): Router {
   router.get('/rivals', (req, res) => {
     const query = withBoardQuery(req.query, res);
     if (query) res.json(rivalStatus(query));
-  });
-
-  // Not this one: the next driver in the window takes its place (or a ghost time).
-  router.post('/rivals/skip', (req, res) => {
-    const query = withBoardQuery(req.body ?? {}, res);
-    if (!query) return;
-    const board = boardFor(query);
-    context.sessionDb.endActiveRival(scopeOf(board, query), 'skipped', Date.now());
-    res.json(rivalStatus(query));
   });
 
   // The player picks their rival: any driver ahead on the board.

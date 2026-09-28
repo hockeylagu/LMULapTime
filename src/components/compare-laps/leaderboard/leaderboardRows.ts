@@ -41,17 +41,27 @@ export function benchmarkBands(benchmark: ReferenceLaptimeEntry | null): Array<{
 }
 
 export const COMPACT_TOP = 10;
+/** The top kept when the player is this many places or more down the board. */
+export const COMPACT_TOP_FAR = 5;
+export const COMPACT_FAR_FROM_TOP = 25;
 export const COMPACT_AROUND_PLAYER = 5;
+export const COMPACT_AROUND_RIVAL = 2;
 /** Boards up to this many drivers are always shown whole. */
 export const COMPACT_THRESHOLD = 25;
 
 /**
  * The rows of the board in the chosen order. Drivers without a value for it (no race pace, a
  * missing sector) come last, unranked. On the best-lap order the benchmark bands sit between the
- * drivers, down to the slowest one. A compact board keeps the top ten and the drivers around the
- * player, and says how many drivers each cut hides.
+ * drivers, down to the slowest one. A compact board keeps the top ten (five when the player is far
+ * down), the drivers around the player and the rival, the pace bands above the player (below, only
+ * those among the drivers shown around them), and says how many drivers each cut hides.
  */
-export function buildLeaderboardRows(board: Leaderboard, sort: LeaderboardSort, compact: boolean): LeaderboardRow[] {
+export function buildLeaderboardRows(
+  board: Leaderboard,
+  sort: LeaderboardSort,
+  compact: boolean,
+  rivalName: string | null = null
+): LeaderboardRow[] {
   const value = VALUE[sort];
   const rank = RANK[sort];
   const drivers = board.entries
@@ -71,8 +81,12 @@ export function buildLeaderboardRows(board: Leaderboard, sort: LeaderboardSort, 
   if (!compact || drivers.length <= COMPACT_THRESHOLD) return all;
 
   const playerIndex = drivers.findIndex((d) => d.entry.isPlayer);
+  const rivalIndex = rivalName ? drivers.findIndex((d) => !d.entry.isPlayer && d.entry.driverName === rivalName) : -1;
+  const top = playerIndex >= COMPACT_FAR_FROM_TOP ? COMPACT_TOP_FAR : COMPACT_TOP;
   const visibleDriver = (index: number) =>
-    index < COMPACT_TOP || (playerIndex >= 0 && Math.abs(index - playerIndex) <= COMPACT_AROUND_PLAYER);
+    index < top ||
+    (rivalIndex >= 0 && Math.abs(index - rivalIndex) <= COMPACT_AROUND_RIVAL) ||
+    (playerIndex >= 0 && Math.abs(index - playerIndex) <= COMPACT_AROUND_PLAYER);
 
   const rows: LeaderboardRow[] = [];
   let driverIndex = -1;
@@ -85,8 +99,8 @@ export function buildLeaderboardRows(board: Leaderboard, sort: LeaderboardSort, 
         hidden++;
         continue;
       }
-    } else if (!visibleDriver(driverIndex + 1)) {
-      continue; // a band inside a hidden stretch
+    } else if (playerIndex >= 0 && driverIndex >= playerIndex && !visibleDriver(driverIndex + 1)) {
+      continue; // a band below the player, away from the drivers shown around them
     }
     if (hidden > 0) {
       rows.push({ kind: 'hidden', count: hidden });

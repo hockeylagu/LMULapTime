@@ -52,6 +52,8 @@ export interface CompareRequest {
   key: number;
   lap: ComparableLap;
   reference?: ComparableLap;
+  /** Also works out where the time is, without waiting for the click. */
+  analyse?: boolean;
 }
 
 /** Laps compared at once: a lap and its reference. */
@@ -87,11 +89,6 @@ const NO_COMPARE_LAPS: CompareLapsApiData = {
   bestS3: null,
   theoreticalBestSec: null,
   benchmarks: [],
-};
-
-const bestOf = (laps: ComparableLap[], key: 's1' | 's2' | 's3'): number | null => {
-  const valid = laps.map((l) => l[key]).filter((v): v is number => v !== null && v > 0);
-  return valid.length > 0 ? Math.min(...valid) : null;
 };
 
 export function useCompareLapsData({
@@ -339,10 +336,6 @@ export function useCompareLapsData({
     if (overallTrackBestObject && !isOverallBestInComparison) handleToggleLap(overallTrackBestObject);
   };
 
-  const bestComparedS1 = useMemo(() => bestOf(selectedLaps, 's1'), [selectedLaps]);
-  const bestComparedS2 = useMemo(() => bestOf(selectedLaps, 's2'), [selectedLaps]);
-  const bestComparedS3 = useMemo(() => bestOf(selectedLaps, 's3'), [selectedLaps]);
-
   const deckLaps = useMemo(() => deckOrder(selectedLaps), [selectedLaps]);
 
   const comparedLaps = useMemo(() => {
@@ -388,9 +381,6 @@ export function useCompareLapsData({
     overallTrackBestObject,
     isOverallBestInComparison,
     handleAddOverallTrackBest,
-    bestComparedS1,
-    bestComparedS2,
-    bestComparedS3,
     comparedLaps,
     chartData,
   };

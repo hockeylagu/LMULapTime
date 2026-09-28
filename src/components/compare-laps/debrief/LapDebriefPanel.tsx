@@ -1,49 +1,57 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Search } from 'lucide-react';
-import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { DebriefCornerRow } from '../../session-detail/debrief/DebriefCornerRow.js';
-import { loadRivalDebrief, RivalDebrief } from './loadRivalDebrief.js';
-
-export interface RivalDebriefPanelProps {
-  player: LeaderboardEntry;
-  rival: LeaderboardEntry;
-}
+import type { LapDebrief } from './loadLapDebrief.js';
 
 type PanelState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'ready'; debrief: RivalDebrief };
+  | { kind: 'ready'; debrief: LapDebrief };
 
-/** The debrief against the rival, built when asked: where the time is and what to change. */
-export const RivalDebriefPanel: React.FC<RivalDebriefPanelProps> = ({ player, rival }) => {
+export interface LapDebriefPanelProps {
+  /** Identifies the two laps: another key drops the debrief shown. */
+  pairKey: string;
+  /** Who (or which lap) the time is measured against. */
+  againstLabel: string;
+  load: (signal: AbortSignal) => Promise<LapDebrief>;
+  /** Builds the debrief as soon as the pair is shown, without waiting for the click. */
+  autoStart?: boolean;
+}
+
+/** Where one lap loses time to another, corner by corner, built when asked. */
+export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, againstLabel, load, autoStart = false }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [state, setState] = useState<PanelState>({ kind: 'idle' });
   const controllerRef = useRef<AbortController | null>(null);
-  const pairKey = `${player.bestLap.sessionId}:${player.bestLap.lapNum}|${rival.driverName}:${rival.bestLap.sessionId}:${rival.bestLap.lapNum}`;
-
-  // Another pair of laps: the debrief shown belongs to the previous one.
+  const loadRef = useRef(load);
   useEffect(() => {
-    setState({ kind: 'idle' });
-    return () => controllerRef.current?.abort();
-  }, [pairKey]);
+    loadRef.current = load;
+  });
 
-  const build = () => {
+  const build = useCallback(() => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
     setState({ kind: 'loading' });
-    loadRivalDebrief(player, rival, controller.signal)
+    loadRef.current(controller.signal)
       .then((debrief) => setState({ kind: 'ready', debrief }))
       .catch((err) => {
         if (isAbortError(err)) return;
         setState({ kind: 'error', message: apiErrorMessage(err, 'The debrief could not be built.') });
       });
-  };
+  }, []);
+
+  // Another pair of laps: the debrief shown belongs to the previous one.
+  useEffect(() => {
+    if (autoStart) build();
+    else setState({ kind: 'idle' });
+    return () => controllerRef.current?.abort();
+  }, [pairKey, autoStart, build]);
 
   if (state.kind === 'idle' || state.kind === 'loading') {
     return (
@@ -65,8 +73,8 @@ export const RivalDebriefPanel: React.FC<RivalDebriefPanelProps> = ({ player, ri
 
   const { debrief } = state;
   return (
-    <div className="rounded-xl border border-lmu-border bg-lmu-bg/60 px-4 py-2" aria-label="Where the time is">
-      <div className="text-[10px] uppercase tracking-wider text-lmu-muted pt-1">Where the time is, against {rival.driverName}</div>
+    <div className="w-full rounded-xl border border-lmu-border bg-lmu-bg/60 px-4 py-2" aria-label="Where the time is">
+      <div className="text-[10px] uppercase tracking-wider text-lmu-muted pt-1">Where the time is, against {againstLabel}</div>
       {debrief.corners.length === 0 ? (
         <p className="text-xs text-lmu-muted py-2">No corner loses more than a few hundredths: the gap is spread along the lap.</p>
       ) : (

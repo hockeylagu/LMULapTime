@@ -69,9 +69,6 @@ describe('CompareLapCard', () => {
         isBaseline={true}
         deltas={null}
         color="#38bdf8"
-        isCardS1Best={true}
-        isCardS2Best={false}
-        isCardS3Best={false}
         onSetBaseline={onSetBaseline}
         onRemoveLap={onRemoveLap}
         benchmarks={mockBenchmarks}
@@ -84,12 +81,13 @@ describe('CompareLapCard', () => {
     expect(screen.getByText('Antonio Fuoco')).toBeInTheDocument();
     expect(screen.getByText('Ferrari 499P')).toBeInTheDocument();
     expect(screen.getByText('1:35.432')).toBeInTheDocument();
-    expect(screen.getByText('285.4 km/h')).toBeInTheDocument();
-    expect(screen.getByText('Wear: 94.5% avg')).toBeInTheDocument();
-    expect(screen.getByText(/45.2% \(-2.1%\)/)).toBeInTheDocument();
-    expect(screen.getByText(/78.5% \(-3.4%\)/)).toBeInTheDocument();
+    expect(screen.queryByText('285.4 km/h')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wear: 94.5% avg')).not.toBeInTheDocument();
+    expect(screen.queryByText(/45.2% \(-2.1%\)/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/78.5% \(-3.4%\)/)).not.toBeInTheDocument();
 
-    // Baseline card should not show 'Set Baseline' button
+    // The baseline is labelled rather than offered as a choice.
+    expect(screen.getByText('Baseline')).toBeInTheDocument();
     expect(screen.queryByText('Set Baseline')).not.toBeInTheDocument();
   });
 
@@ -126,9 +124,6 @@ describe('CompareLapCard', () => {
         isBaseline={false}
         deltas={mockDeltas}
         color="#a855f7"
-        isCardS1Best={false}
-        isCardS2Best={true}
-        isCardS3Best={true}
         onSetBaseline={onSetBaseline}
         onRemoveLap={onRemoveLap}
         onSelectSession={onSelectSession}
@@ -142,7 +137,6 @@ describe('CompareLapCard', () => {
     expect(screen.getByText('+0.123')).toBeInTheDocument();
     expect(screen.getByText('-0.050')).toBeInTheDocument();
     expect(screen.getByText('+0.010')).toBeInTheDocument();
-    expect(screen.getByText('+2.5 km/h')).toBeInTheDocument();
 
     // Click Set Baseline
     const baselineBtn = screen.getByText('Set Baseline');
@@ -173,9 +167,6 @@ describe('CompareLapCard', () => {
         isBaseline={false}
         deltas={null}
         color="#38bdf8"
-        isCardS1Best={false}
-        isCardS2Best={false}
-        isCardS3Best={false}
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
@@ -208,9 +199,6 @@ describe('CompareLapCard', () => {
         isBaseline={false}
         deltas={null}
         color="#38bdf8"
-        isCardS1Best={false}
-        isCardS2Best={false}
-        isCardS3Best={false}
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={[]}
@@ -223,7 +211,7 @@ describe('CompareLapCard', () => {
     expect(screen.getByText(/102\.0%/)).toBeInTheDocument();
   });
 
-  it('renders status badges fallback when tireWear is missing', () => {
+  it('shows the lap status when the lap is not a clean one', () => {
     const pitLap: ComparableLap = {
       ...baseLap,
       isSessionBest: true,
@@ -239,9 +227,6 @@ describe('CompareLapCard', () => {
         isBaseline={false}
         deltas={null}
         color="#38bdf8"
-        isCardS1Best={false}
-        isCardS2Best={false}
-        isCardS3Best={false}
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
@@ -250,7 +235,6 @@ describe('CompareLapCard', () => {
       />
     );
 
-    expect(screen.getByText('N/A')).toBeInTheDocument();
     expect(screen.getByText('PIT STOP')).toBeInTheDocument();
   });
 });

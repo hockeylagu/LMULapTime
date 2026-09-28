@@ -14,6 +14,8 @@ export interface BoardActions {
   onPick?: (entry: LeaderboardEntry) => void;
   /** Your best lap against a driver's; undefined while you have no lap on the board. */
   onCompare?: (entry: LeaderboardEntry) => void;
+  /** As onCompare, and works out where the time is straight away. */
+  onAnalyse?: (entry: LeaderboardEntry) => void;
   /**
    * The telemetry of your best lap against a driver's, or alone from your own row; undefined while
    * you have no lap on the board.
@@ -44,14 +46,17 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
   const player = board.player;
   if (!player) return { compareRequest, compareRef, onPick };
 
-  const onCompare = (entry: LeaderboardEntry) => {
+  const compare = (entry: LeaderboardEntry, analyse: boolean) => {
     setCompareRequest((previous) => ({
       key: (previous?.key ?? 0) + 1,
       reference: boardLapToComparable(entry, carClass, boardLapTag(entry)),
       lap: boardLapToComparable(player, carClass, boardLapTag(player)),
+      analyse,
     }));
     compareRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   };
+  const onCompare = (entry: LeaderboardEntry) => compare(entry, false);
+  const onAnalyse = (entry: LeaderboardEntry) => compare(entry, true);
 
   const onTelemetry = (entry: LeaderboardEntry) => {
     const yours = boardLapTelemetryRef(player);
@@ -64,5 +69,5 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
     if (theirs) navigate(buildTelemetryComparePath(searchParams, yours, theirs));
   };
 
-  return { compareRequest, compareRef, onPick, onCompare, onTelemetry };
+  return { compareRequest, compareRef, onPick, onCompare, onAnalyse, onTelemetry };
 }

@@ -17,7 +17,7 @@ import {
   selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
 import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
-import { isHumanDriver } from '../../shared/domain/leaderboard.js';
+import { isHumanDriver, selectLeaderboardLaps } from '../../shared/domain/leaderboard.js';
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
   const candidates = selectCleanLapCandidates(laps);
@@ -209,6 +209,9 @@ export function extractComparableLaps(
 
     // Check all drivers in matching sessions to determine overall track record without driver restriction
     (s.drivers || []).forEach(d => {
+      const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
+      // The personal best comes from the same laps as the best sectors, so the theoretical best never exceeds it.
+      const leaderboardLaps = isPlayerDriver ? new Set(selectLeaderboardLaps(d.laps || [])) : null;
       if (filters.humansOnly && !isHumanDriver(s, d)) return;
       if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
         return;
@@ -227,8 +230,7 @@ export function extractComparableLaps(
             });
           }
 
-          const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
-          if (isPlayerDriver && (!playerBestLap || playerBestLap.lapTime === null || l.lapTime < playerBestLap.lapTime)) {
+          if (leaderboardLaps?.has(l) && (!playerBestLap || playerBestLap.lapTime === null || l.lapTime < playerBestLap.lapTime)) {
             playerBestLap = toComparableLap(s, d, l, {
               isAllTimePB: true,
               isPlayer: true,
@@ -258,6 +260,8 @@ export function extractComparableLaps(
       }
 
       const sessionBestTime = d.bestLapTime;
+      // The best lap and sectors come from the laps a leaderboard counts, as the rival's theoretical gap does.
+      const representative = new Set(selectLeaderboardLaps(d.laps || []));
 
       (d.laps || []).forEach(l => {
         const isSessionBest = l.lapTime !== null && sessionBestTime !== null && Math.abs(l.lapTime - sessionBestTime) < 0.0005;
@@ -270,7 +274,7 @@ export function extractComparableLaps(
           isPlayer,
         });
 
-        if (l.isValid && l.lapTime && l.lapTime > 0) {
+        if (representative.has(l) && l.lapTime !== null) {
           if (!allTimeBestLap || allTimeBestLap.lapTime === null || l.lapTime < allTimeBestLap.lapTime) {
             allTimeBestLap = { ...lapItem, isAllTimePB: true, tag: '⭐ All-Time Best Lap' };
           }

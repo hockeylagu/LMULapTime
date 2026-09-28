@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2 } from 'lucide-react';
+import { Target, Trash2 } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
@@ -10,13 +10,10 @@ import { CarClassBadge } from '../common/CarClassBadge.js';
 export interface CompareLapCardProps {
   lap: ComparableLap;
   isBaseline: boolean;
-  /** Frames the baseline card; off, the baseline only shows by its missing deltas. */
-  frameBaseline?: boolean;
+  /** The lap is the player's rival's best. */
+  isRival?: boolean;
   deltas: ReturnType<typeof computeLapDeltas> | null;
   color: string;
-  isCardS1Best: boolean;
-  isCardS2Best: boolean;
-  isCardS3Best: boolean;
   onSetBaseline: (id: string) => void;
   onRemoveLap: (lap: ComparableLap) => void;
   onSelectSession?: (sessionId: string) => void;
@@ -28,12 +25,9 @@ export interface CompareLapCardProps {
 export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   lap,
   isBaseline,
-  frameBaseline = true,
+  isRival = false,
   deltas,
   color,
-  isCardS1Best,
-  isCardS2Best,
-  isCardS3Best,
   onSetBaseline,
   onRemoveLap,
   onSelectSession,
@@ -61,13 +55,12 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
     }
   }
 
+  const hasStatus = lap.isPitStop || lap.isOutLap || lap.isInferred || !lap.isValid;
+
   return (
     <div
-      className={`p-4 rounded-2xl border transition-all relative flex flex-col justify-between ${
-        isBaseline && frameBaseline
-          ? 'bg-lmu-card/90 border-lmu-accent shadow-lg shadow-lmu-accent/10'
-          : 'bg-lmu-card/50 border-lmu-border hover:border-lmu-border/80'
-      }`}
+      data-testid={isBaseline ? 'compare-baseline' : undefined}
+      className="p-4 rounded-2xl border transition-all relative flex flex-col justify-between bg-lmu-card/50 border-lmu-border hover:border-lmu-border/80"
     >
       {/* Card Header */}
       <div>
@@ -81,10 +74,22 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             >
               {lap.tag || `Lap ${lap.lapNum || '-'}`}
             </span>
+            {isRival && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-300 shrink-0">
+                <Target className="w-3 h-3" /> Your rival
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {!isBaseline && (
+            {isBaseline ? (
+              <span
+                className="text-[10px] uppercase tracking-wider text-lmu-gold font-semibold px-1.5 py-0.5"
+                title="The other laps' deltas are measured against this one"
+              >
+                Baseline
+              </span>
+            ) : (
               <button
                 type="button"
                 onClick={() => onSetBaseline(lap.id)}
@@ -138,120 +143,48 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             )}
           </div>
 
-          {cat && (
+          {(cat || hasStatus) && (
             <div className="mt-1 flex items-center gap-1.5">
-              <PaceBadge
-                category={cat}
-                percentage={pct}
-                showPercentage={true}
-                size="xs"
-              />
+              {cat && (
+                <PaceBadge
+                  category={cat}
+                  percentage={pct}
+                  showPercentage={true}
+                  size="xs"
+                />
+              )}
+              {hasStatus && (
+                <LapStatusBadge
+                  isPitStop={lap.isPitStop}
+                  isOutLap={lap.isOutLap}
+                  isValid={lap.isValid}
+                  isInferred={lap.isInferred}
+                  pitTooltip={lap.pitStopDurationString ? `Estimated pit loss: ${lap.pitStopDurationString}` : undefined}
+                  size="xs"
+                />
+              )}
             </div>
           )}
         </div>
 
         {/* Sector Breakdown */}
         <div className="mt-3 space-y-2 text-xs font-mono">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-            <span className="text-lmu-gold font-sans font-semibold">S1</span>
-            <div className="flex items-baseline gap-2">
-              <span className={`font-bold ${isCardS1Best ? 'text-lmu-gold' : 'text-white'}`}>
-                {lap.s1String || formatTime(lap.s1)}
-              </span>
-              {deltas && !isBaseline && (
-                <span className={`text-[11px] font-bold ${deltas.s1DeltaClass}`}>{deltas.s1DeltaFormatted}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-            <span className="text-lmu-blue font-sans font-semibold">S2</span>
-            <div className="flex items-baseline gap-2">
-              <span className={`font-bold ${isCardS2Best ? 'text-lmu-blue' : 'text-white'}`}>
-                {lap.s2String || formatTime(lap.s2)}
-              </span>
-              {deltas && !isBaseline && (
-                <span className={`text-[11px] font-bold ${deltas.s2DeltaClass}`}>{deltas.s2DeltaFormatted}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-            <span className="text-lmu-green font-sans font-semibold">S3</span>
-            <div className="flex items-baseline gap-2">
-              <span className={`font-bold ${isCardS3Best ? 'text-lmu-green' : 'text-white'}`}>
-                {lap.s3String || formatTime(lap.s3)}
-              </span>
-              {deltas && !isBaseline && (
-                <span className={`text-[11px] font-bold ${deltas.s3DeltaClass}`}>{deltas.s3DeltaFormatted}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Top Speed & Tires */}
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-            <span className="text-[10px] uppercase text-lmu-muted font-sans block">Top Speed</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="font-bold text-lmu-cyan font-mono">
-                {lap.topSpeed ? `${lap.topSpeed.toFixed(1)} km/h` : 'N/A'}
-              </span>
-            </div>
-            {deltas && !isBaseline && deltas.speedDelta !== null && (
-              <span className={`text-[10px] font-bold font-mono ${deltas.speedDeltaClass}`}>
-                {deltas.speedDeltaFormatted}
-              </span>
-            )}
-          </div>
-
-          <div className="p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
-            <span className="text-[10px] uppercase text-lmu-muted font-sans block">Tires & Wear</span>
-            <span className="text-xs text-white font-medium block truncate mt-0.5">
-              {lap.fCompound || lap.rCompound ? `${lap.fCompound || lap.rCompound}` : 'Standard'}
-            </span>
-            {lap.tireWear ? (
-              <span
-                className="text-[10px] text-lmu-gold font-mono font-bold block"
-                title={`FL: ${lap.tireWear.fl}% | FR: ${lap.tireWear.fr}%\nRL: ${lap.tireWear.rl}% | RR: ${lap.tireWear.rr}%`}
-              >
-                Wear: {lap.tireWear.avg}% avg
-              </span>
-            ) : (
-              <LapStatusBadge
-                isPitStop={lap.isPitStop}
-                isOutLap={lap.isOutLap}
-                isValid={lap.isValid}
-                isInferred={lap.isInferred}
-                pitTooltip={lap.pitStopDurationString ? `Estimated pit loss: ${lap.pitStopDurationString}` : undefined}
-                size="xs"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Fuel & Virtual Energy */}
-        {((lap.fuel !== undefined && lap.fuel !== null) ||
-          (lap.virtualEnergy !== undefined && lap.virtualEnergy !== null)) && (
-          <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-mono">
-            {lap.fuel !== undefined && lap.fuel !== null && (
-              <div className="p-1.5 rounded-lg bg-lmu-bg/30 border border-lmu-border/30 flex items-center justify-between text-[11px]">
-                <span className="text-lmu-muted font-sans">⛽ Fuel:</span>
-                <span className="text-amber-300 font-bold">
-                  {lap.fuel}% {lap.fuelUsed ? `(-${lap.fuelUsed}%)` : ''}
-                </span>
+          {([
+            { label: 'S1', time: lap.s1String || formatTime(lap.s1), delta: deltas?.s1DeltaFormatted, cls: deltas?.s1DeltaClass },
+            { label: 'S2', time: lap.s2String || formatTime(lap.s2), delta: deltas?.s2DeltaFormatted, cls: deltas?.s2DeltaClass },
+            { label: 'S3', time: lap.s3String || formatTime(lap.s3), delta: deltas?.s3DeltaFormatted, cls: deltas?.s3DeltaClass },
+          ]).map((sector) => (
+            <div key={sector.label} className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
+              <span className="text-white font-sans font-semibold">{sector.label}</span>
+              <div className="flex items-baseline gap-2">
+                <span className="font-bold text-white">{sector.time}</span>
+                {deltas && !isBaseline && (
+                  <span className={`text-[11px] font-bold ${sector.cls}`}>{sector.delta}</span>
+                )}
               </div>
-            )}
-            {lap.virtualEnergy !== undefined && lap.virtualEnergy !== null && (
-              <div className="p-1.5 rounded-lg bg-lmu-bg/30 border border-lmu-border/30 flex items-center justify-between text-[11px]">
-                <span className="text-lmu-muted font-sans">⚡ VE:</span>
-                <span className="text-indigo-300 font-bold">
-                  {lap.virtualEnergy}% {lap.virtualEnergyUsed ? `(-${lap.virtualEnergyUsed}%)` : ''}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Open Session Link */}

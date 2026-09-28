@@ -55,25 +55,12 @@ export function getBeatenRivals(db: DatabaseType, scope: RivalScope): RivalTarge
   return rows.map(toTarget);
 }
 
-/** The drivers the player chose not to chase on this board. */
-export function getSkippedRivalDrivers(db: DatabaseType, scope: RivalScope): Set<string> {
-  const rows = db.prepare(`SELECT DISTINCT driver_name FROM rival_targets WHERE ${IN_SCOPE} AND status = 'skipped' AND driver_name IS NOT NULL`)
-    .all(...scopeArgs(scope)) as Array<{ driver_name: string }>;
-  return new Set(rows.map((r) => r.driver_name));
-}
-
 function insertTarget(db: DatabaseType, scope: RivalScope, target: NewRivalTarget): number {
   const result = db.prepare(`
     INSERT INTO rival_targets (layout_key, car_class, car_type, kind, driver_name, target_time, start_time, pinned, status, set_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
   `).run(...scopeArgs(scope), target.kind, target.driverName, target.targetTime, target.startTime, target.pinned ? 1 : 0, target.setAt);
   return Number(result.lastInsertRowid);
-}
-
-/** Ends the active target of the board (skipped, or replaced by a pinned one). */
-export function endActiveRival(db: DatabaseType, scope: RivalScope, status: 'skipped' | 'replaced', now: number): void {
-  db.prepare(`UPDATE rival_targets SET status = ?, ended_at = ? WHERE ${IN_SCOPE} AND status = 'active'`)
-    .run(status, now, ...scopeArgs(scope));
 }
 
 /** Stores what resolving the rival changed, in one transaction; returns the active target's id. */
@@ -99,7 +86,8 @@ export function applyRivalResolution(db: DatabaseType, scope: RivalScope, resolu
 /** Makes a driver the player chose the active rival of the board. */
 export function pinRival(db: DatabaseType, scope: RivalScope, target: NewRivalTarget): number {
   return db.transaction(() => {
-    endActiveRival(db, scope, 'replaced', target.setAt);
+    db.prepare(`UPDATE rival_targets SET status = 'replaced', ended_at = ? WHERE ${IN_SCOPE} AND status = 'active'`)
+      .run(target.setAt, ...scopeArgs(scope));
     return insertTarget(db, scope, target);
   })();
 }

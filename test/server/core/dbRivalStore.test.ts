@@ -44,27 +44,20 @@ describe('rival store', () => {
     ]);
   });
 
-  it('ends a rival out of reach as replaced, not beaten nor skipped, and starts the next one', () => {
+  it('ends a rival out of reach as replaced, not beaten, and starts the next one', () => {
     const far = create(GT3, driverTarget('Far', 99.2));
     const next = db.applyRivalResolution(GT3, {
       beaten: null, retimed: null, replaced: { id: far!, endedAt: 40 }, created: driverTarget('Near', 99.7, 40), active: null,
     });
     expect(db.getActiveRival(GT3)).toMatchObject({ id: next, driverName: 'Near' });
     expect(db.getBeatenRivals(GT3)).toEqual([]);
-    expect([...db.getSkippedRivalDrivers(GT3)]).toEqual([]);
   });
 
-  it('remembers the drivers skipped, and replaces the active rival with a pinned one', () => {
-    create(GT3, driverTarget('Skip me', 99.7));
-    db.endActiveRival(GT3, 'skipped', 10);
-    expect(db.getActiveRival(GT3)).toBeNull();
-    expect([...db.getSkippedRivalDrivers(GT3)]).toEqual(['Skip me']);
-
+  it('replaces the active rival with a pinned one', () => {
     create(GT3, driverTarget('Auto', 99.6));
     const pinned = db.pinRival(GT3, { ...driverTarget('Alien', 95, 20), pinned: true });
     expect(db.getActiveRival(GT3)).toMatchObject({ id: pinned, driverName: 'Alien', pinned: true });
     expect(db.getBeatenRivals(GT3)).toEqual([]);
-    expect([...db.getSkippedRivalDrivers(GT3)]).toEqual(['Skip me']);
   });
 
   it('keeps the rivals when the session cache is cleared: they are the player history, not a cache', () => {
