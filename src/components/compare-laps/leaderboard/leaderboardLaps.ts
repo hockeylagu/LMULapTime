@@ -3,14 +3,19 @@ import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import type { TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
+/** The id the server gives a driver's best board lap (session, driver, lap number). */
+export function boardLapId(entry: LeaderboardEntry): string {
+  return `${entry.bestLap.sessionId}_${entry.driverName}_lap_${entry.bestLap.lapNum}`;
+}
+
 /**
- * A driver's best board lap as the compare deck shows it. The id is the one the server gives the
- * same lap (session, driver, lap number), so the deck and the lap table recognise it.
+ * A driver's best board lap as the compare deck shows it. It keeps the id the server gives the
+ * same lap, so the deck, the presets and the board recognise it.
  */
 export function boardLapToComparable(entry: LeaderboardEntry, carClass: string, tag: string): ComparableLap {
   const lap = entry.bestLap;
   return {
-    id: `${lap.sessionId}_${entry.driverName}_lap_${lap.lapNum}`,
+    id: boardLapId(entry),
     sessionId: lap.sessionId,
     sessionName: lap.sessionName,
     sessionType: lap.sessionType,

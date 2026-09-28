@@ -1,18 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, X } from 'lucide-react';
 import { CompareLapsHeader } from './CompareLapsHeader.js';
-import { CompareLapsFilters } from './CompareLapsFilters.js';
 import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
-import { CompareLapsTable } from './CompareLapsTable.js';
-import { useCompareLapsData, AvailableLapsSortOption, ComparePairRequest, CompareLapsSessionItem } from './useCompareLapsData.js';
-import { ReplaySummary } from '../../../shared/types/index.js';
+import { useCompareLapsData, CompareRequest, CompareLapsSessionItem } from './useCompareLapsData.js';
+import { ComparableLap, ReplaySummary } from '../../../shared/types/index.js';
 import { fetchJson } from '../../api/apiClient.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 
-export type { AvailableLapsSortOption, CompareLapsSessionItem };
+export type { CompareLapsSessionItem };
 
 export interface CompareLapsProps {
   sessions: CompareLapsSessionItem[];
@@ -24,8 +22,21 @@ export interface CompareLapsProps {
   initialCompareDriver?: string;
   initialCompareLapNum?: number;
   onSelectSession?: (sessionId: string) => void;
-  /** Two laps the page asks to compare now (from the leaderboard). */
-  pairRequest?: ComparePairRequest | null;
+  /** Laps the page asks to compare now (from the leaderboard). */
+  compareRequest?: CompareRequest | null;
+  /** The ids of the laps compared, each time they change. */
+  onComparedLapsChange?: (lapIds: string[]) => void;
+}
+
+/**
+ * The lap the telemetry opens and the one it overlays: the player's lap against the other
+ * driver's when one of the two is the player's, otherwise the lap against the baseline.
+ */
+export function telemetryPair(laps: ComparableLap[], baseline: ComparableLap | null): { target: ComparableLap; base: ComparableLap } {
+  const players = laps.filter((l) => l.isPlayer);
+  if (players.length === 1) return { target: players[0], base: laps.find((l) => !l.isPlayer)! };
+  const base = baseline && laps.some((l) => l.id === baseline.id) ? baseline : laps[0];
+  return { target: laps.find((l) => l.id !== base.id)!, base };
 }
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
@@ -38,49 +49,12 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   initialCompareDriver,
   initialCompareLapNum,
   onSelectSession,
-  pairRequest,
+  compareRequest,
+  onComparedLapsChange,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const {
-    selectedTrack,
-    selectedCarClass,
-    availableCarModels,
-    selectedCarModel,
-    setSelectedCarModel,
-    playerOnly,
-    setPlayerOnlyState,
-    loading,
-    loadError,
-    availableLapsSort,
-    setAvailableLapsSort,
-    hideEmpty,
-    setHideEmpty,
-    apiData,
-    selectedLaps,
-    baselineLap,
-    baselineLapId,
-    setBaselineLapId,
-    handleToggleLap,
-    handleClearAll,
-    allTimePBObject,
-    isPBInComparison,
-    handleAddPersonalBest,
-    handleAddTheoreticalBest,
-    overallTrackBestObject,
-    isOverallBestInComparison,
-    handleAddOverallTrackBest,
-    bestComparedS1,
-    bestComparedS2,
-    bestComparedS3,
-    bestAvailableS1,
-    bestAvailableS2,
-    bestAvailableS3,
-    comparedLaps,
-    chartData,
-    displayLaps,
-    emptyCount,
-  } = useCompareLapsData({
+  const data = useCompareLapsData({
     sessions,
     initialTrack,
     initialCarClass,
@@ -89,21 +63,23 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialCompareSessionId,
     initialCompareDriver,
     initialCompareLapNum,
-    pairRequest,
+    compareRequest,
   });
+  const { selectedLaps, baselineLap, setBaselineLapId } = data;
 
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
+
+  const comparedKey = selectedLaps.map((l) => l.id).join('|');
+  useEffect(() => {
+    onComparedLapsChange?.(comparedKey ? comparedKey.split('|') : []);
+  }, [comparedKey, onComparedLapsChange]);
 
   const handleCompareTelemetry = async () => {
     if (selectedLaps.length !== 2) return;
     setTelemetryError(null);
+    const { target: targetLap, base: baseLap } = telemetryPair(selectedLaps, baselineLap);
 
-    const lap1 = selectedLaps[0];
-    const lap2 = selectedLaps[1];
-    const baseLap = baselineLap?.id === lap2.id ? lap2 : lap1;
-    const targetLap = baseLap.id === lap1.id ? lap2 : lap1;
-
-    const findReplayForLap = async (lap: typeof lap1): Promise<string | null> => {
+    const findReplayForLap = async (lap: ComparableLap): Promise<string | null> => {
       if (lap.matchingReplayFile) {
         return lap.matchingReplayFile;
       }
@@ -145,36 +121,31 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     ));
   };
 
-  const onCompareTelemetry = selectedLaps.length === 2 ? handleCompareTelemetry : undefined;
+  const swapBaseline = () => {
+    const other = selectedLaps.find((l) => l.id !== baselineLap?.id);
+    if (other) setBaselineLapId(other.id);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
-        <CompareLapsHeader
-          selectedTrack={selectedTrack}
-          allTimePBObject={allTimePBObject}
-          overallTrackBestObject={overallTrackBestObject}
-          isPBInComparison={isPBInComparison}
-          isOverallBestInComparison={isOverallBestInComparison}
-          theoreticalBestSec={apiData.theoreticalBestSec}
-          selectedLapsCount={selectedLaps.length}
-          onAddPersonalBest={handleAddPersonalBest}
-          onAddTheoreticalBest={handleAddTheoreticalBest}
-          onAddOverallTrackBest={handleAddOverallTrackBest}
-          onClearAll={handleClearAll}
-        />
-        <CompareLapsFilters
-          selectedCarClass={selectedCarClass}
-          availableCarModels={availableCarModels}
-          selectedCarModel={selectedCarModel}
-          setSelectedCarModel={setSelectedCarModel}
-          playerOnly={playerOnly}
-          setPlayerOnly={setPlayerOnlyState}
-        />
-      </div>
+    <section aria-label="Compare laps" className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+      <CompareLapsHeader
+        selectedTrack={data.selectedTrack}
+        allTimePBObject={data.allTimePBObject}
+        overallTrackBestObject={data.overallTrackBestObject}
+        isPBInComparison={data.isPBInComparison}
+        isOverallBestInComparison={data.isOverallBestInComparison}
+        theoreticalBestSec={data.apiData.theoreticalBestSec}
+        selectedLapsCount={selectedLaps.length}
+        baselineLap={baselineLap}
+        onSwapBaseline={selectedLaps.length === 2 ? swapBaseline : undefined}
+        onAddPersonalBest={data.handleAddPersonalBest}
+        onAddTheoreticalBest={data.handleAddTheoreticalBest}
+        onAddOverallTrackBest={data.handleAddOverallTrackBest}
+        onClearAll={data.handleClearAll}
+      />
 
       {telemetryError && (
-        <div className="backdrop-blur-md p-4 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
+        <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{telemetryError}</span>
@@ -190,60 +161,36 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         </div>
       )}
 
+      {data.loadError && (
+        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">
+          Could not load laps for {data.selectedTrack}: {data.loadError}
+        </p>
+      )}
+
       <CompareLapsDeck
-        selectedLaps={selectedLaps}
+        laps={data.deckLaps}
         baselineLap={baselineLap}
-        baselineLapId={baselineLapId}
         setBaselineLapId={setBaselineLapId}
-        onToggleLap={handleToggleLap}
+        onToggleLap={data.handleToggleLap}
         onSelectSession={onSelectSession}
-        bestComparedS1={bestComparedS1}
-        bestComparedS2={bestComparedS2}
-        bestComparedS3={bestComparedS3}
-        benchmarks={apiData.benchmarks}
-        allLaps={apiData.laps}
-        selectedCarClass={selectedCarClass}
+        bestComparedS1={data.bestComparedS1}
+        bestComparedS2={data.bestComparedS2}
+        bestComparedS3={data.bestComparedS3}
+        benchmarks={data.apiData.benchmarks}
+        allLaps={data.apiData.laps}
+        selectedCarClass={data.selectedCarClass}
         lapColors={COMPARE_LAP_COLORS}
       />
 
       {selectedLaps.length > 1 && baselineLap && (
-        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
-          <CompareSectorChart
-            selectedLaps={selectedLaps}
-            comparedLaps={comparedLaps}
-            baselineLap={baselineLap}
-            chartData={chartData}
-            onCompareTelemetry={onCompareTelemetry}
-          />
-        </div>
+        <CompareSectorChart
+          selectedLaps={selectedLaps}
+          comparedLaps={data.comparedLaps}
+          baselineLap={baselineLap}
+          chartData={data.chartData}
+          onCompareTelemetry={handleCompareTelemetry}
+        />
       )}
-
-      {loadError && (
-        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">
-          Could not load laps for {selectedTrack}: {loadError}
-        </p>
-      )}
-
-      <CompareLapsTable
-        selectedTrack={selectedTrack}
-        selectedCarClass={selectedCarClass}
-        playerOnly={playerOnly}
-        displayLaps={displayLaps}
-        emptyCount={emptyCount}
-        hideEmpty={hideEmpty}
-        setHideEmpty={setHideEmpty}
-        availableLapsSort={availableLapsSort}
-        setAvailableLapsSort={setAvailableLapsSort}
-        loading={loading}
-        selectedLaps={selectedLaps}
-        baselineLap={baselineLap}
-        allTimeBestLapId={apiData.allTimeBestLap?.id}
-        bestAvailableS1={bestAvailableS1}
-        bestAvailableS2={bestAvailableS2}
-        bestAvailableS3={bestAvailableS3}
-        onToggleLap={handleToggleLap}
-      />
-
-    </div>
+    </section>
   );
 };

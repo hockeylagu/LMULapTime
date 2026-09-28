@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2 } from 'lucide-react';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
+import { MAX_COMPARED_LAPS } from './useCompareLapsData.js';
 
 export interface CompareLapsHeaderProps {
   selectedTrack: string;
@@ -11,12 +12,18 @@ export interface CompareLapsHeaderProps {
   isOverallBestInComparison: boolean;
   theoreticalBestSec: number | null;
   selectedLapsCount: number;
+  baselineLap: ComparableLap | null;
+  /** Measures the deltas against the other lap. */
+  onSwapBaseline?: () => void;
   onAddPersonalBest: () => void;
   onAddTheoreticalBest: () => void;
   onAddOverallTrackBest: () => void;
   onClearAll: () => void;
 }
 
+const preset = 'px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer';
+
+/** The compare card's header: the laps compared, the baseline, and the quick presets. */
 export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   selectedTrack,
   allTimePBObject,
@@ -25,78 +32,81 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   isOverallBestInComparison,
   theoreticalBestSec,
   selectedLapsCount,
+  baselineLap,
+  onSwapBaseline,
   onAddPersonalBest,
   onAddTheoreticalBest,
   onAddOverallTrackBest,
   onClearAll,
-}) => {
-  return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30 flex items-center gap-1">
-            <ArrowLeftRight className="w-3.5 h-3.5" />
-            Compare Laps
-          </span>
-          <span className="text-xs text-lmu-muted">Apples-to-Apples Sector & Speed Analysis</span>
-        </div>
-        <h2 className="text-2xl font-extrabold text-white mt-1 flex items-center gap-2">
-          Compare Laps
-        </h2>
-        <p className="text-xs text-lmu-muted mt-0.5">
-          Compare laps across sessions using session bests, personal bests, theoretical sectors, and reference targets.
-        </p>
-      </div>
-
-      {/* Quick Presets & Clear */}
-      <div className="flex flex-wrap items-center gap-2">
-        {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
-          <button
-            type="button"
-            onClick={onAddPersonalBest}
-            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Add your Personal Best lap for this track & category"
-          >
-            <Trophy className="w-3.5 h-3.5 text-lmu-accent" />
-            + Personal Best ({formatTime(allTimePBObject.lapTime)})
-          </button>
-        )}
-
-        {theoreticalBestSec && (
-          <button
-            type="button"
-            onClick={onAddTheoreticalBest}
-            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Add all-time theoretical optimal lap for this track & category"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-lmu-accent" />
-            + Theoretical Best ({formatTime(theoreticalBestSec)})
-          </button>
-        )}
-
-        {overallTrackBestObject && !isOverallBestInComparison && (
-          <button
-            type="button"
-            onClick={onAddOverallTrackBest}
-            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            title={`Add all-time fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
-          >
-            <Award className="w-3.5 h-3.5 text-lmu-accent" />
-            + All-Time Best ({overallTrackBestObject.lapTimeString})
-          </button>
-        )}
-
-        {selectedLapsCount > 0 && (
-          <button
-            type="button"
-            onClick={onClearAll}
-            className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-rose-950/40 border border-lmu-border hover:border-rose-500/40 text-xs text-lmu-muted hover:text-rose-400 font-semibold transition-all flex items-center gap-1 cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Clear
-          </button>
+}) => (
+  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-lmu-border/50">
+    <div className="min-w-0">
+      <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+        <ArrowLeftRight className="w-4 h-4 text-lmu-accent" />
+        Compare Laps ({selectedLapsCount}/{MAX_COMPARED_LAPS})
+      </h3>
+      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-lmu-muted">
+        {baselineLap ? (
+          <>
+            <span>Deltas against</span>
+            <span className="font-mono font-bold text-lmu-accent bg-lmu-accent/10 border border-lmu-accent/30 px-2 py-0.5 rounded-lg" data-testid="compare-baseline">
+              {baselineLap.driverName} — {baselineLap.lapTimeString}
+            </span>
+            {onSwapBaseline && (
+              <button
+                type="button"
+                onClick={onSwapBaseline}
+                className="flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                title="Measure the deltas against the other lap"
+              >
+                <ArrowLeftRight className="w-3 h-3" />
+                Swap baseline
+              </button>
+            )}
+          </>
+        ) : (
+          <span>Pick laps on the leaderboard, or start from a preset.</span>
         )}
       </div>
     </div>
-  );
-};
+
+    <div className="flex flex-wrap items-center gap-2">
+      {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
+        <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
+          <Trophy className="w-3.5 h-3.5 text-lmu-accent" />
+          + Personal Best ({formatTime(allTimePBObject.lapTime)})
+        </button>
+      )}
+
+      {theoreticalBestSec && (
+        <button type="button" onClick={onAddTheoreticalBest} className={preset} title="Add your theoretical optimal lap for this track & category">
+          <Sparkles className="w-3.5 h-3.5 text-lmu-accent" />
+          + Theoretical Best ({formatTime(theoreticalBestSec)})
+        </button>
+      )}
+
+      {overallTrackBestObject && !isOverallBestInComparison && (
+        <button
+          type="button"
+          onClick={onAddOverallTrackBest}
+          className={preset}
+          title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
+        >
+          <Award className="w-3.5 h-3.5 text-lmu-accent" />
+          + All-Time Best ({overallTrackBestObject.lapTimeString})
+        </button>
+      )}
+
+      {selectedLapsCount > 0 && (
+        <button
+          type="button"
+          onClick={onClearAll}
+          className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-rose-950/40 border border-lmu-border hover:border-rose-500/40 text-xs text-lmu-muted hover:text-rose-400 font-semibold transition-all flex items-center gap-1 cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Clear
+        </button>
+      )}
+    </div>
+  </div>
+);

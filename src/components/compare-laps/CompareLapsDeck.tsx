@@ -1,14 +1,13 @@
 import React from 'react';
-import { Flag, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { CompareLapCard } from './CompareLapCard';
-import { MAX_COMPARED_LAPS } from './useCompareLapsData.js';
 
 export interface CompareLapsDeckProps {
-  selectedLaps: ComparableLap[];
+  /** The compared laps, left to right. */
+  laps: ComparableLap[];
   baselineLap: ComparableLap | null;
-  baselineLapId: string;
   setBaselineLapId: (id: string) => void;
   onToggleLap: (lap: ComparableLap) => void;
   onSelectSession?: (sessionId: string) => void;
@@ -21,8 +20,12 @@ export interface CompareLapsDeckProps {
   lapColors: readonly string[];
 }
 
+const isBest = (lap: ComparableLap, value: number | null, best: number | null) =>
+  lap.isValid && value !== null && best !== null && Math.abs(value - best) < 0.0005;
+
+/** The compared laps side by side, each with its deltas to the baseline. */
 export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
-  selectedLaps,
+  laps,
   baselineLap,
   setBaselineLapId,
   onToggleLap,
@@ -35,89 +38,41 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
   selectedCarClass,
   lapColors,
 }) => {
-  if (selectedLaps.length === 0) {
+  if (laps.length === 0) {
     return (
-      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-12 rounded-2xl text-center space-y-3">
-        <ArrowLeftRight className="w-12 h-12 text-lmu-muted mx-auto opacity-40" />
-        <h3 className="text-lg font-bold text-white">No Laps Selected for Comparison</h3>
+      <div className="py-8 text-center space-y-2">
+        <ArrowLeftRight className="w-10 h-10 text-lmu-muted mx-auto opacity-40" />
+        <h4 className="text-sm font-bold text-white">No laps selected for comparison</h4>
         <p className="text-xs text-lmu-muted max-w-md mx-auto">
-          Choose laps from the Available Laps Explorer table below or click the quick presets above (Personal Best,
-          Theoretical Best, All-Time Best) to start comparing telemetry side-by-side.
+          Pick two drivers on the leaderboard, compare one with your best, or start from a preset above.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
-      {/* Header & Baseline Lap Indicator */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-lmu-border/50">
-        <div>
-          <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Flag className="w-4 h-4 text-lmu-accent" />
-            Side-by-Side Lap Telemetry Comparison ({selectedLaps.length}/{MAX_COMPARED_LAPS})
-          </h3>
-          <p className="text-xs text-lmu-muted mt-0.5">
-            Set any lap as the <strong className="text-lmu-accent">Baseline</strong> for instant sector and velocity delta calculations.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-white uppercase tracking-wider">
-            Active Baseline Lap:
-          </span>
-          <span className="text-xs font-mono font-bold text-lmu-accent bg-lmu-accent/10 border border-lmu-accent/30 px-2 py-0.5 rounded-lg">
-            {baselineLap ? `${baselineLap.driverName} — ${baselineLap.lapTimeString}` : 'None'}
-          </span>
-          {selectedLaps.length === 2 && (
-            <button
-              type="button"
-              onClick={() => {
-                const other = selectedLaps.find(l => l.id !== baselineLap?.id);
-                if (other) setBaselineLapId(other.id);
-              }}
-              className="flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
-              title="Swap Baseline Lap (⇄)"
-            >
-              <ArrowLeftRight className="w-3 h-3" />
-              <span>Swap Baseline</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {selectedLaps.map((lap, index) => {
-          const isBaseline = lap.id === baselineLap?.id;
-          const deltas = baselineLap ? computeLapDeltas(baselineLap, lap) : null;
-          const color = lapColors[index % lapColors.length];
-          const isCardS1Best =
-            lap.isValid && lap.s1 !== null && bestComparedS1 !== null && Math.abs(lap.s1 - bestComparedS1) < 0.0005;
-          const isCardS2Best =
-            lap.isValid && lap.s2 !== null && bestComparedS2 !== null && Math.abs(lap.s2 - bestComparedS2) < 0.0005;
-          const isCardS3Best =
-            lap.isValid && lap.s3 !== null && bestComparedS3 !== null && Math.abs(lap.s3 - bestComparedS3) < 0.0005;
-
-          return (
-            <CompareLapCard
-              key={lap.id}
-              lap={lap}
-              isBaseline={isBaseline}
-              deltas={deltas}
-              color={color}
-              isCardS1Best={isCardS1Best}
-              isCardS2Best={isCardS2Best}
-              isCardS3Best={isCardS3Best}
-              onSetBaseline={setBaselineLapId}
-              onRemoveLap={onToggleLap}
-              onSelectSession={onSelectSession}
-              benchmarks={benchmarks}
-              allLaps={allLaps}
-              selectedCarClass={selectedCarClass}
-            />
-          );
-        })}
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {laps.map((lap, index) => {
+        const isBaseline = lap.id === baselineLap?.id;
+        return (
+          <CompareLapCard
+            key={lap.id}
+            lap={lap}
+            isBaseline={isBaseline}
+            deltas={baselineLap ? computeLapDeltas(baselineLap, lap) : null}
+            color={lapColors[index % lapColors.length]}
+            isCardS1Best={isBest(lap, lap.s1, bestComparedS1)}
+            isCardS2Best={isBest(lap, lap.s2, bestComparedS2)}
+            isCardS3Best={isBest(lap, lap.s3, bestComparedS3)}
+            onSetBaseline={setBaselineLapId}
+            onRemoveLap={onToggleLap}
+            onSelectSession={onSelectSession}
+            benchmarks={benchmarks}
+            allLaps={allLaps}
+            selectedCarClass={selectedCarClass}
+          />
+        );
+      })}
     </div>
   );
 };

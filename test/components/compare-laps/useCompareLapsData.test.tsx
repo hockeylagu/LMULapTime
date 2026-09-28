@@ -2,7 +2,14 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router';
-import { useCompareLapsData } from '../../../src/components/compare-laps/useCompareLapsData.js';
+import {
+  CompareRequest,
+  deckOrder,
+  defaultBaselineId,
+  toggleComparedLap,
+  useCompareLapsData,
+} from '../../../src/components/compare-laps/useCompareLapsData.js';
+import type { ComparableLap } from '../../../shared/types/index.js';
 
 const laps = [
   {
@@ -56,7 +63,6 @@ describe('useCompareLapsData selection fallbacks', () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    result.current.setPlayerOnly(false);
     await waitFor(() => expect(result.current.allTimePBObject?.id).toBe('fast-player'));
 
     result.current.handleAddPersonalBest();
@@ -93,13 +99,11 @@ describe('useCompareLapsData selection fallbacks', () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    act(() => navigateTo('/compare?track=Monza&carClass=LMP2&playerOnly=false&hideEmpty=false'));
+    act(() => navigateTo('/compare?track=Monza&carClass=LMP2'));
 
     await waitFor(() => {
       expect(result.current.selectedTrack).toBe('Monza');
       expect(result.current.selectedCarClass).toBe('LMP2');
-      expect(result.current.playerOnly).toBe(false);
-      expect(result.current.hideEmpty).toBe(false);
     });
   });
 
@@ -121,7 +125,6 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.loadError).toBe('database is locked'));
     expect(result.current.loading).toBe(false);
     expect(result.current.apiData.laps).toEqual([]);
-    expect(result.current.displayLaps).toEqual([]);
     vi.unstubAllGlobals();
   });
 
@@ -143,5 +146,55 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.apiData.laps.map(lap => lap.id)).toEqual(['monza-player']));
     expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['monza-player']);
     vi.unstubAllGlobals();
+  });
+});
+
+describe('the laps compared', () => {
+  const lap = (id: string, isPlayer = false) => ({ id, isPlayer, driverName: id } as ComparableLap);
+  const ids = (list: ComparableLap[]) => list.map((l) => l.id);
+
+  it('keeps the two newest picks, and takes a lap out when it is picked again', () => {
+    const one = toggleComparedLap([], lap('P1'));
+    const two = toggleComparedLap(one, lap('P2'));
+    expect(ids(two)).toEqual(['P1', 'P2']);
+    expect(ids(toggleComparedLap(two, lap('P3')))).toEqual(['P2', 'P3']);
+    expect(ids(toggleComparedLap(two, lap('P1')))).toEqual(['P2']);
+  });
+
+  it("measures the player's lap against the other driver's, and shows it on the right", () => {
+    const pair = [lap('me', true), lap('rival')];
+    expect(defaultBaselineId(pair)).toBe('rival');
+    expect(ids(deckOrder(pair))).toEqual(['rival', 'me']);
+    expect(defaultBaselineId([lap('P1'), lap('P2')])).toBe('P1');
+    expect(ids(deckOrder([lap('P1'), lap('P2')]))).toEqual(['P1', 'P2']);
+  });
+
+  it('applies the picks and pairs the leaderboard asks for', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ laps, allTimeBestLap: null, playerBestLap: laps[1], benchmarks: [] }),
+    });
+    let compareRequest: CompareRequest | null = null;
+    const { result, rerender } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }], compareRequest }),
+      { wrapper }
+    );
+    await waitFor(() => expect(ids(result.current.selectedLaps)).toEqual(['fast-player']));
+
+    compareRequest = { key: 1, lap: lap('alien-1') };
+    rerender();
+    await waitFor(() => expect(ids(result.current.selectedLaps)).toEqual(['fast-player', 'alien-1']));
+    expect(result.current.baselineLap?.id).toBe('alien-1');
+    expect(ids(result.current.deckLaps)).toEqual(['alien-1', 'fast-player']);
+
+    compareRequest = { key: 2, lap: lap('alien-2') };
+    rerender();
+    await waitFor(() => expect(ids(result.current.selectedLaps)).toEqual(['alien-1', 'alien-2']));
+    expect(result.current.baselineLap?.id).toBe('alien-1');
+
+    compareRequest = { key: 3, reference: lap('rival'), lap: lap('fast-player', true) };
+    rerender();
+    await waitFor(() => expect(ids(result.current.deckLaps)).toEqual(['rival', 'fast-player']));
+    expect(result.current.baselineLap?.id).toBe('rival');
   });
 });

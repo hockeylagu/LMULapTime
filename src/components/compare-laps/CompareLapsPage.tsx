@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { LeaderboardLayout, LeaderboardScope } from '../../../shared/types/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
@@ -46,7 +46,8 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
   const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
-  const { pairRequest, compareRef, onCompare, onTelemetry } = useBoardActions(leaderboard.board, carClass);
+  const { compareRequest, compareRef, onPick, onCompare, onTelemetry } = useBoardActions(leaderboard.board, carClass);
+  const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
   const rival = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
   const rivalName = rival.status?.rival?.kind === 'driver' ? rival.status.rival.driverName : null;
 
@@ -104,12 +105,14 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
           onScopeChange={(next) => updateSearchParams(searchParams, setSearchParams, { scope: next === 'car' ? 'car' : null })}
           onCompare={onCompare}
           onTelemetry={onTelemetry}
+          comparedLapIds={comparedLapIds}
+          onPick={onPick}
         />
       )}
 
       {track && (
         <div ref={compareRef} className="scroll-mt-4">
-          <CompareLaps {...props} pairRequest={pairRequest} />
+          <CompareLaps {...props} compareRequest={compareRequest} onComparedLapsChange={setComparedLapIds} />
         </div>
       )}
     </div>
