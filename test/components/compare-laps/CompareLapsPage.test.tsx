@@ -41,6 +41,11 @@ describe('CompareLapsPage', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.startsWith('/api/leaderboard/layouts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(LAYOUTS) });
       if (url.startsWith('/api/compare/laps')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_LAPS) });
+      if (url.startsWith('/api/rivals?')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({
+          rival: null, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten: [], nextUp: [], trend: [],
+        }) });
+      }
       if (url.startsWith('/api/leaderboard?')) {
         const query = new URLSearchParams(url.split('?')[1]);
         return Promise.resolve({ ok: true, json: () => Promise.resolve({
@@ -102,6 +107,29 @@ describe('CompareLapsPage', () => {
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     expect(urlParams().get('replayName')).toBe('Me.Vcr');
     expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
+  });
+
+  it('shows the rival of the board and asks the server for another one', async () => {
+    const b = board(5, 5);
+    const rivalStatus = {
+      rival: { id: 1, kind: 'driver', driverName: 'Driver 4', targetTime: 100.3, startTime: 100.4, pinned: false, status: 'active', setAt: 1, endedAt: null, beatenTime: null, beatenSessionId: null },
+      rivalEntry: b.entries[3], gap: 0.1, progress: 0, theoreticalGap: 0.1, beaten: [], nextUp: [], trend: [],
+    };
+    const fetchMock = vi.mocked(global.fetch);
+    const defaultFetch = fetchMock.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>;
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.startsWith('/api/leaderboard?')) return Promise.resolve({ ok: true, json: () => Promise.resolve(b) } as Response);
+      if (url.startsWith('/api/rivals')) return Promise.resolve({ ok: true, json: () => Promise.resolve(rivalStatus) } as Response);
+      return defaultFetch(url, init);
+    });
+    render(<CompareLapsPage sessions={[]} />);
+
+    expect(await screen.findByRole('region', { name: 'Your rival' })).toHaveTextContent('Driver 4');
+    fireEvent.click(screen.getByRole('button', { name: /Another rival/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/rivals/skip', expect.objectContaining({ method: 'POST' })));
+    const skipCall = fetchMock.mock.calls.find(([u]) => u === '/api/rivals/skip');
+    expect(JSON.parse(String(skipCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'LMH' });
   });
 
   it('says why when the tracks cannot be loaded', async () => {

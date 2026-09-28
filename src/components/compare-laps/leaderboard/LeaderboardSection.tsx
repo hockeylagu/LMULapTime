@@ -18,6 +18,10 @@ export interface LeaderboardSectionProps {
   onScopeChange: (scope: LeaderboardScope) => void;
   onCompare?: (entry: LeaderboardEntry) => void;
   onTelemetry?: (entry: LeaderboardEntry) => void;
+  /** The rival driver, marked on the board. */
+  rivalName?: string | null;
+  /** Makes a driver ahead the player rival. */
+  onPin?: (driverName: string) => void;
 }
 
 const pill = (active: boolean) =>
@@ -27,7 +31,7 @@ const pill = (active: boolean) =>
 
 /** The board of the selected layout and class: the player's standing, then every driver met there. */
 export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
-  board, loading, error, carClass, scope, playerCarType, onScopeChange, onCompare, onTelemetry,
+  board, loading, error, carClass, scope, playerCarType, onScopeChange, onCompare, onTelemetry, rivalName, onPin,
 }) => {
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);
@@ -107,6 +111,8 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
                       onShowAll={() => setShowAll(true)}
                       onCompare={onCompare}
                       onTelemetry={onTelemetry}
+                      isRival={row.kind === 'driver' && row.entry.driverName === rivalName}
+                      onPin={onPin}
                     />
                   ))}
                 </tbody>
