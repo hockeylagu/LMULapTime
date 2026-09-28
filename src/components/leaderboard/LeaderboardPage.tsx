@@ -8,10 +8,10 @@ import { CompareLaps, CompareLapsProps } from './CompareLaps.js';
 import { TrackRibbon } from './ribbon/TrackRibbon.js';
 import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
 import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
-import { LeaderboardSection } from './leaderboard/LeaderboardSection.js';
-import { useLeaderboard } from './leaderboard/useLeaderboard.js';
-import { useBoardActions, boardLapTag } from './leaderboard/useBoardActions.js';
-import { boardLapToComparable } from './leaderboard/leaderboardLaps.js';
+import { LeaderboardSection } from './board/LeaderboardSection.js';
+import { useLeaderboard } from './board/useLeaderboard.js';
+import { useBoardActions, boardLapTag } from './board/useBoardActions.js';
+import { boardLapToComparable } from './board/leaderboardLaps.js';
 import { RivalCard } from './rivals/RivalCard.js';
 import { useRival } from './rivals/useRival.js';
 

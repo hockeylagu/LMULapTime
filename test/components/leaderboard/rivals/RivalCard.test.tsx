@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { RivalCard } from '../../../../src/components/compare-laps/rivals/RivalCard.js';
-import type { RivalState } from '../../../../src/components/compare-laps/rivals/useRival.js';
+import { RivalCard } from '../../../../src/components/leaderboard/rivals/RivalCard.js';
+import type { RivalState } from '../../../../src/components/leaderboard/rivals/useRival.js';
 import type { RivalStatus, RivalTarget } from '../../../../shared/types/leaderboard.js';
-import { entry } from '../leaderboard/leaderboardFixtures.js';
+import { entry } from '../board/leaderboardFixtures.js';
 
 const player = entry(10, 'Me', 100, {
   isPlayer: true,

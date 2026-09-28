@@ -8,7 +8,7 @@ import {
   defaultBaselineId,
   toggleComparedLap,
   useCompareLapsData,
-} from '../../../src/components/compare-laps/useCompareLapsData.js';
+} from '../../../src/components/leaderboard/useCompareLapsData.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
 
 const laps = [

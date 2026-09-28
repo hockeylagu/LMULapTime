@@ -4,7 +4,7 @@ export * from './session-list/index.js';
 export * from './session-detail/index.js';
 export * from './track-summaries/index.js';
 export * from './track-detail/index.js';
-export * from './compare-laps/index.js';
+export * from './leaderboard/index.js';
 export * from './settings/index.js';
 export * from './replay/index.js';
 export * from './common/index.js';

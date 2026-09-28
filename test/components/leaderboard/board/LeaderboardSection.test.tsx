@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { LeaderboardSection, LeaderboardSectionProps } from '../../../../src/components/compare-laps/leaderboard/LeaderboardSection.js';
-import { rankForTime } from '../../../../src/components/compare-laps/leaderboard/StandingHeader.js';
+import { LeaderboardSection, LeaderboardSectionProps } from '../../../../src/components/leaderboard/board/LeaderboardSection.js';
+import { rankForTime } from '../../../../src/components/leaderboard/board/StandingHeader.js';
 import { BENCHMARK, board } from './leaderboardFixtures.js';
 
 const renderSection = (props: Partial<LeaderboardSectionProps> = {}) => {

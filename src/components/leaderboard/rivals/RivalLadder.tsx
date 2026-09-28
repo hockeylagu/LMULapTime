@@ -2,7 +2,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import type { LeaderboardEntry, RivalTarget } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
-import { formatDrivenAgo } from '../leaderboard/leaderboardFormat.js';
+import { formatDrivenAgo } from '../board/leaderboardFormat.js';
 
 export interface RivalLadderProps {
   beaten: RivalTarget[];

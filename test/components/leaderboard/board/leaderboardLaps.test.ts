@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { boardLapTelemetryRef, boardLapToComparable } from '../../../../src/components/compare-laps/leaderboard/leaderboardLaps.js';
+import { boardLapTelemetryRef, boardLapToComparable } from '../../../../src/components/leaderboard/board/leaderboardLaps.js';
 import { entry } from './leaderboardFixtures.js';
 
 describe('boardLapToComparable', () => {

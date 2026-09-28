@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildLeaderboardRows, LeaderboardRow } from '../../../../src/components/compare-laps/leaderboard/leaderboardRows.js';
+import { buildLeaderboardRows, LeaderboardRow } from '../../../../src/components/leaderboard/board/leaderboardRows.js';
 import { BENCHMARK, board } from './leaderboardFixtures.js';
 
 const describeRows = (rows: LeaderboardRow[]) =>
