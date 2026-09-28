@@ -1,7 +1,7 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from './types.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from './dbSchema.js';
-import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory } from './replayTrajectoryCodec.js';
+import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not
@@ -22,7 +22,7 @@ interface TrajectoryRow {
 }
 
 function readTrajectoryRow(row: Pick<TrajectoryRow, 'parser_version' | 'trajectory_br'>): ReplayTrajectoryData {
-  return upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version);
+  return withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
 }
 
 export function getTrajectoryDefaults(db: DatabaseType, filename: string, driverSlot: number): TrajectoryDefaults | null {

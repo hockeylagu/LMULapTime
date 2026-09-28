@@ -792,7 +792,7 @@ describe('replayParser - extended format & pit info', () => {
         expect(garageReturns.every(e => e.isGarage === true)).toBe(true);
       });
 
-      it('correctly sets inGarage and inPit flags on trajectory points based on event intervals', () => {
+      it('correctly sets inGarage and inPit flags on trajectory points from the pit events', () => {
         if (!runRealReplayTests || !fs.existsSync(lagunaPractice)) return;
 
         // Extract full points around the first stint start (time 0 to 40s)
@@ -803,8 +803,10 @@ describe('replayParser - extended format & pit info', () => {
         const garagePoints = traj.points.filter(p => p.timeSec !== undefined && p.timeSec < 28.0);
         const flyingPoints = traj.points.filter(p => p.timeSec !== undefined && p.timeSec > 35.0 && p.timeSec < 340.0 && (p.speedKmh ?? 0) > 40);
 
+        // Parked in the garage, then driving down the pit lane (in the pits, no longer in the garage).
         if (garagePoints.length > 0) {
-          expect(garagePoints.every(p => p.inGarage === true)).toBe(true);
+          expect(garagePoints.filter(p => (p.speedKmh ?? 0) < 1 && !p.inPit).every(p => p.inGarage === true)).toBe(true);
+          expect(garagePoints.filter(p => (p.speedKmh ?? 0) > 5).every(p => p.inGarage === false && p.inPit === true)).toBe(true);
         }
         if (flyingPoints.length > 0) {
           expect(flyingPoints.every(p => p.inGarage === false && p.inPit === false)).toBe(true);

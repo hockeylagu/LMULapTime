@@ -439,7 +439,7 @@ The payload length is **dynamic** based on the active car count (`eventSize = 21
 Enables 100% accurate running position, leader intervals, and position-over-time charts without post-hoc sorting or interpolation.
 
 #### Type 49 (`eventSize === 1`): Pit & Garage Transitions
-- 1 byte code: `3` = Entered pit lane / Returned to garage. Emitted synchronously with pit entry and garage return beacons.
+- 1 byte code: `3`. Sent next to pit codes `34` (pit entry) and `18` (stall stop) in races, and next to `21` in practice and qualifying. It is **not** a garage return: the app keeps it in `pitEvents` (code `49`) but no longer derives any garage state from it. Meaning otherwise not established.
 
 #### Type 28 (`eventSize === 4`): Track-Limits Verdict
 Not decoded by the app: it copies the XML `<TrackLimits>` rows.
@@ -493,16 +493,18 @@ Emitted with `eventType === 2` (across event classes) to report exact car states
 
 | Action Code (Dec / Hex) | Payload Size | State Description | Garage State |
 | :--- | :--- | :--- | :--- |
-| `16` (`0x10`) | 1 byte | **Exited Garage Bay**: Driver departed garage stall / pit box to begin session outlap or stint. | `isGarage: true` (exiting) |
+| `16` (`0x10`) | 1 byte | **Pit exit after the garage** (practice / qualifying): sent when the car leaves the pit lane, with the pit limiter switching off, about 20 s after it drove out of the stall (no event marks leaving the stall itself; Algarve Q1 12: stall left at 24 s, `16` at 45 s). In races it also appears in the pits without a garage stay. | `isGarage: true` |
 | `18` (`0x12`) | 1 byte | **In Pit Stall**: Car stationary in pit box before mechanics begin work. | `isGarage: false` |
 | `20` (`0x14`) | 1 byte | **Service Commenced**: Mechanics initiate fueling / tire change sequence. | `isGarage: false` |
-| `21` (`0x15`) | 1 byte | **Returned to Garage**: Driver hit ESC back to garage stall or returned to garage bay (end of stint). | `isGarage: true` (entering) |
+| `21` (`0x15`) | 1 byte | **Returned to Garage** (practice / qualifying): the car stops where it is and reappears in its stall a second later. In races it is sent when the car leaves its pit box after a long stop, then drives down the pit lane to `32`. | `isGarage: true` |
 | `32` (`0x20`) | 1 byte | **Exited Pit Lane**: Crossed pit exit timing line (pit limiter disengaged, rejoined racing circuit). | `isGarage: false` |
 | `33` (`0x21`) | 1 byte | **Pit Stop Requested**: In-car dashboard pit request toggle activated by driver. | `isGarage: false` |
 | `34` (`0x22`) | 1 byte | **Entered Pit Lane**: Crossed pit entry line (pit speed limiter engaged, 60 km/h). | `isGarage: false` |
 | `35` (`0x23`) | 1 byte | **On Air Jacks**: Pneumatic air jacks hoisted car in pit box. | `isGarage: false` |
 | `36` (`0x24`) | 1 byte | **On Air Jacks**: Vehicle elevated in pit box. | `isGarage: false` |
 | `37` (`0x25`) | 6 bytes | **Service Complete / Off Jacks**: Service finished, car dropped back to ground. <br>• `+1`: Status byte <br>• `+2..5` (Float32LE): `fuelAddedLiters` (Volume of fuel pumped during stop). | `isGarage: false` |
+
+**Garage state of a point** (`server/replay/garageState.ts`). A garage spell runs from a `21` (or the session start, when `16` is the driver's first pit event other than `33` / `49`) to the next `16`. Within it the car is `inGarage` while parked, then `inPit` from the moment it drives off (≥ 5 km/h) down the pit lane, where the pose pit bit (bit 17) is not set. The spell also ends once the car reaches 100 km/h, which keeps the race meanings of `16` / `21` from flagging racing laps. It is recomputed on read for every stored lap from the lap's `pitEvents`, so rows stored before the rule (type 49 taken for a garage return, the drive to the pit exit flagged as garage) need no re-decode.
 
 ## 5. Lap & Sector Timing Architecture: Official Simulation Timing Stream
 

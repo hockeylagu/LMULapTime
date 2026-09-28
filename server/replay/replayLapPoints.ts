@@ -1,4 +1,5 @@
-import { ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayPitEvent, ReplayTrajectoryPoint } from '../core/types.js';
+import { applyGarageState } from './garageState.js';
 import { RawTrajectoryPoint, isTimeInIntervals } from './replayLapBuilder.js';
 
 type Intervals = Array<{ start: number; end: number }>;
@@ -10,14 +11,15 @@ const MAX_SAMPLE_JUMP_M = 60;
 
 /**
  * Converts raw replay samples to trajectory points. Speed comes from the packet when it
- * decodes to a plausible value, otherwise from the distance to the previous sample.
+ * decodes to a plausible value, otherwise from the distance to the previous sample. The garage
+ * state comes from the driver's pit events (applyGarageState), the same way a stored lap gets it.
  */
 export function buildTrajectoryPoints(
   samples: RawTrajectoryPoint[],
-  garageIntervals: Intervals,
-  pitIntervals: Intervals
+  pitIntervals: Intervals,
+  driverPitEvents: ReplayPitEvent[]
 ): ReplayTrajectoryPoint[] {
-  return samples.map((cur, i) => {
+  const points = samples.map((cur, i): ReplayTrajectoryPoint => {
     let derivedSpeed = 0;
     if (i > 0) {
       const prev = samples[i - 1];
@@ -29,8 +31,6 @@ export function buildTrajectoryPoints(
     }
     const packetSpeed = cur.speedKmhRaw;
     const rawSpeed = packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH ? packetSpeed : derivedSpeed;
-    const inGarage = isTimeInIntervals(cur.sTime, garageIntervals) ||
-      (garageIntervals.length === 0 && Boolean(cur.inPit) && rawSpeed < 1);
     const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
 
     return {
@@ -47,7 +47,7 @@ export function buildTrajectoryPoints(
       gear: cur.gearRaw,
       inPit,
       isOffTrack: cur.isOffTrack,
-      inGarage,
+      inGarage: false,
       isTeleport: false,
       timeSec: Number(cur.sTime.toFixed(4)),
       tcActive: cur.tcActive,
@@ -63,6 +63,8 @@ export function buildTrajectoryPoints(
       tireCompoundIndices: cur.tireCompoundIndices,
     };
   });
+  applyGarageState(points, driverPitEvents);
+  return points;
 }
 
 /**
