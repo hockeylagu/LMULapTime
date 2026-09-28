@@ -32,15 +32,12 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
-    copiedReplay,
     showIncidentsLog,
     setShowIncidentsLog,
     chartMetric,
     setChartMetric,
     hiddenSeries,
     handleLegendClick,
-    handleCopyReplayPath,
-    handleExportCsv,
     handleNavigateToSession,
     hasTireWearData,
     hasFuelData,
@@ -92,11 +89,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         selectedDriverName={selectedDriverName}
         setSelectedDriverName={setSelectedDriverName}
         onBack={onBack}
-        copiedReplay={copiedReplay}
-        handleCopyReplayPath={handleCopyReplayPath}
         relatedSession={relatedSession}
         handleNavigateToSession={handleNavigateToSession}
-        handleExportCsv={handleExportCsv}
         refEntry={refEntry}
       />
 

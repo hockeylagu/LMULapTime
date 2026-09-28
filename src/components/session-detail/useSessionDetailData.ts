@@ -57,7 +57,6 @@ export function useSessionDetailData({
     if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
     return '';
   });
-  const [copiedReplay, setCopiedReplay] = useState<boolean>(false);
   const [showIncidentsLog, setShowIncidentsLog] = useState<boolean>(false);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
@@ -286,69 +285,6 @@ export function useSessionDetailData({
     };
   }, [selectedDriver]);
 
-  const handleCopyReplayPath = () => {
-    if (session?.matchingReplayFile) {
-      navigator.clipboard.writeText(session.matchingReplayFile.path);
-      setCopiedReplay(true);
-      setTimeout(() => setCopiedReplay(false), 2000);
-    }
-  };
-
-  const handleExportCsv = () => {
-    if (!selectedDriver || !session) return;
-    const headers = [
-      'Lap',
-      'LapTime_Seconds',
-      'LapTime_Formatted',
-      'DeltaPrevLap_Seconds',
-      'DeltaOptimal_Seconds',
-      'PaceCategory',
-      'PacePercentage',
-      'S1',
-      'S2',
-      'S3',
-      'TopSpeed_kmh',
-      'FrontTire',
-      'RearTire',
-      'PitStop',
-      'Valid',
-    ];
-    const theo = selectedDriver.theoreticalBest;
-    const rows = selectedDriver.laps.map((l, idx, allLaps) => {
-      const prevLap = idx > 0 ? allLaps[idx - 1] : null;
-      const prevDelta = l.lapTime && prevLap && prevLap.lapTime ? (l.lapTime - prevLap.lapTime).toFixed(3) : '';
-      const optDelta = l.lapTime && theo ? (l.lapTime - theo).toFixed(3) : '';
-
-      return [
-        l.lapNum,
-        l.lapTime || '',
-        l.lapTimeString,
-        prevDelta,
-        optDelta,
-        l.paceCategory || '',
-        l.pacePercentage ? `${l.pacePercentage}%` : '',
-        l.s1 || '',
-        l.s2 || '',
-        l.s3 || '',
-        l.topSpeed || '',
-        l.fCompound,
-        l.rCompound,
-        l.isPitStop ? 'Yes' : 'No',
-        l.isValid ? 'Yes' : 'No',
-      ];
-    });
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${session.trackVenue}_${session.sessionName}_${selectedDriver.name}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const candidatePool: CandidateRelatedSession[] = allSessions.length > 0 ? allSessions : progression;
   const relatedSession = useMemo(() => {
     return findRelatedSession(session, candidatePool);
@@ -367,15 +303,12 @@ export function useSessionDetailData({
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
-    copiedReplay,
     showIncidentsLog,
     setShowIncidentsLog,
     chartMetric,
     setChartMetric,
     hiddenSeries,
     handleLegendClick,
-    handleCopyReplayPath,
-    handleExportCsv,
     handleNavigateToSession,
     hasTireWearData,
     hasFuelData,
