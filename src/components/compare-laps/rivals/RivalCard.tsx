@@ -5,6 +5,7 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import type { RivalState } from './useRival.js';
 import { RivalInsights } from './RivalInsights.js';
 import { RivalLadder } from './RivalLadder.js';
+import { RivalDebriefPanel } from './RivalDebriefPanel.js';
 
 export interface RivalCardProps {
   rival: RivalState;
@@ -95,6 +96,8 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
           <SkipForward className="w-3.5 h-3.5" /> Another rival
         </button>
       </div>
+
+      {rivalEntry && gap > 0 && telemetryReady && <RivalDebriefPanel player={player} rival={rivalEntry} />}
 
       <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} />
     </section>

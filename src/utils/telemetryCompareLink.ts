@@ -10,7 +10,13 @@ export interface TelemetryLapRef {
  * The /telemetry path that shows `target` against `baseline`. Other parameters of the current page
  * (track, class) are kept so the way back finds the same selection.
  */
-export function buildTelemetryComparePath(current: URLSearchParams, target: TelemetryLapRef, baseline: TelemetryLapRef): string {
+export function buildTelemetryComparePath(
+  current: URLSearchParams,
+  target: TelemetryLapRef,
+  baseline: TelemetryLapRef,
+  /** Opens the view on this corner (T number). */
+  corner?: number
+): string {
   const params = new URLSearchParams(current);
   params.set('replayName', target.replayName);
   params.set('lap', String(target.lapNum ?? 1));
@@ -19,5 +25,7 @@ export function buildTelemetryComparePath(current: URLSearchParams, target: Tele
   if (baseline.sessionId) params.set('compareSessionId', baseline.sessionId);
   if (baseline.driverName) params.set('compareDriver', baseline.driverName);
   if (baseline.lapNum !== undefined) params.set('compareLapNum', String(baseline.lapNum));
+  if (corner !== undefined) params.set('corner', String(corner));
+  else params.delete('corner');
   return `/telemetry?${params.toString()}`;
 }
