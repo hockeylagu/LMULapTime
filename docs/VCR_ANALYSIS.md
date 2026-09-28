@@ -840,7 +840,8 @@ floating-point precision.
 | **Tyre compound per wheel (1/16)** | Implemented (`extractReplayTrajectory`) | Point field `tireCompoundIndices` and trajectory `tireCompounds` `[FL, FR, RL, RR]`, raw indices (§2.11 C). All session types since cache v7. |
 | **Cache v6 compatibility** | Implemented (`replayTrajectoryCodec.ts`) | v3–v5 rows are corrected on read (`fuel` → `virtualEnergy`, ambient rescaled from the recovered raw byte, `trackTemp` dropped, `rainPercent` = raw / 255). Stored blobs are never rewritten. v6 rows are served as written (race rows match v7 apart from penalties). On-disk replays are re-decoded at v7 by the background upgrade runner; deleted replays keep their rows and gain no contacts or compounds. |
 | **Session flag (bit 29)** | Implemented (cache v7) | `extractReplayTrajectory` reads the class as `h >>> 30`: weather (0/10), tyres (0/16), contacts (0/17), VE (0/51) and flags (1/10) now decode in practice and qualifying. v6 rows of practice/qualifying replays lack them until re-decoded. |
-| **Track limits (7/28)** | Not implemented | Warning/current points, lap, resolution per verdict; 0 mismatches on 32k XML rows (§2.13 B). Survives a deleted XML. |
+| **Track limits (7/28)** | Not parsed (by decision) | Warning/current points, lap, resolution per verdict; 0 mismatches on 32k XML rows (§2.13 B). A field-for-field copy of the XML `<TrackLimits>` rows, which the stewards log already reads; only useful for a replay whose XML is gone. |
+| **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not parsed (by decision) | One packet per XML `<Sector>` row with an all-zero payload: the car, the time and the kind (engine damage, suspension damage, best S1/S2/S3), nothing about how much damage or where. Duplicates the XML. |
 | **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not implemented | Engine / suspension damage reports and sector-best markers (§2.13 B). |
 | **Player gear shifts (3/11)** | Not parsed (by decision) | Exact upshift / downshift / limiter instants for the player car (§2.13 C). Same information as the pose `gear` channel, only timed to the frame, and DuckDB already gives the player 100 Hz gear. Documented, not decoded. |
 | **Player tyre radius (3/24 `u16@6`)** | Not implemented | Per wheel, radius-like, grows with wheel speed² (§2.13 D). Low value for the app. |
@@ -915,8 +916,8 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
 10. **Wire up the confirmed events:** contacts (1/17) as map markers and a replay incident
     ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C).
     **[DONE in the parser]**, including bit-29 gating and the penalty branch (cache v7).
-    Next: add track limits (7/28) and damage and sector bests (1/23, 1/26, 1/29–31)
-    (§2.13). Player shift instants (3/11) stay documented but unparsed (§5).
+    Track limits (7/28), damage and sector bests (1/23, 1/26, 1/29–31) and player shift
+    instants (3/11) stay documented but unparsed: they duplicate the XML or the gear channel (§5).
 11. **Identify 7/33** (per-car 5 % steps every ~2.4 laps, remote cars only, §2.13 E). Compare
     against an AI or remote car's own DuckDB in a session where that car is the player, or
     against the API's `veFraction` / `fuelFraction` in a live (not replay) session.
