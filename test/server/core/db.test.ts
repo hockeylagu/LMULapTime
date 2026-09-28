@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { SessionDatabase } from '../../../server/core/db.js';
+import { REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
 import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../server/core/types.js';
@@ -302,8 +303,8 @@ describe('SessionDatabase replay cache', () => {
     expect(primary?.trajectoriesCached).toBe(2);
     expect(primary?.compressedSizeBytes).toBeGreaterThan(0);
     expect(primary?.replayDateMs).toBe(1000);
-    expect(primary?.replayVersion).toBe('v5');
-    expect(primary?.parserVersion).toBe('v5');
+    expect(primary?.replayVersion).toBe(REPLAY_CACHE_VERSION);
+    expect(primary?.parserVersion).toBe(REPLAY_CACHE_VERSION);
     expect(primary?.isOnDisk).toBe(false);
 
     const other = list.find(r => r.filename === 'Other_Replay_P2.Vcr');

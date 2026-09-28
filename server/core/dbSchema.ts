@@ -5,9 +5,15 @@ import zlib from 'zlib';
 // and replays LMU has since deleted can never be: their rows are the only copy left. Only bump
 // it when stored rows can no longer be read; a version whose rows the current code still reads
 // correctly belongs in COMPATIBLE_REPLAY_CACHE_VERSIONS instead.
-export const REPLAY_CACHE_VERSION = 'v5';
+// v6: calibrated ambient temp formula, Virtual Energy (1/51), contact events (1/17), tyre compounds (1/16), removal of fake trackTemp
+// v7: event classes read without the race-session bit (29), so practice / qualifying replays get
+//     weather, tyre compounds, contacts, Virtual Energy and flags; penalties decoded from class 3.
+export const REPLAY_CACHE_VERSION = 'v7';
 export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   REPLAY_CACHE_VERSION,
+  // Race replays match v7 except penalties; practice / qualifying rows lack the events above.
+  'v6',
+  'v5',
   // Written by an unreleased build that also stored each lap's edge samples (now derived from
   // the neighbouring lap rows on read); otherwise identical to v3.
   'v4',

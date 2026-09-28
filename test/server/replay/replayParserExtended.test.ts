@@ -272,18 +272,17 @@ describe('replayParser - extended format & pit info', () => {
         evData1.writeFloatLE(0, 45);
         evData1.writeFloatLE(200, 49);
 
-        // Event 2: Class 2 Type 5 Penalty Given: "Cut track warning"
-        // class = 2 (1 << 30), type = 5 (5 << 17), drv = 1
+        // Event 2: Class 3 Type 5 Penalty Given: "Cut track warning" (raw class 7 = class 3 + race bit 29)
         const penaltyText = Buffer.from('Cut track warning', 'utf8');
-        const penaltySize = 3 + penaltyText.length;
+        const penaltySize = 2 + penaltyText.length;
         const evHdr2 = Buffer.alloc(4);
-        const hVal = (2 << 29) | (5 << 17) | (penaltySize << 8) | 1;
+        const hVal = (7 << 29) | (5 << 17) | (penaltySize << 8) | 1;
         evHdr2.writeUInt32LE(hVal >>> 0, 0);
-        const evData2 = Buffer.concat([Buffer.from([1, 0, 0]), penaltyText]); // 3-byte prefix + string
+        const evData2 = Buffer.concat([Buffer.from([1, 0]), penaltyText]); // penalty type, seconds / 2, then text
 
         sliceBufs.push(sBuf1, evHdr1, Buffer.from([0]), evData1, evHdr2, Buffer.from([0]), evData2);
 
-        // Slice 2: Motion + Class 5 Type 2 Pit Event (code 34 = entered pit lane)
+        // Slice 2: Motion + Class 0 Type 2 Pit Event (code 34 = entered pit lane)
         const sBuf2 = Buffer.alloc(6);
         sBuf2.writeFloatLE(30.0, 0);
         sBuf2.writeUInt16LE(2, 4);
@@ -296,8 +295,8 @@ describe('replayParser - extended format & pit info', () => {
         evData3.writeFloatLE(220, 49);
 
         const evHdr4 = Buffer.alloc(4);
-        // class = 5 (5 << 29), type = 2 (2 << 17), size = 1, drv = 1
-        const pitVal = ((5 << 29) | (2 << 17) | (1 << 8) | 1) >>> 0;
+        // raw class 1 (class 0 + race bit 29), type = 2 (2 << 17), size = 1, drv = 1
+        const pitVal = ((1 << 29) | (2 << 17) | (1 << 8) | 1) >>> 0;
         evHdr4.writeUInt32LE(pitVal, 0);
         const evData4 = Buffer.from([34]); // code 34: entered pit lane
 
@@ -358,9 +357,9 @@ describe('replayParser - extended format & pit info', () => {
         sBuf.writeFloatLE(45.0, 0);
         sBuf.writeUInt16LE(1, 4);
 
-        // Class 5 Type 2, code 37 (service complete): +1 status byte, +2..5 fuelAddedLiters (Float32LE)
+        // Class 0 Type 2, code 37 (service complete): +1 status byte, +2..5 fuelAddedLiters (Float32LE)
         const evHdr = Buffer.alloc(4);
-        const pitVal = ((5 << 29) | (2 << 17) | (6 << 8) | 1) >>> 0;
+        const pitVal = ((1 << 29) | (2 << 17) | (6 << 8) | 1) >>> 0;
         evHdr.writeUInt32LE(pitVal, 0);
         const evData = Buffer.alloc(6);
         evData[0] = 37;

@@ -8,6 +8,7 @@ import {
   ReplaySummary,
 } from '../core/types.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
+import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
 import { ReplaySummarySourceData } from './replayServiceTypes.js';
 
 export function cloneReplayMetadata(metadata: ReplayMetadata): ReplayMetadata {
@@ -42,6 +43,7 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     metadata.displayTrack = getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse);
     metadata.trackName = metadata.displayTrack;
 
+    resolveRosterVehicles(metadata, matchedSession.drivers);
     const driver = matchedSession.playerDriver || matchedSession.drivers[0];
     if (driver?.carClass) {
       metadata.carClass = driver.carClass;

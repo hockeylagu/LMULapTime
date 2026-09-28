@@ -117,6 +117,42 @@ const driverSlot  = eventHeader & 0xFF;            // Bottom 8 bits (0 to 255)
 Immediately following the 4-byte `eventHeader` is **1 separator byte** (`0x00` / marker).
 The event payload begins at `offset + 5` and extends for `eventSize` bytes.
 
+**Bit 29 is a per-file flag, not part of the class.** It is set on every event of a race
+replay and clear on every event of a practice or qualifying replay (71/71 race files set,
+158/158 practice/qualifying files clear). The same packet therefore appears as raw class `1`
+in a race and `0` in practice (`3`↔`2`, `7`↔`6`). Identify packets by the two high bits:
+
+```javascript
+const sessionFlag = (eventHeader >>> 29) & 1;  // 1 = race replay, 0 = practice / qualifying
+const classGroup  = (eventHeader >>> 30);      // 0, 1 or 3: the class without the flag
+```
+
+### 3.3 Raw Class Values
+The section headings in §4 are historical groupings. The raw `eventClass` bits of the
+established packets are (race value, then practice/qualifying value):
+
+| Packet | Raw `eventClass` race / P+Q | `eventType` / `eventSize` | Scope |
+| :--- | :--- | :--- | :--- |
+| Vehicle pose & inputs | `1` / `0` | `7..15` / `65` | every car |
+| Brake rotor temperature | `1` / `0` | `15` / `24` or `37` | every car |
+| Virtual energy | `1` / `0` | `51` / `3` | player car |
+| Weather broadcast | `1` / `0` | `10` / `80` | `driverSlot = 255` |
+| Tyre compound | `1` / `0` | `16` / `4` | every car |
+| Contact event | `1` / `0` | `17` / `33` | reporting car |
+| Impact event | `1` / `0` | `6` / `10` | reporting car |
+| Damage & sector-best events | `1` / `0` | `23`, `26`, `29..31` / `23` | reporting car |
+| Downshift marker | `1` / `0` | `0` / `0` | player car |
+| Player chassis (per wheel) | `3` / `2` | `24` / `40` | player car |
+| Player sound events (gearshift, limiter) | `3` / `2` | `11` / `22` | player car |
+| Track flag state | `3` / `2` | `10` / `3` | `driverSlot = 255` |
+| Timing loop checkpoint | `7` / `6` | `6` / `21` (online) or `18` (offline) | every car |
+| Penalty issued | `7` / `6` | `5` / variable | penalised car |
+| Penalty served | `7` / `6` | `7` / `1` | penalised car |
+| Track-limits verdict | `7` / `6` | `28` / `4` | every car |
+| Standings matrix | `7` / `6` | `48` / `21 + N` | `driverSlot = 255` |
+| Packet stream (not decoded) | `7` / `6` | `9` / variable | `driverSlot = 255` |
+| Sequenced opaque messages (not decoded) | `7` / `6` | `60` / variable | `driverSlot = 255` |
+
 ---
 
 ## 4. Event Classes & Payloads
@@ -175,41 +211,30 @@ Emitted periodically alongside vehicle motion packets (at up to ~50 Hz per car).
 
 *Grid Scope: In online multiplayer races, this packet is recorded for all drivers across the entire grid. Per-wheel rubber wear degradation and carcass temperatures are not stored in this packet.*
 
-#### Type 51 (`eventSize === 3`): Onboard Fuel Level Packet
-Emitted continuously throughout stints (~50 Hz per car) to broadcast fuel remaining in tank:
+#### Type 51 (`eventSize === 3`): Virtual Energy Packet
+Emitted continuously (~50 Hz) for the player car. It carries **Virtual Energy**, not fuel.
 
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `0..1` | 2 bytes | UInt16LE | **Fuel Level**: Onboard fuel remaining in tank (monotonically decreases from full capacity down to reserve across stints). |
-| `2` | 1 byte | UInt8 | Fuel pump / feed status indicator. |
+| `0` | 1 byte | UInt8 | **Virtual Energy**: `VE% = byte / 2.55` (i.e. `byte = round(VE% × 2.55)`, 0.39 % resolution). |
+| `1` | 1 byte | UInt8 | `2` for the first seconds of a practice / qualifying session (car still in the garage), otherwise `0`. |
+| `2` | 1 byte | UInt8 | **Pit-request state**: non-zero from a few seconds before the pit-request event (pit code `33`) until service completes (code `37`), or to the end of the session if the stop is never taken. Values seen: `4`, `8`, `13`, `16`, `64`, `128`; their meaning is not established. |
 
-*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle.*
+*Grid Scope: Recorded exclusively for the local player's vehicle.* Validated against DuckDB on
+34 player sessions (practice, qualifying and race) of LMGT3 (BMW M4, Corvette Z06, McLaren 720S)
+and Hypercar (Peugeot 9X8): byte 0 = `round(VE% × 2.55)` in 100 % of samples (one session
+99.95 %). **Cars without a VE system still send the packet, with byte 0 = 0 for the whole
+session**: GTE (Aston Martin Vantage, 4 sessions) and LMP3 (Ginetta / Duqueine / ADESS / Ligier,
+6 sessions at Monza). The replay does **not** store fuel for these cars, and neither does byte 0
+for VE cars. LMU's own replay viewer agrees: an LMP3 replay loaded in-game shows neither fuel
+nor VE. Treat a car that never reports a non-zero byte 0 as having no VE.
 
 #### Type 7: Garage Event
 - Float32LE: Timestamp of entering/exiting garage bay.
 
 ---
 
-### Class 1: Wheel Dynamics & Session Visuals
-
-#### Type 24 (`eventSize === 40`): 4-Corner Wheel Dynamics & Braking Packet
-Emitted continuously at up to ~50–100 Hz per car. Contains granular per-wheel physics structured as **4 discrete 10-byte corner blocks**:
-- **Front-Left (FL)**: Bytes `0..9`
-- **Front-Right (FR)**: Bytes `10..19`
-- **Rear-Left (RL)**: Bytes `20..29`
-- **Rear-Right (RR)**: Bytes `30..39`
-
-Each 10-byte corner block contains:
-
-| Relative Offset | Size | Type | Field Description |
-| :--- | :--- | :--- | :--- |
-| `+0` | 1 byte | UInt8 | Unestablished corner state byte. |
-| `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure. |
-| `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). Does not vary with wheel rotation or speed; wheel speeds are not recorded in this packet. |
-| `+7..8` | 2 bytes | Int16LE | Unestablished corner dynamics field. |
-| `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag. |
-
-*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle. Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
+### Class 1: Session Events & Weather
 
 #### Type 10 (`eventSize === 80`): Track Meteorology, Rain Intensity & Surface Condition Broadcast
 Emitted periodically at ~0.5 Hz (every 1.5–2 seconds) across all sessions. Broadcast with `driverSlot === 255` (`0xFF`) to report global track meteorology, surface precipitation, and ambient temperature:
@@ -217,41 +242,127 @@ Emitted periodically at ~0.5 Hz (every 1.5–2 seconds) across all sessions. Bro
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
 | `0..3` | 4 bytes | Float32LE | **Simulation Time**: Game physics clock in seconds (advances in 3.333s / 10/3 intervals). |
-| `6..9` | 4 bytes | Float32LE | **Solar Progression Factor**: Solar heading and progression angle (increases monotonically from ~0.6 to 2.4+). |
-| `10..13` | 4 bytes | Float32LE | **Track Condition Baseline Factor**: Base track condition scale. |
-| `14..37` | 24 bytes | Binary | Cloud coverage and atmospheric state parameters. |
-| `38` | 1 byte | UInt8 | **Ambient Temperature Metric**: Inverted thermal index (`0x92` = 25.0°C down to `0x81` = 22.0°C, formula: `25.0 - (146 - val) * 0.176`). |
-| `39` | 1 byte | UInt8 | **Track Surface Temperature Candidate**: Road surface thermal baseline (`0x81` = 129, corresponding to ~27.3°C track temperature in Sebring). |
-| `40..41` | 2 bytes | Binary | Atmospheric state and barometric pressure indices. |
-| `42..77` | 36 bytes | Binary | **9 Sector / Path Rain & Surface Wetness Channels**: Structured as 9 discrete 4-byte blocks (`[wetness, wetness, wetness, 0x00]`): <br>• `0x00`: Bone-dry road surface <br>• `0x01..0x03`: Light drizzle / trace dampness <br>• `0x04..0x10`: Steady rain <br>• `0x11..0x18`: Heavy rain <br>• `0x19+`: Torrential rain / standing water |
+| `6..9` | 4 bytes | Float32LE | Linear ramp with session time (~0.0016 per second). Meaning not established. |
+| `10..13` | 4 bytes | Float32LE | Linear ramp with session time, offset from `6..9`. Meaning not established. |
+| `14..37` | 24 bytes | Binary | Not established. |
+| `38` | 1 byte | UInt8 | **Ambient Temperature**: `ambientC = byte / 8 + 5.9` (0.125 °C resolution). |
+| `39` | 1 byte | UInt8 | Constant `0x81` (129) in every replay examined. **Not** track temperature. |
+| `40..41` | 2 bytes | Binary | Not established. |
+| `42..77` | 36 bytes | Binary | **Rain / Surface Wetness**: 9 blocks of 4 bytes, each `[w, w, w, 0x00]`. `rain = w / 255` is the simulation's `raining` value (0.0 = dry). In every replay examined, all 9 blocks carry the same value. |
+
+**Track surface temperature is not stored in the replay.** The engine recomputes it during
+playback from the stored weather state. Take it from DuckDB (`Track Temperature`) when you
+need it.
 
 *Grid Scope: Global broadcast packet (`driverSlot === 255`). Recorded in both online multiplayer and offline practice sessions.*
 
-- **Type 23**: payload size and layout not established (a documented 4-byte countdown variant has
-  not been observed).
+#### Type 16 (`eventSize === 4`): Tyre Compound per Wheel
+Emitted for every car when it loads onto the grid and again whenever its tyres change.
+
+| Offset in Payload | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `0` | 1 byte | UInt8 | Front-left compound index |
+| `1` | 1 byte | UInt8 | Front-right compound index |
+| `2` | 1 byte | UInt8 | Rear-left compound index |
+| `3` | 1 byte | UInt8 | Rear-right compound index |
+
+The index is the compound's position in the car's tyre file: the same index as the XML results'
+`fcompound` / `rcompound` (`"0,Medium"`, `"1,Wet"`). Names must be resolved per car. The last
+packet before a lap gives the compound fitted for that lap. A packet after the chequered flag
+may reset the value.
+
+*Grid Scope: Every car, in every session type (raw class `1` in races, `0` in practice/qualifying; §3.2).*
+
+#### Type 17 (`eventSize === 33`): Contact Event
+Emitted once per contact, by the reporting car (header `driverSlot`). A car-to-car contact
+produces one packet per car. This packet is the source of the XML results' `<Incident>` rows.
+
+| Offset in Payload | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `0..7` | 8 bytes | Binary | Not established (four Int16LE values that vary per contact). |
+| `8..11` | 4 bytes | Float32LE | **Impact magnitude**: the value in the XML `reported contact (x)`. |
+| `12..27` | 16 bytes | Binary | Identity hash of the other object; constant per object type within a session. |
+| `28..31` | 4 bytes | UInt32LE | Small per-object id that accompanies the hash (e.g. `0x4f` / `0x50`). |
+| `32` | 1 byte | UInt8 | **Other party**: the other car's driver slot, or an object code (below). |
+
+| Object code | XML name |
+| :--- | :--- |
+| `105` | Cone |
+| `106` | Post |
+| `107` | Sign |
+| `108` | Wheel (a detached wheel) |
+| `109` | Wing (detached bodywork) |
+| `112` | Immovable (walls, barriers) |
+
+The contact time is the slice `sTime` (0.02 s resolution).
+
+*Grid Scope: Every car, in every session type (raw class `1` in races, `0` in practice/qualifying; §3.2).*
+
+#### Type 6 (`eventSize === 10`): Impact Event
+Emitted by the reporting car around hard impacts, often several in a row (e.g. 4 packets 20 ms
+apart). 492 of 578 in the corpus sit within 0.3 s of a Type 17 contact by the same car.
+
+| Offset in Payload | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `0..5` | 6 bytes | Binary | Not established. |
+| `6..9` | 4 bytes | Float32LE | Session time of the impact (equals the slice `sTime` within 0.2 s in 578/578). |
+
+#### Types 23, 26, 29, 30, 31 (`eventSize === 23`): Damage & Sector-Best Events
+One packet per XML `<Sector>` row, emitted by the car named in that row (header `driverSlot`).
+The 23-byte payload is all zeros in every packet of the corpus; the type carries the meaning.
+Not decoded by the app: no damage amount or location, and the XML `<Sector>` rows say the same.
+
+| Type | XML `<Sector>` text |
+| :--- | :--- |
+| `23` | `reports new engine damage` |
+| `26` | `reports new suspension damage` |
+| `29` | `set new best for sector 1` |
+| `30` | `set new best for sector 2` |
+| `31` | `set new best for sector 3` |
+
+#### Type 0 (`eventSize === 0`): Downshift Marker
+Player car only, no payload. Every one coincides with a Class 3 Type 11 downshift event (277/277
+in three races), but only about a third of downshifts carry one. What selects them is not
+established.
 
 ---
 
 ### Class 3: High-Frequency Wheel Dynamics & Chassis Physics
 
-#### Type 24 (`eventSize === 40`): 4-Corner Wheel Dynamics & Braking Packet
-Emitted continuously at up to ~50–100 Hz per car (`eventClass === 3`). Contains granular per-wheel physics structured as **4 discrete 10-byte corner blocks**:
-- **Front-Left (FL)**: Bytes `0..9`
-- **Front-Right (FR)**: Bytes `10..19`
-- **Rear-Left (RL)**: Bytes `20..29`
-- **Rear-Right (RR)**: Bytes `30..39`
+#### Type 24 (`eventSize === 40`): Player Chassis Packet (per wheel)
+Emitted continuously (~50 Hz, one per player pose). Four 10-byte blocks, one per wheel, in the
+order `[FL, FR, RL, RR]` (block `k` starts at `k × 10`):
 
-Each 10-byte corner block contains:
-
-| Relative Offset | Size | Type | Field Description |
+| Offset in block | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
-| `+0` | 1 byte | UInt8 | Unestablished corner state byte. |
-| `+2..3` | 2 bytes | UInt16LE | **Corner Brake Pressure**: Individual wheel hydraulic braking line pressure. |
-| `+6..7` | 2 bytes | UInt16LE | **Chassis / Track Datum**: Static axle datum (`~1399-1404` for front, `~1454-1460` for rear). Does not vary with wheel rotation or speed; wheel speeds are not recorded in this packet. |
-| `+7..8` | 2 bytes | Int16LE | Unestablished corner dynamics field. |
-| `+9` | 1 byte | UInt8 | Corner brake pressure high byte / ABS modulation flag. |
+| `0` | 1 byte | Int8 | Not established. Tracks longitudinal G (r ≈ 0.93), with a side-dependent offset (left wheels negative, right positive). |
+| `1`, `2`, `4`, `5` | 1 byte each | Int8 | Mostly `0` / `±1`. Not established. |
+| `3` | 1 byte | Int8 | Not established. Small range; follows brake force on the front wheels. |
+| `6..7` | 2 bytes | UInt16LE | **Tyre radius–like value**: constant per axle and car at rest, growing with the square of wheel speed (`value = a + k × v²`, residual 0.3 = integer rounding). Rest values: Corvette / McLaren GT3 front 1399, rear 1454; Peugeot 9X8 1487 on all four (equal tyre sizes). A unit of 0.25 mm gives plausible radii (350 / 364 / 372 mm). |
+| `8` | 1 byte | Int8 | Not established. Tracks longitudinal G (r ≈ 0.95), larger scale than byte `0`. |
+| `9` | 1 byte | Int8 | Not established. Range `-1..1`; follows brake on the front wheels and throttle on the rear wheels (a drive/brake torque sign). |
 
-*Grid Scope: In online multiplayer races, this packet is recorded exclusively for the local player's vehicle. Dedicated servers strip opponent 4-wheel dynamics to conserve network bandwidth.*
+The earlier "per-wheel brake line pressure" reading of these blocks is not supported.
+
+*Grid Scope: Recorded exclusively for the local player's vehicle.*
+
+#### Type 11 (`eventSize === 22`): Player Sound / Animation Event
+Player car only. Fired for discrete driver actions. Not decoded by the app: it duplicates the pose
+`gear` channel, only timed to the frame.
+
+| Offset in Payload | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `0` | 1 byte | UInt8 | Varies per event (93..110). Not established. |
+| `1` | 1 byte | UInt8 | Varies per event (even values `0x5c..0x7e`). Not established. |
+| `2..17` | 16 bytes | Binary | Event hash, identical across cars and sessions for the same action. |
+| `18..21` | 4 bytes | UInt32LE | **Event id**: `52` = upshift, `55` = downshift, `88` = pit limiter toggle, `97` = not established (rare). |
+
+The hash prefixes are `555da8e9…` (upshift), `6868bfaf…` (downshift), `5655040e…` (limiter) and
+`fd2e6aff…` (id 97). On three cars (Corvette GT3, Peugeot 9X8, McLaren GT3), 637 of 638 gear
+changes found independently as RPM steps in DuckDB have one of these events within 0.3 s, and
+upshift events show an RPM drop in 894 of 900 cases.
+
+*Grid Scope: Recorded exclusively for the local player's vehicle.*
 
 #### Type 25 (`eventSize === 34`): High-Frequency Physics Sub-Tick Sync Packet
 Emitted continuously alongside Type 24 for the local player. Byte 3 steps sequentially across sub-ticks (e.g. stepping by 13 cycles).
@@ -260,14 +371,21 @@ Emitted continuously alongside Type 24 for the local player. Byte 3 steps sequen
 
 ### Class 2: Penalties, Incidents & Race Control
 
-- **Type 5**: Penalty Issued Event:
-  - 1 byte: `penaltyId` (Infraction type code: 1 = Cut Track, 2 = Speeding in Pit Lane, 3 = False Start, 4 = Causing a Collision).
-  - 2 bytes: Penalty code / rule reference.
-  - Variable string (`eventSize - 3` bytes): Exact human-readable infraction text (e.g. `"Cut track"`, `"Pit lane speeding"`, `"False start"`).
-- **Type 7**: Penalty Served Event:
-  - 1 byte: `0` = Stop & Go served, `1` = Drive Through served.
-- **Type 8**: Penalty Rescinded:
-  - 1 byte: Penalty cancelled by race control / server admin.
+Penalty packets are raw class **7** (race) / **6** (practice/qualifying), i.e. class 3 once
+bit 29 is masked, not class 2. Validated against the XML `<Penalty>` rows of 69 races: 108/108
+served matched. Issued penalties are **incomplete**: 89 of 146 XML rows have a matching Type 5
+(0 field mismatches); the 13 disqualifications never do (a DQ shows up as a Type 28 verdict with
+resolution `0` plus a zero-size 3/17 marker), and 44 penalties handed out in a burst at the
+start are not in the replay. Prefer the XML when it exists.
+
+- **Type 5** (variable size): Penalty Issued, header `driverSlot` = penalised car:
+  - `+0` UInt8: penalty type: `0` = Stop/Go, `1` = Drive Thru, `3` = Time penalty.
+  - `+1` UInt8: penalty seconds / 2 (XML `Time="10"` → `5`, `Time="100"` → `50`).
+  - `+2..`: reason text, ASCII, the XML `Reason` (e.g. `"Speeding"`, `"Out of position"`, `"Speeding In Pitlane"`).
+- **Type 7** (`eventSize === 1`): Penalty Served, header `driverSlot` = serving car:
+  - `+0` UInt8: penalty type, same codes as Type 5.
+- **Type 8**: *not* a penalty-rescinded event. Raw `7/8` is a high-volume, unrelated packet
+  (a 1-byte broadcast every ~4 s, among others). No rescind packet has been identified.
 - **Type 10**: Track Condition & Flag Status (**Class 3**, payload always 3 bytes):
   - 1 byte: `flagState`:
     - `0`: Green Flag (Track clear / race underway)
@@ -322,6 +440,50 @@ Enables 100% accurate running position, leader intervals, and position-over-time
 
 #### Type 49 (`eventSize === 1`): Pit & Garage Transitions
 - 1 byte code: `3` = Entered pit lane / Returned to garage. Emitted synchronously with pit entry and garage return beacons.
+
+#### Type 28 (`eventSize === 4`): Track-Limits Verdict
+Not decoded by the app: it copies the XML `<TrackLimits>` rows.
+One packet per XML `<TrackLimits>` row (including the XML's duplicated rows), header
+`driverSlot` = the car. Validated on 69 races: 32,469 of 32,622 rows matched exactly with the
+UInt16 lap field, 153 had no packet, **no field mismatches**.
+
+| Offset | Size | Type | Field Description |
+| :--- | :--- | :--- | :--- |
+| `+0` | 1 byte | UInt8 | `WarningPoints × 4` |
+| `+1` | 1 byte | UInt8 | `CurrentPoints × 4` |
+| `+2` | 2 bytes | UInt16LE | `(Lap << 3) \| Resolution`: the lap spills into byte `+3` from lap 32 |
+
+| Resolution | XML text |
+| :--- | :--- |
+| `0` | Disqualify |
+| `1` | Stop Go Penalty |
+| `2` | Drive Through Penalty |
+| `3` | Time Penalty |
+| `4` | Warning |
+| `7` | No Further Action |
+
+#### Type 33 (`eventSize === 4`): Per-Car Progress Step (lead)
+Emitted for every car except the local player: `+0` = `0` or `1`, `+1` = `13 × k` (5 % steps),
+bytes `2..3` zero. Every car emits step `k` when it passes the same track position on the same
+lap, and `k` rises about every 2.3–2.4 laps. The quantity is not established (it does not track
+the player's VE, fuel or tyre wear at the same moments).
+
+#### Type 60 (variable `eventSize`): Sequenced Opaque Messages (not decoded)
+Broadcast (`driverSlot === 255`). Plain header, opaque body:
+`[00][fragments: 01|02][02 00][msgType u16][d2 70 00 00 00 00 00 00][seq u8]…`. `msgType 7` is
+a 26-byte keepalive; `1`, `2`, `3` carry bodies of 100–500 bytes on a steady ~60 s cadence. The
+body is not zlib data. Chat is **not** stored here or anywhere in the replay: XML
+`<ChatMessage>` times do not line up with these packets (13 of 1,094 within 1 s, against 21 for
+random times).
+
+#### Type 9 (variable `eventSize`, ~190–380 bytes): Packet Stream (not decoded)
+Broadcast (`driverSlot === 255`) at exactly **32 Hz**, making up about 9 % of a race replay's
+frame stream. `byte0 & 0x7E` is a sub-stream tag; the number of tags varies by replay (8 to 52).
+Bytes `1..2` (UInt16LE) are a counter that increases separately within each tag. The stream
+runs at a nearly constant ~8 KB/s whatever the grid size (19 to 41 cars), so it is a
+bandwidth-capped stream rather than per-car state. Its fields are bit-packed at variable
+offsets: a sweep of every bit offset (widths 8–16, both bit orders) finds nothing smooth beyond
+the counter.
 
 ---
 
