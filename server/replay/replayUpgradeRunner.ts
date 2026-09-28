@@ -31,8 +31,7 @@ export class ReplayUpgradeRunner {
   // A start asked for while a stopping run finishes its current driver.
   private restartPending: { replaysDir: string; playerName?: string } | null = null;
 
-  /** onFinished runs after each run that ends without a restart pending (the replay facts backfill). */
-  public constructor(private readonly sessionDb: SessionDatabase, private readonly onFinished?: () => void) {
+  public constructor(private readonly sessionDb: SessionDatabase) {
     this.status = idleStatus(this.isEnabled());
   }
 
@@ -82,7 +81,6 @@ export class ReplayUpgradeRunner {
       const restart = this.restartPending;
       this.restartPending = null;
       if (restart) this.start(restart.replaysDir, restart.playerName);
-      else if (!this.stopRequested) this.onFinished?.();
     };
     const step = async (): Promise<void> => {
       try {

@@ -9,6 +9,7 @@ import {
   ReplayWideFacts,
   LapSpan,
   emptyLapFact,
+  factsDriverSlot,
   lapFactsFrom,
   lapSpanFrom,
   replayWideFactsFrom,
@@ -114,12 +115,6 @@ export function getReplayLaps(db: DatabaseType, filename: string, driverSlot?: n
   }));
 }
 
-/** The drivers of a replay that have lap facts. */
-export function getReplayLapDrivers(db: DatabaseType, filename: string): number[] {
-  return (db.prepare('SELECT DISTINCT driver_slot FROM replay_laps WHERE filename = ? ORDER BY driver_slot').all(filename) as Array<{ driver_slot: number }>)
-    .map(r => r.driver_slot);
-}
-
 export function getReplayConditions(db: DatabaseType, filename: string): ReplayConditionFact[] {
   const rows = db.prepare('SELECT * FROM replay_conditions WHERE filename = ? ORDER BY start_sec').all(filename) as Array<{
     start_sec: number; end_sec: number; rain: number | null; ambient_c: number | null; flag_state: number | null; sector_mask: number | null; driver_flag: number | null;
@@ -198,10 +193,10 @@ export function storeDecodedReplayFacts(db: DatabaseType, filename: string, driv
     if (span) spans.set(lap.currentLap, span);
   }
   // A decode that could not name its slot (-1) has no driver to file the laps under.
-  const slot = driverSlotKey >= 0 ? driverSlotKey : trajectory.driverSlot;
-  if (typeof slot === 'number' && slot >= 0) {
+  const slot = factsDriverSlot(driverSlotKey, trajectory);
+  if (slot !== null) {
     const facts = lapFactsFrom(trajectory.laps ?? [], spans);
-    // Like the backfill: every stored lap gets its row, even without a list entry or a timed sample.
+    // Every stored lap gets its row, even without a list entry or a timed sample.
     for (const lapNumber of storedLaps) {
       if (!facts.some(f => f.lapNumber === lapNumber)) facts.push(emptyLapFact(lapNumber));
     }

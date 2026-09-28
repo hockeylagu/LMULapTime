@@ -442,22 +442,9 @@ export interface ReplayUpgradeStatus {
   error: string | null;
 }
 
-/** Background fill of the normalized replay tables from the stored lap rows (no decode). */
-export interface ReplayFactsBackfillStatus {
-  running: boolean;
-  processed: number;
-  total: number;
-  currentFile: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  result: { replays: number; laps: number; interrupted: boolean } | null;
-  error: string | null;
-}
-
 export interface ScanStatus extends ReplayScanStatus {
   sessionScan: SessionScanStatus;
   replayUpgrade?: ReplayUpgradeStatus;
-  replayFacts?: ReplayFactsBackfillStatus;
   telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;
   allComplete?: boolean;

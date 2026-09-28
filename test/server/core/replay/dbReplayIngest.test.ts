@@ -3,7 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { decompressTrajectory } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
@@ -59,6 +60,52 @@ describe('replay ingest', () => {
       expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ fileMtime: 10, fileSize: 20, status: 'stored' });
       // The player's decode also settles the "no driver requested" alias.
       expect(db.getReplayDriverIngest(name, -1)).toMatchObject({ status: 'stored' });
+    });
+
+    describe('stored rows', () => {
+      const ownPit = { driverSlot: 2, timeSec: 0.5, code: 34, action: 'Pit entry' };
+      const lapSummary = { lapNumber: 1, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 };
+      const withFacts = (driverSlot: number | undefined): ReplayTrajectoryData => {
+        const lap: ReplayTrajectoryData = {
+          replayName: name, pointsCount: 1, currentLap: 1, driverSlot,
+          bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+          points: [{ x: 0, y: 0, z: 0, timeSec: 1 }],
+          laps: [lapSummary],
+          weatherEvents: [{ timeSec: 0, rainIntensity: 40, ambientTemp: 20 }],
+          pitEvents: [ownPit, { ...ownPit, driverSlot: 5 }],
+          standingsHistory: [{ timeSec: 0, order: [2, 5] }],
+        };
+        return { ...lap, allLapsData: [lap] };
+      };
+      const storedBlob = (slot: number) => decompressTrajectory((db.getDb()
+        .prepare('SELECT trajectory_br FROM replay_trajectories WHERE driver_slot = ? AND lap_key = 1')
+        .get(slot) as { trajectory_br: Buffer }).trajectory_br);
+
+      it('leave out what the tables hold, and reads still serve it', () => {
+        db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, 2, withFacts(2), false);
+
+        const blob = storedBlob(2);
+        expect(blob.weatherEvents).toBeUndefined();
+        expect(blob.standingsHistory).toBeUndefined();
+        expect(blob.laps).toBeUndefined();
+        expect(blob.pitEvents).toEqual([ownPit]);
+
+        expect(db.getStoredReplayTrajectory(name, 2, 1)?.laps).toEqual([expect.objectContaining({ lapNumber: 1, lapTimeSec: 90 })]);
+        expect(getReplayConditions(db.getDb(), name)[0]).toMatchObject({ rain: 40 });
+      });
+
+      it('keep the lap list of a decode that could not name its driver', () => {
+        db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, -1, withFacts(undefined), true);
+
+        expect(storedBlob(-1).laps).toEqual([lapSummary]);
+        expect(db.getStoredReplayTrajectory(name, -1, 1)?.laps).toEqual([lapSummary]);
+      });
+
+      it('written directly stay whole', () => {
+        db.upsertReplayTrajectoryCache(name, 2, 1, 1, 1, withFacts(2));
+
+        expect(storedBlob(2).pitEvents).toHaveLength(2);
+      });
     });
   });
 

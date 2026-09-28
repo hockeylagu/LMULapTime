@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { ReplaySyncProgress, ReplaySyncResult } from '../dbSchema.js';
+import { factsDriverSlot, withoutReplayFacts } from '../../replay/replayFacts.js';
 import { parseReplayMetadata } from '../../replay/replayParser.js';
 import { extractReplayTrajectory } from '../../replay/replayTrajectory.js';
 import { extractReplayTrajectoryInWorker } from '../../replay/replayTrajectoryWorkerClient.js';
@@ -27,7 +28,8 @@ export interface ReplaySyncHost {
 /**
  * Persists every lap of an `allLaps: true` trajectory result under its own (driverSlot, lap)
  * cache row. The "no explicit lap requested" default is recorded as a pointer instead of a
- * second copy of the chosen lap's blob.
+ * second copy of the chosen lap's blob. Rows leave out what the normalized replay tables hold, so
+ * the caller writes those facts in the same transaction (replaceReplayDriverLaps).
  */
 export function cacheAllLapsForDriver(
   host: ReplaySyncHost,
@@ -39,11 +41,14 @@ export function cacheAllLapsForDriver(
   trajectory: ReplayTrajectoryData
 ): void {
   const perLap = trajectory.allLapsData && trajectory.allLapsData.length > 0 ? trajectory.allLapsData : [trajectory];
+  const factsSlot = factsDriverSlot(driverSlotKey, trajectory);
+  const store = (lapKey: number, lap: ReplayTrajectoryData): void =>
+    host.upsertReplayTrajectoryCache(filename, driverSlotKey, lapKey, mtime, size, withoutReplayFacts(lap, factsSlot), filePath);
   let storedDefaultLap = false;
   for (const lapTrajectory of perLap) {
     if (typeof lapTrajectory.currentLap !== 'number') continue;
     const { allLapsData: _unused, ...single } = lapTrajectory;
-    host.upsertReplayTrajectoryCache(filename, driverSlotKey, lapTrajectory.currentLap, mtime, size, single, filePath);
+    store(lapTrajectory.currentLap, single);
     if (lapTrajectory.currentLap === trajectory.currentLap) storedDefaultLap = true;
   }
 
@@ -54,7 +59,7 @@ export function cacheAllLapsForDriver(
 
   // No numbered row covers the chosen lap, so it must still be stored under the -1 key.
   const { allLapsData: _unused2, ...defaultSingle } = trajectory;
-  host.upsertReplayTrajectoryCache(filename, driverSlotKey, -1, mtime, size, defaultSingle, filePath);
+  store(-1, defaultSingle);
 }
 
 /**

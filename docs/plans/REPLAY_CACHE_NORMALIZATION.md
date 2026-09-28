@@ -1,6 +1,6 @@
 # Replay cache normalization — migration plan
 
-Status: **stage A done (steps 0-5), stage B not started** (written 2026-09-27). Work on a new branch off `main`
+Status: **done: stage A (steps 0-5) and stage B (steps 6-8); the real cache is migrated** (written 2026-09-27). Work on a new branch off `main`
 (suggested name `replay-cache-normalization`), in a branch. One step per commit.
 
 Stage A as built:
@@ -15,8 +15,10 @@ Stage A as built:
 - Step 5: stored trajectories get their lap list from `replay_laps` (`dbReplayTrajectoryStore.ts`),
   falling back to the blob's copy until the replay is backfilled. The traffic signature still
   counts `replay_trajectories` rows: the race positions are built from those blobs, and
-  `replay_laps` also holds listed laps without stored points. No server or client code reads the
-  event arrays of a trajectory, so stage B can drop them from stored rows without rebuilding them.
+  `replay_laps` also holds listed laps without stored points. The client reads none of the
+  event arrays of a trajectory. The server reads one: each lap's own `pitEvents`, to recompute
+  the garage state (`withGarageState` on every read, `readLapSamples` in the race-positions
+  worker), so stripped rows keep the driver's own pit events.
 
 Stage A validated on a copy of the real cache (5.04 GB, 325 replays, 41,847 lap rows; 2026-09-27):
 
@@ -368,6 +370,12 @@ Stage A ends here: every fact exists in the new tables, and every new decode wri
 - **No `REPLAY_CACHE_VERSION` bump.** Stripped rows still read correctly, so a bump would only
   force needless re-decodes (see the comment on `REPLAY_CACHE_VERSION`).
 
+As built: `withoutReplayFacts` (`replayFacts.ts`) drops the weather, flags, contacts,
+penalties, standings, running order and other drivers' pit events. It keeps the driver's own pit
+events (the garage state is recomputed from them), and the lap list when the decode could not
+name its driver (no lap facts filed). The `blob_format` column was used during the migration
+only and has since been dropped (see step 8).
+
 ### Step 7 — strip existing rows, only after verification
 
 For each replay whose facts are backfilled:
@@ -390,6 +398,26 @@ SQLite only reuses freed pages; the file only shrinks after `VACUUM`.
 - It needs about the DB's size in free disk space and takes a few minutes on 5 GB.
 - Add a Settings button: check free space first, stop the background jobs, then run it.
 - Expected result: 4.85 GB → about 4.4 GB of replay data.
+
+### Stage B as built (steps 7-8, one-time, server stopped)
+
+Steps 7 and 8 ran once as a script on a copy of the real cache (`db.backup()`), not as Settings
+actions:
+
+- Compaction applied the step 6 rule to every stored row. Before rewriting a replay, it checked
+  that each row's lists (after `upgradeStoredTrajectory`) equalled the tables. It also checked that
+  each new blob read back to exactly the intended content. One transaction per replay.
+- Result: 325 replays, 41,847 rows, 0 kept whole, no errors. Blob bytes went from 5,094,166,651
+  to 4,584,007,168 in 2,056 s.
+- Then `ALTER TABLE replay_trajectories DROP COLUMN blob_format` (118 s) and `VACUUM INTO`
+  (48 s). `quick_check` ok; counts unchanged (929 sessions, 325 replay facts, 41,847 rows and
+  laps). The file went from 5.46 GB to 4.94 GB.
+- The live DB had not been written since the copy was taken, so the compacted copy replaced it
+  (`server/lmu_cache.db`). The previous file is kept as `lmu_cache.db.backup-pre-stage-b`.
+- The migration code was then removed: the facts backfill (`replayFactsBackfill.ts`, its
+  Settings progress and its trigger after the replay upgrade), the compaction, and
+  `blob_format`. The replay upgrade stays: every new decode writes the facts and a stripped
+  row directly, so a `REPLAY_CACHE_VERSION` bump (v8) re-decodes into the normalized layout.
 
 ---
 

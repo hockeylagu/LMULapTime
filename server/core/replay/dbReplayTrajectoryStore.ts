@@ -25,7 +25,7 @@ interface TrajectoryRow {
   trajectory_br: Buffer;
 }
 
-/** The driver's lap list comes from replay_laps; the blob's own copy only until the replay is backfilled. */
+/** The driver's lap list comes from replay_laps; the blob's own copy only when the replay has no lap facts. */
 function readTrajectoryRow(db: DatabaseType, row: TrajectoryRow): ReplayTrajectoryData {
   const trajectory = withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
   const slot = row.driver_slot >= 0 ? row.driver_slot : trajectory.driverSlot;
