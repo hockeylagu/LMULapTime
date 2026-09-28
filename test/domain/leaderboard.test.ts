@@ -138,7 +138,9 @@ describe('listLeaderboardLayouts', () => {
 
     expect(layouts.map((l) => l.layoutKey)).toEqual(['monza_gp', 'monza_curvagrande']);
     const gp = layouts[0];
-    expect(gp).toMatchObject({ lastDriven: 3000, lastCarClass: 'LMH', trackName: 'Autodromo Nazionale Monza' });
+    expect(gp).toMatchObject({ lastDriven: 3000, lastCarClass: 'LMH', trackName: 'Autodromo Nazionale Monza', circuitName: 'Autodromo Nazionale Monza' });
+    // The circuit name never repeats the layout: that is the layout name's job.
+    expect(layouts[1]).toMatchObject({ circuitName: 'Autodromo Nazionale Monza', layoutName: 'Curva Grande Circuit' });
     expect(gp.classes.map((c) => [c.carClass, c.playerRank, c.fieldSize, c.lastCarType])).toEqual([
       ['LMH', 1, 1, 'Ferrari 499P'],
       ['LMGT3', 2, 2, 'Ferrari 296 LMGT3'],

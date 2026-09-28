@@ -304,6 +304,7 @@ export function listLeaderboardLayouts(sessions: DetailedSession[]): Leaderboard
       layoutKey,
       layoutName: spec.layoutName || spec.officialName,
       trackName: layout.trackName,
+      circuitName: spec.officialName || layout.trackName,
       countryCode: spec.countryCode,
       flagEmoji: spec.flagEmoji,
       lastDriven: layout.lastDriven,
