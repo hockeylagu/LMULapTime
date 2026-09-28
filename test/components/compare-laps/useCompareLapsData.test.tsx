@@ -161,10 +161,10 @@ describe('the laps compared', () => {
     expect(ids(toggleComparedLap(two, lap('P1')))).toEqual(['P2']);
   });
 
-  it("measures the player's lap against the other driver's, and shows it on the right", () => {
+  it("measures the player's lap against the other driver's, and shows it on the left", () => {
     const pair = [lap('me', true), lap('rival')];
     expect(defaultBaselineId(pair)).toBe('rival');
-    expect(ids(deckOrder(pair))).toEqual(['rival', 'me']);
+    expect(ids(deckOrder(pair))).toEqual(['me', 'rival']);
     expect(defaultBaselineId([lap('P1'), lap('P2')])).toBe('P1');
     expect(ids(deckOrder([lap('P1'), lap('P2')]))).toEqual(['P1', 'P2']);
   });
@@ -185,7 +185,7 @@ describe('the laps compared', () => {
     rerender();
     await waitFor(() => expect(ids(result.current.selectedLaps)).toEqual(['fast-player', 'alien-1']));
     expect(result.current.baselineLap?.id).toBe('alien-1');
-    expect(ids(result.current.deckLaps)).toEqual(['alien-1', 'fast-player']);
+    expect(ids(result.current.deckLaps)).toEqual(['fast-player', 'alien-1']);
 
     compareRequest = { key: 2, lap: lap('alien-2') };
     rerender();
@@ -194,7 +194,7 @@ describe('the laps compared', () => {
 
     compareRequest = { key: 3, reference: lap('rival'), lap: lap('fast-player', true) };
     rerender();
-    await waitFor(() => expect(ids(result.current.deckLaps)).toEqual(['rival', 'fast-player']));
+    await waitFor(() => expect(ids(result.current.deckLaps)).toEqual(['fast-player', 'rival']));
     expect(result.current.baselineLap?.id).toBe('rival');
   });
 });
