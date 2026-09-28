@@ -308,9 +308,12 @@ Present at 100 Hz (**44,361 packets** across the session for the player car), st
 - Front axle reports identical values `[T, T]`; rear axle scales by ~0.88 (`Math.round(T * 0.88)`).
 - **Application Integration**: Surfaced in the telemetry strip charts via `TelemetryBrakeTempsChannel`. When native DuckDB telemetry is absent, this authentic VCR thermal stream is automatically displayed.
 
-#### C. Class 0 Type 51 (`sz === 3`): Onboard Fuel Quantity
+#### C. Class 0 Type 51 (`sz === 3`): Onboard Fuel Quantity — **superseded: this is Virtual Energy** (§2.12 A)
 - Present continuously (~50 Hz, 44,361 packets).
 - Bytes 0..1 (UInt16LE) correlate **$r = 0.999$** with onboard fuel remaining (decreasing smoothly from 76 L at stint start down to 11 L at stint finish).
+- *Correction (20260927):* fuel and virtual energy drain together, which caused the high r. Byte 0
+  follows `Virtual Energy` exactly (100 % of 267k samples within rounding) and holds steady while
+  fuel falls. See §2.12 A.
 
 #### D. Validation in Online Multiplayer Races (Imola, Monza, Portimão)
 We verified the presence and distribution of these newly discovered packet types across real **online multiplayer race replays**:
@@ -362,6 +365,7 @@ Offset   Type        Field Description & Calibrated Meaning
 +10..13  Float32LE   Track condition baseline scale (monotonically climbs from 0.27 to 1.92).
 +14..37  Binary      24-byte atmospheric state, sky coverage and cloud density parameters.
 +38      UInt8       Ambient temperature scale (0x92 = 146 down to 0x81 = 129, tracking 25.0°C -> 22.0°C).
+                     [Corrected 20260927, §2.12 B: ambient °C = byte / 8 + 5.9, not the linear 0.176 fit.]
 +42..77  36 bytes    9 discrete 4-byte sector/track path surface wetness channels ([val, val, val, 0x00]).
 ```
 
@@ -559,6 +563,237 @@ changes (slot 17 `03` → `02` at 1141.7 s), but with a different code. Medium r
 `00` or `03`, wet runners on `02`, and `01` shows up only briefly during grid setup. Candidate
 meaning: tyre set, or the compound selected in the garage. Not confirmed.
 
+### 2.12 Corpus & DuckDB validation (all replays on disk, 20260927)
+
+**Corpus:** 229 replays and 929 XML results. Each replay was paired to its XML by contact
+fingerprints (impact magnitudes are near-unique floats), and the slot→name mapping came from the
+VCR roster (`parseReplayMetadata`). **DuckDB pairs:** 8 race replays with same-session 100 Hz
+telemetry of the player car: `Circuit de la Sarthe R1 37–41`, `Daytona International Speedway
+Road Course R1 9–10`, `Algarve International Circuit R1 19`. DuckDB `ts` / `GPS Time` sits on the
+same session clock as slice `sTime`, so samples pair with no offset. Controls came back as
+expected: brake rotor temp at 1/15 `u16@22`, r = 0.9997.
+
+| Finding | Evidence | Verdict |
+|---|---|---|
+| **1/17 contact event** (§2.11 B) | 69 race replays: 9,884 XML incidents matched, **100 % correct** on reporting slot, magnitude and other party. The only "failures" were XML-escaped names (`O&apos;Reilly`). 8 VCR-only contacts. ~6 % of XML incidents have no packet; the gap is concentrated in 4 replays (e.g. `Spa R1 37`: 49/149 missing) | **Confirmed** |
+| **1/17 object codes** | From every non-vehicle contact in the corpus: `105` Cone (26), `106` Post (145), `107` Sign (156), `108` Wheel (101: a detached wheel), `109` Wing (167: detached bodywork), `112` Immovable (2,875: walls/barriers). Values below ~105 are car slots | **Confirmed** |
+| **1/16 tyre compound per wheel** (§2.11 C) | 1,592 of 1,611 drivers' final compound matches the XML. Mismatches are detail the XML cannot express: single-wheel changes (`01010101 → 01000101`), mixed front/rear sets that the XML reduces to axle values, and a post-flag reset to `00` | **Confirmed**, per wheel `[FL, FR, RL, RR]` |
+| **Session-type scope** | ~~1/17 and 1/16 appear in 71/71 race replays and 0/158 practice/qualifying replays~~. **Corrected in §2.13 A:** header bit 29 is a race-session flag, so in practice and qualifying the same packets appear as 0/17 and 0/16. With the flag masked they are in every session type | ~~Race-only packets~~ **All sessions** |
+| **1/51 = Virtual Energy** (A) | 4 races, 267k samples: byte 0 = `round(VE% × 2.55)` in 100 % of samples | **Confirmed**, supersedes "fuel" |
+| **Ambient temperature** (B) | Byte 38 against DuckDB `Ambient Temperature` (Daytona R1 9/10: 17 distinct steps) and the Sebring API run | **Confirmed**: `°C = byte / 8 + 5.9` |
+| **Track temperature** | Not in 1/10/80: best candidate r = 0.52 (Sebring API run) and 0.90 on a trend (Le Mans DuckDB). Byte 39 is constant 129 on every replay. The replay still **reproduces it exactly**: during `Circuit de la Sarthe R1 37` playback, `sessionInfo.trackTemp` matched DuckDB `Track Temperature` within 0.002 °C (75 samples; green flag at session 184 s). No float32/float64 bit pattern of those values exists anywhere in the file. DuckDB's track temperature steps on a fixed ~232 s cycle (141, 375, 606, 838, 1070, 1303 s), unrelated to laps | **Engine-derived, not stored.** Recomputed from stored weather state (sun angle ramps `f32@6`/`@10`, ambient, clouds). Use DuckDB when available |
+| **API wind in replay** | `sessionInfo.windSpeed` is all zeros while DuckDB records 7 m/s | API does not report wind in replay mode |
+| **7/9 stream** (C) | No byte-aligned field correlates with any player channel after detrending | **Bit-packed; open** |
+| **3/24 packet** (D) | Strong but mixed correlations | Lead |
+
+#### A. Class 1 Type 51 (`sz === 3`) byte 0 is Virtual Energy, not fuel
+
+On `Circuit de la Sarthe R1 37`, byte 0 holds at 153 (= 60.0 % × 2.55) from 139 s to 186 s while
+DuckDB `Fuel Level` falls 51.6 → 51.35 L. It then steps down exactly when `Virtual Energy`
+crosses each 1/2.55 % boundary (59.805 % → 152, 59.413 % → 151, …). Across Le Mans R1 38,
+Daytona R1 10 and Algarve R1 19 (VE 4–97 %, 267,000 samples), every sample is within 0.5 of
+`VE% × 2.55`. **Scale: `VE% = byte0 / 2.55` (0.39 % resolution).** Byte 2 was `64` from 426 to
+435 s, just before pit entry (449.4 s). That could be a pit-request flag; unconfirmed.
+
+**App impact:** `server/replay/replayTrajectory.ts` already computes `b0/255*100`, which is VE %,
+but stores it as `fuelPct` in `driverFuel`. What the replay studio shows as "fuel" is therefore
+virtual energy. On cars without a VE system (checked: GTE, `Fuji Speedway R1 29/30`) the packet is still
+sent, but all three bytes are 0 for the whole session, so it carries neither fuel nor VE. The parser
+reports VE only once a car sends a non-zero value (VE starts full).
+
+**Validation by car class (20260927).** Every DuckDB file was paired to its replay by the
+player's timing-line crossings (DuckDB `Lap.ts` against the 7/6 slice `sTime`, ±0.1 s), giving 41
+pairs across practice, qualifying and race:
+
+| Class (player car) | Sessions | Byte 0 |
+|---|---|---|
+| LMGT3 (BMW M4, Corvette Z06, McLaren 720S) | 28 | `round(VE% × 2.55)` in 100 % of samples (Bahrain R1 9: 99.95 %) |
+| Hypercar (Peugeot 9X8) | 6 | 100 % (4 checked here, Daytona R1 9/10 in §2.12) |
+| GTE (Aston Martin Vantage AMR, Spa) | 4 | always `0`; DuckDB has no VE, fuel 5–43 L |
+| LMP3 (Monza, all-LMP3 grids) | 6 | always `0`; DuckDB has no VE, fuel 0.6–38 L |
+
+So the replay records **no fuel for fuel-only cars**. Confirmed in-game: LMU's replay viewer shows
+neither fuel nor VE for an LMP3 replay. For VE cars, fuel follows VE only through
+the car's fuel ratio (implied "capacity" 85–101 L depending on car and track), which is not a
+stored value. Other bytes: byte 1 = `2` for the first seconds of practice/qualifying (in the
+garage). Byte 2 is a **pit-request state**, e.g. Daytona R1 8: `64` from 213.9 to 400.3 s around
+request (code 33) at 217.3 s and service complete (37) at 401.4 s; then `8` from 734.2 to 894.0 s
+(request 745.4, complete 895.1). It stays set to the end of a session when the stop is not
+taken. Values 4, 8, 13, 16, 64, 128 differ per stop; their meaning is open.
+
+*Side finding:* the replay roster labels the Monza LMP3 cars `Oreca 07 LMP2` (`4_25_DKR_…`) or
+leaves them unresolved (`46_25_ADES…`, `12_25_WTM_…`, `11_25_EURO…`): a vehicle-mapping bug in
+`shared/domain/vehicleMapping.ts`, not a VCR issue. Fixed: vehicle ids now resolve through a
+catalog built from the results logs (`shared/domain/vehicleCatalog.ts`, `npm run vehicles:catalog`).
+
+#### B. Ambient temperature: `°C = byte38 / 8 + 5.9`
+
+Daytona R1 9 and R1 10 each step through bytes 161…177 while DuckDB ambient moves 26.026 →
+28.027 °C: exactly 0.125 °C per unit. Fixed points: 161 → 26.026, 169 → 27.026 (all Le Mans
+races), 177 → 28.027/28.028 (Daytona, Algarve), 129 → 22.022 (Sebring API), 153 → 25.025
+(Sebring API). Residual ≤ 0.003 °C. The §2.9 formula (`25 − (146 − x) × 0.176`) is wrong away
+from its two calibration points (it gives 26.2 °C for byte 153).
+
+The Sebring API run (1 Hz `sessionInfo` over the full race at 2×, 167 in-race samples) also
+fixed the replay clock: **VCR `sTime` = race time + 121.5 s** (green flag) for that file. Rain
+matched `byte42 / 255` with a mean error of 0.005 byte units. All 9 wetness channels were equal
+throughout (u16 reads of any block give the same fit).
+
+#### C. Class 7 Type 9: sub-streams by tag, not per car
+
+Tag = `byte0 & 0x7E`. Le Mans R1 37 has 16 tags, not 21 cars. Four tags (`0x00`, `0x10`,
+`0x60`, `0x70`) carry about 5,800 packets each; the rest carry 1,100–5,000. Bytes 1–2 form a
+little-endian counter that climbs separately within each tag. A detrended sweep of every
+byte-aligned u8/i8/u16/i16/f32 in every tag against 106 DuckDB series found nothing above
+r ≈ 0.96 beyond the counter's own time trend. That points to bit-packed (possibly
+delta-coded) network messages. The next step is a bit-offset sweep, reading fields of width
+4–16 at every absolute bit position within one tag.
+
+#### D. Class 3 Type 24 (`sz === 40`, player only): leads after detrending
+
+`u8@36` against `Turbo Boost Pressure` r = 0.983; `u8@26` against wheel/ground speed r = 0.959;
+`i16@7` against `G Force Long` r = 0.944; `i16@17` against `FFB Output` r = 0.923; `i8@9` against
+brake pedal r = −0.912; `i8@39` against throttle r = 0.847. These inputs correlate with each
+other while driving, so each lead needs a partial-correlation or bit-level pass before
+promotion. The §2.8 A "10-byte corner block" model does not fit these offsets well.
+**Class 3 Type 11 (`sz === 22`, player, 354 packets):** `f32@15` against unfiltered throttle
+r = −0.967. Sparse; meaning unknown. *(Both leads superseded by §2.13 C–D: 3/24 is four
+per-wheel blocks after all, and 3/11 is a gear-shift event. The throttle correlation came from
+a float read across an event hash.)*
+
+### 2.13 Race-control events, per-wheel chassis & the session flag (corpus, 20260927)
+
+Method as in §2.12: the 69 race replays paired to their XML, and the three DuckDB pairs with
+different player cars (`Circuit de la Sarthe R1 37` Corvette GT3 slot 8, `Daytona … R1 10`
+Peugeot 9X8 slot 0, `Algarve … R1 19` McLaren GT3 slot 18). Scripts live in the session
+scratchpad (`tl.cjs`, `pen.cjs`, `sec.cjs`, `shift.mjs`, `fit6.mjs`, `bits.cjs`, `rate.cjs`).
+
+| Finding | Evidence | Verdict |
+|---|---|---|
+| **Header bit 29 = race flag** (A) | Set on every event in 71/71 race replays, clear in 158/158 practice/qualifying replays. Every packet exists in both, one raw class apart (`1/8` ↔ `0/8`, `7/9` ↔ `6/9`, `3/24` ↔ `2/24`) | **Confirmed.** Supersedes the "race-only" scope of 1/16 and 1/17 |
+| **7/28 = track-limits verdict** (B) | 32,473 of 32,622 XML `<TrackLimits>` rows matched on slot and time, **0 field mismatches** on WarningPoints, CurrentPoints, Lap and Resolution. Re-check (G): 32,469 exact, and only once the lap is read as `u16@2 >> 3` | **Confirmed** |
+| **7/5, 7/7 = penalty issued / served** (B) | 129/133 issued (slot + reason text), 108/108 served (time). Re-check (G): 89 of 146 issued; DQs and start-burst penalties are missing | **Confirmed layout, partial coverage**; parsed since cache v7 |
+| **1/23, 1/26, 1/29–31 = damage & sector bests** (B) | 2,076 of 2,099 XML `<Sector>` rows matched: 26 suspension damage (713), 23 engine damage (11), 29/30/31 best sector 1/2/3 (491/468/391). Payload always 23 zero bytes | **Confirmed** |
+| **3/11 = player gear-shift / limiter event** (C) | Event id 52 upshift, 55 downshift, 88 pit limiter. 637/638 DuckDB RPM-step shifts have one within 0.3 s, on three different cars | **Confirmed** |
+| **3/24 = four per-wheel blocks** (D) | `u16@6` of each block = `a + k·v²` of that wheel's speed, residual 0.3 (rounding); rest value matches tyre size per axle and car | **Radius-like value confirmed**; other bytes are leads |
+| **1/6 (`sz 10`) = impact** (E) | f32 at +6 equals the event's own `sTime` in 578/578; 492 within 0.3 s of a contact by the same car | Confirmed as impact-related; bytes 0..5 open |
+| **1/0 (`sz 0`) = downshift marker** (E) | Player only; 277/277 coincide with a downshift event, but only ~⅓ of downshifts get one | Partly understood |
+| **7/33 progress step** (E) | +13 (5 %) per step for every remote car at the same track position, about every 2.3–2.4 laps | Lead; quantity unknown |
+| **7/9 stream** (F) | Constant ~8 KB/s at 32 Hz whatever the grid size (19–41 cars); tag count 8–52 per replay; no smooth bit field at any fixed bit offset beyond the counter | Bandwidth-capped, variable-layout stream. **Parked** |
+| **Chat** (F) | Not stored in the replay: no ASCII or UTF-16 copy of any XML `<ChatMessage>` text, and 7/60 timing does not follow chat times (13 of 1,094 within 1 s vs 21 for random times) | **XML only** |
+
+#### A. Bit 29 is a session flag, not part of the class
+
+The Sebring census (§2.11 A) read raw classes 1, 3 and 7. A practice replay shows the same
+packets as 0, 2 and 6: `0/8` poses, `0/51` VE, `2/24`/`2/25` player chassis, `6/9` stream,
+`0/17` contacts, `0/16` tyres. Counting with bit 29 masked (`h >>> 30`):
+
+| Session | Files | With contacts (17) | With tyre packets (16) | With track limits (28) | With 3/11 shifts |
+|---|---|---|---|---|---|
+| Practice | 92 | 48 | 92 | 80 | 92 |
+| Qualifying | 66 | 65 | 66 | 66 | 66 |
+| Race | 71 | 69 | 71 | 69 | 69 |
+
+**App impact:** `server/replay/replayTrajectory.ts` tests `evClass === 1` for weather (1/10),
+tyre compound (1/16), contacts (1/17) and VE (1/51), and `evClass === 3` for flags (3/10). None
+of these branches fires on a practice or qualifying replay. Gate on `h >>> 30` instead.
+
+#### B. Race control: track limits, penalties, damage and sector bests
+
+**7/28 track limits** (`sz 4`): `+0 = WarningPoints × 4`, `+1 = CurrentPoints × 4`,
+`u16@2 = (Lap << 3) | Resolution` (reading only byte 2 wraps the lap at 32). Resolution codes from the corpus XML: `0` Disqualify,
+`1` Stop Go Penalty, `2` Drive Through Penalty, `3` Time Penalty, `4` Warning, `7` No Further
+Action. The XML writes most rows twice, and so does the replay. Example (Le Mans R1 37, slot 5,
+234.67 s): `01 01 04 00` = 0.25 / 0.25 points, lap 0, Warning.
+
+**7/5 penalty issued**: `+0` type (`0` Stop/Go, `1` Drive Thru, `3` Time), `+1` seconds / 2,
+`+2..` reason text (`01 05 "Speeding In Pitlane"` = Drive Thru, 10 s). **7/7 served**: `+0` type.
+Penalties exist only as raw class 7 (or 6); nothing matches class 2. The parser's class-2
+branch, which also reads the text from `+3`, never fires, so replays carry no penalties today.
+Raw 7/8 is an unrelated high-volume packet, so a class-7 gate must not treat type 8 as
+"penalty removed".
+
+**Damage & sector bests** (`sz 23`, zero payload): one packet per XML `<Sector>` row. Le Mans
+R1 37: `1/26` slot 8 at 414.89 s = XML 414.9 "Samuel Lague(8) reports new suspension damage";
+`1/29` slot 3 at 226.69 s = XML 226.7 "R Franco(3) set new best for sector 1".
+
+#### C. Class 3 Type 11: player sound / animation events
+
+Payload `[u8][u8][16-byte hash][u32 id]`, the same shape as the other-object identity in 1/17.
+The hash and id are identical across cars and sessions:
+
+| Id | Hash prefix | Action | Evidence (3 races, 3 cars) |
+|---|---|---|---|
+| 52 | `555da8e9` | Upshift | 894/900 followed by an RPM drop |
+| 55 | `6868bfaf` | Downshift | fired under braking at falling speed; RPM rises or holds |
+| 88 | `5655040e` | Pit limiter toggle | 60 km/h, at pit entry and exit |
+| 97 | `fd2e6aff` | Not established | 1–5 per race (e.g. stationary off track after a crash) |
+
+Recall: 637 of 638 gear changes detected independently as RPM steps in DuckDB have a 3/11
+within 0.3 s. This gives exact shift instants for the player, finer than the gear field of the
+pose stream, which dips through neutral (§4 of VCR_FORMAT.md).
+
+#### D. Class 3 Type 24: four per-wheel blocks
+
+Blocks of 10 bytes at `k × 10`, wheel order `[FL, FR, RL, RR]` (per-wheel correlations follow
+DuckDB `Wheel Speed[k]`). Per block:
+
+- `u16@6`: `a + k·v²` of that wheel's speed, R² 0.99, residual sd 0.3 (integer rounding). At
+  rest: 1399 front / 1454 rear on the Corvette and the McLaren (GT3: smaller front tyre, ratio
+  0.962 against 0.966 from nominal sizes), 1487 on all four wheels of the Peugeot 9X8 (equal
+  tyre sizes). Consistent with rolling radius under centrifugal growth, in 0.25 mm units.
+- `i8@0`, `i8@8`: track G-long (r 0.93 / 0.95); left and right wheels have opposite intercepts.
+- `i8@3`, `i8@9`: tiny range (`-1..1`), following brake on the fronts and throttle on the
+  rears: a sign of drive/brake torque at that wheel.
+- `i8@1`, `@2`, `@4`, `@5`: mostly `0`/`±1` noise. Running sums track nothing.
+
+DuckDB has no per-wheel force, load or radius channel, so only `u16@6` is established.
+
+#### E. Smaller events
+
+- **1/6 (`sz 10`) impact:** e.g. four packets at 414.89–414.95 s for the player's wall hit;
+  the f32 at +6 is the impact time (414.9).
+- **1/0 (`sz 0`) downshift marker:** see table.
+- **7/33 (`sz 4`)** (all cars but the player): `01 0d`, `01 1a`, `01 26` … Each car emits step
+  `k` about 52–57 s after its lap-2 sector-1 crossing at Le Mans, at the same place for every
+  car. On Daytona R1 10 the steps come at 376, 610, 840, 1067, 1309 … s. The player's VE falls
+  about 8.5 % and front-left wear about 1.2 % per step, so neither matches a 5 % bucket.
+- **7/15 (`sz 5`)**: `+0` code (0, 1, 4, 6, 9), `+1..4` Float32LE in the range of lap distance
+  (5,300–12,500 at Le Mans). Lead.
+- **0/19 (`sz 1`, slot 255)**: values 0–3, toggling around pit activity. Lead.
+
+#### F. What stays out of reach
+
+**7/9** carries a constant ~8 KB/s at 32 Hz whatever the grid size, with 8 to 52 tags per
+replay. A sweep of every bit offset (8/10/12/16-bit, LSB- and MSB-first) finds only the
+counter. It looks like a bandwidth-capped network stream with variable-length records. Poses
+already cover every car, so it is parked. **7/60** carries sequenced messages (fragment count,
+type, constant id `d270…`, sequence byte) with opaque bodies on a ~60 s cadence; it is not zlib
+data. **Chat** is not stored in the replay.
+
+#### G. Independent re-check (2026-09-27)
+
+A separate pass with its own scripts over all 229 replays and 69 XML-paired races:
+
+- **Bit 29:** set on every event of 71/71 race replays, on none of 158 practice/qualifying
+  replays. Masked-class packets exist in practice and qualifying: 0/16/4 in 92/92 practice and
+  66/66 qualifying files, 0/17/33 in 48 and 65, 0/51/3 in 38 and 53, 1/10/3 in all of them.
+- **7/28:** 32,469 of 32,622 rows exact once the lap is `u16@2 >> 3`; byte 3 is non-zero from
+  lap 32. 153 rows have no packet.
+- **7/5:** 89 of 146 XML penalties exact (type, seconds, reason; 0 mismatches). The 13
+  disqualifications have no 7/5: a DQ is a 7/28 verdict with resolution `0` plus a zero-size
+  3/17 marker. 44 penalties issued in a burst at the start are absent. **7/7:** 108/108.
+- **Damage & sector bests:** 2,076 of 2,099 `<Sector>` rows, none of the wrong kind.
+- **3/11:** on Le Mans R1 37, Daytona R1 10 and Algarve R1 19, all 1,778 DuckDB gear changes
+  have a shift event of the right direction; 1,779 of 1,789 shift events match a gear change.
+- **3/24 `u16@6`:** R² 0.95–0.99 per wheel; rest values reproduced.
+- **Other classes:** timing (3/6), standings (3/48) and pit (0/2) only ever appear in the one
+  masked class the parser reads. Type 49 appears as masked class 1 and 3 in every session type,
+  as distinct events next to pit / garage codes 21, 34 and 18; the parser keeps reading raw 2
+  and 7 only, because it treats a type-49 event as a garage return.
+
+Not re-checked: 1/6, 1/0, 7/33, 7/15, 0/19.
+
 ---
 
 ## 4. Cross-validation suites
@@ -592,14 +827,24 @@ floating-point precision.
 | **Session Identification** | Implemented (`parseReplayMetadata`) | Session byte parsing, `modUid`, `trackPath`. |
 | **Lap & Sector Timing** | Implemented (`extractReplayLapSummaries`) | Class 6 Type 6 events; matches in-game HUD. |
 | **Tire Dynamics & Wear** | **Unverified; removed from parser** | Speculative Type 15 offsets refuted in analyzed multiplayer sessions (§2.7). Open investigation remains for potential inclusion in offline practice / local race weekend sessions. |
-| **Penalties & Incidents** | Implemented | Class 2 Type 5 penalty strings, lap indices, timestamps. |
+| **Penalties & Incidents** | Implemented (cache v7) | Trajectory `penalties`: class 3 Type 5 issued (`penaltyType`, `penaltySeconds`, reason text from `+2`) and Type 7 served (§2.13 B). Coverage is partial (DQs and start-burst penalties missing, §2.13 G); the XML stays the reference. Before v7 the branch gated on class 2 and never fired. |
 | **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |
 | **Gear** | Implemented (`extractReplayTrajectory`) | Header `eventType - 8`, all cars including AI. |
 | **Engine RPM** | Implemented (`extractReplayTrajectory`) | Bits 53-62 (§2.1), scale 10.9228, saturation guard at raw10 === 1023. |
 | **Pit Events & Strategy** | Implemented (`extractReplayTrajectory`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. Exposed via the trajectory's `pitEvents` field. |
 | **Track Flags & Safety Car** | Implemented (`extractReplayTrajectory`), partially confirmed | Class **3** (not 2) Type 10, always 3 bytes. `flagState` confirmed (§2.6); other 2 bytes decoded but unconfirmed. |
 | **Live Standings** | Implemented (`extractReplayTrajectory`) | Class 7 Type 48. Dynamic grid size (`eventSize = 21 + count`), count + slot array in exact running order (§2.6, §2.9). |
-| **Weather & Track Meteorology** | Implemented (`parseReplayMetadata`, `extractReplayTrajectory`) | Class 1 Type 10 (80 bytes, driverSlot 255). Ambient temp (byte 38), track temp baseline (byte 39), and 9-channel sector rain wetness (§2.9). |
+| **Weather & Track Meteorology** | Implemented (`parseReplayMetadata`, `extractReplayTrajectory`) | Class 1 Type 10 (80 bytes, driverSlot 255). Ambient `byte38 / 8 + 5.9` °C, rain `byte42 / 255` (§2.12 B). Track temperature is not stored and is no longer derived from byte 39. |
+| **Virtual Energy (1/51)** | Implemented (`extractReplayTrajectory`) | Point field `virtualEnergy` = `byte0 / 2.55` (§2.12 A). Before cache v6 it was stored as `fuel`. |
+| **Contact events (1/17)** | Implemented (`extractReplayTrajectory`) | Trajectory `contacts`: slot, `sTime`, impact magnitude, other car slot or object name (§2.11 B, §2.12). All session types since cache v7 (class read as `h >>> 30`, §2.13 A). |
+| **Tyre compound per wheel (1/16)** | Implemented (`extractReplayTrajectory`) | Point field `tireCompoundIndices` and trajectory `tireCompounds` `[FL, FR, RL, RR]`, raw indices (§2.11 C). All session types since cache v7. |
+| **Cache v6 compatibility** | Implemented (`replayTrajectoryCodec.ts`) | v3–v5 rows are corrected on read (`fuel` → `virtualEnergy`, ambient rescaled from the recovered raw byte, `trackTemp` dropped, `rainPercent` = raw / 255). Stored blobs are never rewritten. v6 rows are served as written (race rows match v7 apart from penalties). On-disk replays are re-decoded at v7 by the background upgrade runner; deleted replays keep their rows and gain no contacts or compounds. |
+| **Session flag (bit 29)** | Implemented (cache v7) | `extractReplayTrajectory` reads the class as `h >>> 30`: weather (0/10), tyres (0/16), contacts (0/17), VE (0/51) and flags (1/10) now decode in practice and qualifying. v6 rows of practice/qualifying replays lack them until re-decoded. |
+| **Track limits (7/28)** | Not parsed (by decision) | Warning/current points, lap, resolution per verdict; 0 mismatches on 32k XML rows (§2.13 B). A field-for-field copy of the XML `<TrackLimits>` rows, which the stewards log already reads; only useful for a replay whose XML is gone. |
+| **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not parsed (by decision) | One packet per XML `<Sector>` row with an all-zero payload: the car, the time and the kind (engine damage, suspension damage, best S1/S2/S3), nothing about how much damage or where. Duplicates the XML. |
+| **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not implemented | Engine / suspension damage reports and sector-best markers (§2.13 B). |
+| **Player gear shifts (3/11)** | Not parsed (by decision) | Exact upshift / downshift / limiter instants for the player car (§2.13 C). Same information as the pose `gear` channel, only timed to the frame, and DuckDB already gives the player 100 Hz gear. Documented, not decoded. |
+| **Player tyre radius (3/24 `u16@6`)** | Not implemented | Per wheel, radius-like, grows with wheel speed² (§2.13 D). Low value for the app. |
 
 **Unrelated defect noticed:** ~20 of 45 drivers in the Imola race replay have `carClass`
 unresolved (`?`), falling back to raw vehicleId strings like `99_25_AO_E58B41E50`. This will
@@ -623,7 +868,7 @@ Specification-ready material not yet surfaced in the app.
 
 ### 6.2 Track meteorology, precipitation & wetness (Class 1 Type 10) [ESTABLISHED]
 > **Resolution Note:** The earlier hypothesis that dynamic track meteorology was stored in the metadata 67-byte session block was superseded; that block stores static session rule multipliers (Damage, Fuel, Tire, Session Length). Dynamic track meteorology, precipitation, and sector surface wetness are fully established in **Class 1 Type 10 (`eventSize === 80`)**, detailed in §2.9 and [VCR_FORMAT.md](VCR_FORMAT.md) §4.
-- **Ambient temperature index** at byte 38 (`0x92` to `0x81` scaling $25^\circ\text{C}$ to $22^\circ\text{C}$).
+- **Ambient temperature** at byte 38: `°C = byte / 8 + 5.9` (§2.12 B).
 - **9 sector track wetness / precipitation intensity channels** at bytes 42..77 (zero when dry, positive integers `0x01` to `0x18+` scaling with rainfall rate).
 - Enables real-time rain timeline charts and automatic wet-session classification in Replay Studio.
 
@@ -658,21 +903,24 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
   braking and kerb strikes to validate unknown corner-state fields (§2.3).
 4. **Extend the track model** to more circuits: 2 edge laps each, per §3.
 5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** **[COMPLETED]** Verified via paired capture on Bahrain P1 19 (§2.7, §2.8). Proved that dynamic rubber wear counters and 12-point tire carcass/tread temperatures are universally omitted across both multiplayer and offline practice replays. Simultaneously confirmed individual brake line pressures ($r = 0.930$) in Class 1 Type 24 and brake rotor disc temperature ($r = 1.000$) in Class 2 Type 15.
-6. **Does a timeline seek refresh `/rest/watch/standings`?** It stays frozen during normal
-   playback (§2.10 A). Test once, under user supervision: `PUT /rest/watch/replaytime/{t}`, then
-   read `standings`. If it refreshes, seek-and-sample would turn every `.Vcr` into a paired
-   capture for `veFraction`, `fuelFraction`, `pitState`, `lapDistance` and `pathLateral`.
+6. **Does a timeline seek refresh `/rest/watch/standings`?** **[COMPLETED: no]** After a manual
+   scrub to 5:00 of Sebring R1 15, all 20 cars were byte-identical to the formation snapshot. The
+   API has no per-car ground truth in replay mode; use DuckDB pairs (§2.12) instead.
 7. **Per-sector wetness.** Find a replay whose 9 Class 1 Type 10 wetness blocks ever differ.
    If none do, collapse them to a single `rain = byte / 255` value (§2.10 B).
-8. **Re-derive track temperature.** Byte `+39` did not follow the API's `trackTemp`
-   (§2.10 B). Sweep the `+14..41` bytes against a `sessionInfo.trackTemp` series taken over a
-   long, temperature-varying replay.
-9. **Crack Class 7 Type 9** (32 Hz, 8.7 % of the stream, §2.11 A). Test first for a known
-   compression (zlib/LZ4 magic, entropy per byte). Then check whether the per-packet size
-   tracks field activity (overtakes, pit windows).
+8. **Locate track temperature.** **[RESOLVED: not stored]** The replay reproduces it exactly,
+   but no packet carries it; the engine recomputes it from stored weather state (§2.12).
+9. **Crack Class 7 Type 9** (32 Hz, 8.7 % of the stream, §2.11 A). **[PARKED]** Constant
+   ~8 KB/s whatever the grid size, variable tag count, no field at any fixed bit offset
+   (§2.13 F). Poses already cover every car, so the payoff is low.
 10. **Wire up the confirmed events:** contacts (1/17) as map markers and a replay incident
-    ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C). Parse the
-    3/24 brake-pressure lead for the player car once it has been calibrated.
+    ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C).
+    **[DONE in the parser]**, including bit-29 gating and the penalty branch (cache v7).
+    Track limits (7/28), damage and sector bests (1/23, 1/26, 1/29–31) and player shift
+    instants (3/11) stay documented but unparsed: they duplicate the XML or the gear channel (§5).
+11. **Identify 7/33** (per-car 5 % steps every ~2.4 laps, remote cars only, §2.13 E). Compare
+    against an AI or remote car's own DuckDB in a session where that car is the player, or
+    against the API's `veFraction` / `fuelFraction` in a live (not replay) session.
 
 ---
 
@@ -690,7 +938,7 @@ This section quantifies the empirical accuracy loss, bandwidth decimation, and s
 | **Vehicle Speed** | Native `Ground Speed` float (m/s) | Native vector magnitude $\|(v_x, v_y, v_z)\|$ | Derived from displacement $\Delta(x, z)/\Delta t$ or packed velocity | Speed differentiation introduces high-frequency noise, requiring smoothing filters that shave 1–3 km/h off true apex minimum speeds ($V_{\min}$). |
 | **Engine RPM** | Native `Engine RPM` float | Native `mEngineRPM` float | 10-bit packed field (0–1023) scaled by ~10.9228 | RPM quantised into ~11 RPM bins. Maximum headroom caps at 11,170 RPM. |
 | **Gear Selection** | Timestamped sparse event (`Gear` table) | Native `mGear` (-1, 0, 1..8) | Reconstructed from event header (`eventType - 8`) | Transient neutral (0) frame dips during shifts can cause gear flicker if not debounced. |
-| **4-Wheel Dynamics** | Native 4-corner arrays (`RideHeights`, `TyresPressure`, `Wheel Speed`, `TyresCarcassTemp`, `TyresRubberTemp`) | Full `mWheel[4]` telemetry (ride height, tire load, rotation, temp zones) | Corner brake pressure in Class 1 Type 24 and rotor temps in Class 2 Type 15. **Wheel angular velocities, ride height, tire rubber wear, and 12-point tread/carcass temps are not available as verified VCR fields.** | VCR has no verified physical ride-height or wheel-speed stream; DuckDB is required for those signals. |
+| **4-Wheel Dynamics** | Native 4-corner arrays (`RideHeights`, `TyresPressure`, `Wheel Speed`, `TyresCarcassTemp`, `TyresRubberTemp`) | Full `mWheel[4]` telemetry (ride height, tire load, rotation, temp zones) | Player per-wheel blocks in raw 3/24 (a radius-like value that grows with wheel speed², §2.13 D) and rotor temps in raw 1/15. **Wheel angular velocities, ride height, tire rubber wear, and 12-point tread/carcass temps are not available as verified VCR fields.** | VCR has no verified physical ride-height or wheel-speed stream; DuckDB is required for those signals. |
 | **2D Spatial Racing Line** | None (1D distance / time based) | World $(x, y, z)$ via `mPos` | **World $(x, y, z)$ + Yaw** | VCR is the **only source providing complete multi-car 2D grid coordinates** for circuit map visualization. |
 | **Grid Scope** | **Main driver only** | **Main driver only** | **All drivers & AI grid** | VCR remains indispensable for head-to-head opponent comparisons and alien reference overlays. |
 | **Setup & Friction** | Background native game exporter | Requires external C# console app running live | Automatic game recording | DuckDB and VCR require no secondary tools running while driving. |

@@ -1,7 +1,7 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from './types.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from './dbSchema.js';
-import { compressTrajectory, decompressTrajectory } from './replayTrajectoryCodec.js';
+import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory } from './replayTrajectoryCodec.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not
@@ -19,6 +19,10 @@ interface TrajectoryRow {
   source_path: string | null;
   parser_version: string;
   trajectory_br: Buffer;
+}
+
+function readTrajectoryRow(row: Pick<TrajectoryRow, 'parser_version' | 'trajectory_br'>): ReplayTrajectoryData {
+  return upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version);
 }
 
 export function getTrajectoryDefaults(db: DatabaseType, filename: string, driverSlot: number): TrajectoryDefaults | null {
@@ -111,7 +115,7 @@ export function getReplayTrajectoryCache(
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
   if (!row || !isRowValid(row, mtime, size, filePath)) return null;
-  return decompressTrajectory(row.trajectory_br);
+  return readTrajectoryRow(row);
 }
 
 /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
@@ -123,14 +127,14 @@ export function getStoredReplayTrajectory(
   options?: { allowFallback?: boolean }
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
-  if (row) return decompressTrajectory(row.trajectory_br);
+  if (row) return readTrajectoryRow(row);
 
   // A missing lap falls back to the same driver's default lap, which reports itself as currentLap
   // (the on-disk decode does the same). A missing driver never falls back to another driver: that
   // would serve the player's lap under the requested driver's name.
   if (options?.allowFallback && lapKey !== -1) {
     const rowFallbackLap = selectResolvedRow(db, filename, driverSlot, -1);
-    if (rowFallbackLap) return decompressTrajectory(rowFallbackLap.trajectory_br);
+    if (rowFallbackLap) return readTrajectoryRow(rowFallbackLap);
   }
 
   return null;
@@ -152,7 +156,7 @@ export function getAdjacentLapTrajectories(
   const neighbour = (key: number): ReplayTrajectoryData | null => {
     const row = selectTrajectoryRow(db, filename, driverSlot, key);
     return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size
-      ? decompressTrajectory(row.trajectory_br)
+      ? readTrajectoryRow(row)
       : null;
   };
   return { previous: neighbour(lapKey - 1), next: neighbour(lapKey + 1) };

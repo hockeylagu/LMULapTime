@@ -149,7 +149,10 @@ Measured on a replay loaded from the main menu. Evidence is in
   `raining` equals the replay's Class 1 Type 10 wetness byte / 255, interpolated between
   packets.
 - **`/rest/watch/standings` and `/standings/history` are frozen** at a formation-phase snapshot
-  for the whole playback. `carVelocity` and `carAcceleration` are zeros.
+  for the whole playback, and scrubbing the timeline doesn't refresh them. `carVelocity` and
+  `carAcceleration` are zeros.
+- **Replay clock:** `currentEventTime` stays 0. Use `timeRemainingInGamePhase` instead: race
+  time = session length − remaining.
 - **`/rest/watch/trackmap` returns static track geometry**, not live car positions: `type 0`
   reference line, `type 1` pit lane, and two-point markers for pit boxes (types 3–39, 107–144).
 - **`/rest/watch/getIncidentsList/{minTimeBetweenContacts}`** returns the whole race's contact

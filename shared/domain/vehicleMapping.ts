@@ -1,10 +1,56 @@
 import { matchesCarClass } from './paceCategory.js';
+import { VEHICLE_FILE_GROUPS } from './vehicleCatalog.js';
 
-// Friendly car name mapping from known LMU skin/vehicle ID tokens
+const VEHICLE_FILES = new Map<string, { model: string; carClass: string }>(
+  VEHICLE_FILE_GROUPS.flatMap(group => group.vehicleIds.map(id => [id, { model: group.model, carClass: group.carClass }] as const)),
+);
+
+// LMU results-log <CarType> names that differ from the model names the app shows.
+const LMU_CAR_TYPE_MODELS: Readonly<Record<string, string>> = {
+  'Aston Martin Vantage AMR LMGT3': 'Aston Martin Vantage GT3',
+  'BMW M4 LMGT3': 'BMW M4 GT3',
+  'Chevrolet Corvette Z06 LMGT3.R': 'Corvette Z06 GT3.R',
+  'Ferrari 296 LMGT3': 'Ferrari 296 GT3',
+  'Ferrari 296 LMGT3 Evo': 'Ferrari 296 GT3',
+  'Ford Mustang LMGT3': 'Ford Mustang GT3',
+  'Genesis GMR001': 'Genesis GMR001 Hypercar',
+  'Genesis GMR-001': 'Genesis GMR001 Hypercar',
+  'Lamborghini Huracan LMGT3 Evo2': 'Lamborghini Huracan GT3 Evo2',
+  'Lexus RCF LMGT3': 'Lexus RC F GT3',
+  'McLaren 720S LMGT3 Evo': 'McLaren 720S GT3 Evo',
+  'Mercedes-AMG LMGT3': 'Mercedes-AMG GT3',
+  'Oreca 07': 'Oreca 07 LMP2',
+  'Peugeot 9x8': 'Peugeot 9X8',
+  'Porsche 911 GT3 R LMGT3': 'Porsche 911 GT3 R',
+  'Toyota TR010': 'Toyota GR010 Hybrid',
+};
+
+// LMU results-log <CarClass> names that differ from the app's class ids.
+const LMU_CAR_CLASS_IDS: Readonly<Record<string, string>> = { GT3: 'LMGT3', Hyper: 'LMH', LMP2_ELMS: 'LMP2elms' };
+
+/** A results-log <CarType> as the model name the app shows. */
+export function normalizeLmuCarType(carType: string): string {
+  return LMU_CAR_TYPE_MODELS[carType.trim()] ?? carType.trim();
+}
+
+/** A results-log <CarClass> as the app's class id. */
+export function normalizeLmuCarClass(carClass: string): string {
+  return LMU_CAR_CLASS_IDS[carClass.trim()] ?? carClass.trim();
+}
+
+/** The car a vehicle file is, as LMU's results logs record it (vehicleCatalog.ts). */
+function lookupVehicleFile(vehicleId?: string): { model: string; carClass: string } | undefined {
+  return vehicleId ? VEHICLE_FILES.get(vehicleId.trim().replace(/\.veh$/i, '').toUpperCase()) : undefined;
+}
+
+// Friendly car name mapping: known vehicle files first, then LMU skin/vehicle ID tokens.
+// Team tokens are only a fallback: DKR, WRT, PROT, IRON or AFCO run cars in several classes.
 // NOTE: Specific tokens (RSR, 499P, DSTATI) must be checked BEFORE generic substrings
 // (911, 296) to prevent false matches on vehicle IDs like "911_RSR".
 export function mapVehicleIdToModel(vehicleId?: string): string {
   if (!vehicleId) return 'Unknown Vehicle';
+  const known = lookupVehicleFile(vehicleId);
+  if (known) return known.model;
   const v = vehicleId.toUpperCase();
 
   // --- GTE: specific tokens first to avoid being swallowed by generic GT3 checks ---
@@ -43,10 +89,10 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
   if (v.includes('GINETTA') || v.includes('G61')) return 'Ginetta G61-LT-P325 Evo';
   if (v.includes('DUQUEINE') || v.includes('D09') || v.includes('D08')) return 'Duqueine D09 P3';
   if (v.includes('LIGIER') || v.includes('JSP')) return 'Ligier JS P325';
-  if (v.includes('ADESS') || v.includes('AD25')) return 'ADESS AD25 LMP3';
+  if (v.includes('ADESS') || v.includes('AD25') || v.includes('_ADES')) return 'ADESS AD25 LMP3';
 
-  // --- LMP2 ---
-  if (v.includes('ORECA') || v.includes('VECTOR') || v.includes('DKR') || v.includes('LMP2') || v.includes('07_LMP2')) return 'Oreca 07 LMP2';
+  // --- LMP2 --- (not DKR: DKR Engineering enters both the Oreca and a Ginetta LMP3)
+  if (v.includes('ORECA') || v.includes('VECTOR') || v.includes('LMP2') || v.includes('07_LMP2')) return 'Oreca 07 LMP2';
   if (v.includes('992S') || v.includes('SAFETY')) return 'Porsche 992 (Safety Car)';
   return vehicleId;
 }
@@ -55,6 +101,8 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
  * Maps vehicle model or vehicle ID string to standardized LMU car class (LMGT3, LMH, LMP2, LMP2elms, GTE, LMP3).
  */
 export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): string {
+  const known = lookupVehicleFile(vehicleId);
+  if (known) return known.carClass;
   const model = carModel || mapVehicleIdToModel(vehicleId);
   const combined = `${vehicleId || ''} ${model}`.toUpperCase();
 
@@ -143,6 +191,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
     combined.includes('LIGIER') ||
     combined.includes('JSP') ||
     combined.includes('ADESS') ||
+    combined.includes('_ADES') ||
     combined.includes('AD25')
   ) {
     return 'LMP3';
@@ -152,8 +201,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
   if (
     combined.includes('ORECA') ||
     combined.includes('LMP2') ||
-    combined.includes('VECTOR') ||
-    combined.includes('DKR')
+    combined.includes('VECTOR')
   ) {
     return combined.includes('ELMS') ? 'LMP2elms' : 'LMP2';
   }
@@ -163,6 +211,42 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
   }
 
   return '';
+}
+
+interface RosterVehicle {
+  name: string;
+  vehicleId?: string;
+  carModel?: string;
+  carClass?: string;
+  isPlayer?: boolean;
+}
+
+/**
+ * Resolves each replay roster entry's car. A results-log entry of the same driver (the session
+ * the replay is linked to) takes precedence; otherwise the car is derived from the vehicle id with
+ * the current catalog and rules, so rosters stored by an older build are corrected on read.
+ * The replay's own car follows its player. Returns the same object.
+ */
+export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; carModel?: string; carClass?: string }>(
+  metadata: T,
+  sessionDrivers?: ReadonlyArray<{ name: string; carType?: string; carClass?: string }>,
+): T {
+  const drivers = metadata.drivers ?? [];
+  const byName = new Map((sessionDrivers ?? []).map(driver => [driver.name.trim().toLowerCase(), driver]));
+  for (const driver of drivers) {
+    const logged = byName.get(driver.name.trim().toLowerCase());
+    if (logged?.carType && logged.carType !== 'Unknown Car' && logged.carClass && logged.carClass !== 'General') {
+      driver.carModel = normalizeLmuCarType(logged.carType);
+      driver.carClass = normalizeLmuCarClass(logged.carClass);
+    } else if (driver.vehicleId) {
+      driver.carModel = mapVehicleIdToModel(driver.vehicleId);
+      driver.carClass = mapVehicleIdToClass(driver.vehicleId, driver.carModel) || undefined;
+    }
+  }
+  const player = drivers.find(driver => driver.isPlayer) ?? drivers[0];
+  if (player?.carModel) metadata.carModel = player.carModel;
+  if (player?.carClass) metadata.carClass = player.carClass;
+  return metadata;
 }
 
 /**

@@ -90,14 +90,16 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
 
   let maxRain = 0;
   let firstAmbientTemp: number | undefined = undefined;
-  let firstTrackTemp: number | undefined = undefined;
 
+  // The scan slides byte by byte, so a header match alone is often random data. A real weather
+  // packet carries the same rain value in all 9 rain slots.
   const inspectWeatherPacket = (buf: Buffer, p: number) => {
+    for (let ch = 46; ch < 78; ch += 4) {
+      if (buf[p + 5 + ch] !== buf[p + 5 + 42]) return;
+    }
     if (firstAmbientTemp === undefined) {
       const rawTemp = buf[p + 5 + 38];
-      firstAmbientTemp = Number((25.0 - (146 - rawTemp) * 0.176).toFixed(1));
-      const rawTrack = buf[p + 5 + 39];
-      firstTrackTemp = Number((27.3 - (129 - rawTrack) * 0.176).toFixed(1));
+      firstAmbientTemp = Number((rawTemp / 8 + 5.9).toFixed(1));
     }
     for (let ch = 42; ch < 78; ch += 4) {
       const r = buf[p + 5 + ch];
@@ -113,8 +115,8 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
         const h = buf.readUInt32LE(p);
         const sz = (h >>> 8) & 0x1ff;
         const evType = (h >>> 17) & 0x3f;
-        const evClass = (h >>> 29);
-        if (sz === 80 && evType === 10 && evClass === 1) {
+        const evClass = (h >>> 30); // bit 29 only flags a race replay; weather is sent on slot 255
+        if (sz === 80 && evType === 10 && evClass === 0 && (h & 0xff) === 255) {
           inspectWeatherPacket(buf, p);
         }
       }
@@ -131,8 +133,8 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
           const h = buf.readUInt32LE(p);
           const sz = (h >>> 8) & 0x1ff;
           const evType = (h >>> 17) & 0x3f;
-          const evClass = (h >>> 29);
-          if (sz === 80 && evType === 10 && evClass === 1) {
+          const evClass = (h >>> 30); // bit 29 only flags a race replay; weather is sent on slot 255
+          if (sz === 80 && evType === 10 && evClass === 0 && (h & 0xff) === 255) {
             inspectWeatherPacket(buf, p);
           }
         }
@@ -151,7 +153,6 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
     maxRainIntensity: maxRain,
     weatherCondition,
     ambientTemp: firstAmbientTemp,
-    trackTemp: firstTrackTemp,
   };
 }
 
@@ -482,7 +483,6 @@ export function parseReplayMetadata(
       maxRainIntensity: weather?.hasRain ? weather.maxRainIntensity : undefined,
       weatherCondition: weather?.weatherCondition,
       ambientTemp: weather?.ambientTemp,
-      trackTemp: weather?.trackTemp,
     };
 
     if (options?.verbose) {
