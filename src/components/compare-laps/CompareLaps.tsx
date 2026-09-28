@@ -6,10 +6,11 @@ import { CompareLapsFilters } from './CompareLapsFilters.js';
 import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
 import { CompareLapsTable } from './CompareLapsTable.js';
-import { useCompareLapsData, AvailableLapsSortOption, CompareLapsSessionItem } from './useCompareLapsData.js';
+import { useCompareLapsData, AvailableLapsSortOption, ComparePairRequest, CompareLapsSessionItem } from './useCompareLapsData.js';
 import { ReplaySummary } from '../../../shared/types/index.js';
 import { fetchJson } from '../../api/apiClient.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
+import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 
 export type { AvailableLapsSortOption, CompareLapsSessionItem };
 
@@ -23,6 +24,8 @@ export interface CompareLapsProps {
   initialCompareDriver?: string;
   initialCompareLapNum?: number;
   onSelectSession?: (sessionId: string) => void;
+  /** Two laps the page asks to compare now (from the leaderboard). */
+  pairRequest?: ComparePairRequest | null;
 }
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
@@ -35,6 +38,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   initialCompareDriver,
   initialCompareLapNum,
   onSelectSession,
+  pairRequest,
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -85,6 +89,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialCompareSessionId,
     initialCompareDriver,
     initialCompareLapNum,
+    pairRequest,
   });
 
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
@@ -133,15 +138,11 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       return;
     }
 
-    const telemetryParams = new URLSearchParams(searchParams);
-    telemetryParams.set('replayName', targetReplay);
-    telemetryParams.set('lap', String(targetLap.lapNum ?? 1));
-    if (targetLap.driverName) telemetryParams.set('driverName', targetLap.driverName);
-    telemetryParams.set('baselineReplay', baseReplay);
-    if (baseLap.sessionId) telemetryParams.set('compareSessionId', String(baseLap.sessionId));
-    if (baseLap.driverName) telemetryParams.set('compareDriver', baseLap.driverName);
-    if (baseLap.lapNum !== undefined) telemetryParams.set('compareLapNum', String(baseLap.lapNum));
-    navigate(`/telemetry?${telemetryParams.toString()}`);
+    navigate(buildTelemetryComparePath(
+      searchParams,
+      { replayName: targetReplay, driverName: targetLap.driverName, lapNum: targetLap.lapNum },
+      { replayName: baseReplay, sessionId: baseLap.sessionId, driverName: baseLap.driverName, lapNum: baseLap.lapNum },
+    ));
   };
 
   const onCompareTelemetry = selectedLaps.length === 2 ? handleCompareTelemetry : undefined;
