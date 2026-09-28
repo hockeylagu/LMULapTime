@@ -117,11 +117,13 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(window.location.hash).toContain('sessionId=sess123');
     expect(window.location.hash).toContain('lapNum=1');
 
-    // Click Compare Laps in the header
+    // Click Compare Laps in the header: it should target the driver's best lap of this
+    // session, not an arbitrary lap.
     const openStudioBtn = screen.getByRole('button', { name: /Compare Laps/i });
     fireEvent.click(openStudioBtn);
     expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');
+    expect(window.location.hash).toContain('lapNum=2');
   });
 
   it('switches to Tire Wear chart metric and displays tire wear in table', async () => {
