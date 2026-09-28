@@ -93,11 +93,15 @@ describe('SessionDatabase (SQLite Cache)', () => {
       expect(db.syncSessionsFromDir(dir, parser).added).toBe(2);
 
       fs.rmSync(path.join(dir, '2026_05_29_P1.xml'));
+      // A lap tag the current rules would not give: the kept row is classified again all the same.
+      const kept = db.getSessionById('2026_05_29_P1')!;
+      kept.drivers[0].laps[0].conditions = { rain: 25 };
+      db.getDb().prepare('UPDATE sessions SET data_json = ? WHERE id = ?').run(JSON.stringify(kept), kept.id);
       db.setMetadata('parser_version', 'outdated-parser-version');
       const resync = db.syncSessionsFromDir(dir, parser);
 
       expect(resync).toMatchObject({ added: 0, updated: 1, total: 2 });
-      expect(db.getSessionById('2026_05_29_P1')).not.toBeNull();
+      expect(db.getSessionById('2026_05_29_P1')?.drivers[0].laps[0].conditions).toBeUndefined();
       expect(db.getMetadata('parser_version')).not.toBe('outdated-parser-version');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

@@ -423,6 +423,24 @@ actions:
 
 ## 6. After the migration: lap conditions (the feature this unblocks)
 
+**Built on branch `lap-conditions` (2026-09-28, `b9c476a`, `3507879`), differently from the plan
+below:**
+
+- **Conditions = wet tyres (XML) or replay rain ≥ 13** (`RAIN_WET_MIN`, raw 0-25). Measured over
+  929 sessions: rain 1-12 costs nothing, 13-16 costs 2.4%, 17+ costs 9.2%. Dry is the default and
+  carries no tag.
+- **Flags dropped for now** (the user's call): `sector_mask` is not a plain yellow bitmask yet.
+- **Field pace dropped:** only 1 of 151 "field slower" laps with a replay was under a
+  full-course yellow; they are race laps 2-4 and qualifying cool-down laps.
+- **The user's decision on the average:** the average stays the average of every clean lap.
+  Off pace is measured within each condition (a wet lap against the wet median), and consistency
+  combines each condition's own spread and shows "Per condition: dry 7 · wet 9".
+- **Where the rule runs:** `classifySessionLaps` in the parser (tyres), then again from
+  `dbSessionConditions.ts` with the replay's rain when a link is stored or withdrawn, or when a
+  decode stores the replay's conditions. `DB_PARSER_VERSION` is `2.16_lap_conditions`.
+
+The original plan:
+
 These are separate commits on the same branch (or the next one), in `server/sessions/parser.ts`
 territory:
 

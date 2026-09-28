@@ -84,6 +84,16 @@ export interface TireWear {
 /** Why a racing lap does not show the driver's pace: contact or damage, overtaking or following, or far off their median lap. */
 export type NonRepresentativeReason = 'contact' | 'traffic' | 'offPace';
 
+/**
+ * What set a lap apart from dry running (shared/domain/lapConditions.ts). Absent on a dry lap: dry
+ * is the default. A lap with conditions is judged against the driver's other laps in the same
+ * conditions (off pace, consistency), not against their dry laps.
+ */
+export interface LapConditions {
+  wetTyres?: boolean; // On wet tyres (the XML compound)
+  rain?: number; // Peak rain during the lap from the linked replay (raw, 0-25); only from RAIN_WET_MIN
+}
+
 export interface LapIncident {
   type: 'contact' | 'damage' | 'other';
   description: string;
@@ -142,6 +152,7 @@ export interface LapData {
   isOutLap?: boolean; // Out-lap immediately following a pit stop
   nonRepresentativeReason?: NonRepresentativeReason; // Set by the parser; left out of averages and consistency
   traffic?: LapTraffic; // Set by the parser from every car's line crossings
+  conditions?: LapConditions; // Wet tyres or rain on the lap; absent when dry
   isValid: boolean;
   isInferred?: boolean; // Inferred from session elapsed time for incomplete laps
   paceCategory?: PaceCategory | null;
