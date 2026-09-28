@@ -90,6 +90,7 @@ LMULapTime/
 │   │   │   ├── dbReplayUpgrade.ts  # Replay parser versioning & background upgrade state
 │   │   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
 │   │   ├── dbSchema.ts             # DDL definitions, tables and index setup
+│   │   ├── dbSessionConditions.ts  # Linked replay rain on session laps: classifies stored sessions again
 │   │   ├── dbSessionStore.ts       # Session queries, standings, and summaries
 │   │   ├── dbSessionSync.ts        # Bulk session XML persistence transactions
 │   │   ├── dbTelemetryStore.ts     # Columnar 100 Hz DuckDB telemetry persistence
@@ -125,6 +126,7 @@ LMULapTime/
 │   │   ├── replayMatching.ts       # Deterministic session-to-replay correlation & validation
 │   │   ├── sessionReplayLinks.ts   # Applies the matching rules to stored links: link, re-check, withdraw, one session per replay
 │   │   ├── sessionAnalytics.ts     # True Pace, sector averages, fuel/tire curves
+│   │   ├── sessionLapClassification.ts # Lap conditions, non-representative laps and averages (one entry point)
 │   │   ├── sessionXmlStream.ts     # Streaming XML parser
 │   │   └── sessionXmlTypes.ts      # Raw XML schema interfaces
 │   ├── telemetry/                  # 100 Hz DuckDB telemetry processing
@@ -146,7 +148,8 @@ LMULapTime/
 │       ├── circuitDefinitions.ts   # Canonical specs for all 32 circuits & layouts
 │       ├── circuitSpecs.ts         # Single source of truth circuit resolution engine
 │       ├── formatters.ts           # Lap time formatters & math
-│       ├── lapComparison.ts        # Delta interpolation & sector calculations
+│       ├── lapComparison.ts        # Delta interpolation, sector calculations & consistency
+│       ├── lapConditions.ts        # Wet tyres / rain per lap (dry is the default)
 │       ├── paceCategory.ts         # Pace percentages & vehicle class matching
 │       ├── trackSummaryUtils.ts    # Multi-session track aggregation helpers
 │       └── vehicleMapping.ts       # Car class categorization & model identification
@@ -216,6 +219,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
   - **Incomplete / Partial Laps**: Crashed or disconnected laps (display estimated/partial time where possible; never treat as clean flying laps).
 - **Rule**: True Pace (e.g. Top 3 Clean Lap Average) and Consistency Ratings **must only** include valid, clean flying laps.
 - **One classification**: the session parser (`server/sessions/parser.ts`) infers missing lap times (`isInferred`) and marks out-laps (`isOutLap`) once. Views and analytics read those flags (`isRacingLap`, `selectCleanLapCandidates` in `shared/domain/lapComparison.ts`); never re-derive them from neighbouring laps (`isCompletedPitStop` is the parser's rule). Changing a rule means bumping `DB_PARSER_VERSION` so stored sessions are re-parsed.
+- **Lap conditions**: dry is the default. A lap on wet tyres or in rain from the linked replay (`RAIN_WET_MIN`) carries `conditions` (`shared/domain/lapConditions.ts`), and off pace and consistency judge it against the driver's laps in the same conditions; the average stays the average of every clean lap. `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`) is the one entry point: the parser runs it with the tyres, and `server/core/dbSessionConditions.ts` runs it again with the replay's rain when the session gets its replay or the replay's conditions are stored.
 
 ### C. Deterministic Logic First (AI Is Secondary)
 - Calculations of deltas, telemetry traces, sector rankings, tire wear, pace categories, handling balance (understeer/oversteer), and coaching deficits **must be 100% deterministic**.

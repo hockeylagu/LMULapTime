@@ -19,6 +19,8 @@ export interface SessionSyncHost {
   getSessionsCount(): number;
   getAllStoredReplayFiles(): Array<StoredReplayFileInfo & { filename: string }>;
   upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void;
+  classifySessionConditions(session: DetailedSession): void;
+  reclassifyStoredSessions(which: { ids: string[] }): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
   invalidateSessionCache(): void;
@@ -39,7 +41,7 @@ export function *syncSessionsIterator(
     };
   }
 
-  const DB_PARSER_VERSION = '2.15_off_pace_2pct';
+  const DB_PARSER_VERSION = '2.16_lap_conditions';
   const cachedVersion = host.getMetadata('parser_version');
   const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
 
@@ -74,7 +76,15 @@ export function *syncSessionsIterator(
       host.invalidateSessionCache();
     }
     for (const item of sessionsToInsert) {
+      // A session parsed with its replay already linked gets that replay's rain now; one linked
+      // later gets it when the link is stored (SessionDatabase.updateSessionMatchingReplay).
+      if (item.session.matchingReplayFile) host.classifySessionConditions(item.session);
       host.upsertSession(item.session, item.filePath, item.mtime, item.size);
+    }
+    if (versionMismatch) {
+      // Rows whose XML is gone are not parsed again, but the lap rules still apply to them.
+      const parsedIds = new Set(sessionsToInsert.map(item => item.session.id));
+      host.reclassifyStoredSessions({ ids: existingRows.map(row => row.id).filter(id => !parsedIds.has(id)) });
     }
   });
 
