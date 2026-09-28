@@ -1,5 +1,5 @@
 import type { LapData } from '../../../../shared/types/index.js';
-import { describeLapTraffic, describeNonRepresentative } from '../../../utils/lapTrafficText.js';
+import { describeLapTraffic, describeNonRepresentative, type LapPlaces } from '../../../utils/lapTrafficText.js';
 
 export interface LapDetailSection {
   label: string;
@@ -23,7 +23,7 @@ export function withoutTrackLimitsPrefix(description: string): string {
  * conditions, why it is left out of the average, the cars around the driver, incidents, track
  * limits, penalties and the pit stop. Empty when there is nothing to add.
  */
-export function lapDetailSections(lap: LapData): LapDetailSection[] {
+export function lapDetailSections(lap: LapData, places?: LapPlaces): LapDetailSection[] {
   const sections: LapDetailSection[] = [];
   if (lap.conditions) {
     const lines = [
@@ -37,7 +37,7 @@ export function lapDetailSections(lap: LapData): LapDetailSection[] {
   }
   // Cars going by while the driver is in or out of the pits are not a fight.
   const inPits = lap.isPitStop || lap.isOutLap === true;
-  const traffic = inPits ? [] : describeLapTraffic(lap.traffic);
+  const traffic = inPits ? [] : describeLapTraffic(lap.traffic, places);
   if (traffic.length > 0) sections.push({ label: 'Around you', lines: traffic });
   if (lap.incidents?.length) sections.push({ label: 'Incidents', lines: lap.incidents.map((i) => i.description) });
   if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => withoutTrackLimitsPrefix(tl.description)) });

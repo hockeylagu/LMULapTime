@@ -26,7 +26,7 @@ describe('lapDetailSections', () => {
 
   it('does not call cars going by on a pit lap or an out-lap a fight', () => {
     const traffic = { ahead: null, behind: null, following: false, passed: [], passedBy: [{ name: 'Rui Paiva', carClass: 'GT3', sameClass: true }] };
-    expect(lapDetailSections(lap({ traffic }))).toEqual([{ label: 'Around you', lines: ['Defending: passed by Rui Paiva (GT3)'] }]);
+    expect(lapDetailSections(lap({ traffic }))).toEqual([{ label: 'Around you', lines: ['Defending: passed by Rui Paiva'] }]);
     expect(lapDetailSections(lap({ traffic, isOutLap: true }))).toEqual([]);
   });
 
