@@ -342,6 +342,7 @@ export interface SessionProgressionPoint {
   consistencyScore?: number | null;
   theoreticalGap?: number | null;
   matchingReplayFile?: string;
+  settings?: { serverName?: string };
 }
 
 export interface TrackSummary {

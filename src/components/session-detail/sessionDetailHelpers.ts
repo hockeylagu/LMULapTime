@@ -17,6 +17,7 @@ export interface CandidateRelatedSession {
   dateString?: string;
   timestamp?: number;
   filename?: string;
+  settings?: { serverName?: string };
 }
 
 function findClosestSession<T extends CandidateRelatedSession>(current: DetailedSession, candidates: T[]): T | null {
@@ -52,9 +53,15 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
   const targetType: 'qualifying' | 'race' | null = isRace ? 'qualifying' : (isQuali || isPractice) ? 'race' : null;
   if (!targetType) return null;
 
+  // Online (multiplayer server) and offline sessions are never the same event, even at the
+  // same track and close in time: never link across that boundary.
+  const isCurrentOnline = Boolean(current.settings?.serverName);
+  const sameOnlineStatus = (s: CandidateRelatedSession) => Boolean(s.settings?.serverName) === isCurrentOnline;
+
   const targetSessions = sessions.filter((s) => {
     const sId = s.id || s.sessionId;
     if (sId === current.id) return false;
+    if (!sameOnlineStatus(s)) return false;
     if (targetType === 'qualifying') {
       return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
     }
@@ -69,6 +76,7 @@ export function findRelatedSession<T extends CandidateRelatedSession>(
       const qualiSessions = sessions.filter((s) => {
         const sId = s.id || s.sessionId;
         if (sId === current.id) return false;
+        if (!sameOnlineStatus(s)) return false;
         return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
       });
       if (qualiSessions.length > 0) {
