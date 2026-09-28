@@ -159,7 +159,7 @@ export function initDbSchema(db: DatabaseType): void {
     );
 
     -- The player's rival on a layout, per class (car_type '' ) or per car: a real driver about
-    -- 0.3% ahead, or a ghost time. A target stays until it is beaten, skipped or replaced, so the
+    -- 0.3 s ahead, or a ghost time. A target stays until it is beaten, skipped or replaced, so the
     -- ended rows are the ladder the player climbed. User state, not a cache: never cleared.
     CREATE TABLE IF NOT EXISTS rival_targets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

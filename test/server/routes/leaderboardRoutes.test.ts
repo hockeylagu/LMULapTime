@@ -59,7 +59,7 @@ describe('leaderboardRoutes', () => {
   describe('rivals', () => {
     const BOARD = { layout: 'monza_gp', carClass: 'LMGT3' };
 
-    it('sets the driver about 0.3% ahead as the rival, and keeps it on the next visit', async () => {
+    it('sets the driver about 0.3 s ahead as the rival, and keeps it on the next visit', async () => {
       const first = await request(app).get('/api/rivals?layout=monza_gp&carClass=LMGT3');
       expect(first.status).toBe(200);
       expect(first.body).toMatchObject({
@@ -78,7 +78,7 @@ describe('leaderboardRoutes', () => {
       await request(app).get('/api/rivals?layout=monza_gp&carClass=LMGT3');
       const skipped = await request(app).post('/api/rivals/skip').send(BOARD);
       expect(skipped.status).toBe(200);
-      expect(skipped.body.rival).toMatchObject({ kind: 'ghost', driverName: null, targetTime: 107.784 });
+      expect(skipped.body.rival).toMatchObject({ kind: 'ghost', driverName: null, targetTime: 107.8 });
       const again = await request(app).get('/api/rivals?layout=monza_gp&carClass=LMGT3');
       expect(again.body.rival.kind).toBe('ghost');
     });

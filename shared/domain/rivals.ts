@@ -2,18 +2,21 @@ import type { Leaderboard, LeaderboardEntry, RivalKind, RivalStatus, RivalTarget
 
 /**
  * The rival system: a small, attainable step at a time. The rival is the real driver ahead whose
- * best lap is closest to 0.3% faster than the player's (0.1% to 0.6%), preferring drivers whose
+ * best lap is closest to 0.3 s faster than the player's (0.1 s to 0.6 s), preferring drivers whose
  * lap has a replay, so the telemetry can show where the time is. When nobody is in that window, a
- * ghost time 0.2% under the player's best stands in. A rival stays until it is beaten, skipped or
+ * ghost time 0.2 s under the player's best stands in. A rival stays until it is beaten, skipped or
  * replaced: the target does not move each time new laps arrive.
+ *
+ * The step is in seconds, not a share of the lap: the time is found in the corners, and a long lap
+ * is mostly straights (0.3% at Le Mans is 0.7 s, more than twice the step at Daytona).
  */
 
-export const RIVAL_TARGET_RATIO = 0.003;
-export const RIVAL_MIN_RATIO = 0.001;
-export const RIVAL_MAX_RATIO = 0.006;
-export const GHOST_STEP_RATIO = 0.002;
+export const RIVAL_TARGET_STEP = 0.3;
+export const RIVAL_MIN_STEP = 0.1;
+export const RIVAL_MAX_STEP = 0.6;
+export const GHOST_STEP = 0.2;
 /** A lap without a replay counts as this much further from the ideal step. */
-const NO_REPLAY_PENALTY = 0.001;
+const NO_REPLAY_PENALTY = 0.1;
 
 /** The driver to chase next, or null when nobody ahead is within the window. */
 export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> = new Set()): LeaderboardEntry | null {
@@ -24,9 +27,9 @@ export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> 
   let pickScore = Infinity;
   for (const entry of board.entries) {
     if (entry.isPlayer || exclude.has(entry.driverName)) continue;
-    const ratio = (best - entry.bestLap.lapTime) / best;
-    if (ratio < RIVAL_MIN_RATIO || ratio > RIVAL_MAX_RATIO) continue;
-    const score = Math.abs(ratio - RIVAL_TARGET_RATIO) + (entry.bestLap.replayName ? 0 : NO_REPLAY_PENALTY);
+    const step = best - entry.bestLap.lapTime;
+    if (step < RIVAL_MIN_STEP || step > RIVAL_MAX_STEP) continue;
+    const score = Math.abs(step - RIVAL_TARGET_STEP) + (entry.bestLap.replayName ? 0 : NO_REPLAY_PENALTY);
     if (score < pickScore) {
       pick = entry;
       pickScore = score;
@@ -36,7 +39,7 @@ export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> 
 }
 
 export function ghostTargetTime(playerBest: number): number {
-  return Number((playerBest * (1 - GHOST_STEP_RATIO)).toFixed(3));
+  return Number((playerBest - GHOST_STEP).toFixed(3));
 }
 
 /** A new target to store; the store gives it an id. */
@@ -55,6 +58,8 @@ export interface RivalResolution {
   beaten: { id: number; beatenTime: number; beatenSessionId: string; endedAt: number } | null;
   /** The rival improved their best lap: the target follows it. */
   retimed: { id: number; targetTime: number } | null;
+  /** A rival picked for the player is now out of reach (it improved, or the step changed): pick again. */
+  replaced: { id: number; endedAt: number } | null;
   /** A new target to store, when none is active any more. */
   created: NewRivalTarget | null;
   /** The active target after the changes (id 0 when it is the one to create). */
@@ -91,7 +96,7 @@ export function resolveRival(
   skippedDrivers: ReadonlySet<string>,
   now: number
 ): RivalResolution {
-  const resolution: RivalResolution = { beaten: null, retimed: null, created: null, active };
+  const resolution: RivalResolution = { beaten: null, retimed: null, replaced: null, created: null, active };
   const player = board.player;
   if (!player) return resolution;
 
@@ -102,6 +107,12 @@ export function resolveRival(
       resolution.retimed = { id: current.id, targetTime: rivalTime };
       current = { ...current, targetTime: rivalTime };
     }
+  }
+
+  // A rival the player chose stays however far it gets; one picked for them stays within reach.
+  if (current?.kind === 'driver' && !current.pinned && player.bestLap.lapTime - current.targetTime > RIVAL_MAX_STEP) {
+    resolution.replaced = { id: current.id, endedAt: now };
+    current = null;
   }
 
   if (current && player.bestLap.lapTime < current.targetTime) {

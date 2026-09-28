@@ -13,7 +13,7 @@ const driverTarget = (driverName: string, targetTime: number, setAt = 1): NewRiv
 describe('rival store', () => {
   let db: SessionDatabase;
   const create = (scope: RivalScope, target: NewRivalTarget) =>
-    db.applyRivalResolution(scope, { beaten: null, retimed: null, created: target, active: null });
+    db.applyRivalResolution(scope, { beaten: null, retimed: null, replaced: null, created: target, active: null });
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
@@ -28,12 +28,13 @@ describe('rival store', () => {
 
   it('retimes, then ends a beaten rival and starts the next one in one step', () => {
     const first = create(GT3, driverTarget('Rival', 99.7));
-    db.applyRivalResolution(GT3, { beaten: null, retimed: { id: first!, targetTime: 99.6 }, created: null, active: null });
+    db.applyRivalResolution(GT3, { beaten: null, retimed: { id: first!, targetTime: 99.6 }, replaced: null, created: null, active: null });
     expect(db.getActiveRival(GT3)?.targetTime).toBe(99.6);
 
     const next = db.applyRivalResolution(GT3, {
       beaten: { id: first!, beatenTime: 99.55, beatenSessionId: 'r7', endedAt: 30 },
       retimed: null,
+      replaced: null,
       created: driverTarget('Next', 99.3, 30),
       active: null,
     });
@@ -41,6 +42,16 @@ describe('rival store', () => {
     expect(db.getBeatenRivals(GT3)).toEqual([
       expect.objectContaining({ id: first, driverName: 'Rival', status: 'beaten', beatenTime: 99.55, beatenSessionId: 'r7', endedAt: 30 }),
     ]);
+  });
+
+  it('ends a rival out of reach as replaced, not beaten nor skipped, and starts the next one', () => {
+    const far = create(GT3, driverTarget('Far', 99.2));
+    const next = db.applyRivalResolution(GT3, {
+      beaten: null, retimed: null, replaced: { id: far!, endedAt: 40 }, created: driverTarget('Near', 99.7, 40), active: null,
+    });
+    expect(db.getActiveRival(GT3)).toMatchObject({ id: next, driverName: 'Near' });
+    expect(db.getBeatenRivals(GT3)).toEqual([]);
+    expect([...db.getSkippedRivalDrivers(GT3)]).toEqual([]);
   });
 
   it('remembers the drivers skipped, and replaces the active rival with a pinned one', () => {

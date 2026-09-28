@@ -59,7 +59,7 @@ describe('RivalCard', () => {
   it('shows a ghost target when nobody is within reach', () => {
     renderCard(status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }), rivalEntry: null }));
     expect(screen.getByText('Ghost target')).toBeInTheDocument();
-    expect(screen.getByText('Your best, 0.2% faster')).toBeInTheDocument();
+    expect(screen.getByText('Your best, 0.2 s faster')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Compare laps/ })).not.toBeInTheDocument();
   });
 

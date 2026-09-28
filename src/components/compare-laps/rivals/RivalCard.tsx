@@ -17,7 +17,7 @@ export interface RivalCardProps {
 const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bold text-lmu-muted hover:text-white hover:border-lmu-accent/50 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-default';
 
 /**
- * The next small step: a rival about 0.3% ahead (or a ghost time), the time still to find, how
+ * The next small step: a rival about 0.3 s ahead (or a ghost time), the time still to find, how
  * much of it is closed, and one click to see where it is.
  */
 export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
@@ -45,11 +45,11 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
               {rivalEntry.driverName}
             </h3>
           ) : (
-            <h3 className="text-xl font-extrabold text-white">Your best, 0.2% faster</h3>
+            <h3 className="text-xl font-extrabold text-white">Your best, 0.2 s faster</h3>
           )}
           <p className="text-xs text-lmu-muted">
             {target.kind === 'ghost'
-              ? 'Nobody within 0.6% ahead: beat this time and the next driver comes into reach.'
+              ? 'Nobody within 0.6 s ahead: beat this time and the next driver comes into reach.'
               : `${rivalEntry?.bestLap.carType ?? ''} · ${formatTime(target.targetTime)}`}
           </p>
         </div>
