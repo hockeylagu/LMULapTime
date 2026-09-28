@@ -1,0 +1,90 @@
+import React, { useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
+import { Swords } from 'lucide-react';
+import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
+import { CompareLaps, CompareLapsProps } from './CompareLaps.js';
+import { TrackRibbon } from './ribbon/TrackRibbon.js';
+import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
+import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
+
+/** The lap a deep link asked for belongs to the previous pick: a new track or class drops it. */
+const CLEARED_LAP_PARAMS = {
+  model: null,
+  sessionId: null,
+  lapNum: null,
+  compareSessionId: null,
+  compareDriver: null,
+  compareLapNum: null,
+};
+
+/** The ribbon layout a track name (from the URL or a link) refers to. */
+export function findLayoutForTrack(layouts: LeaderboardLayout[], track: string | null): LeaderboardLayout | null {
+  if (!track) return null;
+  const byName = layouts.find((l) => l.trackName === track);
+  if (byName) return byName;
+  const layoutKey = getCircuitSpecification(track).layoutKey;
+  return layouts.find((l) => l.layoutKey === layoutKey) ?? null;
+}
+
+/**
+ * Rivals & leaderboards: the tracks the player drove (newest first, the last one open by
+ * default), where the player stands among the real drivers met there, and lap comparison.
+ */
+export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { layouts, loading, error } = useLeaderboardLayouts();
+  const track = searchParams.get('track') || props.initialTrack || null;
+  const carClass = searchParams.get('carClass') || props.initialCarClass || null;
+  const selectedLayout = useMemo(() => findLayoutForTrack(layouts, track), [layouts, track]);
+
+  // Without a track in the URL, open the layout driven last, in the class driven last there.
+  useEffect(() => {
+    if (track || layouts.length === 0) return;
+    updateSearchParams(searchParams, setSearchParams, { track: layouts[0].trackName, carClass: layouts[0].lastCarClass });
+  }, [track, layouts, searchParams, setSearchParams]);
+
+  const selectLayout = (layout: LeaderboardLayout) => {
+    if (layout.layoutKey === selectedLayout?.layoutKey) return;
+    updateSearchParams(searchParams, setSearchParams, {
+      ...CLEARED_LAP_PARAMS,
+      track: layout.trackName,
+      carClass: layout.lastCarClass,
+    });
+  };
+
+  const selectClass = (nextClass: string) => {
+    if (nextClass === carClass) return;
+    updateSearchParams(searchParams, setSearchParams, { ...CLEARED_LAP_PARAMS, carClass: nextClass });
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+        <div>
+          <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30 inline-flex items-center gap-1">
+            <Swords className="w-3.5 h-3.5" />
+            Rivals
+          </span>
+          <h2 className="text-2xl font-extrabold text-white mt-1">Leaderboards & Rivals</h2>
+          <p className="text-xs text-lmu-muted mt-0.5">
+            Where you stand among the drivers you raced online, track by track and class by class.
+          </p>
+        </div>
+        <TrackRibbon
+          layouts={layouts}
+          selectedLayoutKey={selectedLayout?.layoutKey ?? null}
+          loading={loading}
+          error={error}
+          onSelect={selectLayout}
+        />
+        {selectedLayout && carClass && (
+          <LayoutClassPills layout={selectedLayout} selectedCarClass={carClass} onSelect={selectClass} />
+        )}
+      </section>
+
+      {track && <CompareLaps {...props} />}
+    </div>
+  );
+};

@@ -7,3 +7,4 @@ export * from './CompareLapsTable.js';
 export * from './CompareLapsTableRow.js';
 export * from './CompareLapCard.js';
 export * from './useCompareLapsData.js';
+export * from './CompareLapsPage.js';

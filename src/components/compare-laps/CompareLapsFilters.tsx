@@ -1,12 +1,8 @@
 import React from 'react';
-import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 
+/** The lap filters under the compare deck; the track and class are picked on the ribbon above. */
 export interface CompareLapsFiltersProps {
-  availableTracks: string[];
-  selectedTrack: string;
-  setSelectedTrack: (track: string) => void;
   selectedCarClass: string;
-  setSelectedCarClass: (carClass: string) => void;
   availableCarModels: string[];
   selectedCarModel: string;
   setSelectedCarModel: (model: string) => void;
@@ -15,11 +11,7 @@ export interface CompareLapsFiltersProps {
 }
 
 export const CompareLapsFilters: React.FC<CompareLapsFiltersProps> = ({
-  availableTracks,
-  selectedTrack,
-  setSelectedTrack,
   selectedCarClass,
-  setSelectedCarClass,
   availableCarModels,
   selectedCarModel,
   setSelectedCarModel,
@@ -27,43 +19,7 @@ export const CompareLapsFilters: React.FC<CompareLapsFiltersProps> = ({
   setPlayerOnly,
 }) => {
   return (
-    <div className="pt-4 border-t border-lmu-border/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      {/* Track Selector */}
-      <div>
-        <label className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block mb-1">
-          Track
-        </label>
-        <select
-          value={selectedTrack}
-          onChange={(e) => setSelectedTrack(e.target.value)}
-          className="w-full bg-lmu-bg border border-lmu-border rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-lmu-accent"
-        >
-          {availableTracks.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Vehicle Category Selector */}
-      <div>
-        <label className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block mb-1">
-          Vehicle Category
-        </label>
-        <select
-          value={selectedCarClass}
-          onChange={(e) => setSelectedCarClass(e.target.value)}
-          className="w-full bg-lmu-bg border border-lmu-border rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-lmu-accent"
-        >
-          {VEHICLE_CLASS_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
+    <div className="pt-4 border-t border-lmu-border/50 grid grid-cols-1 sm:grid-cols-2 gap-3">
       {/* Car Model Selector */}
       <div>
         <label className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block mb-1">
