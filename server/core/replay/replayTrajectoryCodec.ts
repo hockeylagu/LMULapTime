@@ -106,17 +106,12 @@ const PRE_V6_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set(['v3', 'v4', '
  * Brings a row written by an older compatible parser version up to what the current one would
  * store, on read: the samples are never rewritten (for deleted replays they are the only copy).
  * Before v6, Virtual Energy (Class 1 Type 51) was stored as `fuel`, ambient used a wrong scale,
- * track temperature came from a constant byte, and `rainPercent` was scaled by 25 instead of 255.
+ * and track temperature came from a constant byte.
  */
 export function upgradeStoredTrajectory(trajectory: ReplayTrajectoryData, parserVersion: string): ReplayTrajectoryData {
   if (!PRE_V6_REPLAY_CACHE_VERSIONS.has(parserVersion)) return trajectory;
   delete trajectory.trackTemp;
   if (typeof trajectory.ambientTemp === 'number') trajectory.ambientTemp = recalibrateLegacyAmbientTemp(trajectory.ambientTemp);
-  for (const event of trajectory.weatherEvents ?? []) {
-    delete event.trackTemp;
-    if (typeof event.ambientTemp === 'number') event.ambientTemp = recalibrateLegacyAmbientTemp(event.ambientTemp);
-    event.rainPercent = Math.round((event.rainIntensity / 255) * 100);
-  }
   // A car without a Virtual Energy system (e.g. GTE) stored 0 on every point: it has no VE at all.
   const points = trajectory.points ?? [];
   const hasVirtualEnergy = points.some(point => (point.fuel ?? 0) > 0);

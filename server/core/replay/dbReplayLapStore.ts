@@ -81,13 +81,6 @@ export function getReplayFactsVersion(db: DatabaseType, filename: string): strin
   return row?.source_version ?? null;
 }
 
-export function getReplayFactsEnd(db: DatabaseType, filename: string): { endSec: number; sessionRunningOrder: number[] | null } | null {
-  const row = db.prepare('SELECT end_sec, session_running_order FROM replay_facts WHERE filename = ?').get(filename) as
-    { end_sec: number; session_running_order: string | null } | undefined;
-  if (!row) return null;
-  return { endSec: row.end_sec, sessionRunningOrder: row.session_running_order ? JSON.parse(row.session_running_order) as number[] : null };
-}
-
 export interface ReplayLapFactRow extends ReplayLapFact {
   driverSlot: number;
 }

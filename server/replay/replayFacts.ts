@@ -1,9 +1,6 @@
 import {
-  ReplayContactEvent,
   ReplayFlagEvent,
   ReplayLapSummary,
-  ReplayPenaltyEvent,
-  ReplayPitEvent,
   ReplayStandingsSnapshot,
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
@@ -197,24 +194,6 @@ export function driverEventsFrom(trajectory: Pick<ReplayTrajectoryData, 'pitEven
     value: orNull(e.penaltySeconds), otherSlot: null, detail: withoutKeys(e, PENALTY_COLUMNS),
   }));
   return [...pits, ...contacts, ...penalties];
-}
-
-/** The pit, contact and penalty arrays rebuilt from the event rows, as the decoder wrote them. */
-export function driverEventArraysFrom(facts: ReadonlyArray<ReplayDriverEventFact>): { pitEvents: ReplayPitEvent[]; contacts: ReplayContactEvent[]; penalties: ReplayPenaltyEvent[] } {
-  const ordered = [...facts].sort((a, b) => a.seq - b.seq);
-  const pitEvents = ordered.filter(f => f.kind === 'pit').map((f): ReplayPitEvent => ({
-    ...(f.detail as Omit<ReplayPitEvent, 'driverSlot' | 'timeSec' | 'code'>), driverSlot: f.driverSlot, timeSec: f.timeSec, code: f.code ?? 0,
-    ...(f.value !== null ? { durationSec: f.value } : {}),
-  }));
-  const contacts = ordered.filter(f => f.kind === 'contact').map((f): ReplayContactEvent => ({
-    ...(f.detail ?? {}), driverSlot: f.driverSlot, timeSec: f.timeSec, impactMagnitude: f.value ?? 0,
-    ...(f.otherSlot !== null ? { otherParty: f.otherSlot } : {}),
-  }));
-  const penalties = ordered.filter(f => f.kind === 'penalty_given' || f.kind === 'penalty_served').map((f): ReplayPenaltyEvent => ({
-    ...(f.detail as Pick<ReplayPenaltyEvent, 'penaltyText'>), driverSlot: f.driverSlot, timeSec: f.timeSec,
-    action: f.kind === 'penalty_served' ? 'served' : 'given', ...(f.value !== null ? { penaltySeconds: f.value } : {}),
-  }));
-  return { pitEvents, contacts, penalties };
 }
 
 /** The running order snapshots where the order changes; of two at the same time, the later holds. */
