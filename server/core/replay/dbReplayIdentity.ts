@@ -2,6 +2,7 @@ import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, SessionMetadata } from '../types.js';
 import { getStoredReplayFileInfo, StoredReplayFileInfo } from './dbReplayMetadataStore.js';
+import { renameReplayFacts } from './dbReplayLapStore.js';
 
 // A replay's rows are keyed by its filename, but a filename does not name one recording: LMU can
 // write a new recording under a name already in the cache (a restarted practice keeps its file, a
@@ -63,6 +64,7 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
     db.prepare('UPDATE replay_trajectories SET filename = ?, source_path = ? WHERE filename = ?').run(newName, newPath, filename);
     db.prepare('UPDATE replay_trajectory_defaults SET filename = ? WHERE filename = ?').run(newName, filename);
     db.prepare('UPDATE replay_ingest_drivers SET filename = ? WHERE filename = ?').run(newName, filename);
+    renameReplayFacts(db, filename, newName);
     db.prepare('UPDATE telemetry_metadata SET matched_replay_filename = ? WHERE matched_replay_filename = ?').run(newName, filename);
     db.prepare('UPDATE ai_reports SET replay_name = ? WHERE replay_name = ?').run(newName, filename);
     db.prepare('UPDATE ai_reports SET baseline_replay_name = ? WHERE baseline_replay_name = ?').run(newName, filename);

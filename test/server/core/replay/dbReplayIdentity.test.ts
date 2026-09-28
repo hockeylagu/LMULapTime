@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { archivedReplayName } from '../../../../server/core/replay/dbReplayIdentity.js';
+import { getReplayFactsVersion, getReplayLaps, replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { emptyLapFact } from '../../../../server/replay/replayFacts.js';
 import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
 import type { DuckDbFileInfo } from '../../../../server/telemetry/telemetryMatcher.js';
 
@@ -63,6 +65,8 @@ describe('replay identity', () => {
     db.upsertReplayTrajectoryCache(name, 0, 2, savedAt, 6863306, lap(2), replayPath);
     db.setReplayTrajectoryDefaults(name, -1, 2, 0);
     db.recordReplayDriverIngest(name, 0, savedAt, 6863306, 'stored');
+    replaceReplayDriverLapFacts(db.getDb(), name, 0, [emptyLapFact(1), emptyLapFact(2)], 'v7');
+    replaceReplayWideFacts(db.getDb(), name, { endSec: 1, sessionRunningOrder: null, conditions: [], runningOrder: [], driverEvents: [] }, 'v7');
     db.upsertSession(session('owner'), 'C:\\results\\owner.xml', 1, 1);
     db.upsertSession(session('withdrawn'), 'C:\\results\\withdrawn.xml', 1, 1);
     db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, sizeBytes: 6863306 }, 'owned-by-other-session');
@@ -80,6 +84,9 @@ describe('replay identity', () => {
     expect(db.getStoredReplayTrajectory(name, 0, 2)).toBeNull();
     expect(db.getReplayDriverIngest(archivedName, 0)?.fileMtime).toBe(savedAt);
     expect(db.getReplayDriverIngest(name, 0)).toBeNull();
+    expect(getReplayLaps(db.getDb(), archivedName).map(l => l.lapNumber)).toEqual([1, 2]);
+    expect(getReplayFactsVersion(db.getDb(), archivedName)).toBe('v7');
+    expect(getReplayLaps(db.getDb(), name)).toEqual([]);
     expect(db.getSessionById('owner')?.matchingReplayFile).toMatchObject({ name: archivedName, path: `C:\\replays\\${archivedName}` });
     expect(db.getRejectedReplayLinks().get('withdrawn')?.[0].replayName).toBe(archivedName);
     expect(db.getTelemetryMetadata()[0].matchedReplayFilename).toBe(archivedName);

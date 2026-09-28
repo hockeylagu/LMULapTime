@@ -1,5 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { REPLAY_CACHE_VERSION } from '../dbSchema.js';
+import { deleteReplayDriverLapFacts } from './dbReplayLapStore.js';
 
 // Per-driver decode outcomes (see replay_ingest_drivers in dbSchema.ts).
 
@@ -52,8 +53,9 @@ export function isReplayDriverSettled(attempt: ReplayDriverIngest | null, fileMt
     attempt.parserVersion === REPLAY_CACHE_VERSION);
 }
 
-/** Removes a driver's lap rows and default pointer, so a new decode replaces the whole set. */
+/** Removes a driver's lap rows, lap facts and default pointer, so a new decode replaces the whole set. */
 export function deleteReplayDriverLaps(db: DatabaseType, filename: string, driverSlot: number): void {
   db.prepare('DELETE FROM replay_trajectories WHERE filename = ? AND driver_slot = ?').run(filename, driverSlot);
   db.prepare('DELETE FROM replay_trajectory_defaults WHERE filename = ? AND driver_slot = ?').run(filename, driverSlot);
+  deleteReplayDriverLapFacts(db, filename, driverSlot);
 }

@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
+import { getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
 import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
@@ -32,6 +33,7 @@ describe('replay ingest', () => {
 
       expect(db.getStoredReplayTrajectory(name, 2, 2)).not.toBeNull();
       expect(db.getStoredReplayTrajectory(name, 2, 3)).toBeNull();
+      expect(getReplayLaps(db.getDb(), name, 2).map(l => l.lapNumber)).toEqual([1, 2]);
     });
 
     it('keeps the previous set whole when a write fails partway', () => {
@@ -47,6 +49,7 @@ describe('replay ingest', () => {
 
       expect([1, 2, 3].map(n => db.getStoredReplayTrajectory(name, 2, n)?.currentLap)).toEqual([1, 2, 3]);
       expect(db.getStoredReplayTrajectory(name, 2, 4)).toBeNull();
+      expect(getReplayLaps(db.getDb(), name, 2).map(l => l.lapNumber)).toEqual([1, 2, 3]);
       expect(db.getReplayDriverIngest(name, 2)?.fileMtime).toBe(1);
     });
 

@@ -5,6 +5,7 @@ import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { ReplayUpgradeResult } from '../../../../server/core/db.js';
 import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { getReplayFactsVersion } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const name = 'Upgrade_P1.Vcr';
@@ -87,6 +88,18 @@ describe('replay upgrade', () => {
     expect(db.getStoredReplayTrajectory(name, -1, -1)?.driverSlot).toBe(1);
     expect(db.getReplayDriverIngest(name, 2)?.status).toBe('stored');
     expect(db.listReplayUpgradeBacklog(dir)).toEqual([]);
+  });
+
+  it('refreshes the replay facts written by the older version', async () => {
+    ingestAsOlderVersion();
+    sql("UPDATE replay_facts SET source_version = 'v4'");
+    sql("UPDATE replay_laps SET source_version = 'v4'");
+
+    await runUpgrade();
+
+    expect(getReplayFactsVersion(db.getDb(), name)).toBe(REPLAY_CACHE_VERSION);
+    expect(db.getDb().prepare('SELECT DISTINCT source_version FROM replay_laps WHERE filename = ?').all(name))
+      .toEqual([{ source_version: REPLAY_CACHE_VERSION }]);
   });
 
   it('records a driver that fails and keeps its older rows, without listing it again', async () => {

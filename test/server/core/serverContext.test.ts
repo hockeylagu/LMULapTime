@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
-import type { DetailedSession, ReferenceBenchmarkDiff } from '../../../server/core/types.js';
+import type { DetailedSession, ReferenceBenchmarkDiff, ReplayTrajectoryData } from '../../../server/core/types.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
@@ -525,6 +525,43 @@ describe('ServerContext reference laptime refresh', () => {
       '[Reference Laptimes] Startup refresh warning:',
       expect.any(Error)
     );
+  });
+});
+
+describe('ServerContext replay facts backfill', () => {
+  let db: SessionDatabase;
+
+  beforeEach(() => {
+    db = new SessionDatabase(':memory:');
+    const lap: ReplayTrajectoryData = {
+      replayName: 'A.Vcr', pointsCount: 1, currentLap: 1, driverSlot: 1, points: [{ x: 0, y: 0, z: 0, timeSec: 5 }],
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+    };
+    db.upsertReplayTrajectoryCache('A.Vcr', 1, 1, 1, 1, lap, 'C:/gone/A.Vcr');
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  const backfilled = (context: ServerContext) => vi.waitFor(() => expect(context.replayFacts?.getStatus().result?.replays).toBe(1));
+
+  it('runs once the replay upgrade has finished', async () => {
+    const context = createContext(db);
+
+    expect(context.startReplayUpgradeWhenIdle()).toBe(true);
+
+    await backfilled(context);
+    expect(context.replayUpgrade?.getStatus().running).toBe(false);
+  });
+
+  it('runs straight away when the upgrade is turned off', async () => {
+    const context = createContext(db);
+    context.replayUpgrade?.setEnabled(false);
+
+    expect(context.startReplayUpgradeWhenIdle()).toBe(false);
+
+    await backfilled(context);
   });
 });
 

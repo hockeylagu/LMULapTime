@@ -211,6 +211,12 @@ corresponding VCR_FORMAT.md sections have been fixed to match.
   byte 1 was observed constant per stint (33, then 17, then 1 near the checkered flag) which does
   not fit a sector bitmask interpretation, and byte 2 was `0` almost always with one brief `0x10`
   excursion. Kept as raw fields, not trusted as documented.
+  Across all 325 cached replays (2026-09-27), byte 1 only takes `1`, `17` and `33`: bit 0 is
+  always set, and bits 4 and 5 are never set together. It flips between 1 and 17 about 400 times
+  per replay under green, with no change to `flagState`, so the "constant per stint" reading above
+  held for Monza only. Byte 2 takes `0`, `2`, `16`, `32` and `34`. Both bytes are stored raw in
+  `replay_conditions` (`sector_mask`, `driver_flag`) for later decoding. Candidates to correlate:
+  lap crossings, pit entries and exits, sector crossings, and XML session phases.
 - **Live standings (Type 48) slots start at byte 21, not byte 1.** Brute-inspected a real
   payload (`14 00 00 80 bf 00 00 80 bf 00 00 80 bf ff ff ff 7f 00 00 80 42 0f 00 12 0c 06 0d 02
   04 07 08 11 10 05 13 01 0a 09 0e 03 0b`, Monza race, sTime 4.09s): byte 0 = `20` (car count);
