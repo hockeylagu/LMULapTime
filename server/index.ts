@@ -8,6 +8,7 @@ import { TelemetryCatalog } from './telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from './replay/replayCacheService.js';
 import { ServerContext } from './core/serverContext.js';
 import { createAiRouter } from './routes/aiRoutes.js';
+import { createLeaderboardRouter } from './routes/leaderboardRoutes.js';
 import { createReferenceRouter } from './routes/referenceRoutes.js';
 import { createReplayRouter } from './routes/replayRoutes.js';
 import { createSessionRouter } from './routes/sessionRoutes.js';
@@ -82,6 +83,7 @@ app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
 app.use('/api', createReferenceRouter(serverContext));
 app.use('/api', createSessionRouter(serverContext));
+app.use('/api', createLeaderboardRouter(serverContext));
 app.use('/api', createReplayRouter(serverContext));
 
 if (process.env.NODE_ENV !== 'test') {
