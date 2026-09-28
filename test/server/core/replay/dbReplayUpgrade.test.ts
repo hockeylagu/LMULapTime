@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { SessionDatabase } from '../../../server/core/db.js';
-import type { ReplayUpgradeResult } from '../../../server/core/db.js';
-import { REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
-import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { SessionDatabase } from '../../../../server/core/db.js';
+import type { ReplayUpgradeResult } from '../../../../server/core/db.js';
+import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const name = 'Upgrade_P1.Vcr';
 

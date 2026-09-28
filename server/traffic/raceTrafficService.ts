@@ -1,7 +1,7 @@
 import type { DetailedSession, ReplayTrafficResponse } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { getTrackDefinition } from '../tracks/serverTrackSync.js';
-import type { ReplayLapRow } from '../core/dbRacePositionStore.js';
+import type { ReplayLapRow } from '../core/replay/dbRacePositionStore.js';
 import { RACE_POSITIONS_VERSION, RacePositions } from './racePositions.js';
 import { buildRacePositionsInWorker } from './racePositionsWorkerClient.js';
 import { findTrafficSpells, TrafficCarInfo } from './trafficSpells.js';

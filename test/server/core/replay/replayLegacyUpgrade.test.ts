@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { initDbSchema, compressJson, REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
+import { initDbSchema, compressJson, REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
 import {
   compressTrajectory,
   recalibrateLegacyAmbientTemp,
   upgradeStoredReplayMetadata,
   upgradeStoredTrajectory,
-} from '../../../server/core/replayTrajectoryCodec.js';
-import { getStoredReplayTrajectory } from '../../../server/core/dbReplayTrajectoryStore.js';
-import { getStoredReplayMetadata } from '../../../server/core/dbReplayMetadataStore.js';
-import { ReplayMetadata, ReplayTrajectoryData } from '../../../server/core/types.js';
+} from '../../../../server/core/replay/replayTrajectoryCodec.js';
+import { getStoredReplayTrajectory } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
+import { getStoredReplayMetadata } from '../../../../server/core/replay/dbReplayMetadataStore.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
 
 const legacyTrajectory = (): ReplayTrajectoryData => ({
   replayName: 'Lost.Vcr',

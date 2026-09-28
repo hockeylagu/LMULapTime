@@ -31,14 +31,14 @@ import {
   syncReplaysFromDir as runSyncReplaysFromDir,
   cacheAllLapsForDriver,
   ReplaySyncHost,
-} from './dbReplaySync.js';
+} from './replay/dbReplaySync.js';
 import {
   deleteReplayDriverLaps,
   getReplayDriverIngest,
   recordReplayDriverIngest,
   ReplayDriverIngest,
   ReplayDriverIngestStatus,
-} from './dbReplayIngestStore.js';
+} from './replay/dbReplayIngestStore.js';
 import {
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
@@ -46,14 +46,14 @@ import {
   hasValidReplayTrajectoryCache,
   setTrajectoryDefaults,
   upsertReplayTrajectoryCache,
-} from './dbReplayTrajectoryStore.js';
+} from './replay/dbReplayTrajectoryStore.js';
 import {
   ReplayLapRow,
   getRacePositions,
   getReplayLapSignature,
   listReplayLapRows,
   saveRacePositions,
-} from './dbRacePositionStore.js';
+} from './replay/dbRacePositionStore.js';
 import {
   StoredReplayFileInfo,
   getAllStoredReplayFiles,
@@ -63,7 +63,7 @@ import {
   upsertReplayMetadataCache,
   getReplaysCount,
   getReplayCacheList,
-} from './dbReplayMetadataStore.js';
+} from './replay/dbReplayMetadataStore.js';
 import {
   getMetadata,
   setMetadata,
@@ -106,8 +106,8 @@ import {
   getSessionsCount as fetchSessionsCount,
   clearSessionCache,
 } from './dbSessionStore.js';
-import { getRejectedReplayLinks, rejectSessionReplayLink } from './dbReplayLinkStore.js';
-import { archiveReplacedRecording } from './dbReplayIdentity.js';
+import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
+import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
 import {
   listReplayUpgradeBacklog,
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
@@ -115,7 +115,7 @@ import {
   ReplayUpgradeHost,
   ReplayUpgradeProgress,
   ReplayUpgradeResult,
-} from './dbReplayUpgrade.js';
+} from './replay/dbReplayUpgrade.js';
 import {
   SessionXmlSyncParser,
   SessionSyncHost,

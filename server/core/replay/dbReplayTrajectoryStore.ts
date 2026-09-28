@@ -1,6 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayTrajectoryData } from './types.js';
-import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from './dbSchema.js';
+import { ReplayTrajectoryData } from '../types.js';
+import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
 
 /**

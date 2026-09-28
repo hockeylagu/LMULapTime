@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayMetadata, ReplayCacheSummary } from './types.js';
+import { ReplayMetadata, ReplayCacheSummary } from '../types.js';
 import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
-import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
-import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from './dbSchema.js';
+import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
+import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 
 // Replay metadata rows, one per .Vcr file. They outlive the file: LMU deletes old replays, and
 // the stored row is then the only copy of the metadata.

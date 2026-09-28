@@ -2,7 +2,7 @@ import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './replayParser.js';
 import { extractReplayTrajectoryInWorker } from './replayTrajectoryWorkerClient.js';
-import { isReplayDriverSettled } from '../core/dbReplayIngestStore.js';
+import { isReplayDriverSettled } from '../core/replay/dbReplayIngestStore.js';
 import { lapEdgesFromNeighbours } from './replayLapPoints.js';
 import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SessionDatabase } from '../../../server/core/db.js';
-import type { DetailedSession } from '../../../server/core/types.js';
+import { SessionDatabase } from '../../../../server/core/db.js';
+import type { DetailedSession } from '../../../../server/core/types.js';
 
 const replayLink = {
   name: 'Bahrain Paddock Circuit P1 18.Vcr',

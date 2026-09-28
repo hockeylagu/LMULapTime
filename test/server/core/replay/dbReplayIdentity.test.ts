@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SessionDatabase } from '../../../server/core/db.js';
-import { archivedReplayName } from '../../../server/core/dbReplayIdentity.js';
-import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../server/core/types.js';
-import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
+import { SessionDatabase } from '../../../../server/core/db.js';
+import { archivedReplayName } from '../../../../server/core/replay/dbReplayIdentity.js';
+import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { DuckDbFileInfo } from '../../../../server/telemetry/telemetryMatcher.js';
 
 const name = 'Bahrain Paddock Circuit P1 18.Vcr';
 const replayPath = `C:\\replays\\${name}`;

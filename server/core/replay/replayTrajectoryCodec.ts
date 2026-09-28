@@ -1,6 +1,6 @@
-import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from './types.js';
-import { compressJson, decompressJson } from './dbSchema.js';
-import { applyGarageState } from '../replay/garageState.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../types.js';
+import { compressJson, decompressJson } from '../dbSchema.js';
+import { applyGarageState } from '../../replay/garageState.js';
 
 /**
  * Trajectory blobs are stored column-per-channel instead of one object per point: the channel

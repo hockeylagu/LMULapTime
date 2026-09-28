@@ -75,20 +75,21 @@ LMULapTime/
 │   │   ├── db.ts                   # SQLite instance, transactions, schema initialization
 │   │   ├── dbAiReportStore.ts      # AI race engineer coaching reports
 │   │   ├── dbMetadataStore.ts      # Key-value system cache metadata & version tags
-│   │   ├── dbRacePositionStore.ts  # Per-replay race positions index (built from the stored laps)
 │   │   ├── dbReferenceLaptimeStore.ts # Community alien benchmark targets cache
-│   │   ├── dbReplayIdentity.ts     # Replay file fingerprinting, versioning & collision protection
-│   │   ├── dbReplayIngestStore.ts  # Atomic replay lap ingest operations
-│   │   ├── dbReplayLinkStore.ts    # Session-to-replay link tracking & withdrawal
-│   │   ├── dbReplayMetadataStore.ts # Replay headers, driver rosters & layout metadata
-│   │   ├── dbReplaySync.ts         # Replay sync queries and transaction wrappers
-│   │   ├── dbReplayTrajectoryStore.ts # Trajectory compression, decimation & columnar persistence
-│   │   ├── dbReplayUpgrade.ts      # Replay parser versioning & background upgrade state
+│   │   ├── replay/                 # Replay cache stores (one row per driver lap, plus replay-wide facts)
+│   │   │   ├── dbRacePositionStore.ts # Per-replay race positions index (built from the stored laps)
+│   │   │   ├── dbReplayIdentity.ts # Replay file fingerprinting, versioning & collision protection
+│   │   │   ├── dbReplayIngestStore.ts # Atomic replay lap ingest operations
+│   │   │   ├── dbReplayLinkStore.ts # Session-to-replay link tracking & withdrawal
+│   │   │   ├── dbReplayMetadataStore.ts # Replay headers, driver rosters & layout metadata
+│   │   │   ├── dbReplaySync.ts     # Replay sync queries and transaction wrappers
+│   │   │   ├── dbReplayTrajectoryStore.ts # Trajectory compression, decimation & columnar persistence
+│   │   │   ├── dbReplayUpgrade.ts  # Replay parser versioning & background upgrade state
+│   │   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
 │   │   ├── dbSchema.ts             # DDL definitions, tables and index setup
 │   │   ├── dbSessionStore.ts       # Session queries, standings, and summaries
 │   │   ├── dbSessionSync.ts        # Bulk session XML persistence transactions
 │   │   ├── dbTelemetryStore.ts     # Columnar 100 Hz DuckDB telemetry persistence
-│   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
 │   │   ├── serverContext.ts        # Background scanner lifecycle and state coordinator
 │   │   ├── backgroundScan.ts       # Drains a sync iterator one step per event-loop turn into its scan status
 │   │   └── types.ts                # Core shared domain interfaces and telemetry models
@@ -250,7 +251,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
 - WAL mode is mandatory: `PRAGMA journal_mode = WAL;`.
-- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`, `dbReplaySync.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
+- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`), with the replay cache stores in `server/core/replay/` (`dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReplaySync.ts`, `dbRacePositionStore.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
 - Use columnar tables for high-frequency telemetry data to maintain sub-millisecond query performance and compact storage.
 - Always use parameterized queries (`stmt.run(arg1, arg2)`) to guard against SQL injection and handle player/track names containing special characters or apostrophes.
 - Wrap bulk operations (e.g., scanning hundreds of XML files or saving hundreds of benchmark rows) in transactions: `db.transaction(...)`.

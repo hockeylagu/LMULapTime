@@ -9,7 +9,7 @@
 import path from 'path';
 import Database from 'better-sqlite3';
 import { DuckDbLapTelemetry, ReplayMetadata } from '../../server/core/types.js';
-import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
+import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
 import { DUCKDB_TELEMETRY_CACHE_VERSION, decompressJson } from '../../server/core/dbSchema.js';
 import { vcrLapBaseTime } from '../../server/telemetry/telemetryFusion.js';
 import { checkDuckVcrClock } from './duckVcrClockCheck.js';

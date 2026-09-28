@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { SessionDatabase } from '../../../server/core/db.js';
-import type { ReplayTrajectoryData } from '../../../server/core/types.js';
-import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { SessionDatabase } from '../../../../server/core/db.js';
+import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
+import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const name = 'Ingest_P1.Vcr';
 
