@@ -58,6 +58,9 @@ export interface UseCompareLapsParams {
   initialCompareLapNum?: number;
 }
 
+/** Laps compared at once: a lap and its reference. */
+export const MAX_COMPARED_LAPS = 2;
+
 const NO_COMPARE_LAPS: CompareLapsApiData = {
   laps: [],
   allTimeBestLap: null,
@@ -251,7 +254,7 @@ export function useCompareLapsData({
       }
     }
 
-    const initialSlice = candidates.slice(0, 4);
+    const initialSlice = candidates.slice(0, MAX_COMPARED_LAPS);
     setSelectedLaps(initialSlice);
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
     initializedScopeRef.current = currentScope;
@@ -308,8 +311,10 @@ export function useCompareLapsData({
         setBaselineLapId(next.length > 0 ? next[0].id : '');
       }
     } else {
-      if (selectedLaps.length >= 4) {
-        setSelectedLaps([...selectedLaps.slice(0, 3), lap]);
+      if (selectedLaps.length >= MAX_COMPARED_LAPS) {
+        // Full: the new lap takes the place of the one compared with the baseline.
+        const kept = selectedLaps.find((l) => l.id === baselineLapId) ?? selectedLaps[0];
+        setSelectedLaps([kept, lap]);
       } else {
         setSelectedLaps([...selectedLaps, lap]);
       }

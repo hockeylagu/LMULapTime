@@ -177,7 +177,7 @@ describe('CompareLaps component', () => {
     expect(screen.getAllByText('Compare Laps').length).toBeGreaterThan(0);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/2\)/i)).toBeInTheDocument();
     });
   });
 
@@ -185,7 +185,7 @@ describe('CompareLaps component', () => {
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/2\)/i)).toBeInTheDocument();
     });
 
     // Click + Theoretical Best
@@ -193,16 +193,17 @@ describe('CompareLaps component', () => {
     fireEvent.click(theoBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
-    // Click + All-Time Best
+    // Click + All-Time Best: two laps are compared at most, so it takes the theoretical best's place
     const allTimeBtn = screen.getByRole('button', { name: /\+ All-Time Best/i });
     fireEvent.click(allTimeBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(3\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /\+ Theoretical Best/i })).toBeInTheDocument();
     });
+    expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
   });
 
   it('allows adding and removing laps from comparison', async () => {
@@ -243,7 +244,7 @@ describe('CompareLaps component', () => {
     fireEvent.click(theoBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
     const setBaselineButtons = screen.getAllByRole('button', { name: /Set Baseline/i });
@@ -309,10 +310,10 @@ describe('CompareLaps component', () => {
     );
 
     await waitFor(() => {
-      // Both Lap 1 (2:02.500) and Personal Best Lap 2 (2:01.800) are in the deck (2/4)
+      // Both Lap 1 (2:02.500) and Personal Best Lap 2 (2:01.800) are in the deck ((2/2))
       expect(screen.getAllByText('2:02.500').length).toBeGreaterThan(0);
       expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
     // Remove Personal Best lap from deck
@@ -321,8 +322,8 @@ describe('CompareLaps component', () => {
     fireEvent.click(removeButtons[1]); // remove PB lap
 
     await waitFor(() => {
-      // Deck drops to 1/4 and + Personal Best button appears in toolbar
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      // Deck drops to (1/2) and + Personal Best button appears in toolbar
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/2\)/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /\+ Personal Best \(2:01\.800\)/i })).toBeInTheDocument();
     });
 
@@ -331,7 +332,7 @@ describe('CompareLaps component', () => {
     fireEvent.click(addPbBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
   });
 
@@ -369,7 +370,7 @@ describe('CompareLaps component', () => {
 
     // Initial load selects player's PB lap (2:01.800)
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/2\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
     });
 
@@ -379,7 +380,7 @@ describe('CompareLaps component', () => {
 
     // The previously selected lap remains in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(1\/2\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:01.800').length).toBeGreaterThan(0);
     });
 
@@ -398,7 +399,7 @@ describe('CompareLaps component', () => {
 
     // The chosen all-driver lap is now added to the comparison deck alongside the prior selection.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
 
@@ -408,7 +409,7 @@ describe('CompareLaps component', () => {
 
     // The explicit all-driver selection remains in the comparison deck.
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
       expect(screen.getAllByText('2:00.900').length).toBeGreaterThan(0);
     });
   });
@@ -428,7 +429,7 @@ describe('CompareLaps component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Active Baseline Lap:/i).parentElement).toHaveTextContent('Sim Driver — 2:01.800');
     });
   });
@@ -451,9 +452,9 @@ describe('CompareLaps component', () => {
       />
     );
 
-    // Two laps (Lap 1 & Personal Best Lap 2) are selected initially (2/4)
+    // Two laps (Lap 1 & Personal Best Lap 2) are selected initially ((2/2))
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
     // "Compare Telemetry" button is visible ONLY ONCE (in the chart header) and styled with green gradient
@@ -494,7 +495,7 @@ describe('CompareLaps component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
     const compareBtn = screen.getByRole('button', { name: /Compare Telemetry/i });
@@ -530,7 +531,7 @@ describe('CompareLaps component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/4\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/i)).toBeInTheDocument();
     });
 
     const compareBtn = screen.getByRole('button', { name: /Compare Telemetry/i });
