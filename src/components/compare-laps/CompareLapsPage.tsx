@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { Swords } from 'lucide-react';
 import type { LeaderboardLayout, LeaderboardScope } from '../../../shared/types/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
@@ -75,11 +74,7 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
     <div className="space-y-6">
       <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <div>
-          <span className="px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30 inline-flex items-center gap-1">
-            <Swords className="w-3.5 h-3.5" />
-            Rivals
-          </span>
-          <h2 className="text-2xl font-extrabold text-white mt-1">Leaderboards & Rivals</h2>
+          <h2 className="text-2xl font-extrabold text-white">Leaderboards & Rivals</h2>
           <p className="text-xs text-lmu-muted mt-0.5">
             Where you stand among the drivers you raced online, track by track and class by class.
           </p>

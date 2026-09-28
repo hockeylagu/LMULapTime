@@ -2,6 +2,7 @@ import React from 'react';
 import { MapPin } from 'lucide-react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
+import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { carClassLabel, formatDrivenAgo } from '../leaderboard/leaderboardFormat.js';
 
 export interface TrackRibbonCardProps {
@@ -58,7 +59,7 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
       <div className="text-[11px] text-lmu-muted truncate">{layout.layoutName}</div>
       {latest && (
         <div className="mt-1.5 flex items-center justify-between text-[11px]">
-          <span className="font-bold text-sky-400">{carClassLabel(latest.carClass)}</span>
+          <CarClassBadge carClass={latest.carClass} size="xs" title={carClassLabel(latest.carClass)} />
           <span className="font-mono text-white">{formatTime(latest.playerBest)}</span>
         </div>
       )}

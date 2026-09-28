@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
+import { getCarClassBadgeConfig } from '../../common/CarClassBadge.js';
 import { carClassLabel } from '../leaderboard/leaderboardFormat.js';
 
 export interface LayoutClassPillsProps {
@@ -8,26 +9,29 @@ export interface LayoutClassPillsProps {
   onSelect: (carClass: string) => void;
 }
 
-/** The classes the player drove on the selected layout, most recent first, with the rank in each. */
+/**
+ * The classes the player drove on the selected layout, most recent first, with the rank in each.
+ * Each pill wears its class badge colours, as the class filters elsewhere do.
+ */
 export const LayoutClassPills: React.FC<LayoutClassPillsProps> = ({ layout, selectedCarClass, onSelect }) => (
   <div role="group" aria-label="Car class" className="flex flex-wrap items-center gap-2">
     {layout.classes.map((c) => {
       const selected = c.carClass === selectedCarClass;
+      const badge = getCarClassBadgeConfig(c.carClass);
       return (
         <button
           key={c.carClass}
           type="button"
           aria-pressed={selected}
           onClick={() => onSelect(c.carClass)}
-          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-            selected
-              ? 'bg-lmu-accent text-white border-lmu-accent'
-              : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/50'
-          }`}
+          title={badge?.title}
+          className={`h-7 px-3 rounded-[5px] border font-mono text-xs font-bold uppercase tracking-wider transition-opacity cursor-pointer inline-flex items-center gap-2 ${
+            badge ? `${badge.borderClass} ${badge.textClass} ${badge.bgClass}` : 'border-lmu-border text-lmu-muted'
+          } ${selected ? 'opacity-100 brightness-110' : 'opacity-40 hover:opacity-100'}`}
         >
           <span>{carClassLabel(c.carClass)}</span>
           {c.playerRank !== null && (
-            <span className={`font-mono ${selected ? 'text-white/90' : 'text-slate-400'}`}>
+            <span className="text-slate-300 font-semibold normal-case">
               P{c.playerRank}/{c.fieldSize}
             </span>
           )}
