@@ -139,14 +139,14 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     fireEvent.click(compareButtons[0]);
 
     // Verify hash changed to full comparison studio with session & lap parameters
-    expect(window.location.hash).toContain('compare');
+    expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');
     expect(window.location.hash).toContain('lapNum=1');
 
     // Click Compare Laps in the header
     const openStudioBtn = screen.getByRole('button', { name: /Compare Laps/i });
     fireEvent.click(openStudioBtn);
-    expect(window.location.hash).toContain('compare');
+    expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');
   });
 

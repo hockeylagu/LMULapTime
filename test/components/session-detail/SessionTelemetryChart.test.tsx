@@ -57,6 +57,6 @@ describe('SessionTelemetryChart navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select lap 2' }));
 
-    expect(window.location.hash).toBe('#/compare?track=Spa&carClass=LMH&sessionId=sess123&lapNum=2');
+    expect(window.location.hash).toBe('#/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=2');
   });
 });

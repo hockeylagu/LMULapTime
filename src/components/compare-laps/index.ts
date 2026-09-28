@@ -4,4 +4,4 @@ export * from './CompareLapsDeck.js';
 export * from './CompareSectorChart.js';
 export * from './CompareLapCard.js';
 export * from './useCompareLapsData.js';
-export * from './CompareLapsPage.js';
+export * from './LeaderboardPage.js';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
-import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, ArrowLeftRight, Film } from 'lucide-react';
+import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, Trophy, Film } from 'lucide-react';
 import { ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
 
 export interface NavbarProps {
@@ -115,9 +115,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             Tracks
           </NavLink>
 
-          <NavLink to={{ pathname: '/compare', search: tabSearch }} className={tabClass}>
-            <ArrowLeftRight className="w-4 h-4" />
-            Compare Laps
+          <NavLink to={{ pathname: '/leaderboard', search: tabSearch }} className={tabClass}>
+            <Trophy className="w-4 h-4" />
+            Leaderboard
           </NavLink>
 
           <NavLink to={{ pathname: '/settings', search: tabSearch }} className={tabClass}>

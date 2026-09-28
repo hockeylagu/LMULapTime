@@ -36,7 +36,7 @@ export function findLayoutForTrack(layouts: LeaderboardLayout[], track: string |
  * Rivals & leaderboards: the tracks the player drove (newest first, the last one open by
  * default), where the player stands among the real drivers met there, and lap comparison.
  */
-export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
+export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { layouts, loading, error } = useLeaderboardLayouts();
   const track = searchParams.get('track') || props.initialTrack || null;
@@ -75,7 +75,7 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
     <div className="space-y-6">
       <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white">Leaderboards & Rivals</h2>
+          <h2 className="text-2xl font-extrabold text-white">Leaderboard</h2>
           <p className="text-xs text-lmu-muted mt-0.5">
             Where you stand among the drivers you raced online, track by track and class by class.
           </p>

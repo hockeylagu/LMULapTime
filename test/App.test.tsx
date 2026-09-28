@@ -148,6 +148,27 @@ describe('App component', () => {
     });
   });
 
+  it('opens the Leaderboard from its tab, and old Compare Laps links on the same track', async () => {
+    const answer = global.fetch as ReturnType<typeof vi.fn>;
+    const defaultAnswer = answer.getMockImplementation() as (url: string) => unknown;
+    const reply = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+    answer.mockImplementation((url: string) => {
+      if (url.startsWith('/api/leaderboard/layouts')) return reply([]);
+      if (url.startsWith('/api/leaderboard?')) {
+        return reply({ layoutKey: 'spa_gp', layoutName: '', carClass: 'LMGT3', scope: 'class', carType: null, entries: [], player: null, benchmark: null });
+      }
+      if (url.startsWith('/api/rivals')) return reply({ rival: null, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten: [], nextUp: [], trend: [] });
+      if (url.startsWith('/api/compare/laps')) return reply({ laps: [], allTimeBestLap: null, benchmarks: [] });
+      return defaultAnswer(url);
+    });
+    window.location.hash = '#/compare?track=Spa&carClass=LMGT3&sessionId=sess1';
+    render(<App />);
+
+    await waitFor(() => expect(window.location.hash).toBe('#/leaderboard?track=Spa&carClass=LMGT3&sessionId=sess1'));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Leaderboard' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Leaderboard/ })).toHaveAttribute('href', expect.stringMatching(/^\/leaderboard\?/));
+  });
+
   it('navigates to session detail when hash is set to session/:id and handles back navigation', async () => {
     window.location.hash = '#session/sess1';
     render(<App />);
