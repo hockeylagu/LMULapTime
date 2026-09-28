@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { Swords } from 'lucide-react';
-import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
+import type { LeaderboardLayout, LeaderboardScope } from '../../../shared/types/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { CompareLaps, CompareLapsProps } from './CompareLaps.js';
 import { TrackRibbon } from './ribbon/TrackRibbon.js';
 import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
 import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
+import { LeaderboardSection } from './leaderboard/LeaderboardSection.js';
+import { useLeaderboard } from './leaderboard/useLeaderboard.js';
 
 /** The lap a deep link asked for belongs to the previous pick: a new track or class drops it. */
 const CLEARED_LAP_PARAMS = {
@@ -38,6 +40,10 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
   const track = searchParams.get('track') || props.initialTrack || null;
   const carClass = searchParams.get('carClass') || props.initialCarClass || null;
   const selectedLayout = useMemo(() => findLayoutForTrack(layouts, track), [layouts, track]);
+  const layoutKey = selectedLayout?.layoutKey ?? (track ? getCircuitSpecification(track).layoutKey : null);
+  const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
+  const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
+  const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
 
   // Without a track in the URL, open the layout driven last, in the class driven last there.
   useEffect(() => {
@@ -83,6 +89,16 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
           <LayoutClassPills layout={selectedLayout} selectedCarClass={carClass} onSelect={selectClass} />
         )}
       </section>
+
+      {layoutKey && carClass && (
+        <LeaderboardSection
+          {...leaderboard}
+          carClass={carClass}
+          scope={scope}
+          playerCarType={playerCarType}
+          onScopeChange={(next) => updateSearchParams(searchParams, setSearchParams, { scope: next === 'car' ? 'car' : null })}
+        />
+      )}
 
       {track && <CompareLaps {...props} />}
     </div>
