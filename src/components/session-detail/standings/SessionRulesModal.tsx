@@ -1,17 +1,23 @@
 import React, { useEffect } from 'react';
-import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc } from 'lucide-react';
-import { SessionSettings } from '../../../../shared/types/index.js';
+import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc, Sun, CloudRain, CloudDrizzle, Thermometer } from 'lucide-react';
+import { DetailedSession, SessionSettings } from '../../../../shared/types/index.js';
+
+export type SessionConditionsInfo = Pick<NonNullable<DetailedSession['matchingReplayFile']>, 'weatherCondition' | 'maxRainIntensity' | 'ambientTemp' | 'trackTemp'>;
 
 export interface SessionRulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings?: SessionSettings;
+  conditions?: SessionConditionsInfo;
 }
+
+const WEATHER_LABEL = { Dry: 'Dry Track', Wet: 'Wet Track', 'Dynamic Weather': 'Dynamic Weather' } as const;
 
 export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
   isOpen,
   onClose,
-  settings,
+  settings = {},
+  conditions,
 }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -22,7 +28,8 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !settings) return null;
+  if (!isOpen) return null;
+  const weather = conditions?.weatherCondition;
 
   return (
     <div
@@ -44,7 +51,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Rules & Server Configuration</h3>
-              <p className="text-xs text-slate-400">Session multipliers, damage, and setup parameters</p>
+              <p className="text-xs text-slate-400">Session multipliers, damage, setup parameters and conditions</p>
             </div>
           </div>
           <button
@@ -158,6 +165,41 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
               <div>
                 <div className="text-[10px] uppercase font-semibold text-slate-400">Lap Count</div>
                 <div className="text-xs font-bold font-mono text-white">{settings.raceLaps} Laps</div>
+              </div>
+            </div>
+          )}
+
+          {weather && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+              {weather === 'Wet' ? <CloudRain className="w-4 h-4 text-blue-400 shrink-0" />
+                : weather === 'Dynamic Weather' ? <CloudDrizzle className="w-4 h-4 text-cyan-400 shrink-0" />
+                : <Sun className="w-4 h-4 text-amber-400 shrink-0" />}
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Weather</div>
+                <div className="text-xs font-bold text-white">
+                  {WEATHER_LABEL[weather]}
+                  {conditions?.maxRainIntensity ? <span className="font-mono text-slate-300"> · max rain {conditions.maxRainIntensity}/25</span> : null}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {conditions?.ambientTemp !== undefined && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+              <Thermometer className="w-4 h-4 text-cyan-400 shrink-0" />
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Air Temperature</div>
+                <div className="text-xs font-bold font-mono text-white">{conditions.ambientTemp.toFixed(1)}°C</div>
+              </div>
+            </div>
+          )}
+
+          {conditions?.trackTemp !== undefined && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+              <Thermometer className="w-4 h-4 text-orange-400 shrink-0" />
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Track Temperature</div>
+                <div className="text-xs font-bold font-mono text-white">{conditions.trackTemp.toFixed(1)}°C</div>
               </div>
             </div>
           )}
