@@ -842,7 +842,7 @@ floating-point precision.
 | **Session flag (bit 29)** | Implemented (cache v7) | `extractReplayTrajectory` reads the class as `h >>> 30`: weather (0/10), tyres (0/16), contacts (0/17), VE (0/51) and flags (1/10) now decode in practice and qualifying. v6 rows of practice/qualifying replays lack them until re-decoded. |
 | **Track limits (7/28)** | Not implemented | Warning/current points, lap, resolution per verdict; 0 mismatches on 32k XML rows (§2.13 B). Survives a deleted XML. |
 | **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not implemented | Engine / suspension damage reports and sector-best markers (§2.13 B). |
-| **Player gear shifts (3/11)** | Not implemented | Exact upshift / downshift / limiter instants for the player car (§2.13 C). |
+| **Player gear shifts (3/11)** | Not parsed (by decision) | Exact upshift / downshift / limiter instants for the player car (§2.13 C). Same information as the pose `gear` channel, only timed to the frame, and DuckDB already gives the player 100 Hz gear. Documented, not decoded. |
 | **Player tyre radius (3/24 `u16@6`)** | Not implemented | Per wheel, radius-like, grows with wheel speed² (§2.13 D). Low value for the app. |
 
 **Unrelated defect noticed:** ~20 of 45 drivers in the Imola race replay have `carClass`
@@ -915,8 +915,8 @@ Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exi
 10. **Wire up the confirmed events:** contacts (1/17) as map markers and a replay incident
     ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C).
     **[DONE in the parser]**, including bit-29 gating and the penalty branch (cache v7).
-    Next: add track limits (7/28),
-    damage and sector bests (1/23, 1/26, 1/29–31) and player shift instants (3/11) (§2.13).
+    Next: add track limits (7/28) and damage and sector bests (1/23, 1/26, 1/29–31)
+    (§2.13). Player shift instants (3/11) stay documented but unparsed (§5).
 11. **Identify 7/33** (per-car 5 % steps every ~2.4 laps, remote cars only, §2.13 E). Compare
     against an AI or remote car's own DuckDB in a session where that car is the player, or
     against the API's `veFraction` / `fuelFraction` in a live (not replay) session.

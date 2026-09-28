@@ -346,7 +346,8 @@ The earlier "per-wheel brake line pressure" reading of these blocks is not suppo
 *Grid Scope: Recorded exclusively for the local player's vehicle.*
 
 #### Type 11 (`eventSize === 22`): Player Sound / Animation Event
-Player car only. Fired for discrete driver actions:
+Player car only. Fired for discrete driver actions. Not decoded by the app: it duplicates the pose
+`gear` channel, only timed to the frame.
 
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
