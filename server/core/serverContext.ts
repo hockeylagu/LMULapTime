@@ -11,6 +11,7 @@ import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../te
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
+import { ReplayFactsBackfillRunner } from '../replay/replayFactsBackfill.js';
 import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
 
 export interface ServerContextOptions {
@@ -34,6 +35,7 @@ export class ServerContext {
   // The parser and replay_metadata revision the replay index was last loaded for.
   private replayIndexLoadedFor: [LmuParser, number] | null = null;
   private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
+  private replayFactsRunner: ReplayFactsBackfillRunner | null = null;
   private readonly replayLinks: SessionReplayLinks;
   private replayScanStatus: ReplayScanStatus = {
     running: false,
@@ -87,20 +89,43 @@ export class ServerContext {
   /** Null when the database cannot run the upgrade (test doubles). */
   public get replayUpgrade(): ReplayUpgradeRunner | null {
     if (!this.replayUpgradeRunner && typeof this.sessionDb.upgradeReplaysAsyncIterator === 'function') {
-      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb);
+      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb, () => this.startReplayFactsBackfillWhenIdle());
     }
     return this.replayUpgradeRunner;
   }
 
-  // The upgrade is the lowest-priority work: it runs only once no scan is running.
+  /** Null when the database cannot run the backfill (test doubles). */
+  public get replayFacts(): ReplayFactsBackfillRunner | null {
+    if (!this.replayFactsRunner && typeof this.sessionDb.getDb === 'function') {
+      this.replayFactsRunner = new ReplayFactsBackfillRunner(this.sessionDb.getDb());
+    }
+    return this.replayFactsRunner;
+  }
+
+  // The upgrade is the lowest-priority work: it runs only once no scan is running. The replay facts
+  // backfill follows it (its onFinished), or runs straight away when the upgrade is turned off.
   public startReplayUpgradeWhenIdle(): boolean {
     if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
-    return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
+    const upgrade = this.replayUpgrade;
+    const started = upgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
+    if (!started && !upgrade?.getStatus().running) this.startReplayFactsBackfillWhenIdle();
+    return started;
+  }
+
+  public startReplayFactsBackfillWhenIdle(): boolean {
+    if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    return this.replayFacts?.start() ?? false;
+  }
+
+  /** Asks the background replay work (upgrade, facts backfill) to pause for a scan. */
+  private stopBackgroundReplayWork(): void {
+    this.replayUpgrade?.stop();
+    this.replayFacts?.stop();
   }
 
   public configureDirectories(values: { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown }): boolean {
     if (this.hasActiveFileScan()) return false;
-    this.replayUpgrade?.stop();
+    this.stopBackgroundReplayWork();
 
     if (typeof values.resultsDir === 'string' && fs.existsSync(values.resultsDir)) this.currentResultsDir = values.resultsDir;
     if (typeof values.replaysDir === 'string' && fs.existsSync(values.replaysDir)) this.currentReplaysDir = values.replaysDir;
@@ -232,7 +257,7 @@ export class ServerContext {
 
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
-    this.replayUpgrade?.stop();
+    this.stopBackgroundReplayWork();
     this.replayScanStatus = startedScanStatus();
     const replaysDir = this.currentReplaysDir;
     const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, { playerName: this.parser.configuredPlayerName });
@@ -264,7 +289,7 @@ export class ServerContext {
 
   public runSessionSyncInBackground(forceReparse = false): boolean {
     if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
-    this.replayUpgrade?.stop();
+    this.stopBackgroundReplayWork();
     const status: SessionScanStatus = startedScanStatus();
     this.sessionScanStatus = status;
     const resultsDir = this.currentResultsDir;
@@ -349,6 +374,7 @@ export class ServerContext {
       ...this.replayScanStatus,
       sessionScan: this.sessionScanStatus,
       replayUpgrade: this.replayUpgrade?.getStatus(),
+      replayFacts: this.replayFacts?.getStatus(),
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
       allComplete,

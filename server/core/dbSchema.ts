@@ -182,6 +182,102 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (filename, driver_slot, lap_key)
     );
 
+    -- Normalized replay facts (server/core/replay/dbReplayLapStore.ts): each fact once, at its own
+    -- level (replay -> driver -> lap), instead of copied into every lap blob. Replay-wide conditions
+    -- and events are keyed by time; a lap gets its conditions by joining on its time span.
+
+    -- One row per replay whose replay-wide facts are stored, and the decode they came from.
+    CREATE TABLE IF NOT EXISTS replay_facts (
+      filename TEXT PRIMARY KEY,
+      source_version TEXT NOT NULL,
+      end_sec REAL NOT NULL,
+      session_running_order TEXT,
+      updated_at INTEGER NOT NULL
+    );
+
+    -- One row per driver per lap: the lap's timing facts. start_sec / end_sec are the replay times
+    -- of the lap's first and last stored sample (null when the lap's points are not stored).
+    CREATE TABLE IF NOT EXISTS replay_laps (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      lap_number INTEGER NOT NULL,
+      start_sec REAL,
+      end_sec REAL,
+      lap_time_sec REAL,
+      s1_sec REAL,
+      s2_sec REAL,
+      s3_sec REAL,
+      lap_dist_m REAL,
+      is_outlap INTEGER,
+      is_valid INTEGER,
+      is_best INTEGER,
+      start_frame INTEGER,
+      end_frame INTEGER,
+      source_version TEXT NOT NULL,
+      PRIMARY KEY (filename, driver_slot, lap_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_replay_laps_time ON replay_laps(filename, start_sec);
+
+    -- Replay-wide conditions over time, one row per change: weather (rain 0-255 as decoded, ambient
+    -- °C) and the track flag packet (slot 255, the same for every car). Null = not recorded yet.
+    CREATE TABLE IF NOT EXISTS replay_conditions (
+      filename TEXT NOT NULL,
+      start_sec REAL NOT NULL,
+      end_sec REAL NOT NULL,
+      rain INTEGER,
+      ambient_c REAL,
+      flag_state INTEGER,
+      -- Raw bytes 1 and 2 of the flag packet, meaning unconfirmed (docs/VCR_ANALYSIS.md 2.6).
+      sector_mask INTEGER,
+      driver_flag INTEGER,
+      PRIMARY KEY (filename, start_sec)
+    );
+
+    -- Events of one car at one moment: 'pit', 'contact', 'penalty_given', 'penalty_served'. seq is
+    -- the event's place in the decoded array, so the arrays rebuild in their original order; detail
+    -- holds the fields without a column, as JSON.
+    CREATE TABLE IF NOT EXISTS replay_driver_events (
+      filename TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      time_sec REAL NOT NULL,
+      code INTEGER,
+      value REAL,
+      other_slot INTEGER,
+      detail TEXT,
+      PRIMARY KEY (filename, kind, seq)
+    );
+    CREATE INDEX IF NOT EXISTS idx_replay_driver_events_slot ON replay_driver_events(filename, driver_slot, time_sec);
+
+    -- The running order over the replay (P1 first), only where it changes.
+    CREATE TABLE IF NOT EXISTS replay_running_order (
+      filename TEXT NOT NULL,
+      time_sec REAL NOT NULL,
+      order_json TEXT NOT NULL,
+      PRIMARY KEY (filename, time_sec)
+    );
+
+    -- Recreated on every start so a changed definition reaches existing databases. The lower bound
+    -- (the row holding at the lap's start) keeps the join an index range: without it every lap
+    -- scans all earlier rows, 0.7 s on a 6,000-row replay.
+    DROP VIEW IF EXISTS replay_lap_conditions;
+    CREATE VIEW replay_lap_conditions AS
+    SELECT l.filename, l.driver_slot, l.lap_number,
+           MAX(c.rain) AS max_rain,
+           (SELECT c2.rain FROM replay_conditions c2
+             WHERE c2.filename = l.filename AND c2.start_sec <= l.start_sec
+             ORDER BY c2.start_sec DESC LIMIT 1) AS rain_at_start,
+           MIN(c.ambient_c) AS min_ambient_c,
+           MAX(CASE WHEN c.flag_state IN (3, 4, 5, 6) THEN 1 ELSE 0 END) AS full_course_yellow
+    FROM replay_laps l
+    JOIN replay_conditions c
+      ON c.filename = l.filename
+     AND c.start_sec >= COALESCE((SELECT MAX(c3.start_sec) FROM replay_conditions c3
+                                   WHERE c3.filename = l.filename AND c3.start_sec <= l.start_sec), l.start_sec)
+     AND c.start_sec < l.end_sec AND c.end_sec > l.start_sec
+    GROUP BY l.filename, l.driver_slot, l.lap_number;
+
     -- Every car's low-rate track position through a replay, built from its stored laps (the
     -- signature says which), to find who was close to whom and where.
     CREATE TABLE IF NOT EXISTS replay_race_positions (

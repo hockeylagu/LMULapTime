@@ -19,6 +19,7 @@ import {
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import {
   initDbSchema,
+  REPLAY_CACHE_VERSION,
   CacheStats,
   SyncResult,
   SessionSyncProgress,
@@ -108,6 +109,7 @@ import {
 } from './dbSessionStore.js';
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
+import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
 import {
   listReplayUpgradeBacklog,
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
@@ -309,6 +311,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     this.db.transaction(() => {
       deleteReplayDriverLaps(this.db, filename, driverSlotKey);
       cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
+      storeDecodedReplayFacts(this.db, filename, driverSlotKey, trajectory, REPLAY_CACHE_VERSION);
       recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
       if (isPrimary) {
         // Rows stored under the alias itself (from a decode that could not name the slot) are superseded.

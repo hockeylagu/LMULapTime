@@ -1,7 +1,41 @@
 # Replay cache normalization — migration plan
 
-Status: **planned, not started** (written 2026-09-27). Work on a new branch off `main`
+Status: **stage A done (steps 0-5), stage B not started** (written 2026-09-27). Work on a new branch off `main`
 (suggested name `replay-cache-normalization`), in a branch. One step per commit.
+
+Stage A as built:
+
+- D1: the flag packet is a slot-255 broadcast, so `flag_state`, `sector_mask` and `driver_flag`
+  live in `replay_conditions`.
+- D2: every lap blob holds every driver's pit, contact and penalty events, so one row per replay
+  fills `replay_driver_events`.
+- D3: `start_sec` / `end_sec` are the first and last sample of the lap's stored row (nullable
+  when the lap has no stored points); the start and end frames are kept too.
+- Replay-wide facts carry their version in a `replay_facts` table (one row per replay).
+- Step 5: stored trajectories get their lap list from `replay_laps` (`dbReplayTrajectoryStore.ts`),
+  falling back to the blob's copy until the replay is backfilled. The traffic signature still
+  counts `replay_trajectories` rows: the race positions are built from those blobs, and
+  `replay_laps` also holds listed laps without stored points. No server or client code reads the
+  event arrays of a trajectory, so stage B can drop them from stored rows without rebuilding them.
+
+Stage A validated on a copy of the real cache (5.04 GB, 325 replays, 41,847 lap rows; 2026-09-27):
+
+- D1: all 17,361 flag events are `driverSlot` 255. 24 of 17,285 flag times hold two differing
+  packets; the later one is kept.
+- D2: in 25 sampled replays (v3 and v7, up to 59 cars), the pit, contact, penalty, flag, weather,
+  standings and running-order arrays are identical in every lap row.
+- D3: in 25 linked sessions, `start_sec` sits at a constant offset of 0.0-0.23 s after the XML
+  `et` (p90 deviation ≤ 0.16 s), and each lap starts where the previous one ended (median gap 0).
+- Backfill: 325 replays and 41,847 laps in 296 s. The event-loop delay reached 330 ms at most
+  (p99 58 ms). This is a one-off pass, so the decompression stays on the main thread. Listing the
+  backlog takes 12-38 ms, and a re-run does nothing.
+- Rows: 41,847 laps (41,778 with a span), 138,054 conditions, 27,000 driver events and 40,994
+  running-order rows. 95% of the condition rows are `sector_mask` changes: it toggles between 1
+  and 17 (and 33) during green-flag running, so it is not a plain yellow-sector bitmask. Decode
+  it before section 6 uses it for local yellows.
+- `replay_lap_conditions` gives the same rain and FCY per lap as the blob arrays (87 laps
+  sampled, 0 mismatches). A lower bound on the join takes Daytona R1 7 (6,385 condition rows,
+  1,348 laps) from 674 ms to 146 ms.
 
 Read `AGENTS.md` first. The rules that matter most here:
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpCircle } from 'lucide-react';
-import { ReplayScanStatus, ReplayUpgradeStatus } from '../../../shared/types/index.js';
+import { ReplayFactsBackfillStatus, ReplayScanStatus, ReplayUpgradeStatus } from '../../../shared/types/index.js';
 import { fetchJson, postJson } from '../../api/apiClient.js';
 
 // Progress of the background re-decode of on-disk replays stored by an older parser version.
@@ -13,6 +13,8 @@ export interface ReplayUpgradeOverview {
   status: ReplayUpgradeStatus;
   pendingReplays: number;
   pendingDrivers: number;
+  /** The fill of the normalized replay tables from the stored rows, which follows the upgrade. */
+  facts?: { status: ReplayFactsBackfillStatus; pendingReplays: number } | null;
 }
 
 function isOverview(value: unknown): value is ReplayUpgradeOverview {
@@ -38,7 +40,7 @@ export const ReplayUpgradeCard: React.FC<ReplayUpgradeCardProps> = ({ replayScan
         if (!isOverview(data)) return;
         setOverview(data);
         setError(null);
-        if (data.status.running) timer.current = setTimeout(load, POLL_MS);
+        if (data.status.running || data.facts?.status.running) timer.current = setTimeout(load, POLL_MS);
       })
       .catch(() => setError('Unable to load the replay upgrade status.'));
   }, []);
@@ -66,7 +68,9 @@ export const ReplayUpgradeCard: React.FC<ReplayUpgradeCardProps> = ({ replayScan
   };
 
   const status = overview?.status;
+  const facts = overview?.facts;
   const runPercent = status && status.driversTotal > 0 ? Math.round((status.driversDone / status.driversTotal) * 100) : 0;
+  const factsPercent = facts && facts.status.total > 0 ? Math.round((facts.status.processed / facts.status.total) * 100) : 0;
 
   const idleMessage = (): string => {
     if (!overview || !status) return '';
@@ -148,7 +152,28 @@ export const ReplayUpgradeCard: React.FC<ReplayUpgradeCardProps> = ({ replayScan
         </p>
       )}
 
-      {(error || status?.error) && <p className="text-xs font-semibold text-rose-400">{error || status?.error}</p>}
+      {facts?.status.running ? (
+        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-lmu-muted uppercase tracking-wider">Indexing Replay Laps</span>
+            <span className="font-mono font-bold text-white">{facts.status.processed} / {facts.status.total}</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-lmu-border/50 overflow-hidden">
+            <div className="h-full bg-lmu-accent transition-all duration-300" style={{ width: `${factsPercent}%` }} />
+          </div>
+          {facts.status.currentFile && <p className="text-[11px] text-lmu-muted font-mono truncate">{facts.status.currentFile}</p>}
+        </div>
+      ) : (
+        facts && facts.pendingReplays > 0 && (
+          <p className="text-[11px] text-lmu-muted">
+            <span className="font-mono text-white">{facts.pendingReplays}</span> replays wait for their laps and conditions to be indexed from the cache.
+          </p>
+        )
+      )}
+
+      {(error || status?.error || facts?.status.error) && (
+        <p className="text-xs font-semibold text-rose-400">{error || status?.error || facts?.status.error}</p>
+      )}
     </div>
   );
 };

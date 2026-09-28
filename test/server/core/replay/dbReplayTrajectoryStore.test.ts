@@ -7,6 +7,8 @@ import {
   hasValidReplayTrajectoryCache,
   upsertReplayTrajectoryCache,
 } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
+import { replaceReplayDriverLapFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { lapFactsFrom } from '../../../../server/replay/replayFacts.js';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 
 const lap = (lapNumber: number): ReplayTrajectoryData => ({
@@ -31,6 +33,18 @@ describe('dbReplayTrajectoryStore', () => {
   afterEach(() => db.close());
 
   const setVersion = (version: string) => db.prepare('UPDATE replay_trajectories SET parser_version = ?').run(version);
+
+  describe('lap list', () => {
+    const summary = (lapNumber: number, lapTimeSec: number) => ({ lapNumber, lapTimeSec, s1Sec: 30, s2Sec: 30, s3Sec: lapTimeSec - 60 });
+
+    it('comes from the lap facts once the driver has them, and from the blob until then', () => {
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, { ...lap(4), laps: [summary(4, 100)] });
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.laps).toEqual([summary(4, 100)]);
+
+      replaceReplayDriverLapFacts(db, 'Spa_R1.Vcr', 3, lapFactsFrom([summary(4, 100), summary(5, 99)], new Map()), REPLAY_CACHE_VERSION);
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.laps).toEqual([summary(4, 100), summary(5, 99)]);
+    });
+  });
 
   describe('cache versions', () => {
     it('keeps rows of a compatible version valid, so the replay is not decoded again', () => {

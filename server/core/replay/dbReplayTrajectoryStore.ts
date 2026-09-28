@@ -2,6 +2,8 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
+import { getReplayLaps } from './dbReplayLapStore.js';
+import { lapSummariesFrom } from '../../replay/replayFacts.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not
@@ -14,6 +16,8 @@ export interface TrajectoryDefaults {
 }
 
 interface TrajectoryRow {
+  filename: string;
+  driver_slot: number;
   file_mtime: number;
   file_size: number;
   source_path: string | null;
@@ -21,8 +25,14 @@ interface TrajectoryRow {
   trajectory_br: Buffer;
 }
 
-function readTrajectoryRow(row: Pick<TrajectoryRow, 'parser_version' | 'trajectory_br'>): ReplayTrajectoryData {
-  return withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
+/** The driver's lap list comes from replay_laps; the blob's own copy only until the replay is backfilled. */
+function readTrajectoryRow(db: DatabaseType, row: TrajectoryRow): ReplayTrajectoryData {
+  const trajectory = withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
+  const slot = row.driver_slot >= 0 ? row.driver_slot : trajectory.driverSlot;
+  if (typeof slot !== 'number' || slot < 0) return trajectory;
+  const laps = lapSummariesFrom(getReplayLaps(db, row.filename, slot));
+  if (laps.length > 0) trajectory.laps = laps;
+  return trajectory;
 }
 
 export function getTrajectoryDefaults(db: DatabaseType, filename: string, driverSlot: number): TrajectoryDefaults | null {
@@ -84,7 +94,7 @@ export function resolveTrajectoryKey(
 
 function selectTrajectoryRow(db: DatabaseType, filename: string, driverSlot: number, lapKey: number): TrajectoryRow | undefined {
   return db.prepare(
-    'SELECT file_mtime, file_size, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    'SELECT filename, driver_slot, file_mtime, file_size, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
   ).get(filename, driverSlot, lapKey) as TrajectoryRow | undefined;
 }
 
@@ -115,7 +125,7 @@ export function getReplayTrajectoryCache(
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
   if (!row || !isRowValid(row, mtime, size, filePath)) return null;
-  return readTrajectoryRow(row);
+  return readTrajectoryRow(db, row);
 }
 
 /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
@@ -127,14 +137,14 @@ export function getStoredReplayTrajectory(
   options?: { allowFallback?: boolean }
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
-  if (row) return readTrajectoryRow(row);
+  if (row) return readTrajectoryRow(db, row);
 
   // A missing lap falls back to the same driver's default lap, which reports itself as currentLap
   // (the on-disk decode does the same). A missing driver never falls back to another driver: that
   // would serve the player's lap under the requested driver's name.
   if (options?.allowFallback && lapKey !== -1) {
     const rowFallbackLap = selectResolvedRow(db, filename, driverSlot, -1);
-    if (rowFallbackLap) return readTrajectoryRow(rowFallbackLap);
+    if (rowFallbackLap) return readTrajectoryRow(db, rowFallbackLap);
   }
 
   return null;
@@ -156,7 +166,7 @@ export function getAdjacentLapTrajectories(
   const neighbour = (key: number): ReplayTrajectoryData | null => {
     const row = selectTrajectoryRow(db, filename, driverSlot, key);
     return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size
-      ? readTrajectoryRow(row)
+      ? readTrajectoryRow(db, row)
       : null;
   };
   return { previous: neighbour(lapKey - 1), next: neighbour(lapKey + 1) };

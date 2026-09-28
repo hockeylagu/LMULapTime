@@ -80,6 +80,7 @@ LMULapTime/
 │   │   │   ├── dbRacePositionStore.ts # Per-replay race positions index (built from the stored laps)
 │   │   │   ├── dbReplayIdentity.ts # Replay file fingerprinting, versioning & collision protection
 │   │   │   ├── dbReplayIngestStore.ts # Atomic replay lap ingest operations
+│   │   │   ├── dbReplayLapStore.ts # Normalized replay facts: laps, time-keyed conditions, driver events, running order
 │   │   │   ├── dbReplayLinkStore.ts # Session-to-replay link tracking & withdrawal
 │   │   │   ├── dbReplayMetadataStore.ts # Replay headers, driver rosters & layout metadata
 │   │   │   ├── dbReplaySync.ts     # Replay sync queries and transaction wrappers
@@ -96,6 +97,8 @@ LMULapTime/
 │   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index.json
 │   ├── replay/                     # Binary .Vcr parser, downsampler & worker thread decoder
 │   │   ├── replayCacheService.ts   # Replay cache inspection & management
+│   │   ├── replayFacts.ts          # Decoded trajectory -> normalized replay fact rows (pure)
+│   │   ├── replayFactsBackfill.ts  # Background fill of the normalized replay tables from stored rows
 │   │   ├── replayLapBuilder.ts     # Timing loop detection & lap slicing
 │   │   ├── replayLapPoints.ts      # Trajectory point slicing and indexing
 │   │   ├── replayMetadataService.ts # Driver roster and replay header extraction
