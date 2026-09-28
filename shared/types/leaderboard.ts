@@ -78,6 +78,8 @@ export interface LeaderboardLayout {
   countryCode: string;
   flagEmoji: string;
   lastDriven: number;
+  /** A thumbnail SVG path of the layout in a 100 x 100 box; null when its geometry is not known. */
+  outlinePath?: string | null;
   /** The class the player drove last here. */
   lastCarClass: string;
   classes: LeaderboardLayoutClass[];

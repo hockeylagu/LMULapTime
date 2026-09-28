@@ -32,6 +32,7 @@ describe('leaderboardRoutes', () => {
     const first = await request(app).get('/api/leaderboard/layouts');
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject([{ layoutKey: 'monza_gp', lastCarClass: 'LMGT3', classes: [{ playerRank: 2, fieldSize: 2 }] }]);
+    expect(first.body[0].outlinePath).toMatch(/^M.+Z$/);
     const second = await request(app).get('/api/leaderboard/layouts');
     expect(second.body).toEqual(first.body);
   });

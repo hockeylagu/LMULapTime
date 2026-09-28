@@ -3,6 +3,7 @@ import { buildLeaderboard, listLeaderboardLayouts } from '../../shared/domain/le
 import type { LeaderboardLayout } from '../../shared/types/leaderboard.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { ServerContext } from '../core/serverContext.js';
+import { getTrackOutlinePath } from '../tracks/trackOutline.js';
 import { DetailedSession } from '../core/types.js';
 import { queryString } from './queryParams.js';
 
@@ -14,7 +15,13 @@ export function createLeaderboardRouter(context: ServerContext): Router {
 
   router.get('/leaderboard/layouts', (_req, res) => {
     const sessions = context.loadSessions();
-    if (layoutsFor?.sessions !== sessions) layoutsFor = { sessions, layouts: listLeaderboardLayouts(sessions) };
+    if (layoutsFor?.sessions !== sessions) {
+      const layouts = listLeaderboardLayouts(sessions).map((layout) => ({
+        ...layout,
+        outlinePath: getTrackOutlinePath(layout.layoutKey),
+      }));
+      layoutsFor = { sessions, layouts };
+    }
     res.json(layoutsFor.layouts);
   });
 
