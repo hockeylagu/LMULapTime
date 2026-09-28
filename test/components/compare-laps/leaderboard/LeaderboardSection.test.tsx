@@ -74,9 +74,25 @@ describe('LeaderboardSection', () => {
     const { onScopeChange } = renderSection();
     fireEvent.click(screen.getByRole('button', { name: 'My car' }));
     expect(onScopeChange).toHaveBeenCalledWith('car');
-    fireEvent.click(screen.getByRole('button', { name: 'S2' }));
-    expect(screen.getByRole('button', { name: 'S2' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Best Lap/ })).toHaveAttribute('aria-sort', 'ascending');
+    fireEvent.click(screen.getByRole('button', { name: 'Sector 2' }));
+    expect(screen.getByRole('columnheader', { name: /Sector 2/ })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: /Best Lap/ })).not.toHaveAttribute('aria-sort');
+    expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien pace/ })).not.toBeInTheDocument();
+  });
+
+  it('rates every best lap against the benchmark, and marks the best sectors in their sector colours', () => {
+    renderSection();
+    const table = screen.getByRole('table');
+    const leader = within(table).getByText('Driver 1').closest('tr') as HTMLTableRowElement;
+    expect(leader).toHaveTextContent('Alien(100.0%)');
+    const [s1, s3] = within(leader).getAllByText((100 * 0.3).toFixed(3));
+    expect(s1).toHaveClass('text-lmu-gold');
+    expect(within(leader).getByText((100 * 0.4).toFixed(3))).toHaveClass('text-lmu-blue');
+    expect(s3).toHaveClass('text-lmu-green');
+    const me = within(table).getByText('Me').closest('tr') as HTMLTableRowElement;
+    expect(me).toHaveTextContent('Good(102.8%)');
+    expect(within(me).getAllByText((102.9 * 0.3).toFixed(3))[0]).not.toHaveClass('text-lmu-gold');
   });
 
   it('invites the player to drive when they are not on the board, and says why a board failed', () => {

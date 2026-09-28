@@ -3,14 +3,6 @@ import type { Leaderboard, LeaderboardEntry } from '../../../../shared/types/lea
 
 export type LeaderboardSort = 'lap' | 's1' | 's2' | 's3' | 'pace';
 
-export const LEADERBOARD_SORTS: Array<{ id: LeaderboardSort; label: string }> = [
-  { id: 'lap', label: 'Best lap' },
-  { id: 's1', label: 'S1' },
-  { id: 's2', label: 'S2' },
-  { id: 's3', label: 'S3' },
-  { id: 'pace', label: 'Race pace' },
-];
-
 export type LeaderboardRow =
   | { kind: 'driver'; entry: LeaderboardEntry; rank: number | null; value: number | null }
   | { kind: 'band'; label: string; percent: number; time: number }

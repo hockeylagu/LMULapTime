@@ -1,4 +1,5 @@
-import { VEHICLE_CLASS_OPTIONS } from '../../../../shared/domain/paceCategory.js';
+import type { PaceCategory, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
+import { getPaceCategoryFromPercentage, VEHICLE_CLASS_OPTIONS } from '../../../../shared/domain/paceCategory.js';
 
 /** Session timestamps are stored in seconds or milliseconds; this reads either as milliseconds. */
 export function toEpochMs(timestamp: number): number {
@@ -25,4 +26,15 @@ export function formatGap(seconds: number): string {
 /** The class name as the class pills show it (LMH -> Hypercar). */
 export function carClassLabel(carClass: string): string {
   return VEHICLE_CLASS_OPTIONS.find((o) => o.id === carClass)?.label ?? carClass;
+}
+
+/** A lap's benchmark pace, as the session tables rate laps: its time against the 100% target. */
+export function benchmarkPace(
+  lapTime: number,
+  benchmark: ReferenceLaptimeEntry | null
+): { category: PaceCategory; percentage: number } | null {
+  const target = benchmark?.target100Sec || benchmark?.targets.alienSec;
+  if (!target || lapTime <= 0) return null;
+  const percentage = parseFloat(((lapTime / target) * 100).toFixed(2));
+  return { category: getPaceCategoryFromPercentage(percentage), percentage };
 }

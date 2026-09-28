@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ListOrdered } from 'lucide-react';
+import { ArrowUp, ListOrdered } from 'lucide-react';
 import type { Leaderboard, LeaderboardEntry, LeaderboardScope } from '../../../../shared/types/leaderboard.js';
 import { LoadingState } from '../../common/LoadingState.js';
-import { buildLeaderboardRows, COMPACT_THRESHOLD, LEADERBOARD_SORTS, LeaderboardSort } from './leaderboardRows.js';
+import { buildLeaderboardRows, COMPACT_THRESHOLD, LeaderboardSort } from './leaderboardRows.js';
 import { LeaderboardRow } from './LeaderboardRow.js';
 import { StandingHeader } from './StandingHeader.js';
 import { carClassLabel } from './leaderboardFormat.js';
@@ -36,6 +36,19 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);
   const rows = useMemo(() => (board ? buildLeaderboardRows(board, sort, !showAll) : []), [board, sort, showAll]);
+  const sortHeader = (column: LeaderboardSort, label: string, title?: string) => (
+    <th className="px-3 py-3 text-right" title={title} aria-sort={sort === column ? 'ascending' : undefined}>
+      <button
+        type="button"
+        onClick={() => setSort(column)}
+        className="inline-flex items-center gap-1 uppercase hover:text-white"
+        title={`Order by ${label.toLowerCase()}`}
+      >
+        {label}
+        {sort === column && <ArrowUp className="h-3 w-3" />}
+      </button>
+    </th>
+  );
 
   return (
     <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4" aria-label="Leaderboard">
@@ -65,13 +78,6 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
               My car
             </button>
           </div>
-          <div role="group" aria-label="Order" className="flex items-center gap-1 bg-lmu-bg p-1 rounded-xl border border-lmu-border">
-            {LEADERBOARD_SORTS.map((s) => (
-              <button key={s.id} type="button" aria-pressed={sort === s.id} onClick={() => setSort(s.id)} className={pill(sort === s.id)}>
-                {s.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -86,28 +92,30 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
           {board.entries.length === 0 ? (
             <p className="text-sm text-lmu-muted">Nobody has a clean dry lap here in this {scope === 'car' ? 'car' : 'class'} yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-lmu-muted border-b border-lmu-border">
-                    <th className="px-2 py-1.5 text-right">#</th>
-                    <th className="px-2 py-1.5 text-left">Driver</th>
-                    <th className="px-2 py-1.5 text-right">Best lap</th>
-                    <th className="px-2 py-1.5 text-right">Gap</th>
-                    <th className="px-2 py-1.5 text-right">Vs you</th>
-                    <th className="px-2 py-1.5 text-right">S1</th>
-                    <th className="px-2 py-1.5 text-right">S2</th>
-                    <th className="px-2 py-1.5 text-right">S3</th>
-                    <th className="px-2 py-1.5 text-right" title="Best average of three clean laps in one session">Race pace</th>
-                    <th className="px-2 py-1.5"><span className="sr-only">Actions</span></th>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs text-lmu-muted">
+                <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
+                  <tr>
+                    <th className="px-3 py-3">Pos</th>
+                    <th className="px-3 py-3">Driver</th>
+                    {sortHeader('lap', 'Best Lap')}
+                    <th className="px-3 py-3 text-center">Pace Category</th>
+                    <th className="px-3 py-3 text-right">Gap</th>
+                    <th className="px-3 py-3 text-right">Vs You</th>
+                    {sortHeader('s1', 'Sector 1')}
+                    {sortHeader('s2', 'Sector 2')}
+                    {sortHeader('s3', 'Sector 3')}
+                    {sortHeader('pace', 'Race Pace', 'Best average of three clean laps in one session')}
+                    <th className="px-2 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-lmu-border/50 font-mono">
                   {rows.map((row, i) => (
                     <LeaderboardRow
                       key={row.kind === 'driver' ? row.entry.driverName : `${row.kind}-${i}`}
                       row={row}
                       player={board.player}
+                      benchmark={board.benchmark}
                       onShowAll={() => setShowAll(true)}
                       onCompare={onCompare}
                       onTelemetry={onTelemetry}
