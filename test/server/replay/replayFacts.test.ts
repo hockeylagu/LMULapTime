@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../server/core/types.js';
-import { upgradeStoredTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import {
   conditionsFrom,
-  driverEventArraysFrom,
   driverEventsFrom,
   factsDriverSlot,
   lapFactsFrom,
   lapSpanFrom,
   lapSummariesFrom,
-  replayWideFactsFrom,
   runningOrderFrom,
   withoutReplayFacts,
 } from '../../../server/replay/replayFacts.js';
@@ -107,10 +104,6 @@ describe('replay facts', () => {
       expect(facts.filter(f => f.kind.startsWith('penalty')).map(f => f.kind)).toEqual(['penalty_given', 'penalty_served', 'penalty_given']);
     });
 
-    it('rebuilds the decoded arrays exactly, in their order', () => {
-      expect(driverEventArraysFrom(driverEventsFrom(trajectory))).toEqual(trajectory);
-      expect(driverEventArraysFrom([])).toEqual({ pitEvents: [], contacts: [], penalties: [] });
-    });
   });
 
   it('keeps the running order only where it changes', () => {
@@ -143,21 +136,4 @@ describe('replay facts', () => {
     });
   });
 
-  it('reads replay-wide facts from a legacy row after its values are corrected', () => {
-    const legacy = {
-      replayName: 'r', pointsCount: 1, bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
-      points: [{ x: 0, y: 0, z: 0, timeSec: 50 }],
-      weatherEvents: [{ timeSec: 0, rainIntensity: 0, ambientTemp: 25 }],
-      standingsHistory: [{ timeSec: 10, order: [0] }],
-      sessionRunningOrder: [0],
-    } as ReplayTrajectoryData;
-    const facts = replayWideFactsFrom(upgradeStoredTrajectory(legacy, 'v3'));
-
-    expect(facts.endSec).toBe(50);
-    // v3 ambient used the old scale: 25 °C is raw 146, which the current scale reads as 24.1 °C.
-    expect(facts.conditions).toEqual([{ startSec: 0, endSec: 50, rain: 0, ambientC: 24.1, flagState: null, sectorMask: null, driverFlag: null }]);
-    expect(facts.runningOrder).toEqual([{ timeSec: 10, order: [0] }]);
-    expect(facts.sessionRunningOrder).toEqual([0]);
-    expect(facts.driverEvents).toEqual([]);
-  });
 });

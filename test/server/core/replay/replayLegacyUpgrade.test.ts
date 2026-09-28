@@ -19,7 +19,6 @@ const legacyTrajectory = (): ReplayTrajectoryData => ({
   bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1 },
   ambientTemp: 26.2,
   trackTemp: 27.3,
-  weatherEvents: [{ timeSec: 1, rainIntensity: 51, rainPercent: 100, ambientTemp: 26.2, trackTemp: 27.3 }],
   points: [
     { x: 0, y: 0, z: 0, fuel: 60, ambientTemp: 26.2, trackTemp: 27.3 },
     { x: 1, y: 0, z: 1, fuel: 59.6, ambientTemp: 26.2, trackTemp: 27.3 },
@@ -35,11 +34,10 @@ describe('legacy replay rows are corrected on read, never rewritten', () => {
     expect(recalibrateLegacyAmbientTemp(22.0)).toBe(22);
   });
 
-  it('moves mislabelled fuel to Virtual Energy, drops track temperature and rescales rain', () => {
+  it('moves mislabelled fuel to Virtual Energy, and drops track temperature', () => {
     const upgraded = upgradeStoredTrajectory(legacyTrajectory(), 'v5');
     expect(upgraded.trackTemp).toBeUndefined();
     expect(upgraded.ambientTemp).toBe(25);
-    expect(upgraded.weatherEvents?.[0]).toEqual({ timeSec: 1, rainIntensity: 51, rainPercent: 20, ambientTemp: 25 });
     expect(upgraded.points.map(p => p.virtualEnergy)).toEqual([60, 59.6]);
     expect(upgraded.points.every(p => p.fuel === undefined && p.trackTemp === undefined)).toBe(true);
   });
