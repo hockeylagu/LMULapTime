@@ -10,6 +10,7 @@ import type {
 import { getCircuitSpecification } from './circuitSpecs.js';
 import { getDisplayTrackName } from './formatters.js';
 import { selectCleanLapCandidates } from './lapComparison.js';
+import { lapConditionGroup } from './lapConditions.js';
 import { findMatchingTrackBenchmarkEntries, matchesCarClass, normalizeCarClass } from './paceCategory.js';
 
 /**
@@ -18,7 +19,7 @@ import { findMatchingTrackBenchmarkEntries, matchesCarClass, normalizeCarClass }
  * Only real people are ranked: the player's own laps from any session, and the other drivers of
  * online (Multiplayer) sessions. Offline sessions are raced against AI, whose laps never count.
  * Only representative laps count: valid flying laps at racing speed, not marked non-representative
- * by the parser (contact, traffic, off pace), and not on wet tyres. Layouts of one facility are
+ * by the parser (contact, traffic, off pace), and dry (no wet tyres or rain). Layouts of one facility are
  * never mixed: every session is keyed by its circuit specification's layoutKey.
  */
 
@@ -40,15 +41,13 @@ export function isHumanDriver(session: DetailedSession, driver: DriverData): boo
   return isOnlineSession(session) || isPlayerDriver(session, driver);
 }
 
-/** Laps run on wet or intermediate tyres: another race than the dry leaderboard. */
-export function isWetTyreLap(lap: Pick<LapData, 'fCompound' | 'rCompound'>): boolean {
-  return /wet|inter/i.test(`${lap.fCompound ?? ''} ${lap.rCompound ?? ''}`);
-}
-
-/** The laps of a driver's session that may stand on a leaderboard. */
+/**
+ * The laps of a driver's session that may stand on a leaderboard. Laps on wet tyres or in the
+ * rain (the parser's conditions tag) are another race than the dry board.
+ */
 export function selectLeaderboardLaps(laps: LapData[]): LapData[] {
   return selectCleanLapCandidates(laps).filter(
-    (lap) => lap.isValid && lap.lapTime !== null && lap.lapTime > 0 && !isWetTyreLap(lap)
+    (lap) => lap.isValid && lap.lapTime !== null && lap.lapTime > 0 && lapConditionGroup(lap) === 'dry'
   );
 }
 
