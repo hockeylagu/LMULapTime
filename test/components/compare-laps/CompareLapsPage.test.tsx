@@ -114,6 +114,28 @@ describe('CompareLapsPage', () => {
     expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
   });
 
+  it("opens the player's own lap in telemetry, alone, and its session", async () => {
+    const fetchMock = vi.mocked(global.fetch);
+    const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      return url.startsWith('/api/leaderboard?')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
+        : defaultFetch(url);
+    });
+    const onSelectSession = vi.fn();
+    render(<CompareLapsPage sessions={[]} onSelectSession={onSelectSession} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open the session of your best lap' }));
+    expect(onSelectSession).toHaveBeenCalledWith('s-Me');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Telemetry of your best lap' }));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
+    expect(urlParams().get('replayName')).toBe('Me.Vcr');
+    expect(urlParams().get('lap')).toBe('3');
+    expect(urlParams().has('baselineReplay')).toBe(false);
+  });
+
   it('compares two drivers picked on the board, neither of them the player', async () => {
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;

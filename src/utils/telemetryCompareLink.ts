@@ -6,14 +6,16 @@ export interface TelemetryLapRef {
   sessionId?: string;
 }
 
+const BASELINE_PARAMS = ['baselineReplay', 'compareSessionId', 'compareDriver', 'compareLapNum'];
+
 /**
- * The /telemetry path that shows `target` against `baseline`. Other parameters of the current page
- * (track, class) are kept so the way back finds the same selection.
+ * The /telemetry path that shows `target`, against `baseline` when there is one. Other parameters
+ * of the current page (track, class) are kept so the way back finds the same selection.
  */
 export function buildTelemetryComparePath(
   current: URLSearchParams,
   target: TelemetryLapRef,
-  baseline: TelemetryLapRef,
+  baseline: TelemetryLapRef | null,
   /** Opens the view on this corner (T number). */
   corner?: number
 ): string {
@@ -21,10 +23,13 @@ export function buildTelemetryComparePath(
   params.set('replayName', target.replayName);
   params.set('lap', String(target.lapNum ?? 1));
   if (target.driverName) params.set('driverName', target.driverName);
-  params.set('baselineReplay', baseline.replayName);
-  if (baseline.sessionId) params.set('compareSessionId', baseline.sessionId);
-  if (baseline.driverName) params.set('compareDriver', baseline.driverName);
-  if (baseline.lapNum !== undefined) params.set('compareLapNum', String(baseline.lapNum));
+  BASELINE_PARAMS.forEach((key) => params.delete(key));
+  if (baseline) {
+    params.set('baselineReplay', baseline.replayName);
+    if (baseline.sessionId) params.set('compareSessionId', baseline.sessionId);
+    if (baseline.driverName) params.set('compareDriver', baseline.driverName);
+    if (baseline.lapNum !== undefined) params.set('compareLapNum', String(baseline.lapNum));
+  }
   if (corner !== undefined) params.set('corner', String(corner));
   else params.delete('corner');
   return `/telemetry?${params.toString()}`;
