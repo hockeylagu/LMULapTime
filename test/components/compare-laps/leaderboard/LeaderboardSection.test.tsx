@@ -51,6 +51,17 @@ describe('LeaderboardSection', () => {
     expect(screen.queryByRole('button', { name: 'Compare with Me' })).not.toBeInTheDocument();
   });
 
+  it('marks the rival, and offers to make any driver ahead the rival', () => {
+    const onPin = vi.fn();
+    renderSection({ rivalName: 'Driver 29', onPin });
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Driver 29').parentElement).toHaveTextContent('Rival');
+    expect(screen.queryByRole('button', { name: 'Make Driver 29 your rival' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Make Driver 31 your rival' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Make Driver 28 your rival' }));
+    expect(onPin).toHaveBeenCalledWith('Driver 28');
+  });
+
   it('greys out the telemetry of a lap without a replay', () => {
     const b = board(5, 5);
     b.entries[1] = { ...b.entries[1], bestLap: { ...b.entries[1].bestLap, replayName: null } };

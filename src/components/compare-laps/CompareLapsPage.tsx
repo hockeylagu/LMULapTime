@@ -11,6 +11,8 @@ import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
 import { LeaderboardSection } from './leaderboard/LeaderboardSection.js';
 import { useLeaderboard } from './leaderboard/useLeaderboard.js';
 import { useBoardActions } from './leaderboard/useBoardActions.js';
+import { RivalCard } from './rivals/RivalCard.js';
+import { useRival } from './rivals/useRival.js';
 
 /** The lap a deep link asked for belongs to the previous pick: a new track or class drops it. */
 const CLEARED_LAP_PARAMS = {
@@ -46,6 +48,8 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
   const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
   const { pairRequest, compareRef, onCompare, onTelemetry } = useBoardActions(leaderboard.board, carClass);
+  const rival = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
+  const rivalName = rival.status?.rival?.kind === 'driver' ? rival.status.rival.driverName : null;
 
   // Without a track in the URL, open the layout driven last, in the class driven last there.
   useEffect(() => {
@@ -92,9 +96,13 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
         )}
       </section>
 
+      <RivalCard rival={rival} player={leaderboard.board?.player ?? null} onCompare={onCompare} onTelemetry={onTelemetry} />
+
       {layoutKey && carClass && (
         <LeaderboardSection
           {...leaderboard}
+          rivalName={rivalName}
+          onPin={rival.pin}
           carClass={carClass}
           scope={scope}
           playerCarType={playerCarType}
