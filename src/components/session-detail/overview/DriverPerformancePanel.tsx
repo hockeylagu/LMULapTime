@@ -147,6 +147,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
         lapStdDev={lapStdDev}
         consistencyScore={consistencyScore}
         cleanLapsCount={consistency.sampleCount}
+        consistencyGroups={consistency.conditionGroups}
         totalLapsCount={selectedDriver.laps?.length || 0}
         hasMultipleLaps={hasMultipleLaps}
         theoGap={theoGap}

@@ -1,6 +1,7 @@
 import { Activity } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import type { ConsistencyRating } from '../../../../shared/domain/lapComparison.js';
 import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common';
 import { SectorsMetricBox } from './SectorsMetricBox.js';
@@ -18,6 +19,8 @@ export interface DriverTimingMetricsRowProps {
   lapStdDev: number | null;
   consistencyScore: number | null;
   cleanLapsCount: number;
+  /** Clean laps per condition, when the session mixes dry and wet laps. */
+  consistencyGroups?: ConsistencyRating['conditionGroups'];
   totalLapsCount: number;
   hasMultipleLaps: boolean;
   theoGap: number | null;
@@ -39,6 +42,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
   lapStdDev,
   consistencyScore,
   cleanLapsCount,
+  consistencyGroups,
   totalLapsCount,
   hasMultipleLaps,
   theoGap,
@@ -46,6 +50,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
   avgS2,
   avgS3,
 }) => {
+  const groupsText = consistencyGroups?.map((g) => `${g.group} ${g.laps}`).join(' · ');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const bestLapNum =
@@ -172,7 +177,9 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
                     ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
                     : 'bg-rose-950/60 text-rose-300 border-rose-500/40'
                 }`}
-                title="Pace consistency rating based on clean lap standard deviation"
+                title={groupsText
+                  ? `Pace consistency within each condition (${groupsText} clean laps): a change of conditions is not held against it`
+                  : 'Pace consistency rating based on clean lap standard deviation'}
               >
                 {consistencyScore.toFixed(1)}% Consist
               </span>
@@ -191,7 +198,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               </strong>
             </span>
             {lapStdDev !== null && (
-              <span title="Standard deviation of clean flying lap times">
+              <span title={groupsText ? `Standard deviation of clean flying lap times, within each condition (${groupsText})` : 'Standard deviation of clean flying lap times'}>
                 Std: <strong className="text-white font-mono">±{lapStdDev.toFixed(3)}s</strong>
               </span>
             )}
@@ -210,6 +217,12 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               </span>
             )}
           </div>
+          {groupsText && (
+            <p className="text-[9px] text-sky-300 truncate" data-testid="consistency-groups"
+              title="Consistency is measured within each condition, then combined">
+              Per condition: {groupsText}
+            </p>
+          )}
         </div>
       </div>
 
