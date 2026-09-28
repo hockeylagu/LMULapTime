@@ -71,10 +71,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(lapTimeHeader.querySelector('svg')).not.toBeNull();
   });
 
-  it('allows switching drivers and exporting CSV', async () => {
-    global.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
-    global.URL.revokeObjectURL = vi.fn();
-
+  it('allows switching drivers', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
@@ -88,29 +85,6 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Porsche 963/i).length).toBeGreaterThan(0);
     });
-
-    // Click Export CSV
-    const exportBtn = screen.getByRole('button', { name: /export csv/i });
-    fireEvent.click(exportBtn);
-    expect(global.URL.createObjectURL).toHaveBeenCalled();
-  });
-
-  it('copies replay file path when clicking Copy Path', async () => {
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockImplementation(() => Promise.resolve()),
-      },
-    });
-
-    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Copy Replay/i })).toBeInTheDocument();
-    });
-
-    const copyBtn = screen.getByRole('button', { name: /Copy Replay/i });
-    fireEvent.click(copyBtn);
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('C:\\LMU\\UserData\\Replays\\spa_replay.vcr');
   });
 
   it('navigates to track detail when clicking track heading, carrying the session car class', async () => {

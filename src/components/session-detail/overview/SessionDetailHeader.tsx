@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
+import { ArrowLeft, Video, Timer, Trophy, ChevronRight, Sliders, Zap } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
@@ -16,11 +16,8 @@ export interface SessionDetailHeaderProps {
   selectedDriverName: string;
   setSelectedDriverName: (name: string) => void;
   onBack: () => void;
-  copiedReplay: boolean;
-  handleCopyReplayPath: () => void;
   relatedSession: { type: 'qualifying' | 'race'; target: CandidateRelatedSession } | null;
   handleNavigateToSession: (id: string) => void;
-  handleExportCsv: () => void;
   refEntry: ReferenceLaptimeEntry | null;
 }
 
@@ -30,11 +27,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   selectedDriverName,
   setSelectedDriverName,
   onBack,
-  copiedReplay,
-  handleCopyReplayPath,
   relatedSession,
   handleNavigateToSession,
-  handleExportCsv,
   refEntry,
 }) => {
   const navigate = useNavigate();
@@ -81,40 +75,25 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
         <div className="flex items-center gap-3">
           {session.matchingReplayFile && (
-            <>
-              <button
-                onClick={() => handleOpenReplay()}
-                title={`Matching Replay: ${session.matchingReplayFile.name}${
-                  hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
-                }\nClick to inspect trajectory and telemetry`}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
-                  hasDuckDb
-                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
-                    : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
-                }`}
-              >
-                {hasDuckDb ? (
-                  <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                ) : (
-                  <Video className="w-4 h-4 text-lmu-green" />
-                )}
-                <span>{hasDuckDb ? 'Open Telemetry' : 'Open Replay'}</span>
-                {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">100Hz</span>}
-              </button>
-
-              <button
-                onClick={handleCopyReplayPath}
-                title={`Matching Replay: ${session.matchingReplayFile.name}\nPath: ${session.matchingReplayFile.path}\nClick to copy path`}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
-                  copiedReplay
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-lmu-card text-lmu-muted border-lmu-border hover:text-white hover:border-lmu-accent'
-                }`}
-              >
-                {copiedReplay ? 'Path Copied!' : 'Copy Replay'}
-              </button>
-
-            </>
+            <button
+              onClick={() => handleOpenReplay()}
+              title={`Matching Replay: ${session.matchingReplayFile.name}${
+                hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
+              }\nClick to inspect trajectory and telemetry`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
+                hasDuckDb
+                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                  : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
+              }`}
+            >
+              {hasDuckDb ? (
+                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+              ) : (
+                <Video className="w-4 h-4 text-lmu-green" />
+              )}
+              <span>{hasDuckDb ? 'Open Telemetry' : 'Open Replay'}</span>
+              {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">100Hz</span>}
+            </button>
           )}
 
           {relatedSession && (
@@ -149,14 +128,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               )}
             </button>
           )}
-
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-green transition-all"
-          >
-            <Download className="w-4 h-4 text-lmu-green" />
-            Export CSV
-          </button>
         </div>
       </div>
 
