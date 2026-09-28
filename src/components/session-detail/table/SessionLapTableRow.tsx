@@ -10,6 +10,13 @@ import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
 
+const COMPOUND_STYLES: Record<string, string | undefined> = {
+  S: 'border-white text-white',
+  M: 'border-yellow-400 text-yellow-400',
+  H: 'border-red-500 text-red-500',
+  W: 'border-sky-400 text-sky-400',
+};
+
 export interface SessionLapTableRowProps {
   session: DetailedSession;
   selectedDriver?: DriverData;
@@ -99,6 +106,10 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
             return otherLap && otherLap.position > 0 && otherLap.position < l.position;
           }).length
       : l.position;
+
+  const compound = l.fCompound || l.rCompound;
+  const compoundLetter = compound ? compound.trim().charAt(0).toUpperCase() : '';
+  const compoundStyle = COMPOUND_STYLES[compoundLetter];
 
   const eventsTooltip = lapEventsTooltip(l);
   const detailSections = lapDetailSections(l);
@@ -224,8 +235,13 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         {l.topSpeed ? `${l.topSpeed.toFixed(1)} km/h` : '-'}
       </td>
       <td className="px-3 py-2.5 text-center font-sans text-xs">
-        {l.fCompound || l.rCompound ? (
-          <span className="px-2 py-0.5 rounded bg-lmu-border text-white">{l.fCompound || l.rCompound}</span>
+        {compoundStyle ? (
+          <span
+            className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 text-xs font-bold font-mono leading-none ${compoundStyle}`}
+            title={compound}
+          >
+            {compoundLetter}
+          </span>
         ) : (
           '-'
         )}
