@@ -104,7 +104,7 @@ const PRE_V6_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set(['v3', 'v4', '
 
 /**
  * Brings a row written by an older compatible parser version up to what the current one would
- * store, on read: the blob itself is never rewritten (for deleted replays it is the only copy).
+ * store, on read: the samples are never rewritten (for deleted replays they are the only copy).
  * Before v6, Virtual Energy (Class 1 Type 51) was stored as `fuel`, ambient used a wrong scale,
  * track temperature came from a constant byte, and `rainPercent` was scaled by 25 instead of 255.
  */
@@ -143,7 +143,7 @@ export function upgradeStoredReplayMetadata(metadata: ReplayMetadata, parserVers
 /**
  * Recomputes the garage state of a stored lap from its driver's pit events (see garageState.ts),
  * on read and for every parser version: laps stored before the rule took type 49 events for garage
- * returns and flagged the drive out to the pit exit as garage. The blob is never rewritten.
+ * returns and flagged the drive out to the pit exit as garage. The samples are never rewritten.
  * Remove this adapter only once every stored row, deleted replays included, has been rewritten
  * with the current rule.
  */

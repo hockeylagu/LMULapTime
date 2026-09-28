@@ -72,21 +72,6 @@ describe('ReplayUpgradeCard', () => {
     expect(screen.getByText(/paused/)).toBeInTheDocument();
   });
 
-  it('shows the replay lap indexing that follows the upgrade, and what it still has to do', async () => {
-    const facts = { running: true, processed: 40, total: 160, currentFile: 'Daytona R1 7.Vcr', startedAt: null, finishedAt: null, result: null, error: null };
-    global.fetch = vi.fn().mockResolvedValue(respond({ status: status(), pendingReplays: 0, pendingDrivers: 0, facts: { status: facts, pendingReplays: 120 } }));
-    const { unmount } = render(<ReplayUpgradeCard />);
-    await waitFor(() => expect(screen.getByText('40 / 160')).toBeInTheDocument());
-    expect(screen.getByText('Daytona R1 7.Vcr')).toBeInTheDocument();
-    unmount();
-
-    global.fetch = vi.fn().mockResolvedValue(respond({
-      status: status(), pendingReplays: 0, pendingDrivers: 0, facts: { status: { ...facts, running: false }, pendingReplays: 3 },
-    }));
-    render(<ReplayUpgradeCard />);
-    await waitFor(() => expect(screen.getByText(/replays wait for their laps and conditions/)).toBeInTheDocument());
-  });
-
   it('turns the upgrade off with the switch', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(respond({ status: status(), pendingReplays: 2, pendingDrivers: 40 }))

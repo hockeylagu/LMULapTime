@@ -234,6 +234,32 @@ export function runningOrderFrom(history: ReadonlyArray<ReplayStandingsSnapshot>
   return rows;
 }
 
+/** The slot a decode's lap facts are filed under: null when the decode could not name its driver. */
+export function factsDriverSlot(driverSlotKey: number, trajectory: Pick<ReplayTrajectoryData, 'driverSlot'>): number | null {
+  const slot = driverSlotKey >= 0 ? driverSlotKey : trajectory.driverSlot;
+  return typeof slot === 'number' && slot >= 0 ? slot : null;
+}
+
+/**
+ * A lap row without what the normalized tables hold. The driver's own pit events stay: the garage
+ * state is recomputed from them on every read (withGarageState, lapSamples.ts). The lap list stays
+ * when the decode filed no lap facts (factsSlot null).
+ */
+export function withoutReplayFacts(lap: ReplayTrajectoryData, factsSlot: number | null): ReplayTrajectoryData {
+  const stripped: ReplayTrajectoryData = { ...lap };
+  delete stripped.weatherEvents;
+  delete stripped.flagEvents;
+  delete stripped.contacts;
+  delete stripped.penalties;
+  delete stripped.standingsHistory;
+  delete stripped.sessionRunningOrder;
+  const ownPitEvents = (lap.pitEvents ?? []).filter(e => e.driverSlot === lap.driverSlot);
+  if (ownPitEvents.length > 0) stripped.pitEvents = ownPitEvents;
+  else delete stripped.pitEvents;
+  if (factsSlot !== null) delete stripped.laps;
+  return stripped;
+}
+
 /**
  * The replay-wide facts of a decoded (or stored and upgraded) lap. They run to the latest of
  * `endSec`, the last event and the lap's last sample.

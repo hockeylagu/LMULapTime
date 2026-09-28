@@ -5,17 +5,58 @@ import {
   conditionsFrom,
   driverEventArraysFrom,
   driverEventsFrom,
+  factsDriverSlot,
   lapFactsFrom,
   lapSpanFrom,
   lapSummariesFrom,
   replayWideFactsFrom,
   runningOrderFrom,
+  withoutReplayFacts,
 } from '../../../server/replay/replayFacts.js';
 
 const wx = (timeSec: number, rainIntensity: number, ambientTemp = 20): ReplayWeatherEvent => ({ timeSec, rainIntensity, ambientTemp });
 const flag = (timeSec: number, flagState: number, sectorMask = 33): ReplayFlagEvent => ({ timeSec, flagState, flagName: 'x', sectorMask, driverSlot: 255, driverFlag: 0 });
 
 describe('replay facts', () => {
+  describe('stored lap rows', () => {
+    const decodedLap: ReplayTrajectoryData = {
+      replayName: 'R.Vcr', pointsCount: 1, currentLap: 2, driverSlot: 3,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      points: [{ x: 0, y: 0, z: 0, timeSec: 10 }],
+      laps: [{ lapNumber: 2, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 }],
+      weatherEvents: [wx(0, 0)],
+      flagEvents: [flag(0, 0)],
+      pitEvents: [{ driverSlot: 3, timeSec: 5, code: 34, action: 'Pit entry' }, { driverSlot: 4, timeSec: 6, code: 34, action: 'Pit entry' }],
+      contacts: [{ driverSlot: 3, timeSec: 7, impactMagnitude: 2, otherParty: 4 }],
+      penalties: [{ driverSlot: 4, timeSec: 8, penaltyText: 'x', action: 'given' }],
+      standingsHistory: [{ timeSec: 0, order: [3, 4] }],
+      sessionRunningOrder: [3, 4],
+    };
+
+    it('leave out the replay-wide facts and keep the driver\'s own pit events', () => {
+      const stored = withoutReplayFacts(decodedLap, 3);
+
+      expect(stored).toEqual({
+        replayName: 'R.Vcr', pointsCount: 1, currentLap: 2, driverSlot: 3,
+        bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+        points: [{ x: 0, y: 0, z: 0, timeSec: 10 }],
+        pitEvents: [{ driverSlot: 3, timeSec: 5, code: 34, action: 'Pit entry' }],
+      });
+      expect(decodedLap.pitEvents).toHaveLength(2);
+    });
+
+    it('keep the lap list when the decode filed no lap facts', () => {
+      expect(withoutReplayFacts(decodedLap, null).laps).toEqual(decodedLap.laps);
+      expect(withoutReplayFacts({ ...decodedLap, driverSlot: 9 }, 9).pitEvents).toBeUndefined();
+    });
+
+    it('are filed under the decoded slot, or the trajectory\'s own for the -1 alias', () => {
+      expect(factsDriverSlot(2, { driverSlot: 5 })).toBe(2);
+      expect(factsDriverSlot(-1, { driverSlot: 5 })).toBe(5);
+      expect(factsDriverSlot(-1, {})).toBeNull();
+    });
+  });
+
   describe('conditions', () => {
     it('keeps one row per change of the weather or the flags, the last running to the end', () => {
       const rows = conditionsFrom([wx(0, 0), wx(3, 0), wx(6, 40), wx(9, 40)], [flag(0, 0), flag(3, 0), flag(7, 3)], 20);

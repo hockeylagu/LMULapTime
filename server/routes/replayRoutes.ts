@@ -40,13 +40,11 @@ export function createReplayRouter(context: ServerContext): Router {
     const upgrade = context.replayUpgrade;
     if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
     const backlog = upgrade.getBacklog(context.replaysDir);
-    const facts = context.replayFacts;
     res.json({
       status: upgrade.getStatus(),
       pendingReplays: backlog.length,
       pendingDrivers: backlog.reduce((sum, replay) => sum + replay.driverSlots.length, 0),
       backlog: backlog.map(({ filename, metadataOutdated, driverSlots }) => ({ filename, metadataOutdated, driverSlots })),
-      facts: facts ? { status: facts.getStatus(), pendingReplays: facts.getPendingCount() } : null,
     });
   });
 

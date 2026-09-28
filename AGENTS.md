@@ -98,7 +98,6 @@ LMULapTime/
 │   ├── replay/                     # Binary .Vcr parser, downsampler & worker thread decoder
 │   │   ├── replayCacheService.ts   # Replay cache inspection & management
 │   │   ├── replayFacts.ts          # Decoded trajectory -> normalized replay fact rows (pure)
-│   │   ├── replayFactsBackfill.ts  # Background fill of the normalized replay tables from stored rows
 │   │   ├── replayLapBuilder.ts     # Timing loop detection & lap slicing
 │   │   ├── replayLapPoints.ts      # Trajectory point slicing and indexing
 │   │   ├── replayMetadataService.ts # Driver roster and replay header extraction
