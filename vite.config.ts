@@ -21,11 +21,12 @@ export default defineConfig({
       },
     },
   },
+  // LMU_UI_PORT / LMU_API_PORT let a second checkout (a worktree) run beside the main one.
   server: {
-    port: 5173,
+    port: Number(process.env.LMU_UI_PORT) || 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.LMU_API_PORT || 3001}`,
         changeOrigin: true,
       },
     },
