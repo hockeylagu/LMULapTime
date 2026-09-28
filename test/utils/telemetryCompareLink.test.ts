@@ -22,4 +22,12 @@ describe('buildTelemetryComparePath', () => {
       compareLapNum: '3',
     });
   });
+
+  it('opens on a corner when one is named, and drops a corner the page carried otherwise', () => {
+    const lap = { replayName: 'R.Vcr', lapNum: 1 };
+    const onCorner = buildTelemetryComparePath(new URLSearchParams(), lap, lap, 5);
+    expect(new URLSearchParams(onCorner.split('?')[1]).get('corner')).toBe('5');
+    const noCorner = buildTelemetryComparePath(new URLSearchParams('corner=3'), lap, lap);
+    expect(new URLSearchParams(noCorner.split('?')[1]).has('corner')).toBe(false);
+  });
 });
