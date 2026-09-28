@@ -51,6 +51,16 @@ describe('LeaderboardSection', () => {
     expect(screen.queryByRole('button', { name: 'Compare with Me' })).not.toBeInTheDocument();
   });
 
+  it("opens the session and the telemetry of the player's own best lap", () => {
+    const onOpenSession = vi.fn();
+    const { onTelemetry } = renderSection({ onOpenSession });
+    fireEvent.click(screen.getByRole('button', { name: 'Open the session of your best lap' }));
+    expect(onOpenSession).toHaveBeenCalledWith('s-Me');
+    fireEvent.click(screen.getByRole('button', { name: 'Telemetry of your best lap' }));
+    expect(onTelemetry).toHaveBeenCalledWith(expect.objectContaining({ driverName: 'Me', isPlayer: true }));
+    expect(screen.getAllByRole('button', { name: /Open the session/ })).toHaveLength(1);
+  });
+
   it('marks the rival, and offers to make any driver ahead the rival', () => {
     const onPin = vi.fn();
     renderSection({ rivalName: 'Driver 29', onPin });

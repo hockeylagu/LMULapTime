@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, Activity, Crosshair, SquareCheck, SquarePlus } from 'lucide-react';
+import { ArrowLeftRight, Activity, Crosshair, FileText, SquareCheck, SquarePlus } from 'lucide-react';
 import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
@@ -23,6 +23,8 @@ export interface LeaderboardRowProps {
   /** Whether this driver's best lap is in the comparison. */
   isCompared?: boolean;
   onPick?: (entry: LeaderboardEntry) => void;
+  /** Opens the session of the player's best lap. */
+  onOpenSession?: (sessionId: string) => void;
 }
 
 /** The best-sector colour of each sector, as the session lap table marks them. */
@@ -37,7 +39,7 @@ const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: numbe
 
 /** One row of the board: a driver, a benchmark band, or the drivers a compact board hides. */
 export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
-  row, player, benchmark, onShowAll, onCompare, onTelemetry, isRival, onPin, isCompared = false, onPick,
+  row, player, benchmark, onShowAll, onCompare, onTelemetry, isRival, onPin, isCompared = false, onPick, onOpenSession,
 }) => {
   if (row.kind === 'band') {
     return (
@@ -134,13 +136,28 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
             <ArrowLeftRight className="w-3.5 h-3.5" />
           </button>
         )}
-        {!entry.isPlayer && onTelemetry && (
+        {entry.isPlayer && onOpenSession && (
+          <button
+            type="button"
+            onClick={() => onOpenSession(entry.bestLap.sessionId)}
+            title={`Open the session of your best lap (${entry.bestLap.sessionName})`}
+            aria-label="Open the session of your best lap"
+            className="p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-border cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onTelemetry && (
           <button
             type="button"
             onClick={() => onTelemetry(entry)}
             disabled={!hasTelemetry}
-            title={hasTelemetry ? `Open the telemetry of your best lap against ${entry.driverName}'s` : 'Telemetry needs the replay of both laps'}
-            aria-label={`Telemetry against ${entry.driverName}`}
+            title={
+              !hasTelemetry
+                ? entry.isPlayer ? 'Telemetry needs the replay of your lap' : 'Telemetry needs the replay of both laps'
+                : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
+            }
+            aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
             className="p-1 rounded-lg text-lmu-muted enabled:hover:text-sky-300 enabled:hover:bg-lmu-border enabled:cursor-pointer disabled:opacity-30"
           >
             <Activity className="w-3.5 h-3.5" />

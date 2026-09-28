@@ -107,6 +107,7 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
           onTelemetry={onTelemetry}
           comparedLapIds={comparedLapIds}
           onPick={onPick}
+          onOpenSession={props.onSelectSession}
         />
       )}
 

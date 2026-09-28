@@ -23,6 +23,17 @@ describe('buildTelemetryComparePath', () => {
     });
   });
 
+  it('opens a lap alone, dropping a comparison the page carried', () => {
+    const path = buildTelemetryComparePath(
+      new URLSearchParams('track=Monza&baselineReplay=Old.Vcr&compareSessionId=s-old&compareDriver=X&compareLapNum=2'),
+      { replayName: 'Monza R1.Vcr', driverName: 'Me', lapNum: 7 },
+      null,
+    );
+    expect(Object.fromEntries(new URLSearchParams(path.split('?')[1]))).toEqual({
+      track: 'Monza', replayName: 'Monza R1.Vcr', lap: '7', driverName: 'Me',
+    });
+  });
+
   it('opens on a corner when one is named, and drops a corner the page carried otherwise', () => {
     const lap = { replayName: 'R.Vcr', lapNum: 1 };
     const onCorner = buildTelemetryComparePath(new URLSearchParams(), lap, lap, 5);

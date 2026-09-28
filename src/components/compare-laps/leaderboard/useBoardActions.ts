@@ -14,7 +14,10 @@ export interface BoardActions {
   onPick?: (entry: LeaderboardEntry) => void;
   /** Your best lap against a driver's; undefined while you have no lap on the board. */
   onCompare?: (entry: LeaderboardEntry) => void;
-  /** The telemetry of your best lap against a driver's; undefined while you have no lap on the board. */
+  /**
+   * The telemetry of your best lap against a driver's, or alone from your own row; undefined while
+   * you have no lap on the board.
+   */
   onTelemetry?: (entry: LeaderboardEntry) => void;
 }
 
@@ -52,8 +55,13 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
 
   const onTelemetry = (entry: LeaderboardEntry) => {
     const yours = boardLapTelemetryRef(player);
+    if (!yours) return;
+    if (entry.isPlayer) {
+      navigate(buildTelemetryComparePath(searchParams, yours, null));
+      return;
+    }
     const theirs = boardLapTelemetryRef(entry);
-    if (yours && theirs) navigate(buildTelemetryComparePath(searchParams, yours, theirs));
+    if (theirs) navigate(buildTelemetryComparePath(searchParams, yours, theirs));
   };
 
   return { compareRequest, compareRef, onPick, onCompare, onTelemetry };

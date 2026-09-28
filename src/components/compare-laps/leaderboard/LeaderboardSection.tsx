@@ -27,6 +27,8 @@ export interface LeaderboardSectionProps {
   comparedLapIds?: readonly string[];
   /** Adds a driver's best lap to the comparison, or takes it out. */
   onPick?: (entry: LeaderboardEntry) => void;
+  /** Opens the session of the player's best lap. */
+  onOpenSession?: (sessionId: string) => void;
 }
 
 const pill = (active: boolean) =>
@@ -37,7 +39,7 @@ const pill = (active: boolean) =>
 /** The board of the selected layout and class: the player's standing, then every driver met there. */
 export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
   board, loading, error, carClass, scope, playerCarType, onScopeChange, onCompare, onTelemetry, rivalName, onPin,
-  comparedLapIds = [], onPick,
+  comparedLapIds = [], onPick, onOpenSession,
 }) => {
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);
@@ -130,6 +132,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
                       onPin={onPin}
                       isCompared={row.kind === 'driver' && comparedLapIds.includes(boardLapId(row.entry))}
                       onPick={onPick}
+                      onOpenSession={onOpenSession}
                     />
                   ))}
                 </tbody>
