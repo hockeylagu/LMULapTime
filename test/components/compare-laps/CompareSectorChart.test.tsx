@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import {
   CompareSectorChart,
   CompareSectorChartDataItem,
@@ -50,35 +50,18 @@ describe('CompareSectorChart component', () => {
     expect(c2).toBeEmptyDOMElement();
   });
 
-  it('renders sector comparison context and invokes telemetry comparison for 2 laps', () => {
-    const onCompareTelemetry = vi.fn();
+  it('titles the chart without repeating the baseline shown on its card', () => {
     render(
       <CompareSectorChart
         selectedLaps={[baseline, target]}
         comparedLaps={[target]}
         baselineLap={baseline}
         chartData={chartData}
-        onCompareTelemetry={onCompareTelemetry}
       />
     );
 
-    expect(screen.getByText(/Sector Telemetry Breakdown/i)).toBeInTheDocument();
-    expect(screen.getByText(/Baseline Reference/i)).toBeInTheDocument();
-    const button = screen.getByRole('button', { name: /Compare Telemetry/i });
-    fireEvent.click(button);
-    expect(onCompareTelemetry).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not show telemetry action when more than two laps are selected', () => {
-    render(
-      <CompareSectorChart
-        selectedLaps={[baseline, target, { ...target, id: 'third' }]}
-        comparedLaps={[target]}
-        baselineLap={baseline}
-        chartData={chartData}
-        onCompareTelemetry={vi.fn()}
-      />
-    );
+    expect(screen.getByText('Sector gaps')).toBeInTheDocument();
+    expect(screen.queryByText(/Baseline Reference/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Compare Telemetry/i })).not.toBeInTheDocument();
   });
 });

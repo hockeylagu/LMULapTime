@@ -331,6 +331,23 @@ describe('sessionAnalytics server module', () => {
       expect(result.bestS3).toBe(46.5);
     });
 
+    it('takes the best sectors only from the laps a leaderboard counts', () => {
+      const sessions = structuredClone(mockSessions);
+      sessions[0].drivers[0].laps[0].s1 = 29.0; // the start lap
+      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'LMGT3', playerOnly: true });
+      expect(result.bestS1).toBe(30.5);
+      expect(result.theoreticalBestSec).toBe(122.5);
+    });
+
+    it('takes the personal best from the same laps, so the theoretical best is never slower', () => {
+      const sessions = structuredClone(mockSessions);
+      Object.assign(sessions[0].drivers[0].laps[0], { lapTime: 121.0, s1: 30.0, s2: 45.0, s3: 46.0 }); // the start lap
+      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'LMGT3', playerOnly: true });
+      expect(result.playerBestLap?.lapTime).toBe(122.5);
+      expect(result.allTimeBestLap?.lapTime).toBe(122.5);
+      expect(result.theoreticalBestSec).toBe(122.5);
+    });
+
     it('filters strictly by carClass and returns empty when class does not match', () => {
       const result = extractComparableLaps(mockSessions, {
         trackName: 'Spa',

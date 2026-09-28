@@ -81,10 +81,8 @@ import {
 import {
   RivalScope,
   applyRivalResolution,
-  endActiveRival,
   getActiveRival,
   getBeatenRivals,
-  getSkippedRivalDrivers,
   pinRival,
 } from './dbRivalStore.js';
 import type { RivalTarget } from '../../shared/types/leaderboard.js';
@@ -232,16 +230,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getBeatenRivals(this.db, scope);
   }
 
-  public getSkippedRivalDrivers(scope: RivalScope): Set<string> {
-    return getSkippedRivalDrivers(this.db, scope);
-  }
-
   public applyRivalResolution(scope: RivalScope, resolution: RivalResolution): number | null {
     return applyRivalResolution(this.db, scope, resolution);
-  }
-
-  public endActiveRival(scope: RivalScope, status: 'skipped' | 'replaced', now: number): void {
-    endActiveRival(this.db, scope, status, now);
   }
 
   public pinRival(scope: RivalScope, target: NewRivalTarget): number {

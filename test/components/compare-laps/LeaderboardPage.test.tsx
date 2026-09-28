@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/compare-laps/index.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import { board } from './leaderboard/leaderboardFixtures.js';
@@ -102,11 +102,12 @@ describe('LeaderboardPage', () => {
     render(<LeaderboardPage sessions={[]} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
-    expect(await screen.findByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument();
-    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Driver 1 — 1:40.000');
+    expect(await screen.findAllByTitle('Remove from comparison')).toHaveLength(2);
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Driver 1.*1:40\.000/);
     expect(screen.getAllByText('⭐ Your best').length).toBeGreaterThan(0);
-    // Your lap against another driver's: no baseline frame to jump between the cards.
+    // The baseline card is labelled, not framed.
     expect(screen.getByRole('region', { name: 'Compare laps' }).querySelector('.border-lmu-accent')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Compare laps' })).getByRole('button', { name: "Where's the time?" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: "Pick Driver 1's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'false');
 
@@ -151,19 +152,19 @@ describe('LeaderboardPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: "Pick Driver 1's lap to compare" }));
     fireEvent.click(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" }));
-    await waitFor(() => expect(screen.getByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument());
-    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Driver 1 — 1:40.000');
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Driver 1.*1:40\.000/);
     expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" }));
-    await waitFor(() => expect(screen.getByText(/Compare Laps \(1\/2\)/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
   });
 
-  it('shows the rival of the board and asks the server for another one', async () => {
+  it('shows the rival of the board and asks the server to pin the next one', async () => {
     const b = board(5, 5);
     const rivalStatus = {
       rival: { id: 1, kind: 'driver', driverName: 'Driver 4', targetTime: 100.3, startTime: 100.4, pinned: false, status: 'active', setAt: 1, endedAt: null, beatenTime: null, beatenSessionId: null },
-      rivalEntry: b.entries[3], gap: 0.1, progress: 0, theoreticalGap: 0.1, beaten: [], nextUp: [], trend: [],
+      rivalEntry: b.entries[3], gap: 0.1, progress: 0, theoreticalGap: 0.1, beaten: [], nextUp: [b.entries[2]], trend: [],
     };
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>;
@@ -175,11 +176,12 @@ describe('LeaderboardPage', () => {
     });
     render(<LeaderboardPage sessions={[]} />);
 
-    expect(await screen.findByRole('region', { name: 'Your rival' })).toHaveTextContent('Driver 4');
-    fireEvent.click(screen.getByRole('button', { name: /Another rival/ }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/rivals/skip', expect.objectContaining({ method: 'POST' })));
-    const skipCall = fetchMock.mock.calls.find(([u]) => u === '/api/rivals/skip');
-    expect(JSON.parse(String(skipCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'LMH' });
+    const rivalCard = await screen.findByRole('region', { name: 'Your rival' });
+    expect(rivalCard).toHaveTextContent('Driver 4');
+    fireEvent.click(within(rivalCard).getByRole('button', { name: 'Make Driver 3 your rival' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/rivals/pin', expect.objectContaining({ method: 'POST' })));
+    const pinCall = fetchMock.mock.calls.find(([u]) => u === '/api/rivals/pin');
+    expect(JSON.parse(String(pinCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'LMH', driverName: 'Driver 3' });
   });
 
   it('says why when the tracks cannot be loaded', async () => {

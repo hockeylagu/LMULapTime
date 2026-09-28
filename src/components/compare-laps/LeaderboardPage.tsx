@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { Trophy } from 'lucide-react';
 import type { LeaderboardLayout, LeaderboardScope } from '../../../shared/types/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
@@ -9,7 +10,8 @@ import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
 import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
 import { LeaderboardSection } from './leaderboard/LeaderboardSection.js';
 import { useLeaderboard } from './leaderboard/useLeaderboard.js';
-import { useBoardActions } from './leaderboard/useBoardActions.js';
+import { useBoardActions, boardLapTag } from './leaderboard/useBoardActions.js';
+import { boardLapToComparable } from './leaderboard/leaderboardLaps.js';
 import { RivalCard } from './rivals/RivalCard.js';
 import { useRival } from './rivals/useRival.js';
 
@@ -46,10 +48,15 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
   const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
-  const { compareRequest, compareRef, onPick, onCompare, onTelemetry } = useBoardActions(leaderboard.board, carClass);
+  const { compareRequest, compareRef, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
   const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
   const rival = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
   const rivalName = rival.status?.rival?.kind === 'driver' ? rival.status.rival.driverName : null;
+  const rivalEntry = rival.status?.rivalEntry ?? null;
+  const rivalLap = useMemo(
+    () => (rivalEntry && carClass ? boardLapToComparable(rivalEntry, carClass, boardLapTag(rivalEntry)) : null),
+    [rivalEntry, carClass]
+  );
 
   // Without a track in the URL, open the layout driven last, in the class driven last there.
   useEffect(() => {
@@ -75,7 +82,10 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
     <div className="space-y-6">
       <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white">Leaderboard</h2>
+          <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-lmu-gold" />
+            Leaderboard
+          </h2>
           <p className="text-xs text-lmu-muted mt-0.5">
             Where you stand among the drivers you raced online, track by track and class by class.
           </p>
@@ -92,7 +102,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
         )}
       </section>
 
-      <RivalCard rival={rival} player={leaderboard.board?.player ?? null} onCompare={onCompare} onTelemetry={onTelemetry} />
+      <RivalCard rival={rival} player={leaderboard.board?.player ?? null} onCompare={onAnalyse} onTelemetry={onTelemetry} />
 
       {layoutKey && carClass && (
         <LeaderboardSection
@@ -113,7 +123,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
 
       {track && (
         <div ref={compareRef} className="scroll-mt-4">
-          <CompareLaps {...props} compareRequest={compareRequest} onComparedLapsChange={setComparedLapIds} />
+          <CompareLaps {...props} compareRequest={compareRequest} onComparedLapsChange={setComparedLapIds} rivalLap={rivalLap} />
         </div>
       )}
     </div>

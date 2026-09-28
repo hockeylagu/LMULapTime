@@ -1,16 +1,18 @@
 import React from 'react';
-import { Activity, ArrowLeftRight, Ghost, SkipForward, Target } from 'lucide-react';
+import { Activity, ArrowLeftRight, Ghost, Target } from 'lucide-react';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import type { RivalState } from './useRival.js';
 import { RivalInsights } from './RivalInsights.js';
 import { RivalLadder } from './RivalLadder.js';
-import { RivalDebriefPanel } from './RivalDebriefPanel.js';
+import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
 
 export interface RivalCardProps {
   rival: RivalState;
   player: LeaderboardEntry | null;
+  /** Puts the player's best and the rival's in the comparison below, and works out where the time is. */
   onCompare?: (entry: LeaderboardEntry) => void;
+  /** Opens the telemetry of the two laps. */
   onTelemetry?: (entry: LeaderboardEntry) => void;
 }
 
@@ -18,7 +20,7 @@ const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bol
 
 /**
  * The next small step: a rival about 0.3 s ahead (or a ghost time), the time still to find, how
- * much of it is closed, and one click to see where it is.
+ * much of it is closed and the sectors it is in. The corners it is in are the comparison's job.
  */
 export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
   const { status, error } = rival;
@@ -30,6 +32,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
   const { rival: target, rivalEntry, gap, progress } = status;
   const percent = (gap / target.targetTime) * 100;
   const telemetryReady = Boolean(rivalEntry?.bestLap.replayName && player.bestLap.replayName);
+  const closed = progress !== null ? Math.round(progress * 100) : null;
 
   return (
     <section aria-label="Your rival" className="bg-gradient-to-br from-amber-500/10 via-lmu-card/80 to-lmu-card/75 backdrop-blur-md border border-amber-400/20 p-6 rounded-2xl space-y-4">
@@ -64,42 +67,48 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
         </div>
       </div>
 
-      {progress !== null && (
+      {closed !== null && (
         <div>
           <div className="h-2 rounded-full bg-lmu-bg border border-lmu-border overflow-hidden" role="progressbar"
-            aria-label="Gap closed since this rival was set" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
-            <div className="h-full bg-gradient-to-r from-amber-500 to-emerald-400" style={{ width: `${Math.max(2, progress * 100)}%` }} />
+            aria-label="Gap closed since this rival was set" aria-valuemin={0} aria-valuemax={100} aria-valuenow={closed}>
+            <div className="h-full bg-gradient-to-r from-amber-500 to-emerald-400" style={{ width: `${Math.max(2, closed)}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-lmu-muted mt-1 font-mono">
             <span>set at {formatTime(target.startTime)}</span>
-            <span>{Math.round(progress * 100)}% closed</span>
+            <span>{closed > 0 ? `${closed}% closed` : `beat ${formatTime(target.startTime)} to start closing`}</span>
             <span>target {formatTime(target.targetTime)}</span>
           </div>
         </div>
       )}
 
-      <RivalInsights status={status} player={player} />
+      <SectorGapSummary
+        gap={gap}
+        theoreticalBest={player.theoreticalBest}
+        theoreticalGap={status.theoreticalGap}
+        yours={player.bestLap}
+        theirs={rivalEntry?.bestLap ?? null}
+        theirLabel="your rival"
+        showSectors
+        aside={status.trend.length >= 2 ? <RivalInsights status={status} /> : undefined}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {rivalEntry && onCompare && (
-          <button type="button" className={action} onClick={() => onCompare(rivalEntry)}>
-            <ArrowLeftRight className="w-3.5 h-3.5" /> Compare laps
-          </button>
-        )}
-        {rivalEntry && onTelemetry && (
-          <button type="button" className={action} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
-            title={telemetryReady ? 'Where the time is, corner by corner' : 'Telemetry needs the replay of both laps'}>
-            <Activity className="w-3.5 h-3.5" /> Telemetry
-          </button>
-        )}
-        <button type="button" className={action} onClick={rival.skip} title="Pick the next driver in reach instead">
-          <SkipForward className="w-3.5 h-3.5" /> Another rival
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {rivalEntry && onCompare && (
+            <button type="button" className={action} onClick={() => onCompare(rivalEntry)}
+              title="Your best lap and your rival's side by side in Compare laps, with where the time is">
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Analyse in Compare laps
+            </button>
+          )}
+          {rivalEntry && onTelemetry && (
+            <button type="button" className={action} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
+              title={telemetryReady ? 'Speed, pedals, delta and line of the two laps, overlaid' : 'Telemetry needs the replay of both laps'}>
+              <Activity className="w-3.5 h-3.5" /> Compare Telemetry
+            </button>
+          )}
+        </div>
+        <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} />
       </div>
-
-      {rivalEntry && gap > 0 && telemetryReady && <RivalDebriefPanel player={player} rival={rivalEntry} />}
-
-      <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} />
     </section>
   );
 };

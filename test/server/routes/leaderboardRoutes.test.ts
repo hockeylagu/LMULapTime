@@ -74,15 +74,6 @@ describe('leaderboardRoutes', () => {
       expect(again.body.rival.id).toBe(first.body.rival.id);
     });
 
-    it('moves on to a ghost time when the rival is skipped, and remembers the skip', async () => {
-      await request(app).get('/api/rivals?layout=monza_gp&carClass=LMGT3');
-      const skipped = await request(app).post('/api/rivals/skip').send(BOARD);
-      expect(skipped.status).toBe(200);
-      expect(skipped.body.rival).toMatchObject({ kind: 'ghost', driverName: null, targetTime: 107.8 });
-      const again = await request(app).get('/api/rivals?layout=monza_gp&carClass=LMGT3');
-      expect(again.body.rival.kind).toBe('ghost');
-    });
-
     it('pins a driver ahead as the rival, and refuses one who is not ahead', async () => {
       const pinned = await request(app).post('/api/rivals/pin').send({ ...BOARD, driverName: 'Rival' });
       expect(pinned.body.rival).toMatchObject({ driverName: 'Rival', pinned: true });

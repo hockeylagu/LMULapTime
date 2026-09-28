@@ -1,8 +1,7 @@
 import React from 'react';
-import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } from 'lucide-react';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
-import { MAX_COMPARED_LAPS } from './useCompareLapsData.js';
 
 export interface CompareLapsHeaderProps {
   selectedTrack: string;
@@ -12,9 +11,13 @@ export interface CompareLapsHeaderProps {
   isOverallBestInComparison: boolean;
   theoreticalBestSec: number | null;
   selectedLapsCount: number;
-  baselineLap: ComparableLap | null;
+  /** The rival's lap, while it is not in the comparison. */
+  rivalLap?: ComparableLap | null;
+  onAddRival?: () => void;
   /** Measures the deltas against the other lap. */
   onSwapBaseline?: () => void;
+  /** Opens the telemetry of the two laps compared. */
+  onCompareTelemetry?: () => void;
   onAddPersonalBest: () => void;
   onAddTheoreticalBest: () => void;
   onAddOverallTrackBest: () => void;
@@ -22,6 +25,7 @@ export interface CompareLapsHeaderProps {
 }
 
 const preset = 'px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer';
+const headerAction = 'flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer';
 
 /** The compare card's header: the laps compared, the baseline, and the quick presets. */
 export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
@@ -32,8 +36,10 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   isOverallBestInComparison,
   theoreticalBestSec,
   selectedLapsCount,
-  baselineLap,
+  rivalLap,
+  onAddRival,
   onSwapBaseline,
+  onCompareTelemetry,
   onAddPersonalBest,
   onAddTheoreticalBest,
   onAddOverallTrackBest,
@@ -43,34 +49,42 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
     <div className="min-w-0">
       <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
         <ArrowLeftRight className="w-4 h-4 text-lmu-accent" />
-        Compare Laps ({selectedLapsCount}/{MAX_COMPARED_LAPS})
+        Compare Laps
       </h3>
       <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-lmu-muted">
-        {baselineLap ? (
-          <>
-            <span>Deltas against</span>
-            <span className="font-mono font-bold text-lmu-accent bg-lmu-accent/10 border border-lmu-accent/30 px-2 py-0.5 rounded-lg" data-testid="compare-baseline">
-              {baselineLap.driverName} — {baselineLap.lapTimeString}
-            </span>
-            {onSwapBaseline && (
-              <button
-                type="button"
-                onClick={onSwapBaseline}
-                className="flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
-                title="Measure the deltas against the other lap"
-              >
-                <ArrowLeftRight className="w-3 h-3" />
-                Swap baseline
-              </button>
-            )}
-          </>
-        ) : (
-          <span>Pick laps on the leaderboard, or start from a preset.</span>
+        {selectedLapsCount === 0 && <span>Pick laps on the leaderboard, or start from a preset.</span>}
+        {onSwapBaseline && (
+          <button
+            type="button"
+            onClick={onSwapBaseline}
+            className={headerAction}
+            title="Measure the deltas against the other lap"
+          >
+            <ArrowLeftRight className="w-3 h-3" />
+            Swap baseline
+          </button>
+        )}
+        {onCompareTelemetry && (
+          <button
+            type="button"
+            onClick={onCompareTelemetry}
+            className={headerAction}
+            title="Speed, pedals, delta and line of the two laps, overlaid"
+          >
+            <Activity className="w-3 h-3" />
+            Compare Telemetry
+          </button>
         )}
       </div>
     </div>
 
     <div className="flex flex-wrap items-center gap-2">
+      {rivalLap && onAddRival && (
+        <button type="button" onClick={onAddRival} className={preset} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
+          <Crosshair className="w-3.5 h-3.5 text-amber-300" />
+          + Rival ({rivalLap.lapTimeString})
+        </button>
+      )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
         <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
           <Trophy className="w-3.5 h-3.5 text-lmu-accent" />
