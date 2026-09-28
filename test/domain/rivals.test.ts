@@ -37,9 +37,9 @@ const target = (extra: Partial<RivalTarget>): RivalTarget => ({
   setAt: 1, endedAt: null, beatenTime: null, beatenSessionId: null, ...extra,
 });
 
-// At 100 s: 0.1% = 99.9, 0.3% = 99.7, 0.6% = 99.4.
+// At 100 s: 0.1 s = 99.9, 0.3 s = 99.7, 0.6 s = 99.4.
 describe('pickRivalEntry', () => {
-  it('picks the driver ahead closest to 0.3% faster, within 0.1% to 0.6%', () => {
+  it('picks the driver ahead closest to 0.3 s faster, within 0.1 s to 0.6 s', () => {
     const b = board({ Me: 100, TooClose: 99.95, Near: 99.8, Ideal: 99.69, Far: 99.45, TooFar: 99.3 });
     expect(pickRivalEntry(b)?.driverName).toBe('Ideal');
     expect(pickRivalEntry(b, new Set(['Ideal']))?.driverName).toBe('Near');
@@ -57,7 +57,7 @@ describe('pickRivalEntry', () => {
 });
 
 describe('resolveRival', () => {
-  it('sets a driver target, or a ghost 0.2% under the player best when nobody is close', () => {
+  it('sets a driver target, or a ghost 0.2 s under the player best when nobody is close', () => {
     const withRival = resolveRival(board({ Me: 100, Rival: 99.7 }), null, new Set(), 50);
     expect(withRival.created).toEqual({ kind: 'driver', driverName: 'Rival', targetTime: 99.7, startTime: 100, pinned: false, setAt: 50 });
     expect(withRival.active).toMatchObject({ kind: 'driver', driverName: 'Rival', status: 'active' });
@@ -69,11 +69,28 @@ describe('resolveRival', () => {
 
   it('keeps the rival while it is ahead, and follows its best lap when it improves', () => {
     const kept = resolveRival(board({ Me: 100, Rival: 99.7 }), target({}), new Set(), 50);
-    expect(kept).toMatchObject({ beaten: null, retimed: null, created: null, active: { id: 7 } });
+    expect(kept).toMatchObject({ beaten: null, retimed: null, replaced: null, created: null, active: { id: 7 } });
 
-    const improved = resolveRival(board({ Me: 100, Rival: 99.2 }), target({}), new Set(), 50);
-    expect(improved.retimed).toEqual({ id: 7, targetTime: 99.2 });
-    expect(improved.active?.targetTime).toBe(99.2);
+    const improved = resolveRival(board({ Me: 100, Rival: 99.5 }), target({}), new Set(), 50);
+    expect(improved.retimed).toEqual({ id: 7, targetTime: 99.5 });
+    expect(improved.active?.targetTime).toBe(99.5);
+  });
+
+  it('picks again when a rival picked for the player is out of reach, but keeps a chosen one', () => {
+    const b = board({ Me: 100, Rival: 99.2, Near: 99.7 });
+    const r = resolveRival(b, target({}), new Set(), 50);
+    expect(r.retimed).toEqual({ id: 7, targetTime: 99.2 });
+    expect(r.replaced).toEqual({ id: 7, endedAt: 50 });
+    expect(r.created?.driverName).toBe('Near');
+
+    const chosen = resolveRival(b, target({ pinned: true }), new Set(), 50);
+    expect(chosen).toMatchObject({ replaced: null, created: null, active: { id: 7, targetTime: 99.2 } });
+  });
+
+  it('measures the step in seconds, whatever the lap length', () => {
+    const leMans = board({ Me: 240, Percent: 239.28, Seconds: 239.7 });
+    expect(pickRivalEntry(leMans)?.driverName).toBe('Seconds');
+    expect(ghostTargetTime(240)).toBe(239.8);
   });
 
   it('ends a beaten rival and picks the next one, never a skipped driver', () => {
@@ -90,7 +107,7 @@ describe('resolveRival', () => {
   });
 
   it('does nothing without a player lap on the board', () => {
-    expect(resolveRival(board({ Other: 100 }), null, new Set(), 50)).toEqual({ beaten: null, retimed: null, created: null, active: null });
+    expect(resolveRival(board({ Other: 100 }), null, new Set(), 50)).toEqual({ beaten: null, retimed: null, replaced: null, created: null, active: null });
   });
 });
 

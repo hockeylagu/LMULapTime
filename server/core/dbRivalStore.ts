@@ -82,6 +82,10 @@ export function applyRivalResolution(db: DatabaseType, scope: RivalScope, resolu
     if (resolution.retimed) {
       db.prepare('UPDATE rival_targets SET target_time = ? WHERE id = ?').run(resolution.retimed.targetTime, resolution.retimed.id);
     }
+    if (resolution.replaced) {
+      db.prepare(`UPDATE rival_targets SET status = 'replaced', ended_at = ? WHERE id = ?`)
+        .run(resolution.replaced.endedAt, resolution.replaced.id);
+    }
     if (resolution.beaten) {
       const b = resolution.beaten;
       db.prepare(`UPDATE rival_targets SET status = 'beaten', ended_at = ?, beaten_time = ?, beaten_session_id = ? WHERE id = ?`)
