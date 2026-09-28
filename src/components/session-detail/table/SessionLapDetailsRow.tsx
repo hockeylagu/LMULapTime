@@ -7,6 +7,17 @@ export interface SessionLapDetailsRowProps {
   columnCount: number;
 }
 
+/** One line of a group, with what comes before its first colon ("Attacking:") in bold. */
+const DetailLine: React.FC<{ line: string }> = ({ line }) => {
+  const colon = line.indexOf(': ');
+  if (colon < 0) return <div>{line}</div>;
+  return (
+    <div>
+      <span className="font-semibold text-white">{line.slice(0, colon + 1)}</span>{line.slice(colon + 1)}
+    </div>
+  );
+};
+
 /** The expanded line under a lap: what happened on it, one labelled group per kind. */
 export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapNum, sections, columnCount }) => (
   <tr className="bg-lmu-bg/60" data-testid={`lap-details-${lapNum}`}>
@@ -15,7 +26,9 @@ export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapN
         {sections.map((section) => (
           <React.Fragment key={section.label}>
             <dt className="text-lmu-muted font-semibold uppercase tracking-wider text-[10px] pt-px">{section.label}</dt>
-            <dd className="text-slate-200">{section.lines.join(' · ')}</dd>
+            <dd className="text-slate-200 space-y-0.5">
+              {section.lines.map((line) => <DetailLine key={line} line={line} />)}
+            </dd>
           </React.Fragment>
         ))}
       </dl>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeLapGaps, describeLapTraffic, describeTrafficSpell, NON_REPRESENTATIVE_LABELS } from '../../src/utils/lapTrafficText.js';
+import { describeLapTraffic, describeNonRepresentative, describeTrafficSpell, NON_REPRESENTATIVE_LABELS } from '../../src/utils/lapTrafficText.js';
 import type { LapTraffic, TrafficCar, TrafficSpell } from '../../shared/types/index.js';
 
 const car = (name: string, carClass: string, sameClass = carClass === 'Hyper'): TrafficCar => ({ name, carClass, sameClass });
@@ -9,32 +9,43 @@ const traffic = (overrides: Partial<LapTraffic>): LapTraffic => ({
 });
 
 describe('describeLapTraffic', () => {
-  it('names a single car and counts several per class', () => {
-    expect(describeLapTraffic(traffic({ passed: [car('Rui Paiva', 'GT3')] }))).toEqual(['Passed Rui Paiva (GT3)']);
+  it('says whether the driver was attacking, defending, following or in other classes, attacking first', () => {
     expect(describeLapTraffic(traffic({
-      passed: [car('A', 'GT3'), car('B', 'GT3'), car('C', 'Hyper')],
-      passedBy: [car('Vinicius Ares', 'Hyper')],
-    }))).toEqual(['Passed 2 GT3, 1 Hyper', 'Passed by Vinicius Ares (Hyper)']);
+      passed: [car('A', 'GT3'), car('B', 'GT3'), car('Rui Paiva', 'Hyper')],
+      passedBy: [car('Vinicius Ares', 'Hyper'), car('C', 'LMP2'), car('D', 'LMP2')],
+    }))).toEqual([
+      'Attacking: passed Rui Paiva (Hyper)',
+      'Defending: passed by Vinicius Ares (Hyper)',
+      'Other classes: passed 2 GT3; passed by 2 LMP2',
+    ]);
   });
 
-  it('describes following the car ahead with the gap at the start of the lap', () => {
-    const ahead = { car: car('Vinicius Ares', 'Hyper'), gapSec: 0.44 };
-    expect(describeLapTraffic(traffic({ ahead, following: true }))).toEqual(['Followed Vinicius Ares (Hyper) 0.44s']);
-    expect(describeLapTraffic(traffic({ ahead }))).toEqual([]);
+  it('calls a car of the class close all lap attacking ahead and defending behind, another class ahead following', () => {
+    const rival = { car: car('Vinicius Ares', 'Hyper'), gapSec: 0.44 };
+    const gt3 = { car: car('Rui Paiva', 'GT3'), gapSec: 0.7 };
+    expect(describeLapTraffic(traffic({ ahead: rival, following: true, behind: rival, pressured: true }))).toEqual([
+      'Attacking: within 1 s of Vinicius Ares (Hyper) all lap',
+      'Defending: Vinicius Ares (Hyper) within 1 s behind all lap',
+    ]);
+    expect(describeLapTraffic(traffic({ ahead: gt3, following: true, behind: gt3, pressured: true }))).toEqual([
+      'Following: within 1 s of Rui Paiva (GT3) all lap',
+      'Other classes: Rui Paiva (GT3) within 1 s behind all lap',
+    ]);
+    expect(describeLapTraffic(traffic({ ahead: rival }))).toEqual([]);
   });
 
   it('says nothing for a lap without traffic data', () => {
     expect(describeLapTraffic(undefined)).toEqual([]);
-    expect(describeLapGaps(undefined)).toEqual([]);
   });
 });
 
-describe('describeLapGaps', () => {
-  it('lists the cars ahead and behind on the road', () => {
-    expect(describeLapGaps(traffic({
-      ahead: { car: car('A', 'Hyper'), gapSec: 2.7 },
-      behind: { car: car('B', 'GT3'), gapSec: 0.24 },
-    }))).toEqual(['Ahead on the road: A (Hyper) 2.70s', 'Behind on the road: B (GT3) 0.24s']);
+describe('describeNonRepresentative', () => {
+  it('names what the driver was doing on a traffic lap', () => {
+    expect(describeNonRepresentative('traffic', traffic({
+      passed: [car('A', 'Hyper')], passedBy: [car('B', 'GT3')], ahead: { car: car('C', 'GT3'), gapSec: 0.5 }, following: true,
+    }))).toBe('Slower than your median lap while attacking, following a car and in multiclass traffic');
+    expect(describeNonRepresentative('traffic', undefined)).toBe(NON_REPRESENTATIVE_LABELS.traffic.title);
+    expect(describeNonRepresentative('contact', undefined)).toBe(NON_REPRESENTATIVE_LABELS.contact.title);
   });
 });
 

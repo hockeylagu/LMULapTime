@@ -63,6 +63,8 @@ export interface LapTraffic {
   behind: TrafficGap | null;
   /** Within the following gap of a car ahead both when the lap started and when it finished. */
   following: boolean;
+  /** Within the following gap of a car behind both when the lap started and when it finished (absent before parser 2.17). */
+  pressured?: boolean;
   /** Cars that started the lap ahead on the road and finished it behind. */
   passed: TrafficCar[];
   /** Cars that started the lap behind on the road and finished it ahead. */

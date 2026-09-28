@@ -17,8 +17,17 @@ describe('lapDetailSections', () => {
     } as Partial<LapData>));
 
     expect(sections.map((s) => s.label)).toEqual(['Left out of average', 'Around you', 'Incidents', 'Track limits']);
-    expect(sections[1].lines).toEqual(['Passed Rui Paiva (GT3)']);
+    expect(sections[0].lines).toEqual(['Slower than your median lap, with contact or damage']);
+    expect(sections[1].lines).toEqual(['Other classes: passed Rui Paiva (GT3)']);
     expect(sections[2].lines).toEqual(['Contact with another car (326N)']);
+    // The heading already says Track limits.
+    expect(sections[3].lines).toEqual(['Violation (+0.25 pts)']);
+  });
+
+  it('does not call cars going by on a pit lap or an out-lap a fight', () => {
+    const traffic = { ahead: null, behind: null, following: false, passed: [], passedBy: [{ name: 'Rui Paiva', carClass: 'GT3', sameClass: true }] };
+    expect(lapDetailSections(lap({ traffic }))).toEqual([{ label: 'Around you', lines: ['Defending: passed by Rui Paiva (GT3)'] }]);
+    expect(lapDetailSections(lap({ traffic, isOutLap: true }))).toEqual([]);
   });
 
   it('adds the pit loss on a pit lap and nothing on a quiet lap', () => {

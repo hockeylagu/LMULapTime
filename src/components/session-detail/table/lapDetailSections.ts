@@ -1,5 +1,5 @@
 import type { LapData } from '../../../../shared/types/index.js';
-import { NON_REPRESENTATIVE_LABELS, describeLapGaps, describeLapTraffic } from '../../../utils/lapTrafficText.js';
+import { describeLapTraffic, describeNonRepresentative } from '../../../utils/lapTrafficText.js';
 
 export interface LapDetailSection {
   label: string;
@@ -11,6 +11,12 @@ export const CONDITIONS_NOTE = 'judged against your other laps in the same condi
 
 /** Rain as the replay records it (0-25). */
 export const describeRain = (rain: number): string => `Rain ${rain}/25`;
+
+/** "Track limits review (No Further Action)" as "Review (No Further Action)", under a Track limits heading. */
+export function withoutTrackLimitsPrefix(description: string): string {
+  const rest = description.replace(/^track limits\s+/i, '');
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
 
 /**
  * What happened on a lap beyond its times, grouped for the lap table's expanded row: the
@@ -27,12 +33,14 @@ export function lapDetailSections(lap: LapData): LapDetailSection[] {
     sections.push({ label: 'Conditions', lines: [`${lines.join(' · ')}: ${CONDITIONS_NOTE}`] });
   }
   if (lap.nonRepresentativeReason) {
-    sections.push({ label: 'Left out of average', lines: [NON_REPRESENTATIVE_LABELS[lap.nonRepresentativeReason].title] });
+    sections.push({ label: 'Left out of average', lines: [describeNonRepresentative(lap.nonRepresentativeReason, lap.traffic)] });
   }
-  const traffic = [...describeLapTraffic(lap.traffic), ...describeLapGaps(lap.traffic)];
+  // Cars going by while the driver is in or out of the pits are not a fight.
+  const inPits = lap.isPitStop || lap.isOutLap === true;
+  const traffic = inPits ? [] : describeLapTraffic(lap.traffic);
   if (traffic.length > 0) sections.push({ label: 'Around you', lines: traffic });
   if (lap.incidents?.length) sections.push({ label: 'Incidents', lines: lap.incidents.map((i) => i.description) });
-  if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => tl.description) });
+  if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => withoutTrackLimitsPrefix(tl.description)) });
   if (lap.penalties?.length) sections.push({ label: 'Penalties', lines: lap.penalties.map((p) => p.description) });
   if (lap.isPitStop && lap.pitStopDurationString) {
     sections.push({ label: 'Pit stop', lines: [`Estimated pit loss: ${lap.pitStopDurationString}`] });
@@ -47,7 +55,7 @@ export function lapEventsTooltip(lap: LapData): string | undefined {
     blocks.push(`Incidents (${lap.incidentCount}):\n${lap.incidents?.map((i) => `  • ${i.description}`).join('\n')}`);
   }
   if (lap.trackLimitCount && lap.trackLimitCount > 0) {
-    blocks.push(`Track limits (${lap.trackLimitCount}):\n${lap.trackLimits?.map((tl) => `  • ${tl.description}`).join('\n')}`);
+    blocks.push(`Track limits (${lap.trackLimitCount}):\n${lap.trackLimits?.map((tl) => `  • ${withoutTrackLimitsPrefix(tl.description)}`).join('\n')}`);
   }
   if (lap.penaltyCount && lap.penaltyCount > 0) {
     blocks.push(`Penalties (${lap.penaltyCount}):\n${lap.penalties?.map((p) => `  • ${p.description}`).join('\n')}`);

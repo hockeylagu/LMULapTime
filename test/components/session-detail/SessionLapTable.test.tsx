@@ -76,7 +76,7 @@ describe('SessionLapTable traffic', () => {
     );
 
     // The status column only carries icons; the reason is in the icon's tooltip.
-    expect(screen.getByText('Traffic').closest('[title]')?.getAttribute('title')).toMatch(/^Slower than your median lap, spent overtaking/);
+    expect(screen.getByText('Traffic').closest('[title]')?.getAttribute('title')).toBe('Slower than your median lap while in multiclass traffic: left out of the average and consistency');
     expect(screen.queryByTestId('lap-details-2')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show what happened on lap 1' })).not.toBeInTheDocument();
 
@@ -84,7 +84,8 @@ describe('SessionLapTable traffic', () => {
 
     const details = screen.getByTestId('lap-details-2');
     expect(details).toHaveTextContent('Left out of average');
-    expect(details).toHaveTextContent('Around youPassed Rui Paiva (GT3) · Ahead on the road: Rui Paiva (GT3) 2.00s');
+    expect(details).toHaveTextContent('Around youOther classes: passed Rui Paiva (GT3)');
+    expect(details).not.toHaveTextContent('start of the lap');
     // Expanding does not open the telemetry.
     expect(window.location.hash).not.toContain('telemetry');
 
