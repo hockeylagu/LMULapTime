@@ -120,13 +120,20 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               {lap.sessionName} ({lap.sessionType || 'P'})
             </p>
           )}
-          <h4
-            className={`text-2xl font-extrabold font-mono mt-0.5 ${
-              lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
-            }`}
-          >
-            {lap.lapTimeString}
-          </h4>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <h4
+              className={`text-2xl font-extrabold font-mono ${
+                lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
+              }`}
+            >
+              {lap.lapTimeString}
+            </h4>
+            {deltas && !isBaseline && deltas.lapTimeDelta !== null && (
+              <span className={`text-sm font-mono ${deltas.lapTimeDeltaClass}`} data-testid="lap-time-delta">
+                {deltas.lapTimeDeltaFormatted}
+              </span>
+            )}
+          </div>
 
           {cat && (
             <div className="mt-1 flex items-center gap-1.5">

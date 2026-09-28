@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeftRight, Activity, Crosshair } from 'lucide-react';
+import { ArrowLeftRight, Activity, Crosshair, SquareCheck, SquarePlus } from 'lucide-react';
 import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
@@ -20,6 +20,9 @@ export interface LeaderboardRowProps {
   /** The player's current rival. */
   isRival?: boolean;
   onPin?: (driverName: string) => void;
+  /** Whether this driver's best lap is in the comparison. */
+  isCompared?: boolean;
+  onPick?: (entry: LeaderboardEntry) => void;
 }
 
 /** The best-sector colour of each sector, as the session lap table marks them. */
@@ -33,7 +36,9 @@ const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: numbe
 );
 
 /** One row of the board: a driver, a benchmark band, or the drivers a compact board hides. */
-export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({ row, player, benchmark, onShowAll, onCompare, onTelemetry, isRival, onPin }) => {
+export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
+  row, player, benchmark, onShowAll, onCompare, onTelemetry, isRival, onPin, isCompared = false, onPick,
+}) => {
   if (row.kind === 'band') {
     return (
       <tr aria-label={`${row.label} pace, ${row.percent}%`}>
@@ -95,6 +100,18 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({ row, player, ben
       <SectorCell sector={2} time={entry.bestS3} rank={entry.s3Rank} />
       <td className="px-3 py-2 text-right text-slate-300">{formatTime(entry.top3Average)}</td>
       <td className="px-2 py-2 text-right whitespace-nowrap font-sans">
+        {onPick && (
+          <button
+            type="button"
+            onClick={() => onPick(entry)}
+            aria-pressed={isCompared}
+            title={isCompared ? `Take ${entry.driverName}'s lap out of the comparison` : `Add ${entry.driverName}'s best lap to the comparison`}
+            aria-label={`Pick ${entry.driverName}'s lap to compare`}
+            className={`p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${isCompared ? 'text-lmu-accent' : 'text-lmu-muted hover:text-white'}`}
+          >
+            {isCompared ? <SquareCheck className="w-3.5 h-3.5" /> : <SquarePlus className="w-3.5 h-3.5" />}
+          </button>
+        )}
         {canPin && (
           <button
             type="button"

@@ -6,11 +6,7 @@ import {
   matchesCarClass,
   getPaceCategoryFromPercentage,
 } from '../../../shared/domain/paceCategory.js';
-import {
-  createTheoreticalBestLap,
-  filterLapsByCarCategory,
-} from '../../../shared/domain/lapComparison.js';
-import { updateSearchParams } from '../../utils/urlParams.js';
+import { createTheoreticalBestLap } from '../../../shared/domain/lapComparison.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 
 /** The /api/compare/laps response. */
@@ -25,18 +21,6 @@ interface CompareLapsApiData {
   theoreticalBestSec: number | null;
   benchmarks: ReferenceLaptimeEntry[];
 }
-
-export type AvailableLapsSortOption =
-  | 'lap-asc'
-  | 'lap-desc'
-  | 'date-desc'
-  | 'date-asc'
-  | 'speed-desc'
-  | 'speed-asc'
-  | 's1-asc'
-  | 's2-asc'
-  | 's3-asc'
-  | 'pace-asc';
 
 export type CompareLapsSessionItem = DetailedSession | (Omit<Partial<DetailedSession>, 'sessionType'> & {
   id: string;
@@ -56,18 +40,42 @@ export interface UseCompareLapsParams {
   initialCompareSessionId?: string;
   initialCompareDriver?: string;
   initialCompareLapNum?: number;
-  /** Two laps to compare now (a new key each time): the reference becomes the baseline. */
-  pairRequest?: ComparePairRequest | null;
+  /** Laps the page asks to compare now (a new key each time). */
+  compareRequest?: CompareRequest | null;
 }
 
-export interface ComparePairRequest {
+/**
+ * What the page asks of the comparison: a pair (the reference becomes the baseline), or one lap
+ * picked on the leaderboard (added, or removed when it is already compared).
+ */
+export interface CompareRequest {
   key: number;
-  reference: ComparableLap;
   lap: ComparableLap;
+  reference?: ComparableLap;
 }
 
 /** Laps compared at once: a lap and its reference. */
 export const MAX_COMPARED_LAPS = 2;
+
+/** The lap the deltas are measured against: the other driver's when one of the two is the player's. */
+export function defaultBaselineId(laps: ComparableLap[]): string {
+  const players = laps.filter((l) => l.isPlayer);
+  if (laps.length === 2 && players.length === 1) return laps.find((l) => !l.isPlayer)!.id;
+  return laps[0]?.id ?? '';
+}
+
+/** The laps left to right: the player's lap on the right of the other driver's, otherwise as picked. */
+export function deckOrder(laps: ComparableLap[]): ComparableLap[] {
+  if (laps.length === 2 && laps[0].isPlayer && !laps[1].isPlayer) return [laps[1], laps[0]];
+  return laps;
+}
+
+/** Adds a lap, or removes it when it is compared already. Full, the newest pick stays with it. */
+export function toggleComparedLap(laps: ComparableLap[], lap: ComparableLap): ComparableLap[] {
+  if (laps.some((l) => l.id === lap.id)) return laps.filter((l) => l.id !== lap.id);
+  if (laps.length >= MAX_COMPARED_LAPS) return [laps[laps.length - 1], lap];
+  return [...laps, lap];
+}
 
 const NO_COMPARE_LAPS: CompareLapsApiData = {
   laps: [],
@@ -81,6 +89,11 @@ const NO_COMPARE_LAPS: CompareLapsApiData = {
   benchmarks: [],
 };
 
+const bestOf = (laps: ComparableLap[], key: 's1' | 's2' | 's3'): number | null => {
+  const valid = laps.map((l) => l[key]).filter((v): v is number => v !== null && v > 0);
+  return valid.length > 0 ? Math.min(...valid) : null;
+};
+
 export function useCompareLapsData({
   sessions,
   initialTrack,
@@ -90,9 +103,9 @@ export function useCompareLapsData({
   initialCompareSessionId,
   initialCompareDriver,
   initialCompareLapNum,
-  pairRequest,
+  compareRequest,
 }: UseCompareLapsParams) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const availableTracks = useMemo(() => {
     const set = new Set<string>();
@@ -105,11 +118,7 @@ export function useCompareLapsData({
 
   const selectedTrack = searchParams.get('track') || initialTrack || (availableTracks.length > 0 ? availableTracks[0] : 'Bahrain');
   const selectedCarClass = searchParams.get('carClass') || initialCarClass || 'LMGT3';
-  const selectedCarModel = searchParams.get('model') || 'All';
-  const playerOnly = searchParams.get('playerOnly') !== 'false';
   const [loading, setLoading] = useState<boolean>(false);
-  const [availableLapsSort, setAvailableLapsSort] = useState<AvailableLapsSortOption>('lap-asc');
-  const hideEmpty = searchParams.get('hideEmpty') !== 'false';
 
   const [apiData, setApiData] = useState<CompareLapsApiData>(NO_COMPARE_LAPS);
   // Why the laps for the selected track could not be loaded; null otherwise.
@@ -131,28 +140,16 @@ export function useCompareLapsData({
     setBaselineLapId('');
   }
 
-  const setSelectedCarModel = (model: string) => {
-    updateSearchParams(searchParams, setSearchParams, { model });
-  };
-
-  const setPlayerOnly = (val: boolean) => {
-    // Keep whatever laps are currently selected when switching driver scope
-    updateSearchParams(searchParams, setSearchParams, { playerOnly: val ? null : 'false' });
-  };
-
-  const setHideEmpty = (hide: boolean) => {
-    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide });
-  };
-
   useEffect(() => {
     if (!selectedTrack) return;
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
+    // The player's own laps and bests; the other drivers' laps come from the leaderboard.
     const query = new URLSearchParams({
       track: selectedTrack,
       carClass: selectedCarClass,
-      playerOnly: String(playerOnly),
+      playerOnly: 'true',
       // The compare page only ever shows real people: offline sessions' other drivers are AI.
       humansOnly: 'true',
     });
@@ -175,7 +172,7 @@ export function useCompareLapsData({
     return () => {
       controller.abort();
     };
-  }, [selectedTrack, selectedCarClass, playerOnly, lapScope]);
+  }, [selectedTrack, selectedCarClass, lapScope]);
 
   const targetSessionId = searchParams.get('sessionId') || initialSessionId || undefined;
   const targetLapNum =
@@ -191,40 +188,13 @@ export function useCompareLapsData({
 
   useEffect(() => {
     // Until the laps of a newly selected track or class arrive (the URL can change it, not only the
-    // selector), apiData still holds the previous selection's laps: never pick from those.
+    // ribbon), apiData still holds the previous selection's laps: never pick from those.
     if (loadedScope !== lapScope) return;
 
     const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNum ?? ''}__${targetCompareSessionId || ''}__${targetCompareDriver || ''}__${targetCompareLapNum ?? ''}`;
-
-    // If already initialized for this track and vehicle class scope,
-    // preserve whatever laps the user has selected (keeps player laps when changing driver scope)
-    if (initializedScopeRef.current === currentScope) {
-      if (apiData.laps.length > 0) {
-        setSelectedLaps((prevSelected) =>
-          prevSelected.map((selLap) => {
-            const fresh = apiData.laps.find((l) => l.id === selLap.id);
-            if (!fresh) return selLap;
-            return {
-              ...fresh,
-              tag: selLap.tag || fresh.tag,
-              isAllTimePB: selLap.isAllTimePB || fresh.isAllTimePB,
-              isTheoreticalBest: selLap.isTheoreticalBest || fresh.isTheoreticalBest,
-            };
-          })
-        );
-      }
-      return;
-    }
+    if (initializedScopeRef.current === currentScope) return;
 
     const candidates: ComparableLap[] = [];
-
-    if (!playerOnly) {
-      setSelectedLaps([]);
-      setBaselineLapId('');
-      initializedScopeRef.current = currentScope;
-      return;
-    }
-
     const findSessionLap = (sessionId?: string, driverName?: string, lapNum?: number) => apiData.laps.find(
       lap => lap.sessionId === sessionId &&
         (driverName === undefined || lap.driverName === driverName) &&
@@ -265,79 +235,35 @@ export function useCompareLapsData({
     initializedScopeRef.current = currentScope;
   }, [apiData, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
 
-  // A pair asked for from the leaderboard. Declared after the default selection above so that,
-  // when the laps of the pick arrive in the same render, the pair is what stays selected.
-  const appliedPairKeyRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!pairRequest || appliedPairKeyRef.current === pairRequest.key || loadedScope !== lapScope) return;
-    appliedPairKeyRef.current = pairRequest.key;
-    setSelectedLaps([pairRequest.reference, pairRequest.lap]);
-    setBaselineLapId(pairRequest.reference.id);
-  }, [pairRequest, loadedScope, lapScope]);
-
-  const availableCarModels = useMemo(() => {
-    const set = new Set<string>();
-    apiData.laps.forEach((l) => {
-      if (l.carType) set.add(l.carType);
-    });
-    return Array.from(set).sort();
-  }, [apiData.laps]);
-
-  const baseFilteredLaps = useMemo(() => {
-    return filterLapsByCarCategory(apiData.laps, selectedCarClass, selectedCarModel);
-  }, [apiData.laps, selectedCarClass, selectedCarModel]);
-
-  const emptyCount = useMemo(() => {
-    return baseFilteredLaps.filter((l) => !l.isValid || !l.lapTime || l.lapTime <= 0 || l.isPitStop).length;
-  }, [baseFilteredLaps]);
-
-  const displayLaps = useMemo(() => {
-    let list = baseFilteredLaps;
-    if (hideEmpty) {
-      list = list.filter((l) => l.isValid && !l.isPitStop && l.lapTime !== null && l.lapTime > 0);
+  const handleToggleLap = (lap: ComparableLap) => {
+    const next = toggleComparedLap(selectedLaps, lap);
+    setSelectedLaps(next);
+    // A lap added picks the baseline again; a lap removed only moves it when it was the baseline.
+    if (next.length > selectedLaps.length || next.length === MAX_COMPARED_LAPS || !next.some((l) => l.id === baselineLapId)) {
+      setBaselineLapId(defaultBaselineId(next));
     }
-    const sorted = [...list].sort((a, b) => {
-      if (availableLapsSort === 'lap-asc') return (a.lapTime ?? 999999) - (b.lapTime ?? 999999);
-      if (availableLapsSort === 'lap-desc') return (b.lapTime ?? -1) - (a.lapTime ?? -1);
-      if (availableLapsSort === 'date-desc') return (b.dateString || '').localeCompare(a.dateString || '');
-      if (availableLapsSort === 'date-asc') return (a.dateString || '').localeCompare(b.dateString || '');
-      if (availableLapsSort === 'speed-desc') return (b.topSpeed ?? -1) - (a.topSpeed ?? -1);
-      if (availableLapsSort === 'speed-asc') return (a.topSpeed ?? 999999) - (b.topSpeed ?? 999999);
-      if (availableLapsSort === 's1-asc') return (a.s1 ?? 999999) - (b.s1 ?? 999999);
-      if (availableLapsSort === 's2-asc') return (a.s2 ?? 999999) - (b.s2 ?? 999999);
-      if (availableLapsSort === 's3-asc') return (a.s3 ?? 999999) - (b.s3 ?? 999999);
-      if (availableLapsSort === 'pace-asc') return (a.pacePercentage ?? 999999) - (b.pacePercentage ?? 999999);
-      return 0;
-    });
-    return playerOnly ? sorted : sorted.slice(0, 100);
-  }, [baseFilteredLaps, hideEmpty, availableLapsSort, playerOnly]);
+  };
+
+  // What the page asked for (the leaderboard). Declared after the default selection above so that,
+  // when the laps of the pick arrive in the same render, the request is what stays selected.
+  const appliedRequestKeyRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!compareRequest || appliedRequestKeyRef.current === compareRequest.key || loadedScope !== lapScope) return;
+    appliedRequestKeyRef.current = compareRequest.key;
+    if (compareRequest.reference) {
+      setSelectedLaps([compareRequest.reference, compareRequest.lap]);
+      setBaselineLapId(compareRequest.reference.id);
+      return;
+    }
+    const next = toggleComparedLap(selectedLaps, compareRequest.lap);
+    setSelectedLaps(next);
+    setBaselineLapId(defaultBaselineId(next));
+  }, [compareRequest, loadedScope, lapScope, selectedLaps]);
 
   const baselineLap = useMemo(() => {
     if (selectedLaps.length === 0) return null;
     return selectedLaps.find((l) => l.id === baselineLapId) || selectedLaps[0];
   }, [selectedLaps, baselineLapId]);
-
-  const handleToggleLap = (lap: ComparableLap) => {
-    const exists = selectedLaps.some((l) => l.id === lap.id);
-    if (exists) {
-      const next = selectedLaps.filter((l) => l.id !== lap.id);
-      setSelectedLaps(next);
-      if (baselineLapId === lap.id) {
-        setBaselineLapId(next.length > 0 ? next[0].id : '');
-      }
-    } else {
-      if (selectedLaps.length >= MAX_COMPARED_LAPS) {
-        // Full: the new lap takes the place of the one compared with the baseline.
-        const kept = selectedLaps.find((l) => l.id === baselineLapId) ?? selectedLaps[0];
-        setSelectedLaps([kept, lap]);
-      } else {
-        setSelectedLaps([...selectedLaps, lap]);
-      }
-      if (selectedLaps.length === 0) {
-        setBaselineLapId(lap.id);
-      }
-    }
-  };
 
   const handleClearAll = () => {
     setSelectedLaps([]);
@@ -345,22 +271,14 @@ export function useCompareLapsData({
   };
 
   const allTimePBObject: ComparableLap | null = useMemo(() => {
-    if (apiData.playerBestLap) {
-      return { ...apiData.playerBestLap, isAllTimePB: true, tag: apiData.playerBestLap.tag || '⭐ Personal Best' };
-    }
-    const playerValid = apiData.laps.filter((l) => (l.isPlayer || playerOnly) && l.isValid && l.lapTime && l.lapTime > 0);
-    if (playerValid.length > 0) {
-      const sorted = [...playerValid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
-      return { ...sorted[0], isAllTimePB: true, tag: '⭐ Personal Best' };
-    }
-    if (apiData.allTimeBestLap) {
-      return { ...apiData.allTimeBestLap, isAllTimePB: true, tag: apiData.allTimeBestLap.tag || '⭐ Personal Best' };
-    }
-    const valid = apiData.laps.filter((l) => l.isValid && l.lapTime && l.lapTime > 0);
-    if (valid.length === 0) return null;
-    const sorted = [...valid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
-    return sorted.length > 0 ? { ...sorted[0], isAllTimePB: true, tag: '⭐ Personal Best' } : null;
-  }, [apiData.playerBestLap, apiData.allTimeBestLap, apiData.laps, playerOnly]);
+    const fastest = (list: ComparableLap[]) => [...list]
+      .filter((l) => l.isValid && l.lapTime && l.lapTime > 0)
+      .sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999))[0];
+    // The laps loaded are the player's own (playerOnly), some without the flag.
+    const best = apiData.playerBestLap ?? fastest(apiData.laps.filter((l) => l.isPlayer))
+      ?? fastest(apiData.laps) ?? apiData.allTimeBestLap ?? null;
+    return best ? { ...best, isAllTimePB: true, tag: best.tag || '⭐ Personal Best' } : null;
+  }, [apiData.playerBestLap, apiData.allTimeBestLap, apiData.laps]);
 
   const isPBInComparison = Boolean(allTimePBObject && selectedLaps.some((l) => l.id === allTimePBObject.id));
 
@@ -421,35 +339,11 @@ export function useCompareLapsData({
     if (overallTrackBestObject && !isOverallBestInComparison) handleToggleLap(overallTrackBestObject);
   };
 
-  const bestComparedS1 = useMemo(() => {
-    const valid = selectedLaps.map((l) => l.s1).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [selectedLaps]);
+  const bestComparedS1 = useMemo(() => bestOf(selectedLaps, 's1'), [selectedLaps]);
+  const bestComparedS2 = useMemo(() => bestOf(selectedLaps, 's2'), [selectedLaps]);
+  const bestComparedS3 = useMemo(() => bestOf(selectedLaps, 's3'), [selectedLaps]);
 
-  const bestComparedS2 = useMemo(() => {
-    const valid = selectedLaps.map((l) => l.s2).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [selectedLaps]);
-
-  const bestComparedS3 = useMemo(() => {
-    const valid = selectedLaps.map((l) => l.s3).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [selectedLaps]);
-
-  const bestAvailableS1 = useMemo(() => {
-    const valid = displayLaps.map((l) => l.s1).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [displayLaps]);
-
-  const bestAvailableS2 = useMemo(() => {
-    const valid = displayLaps.map((l) => l.s2).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [displayLaps]);
-
-  const bestAvailableS3 = useMemo(() => {
-    const valid = displayLaps.map((l) => l.s3).filter((v): v is number => v !== null && v > 0);
-    return valid.length > 0 ? Math.min(...valid) : null;
-  }, [displayLaps]);
+  const deckLaps = useMemo(() => deckOrder(selectedLaps), [selectedLaps]);
 
   const comparedLaps = useMemo(() => {
     if (!baselineLap) return selectedLaps;
@@ -477,20 +371,11 @@ export function useCompareLapsData({
     availableTracks,
     selectedTrack,
     selectedCarClass,
-    availableCarModels,
-    selectedCarModel,
-    setSelectedCarModel,
-    playerOnly,
-    setPlayerOnlyState: setPlayerOnly,
-    setPlayerOnly,
     loading,
     loadError,
-    availableLapsSort,
-    setAvailableLapsSort,
-    hideEmpty,
-    setHideEmpty,
     apiData,
     selectedLaps,
+    deckLaps,
     baselineLap,
     baselineLapId,
     setBaselineLapId,
@@ -506,12 +391,7 @@ export function useCompareLapsData({
     bestComparedS1,
     bestComparedS2,
     bestComparedS3,
-    bestAvailableS1,
-    bestAvailableS2,
-    bestAvailableS3,
     comparedLaps,
     chartData,
-    displayLaps,
-    emptyCount,
   };
 }

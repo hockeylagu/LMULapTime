@@ -99,14 +99,37 @@ describe('CompareLapsPage', () => {
     render(<CompareLapsPage sessions={[]} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
-    expect(await screen.findByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/)).toBeInTheDocument();
-    expect(screen.getByText('Active Baseline Lap:').nextElementSibling).toHaveTextContent('Driver 1 — 1:40.000');
+    expect(await screen.findByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument();
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Driver 1 — 1:40.000');
     expect(screen.getAllByText('⭐ Your best').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: "Pick Driver 1's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByRole('button', { name: 'Telemetry against Driver 1' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     expect(urlParams().get('replayName')).toBe('Me.Vcr');
     expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
+  });
+
+  it('compares two drivers picked on the board, neither of them the player', async () => {
+    const fetchMock = vi.mocked(global.fetch);
+    const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      return url.startsWith('/api/leaderboard?')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
+        : defaultFetch(url);
+    });
+    render(<CompareLapsPage sessions={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: "Pick Driver 1's lap to compare" }));
+    fireEvent.click(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" }));
+    await waitFor(() => expect(screen.getByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument());
+    expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Driver 1 — 1:40.000');
+    expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" }));
+    await waitFor(() => expect(screen.getByText(/Compare Laps \(1\/2\)/)).toBeInTheDocument());
   });
 
   it('shows the rival of the board and asks the server for another one', async () => {
