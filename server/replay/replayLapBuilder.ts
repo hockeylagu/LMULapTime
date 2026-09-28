@@ -55,7 +55,6 @@ export interface DetectedLapInternal {
 export interface LapDetectionResult {
   detectedLaps: DetectedLapInternal[];
   cumDist: number[];
-  garageIntervals: Array<{ start: number; end: number }>;
   pitIntervals: Array<{ start: number; end: number }>;
   lapsSummary: ReplayLapSummary[];
 }
@@ -84,30 +83,12 @@ export function isTimeInIntervals(t: number, intervals: Array<{ start: number; e
 }
 
 /**
- * Synthesizes garage and pit intervals from recorded replay pit events.
+ * Pit-lane intervals from recorded replay pit events (garage stays: see garageState.ts).
  */
-export function buildPitAndGarageIntervals(
-  targetPitEvents: ReplayPitEvent[]
-): { garageIntervals: Array<{ start: number; end: number }>; pitIntervals: Array<{ start: number; end: number }> } {
-  const garageIntervals: Array<{ start: number; end: number }> = [];
+export function buildPitIntervals(targetPitEvents: ReplayPitEvent[]): Array<{ start: number; end: number }> {
   const pitIntervals: Array<{ start: number; end: number }> = [];
-
-  // Check if vehicle started in the garage (prior to first garage exit event)
-  const firstGarageExit = targetPitEvents.find(e => e.code === 16);
-  if (firstGarageExit && firstGarageExit.timeSec > 0) {
-    garageIntervals.push({ start: 0, end: firstGarageExit.timeSec });
-  }
-
   for (let p = 0; p < targetPitEvents.length; p++) {
     const ev = targetPitEvents[p];
-    // Garage returns (code 21 or code 49)
-    if (ev.code === 21 || ev.code === 49) {
-      const nextExit = targetPitEvents.slice(p + 1).find(e => e.code === 16);
-      garageIntervals.push({
-        start: ev.timeSec,
-        end: nextExit ? nextExit.timeSec : Infinity,
-      });
-    }
     // Pit lane entries (code 34)
     if (ev.code === 34) {
       const nextPitExit = targetPitEvents.slice(p + 1).find(e => e.code === 32);
@@ -118,7 +99,7 @@ export function buildPitAndGarageIntervals(
     }
   }
 
-  return { garageIntervals, pitIntervals };
+  return pitIntervals;
 }
 
 /**
@@ -343,7 +324,7 @@ export function detectLapsFromTelemetry(
   }
 
   const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
-  const { garageIntervals, pitIntervals } = buildPitAndGarageIntervals(targetPitEvents);
+  const pitIntervals = buildPitIntervals(targetPitEvents);
 
   const lapsSummary: ReplayLapSummary[] = detectedLaps.map(l => {
     const rawCount = Math.max(0, l.endIdx - l.startIdx + 1);
@@ -366,7 +347,6 @@ export function detectLapsFromTelemetry(
   return {
     detectedLaps,
     cumDist,
-    garageIntervals,
     pitIntervals,
     lapsSummary,
   };

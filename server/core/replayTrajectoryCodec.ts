@@ -1,5 +1,6 @@
 import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from './types.js';
 import { compressJson, decompressJson } from './dbSchema.js';
+import { applyGarageState } from '../replay/garageState.js';
 
 /**
  * Trajectory blobs are stored column-per-channel instead of one object per point: the channel
@@ -137,4 +138,18 @@ export function upgradeStoredReplayMetadata(metadata: ReplayMetadata, parserVers
   delete metadata.trackTemp;
   if (typeof metadata.ambientTemp === 'number') metadata.ambientTemp = recalibrateLegacyAmbientTemp(metadata.ambientTemp);
   return metadata;
+}
+
+/**
+ * Recomputes the garage state of a stored lap from its driver's pit events (see garageState.ts),
+ * on read and for every parser version: laps stored before the rule took type 49 events for garage
+ * returns and flagged the drive out to the pit exit as garage. The blob is never rewritten.
+ * Remove this adapter only once every stored row, deleted replays included, has been rewritten
+ * with the current rule.
+ */
+export function withGarageState(trajectory: ReplayTrajectoryData): ReplayTrajectoryData {
+  if (!trajectory.points?.length) return trajectory;
+  const slot = trajectory.driverSlot;
+  applyGarageState(trajectory.points, (trajectory.pitEvents ?? []).filter(e => e.driverSlot === slot));
+  return trajectory;
 }

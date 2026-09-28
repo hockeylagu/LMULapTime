@@ -575,7 +575,8 @@ export function extractReplayTrajectory(
     // Stage 5: Lap Classification & Split Timing Correlation
     tracker.report('lap_analysis', 88);
     const lapAnalysis = detectLapsFromTelemetry(rawPts, vcrTimingEvents, targetSlot, replayPitEvents, maxPoints);
-    const { detectedLaps, garageIntervals, pitIntervals, lapsSummary } = lapAnalysis;
+    const { detectedLaps, pitIntervals, lapsSummary } = lapAnalysis;
+    const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
 
     if (!options.silent) {
       const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap);
@@ -600,7 +601,7 @@ export function extractReplayTrajectory(
         ? Math.round((rawPointsCount - 1) / lapDuration)
         : 0;
 
-      const lapPoints = buildTrajectoryPoints(lapRawPts, garageIntervals, pitIntervals);
+      const lapPoints = buildTrajectoryPoints(lapRawPts, pitIntervals, targetPitEvents);
       const selected = maxPoints > 0 && lapPoints.length > maxPoints ? selectFeatureSamples(lapPoints, maxPoints) : null;
       const finalPoints = selected ? selected.map(i => lapPoints[i]) : lapPoints;
 

@@ -3,7 +3,7 @@ import { buildRacePositions, readLapSamples } from '../../../server/traffic/lapS
 import { buildRacePositionsInWorker } from '../../../server/traffic/racePositionsWorkerClient.js';
 import { compressTrajectory } from '../../../server/core/replayTrajectoryCodec.js';
 import { compressJson } from '../../../server/core/dbSchema.js';
-import { distanceAt } from '../../../server/traffic/racePositions.js';
+import { distanceAt, RACE_POSITIONS_VERSION } from '../../../server/traffic/racePositions.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
 import { circleCenterline, pointAt } from './circleTrack.js';
 
@@ -31,6 +31,17 @@ describe('readLapSamples', () => {
     expect(samples.onTrack.filter(Boolean)).toHaveLength(40); // in the pits from 108 s
   });
 
+  it('recomputes the garage state instead of trusting the stored flag', () => {
+    // Stored before the fix: a type 49 event at a race pit stop flagged the rest of the race as garage.
+    const lap = { ...storedLap(7, 500, 10, 0), driverSlot: 3, pitEvents: [
+      { driverSlot: 3, timeSec: 400, code: 18, action: 'stopped in pit stall' },
+      { driverSlot: 3, timeSec: 400.1, code: 49, action: 'entered pit / garage', isGarage: true },
+    ] };
+    lap.points.forEach(p => { p.inGarage = true; });
+
+    expect(readLapSamples(7, compressTrajectory(lap)).onTrack.every(Boolean)).toBe(true);
+  });
+
   it('reads a lap stored in the older one-object-per-point format too', () => {
     const lap = storedLap(1, 0, 2, 0);
     const samples = readLapSamples(1, compressJson(lap));
@@ -50,7 +61,7 @@ describe('buildRacePositions', () => {
   it('places every car on the track through the replay', () => {
     const positions = buildRacePositions(laps, circleCenterline());
 
-    expect(positions.version).toBe('v1');
+    expect(positions.version).toBe(RACE_POSITIONS_VERSION);
     expect(positions.trackLengthM).toBeCloseTo(1000, 0);
     expect(positions.drivers.map(d => d.slot)).toEqual([0, 4]);
     expect(distanceAt(positions.drivers[0], 30)).toBeCloseTo(1500, 0);

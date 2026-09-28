@@ -8,6 +8,9 @@ import zlib from 'zlib';
 // v6: calibrated ambient temp formula, Virtual Energy (1/51), contact events (1/17), tyre compounds (1/16), removal of fake trackTemp
 // v7: event classes read without the race-session bit (29), so practice / qualifying replays get
 //     weather, tyre compounds, contacts, Virtual Energy and flags; penalties decoded from class 3.
+// Garage state (inGarage, and inPit on the drive out of the garage) is recomputed on read from the
+// pit events for every version (withGarageState, replayTrajectoryCodec.ts), so it needed no bump.
+// If a later bump rewrites every stored row, deleted replays included, drop that adapter.
 export const REPLAY_CACHE_VERSION = 'v7';
 export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   REPLAY_CACHE_VERSION,

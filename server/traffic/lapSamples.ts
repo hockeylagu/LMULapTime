@@ -1,4 +1,6 @@
 import zlib from 'zlib';
+import { ReplayPitEvent } from '../core/types.js';
+import { garageSpells, garageState } from '../replay/garageState.js';
 import { buildCenterlineSpatialIndex } from '../tracks/trackProjection.js';
 import { buildDriverPositions, LapSamples, POSITION_SAMPLE_HZ, RACE_POSITIONS_VERSION, RacePositions } from './racePositions.js';
 
@@ -13,6 +15,8 @@ type Column = Array<number | boolean | null>;
 
 interface StoredLapColumns {
   rawSampleRateHz?: number;
+  driverSlot?: number;
+  pitEvents?: ReplayPitEvent[];
   pointsLength?: number;
   constants?: Record<string, unknown>;
   columns?: Record<string, Column>;
@@ -43,8 +47,15 @@ export function readLapSamples(lapNumber: number, blob: Uint8Array): LapSamples 
   const x = pick('x');
   const z = pick('z');
   const inPit = pick('inPit');
-  const inGarage = pick('inGarage');
+  const speed = pick('speedKmh');
   const teleport = pick('isTeleport');
+  // The stored garage flag is not read: it is recomputed from the pit events, as a full read does.
+  const garage = garageState({
+    length,
+    timeSec: i => (typeof time[i] === 'number' ? time[i] as number : undefined),
+    speedKmh: i => (typeof speed[i] === 'number' ? speed[i] as number : undefined),
+    inPit: i => inPit[i] === true,
+  }, garageSpells((stored.pitEvents ?? []).filter(e => e.driverSlot === stored.driverSlot)));
   const step = Math.max(1, Math.round((stored.rawSampleRateHz || 50) / POSITION_SAMPLE_HZ));
 
   const samples: LapSamples = { lapNumber, times: [], x: [], z: [], onTrack: [] };
@@ -56,7 +67,7 @@ export function readLapSamples(lapNumber: number, blob: Uint8Array): LapSamples 
     samples.times.push(t);
     samples.x.push(px);
     samples.z.push(pz);
-    samples.onTrack.push(inPit[i] !== true && inGarage[i] !== true && teleport[i] !== true);
+    samples.onTrack.push(inPit[i] !== true && !garage.inGarage[i] && !garage.leavingGarage[i] && teleport[i] !== true);
   }
   return samples;
 }

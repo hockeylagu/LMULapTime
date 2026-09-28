@@ -7,8 +7,11 @@ import type { ReplayTrajectoryPoint } from '../core/types.js';
  */
 export const POSITION_SAMPLE_HZ = 5;
 
-/** Bumped when the stored index layout or the way it is built changes. */
-export const RACE_POSITIONS_VERSION = 'v1';
+/**
+ * Bumped when the stored index layout or the way it is built changes.
+ * v2: garage state recomputed from the pit events (cars no longer dropped after a pit stop).
+ */
+export const RACE_POSITIONS_VERSION = 'v2';
 
 /** Samples further apart than this in time are a gap in the recording (pits, garage): no position between them. */
 const MAX_SAMPLE_GAP_SEC = 1.5;
