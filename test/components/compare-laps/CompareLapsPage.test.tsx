@@ -40,6 +40,13 @@ describe('CompareLapsPage', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.startsWith('/api/leaderboard/layouts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(LAYOUTS) });
       if (url.startsWith('/api/compare/laps')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_LAPS) });
+      if (url.startsWith('/api/leaderboard?')) {
+        const query = new URLSearchParams(url.split('?')[1]);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({
+          layoutKey: query.get('layout'), layoutName: '', carClass: query.get('carClass'), scope: 'class', carType: null,
+          entries: [], player: null, benchmark: null,
+        }) });
+      }
       return Promise.reject(new Error(`Unexpected ${url}`));
     });
   });
@@ -53,6 +60,8 @@ describe('CompareLapsPage', () => {
     expect(cards[0]).toHaveTextContent('Daytona International Speedway (Road Course)');
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(await screen.findByRole('heading', { name: /Leaderboard · Hypercar/ })).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH', expect.anything());
   });
 
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
