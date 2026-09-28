@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/compare-laps/index.js';
+import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/leaderboard/index.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
-import { board } from './leaderboard/leaderboardFixtures.js';
+import { board } from './board/leaderboardFixtures.js';
 
 const layout = (layoutKey: string, trackName: string, lastDriven: number, classes: Array<[string, number]>): LeaderboardLayout => ({
   layoutKey,

@@ -3,7 +3,7 @@ import { MapPin } from 'lucide-react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
-import { carClassLabel, formatDrivenAgo } from '../leaderboard/leaderboardFormat.js';
+import { carClassLabel, formatDrivenAgo } from '../board/leaderboardFormat.js';
 
 export interface TrackRibbonCardProps {
   layout: LeaderboardLayout;

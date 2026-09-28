@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { CompareLaps, telemetryPair } from '../../../src/components/compare-laps/index.js';
+import { CompareLaps, telemetryPair } from '../../../src/components/leaderboard/index.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
 
 describe('CompareLaps component', () => {

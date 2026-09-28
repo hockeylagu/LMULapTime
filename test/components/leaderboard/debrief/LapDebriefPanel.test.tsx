@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { LapDebriefPanel } from '../../../../src/components/compare-laps/debrief/LapDebriefPanel.js';
-import { LapDebriefUnavailableError } from '../../../../src/components/compare-laps/debrief/loadLapDebrief.js';
+import { LapDebriefPanel } from '../../../../src/components/leaderboard/debrief/LapDebriefPanel.js';
+import { LapDebriefUnavailableError } from '../../../../src/components/leaderboard/debrief/loadLapDebrief.js';
 import type { DebriefCorner } from '../../../../src/utils/sessionDebrief.js';
 
 const loader = { load: vi.fn() };

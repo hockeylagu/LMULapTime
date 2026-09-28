@@ -5,7 +5,7 @@ import {
   CompareSectorChartDataItem,
   CompareSectorTooltip,
   SectorTooltipPayloadItem,
-} from '../../../src/components/compare-laps/CompareSectorChart.js';
+} from '../../../src/components/leaderboard/CompareSectorChart.js';
 import { ComparableLap } from '../../../server/core/types.js';
 
 const baseline: ComparableLap = {

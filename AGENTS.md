@@ -165,12 +165,12 @@ LMULapTime/
 │   ├── api/                        # The only place the client calls the server (fetchJson/postJson, replay, reference & leaderboard loaders)
 │   ├── components/                 # Modular UI feature packages (<= 300 lines per file)
 │   │   ├── common/                 # Badges, modals, pills, grids, selectors
-│   │   ├── compare-laps/           # Leaderboard page: track ribbon, leaderboard, rival card & two-lap comparison
+│   │   ├── dashboard/              # Cockpit hero, driving overview, sparklines, car/track summaries
+│   │   ├── leaderboard/            # Leaderboard page: track ribbon, leaderboard, rival card & two-lap comparison
+│   │   │   ├── board/              # Leaderboard rows, standing header & board actions
 │   │   │   ├── debrief/            # Where one lap loses time to another: sector gaps & corner debrief
-│   │   │   ├── leaderboard/        # Leaderboard rows, standing header & board actions
 │   │   │   ├── ribbon/             # Track ribbon of the layouts driven, with class pills
 │   │   │   └── rivals/             # Rival card, ladder of rivals beaten & gap trend
-│   │   ├── dashboard/              # Cockpit hero, driving overview, sparklines, car/track summaries
 │   │   ├── navbar/                 # Navigation header & background scan badge
 │   │   ├── replay/                 # Replay studio, track map & telemetry strip
 │   │   │   ├── analysis/           # Corner phase cards (Entry/Rotation/Exit), speed tables, AI tab

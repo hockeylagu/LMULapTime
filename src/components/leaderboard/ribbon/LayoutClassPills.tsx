@@ -1,7 +1,7 @@
 import React from 'react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
 import { getCarClassBadgeConfig } from '../../common/CarClassBadge.js';
-import { carClassLabel } from '../leaderboard/leaderboardFormat.js';
+import { carClassLabel } from '../board/leaderboardFormat.js';
 
 export interface LayoutClassPillsProps {
   layout: LeaderboardLayout;

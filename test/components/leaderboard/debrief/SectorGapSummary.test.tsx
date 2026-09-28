@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { SectorGapSummary, worstSector } from '../../../../src/components/compare-laps/debrief/SectorGapSummary.js';
+import { SectorGapSummary, worstSector } from '../../../../src/components/leaderboard/debrief/SectorGapSummary.js';
 
 const yours = { s1: 30, s2: 40, s3: 30 };
 const theirs = { s1: 30.05, s2: 39.9, s3: 29.75 };
