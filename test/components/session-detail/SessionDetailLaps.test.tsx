@@ -122,6 +122,23 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(screen.queryByText(/AI Driver 2\s*\(You\)/i)).not.toBeInTheDocument();
   });
 
+  it('breaks the consistency down by condition when the session mixes dry and wet laps', async () => {
+    const base = mockDetailedSession.playerDriver.laps[0];
+    const laps = [120, 100.1, 100.3, 99.9, 110.2, 110.5, 110.1].map((lapTime, i) => ({
+      ...base, lapNum: i + 1, lapTime, isValid: true, isPitStop: false,
+      ...(i >= 4 ? { conditions: { wetTyres: true } } : {}),
+    }));
+    const player = { ...mockDetailedSession.playerDriver, laps };
+    const mixed = { ...mockDetailedSession, playerDriver: player, drivers: [player, ...mockDetailedSession.drivers.slice(1)] };
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mixed) });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    const groups = await screen.findByTestId('consistency-groups');
+    expect(groups).toHaveTextContent('Per condition: dry 3 · wet 3');
+    expect(screen.getByText(/% Consist/).getAttribute('title')).toMatch(/^Pace consistency within each condition/);
+  });
+
   it('renders session lap average and sector averages with interactive legend toggle', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
