@@ -38,6 +38,7 @@ describe('Server API wiring', () => {
     ['session', '/api/track/Spa'],
     ['session', '/api/compare/laps?track=Spa'],
     ['reference', '/api/reference-laptimes'],
+    ['leaderboard', '/api/leaderboard/layouts'],
     ['replay', '/api/replays'],
     ['replay', '/api/replays/cache'],
     ['replay', '/api/telemetry'],
