@@ -64,9 +64,9 @@ export function defaultBaselineId(laps: ComparableLap[]): string {
   return laps[0]?.id ?? '';
 }
 
-/** The laps left to right: the player's lap on the right of the other driver's, otherwise as picked. */
+/** The laps left to right: the player's lap on the left of the other driver's, otherwise as picked. */
 export function deckOrder(laps: ComparableLap[]): ComparableLap[] {
-  if (laps.length === 2 && laps[0].isPlayer && !laps[1].isPlayer) return [laps[1], laps[0]];
+  if (laps.length === 2 && !laps[0].isPlayer && laps[1].isPlayer) return [laps[1], laps[0]];
   return laps;
 }
 
