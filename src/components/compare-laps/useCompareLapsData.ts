@@ -114,19 +114,13 @@ export function useCompareLapsData({
   const [loadedScope, setLoadedScope] = useState<string>('');
   const lapScope = `${selectedTrack}__${selectedCarClass}`;
 
-  const setSelectedTrack = (track: string) => {
+  // The page picks the track and class (the ribbon): laps of the previous pick are never kept.
+  const [selectionScope, setSelectionScope] = useState(lapScope);
+  if (selectionScope !== lapScope) {
+    setSelectionScope(lapScope);
     setSelectedLaps([]);
     setBaselineLapId('');
-    initializedScopeRef.current = '';
-    updateSearchParams(searchParams, setSearchParams, { track, model: null });
-  };
-
-  const setSelectedCarClass = (carClass: string) => {
-    setSelectedLaps([]);
-    setBaselineLapId('');
-    initializedScopeRef.current = '';
-    updateSearchParams(searchParams, setSearchParams, { carClass, model: null });
-  };
+  }
 
   const setSelectedCarModel = (model: string) => {
     updateSearchParams(searchParams, setSearchParams, { model });
@@ -461,9 +455,7 @@ export function useCompareLapsData({
   return {
     availableTracks,
     selectedTrack,
-    setSelectedTrack,
     selectedCarClass,
-    setSelectedCarClass,
     availableCarModels,
     selectedCarModel,
     setSelectedCarModel,

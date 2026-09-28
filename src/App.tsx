@@ -7,7 +7,7 @@ import {
   SessionDetail,
   TrackDetail,
   Settings,
-  CompareLaps,
+  CompareLapsPage,
   ReplayInspectorPage,
   ReferenceLaptimeUpdateToast,
   LoadingState,
@@ -74,7 +74,7 @@ interface CompareRouteProps {
 function CompareRoute({ sessions, onSelectSession }: CompareRouteProps) {
   const [searchParams] = useSearchParams();
   return (
-    <CompareLaps
+    <CompareLapsPage
       sessions={sessions}
       onSelectSession={onSelectSession}
       initialTrack={searchParams.get('track') || undefined}

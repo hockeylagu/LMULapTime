@@ -39,11 +39,8 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
-    availableTracks,
     selectedTrack,
-    setSelectedTrack,
     selectedCarClass,
-    setSelectedCarClass,
     availableCarModels,
     selectedCarModel,
     setSelectedCarModel,
@@ -166,11 +163,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           onClearAll={handleClearAll}
         />
         <CompareLapsFilters
-          availableTracks={availableTracks}
-          selectedTrack={selectedTrack}
-          setSelectedTrack={setSelectedTrack}
           selectedCarClass={selectedCarClass}
-          setSelectedCarClass={setSelectedCarClass}
           availableCarModels={availableCarModels}
           selectedCarModel={selectedCarModel}
           setSelectedCarModel={setSelectedCarModel}
