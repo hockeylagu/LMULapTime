@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap, CloudRain, CloudDrizzle, Sun, Thermometer } from 'lucide-react';
+import { ArrowLeft, Video, Timer, Trophy, Download, ChevronRight, Sliders, Zap } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
@@ -8,6 +8,7 @@ import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
+import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
@@ -62,6 +63,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     ? `${settings.durationMinutes} min`
     : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640 ? `${settings.raceLaps} Laps` : undefined;
 
+  const hasConditions = hasSessionConditions(session.matchingReplayFile);
   const hasDuckDb = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
   const duckFilename = session.duckdbFilename || session.matchingReplayFile?.duckdbFilename;
 
@@ -176,52 +178,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                     {session.sessionName} ({session.sessionType})
                   </span>
                   <span className="text-xs text-lmu-muted">{session.timeString}</span>
-                  {session.matchingReplayFile?.weatherCondition && (
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded border ${
-                        session.matchingReplayFile.weatherCondition === 'Wet'
-                          ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
-                          : session.matchingReplayFile.weatherCondition === 'Dynamic Weather'
-                          ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400'
-                          : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                      }`}
-                      title={
-                        session.matchingReplayFile.maxRainIntensity
-                          ? `Max Rain: ${session.matchingReplayFile.maxRainIntensity}/25`
-                          : 'Weather Condition'
-                      }
-                    >
-                      {session.matchingReplayFile.weatherCondition === 'Wet' ? (
-                        <>
-                          <CloudRain className="w-3 h-3 text-blue-400" />
-                          <span>Wet Track {session.matchingReplayFile.maxRainIntensity ? `(${session.matchingReplayFile.maxRainIntensity})` : ''}</span>
-                        </>
-                      ) : session.matchingReplayFile.weatherCondition === 'Dynamic Weather' ? (
-                        <>
-                          <CloudDrizzle className="w-3 h-3 text-cyan-400" />
-                          <span>Dynamic Rain {session.matchingReplayFile.maxRainIntensity ? `(${session.matchingReplayFile.maxRainIntensity})` : ''}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sun className="w-3 h-3 text-amber-400" />
-                          <span>Dry Track</span>
-                        </>
-                      )}
-                    </span>
-                  )}
-                  {session.matchingReplayFile?.ambientTemp !== undefined && (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono font-medium rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300"
-                      title="Atmospheric & Track Temperature"
-                    >
-                      <Thermometer className="w-3 h-3 text-cyan-400" />
-                      <span>
-                        {session.matchingReplayFile.ambientTemp.toFixed(1)}°C Air
-                        {session.matchingReplayFile.trackTemp !== undefined &&
-                          ` · ${session.matchingReplayFile.trackTemp.toFixed(1)}°C Track`}
-                      </span>
-                    </span>
-                  )}
                 </div>
                 <h2
                   onClick={() => {
@@ -262,19 +218,19 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
         </div>
 
         {/* Lap Reference & Rules Row */}
-        {(refEntry || hasSettings) && (
+        {(refEntry || hasSettings || hasConditions) && (
           <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center justify-between gap-3 text-xs">
             <SessionReferenceAndSafety refEntry={refEntry} selectedDriver={selectedDriver} />
-            {hasSettings && (
+            {(hasSettings || hasConditions) && (
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all shadow-sm cursor-pointer group shrink-0 ml-auto md:ml-0"
-                title="View Rules & Server Configuration"
+                className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all shadow-sm cursor-pointer group shrink-0 ml-auto md:ml-0"
+                title="View Rules, Server Configuration & Conditions"
               >
                 <Sliders className="w-3.5 h-3.5 text-lmu-accent group-hover:rotate-12 transition-transform shrink-0" />
                 <span className="text-slate-300">Rules & Config:</span>
-                {modeLabel && (
+                {hasSettings && modeLabel && (
                   <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold text-[11px] border border-slate-700/60">
                     {modeLabel}
                   </span>
@@ -284,6 +240,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                     {durationLabel}
                   </span>
                 )}
+                {hasConditions && session.matchingReplayFile && <SessionConditions replay={session.matchingReplayFile} />}
               </button>
             )}
           </div>
@@ -294,6 +251,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
         isOpen={showRulesModal}
         onClose={() => setShowRulesModal(false)}
         settings={session.settings}
+        conditions={session.matchingReplayFile}
       />
     </>
   );

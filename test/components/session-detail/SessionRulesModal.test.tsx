@@ -37,6 +37,20 @@ describe('SessionRulesModal', () => {
     expect(screen.getByText('30 min')).toBeInTheDocument();
   });
 
+  it('renders the full session conditions, even without settings', () => {
+    render(
+      <SessionRulesModal
+        isOpen={true}
+        onClose={vi.fn()}
+        conditions={{ weatherCondition: 'Wet', maxRainIntensity: 12, ambientTemp: 18.4, trackTemp: 22.7 }}
+      />
+    );
+    expect(screen.getByText('Wet Track')).toBeInTheDocument();
+    expect(screen.getByText(/max rain 12\/25/)).toBeInTheDocument();
+    expect(screen.getByText('18.4°C')).toBeInTheDocument();
+    expect(screen.getByText('22.7°C')).toBeInTheDocument();
+  });
+
   it('closes on Escape key press and backdrop click', () => {
     const onClose = vi.fn();
     const { rerender } = render(<SessionRulesModal isOpen={true} onClose={onClose} settings={baseSettings} />);

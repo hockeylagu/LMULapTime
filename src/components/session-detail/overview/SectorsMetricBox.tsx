@@ -82,12 +82,6 @@ export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriv
           </div>
         ))}
       </div>
-      {comparison?.biggestGap && (
-        <p className="mt-1 text-[10px] text-amber-300 truncate" title={scopeTitle}>
-          Biggest gap {comparison.biggestGap.label}{' '}
-          <span className="font-mono font-bold">{formatGap(comparison.biggestGap.gap)}s</span> to {comparison.biggestGap.rivalName}
-        </p>
-      )}
     </div>
   );
 };

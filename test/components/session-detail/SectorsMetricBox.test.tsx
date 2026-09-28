@@ -21,7 +21,7 @@ const malynych = driver('Alexandr Malynych', 'Peugeot 9x8', 25.098, 42.394, 28.2
 const averages = { s1: 25.3, s2: 42.3, s3: 28.8, lap: 96.3 };
 
 describe('SectorsMetricBox', () => {
-  it('puts each best and average sector next to the fastest same car and calls out the biggest gap', () => {
+  it('puts each best and average sector next to the fastest same car and highlights the biggest gap', () => {
     render(<SectorsMetricBox selectedDriver={me} drivers={[me, malynych]} averages={averages} />);
 
     const box = screen.getByTestId('sectors-metric');
@@ -29,7 +29,8 @@ describe('SectorsMetricBox', () => {
     expect(within(box).getByText('+0.393')).toBeInTheDocument();
     expect(within(box).getByText('-0.332')).toBeInTheDocument();
     expect(within(box).getByText('0:28.255')).toHaveAttribute('title', 'Alexandr Malynych');
-    expect(box).toHaveTextContent('Biggest gap S3 +0.393s to Alexandr Malynych');
+    expect(within(box).getByText('+0.393').parentElement).toHaveClass('bg-amber-500/10');
+    expect(box).not.toHaveTextContent('Biggest gap');
   });
 
   it('keeps the best and average sectors without a rival in the class', () => {
