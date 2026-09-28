@@ -50,6 +50,9 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
     );
   }
 
+  // Your lap against another driver's always reads the same way (yours on the left, measured
+  // against theirs): no frame jumping between the two cards.
+  const playerPair = laps.length === 2 && laps.filter((l) => l.isPlayer).length === 1;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {laps.map((lap, index) => {
@@ -59,6 +62,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
             key={lap.id}
             lap={lap}
             isBaseline={isBaseline}
+            frameBaseline={!playerPair}
             deltas={baselineLap ? computeLapDeltas(baselineLap, lap) : null}
             color={lapColors[index % lapColors.length]}
             isCardS1Best={isBest(lap, lap.s1, bestComparedS1)}

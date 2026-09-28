@@ -10,6 +10,8 @@ import { CarClassBadge } from '../common/CarClassBadge.js';
 export interface CompareLapCardProps {
   lap: ComparableLap;
   isBaseline: boolean;
+  /** Frames the baseline card; off, the baseline only shows by its missing deltas. */
+  frameBaseline?: boolean;
   deltas: ReturnType<typeof computeLapDeltas> | null;
   color: string;
   isCardS1Best: boolean;
@@ -26,6 +28,7 @@ export interface CompareLapCardProps {
 export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   lap,
   isBaseline,
+  frameBaseline = true,
   deltas,
   color,
   isCardS1Best,
@@ -61,7 +64,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   return (
     <div
       className={`p-4 rounded-2xl border transition-all relative flex flex-col justify-between ${
-        isBaseline
+        isBaseline && frameBaseline
           ? 'bg-lmu-card/90 border-lmu-accent shadow-lg shadow-lmu-accent/10'
           : 'bg-lmu-card/50 border-lmu-border hover:border-lmu-border/80'
       }`}
