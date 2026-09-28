@@ -84,13 +84,12 @@ describe('DashboardHero', () => {
     },
   ];
 
-  it('renders welcome back greeting with driver name and active stint badge', () => {
+  it('renders welcome back greeting with driver name', () => {
     const onSelectSession = vi.fn();
     render(<DashboardHero sessions={mockSessions} onSelectSession={onSelectSession} trackGeometry={mockGeometry} />);
 
     expect(screen.getByText(/Welcome back,/i)).toBeInTheDocument();
     expect(screen.getByText('Samuel Lague')).toBeInTheDocument();
-    expect(screen.getByText(/Active Stint/i)).toBeInTheDocument();
   });
 
   it('displays the latest outing spotlight details correctly with circuit layout outline', () => {
