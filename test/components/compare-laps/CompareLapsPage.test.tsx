@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CompareLapsPage, findLayoutForTrack } from '../../../src/components/compare-laps/index.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
+import { board } from './leaderboard/leaderboardFixtures.js';
 
 const layout = (layoutKey: string, trackName: string, lastDriven: number, classes: Array<[string, number]>): LeaderboardLayout => ({
   layoutKey,
@@ -79,6 +80,26 @@ describe('CompareLapsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ }));
     await waitFor(() => expect(urlParams().get('carClass')).toBe('LMGT3'));
+  });
+
+  it('compares the player best lap with a driver of the board, here or in telemetry', async () => {
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string) =>
+      url.startsWith('/api/leaderboard?')
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) })
+        : defaultFetch(url));
+    render(<CompareLapsPage sessions={[]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
+    expect(await screen.findByText(/Side-by-Side Lap Telemetry Comparison \(2\/2\)/)).toBeInTheDocument();
+    expect(screen.getByText('Active Baseline Lap:').nextElementSibling).toHaveTextContent('Driver 1 — 1:40.000');
+    expect(screen.getAllByText('⭐ Your best').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Telemetry against Driver 1' }));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
+    expect(urlParams().get('replayName')).toBe('Me.Vcr');
+    expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
   });
 
   it('says why when the tracks cannot be loaded', async () => {

@@ -10,6 +10,7 @@ import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
 import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
 import { LeaderboardSection } from './leaderboard/LeaderboardSection.js';
 import { useLeaderboard } from './leaderboard/useLeaderboard.js';
+import { useBoardActions } from './leaderboard/useBoardActions.js';
 
 /** The lap a deep link asked for belongs to the previous pick: a new track or class drops it. */
 const CLEARED_LAP_PARAMS = {
@@ -44,6 +45,7 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
   const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
+  const { pairRequest, compareRef, onCompare, onTelemetry } = useBoardActions(leaderboard.board, carClass);
 
   // Without a track in the URL, open the layout driven last, in the class driven last there.
   useEffect(() => {
@@ -97,10 +99,16 @@ export const CompareLapsPage: React.FC<CompareLapsProps> = (props) => {
           scope={scope}
           playerCarType={playerCarType}
           onScopeChange={(next) => updateSearchParams(searchParams, setSearchParams, { scope: next === 'car' ? 'car' : null })}
+          onCompare={onCompare}
+          onTelemetry={onTelemetry}
         />
       )}
 
-      {track && <CompareLaps {...props} />}
+      {track && (
+        <div ref={compareRef} className="scroll-mt-4">
+          <CompareLaps {...props} pairRequest={pairRequest} />
+        </div>
+      )}
     </div>
   );
 };

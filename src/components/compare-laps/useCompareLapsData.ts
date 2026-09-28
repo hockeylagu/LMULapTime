@@ -56,6 +56,14 @@ export interface UseCompareLapsParams {
   initialCompareSessionId?: string;
   initialCompareDriver?: string;
   initialCompareLapNum?: number;
+  /** Two laps to compare now (a new key each time): the reference becomes the baseline. */
+  pairRequest?: ComparePairRequest | null;
+}
+
+export interface ComparePairRequest {
+  key: number;
+  reference: ComparableLap;
+  lap: ComparableLap;
 }
 
 /** Laps compared at once: a lap and its reference. */
@@ -82,6 +90,7 @@ export function useCompareLapsData({
   initialCompareSessionId,
   initialCompareDriver,
   initialCompareLapNum,
+  pairRequest,
 }: UseCompareLapsParams) {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -255,6 +264,16 @@ export function useCompareLapsData({
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
     initializedScopeRef.current = currentScope;
   }, [apiData, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
+
+  // A pair asked for from the leaderboard. Declared after the default selection above so that,
+  // when the laps of the pick arrive in the same render, the pair is what stays selected.
+  const appliedPairKeyRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!pairRequest || appliedPairKeyRef.current === pairRequest.key || loadedScope !== lapScope) return;
+    appliedPairKeyRef.current = pairRequest.key;
+    setSelectedLaps([pairRequest.reference, pairRequest.lap]);
+    setBaselineLapId(pairRequest.reference.id);
+  }, [pairRequest, loadedScope, lapScope]);
 
   const availableCarModels = useMemo(() => {
     const set = new Set<string>();
