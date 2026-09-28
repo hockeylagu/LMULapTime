@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   buildLeaderboard,
   findLayoutBenchmark,
-  isWetTyreLap,
   listLeaderboardLayouts,
   sessionLayoutKey,
 } from '../../shared/domain/leaderboard.js';
@@ -74,7 +73,8 @@ describe('buildLeaderboard', () => {
           lap(3, 100.5, { isPitStop: true }),
           lap(4, 101, { isOutLap: true }),
           lap(5, 101.5, { nonRepresentativeReason: 'traffic' }),
-          lap(6, 102, { fCompound: '1,Wet', rCompound: '1,Wet' }),
+          lap(6, 102, { conditions: { wetTyres: true } }),
+          lap(8, 102.5, { conditions: { rain: 18 } }),
           lap(7, 108),
         ], { isPlayer: true }),
       ]),
@@ -122,14 +122,6 @@ describe('findLayoutBenchmark', () => {
     const entries = [entry('Monza', 'Hypercar'), entry('Monza', 'LMGT3')];
     expect(findLayoutBenchmark(entries, 'monza_gp', 'LMGT3')?.carClass).toBe('LMGT3');
     expect(findLayoutBenchmark([entries[0]], 'monza_gp', 'LMGT3')).toBeNull();
-  });
-});
-
-describe('isWetTyreLap', () => {
-  it('tells wet and intermediate tyres from dry ones', () => {
-    expect(isWetTyreLap({ fCompound: '1,Wet', rCompound: '1,Wet' })).toBe(true);
-    expect(isWetTyreLap({ fCompound: 'Intermediate', rCompound: 'Intermediate' })).toBe(true);
-    expect(isWetTyreLap({ fCompound: '0,Medium', rCompound: '0,Soft' })).toBe(false);
   });
 });
 
