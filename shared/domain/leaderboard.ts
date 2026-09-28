@@ -226,6 +226,23 @@ export function buildLeaderboard(
   };
 }
 
+/** The player's best representative lap of each session on a board, oldest first. */
+export function playerSessionBests(
+  sessions: DetailedSession[],
+  query: LeaderboardQuery
+): Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }> {
+  const carClass = normalizeCarClass(query.carClass);
+  const carType = query.carType?.trim() || null;
+  const bests: Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }> = [];
+  forEachRankedDriver(sessions, (session, driver, layoutKey, cls, laps) => {
+    if (layoutKey !== query.layoutKey || cls !== carClass || !isPlayerDriver(session, driver)) return;
+    if (carType && !sameCar(driver.carType, carType)) return;
+    const best = Math.min(...laps.map((l) => l.lapTime as number));
+    bests.push({ sessionId: session.id, sessionName: session.sessionName, timestamp: session.timestamp, best });
+  });
+  return bests.sort((a, b) => a.timestamp - b.timestamp);
+}
+
 interface LayoutAccumulator {
   trackName: string;
   lastDriven: number;
