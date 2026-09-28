@@ -9,6 +9,7 @@ import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
+import { lapClassPosition, lapPlaces } from './lapPlaces.js';
 
 const COMPOUND_STYLES: Record<string, string | undefined> = {
   S: 'border-white text-white',
@@ -92,27 +93,14 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
   const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
 
-  const lapClassPos =
-    isMultiClass && l.position > 0
-      ? 1 +
-        (session.drivers || [])
-          .filter(
-            (d) =>
-              d.name !== selectedDriver?.name &&
-              (d.carClass || '').toLowerCase() === (selectedDriver?.carClass || '').toLowerCase()
-          )
-          .filter((d) => {
-            const otherLap = d.laps?.find((ol) => ol.lapNum === l.lapNum);
-            return otherLap && otherLap.position > 0 && otherLap.position < l.position;
-          }).length
-      : l.position;
+  const lapClassPos = lapClassPosition(session, selectedDriver, l, isMultiClass);
 
   const compound = l.fCompound || l.rCompound;
   const compoundLetter = compound ? compound.trim().charAt(0).toUpperCase() : '';
   const compoundStyle = COMPOUND_STYLES[compoundLetter];
 
   const eventsTooltip = lapEventsTooltip(l);
-  const detailSections = lapDetailSections(l);
+  const detailSections = lapDetailSections(l, lapPlaces(session, selectedDriver, l, prevLap, isMultiClass));
 
   const incompleteTooltip = eventsTooltip
     ? `Incomplete Lap:\n${eventsTooltip}`
