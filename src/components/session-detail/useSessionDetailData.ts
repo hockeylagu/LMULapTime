@@ -143,6 +143,7 @@ export function useSessionDetailData({
               trackCourse: s.trackCourse,
               timeString: s.timeString,
               timestamp: s.timestamp,
+              settings: s.settings ? { serverName: s.settings.serverName } : undefined,
             }));
             setFetchedSessions(stripped as unknown as DetailedSession[]);
           }

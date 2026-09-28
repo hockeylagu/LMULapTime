@@ -193,5 +193,56 @@ describe('sessionDetailHelpers', () => {
       const res = findRelatedSession(currentOtherTrack, candidates);
       expect(res?.target.id).toBe('q_any');
     });
+
+    it('never links an offline session to an online session, even at the same track and closest in time', () => {
+      const offlinePractice: DetailedSession = {
+        ...baseCurrent,
+        id: 'practice_monza_offline',
+        sessionType: 'Practice',
+        sessionName: 'Practice 1',
+        timestamp: 8000,
+      } as unknown as DetailedSession;
+      // No settings.serverName: offline session.
+
+      const candidates: CandidateRelatedSession[] = [
+        {
+          id: 'r_online_monza',
+          sessionType: 'Race',
+          sessionName: 'Race 1',
+          trackVenue: 'Autodromo Nazionale Monza',
+          timestamp: 8100,
+          settings: { serverName: 'Some Multiplayer Server' },
+        },
+        {
+          id: 'q_offline_monza',
+          sessionType: 'Qualifying',
+          sessionName: 'Qualifying',
+          trackVenue: 'Autodromo Nazionale Monza',
+          timestamp: 8500,
+        },
+      ];
+
+      const res = findRelatedSession(offlinePractice, candidates);
+      expect(res).not.toBeNull();
+      expect(res?.type).toBe('qualifying');
+      expect(res?.target.id).toBe('q_offline_monza');
+    });
+
+    it('never links an online session to an offline session', () => {
+      const onlineRace: DetailedSession = {
+        ...baseCurrent,
+        id: 'race_online_monza',
+        sessionType: 'Race',
+        sessionName: 'Race 1',
+        timestamp: 9000,
+        settings: { serverName: 'Some Multiplayer Server' },
+      } as unknown as DetailedSession;
+
+      const candidates: CandidateRelatedSession[] = [
+        { id: 'q_offline_monza', sessionType: 'Qualifying', trackVenue: 'Autodromo Nazionale Monza', timestamp: 8900 },
+      ];
+
+      expect(findRelatedSession(onlineRace, candidates)).toBeNull();
+    });
   });
 });
