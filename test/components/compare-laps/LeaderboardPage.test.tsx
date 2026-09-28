@@ -105,6 +105,8 @@ describe('LeaderboardPage', () => {
     expect(await screen.findByText(/Compare Laps \(2\/2\)/)).toBeInTheDocument();
     expect(screen.getByTestId('compare-baseline')).toHaveTextContent('Driver 1 — 1:40.000');
     expect(screen.getAllByText('⭐ Your best').length).toBeGreaterThan(0);
+    // Your lap against another driver's: no baseline frame to jump between the cards.
+    expect(screen.getByRole('region', { name: 'Compare laps' }).querySelector('.border-lmu-accent')).toBeNull();
     expect(screen.getByRole('button', { name: "Pick Driver 1's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'false');
 
