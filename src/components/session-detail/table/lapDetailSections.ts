@@ -6,13 +6,26 @@ export interface LapDetailSection {
   lines: string[];
 }
 
+/** How a lap with conditions is judged (shared/domain/lapConditions.ts). */
+export const CONDITIONS_NOTE = 'judged against your other laps in the same conditions';
+
+/** Rain as the replay records it (0-25). */
+export const describeRain = (rain: number): string => `Rain ${rain}/25`;
+
 /**
- * What happened on a lap beyond its times, grouped for the lap table's expanded row: why it is
- * left out of the average, the cars around the driver, incidents, track limits, penalties and the
- * pit stop. Empty when there is nothing to add.
+ * What happened on a lap beyond its times, grouped for the lap table's expanded row: the
+ * conditions, why it is left out of the average, the cars around the driver, incidents, track
+ * limits, penalties and the pit stop. Empty when there is nothing to add.
  */
 export function lapDetailSections(lap: LapData): LapDetailSection[] {
   const sections: LapDetailSection[] = [];
+  if (lap.conditions) {
+    const lines = [
+      ...(lap.conditions.rain !== undefined ? [describeRain(lap.conditions.rain)] : []),
+      ...(lap.conditions.wetTyres ? ['On wet tyres'] : []),
+    ];
+    sections.push({ label: 'Conditions', lines: [`${lines.join(' · ')}: ${CONDITIONS_NOTE}`] });
+  }
   if (lap.nonRepresentativeReason) {
     sections.push({ label: 'Left out of average', lines: [NON_REPRESENTATIVE_LABELS[lap.nonRepresentativeReason].title] });
   }

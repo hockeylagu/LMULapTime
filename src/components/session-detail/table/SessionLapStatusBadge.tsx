@@ -1,12 +1,13 @@
 import React from 'react';
 import {
-  AlertTriangle, Ban, CarFront, CircleAlert, Clock, Flag, LogOut, ShieldAlert, ShieldCheck, Snail, Users, Wrench,
+  AlertTriangle, Ban, CarFront, CircleAlert, Clock, CloudRain, Droplets, Flag, LogOut, ShieldAlert, ShieldCheck, Snail, Users, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { LapData, NonRepresentativeReason } from '../../../../shared/types/index.js';
 import { resolveLapStatus } from '../../common/lapStatus.js';
 import { getWorstTrackLimitSeverity, getTrackLimitBadgeClasses } from '../../../utils/trackLimits.js';
 import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
+import { CONDITIONS_NOTE, describeRain } from './lapDetailSections.js';
 
 export interface SessionLapStatusBadgeProps {
   lap: LapData;
@@ -46,7 +47,8 @@ const badge = 'px-1 py-0.5 rounded border';
 
 /**
  * The lap's status as a row of icons, each explained by its tooltip: valid, start, pit, out-lap or
- * incomplete; why it is left out of the average; incidents, track limits and penalties. The details
+ * incomplete; rain and wet tyres (none on a dry lap); why it is left out of the average; incidents,
+ * track limits and penalties. The details
  * are in the lap's expanded row.
  */
 export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
@@ -86,6 +88,12 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       {status === 'inferred' && <StatusIcon icon={Clock} label="Incomplete" className="text-amber-400" title={incompleteTooltip} />}
       {status === 'invalid' && <StatusIcon icon={CircleAlert} label="Incomplete" className="text-lmu-gold" title={incompleteTooltip} />}
 
+      {l.conditions?.rain !== undefined && (
+        <StatusIcon icon={CloudRain} label="Rain" className="text-sky-400" title={`${describeRain(l.conditions.rain)}: ${CONDITIONS_NOTE}`} />
+      )}
+      {l.conditions?.wetTyres && (
+        <StatusIcon icon={Droplets} label="Wet tyres" className="text-sky-300" title={`On wet tyres: ${CONDITIONS_NOTE}`} />
+      )}
       {reason && (
         <StatusIcon icon={REASON_ICONS[reason]} label={NON_REPRESENTATIVE_LABELS[reason].label}
           className={`${badge} bg-amber-500/15 text-amber-300 border-amber-500/40`}

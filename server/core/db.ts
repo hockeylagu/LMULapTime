@@ -110,6 +110,7 @@ import {
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
 import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
+import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
 import {
   listReplayUpgradeBacklog,
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
@@ -311,7 +312,10 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     this.db.transaction(() => {
       deleteReplayDriverLaps(this.db, filename, driverSlotKey);
       cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
-      storeDecodedReplayFacts(this.db, filename, driverSlotKey, trajectory, REPLAY_CACHE_VERSION);
+      // New replay conditions reach the laps of the sessions linked to the replay.
+      if (storeDecodedReplayFacts(this.db, filename, driverSlotKey, trajectory, REPLAY_CACHE_VERSION)) {
+        this.reclassifyStoredSessions({ replayName: filename });
+      }
       recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
       if (isPrimary) {
         // Rows stored under the alias itself (from a decode that could not name the slot) are superseded.
@@ -478,24 +482,39 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     this.allSessionsCache = null;
   }
 
+  /** Links a replay to the session, whose laps then get that replay's conditions. */
   public updateSessionMatchingReplay(sessionId: string, matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>): void {
     const result = modifySessionMatchingReplay(this.db, sessionId, matchingReplayFile);
-    if (result.updated && this.allSessionsCache) {
-      const cached = this.allSessionsCache.find(s => s.id === sessionId);
-      if (cached) cached.matchingReplayFile = matchingReplayFile;
-    }
+    if (result.updated) this.reclassifyStoredSessions({ ids: [sessionId] });
   }
 
-  /** Withdraws the session's replay link (see dbReplayLinkStore); the cached session loses it too. */
+  /** Withdraws the session's replay link (see dbReplayLinkStore); its laps lose that replay's conditions. */
   public rejectSessionReplayLink(
     sessionId: string,
     link: NonNullable<SessionMetadata['matchingReplayFile']>,
     reason: ReplayLinkRejectionReason
   ): RejectedReplayLink | null {
     const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
-    const cached = rejected ? this.allSessionsCache?.find(s => s.id === sessionId) : undefined;
-    if (cached) delete cached.matchingReplayFile;
+    if (rejected) this.reclassifyStoredSessions({ ids: [sessionId] });
     return rejected;
+  }
+
+  /** Classifies a parsed session's laps with its linked replay's rain, before it is stored. */
+  public classifySessionConditions(session: DetailedSession): void {
+    classifySessionConditions(this.db, session);
+  }
+
+  /**
+   * Classifies stored sessions again (see dbSessionConditions). Loaded sessions are updated in
+   * place: callers such as the replay links hold on to them.
+   */
+  public reclassifyStoredSessions(which: { ids: string[] } | { replayName: string }): void {
+    for (const session of reclassifyStoredSessions(this.db, which)) {
+      const cached = this.allSessionsCache?.find(s => s.id === session.id);
+      if (!cached) continue;
+      Object.assign(cached, session);
+      if (!session.matchingReplayFile) delete cached.matchingReplayFile;
+    }
   }
 
   public getRejectedReplayLinks(): Map<string, RejectedReplayLink[]> {
