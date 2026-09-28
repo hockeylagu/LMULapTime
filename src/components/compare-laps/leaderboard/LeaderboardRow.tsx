@@ -32,7 +32,7 @@ const SECTOR_BEST_CLASS = ['text-lmu-gold', 'text-lmu-blue', 'text-lmu-green'] a
 
 const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: number | null }> = ({ sector, time, rank }) => (
   <td className="px-3 py-2 text-right whitespace-nowrap">
-    <span className={rank === 1 ? `${SECTOR_BEST_CLASS[sector]} font-bold` : 'text-slate-300'}>{time !== null ? time.toFixed(3) : '—'}</span>
+    <span className={rank === 1 ? `${SECTOR_BEST_CLASS[sector]} font-bold` : 'text-slate-300'}>{time !== null ? formatTime(time) : '—'}</span>
     {rank !== null && <span className="ml-1 text-[10px] text-lmu-muted">P{rank}</span>}
   </td>
 );

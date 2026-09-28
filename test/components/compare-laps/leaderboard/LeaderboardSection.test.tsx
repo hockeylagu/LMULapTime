@@ -96,13 +96,13 @@ describe('LeaderboardSection', () => {
     const table = screen.getByRole('table');
     const leader = within(table).getByText('Driver 1').closest('tr') as HTMLTableRowElement;
     expect(leader).toHaveTextContent('Alien(100.0%)');
-    const [s1, s3] = within(leader).getAllByText((100 * 0.3).toFixed(3));
+    const [s1, s3] = within(leader).getAllByText('0:30.000');
     expect(s1).toHaveClass('text-lmu-gold');
-    expect(within(leader).getByText((100 * 0.4).toFixed(3))).toHaveClass('text-lmu-blue');
+    expect(within(leader).getByText('0:40.000')).toHaveClass('text-lmu-blue');
     expect(s3).toHaveClass('text-lmu-green');
     const me = within(table).getByText('Me').closest('tr') as HTMLTableRowElement;
     expect(me).toHaveTextContent('Good(102.8%)');
-    expect(within(me).getAllByText((102.9 * 0.3).toFixed(3))[0]).not.toHaveClass('text-lmu-gold');
+    expect(within(me).getAllByText('0:30.870')[0]).not.toHaveClass('text-lmu-gold');
   });
 
   it('invites the player to drive when they are not on the board, and says why a board failed', () => {
