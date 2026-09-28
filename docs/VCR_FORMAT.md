@@ -310,6 +310,7 @@ apart). 492 of 578 in the corpus sit within 0.3 s of a Type 17 contact by the sa
 #### Types 23, 26, 29, 30, 31 (`eventSize === 23`): Damage & Sector-Best Events
 One packet per XML `<Sector>` row, emitted by the car named in that row (header `driverSlot`).
 The 23-byte payload is all zeros in every packet of the corpus; the type carries the meaning.
+Not decoded by the app: no damage amount or location, and the XML `<Sector>` rows say the same.
 
 | Type | XML `<Sector>` text |
 | :--- | :--- |
@@ -441,6 +442,7 @@ Enables 100% accurate running position, leader intervals, and position-over-time
 - 1 byte code: `3` = Entered pit lane / Returned to garage. Emitted synchronously with pit entry and garage return beacons.
 
 #### Type 28 (`eventSize === 4`): Track-Limits Verdict
+Not decoded by the app: it copies the XML `<TrackLimits>` rows.
 One packet per XML `<TrackLimits>` row (including the XML's duplicated rows), header
 `driverSlot` = the car. Validated on 69 races: 32,469 of 32,622 rows matched exactly with the
 UInt16 lap field, 153 had no packet, **no field mismatches**.
