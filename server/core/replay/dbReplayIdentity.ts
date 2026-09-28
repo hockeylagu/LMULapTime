@@ -1,6 +1,6 @@
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayMetadata, SessionMetadata } from './types.js';
+import { ReplayMetadata, SessionMetadata } from '../types.js';
 import { getStoredReplayFileInfo, StoredReplayFileInfo } from './dbReplayMetadataStore.js';
 
 // A replay's rows are keyed by its filename, but a filename does not name one recording: LMU can

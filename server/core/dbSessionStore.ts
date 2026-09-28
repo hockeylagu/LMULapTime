@@ -1,6 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession, SessionMetadata } from './types.js';
-import { isReplayLinkWithdrawn } from './dbReplayLinkStore.js';
+import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
 
 export function getAllSessions(db: DatabaseType): DetailedSession[] {
   const rows = db.prepare('SELECT data_json FROM sessions ORDER BY timestamp ASC').all() as { data_json: string }[];

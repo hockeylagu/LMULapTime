@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import zlib from 'node:zlib';
-import { ReplayTrajectoryData } from '../../../server/core/types.js';
+import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import {
   compressTrajectory,
   decompressTrajectory,
   toColumnarTrajectory,
   isColumnar,
-} from '../../../server/core/replayTrajectoryCodec.js';
+} from '../../../../server/core/replay/replayTrajectoryCodec.js';
 
 function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajectoryData {
   return {

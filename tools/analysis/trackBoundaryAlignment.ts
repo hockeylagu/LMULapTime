@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Point2D, NativeTrackPoint, TrackConfig } from './trackConfigs.js';
-import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
+import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
 
 const LMU_API_BASE_URL = process.env.LMU_API_BASE_URL ?? 'http://localhost:6397';
 const NATIVE_TRACKMAP_CACHE = path.resolve('tools/analysis/cache/lmu_all_trackmaps.json');

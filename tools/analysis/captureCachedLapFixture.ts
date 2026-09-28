@@ -19,7 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
-import { decompressTrajectory } from '../../server/core/replayTrajectoryCodec.js';
+import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 const FIELDS: Array<keyof ReplayTrajectoryPoint> = ['x', 'z', 'timeSec', 'speedKmh', 'throttle', 'brake', 'steerYaw'];

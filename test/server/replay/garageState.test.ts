@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyGarageState, garageSpells } from '../../../server/replay/garageState.js';
-import { withGarageState } from '../../../server/core/replayTrajectoryCodec.js';
+import { withGarageState } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import type { ReplayPitEvent, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
 
 const event = (timeSec: number, code: number): ReplayPitEvent => ({ driverSlot: 0, timeSec, code, action: String(code) });

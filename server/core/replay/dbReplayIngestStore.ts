@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { REPLAY_CACHE_VERSION } from './dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../dbSchema.js';
 
 // Per-driver decode outcomes (see replay_ingest_drivers in dbSchema.ts).
 

@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { compressJson, decompressJson } from './dbSchema.js';
+import { compressJson, decompressJson } from '../dbSchema.js';
 
 /**
  * The race positions index of a replay (server/traffic/racePositions.ts) is built from the

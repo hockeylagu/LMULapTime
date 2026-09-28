@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionDatabase } from '../../../server/core/db.js';
-import type { ReplayUpgradeProgress, ReplayUpgradeResult } from '../../../server/core/dbReplayUpgrade.js';
+import type { ReplayUpgradeProgress, ReplayUpgradeResult } from '../../../server/core/replay/dbReplayUpgrade.js';
 import { ReplayUpgradeRunner } from '../../../server/replay/replayUpgradeRunner.js';
 
 // A database double whose upgrade decodes `drivers` drivers, one per step, honouring shouldStop.
