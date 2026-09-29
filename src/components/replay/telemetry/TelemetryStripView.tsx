@@ -163,7 +163,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         {dragSelection && (
           <div
             style={{ left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`, width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%` }}
-            className="absolute top-3.5 bottom-0 bg-lmu-info-strong/25 border-x-2 border-lmu-info pointer-events-none z-40 backdrop-blur-[1px]"
+            className="absolute top-3.5 bottom-0 bg-lmu-info-strong/25 border-x-2 border-lmu-info pointer-events-none z-40"
           />
         )}
         </div>
@@ -191,7 +191,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         </div>
 
         {isCursorInView && (
-          <div style={{ left: `${cursorPct}%` }} className="absolute inset-y-0 w-[1.5px] bg-white pointer-events-none z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+          <div style={{ left: `${cursorPct}%` }} className="absolute inset-y-0 w-[1.5px] bg-white pointer-events-none z-30" />
         )}
       </div>
 

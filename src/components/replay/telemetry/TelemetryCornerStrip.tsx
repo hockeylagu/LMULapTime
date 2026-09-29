@@ -73,7 +73,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
         let borderAndBgClass: string;
         if (isCurrent) {
           borderAndBgClass =
-            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40 shadow-[0_0_8px_rgba(14,165,233,0.3)]';
+            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40';
         } else if (isCompareMode) {
           if (initialStraight.timeDeltaSec > 0.005) {
             borderAndBgClass =
@@ -157,10 +157,10 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
         let borderAndBgClass: string;
         if (isSelected) {
           borderAndBgClass =
-            'border-lmu-aqua bg-lmu-aqua-deep/40 ring-1 ring-lmu-aqua/60 shadow-[0_0_12px_rgba(34,211,238,0.4)]';
+            'border-lmu-aqua bg-lmu-aqua-deep/40 ring-1 ring-lmu-aqua/60';
         } else if (isCurrent) {
           borderAndBgClass =
-            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40 shadow-[0_0_8px_rgba(14,165,233,0.3)]';
+            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40';
         } else if (isCompareMode) {
           if (c.timeDeltaSec > 0.005) {
             borderAndBgClass =

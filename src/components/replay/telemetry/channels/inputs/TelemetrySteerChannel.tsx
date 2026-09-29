@@ -205,10 +205,10 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
             const leftPct = Math.min(97, Math.max(0, band.xStart / 10));
             const badgeLabel = !isUS ? band.label : isScrub ? band.label : `US ${band.phase}`;
             const badgeClass = !isUS
-              ? 'text-lmu-warn-soft bg-lmu-warn-deep/90 border-lmu-warn/60 shadow-[0_1px_4px_rgba(245,158,11,0.25)]'
+              ? 'text-lmu-warn-soft bg-lmu-warn-deep/90 border-lmu-warn/60'
               : isScrub
-                ? 'text-lmu-loss-soft bg-lmu-loss-deep/90 border-lmu-loss/70 shadow-[0_1px_4px_rgba(244,63,94,0.3)]'
-                : 'text-lmu-info-soft bg-lmu-info-deep/90 border-lmu-info/60 shadow-[0_1px_4px_rgba(56,189,248,0.25)]';
+                ? 'text-lmu-loss-soft bg-lmu-loss-deep/90 border-lmu-loss/70'
+                : 'text-lmu-info-soft bg-lmu-info-deep/90 border-lmu-info/60';
             const titleType = !isUS ? 'Oversteer' : isScrub ? `Tire Scrub (${band.scrubSeverityPct}% severity)` : 'Understeer';
 
             return (

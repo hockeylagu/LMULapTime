@@ -110,7 +110,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
               }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 aspect-square rounded-full cursor-pointer transition-transform hover:scale-125 ${
                 isLatest
-                  ? 'w-2.5 h-2.5 border-2 shadow-sm shadow-lmu-gain-strong/50'
+                  ? 'w-2.5 h-2.5 border-2'
                   : 'w-2 h-2 border-[1.5px]'
               }`}
               title={`${c.point.trackName} · ${c.point.bestLapTimeString} (${c.point.pacePercentage}%)`}

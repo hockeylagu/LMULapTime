@@ -69,7 +69,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
       </div>
 
       {/* Track Title Card */}
-      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+      <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3.5">
@@ -117,7 +117,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                 type="button"
                 onClick={() => setSelectedCarModel('All')}
                 className={`px-3 py-1 rounded-lg font-medium transition-all ${selectedCarModel === 'All'
-                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/40 font-bold shadow-sm'
+                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/40 font-bold'
                   : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                   }`}
               >
@@ -129,7 +129,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   type="button"
                   onClick={() => setSelectedCarModel(car)}
                   className={`px-3 py-1 rounded-lg font-medium transition-all ${selectedCarModel === car
-                    ? 'bg-lmu-accent text-white font-bold shadow-sm'
+                    ? 'bg-lmu-accent text-white font-bold'
                     : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                     }`}
                 >

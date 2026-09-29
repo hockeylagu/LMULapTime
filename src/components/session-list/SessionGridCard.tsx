@@ -27,7 +27,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   return (
     <div
       onClick={() => onSelectSession(s.id)}
-      className={`bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] transition-all duration-200 ease-in-out hover:bg-lmu-cardHover/85 hover:border-lmu-accent/30 hover:-translate-y-0.5 p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
+      className={`bg-lmu-card border border-lmu-border transition-all duration-200 ease-in-out hover:bg-lmu-cardHover hover:border-lmu-rule p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
         empty ? 'border-lmu-warn-strong/30 bg-lmu-warn-deep/10' : ''
       }`}
     >
@@ -101,7 +101,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             </span>
             {s.sessionType === 'Race' && p?.position ? (
               <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white"
                 title={p.gridPosition ? `Started P${p.gridPosition} → Finished P${p.position}` : `Finished P${p.position}`}
               >
                 <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Finish:</span>
@@ -120,7 +120,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
               </span>
             ) : (s.sessionType === 'Qualifying' || s.sessionName?.toLowerCase().includes('quali')) && p?.position ? (
               <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white"
                 title={`Qualified P${p.position}`}
               >
                 <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Qual:</span>

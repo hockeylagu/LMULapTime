@@ -155,7 +155,7 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
             style={{ left: `${(band.xStart + band.width / 2) / 10}%` }}
             className="absolute top-1 -translate-x-1/2 pointer-events-none z-10"
           >
-            <span className={`px-1 py-0.2 rounded text-[10px] font-mono font-bold border whitespace-nowrap shadow-sm ${
+            <span className={`px-1 py-0.2 rounded text-[10px] font-mono font-bold border whitespace-nowrap ${
               band.isTireScrub
                 ? 'bg-lmu-loss-deep/90 border-lmu-loss-strong/60 text-lmu-loss-soft'
                 : band.type === 'understeer'
@@ -169,14 +169,14 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
 
         {/* Synchronized Scrub Line + Live Speed & Handling Badge */}
         {scrubPct !== null && (
-          <div style={{ left: `${scrubPct}%` }} className="absolute top-0 bottom-0 w-[1px] bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)] pointer-events-none -translate-x-1/2 z-20">
+          <div style={{ left: `${scrubPct}%` }} className="absolute top-0 bottom-0 w-[1px] bg-white pointer-events-none -translate-x-1/2 z-20">
             {currentSpeed !== null && (
               <div className="absolute top-1 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 pointer-events-none">
                 <span className="px-1.5 py-0.5 rounded bg-lmu-badge border border-white/80 text-white text-[10px] font-mono font-bold shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
                   {currentSpeed} km/h
                 </span>
                 {currentHandling && (
-                  <span className={`px-1 py-0.2 rounded border text-[10px] font-mono font-bold shadow whitespace-nowrap ${currentHandling.color}`}>
+                  <span className={`px-1 py-0.2 rounded border text-[10px] font-mono font-bold whitespace-nowrap ${currentHandling.color}`}>
                     {currentHandling.label} {currentHandling.deg > 0 ? `+${currentHandling.deg.toFixed(1)}°` : `${currentHandling.deg.toFixed(1)}°`}
                   </span>
                 )}

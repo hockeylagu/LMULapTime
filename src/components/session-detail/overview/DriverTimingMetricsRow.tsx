@@ -89,7 +89,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         onClick={handleOpenBestLapTelemetry}
         className={`p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between transition-all ${
           bestLapNum
-            ? 'cursor-pointer hover:border-lmu-gold/60 hover:bg-lmu-card/80 group/card shadow-sm'
+            ? 'cursor-pointer hover:border-lmu-gold/60 hover:bg-lmu-card/80 group/card'
             : ''
         }`}
         title={bestLapNum ? `Click to open telemetry for Best Lap (Lap ${bestLapNum})` : undefined}

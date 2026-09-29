@@ -152,7 +152,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               e.stopPropagation();
               onSelectSession(s.id);
             }}
-            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent-text hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center group/btn"
+            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent-text hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shrink-0 flex items-center justify-center group/btn"
             title={`Analyze ${displayTrack || 'Session'} Details`}
             aria-label={`Analyze ${displayTrack || 'Session'}`}
           >

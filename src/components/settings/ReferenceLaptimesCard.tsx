@@ -23,7 +23,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
     : 'Not cached yet';
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-lmu-gold" />
@@ -62,7 +62,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
           type="button"
           onClick={onUpdateReferenceLaptimes}
           disabled={isUpdatingLaptimes}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-lmu-warn transition-all shadow-md shadow-lmu-gold/20 shrink-0 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-lmu-warn transition-all shrink-0 disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isUpdatingLaptimes ? 'animate-spin' : ''}`} />
           {isUpdatingLaptimes ? 'Fetching Spreadsheet...' : 'Update Reference Lap Time Benchmarks'}

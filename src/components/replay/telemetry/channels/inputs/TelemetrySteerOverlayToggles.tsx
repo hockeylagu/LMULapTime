@@ -15,14 +15,14 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
   onToggleBalance,
   onToggleScrub,
 }) => (
-  <div className="absolute top-2 right-3 z-20 flex items-center rounded-lg bg-lmu-card/90 border border-lmu-rule/80 p-0.5 shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-auto">
+  <div className="absolute top-2 right-3 z-20 flex items-center rounded-lg bg-lmu-card/90 border border-lmu-rule/80 p-0.5 pointer-events-auto">
     <button
       type="button"
       onClick={onToggleBalance}
       title={showBalance ? 'Hide Understeer / Oversteer Overlay' : 'Show Understeer / Oversteer Overlay'}
       className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider transition-all flex items-center gap-1.5 ${
         showBalance
-          ? 'bg-lmu-raised text-lmu-text border border-lmu-info-strong/40 shadow-[0_0_8px_rgba(56,189,248,0.2)]'
+          ? 'bg-lmu-raised text-lmu-text border border-lmu-info-strong/40'
           : 'text-lmu-faint hover:text-lmu-text-soft hover:bg-lmu-raised/40'
       }`}
     >
@@ -49,7 +49,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
       title={showScrub ? 'Remove Tire Scrub Zones' : 'Add Tire Scrub Zones'}
       className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider transition-all flex items-center gap-1 ml-0.5 ${
         showScrub
-          ? 'bg-lmu-loss-deep/80 text-lmu-loss-soft border border-lmu-loss-strong/60 shadow-[0_0_8px_rgba(244,63,94,0.3)]'
+          ? 'bg-lmu-loss-deep/80 text-lmu-loss-soft border border-lmu-loss-strong/60'
           : 'text-lmu-faint hover:text-lmu-loss-soft hover:bg-lmu-raised/40'
       }`}
     >

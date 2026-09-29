@@ -136,7 +136,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
               telemetryResolution === 'standard' && !isFullResolution
-                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white shadow-sm'
+                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}
           >
@@ -156,7 +156,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
               telemetryResolution === 'high' && !isFullResolution
-                ? 'bg-lmu-gain-strong/20 border-lmu-gain-strong/60 text-white shadow-sm'
+                ? 'bg-lmu-gain-strong/20 border-lmu-gain-strong/60 text-white'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}
           >
@@ -176,7 +176,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
             }}
             className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
               telemetryResolution === 'full' || isFullResolution
-                ? 'bg-lmu-purple-strong/20 border-lmu-purple-strong/60 text-white shadow-[0_0_10px_rgba(168,85,247,0.3)]'
+                ? 'bg-lmu-purple-strong/20 border-lmu-purple-strong/60 text-white'
                 : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
             }`}
           >
@@ -205,7 +205,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                 duckdbUnavailableReason
                   ? 'border-lmu-border/50 bg-black/20 text-lmu-muted opacity-60 cursor-not-allowed'
                   : source === 'duckdb'
-                  ? 'bg-lmu-warn-strong/20 border-lmu-warn-strong/60 text-white shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                  ? 'bg-lmu-warn-strong/20 border-lmu-warn-strong/60 text-white'
                   : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
               }`}
             >
@@ -226,7 +226,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               onClick={() => onSelectSource('vcr')}
               className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 source === 'vcr'
-                  ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white shadow-[0_0_10px_rgba(56,189,248,0.25)]'
+                  ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white'
                   : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
               }`}
             >

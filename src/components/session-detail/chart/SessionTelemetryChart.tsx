@@ -81,7 +81,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl relative space-y-4">
+    <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl relative space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -111,7 +111,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={() => setChartMetric('lapTime')}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activeChartMetric === 'lapTime'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >
@@ -122,7 +122,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={() => setChartMetric('sectors')}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activeChartMetric === 'sectors'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >
@@ -133,7 +133,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={() => setChartMetric('topSpeed')}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activeChartMetric === 'topSpeed'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >
@@ -144,7 +144,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={() => setChartMetric('positions')}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
               activeChartMetric === 'positions'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >
@@ -161,7 +161,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               !hasTireWearData
                 ? 'opacity-40 cursor-not-allowed text-lmu-muted'
                 : activeChartMetric === 'tireWear'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >
@@ -178,7 +178,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               !hasFuelData
                 ? 'opacity-40 cursor-not-allowed text-lmu-muted'
                 : activeChartMetric === 'fuelEnergy'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
+                ? 'bg-lmu-accent text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
           >

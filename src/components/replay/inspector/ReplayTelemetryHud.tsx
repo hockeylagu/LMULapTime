@@ -25,7 +25,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
 
       {/* Throttle */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
-        currentPoint?.tcActive ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/10 shadow-[0_0_8px_rgba(245,158,11,0.25)]' : 'border-lmu-border'
+        currentPoint?.tcActive ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/10' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-lmu-gain font-bold">THR</span>
@@ -41,7 +41,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
 
       {/* Brake */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
-        currentPoint?.absActive ? 'border-lmu-aqua-strong/70 bg-lmu-aqua-strong/10 shadow-[0_0_8px_rgba(6,182,212,0.25)]' : 'border-lmu-border'
+        currentPoint?.absActive ? 'border-lmu-aqua-strong/70 bg-lmu-aqua-strong/10' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-lmu-loss font-bold">BRK</span>
@@ -67,11 +67,11 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       {/* Status / Track State */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
-          ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15 shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse'
+          ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15 animate-pulse'
           : currentPoint?.isOffTrack
-          ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/15 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+          ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/15'
           : (currentPoint?.rainIntensity ?? 0) > 0
-          ? 'border-lmu-azure-strong/70 bg-lmu-azure-strong/15 shadow-[0_0_8px_rgba(59,130,246,0.25)]'
+          ? 'border-lmu-azure-strong/70 bg-lmu-azure-strong/15'
           : currentPoint?.inPit
           ? 'border-lmu-azure-strong/50 bg-lmu-azure-strong/10'
           : 'border-lmu-border'

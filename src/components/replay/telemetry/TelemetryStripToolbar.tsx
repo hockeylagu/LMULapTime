@@ -136,7 +136,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'scrub'
-                ? 'bg-lmu-info-strong text-lmu-deep font-bold shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
             title="Scrub timeline (Tip: hold Shift while dragging to zoom)"
@@ -152,7 +152,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'zoom'
-                ? 'bg-lmu-info-strong text-lmu-deep font-bold shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
             title="Drag to zoom into a track section"
@@ -173,14 +173,14 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
                 telemetryResolution === 'standard' && !isFullResolution
                   ? isResPopoverOpen
-                    ? 'bg-lmu-info-strong/30 border-lmu-info/70 text-lmu-info-soft font-bold shadow-[0_0_10px_rgba(56,189,248,0.4)]'
+                    ? 'bg-lmu-info-strong/30 border-lmu-info/70 text-lmu-info-soft font-bold'
                     : 'bg-lmu-info-strong/10 border-lmu-info-strong/30 text-lmu-info-soft hover:bg-lmu-info-strong/20'
                   : telemetryResolution === 'high' && !isFullResolution
                   ? isResPopoverOpen
-                    ? 'bg-lmu-gain-strong/30 border-lmu-gain/70 text-lmu-gain-soft font-bold shadow-[0_0_10px_rgba(16,185,129,0.4)]'
+                    ? 'bg-lmu-gain-strong/30 border-lmu-gain/70 text-lmu-gain-soft font-bold'
                     : 'bg-lmu-gain-strong/15 border-lmu-gain-strong/40 text-lmu-gain-soft hover:bg-lmu-gain-strong/25'
                   : isResPopoverOpen
-                  ? 'bg-lmu-purple-strong/40 border-lmu-purple/80 text-lmu-purple-soft font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                  ? 'bg-lmu-purple-strong/40 border-lmu-purple/80 text-lmu-purple-soft font-bold'
                   : 'bg-lmu-purple-strong/10 border-lmu-purple-strong/30 text-lmu-purple-soft hover:bg-lmu-purple-strong/20'
               }`}
               title="Inspect replay telemetry resolution and configure recording fidelity"

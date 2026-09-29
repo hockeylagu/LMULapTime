@@ -52,7 +52,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   onViewModeChange,
 }) => {
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl">
+    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl">
       <TrackSessionsToolbar
         filterType={filterType}
         setFilterType={setFilterType}

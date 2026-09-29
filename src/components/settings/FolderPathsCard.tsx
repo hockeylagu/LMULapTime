@@ -38,7 +38,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
     : 0;
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-6">
+    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-6">
       <div className="border-b border-lmu-border/50 pb-3">
         <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <HardDrive className="w-5 h-5 text-lmu-accent-text" />
@@ -222,7 +222,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
           <button
             type="submit"
             disabled={isScanning}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-accent text-white font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/90 transition-all shadow-md shadow-lmu-accent/20 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-accent text-white font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/90 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
             {isScanning ? 'Scanning Directory...' : 'Rescan & Load Telemetry'}

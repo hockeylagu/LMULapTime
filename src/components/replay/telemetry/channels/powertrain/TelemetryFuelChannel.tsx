@@ -99,7 +99,7 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-gain-soft border border-lmu-gain-strong/40 shadow-sm">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-gain-soft border border-lmu-gain-strong/40">
             {currentFuel !== undefined ? `${currentFuel.toFixed(1)}L` : '--'}
           </span>
         </div>

@@ -47,7 +47,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           Lap {currentLap}
         </span>
         {currentLapSummary.isBest && (
-          <span className="px-2 py-0.5 rounded-full bg-lmu-gold/15 border border-lmu-gold/40 text-lmu-gold font-bold text-[10px] shadow-sm">
+          <span className="px-2 py-0.5 rounded-full bg-lmu-gold/15 border border-lmu-gold/40 text-lmu-gold font-bold text-[10px]">
             ★ Fastest Lap
           </span>
         )}
@@ -65,7 +65,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
 
         {/* Overall Lap Delta Pill against Baseline */}
         {isCompareMode && baselineTrajectory && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-lmu-warn-deep/20 border border-lmu-warn-strong/40 text-[11px] font-mono shadow-sm">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-lmu-warn-deep/20 border border-lmu-warn-strong/40 text-[11px] font-mono">
             {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
               <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}>
                 Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})

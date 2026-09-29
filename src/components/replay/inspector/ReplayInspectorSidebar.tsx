@@ -160,7 +160,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                   <button
                     onClick={() => setCornerSubView('compare')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'compare' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      cornerSubView === 'compare' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
                     <Timer className="w-3.5 h-3.5" /> vs Baseline
@@ -168,7 +168,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                   <button
                     onClick={() => setCornerSubView('consistency')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'consistency' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      cornerSubView === 'consistency' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
                     <Activity className="w-3.5 h-3.5" /> Consistency

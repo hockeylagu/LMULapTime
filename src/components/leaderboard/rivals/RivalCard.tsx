@@ -35,7 +35,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
   const closed = progress !== null ? Math.round(progress * 100) : null;
 
   return (
-    <section aria-label="Your rival" className="bg-gradient-to-br from-lmu-warn-strong/10 via-lmu-card/80 to-lmu-card/75 backdrop-blur-md border border-lmu-warn/20 p-6 rounded-2xl space-y-4">
+    <section aria-label="Your rival" className="bg-lmu-card border border-lmu-warn-strong/30 p-6 rounded-2xl space-y-4">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-lmu-warn-soft flex items-center gap-1.5">
@@ -71,7 +71,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
         <div>
           <div className="h-2 rounded-full bg-lmu-bg border border-lmu-border overflow-hidden" role="progressbar"
             aria-label="Gap closed since this rival was set" aria-valuemin={0} aria-valuemax={100} aria-valuenow={closed}>
-            <div className="h-full bg-gradient-to-r from-lmu-warn-strong to-lmu-gain" style={{ width: `${Math.max(2, closed)}%` }} />
+            <div className="h-full bg-lmu-warn" style={{ width: `${Math.max(2, closed)}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-lmu-muted mt-1 font-mono">
             <span>set at {formatTime(target.startTime)}</span>

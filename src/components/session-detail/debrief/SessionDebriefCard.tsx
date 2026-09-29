@@ -66,7 +66,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
   const requestDebrief = () => setRequest({ key, attempt: attempt + 1 });
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md p-4 rounded-xl border border-lmu-border/70 space-y-3" data-testid="session-debrief">
+    <div className="bg-lmu-card p-4 rounded-xl border border-lmu-border space-y-3" data-testid="session-debrief">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-lmu-border/50 pb-2">
         <div className="flex items-center gap-1.5">
           <Crosshair className="w-4 h-4 text-lmu-warn" />

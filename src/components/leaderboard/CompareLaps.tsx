@@ -164,7 +164,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   };
 
   return (
-    <section aria-label="Compare laps" className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+    <section aria-label="Compare laps" className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <CompareLapsHeader
         selectedTrack={data.selectedTrack}
         allTimePBObject={data.allTimePBObject}

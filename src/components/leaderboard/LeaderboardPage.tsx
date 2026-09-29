@@ -80,7 +80,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
 
   return (
     <div className="space-y-6">
-      <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+      <section className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
         <div>
           <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
             <Trophy className="w-6 h-6 text-lmu-gold" />

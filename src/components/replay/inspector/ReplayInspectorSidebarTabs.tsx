@@ -13,7 +13,7 @@ export interface ReplayInspectorSidebarTabsProps {
 const tabClass = (isActive: boolean) =>
   `flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer border ${
     isActive
-      ? 'bg-lmu-accent text-white border-lmu-accent shadow-md'
+      ? 'bg-lmu-accent text-white border-lmu-accent'
       : 'bg-lmu-bg/60 text-lmu-muted hover:text-white border-lmu-border/60 hover:border-lmu-border'
   }`;
 

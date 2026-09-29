@@ -25,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const tabSearch = location.pathname === '/telemetry' ? '' : location.search;
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${isActive
-      ? 'bg-lmu-accent text-white shadow-md shadow-lmu-accent/20'
+      ? 'bg-lmu-accent text-white'
       : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
     }`;
 
@@ -91,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-3 cursor-pointer group select-none"
           title="Return to Dashboard"
         >
-          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text shadow-lg shadow-lmu-accent/10 group-hover:scale-105 transition-transform">
+          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text group-hover:scale-105 transition-transform">
             <Gauge className="w-6 h-6 animate-pulse" />
           </div>
           <div>

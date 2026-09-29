@@ -181,7 +181,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Sessions View */}
       <div className="space-y-4">
-        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl overflow-hidden">
+        <div className="bg-lmu-card border border-lmu-border rounded-2xl overflow-hidden">
           <DashboardFilterBar
             tracks={tracks}
             selectedTrack={selectedTrack}

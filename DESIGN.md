@@ -150,7 +150,7 @@ The interface is the timing screen a race engineer reads after the run. It is de
 
 The surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.
 
-Depth is flat and tonal. The translucent "glass" cards, background blurs, glow blobs and gradients in the current code are legacy, and polish work removes them rather than extending them.
+Depth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.
 
 **Key Characteristics:**
 - Dark only, near-black blue base; no light theme.
@@ -271,14 +271,15 @@ Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between
 
 Flat and tonal. Depth comes from stepping between the neutral surfaces: the deep tones sit below the page, `lmu-bg` is the page, and `lmu-card` panels sit above it, each edged with a `lmu-border` hairline. Hover lifts a surface one tonal step (`lmu-card-hover`, or `white/5–10` over a panel) rather than adding a shadow.
 
-The current code still carries a glass-and-glow vocabulary: `bg-lmu-card/75 backdrop-blur-md` on most panels, `shadow-[0_2px_10px_rgba(0,0,0,0.85)]` on map markers, colored `shadow-*` halos on active controls, and blurred glow blobs and gradients in the dashboard hero. These are legacy. Polish replaces them with solid tonal panels, and new work never introduces them.
+Selection is shown by fill and border (solid red, or a signal tint with its rim), never by a glow. The playhead is a plain white line.
 
 ### Shadow Vocabulary
-- **Marker lift** (`box-shadow: 0 2px 10px rgba(0,0,0,0.85)`): allowed only where a marker floats over the track map and needs separation from busy geometry.
-- **Overlay** (`shadow-xl` / `shadow-2xl`): popovers, dropdowns and toasts that genuinely sit above the page.
+These are the only shadows the app uses; everything else (`shadow-sm` on pills, colored halos, `shadow-inner`) was removed in the quieter pass.
+- **Marker lift** (`shadow-[0_2px_10px_rgba(0,0,0,0.85)]`, `drop-shadow-*` on SVG): only where a marker or cursor readout floats over busy geometry, the track map or a telemetry trace.
+- **Overlay** (`shadow-lg` to `shadow-2xl`): popovers, dropdowns, tooltips, modals, toasts and the controls floating over the map, which genuinely sit above the page.
 
 ### Named Rules
-**The Flat Wall Rule.** Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays only. No glow halos, no gradient panels, no decorative light.
+**The Flat Wall Rule.** Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light.
 
 ## Shapes
 
@@ -307,8 +308,9 @@ A signature filter control (session type, car class, sort). It is a 36px `lmu-bg
 
 ### Cards / Panels
 - **Corner Style:** 16px for top-level panels, 12px for compact ones.
-- **Background:** solid `lmu-card`. The current `lmu-card/75` with `backdrop-blur-md` is legacy (see Elevation).
-- **Border:** 1px `white/[0.07]` or `lmu-border` hairline.
+- **Background:** solid `lmu-card` (`bg-lmu-card border border-lmu-border`).
+- **Border:** 1px `lmu-border` hairline; a signal rim at 30% marks a card with one meaning (the rival card is `lmu-warn-strong/30`).
+- **Clickable card:** hover steps to `lmu-cardHover` with an `lmu-rule` border; no lift, no translate.
 - **Internal Padding:** 24px (top-level) or 16px (compact), with 12–16px between groups.
 - **Empty state:** centered muted text at 48px vertical padding inside the same panel shell.
 
