@@ -1,6 +1,6 @@
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
-import type { SessionProgressionPoint } from './ImprovementChart.js';
+import type { SessionProgressionPoint } from './improvementChartTypes.js';
 import type { ImprovementMetric } from './ImprovementChartControls.js';
 import { calculateLapPrDelta, formatSessionAxisLabel } from './improvementChartUtils.js';
 

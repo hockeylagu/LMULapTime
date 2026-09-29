@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `smells-cleanup` (2026-09-29): 376 source files, 212 test files, 1770 tests.
+Last checked against branch `smells-cleanup` (2026-09-29): 376 source files, 213 test files, 1772 tests.
 
 ---
 
@@ -147,11 +147,16 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 **Size limits close to the edge**
 - Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
   and `tools/analysis/trackBoundaryBuilders.ts` (852, an offline tool). Watch them; split by circuit family or builder if they grow.
-- Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`.
+- Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`;
+  `src/components/replay/inspector/` is at 18 and `test/components/replay/telemetry/` at 17.
+- Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
 
 **Logic in the wrong place / duplicated**
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
 - Version constants are spread across five files; the table in section 5 is the index.
+- `lapClassPosition` (`shared/domain/lapPlaces.ts`) matches car classes by lowercased name instead of `mapVehicleIdToClass`.
+- The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
+  benchmark pace fields.
 
 **Rule exceptions**
 - `server/core/types.ts` is a re-export barrel: server code imports types through it, so the same types have two import paths.
