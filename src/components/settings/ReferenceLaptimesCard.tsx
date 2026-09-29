@@ -47,7 +47,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
               href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-lmu-accent hover:underline ml-1"
+              className="inline-flex items-center gap-1 text-lmu-accent-text hover:underline ml-1"
             >
               <span>View Sheet</span>
               <ExternalLink className="w-3 h-3" />
@@ -62,7 +62,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
           type="button"
           onClick={onUpdateReferenceLaptimes}
           disabled={isUpdatingLaptimes}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-amber-400 transition-all shadow-md shadow-lmu-gold/20 shrink-0 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-lmu-warn transition-all shadow-md shadow-lmu-gold/20 shrink-0 disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isUpdatingLaptimes ? 'animate-spin' : ''}`} />
           {isUpdatingLaptimes ? 'Fetching Spreadsheet...' : 'Update Reference Lap Time Benchmarks'}

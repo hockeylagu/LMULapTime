@@ -67,7 +67,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
         <div>{overallPosition}{isMultiClass && hasDifferentClass && d.classPosition > 0 ? ` (P${d.classPosition})` : ''}</div>
       </td>
       <td className="px-3.5 py-2.5 text-center font-mono font-bold">
-        <span className={d.positionGain && d.positionGain > 0 ? 'text-lmu-green' : d.positionGain && d.positionGain < 0 ? 'text-rose-400' : 'text-slate-300'}>
+        <span className={d.positionGain && d.positionGain > 0 ? 'text-lmu-green' : d.positionGain && d.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-text-soft'}>
           {d.positionGain === null || d.positionGain === undefined ? '-' : d.positionGain > 0 ? `+${d.positionGain}` : d.positionGain}
         </span>
       </td>
@@ -88,7 +88,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       </td>
       <td className="px-3.5 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-400 font-medium truncate" title={d.carType}>{d.carType}</span>
+          <span className="text-lmu-muted font-medium truncate" title={d.carType}>{d.carType}</span>
           <CarClassBadge carClass={d.carClass} carType={d.carType} size="xs" />
         </div>
       </td>
@@ -105,7 +105,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS3 ? 'text-lmu-green font-bold' : 'text-lmu-muted'}`} title={isBestS3 ? 'Session best S3' : undefined}>
         {bestLap?.s3 !== null && bestLap?.s3 !== undefined ? formatTime(bestLap.s3) : '-'}
       </td>
-      <td className={`px-3.5 py-2.5 text-right font-mono font-semibold ${isNonFinisher ? 'text-rose-300' : 'text-white'}`}>
+      <td className={`px-3.5 py-2.5 text-right font-mono font-semibold ${isNonFinisher ? 'text-lmu-loss-soft' : 'text-white'}`}>
         {timeOrGap}
       </td>
       <td className="px-3.5 py-2.5 text-center">
@@ -172,10 +172,10 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
           if (incCount === 0 && penCount === 0 && tlCount === 0) {
             return (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 cursor-help"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-lmu-gain-deep/60 text-lmu-gain-soft border border-lmu-gain-strong/30 cursor-help"
                 title={tooltip}
               >
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <ShieldCheck className="w-3 h-3 text-lmu-gain" />
                 <span>Clean</span>
               </span>
             );
@@ -184,11 +184,11 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
           if (penCount > 0) {
             return (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-950/70 text-rose-300 border border-rose-500/40 cursor-help"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-lmu-loss-deep/70 text-lmu-loss-soft border border-lmu-loss-strong/40 cursor-help"
                 title={tooltip}
               >
                 <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {penCount} Pen</span>
-                {incCount > 0 && <span className="text-[10px] text-rose-200/70 font-mono">({incCount}x)</span>}
+                {incCount > 0 && <span className="text-[10px] text-lmu-loss-soft/70 font-mono">({incCount}x)</span>}
               </span>
             );
           }
@@ -202,12 +202,12 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
           if (incCount > 0) {
             return (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-950/60 text-orange-300 border border-orange-500/30 cursor-help"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-lmu-orange-deep/60 text-lmu-orange-soft border border-lmu-orange-strong/30 cursor-help"
                 title={tooltip}
               >
                 <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {incCount}x</span>
                 {tlCount > 0 && (
-                  <span className={`text-[10px] font-mono ${tlSeverity === 'green' ? 'text-emerald-300/80' : tlSeverity === 'orange' ? 'text-orange-300/80' : 'text-yellow-300/70'}`}>
+                  <span className={`text-[10px] font-mono ${tlSeverity === 'green' ? 'text-lmu-gain-soft/80' : tlSeverity === 'orange' ? 'text-lmu-orange-soft/80' : 'text-lmu-warn-soft/70'}`}>
                     ({tlCount} TL)
                   </span>
                 )}

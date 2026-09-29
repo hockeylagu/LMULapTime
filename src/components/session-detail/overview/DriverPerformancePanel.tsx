@@ -106,7 +106,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
             </h3>
           </div>
           <span className="text-xs text-lmu-muted hidden sm:inline">•</span>
-          <span className="text-xs text-slate-200 font-semibold truncate max-w-xs flex items-center gap-1.5" title={selectedDriver.carType}>
+          <span className="text-xs text-lmu-text font-semibold truncate max-w-xs flex items-center gap-1.5" title={selectedDriver.carType}>
             <span className="truncate">{selectedDriver.carType}</span>
             <CarClassBadge carClass={selectedDriver.carClass} carType={selectedDriver.carType} size="xs" />
             <span className="text-lmu-muted font-normal">
@@ -119,10 +119,10 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
           <span
             className={`px-2.5 py-0.5 rounded text-xs font-bold ${
               selectedDriver.finishStatus.toLowerCase().includes('dnf')
-                ? 'bg-rose-950/60 text-rose-300 border border-rose-500/40'
+                ? 'bg-lmu-loss-deep/60 text-lmu-loss-soft border border-lmu-loss-strong/40'
                 : selectedDriver.classPosition === 1 || selectedDriver.position === 1
-                ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
-                : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40'
+                ? 'bg-lmu-warn-deep/60 text-lmu-warn-soft border border-lmu-warn-strong/40'
+                : 'bg-lmu-gain-deep/60 text-lmu-gain-soft border border-lmu-gain-strong/40'
             }`}
           >
             🏁 {selectedDriver.finishStatus}

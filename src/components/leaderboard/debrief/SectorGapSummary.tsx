@@ -65,7 +65,7 @@ export const SectorGapSummary: React.FC<SectorGapSummaryProps> = ({
       {sectors && (sectors.gap < 0 ? (
         <>
           Your best sectors add up to <span className="font-mono text-white">{formatTime(sectors.best)}</span>,{' '}
-          <span className="font-mono text-emerald-400">{Math.abs(sectors.gap).toFixed(3)} s</span> under {theirLabel}.
+          <span className="font-mono text-lmu-gain">{Math.abs(sectors.gap).toFixed(3)} s</span> under {theirLabel}.
           You have already driven it, just not on one lap.{' '}
         </>
       ) : (
@@ -77,14 +77,14 @@ export const SectorGapSummary: React.FC<SectorGapSummaryProps> = ({
       {worst && !showSectors && (
         <>
           {gap > 0 ? 'Most of it is in' : 'Still slower in'} {worst.label}{' '}
-          <span className="font-mono text-rose-300">({formatGap(worst.gap)})</span>.
+          <span className="font-mono text-lmu-loss-soft">({formatGap(worst.gap)})</span>.
         </>
       )}
     </p>
   );
 
   return (
-    <div className="space-y-2 text-xs text-slate-300">
+    <div className="space-y-2 text-xs text-lmu-text-soft">
       {(sentence || aside) && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           {sentence || <span />}
@@ -100,9 +100,9 @@ export const SectorGapSummary: React.FC<SectorGapSummaryProps> = ({
               title={c.gap === null ? undefined : c.gap < 0 ? `You are faster in ${c.label}` : `You lose time in ${c.label}`}
               className={`px-2 py-0.5 rounded-lg border font-mono ${
                 c.gap !== null && c.gap < 0
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  ? 'border-lmu-gain-strong/30 bg-lmu-gain-strong/10 text-lmu-gain-soft'
                   : worst?.label === c.label
-                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                  ? 'border-lmu-loss-strong/40 bg-lmu-loss-strong/10 text-lmu-loss-soft'
                   : 'border-lmu-border bg-lmu-bg/60'
               }`}
             >

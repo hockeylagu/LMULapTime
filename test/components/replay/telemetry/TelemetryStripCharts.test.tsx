@@ -198,16 +198,16 @@ describe('TelemetryStripCharts', () => {
     expect(zoomBtn).toBeInTheDocument();
 
     // Default is scrub mode
-    expect(scrubBtn.className).toContain('bg-sky-500');
+    expect(scrubBtn.className).toContain('bg-lmu-info-strong');
 
     // Switch to Zoom Range
     fireEvent.click(zoomBtn);
-    expect(zoomBtn.className).toContain('bg-sky-500');
-    expect(scrubBtn.className).not.toContain('bg-sky-500');
+    expect(zoomBtn.className).toContain('bg-lmu-info-strong');
+    expect(scrubBtn.className).not.toContain('bg-lmu-info-strong');
 
     // Switch back to Scrub
     fireEvent.click(scrubBtn);
-    expect(scrubBtn.className).toContain('bg-sky-500');
+    expect(scrubBtn.className).toContain('bg-lmu-info-strong');
   });
 
   it('allows selecting a range via drag in Zoom mode and zooming the charts', () => {

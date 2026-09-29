@@ -179,7 +179,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
 
             {activeTab === 'ai-report' && (
               <div className="px-4 py-2.5 bg-lmu-card/50 border-b border-lmu-border/60 flex items-center gap-2 shrink-0 min-h-[41px]">
-                <BrainCircuit className="w-4 h-4 text-lmu-accent shrink-0" />
+                <BrainCircuit className="w-4 h-4 text-lmu-accent-text shrink-0" />
                 <span className="text-xs font-bold text-white">AI Coaching Report</span>
               </div>
             )}

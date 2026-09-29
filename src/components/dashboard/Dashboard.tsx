@@ -221,7 +221,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             } : undefined}
             hideEmptyNotice={hideEmpty && emptyCount > 0 ? (
               <span>
-                Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className="text-lmu-accent underline hover:text-white">Click here to show empty results</button>.
+                Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className="text-lmu-accent-text underline hover:text-white">Click here to show empty results</button>.
               </span>
             ) : undefined}
           />

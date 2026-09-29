@@ -46,11 +46,11 @@ describe('BenchmarkLapsSummaryCard', () => {
     const goodPercent = screen.getByText('103.2%');
 
     // Alien should be purple
-    expect(alienPercent.className).toContain('text-purple-400');
+    expect(alienPercent.className).toContain('text-lmu-purple');
     // Competitive should be amber/yellow
-    expect(competitivePercent.className).toContain('text-amber-400');
+    expect(competitivePercent.className).toContain('text-lmu-warn');
     // Good should be emerald/green
-    expect(goodPercent.className).toContain('text-emerald-400');
+    expect(goodPercent.className).toContain('text-lmu-gain');
   });
 
   it('invokes onSelectSession when clicking a benchmark entry', () => {

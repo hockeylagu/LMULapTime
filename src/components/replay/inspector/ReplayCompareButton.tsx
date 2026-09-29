@@ -40,7 +40,7 @@ export const ReplayCompareButton: React.FC<ReplayCompareButtonProps> = ({
         <button
           type="button"
           onClick={() => onSelectCompareLap(suggestion)}
-          className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-mono border transition-all cursor-pointer bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+          className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-mono border transition-all cursor-pointer bg-lmu-gain-strong/10 border-lmu-gain-strong/30 text-lmu-gain hover:bg-lmu-gain-strong/20"
           title={`Compare with your fastest lap in the ${suggestion.carType} here: ${suggestion.sessionType ?? ''} ${suggestion.dateString ?? ''}, lap ${suggestion.lapNum}`}
         >
           <Sparkles className="w-3 h-3" />

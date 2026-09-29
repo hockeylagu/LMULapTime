@@ -1,0 +1,706 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-29T13:50:03.542Z",
+  "title": "Design System: LMU Lap Time Analyzer",
+  "extensions": {
+    "colorMeta": {
+      "lmu-bg": {
+        "role": "neutral",
+        "displayName": "Pit Wall Black",
+        "canonical": "#0B0E14",
+        "tonalRamp": [
+          "#1B2331",
+          "#2D3A52",
+          "#3F5173",
+          "#516894",
+          "#6B81AE",
+          "#96A6C5",
+          "#C4CDDE",
+          "#EFF1F6"
+        ]
+      },
+      "lmu-deep": {
+        "role": "neutral",
+        "displayName": "Deep Tarmac",
+        "canonical": "#060910",
+        "tonalRamp": [
+          "#151F38",
+          "#23345D",
+          "#314982",
+          "#3F5EA7",
+          "#5877C0",
+          "#889FD2",
+          "#BCC9E6",
+          "#ECF0F8"
+        ]
+      },
+      "lmu-dark": {
+        "role": "neutral",
+        "displayName": "Deep Tarmac (dark)",
+        "canonical": "#080A0F",
+        "tonalRamp": [
+          "#1B2132",
+          "#2C3753",
+          "#3E4E74",
+          "#506496",
+          "#697DAF",
+          "#95A3C6",
+          "#C3CBDF",
+          "#EEF1F6"
+        ]
+      },
+      "lmu-surface": {
+        "role": "neutral",
+        "displayName": "Deep Tarmac (surface)",
+        "canonical": "#080C14",
+        "tonalRamp": [
+          "#162137",
+          "#24375B",
+          "#334D80",
+          "#4262A4",
+          "#5B7CBD",
+          "#8AA2D0",
+          "#BDCBE5",
+          "#EDF0F8"
+        ]
+      },
+      "lmu-strip": {
+        "role": "neutral",
+        "displayName": "Deep Tarmac (strip)",
+        "canonical": "#0A0E17",
+        "tonalRamp": [
+          "#172035",
+          "#273659",
+          "#364C7C",
+          "#4661A0",
+          "#5F7BB9",
+          "#8DA1CE",
+          "#BFCAE3",
+          "#EDF0F7"
+        ]
+      },
+      "lmu-badge": {
+        "role": "neutral",
+        "displayName": "Deep Tarmac (badge well)",
+        "canonical": "#070C18",
+        "tonalRamp": [
+          "#111E3B",
+          "#1D3163",
+          "#28458A",
+          "#3459B2",
+          "#4D72CB",
+          "#819BDA",
+          "#B8C7EA",
+          "#EBEFF9"
+        ]
+      },
+      "lmu-card": {
+        "role": "neutral",
+        "displayName": "Garage Panel",
+        "canonical": "#151A23",
+        "tonalRamp": [
+          "#1D2430",
+          "#303B50",
+          "#435370",
+          "#566B8F",
+          "#7084A9",
+          "#99A8C2",
+          "#C6CEDD",
+          "#EFF1F5"
+        ]
+      },
+      "lmu-card-hover": {
+        "role": "neutral",
+        "displayName": "Garage Panel Hover",
+        "canonical": "#1A202C",
+        "tonalRamp": [
+          "#1C2330",
+          "#2F3A50",
+          "#425270",
+          "#556990",
+          "#6F82AA",
+          "#98A6C2",
+          "#C5CDDD",
+          "#EFF1F6"
+        ]
+      },
+      "lmu-raised": {
+        "role": "neutral",
+        "displayName": "Raised Chip",
+        "canonical": "oklch(27.9% 0.041 260.031)",
+        "tonalRamp": [
+          "#192334",
+          "#293A56",
+          "#3A5179",
+          "#4A699C",
+          "#6382B5",
+          "#90A6CA",
+          "#C1CDE1",
+          "#EEF1F7"
+        ]
+      },
+      "lmu-border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#232A36",
+        "tonalRamp": [
+          "#1E242E",
+          "#323C4D",
+          "#46546C",
+          "#5A6C8B",
+          "#7486A5",
+          "#9CA9BF",
+          "#C7CFDB",
+          "#F0F2F5"
+        ]
+      },
+      "lmu-rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(37.2% 0.044 257.287)",
+        "tonalRamp": [
+          "#1B2431",
+          "#2E3C52",
+          "#405573",
+          "#526D93",
+          "#6C86AD",
+          "#96A9C5",
+          "#C4CFDE",
+          "#EFF2F6"
+        ]
+      },
+      "lmu-rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule Strong",
+        "canonical": "oklch(44.6% 0.043 257.281)",
+        "tonalRamp": [
+          "#1E252F",
+          "#323D4E",
+          "#46566D",
+          "#596E8C",
+          "#7388A6",
+          "#9BAABF",
+          "#C7CFDB",
+          "#EFF2F5"
+        ]
+      },
+      "lmu-text": {
+        "role": "neutral",
+        "displayName": "Grid White",
+        "canonical": "#F8F9FA",
+        "tonalRamp": [
+          "#20262D",
+          "#35404A",
+          "#4A5968",
+          "#607386",
+          "#798C9F",
+          "#A0ADBB",
+          "#C9D1D9",
+          "#F0F2F4"
+        ]
+      },
+      "lmu-text-soft": {
+        "role": "neutral",
+        "displayName": "Soft White",
+        "canonical": "oklch(86.9% 0.022 252.894)",
+        "tonalRamp": [
+          "#1B2531",
+          "#2D3E52",
+          "#3F5773",
+          "#517094",
+          "#6B89AE",
+          "#96ABC5",
+          "#C4D0DF",
+          "#EFF2F6"
+        ]
+      },
+      "lmu-muted": {
+        "role": "neutral",
+        "displayName": "Telemetry Grey",
+        "canonical": "#8D99AE",
+        "tonalRamp": [
+          "#20242D",
+          "#353D4B",
+          "#4A5568",
+          "#5F6D86",
+          "#7987A0",
+          "#A0AABB",
+          "#C9CFD9",
+          "#F0F2F4"
+        ]
+      },
+      "lmu-faint": {
+        "role": "neutral",
+        "displayName": "Faint Grey",
+        "canonical": "#7F8BA1",
+        "tonalRamp": [
+          "#20252C",
+          "#363D4A",
+          "#4C5567",
+          "#616E84",
+          "#7B879E",
+          "#A1AABA",
+          "#CACFD8",
+          "#F0F2F4"
+        ]
+      },
+      "lmu-accent": {
+        "role": "primary",
+        "displayName": "Pit Lane Red",
+        "canonical": "#DC3441",
+        "tonalRamp": [
+          "#410B0F",
+          "#6D131A",
+          "#981A24",
+          "#C4222E",
+          "#DD3B48",
+          "#E7747D",
+          "#F2B1B6",
+          "#FBE9EB"
+        ]
+      },
+      "lmu-accent-text": {
+        "role": "primary",
+        "displayName": "Pit Lane Red Text",
+        "canonical": "#F26B74",
+        "tonalRamp": [
+          "#46060A",
+          "#750A11",
+          "#A40E18",
+          "#D3131F",
+          "#EC2C39",
+          "#F26972",
+          "#F8ABB0",
+          "#FDE8E9"
+        ]
+      },
+      "lmu-gold": {
+        "role": "secondary",
+        "displayName": "Sector Gold",
+        "canonical": "#FFB703",
+        "tonalRamp": [
+          "#4D3700",
+          "#805B00",
+          "#B38000",
+          "#E6A400",
+          "#FFBD1A",
+          "#FFD05C",
+          "#FFE5A3",
+          "#FFF8E5"
+        ]
+      },
+      "lmu-blue": {
+        "role": "secondary",
+        "displayName": "Timing Blue",
+        "canonical": "#219EBC",
+        "tonalRamp": [
+          "#0B3741",
+          "#135B6C",
+          "#1B8098",
+          "#22A4C3",
+          "#3CBEDD",
+          "#74D0E7",
+          "#B1E5F1",
+          "#E9F8FB"
+        ]
+      },
+      "lmu-cyan": {
+        "role": "secondary",
+        "displayName": "Pale Timing Cyan",
+        "canonical": "#8ECAE6",
+        "tonalRamp": [
+          "#0E2F3F",
+          "#174F68",
+          "#206E92",
+          "#2A8DBC",
+          "#43A7D5",
+          "#79C0E1",
+          "#B4DCEE",
+          "#EAF5FA"
+        ]
+      },
+      "lmu-green": {
+        "role": "secondary",
+        "displayName": "Sector Teal",
+        "canonical": "#2A9D8F",
+        "tonalRamp": [
+          "#103C37",
+          "#1B655C",
+          "#268D80",
+          "#30B5A5",
+          "#4ACFBE",
+          "#7EDDD1",
+          "#B7ECE5",
+          "#EBFAF8"
+        ]
+      },
+      "lmu-gain": {
+        "role": "tertiary",
+        "displayName": "Gain",
+        "canonical": "oklch(76.5% 0.177 163.223)",
+        "tonalRamp": [
+          "#004D35",
+          "#008058",
+          "#00B37B",
+          "#00E69E",
+          "#1AFFB8",
+          "#5CFFCC",
+          "#A3FFE2",
+          "#E5FFF7"
+        ]
+      },
+      "lmu-loss": {
+        "role": "tertiary",
+        "displayName": "Loss",
+        "canonical": "oklch(71.2% 0.194 13.428)",
+        "tonalRamp": [
+          "#4D000D",
+          "#800016",
+          "#B3001F",
+          "#E60028",
+          "#FF1A41",
+          "#FF5C78",
+          "#FFA3B3",
+          "#FFE5EA"
+        ]
+      },
+      "lmu-warn": {
+        "role": "tertiary",
+        "displayName": "Warn",
+        "canonical": "oklch(82.8% 0.189 84.429)",
+        "tonalRamp": [
+          "#4D3800",
+          "#805D00",
+          "#B38200",
+          "#E6A700",
+          "#FFC01A",
+          "#FFD25C",
+          "#FFE6A3",
+          "#FFF8E5"
+        ]
+      },
+      "lmu-info": {
+        "role": "tertiary",
+        "displayName": "Info",
+        "canonical": "oklch(74.6% 0.16 232.661)",
+        "tonalRamp": [
+          "#00384D",
+          "#005E80",
+          "#0084B3",
+          "#00A9E6",
+          "#1AC3FF",
+          "#5CD4FF",
+          "#A3E7FF",
+          "#E5F8FF"
+        ]
+      },
+      "lmu-aqua": {
+        "role": "tertiary",
+        "displayName": "Aqua (data)",
+        "canonical": "oklch(78.9% 0.154 211.53)",
+        "tonalRamp": [
+          "#00434D",
+          "#006F80",
+          "#009CB3",
+          "#00C8E6",
+          "#1AE2FF",
+          "#5CEAFF",
+          "#A3F3FF",
+          "#E5FCFF"
+        ]
+      },
+      "lmu-azure": {
+        "role": "tertiary",
+        "displayName": "Azure (data)",
+        "canonical": "oklch(70.7% 0.165 254.624)",
+        "tonalRamp": [
+          "#00244D",
+          "#003B80",
+          "#0053B3",
+          "#006BE6",
+          "#1A84FF",
+          "#5CA8FF",
+          "#A3CEFF",
+          "#E5F1FF"
+        ]
+      },
+      "lmu-indigo": {
+        "role": "tertiary",
+        "displayName": "Indigo (data)",
+        "canonical": "oklch(67.3% 0.182 276.935)",
+        "tonalRamp": [
+          "#00064D",
+          "#000A80",
+          "#000EB3",
+          "#0012E6",
+          "#1A2BFF",
+          "#5C68FF",
+          "#A3AAFF",
+          "#E5E7FF"
+        ]
+      },
+      "lmu-violet": {
+        "role": "tertiary",
+        "displayName": "Violet (data)",
+        "canonical": "oklch(70.2% 0.183 293.541)",
+        "tonalRamp": [
+          "#15004D",
+          "#230080",
+          "#3100B3",
+          "#3F00E6",
+          "#591AFF",
+          "#895CFF",
+          "#BDA3FF",
+          "#EDE5FF"
+        ]
+      },
+      "lmu-purple": {
+        "role": "tertiary",
+        "displayName": "Purple (data)",
+        "canonical": "oklch(71.4% 0.203 305.504)",
+        "tonalRamp": [
+          "#29004D",
+          "#450080",
+          "#6100B3",
+          "#7C00E6",
+          "#961AFF",
+          "#B45CFF",
+          "#D5A3FF",
+          "#F3E5FF"
+        ]
+      },
+      "lmu-orange": {
+        "role": "tertiary",
+        "displayName": "Orange (data)",
+        "canonical": "oklch(75% 0.183 55.934)",
+        "tonalRamp": [
+          "#4D2900",
+          "#804400",
+          "#B35F00",
+          "#E67A00",
+          "#FF931A",
+          "#FFB25C",
+          "#FFD4A3",
+          "#FFF3E5"
+        ]
+      },
+      "lmu-teal": {
+        "role": "tertiary",
+        "displayName": "Teal (data)",
+        "canonical": "oklch(77.7% 0.152 181.912)",
+        "tonalRamp": [
+          "#004D44",
+          "#008072",
+          "#00B39F",
+          "#00E6CD",
+          "#1AFFE6",
+          "#5CFFED",
+          "#A3FFF5",
+          "#E5FFFC"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "brand": {
+        "displayName": "Brand",
+        "purpose": "Navbar wordmark only; uppercase."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Panel and page headers."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, track names, nav tabs."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default 12px prose and helper text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase tracked captions, column headers, pills; sits on the 10px floor."
+      },
+      "readout": {
+        "displayName": "Readout",
+        "purpose": "Lap times, deltas, positions, units."
+      },
+      "readout-large": {
+        "displayName": "Readout Large",
+        "purpose": "Headline values such as best lap."
+      }
+    },
+    "shadows": [
+      {
+        "name": "marker-lift",
+        "value": "0 2px 10px rgba(0,0,0,0.85)",
+        "purpose": "Track map markers over busy geometry only."
+      },
+      {
+        "name": "overlay",
+        "value": "0 25px 50px -12px rgba(0,0,0,0.25)",
+        "purpose": "Popovers, dropdowns, toasts (shadow-2xl)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default Tailwind transition for hover and selection color/opacity changes."
+      },
+      {
+        "name": "progress",
+        "value": "300ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Progress bar width during scans."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "container",
+        "value": "1500px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Nav Tab Group",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Top-bar tab group; active tab solid Pit Lane Red.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-tab ds-nav-tab--active\" href=\"#\">Dashboard</a><a class=\"ds-nav-tab\" href=\"#\">Tracks</a><a class=\"ds-nav-tab\" href=\"#\">Leaderboard</a></nav>",
+      "css": ".ds-nav{display:inline-flex;gap:4px;padding:4px;background:#151A23;border:1px solid #232A36;border-radius:12px;font-family:'Segoe UI',sans-serif}.ds-nav-tab{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#8D99AE;text-decoration:none;transition:background .15s,color .15s}.ds-nav-tab:hover{color:#fff;background:rgba(35,42,54,.5)}.ds-nav-tab:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-nav-tab--active,.ds-nav-tab--active:hover{background:#DC3441;color:#fff}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action; uppercase tracked label on red.",
+      "html": "<button class=\"ds-btn-primary\">Build debrief</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;border-radius:12px;background:#DC3441;color:#fff;font:700 12px 'Segoe UI',sans-serif;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:opacity .15s}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "Square icon action in an inset well.",
+      "html": "<button class=\"ds-btn-icon\" aria-label=\"Refresh\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/></svg></button>",
+      "css": ".ds-btn-icon{display:inline-flex;align-items:center;justify-content:center;padding:6px;border-radius:8px;background:#0B0E14;border:1px solid #232A36;color:#8D99AE;cursor:pointer;transition:background .15s,color .15s}.ds-btn-icon:hover{background:#1A202C;color:#fff}.ds-btn-icon:focus-visible{outline:2px solid #DC3441;outline-offset:2px}"
+    },
+    {
+      "name": "Segmented Pills",
+      "kind": "chip",
+      "refersTo": "segment-selected",
+      "description": "Signature filter control: monospace uppercase segments in an inset well.",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button class=\"ds-seg-btn ds-seg-btn--on\">ALL</button><button class=\"ds-seg-btn\">Practice</button><button class=\"ds-seg-btn\">Qualifying</button><button class=\"ds-seg-btn\">Race</button></div>",
+      "css": ".ds-seg{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 6px;background:#0B0E14;border:1px solid #232A36;border-radius:12px}.ds-seg-btn{height:24px;padding:0 14px;border-radius:5px;border:1px solid #1D293D;background:transparent;color:#7F8BA1;font:700 12px monospace;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:color .15s}.ds-seg-btn:hover{color:#fff;border-color:#314158}.ds-seg-btn:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-seg-btn--on,.ds-seg-btn--on:hover{background:#DC3441;border-color:#DC3441;color:#fff}"
+    },
+    {
+      "name": "Status Pills",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Tinted signal pills: pit stop, out lap, gain, loss.",
+      "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-pill--pit\">PIT STOP</span><span class=\"ds-pill ds-pill--out\">Out Lap</span><span class=\"ds-pill ds-pill--gain\">-0.214</span><span class=\"ds-pill ds-pill--loss\">+0.387</span></div>",
+      "css": ".ds-pills{display:flex;gap:8px}.ds-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font:700 11px 'Segoe UI',sans-serif;letter-spacing:.03em;border:1px solid transparent}.ds-pill--pit{background:rgba(220,52,65,.2);color:#F26B74}.ds-pill--out{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.3);color:#00D3F2}.ds-pill--gain{font-family:monospace;background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#00D492}.ds-pill--loss{font-family:monospace;background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.3);color:#FF637E}"
+    },
+    {
+      "name": "Readout Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Solid tonal panel with label-over-readout figures (the pit wall stack).",
+      "html": "<section class=\"ds-panel\"><h3 class=\"ds-panel-title\">Daytona International Speedway</h3><div class=\"ds-stats\"><div><div class=\"ds-label\">Best lap</div><div class=\"ds-readout\">1:35.894</div></div><div><div class=\"ds-label\">True pace</div><div class=\"ds-readout\">1:36.210</div></div><div><div class=\"ds-label\">vs rival</div><div class=\"ds-readout ds-loss\">+0.312</div></div></div></section>",
+      "css": ".ds-panel{background:#151A23;border:1px solid #232A36;border-radius:16px;padding:24px;font-family:'Segoe UI',sans-serif;color:#F8F9FA}.ds-panel-title{margin:0 0 16px;font-size:14px;font-weight:700}.ds-stats{display:flex;gap:32px}.ds-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8D99AE;margin-bottom:4px}.ds-readout{font:800 18px monospace;color:#fff}.ds-loss{color:#FF637E}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Inset field; border shifts to red on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search sessions, tracks, cars\" />",
+      "css": ".ds-input{width:280px;padding:8px 12px;border-radius:8px;border:1px solid #232A36;background:#0B0E14;color:#fff;font:14px 'Segoe UI',sans-serif;outline:none;transition:border-color .15s}.ds-input::placeholder{color:#8D99AE}.ds-input:focus{border-color:#DC3441}.ds-input:focus-visible{box-shadow:0 0 0 2px rgba(220,52,65,.35)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Engineer's Pit Wall",
+    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal. The translucent \"glass\" cards, background blurs, glow blobs and gradients in the current code are legacy, and polish work removes them rather than extending them.",
+    "keyCharacteristics": [
+      "Dark only, near-black blue base; no light theme.",
+      "Numbers first: lap times, deltas and units in bold monospace.",
+      "Uppercase, tracked, 10px labels above values.",
+      "One brand red for identity and selection; every other hue is a fixed-meaning signal.",
+      "Flat tonal layering with hairline borders; no glow, no glass.",
+      "Dense desktop layout inside a 1500px column."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Rule",
+        "body": "Every signal family means one fixed thing:",
+        "section": "colors"
+      },
+      {
+        "name": "The One Red Rule",
+        "body": "Pit Lane Red marks identity and the current selection. A screen shows it on the active tab, the selected control and at most a handful of alerts. It never fills a panel.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Dimmed Text Rule",
+        "body": "Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or desaturate a colored control (`grayscale` when off, full color when selected).",
+        "section": "colors"
+      },
+      {
+        "name": "The Readout Rule",
+        "body": "Every number a driver compares (lap time, delta, position, speed, temperature, percentage) is set in `font-mono` with its unit. Prose numbers in a sentence may stay proportional.",
+        "section": "typography"
+      },
+      {
+        "name": "The 10px Floor",
+        "body": "No text renders below 10px. The existing 8px and 9px sizes (`text-[8px]`, `text-[9px]`, about 180 uses) are drift; polish raises them to 10px or restructures the element. SVG map labels follow the same floor at their rendered scale.",
+        "section": "typography"
+      },
+      {
+        "name": "The Timing Sheet Rule",
+        "body": "Density is a feature. Prefer rows, tables and label-over-value stacks to spacious cards. Reach for whitespace only to separate questions, not to decorate an answer.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Wall Rule",
+        "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays only. No glow halos, no gradient panels, no decorative light.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).",
+      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
+      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
+      "**Do** separate surfaces by tone and a `lmu-border` hairline.",
+      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.",
+      "**Do** give every interactive control a visible `focus-visible` ring.",
+      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values."
+    ],
+    "donts": [
+      "**Don't** render any text below 10px.",
+      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
+      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.",
+      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
+      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.",
+      "**Don't** add a light theme.",
+      "**Don't** add web fonts; Segoe UI and system monospace are the rendered fonts, and the unused Outfit / JetBrains Mono request is slated for removal.",
+      "**Don't** use decorative pulse or ping animation on static chrome; reserve `animate-spin` and `animate-pulse` for real loading or live-sync states."
+    ]
+  }
+}

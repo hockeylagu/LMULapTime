@@ -93,7 +93,7 @@ export function computeLapDeltas(baseline: ComparableLap, target: ComparableLap)
       return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-lmu-green font-bold' };
     }
     // Slower than baseline (red / orange / yellow)
-    return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-rose-400 font-medium' };
+    return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-lmu-loss font-medium' };
   };
 
   // Delta helper for speed (in km/h)
@@ -110,7 +110,7 @@ export function computeLapDeltas(baseline: ComparableLap, target: ComparableLap)
       return { delta, formatted: `+${delta.toFixed(1)} km/h`, deltaClass: 'text-lmu-cyan font-bold' };
     }
     // Lower top speed
-    return { delta, formatted: `${delta.toFixed(1)} km/h`, deltaClass: 'text-rose-400 font-medium' };
+    return { delta, formatted: `${delta.toFixed(1)} km/h`, deltaClass: 'text-lmu-loss font-medium' };
   };
 
   const lapRes = computeTimeDelta(baseline.lapTime, target.lapTime);
@@ -303,9 +303,9 @@ export function computeLapToLapDelta(
     return { delta: 0, formatted: '±0.000s', deltaClass: 'text-white font-semibold', isFaster: false };
   }
   if (delta < 0) {
-    return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-emerald-400 font-bold', isFaster: true };
+    return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-lmu-gain font-bold', isFaster: true };
   }
-  return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-rose-400 font-medium', isFaster: false };
+  return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-lmu-loss font-medium', isFaster: false };
 }
 
 /**

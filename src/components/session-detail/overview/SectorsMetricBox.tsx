@@ -23,7 +23,7 @@ function formatGap(gap: number | null): string {
 }
 
 const gapClass = (gap: number | null) =>
-  gap === null ? 'text-lmu-muted' : gap > 0.0005 ? 'text-rose-400' : 'text-emerald-400';
+  gap === null ? 'text-lmu-muted' : gap > 0.0005 ? 'text-lmu-loss' : 'text-lmu-gain';
 
 /**
  * The driver's best and average sectors, next to the fastest other driver in the same car this
@@ -65,7 +65,7 @@ export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriv
           <div
             key={row.key}
             className={`grid ${columns} gap-x-2 items-center rounded px-0.5 ${
-              comparison?.biggestGap?.key === row.key ? 'bg-amber-500/10' : ''
+              comparison?.biggestGap?.key === row.key ? 'bg-lmu-warn-strong/10' : ''
             } ${row.key === 'lap' ? 'border-t border-lmu-border/40' : ''}`}
           >
             <span className="text-lmu-muted text-[10px] font-semibold font-sans">{row.label}</span>

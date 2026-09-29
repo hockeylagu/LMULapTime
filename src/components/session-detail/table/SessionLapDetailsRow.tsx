@@ -26,7 +26,7 @@ export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapN
         {sections.map((section) => (
           <React.Fragment key={section.label}>
             <dt className="text-lmu-muted font-semibold uppercase tracking-wider text-[10px] pt-px">{section.label}</dt>
-            <dd className="text-slate-200 space-y-0.5">
+            <dd className="text-lmu-text space-y-0.5">
               {section.lines.map((line) => <DetailLine key={line} line={line} />)}
             </dd>
           </React.Fragment>

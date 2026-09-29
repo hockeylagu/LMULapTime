@@ -29,7 +29,7 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
       <div>
         <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-lmu-accent" />
+          <TrendingUp className="w-5 h-5 text-lmu-accent-text" />
           <span>Progression Timeline</span>
         </h3>
         <span className="text-xs text-lmu-muted">
@@ -40,7 +40,7 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
       <div className="flex flex-wrap items-center gap-3">
         {/* Range & Session Count Selector */}
         <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
-          <Calendar className="w-3.5 h-3.5 text-lmu-accent" />
+          <Calendar className="w-3.5 h-3.5 text-lmu-accent-text" />
           <span className="text-lmu-muted font-medium">History:</span>
           <select
             value={activeRange}

@@ -54,7 +54,7 @@ describe('lapComparison utility', () => {
       const deltas = computeLapDeltas(baseLap, slowerLap);
       expect(deltas.lapTimeDelta).toBe(0.75);
       expect(deltas.lapTimeDeltaFormatted).toBe('+0.750s');
-      expect(deltas.lapTimeDeltaClass).toContain('text-rose-400');
+      expect(deltas.lapTimeDeltaClass).toContain('text-lmu-loss');
       expect(deltas.s1Delta).toBe(0.2);
       expect(deltas.s1DeltaFormatted).toBe('+0.200s');
       expect(deltas.speedDelta).toBe(-4.5);
@@ -232,7 +232,7 @@ describe('lapComparison utility', () => {
       const res = computeLapToLapDelta(123.456, 122.123);
       expect(res.delta).toBe(-1.333);
       expect(res.formatted).toBe('-1.333s');
-      expect(res.deltaClass).toContain('text-emerald-400');
+      expect(res.deltaClass).toContain('text-lmu-gain');
       expect(res.isFaster).toBe(true);
     });
 
@@ -240,7 +240,7 @@ describe('lapComparison utility', () => {
       const res = computeLapToLapDelta(122.0, 122.456);
       expect(res.delta).toBe(0.456);
       expect(res.formatted).toBe('+0.456s');
-      expect(res.deltaClass).toContain('text-rose-400');
+      expect(res.deltaClass).toContain('text-lmu-loss');
       expect(res.isFaster).toBe(false);
     });
   });

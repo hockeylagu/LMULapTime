@@ -65,17 +65,17 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
   };
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-amber-950/20">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-warn-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-amber-500/20 text-amber-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-warn-strong/20 text-lmu-warn font-black text-[10px] tracking-wider flex items-center gap-1">
           <Gauge className="w-3 h-3" />
           LONGITUDINAL G
         </span>
-        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-violet-500/20 text-violet-300 font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>}
         {hasLonG ? (
-          <span className={`text-xs font-mono font-bold ${lonG && lonG < -0.1 ? 'text-rose-400' : lonG && lonG > 0.1 ? 'text-emerald-400' : 'text-amber-300'}`}>
+          <span className={`text-xs font-mono font-bold ${lonG && lonG < -0.1 ? 'text-lmu-loss' : lonG && lonG > 0.1 ? 'text-lmu-gain' : 'text-lmu-warn-soft'}`}>
             {formatG(lonG)}
           </span>
         ) : (
@@ -84,16 +84,16 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
           </span>
         )}
         {baseLonG !== undefined && (
-          <span className="text-[11px] font-mono text-sky-400/90 ml-1 pl-2 border-l border-white/10">
+          <span className="text-[11px] font-mono text-lmu-info/90 ml-1 pl-2 border-l border-white/10">
             Base: {formatG(baseLonG)}
           </span>
         )}
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+3.0G Acceleration', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-emerald-400 font-mono' },
-        { label: '0.0G Neutral', borderClassName: 'border-b border-amber-400/50', labelClassName: 'text-[8px] text-amber-300 font-mono' },
-        { label: '-3.0G Braking', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-rose-400 font-mono' },
+        { label: '+3.0G Acceleration', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-gain font-mono' },
+        { label: '0.0G Neutral', borderClassName: 'border-b border-lmu-warn/50', labelClassName: 'text-[8px] text-lmu-warn-soft font-mono' },
+        { label: '-3.0G Braking', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-loss font-mono' },
       ]} />
 
       {isCursorInView && hasLonG && (
@@ -103,11 +103,11 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-amber-400/80 font-mono font-bold text-[11px] text-amber-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn/80 font-mono font-bold text-[11px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {formatG(lonG)}
           </span>
           {baseLonG !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-sky-500/80 font-mono font-bold text-[10px] text-sky-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-info-strong/80 font-mono font-bold text-[10px] text-lmu-info-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {formatG(baseLonG)}
             </span>
           )}

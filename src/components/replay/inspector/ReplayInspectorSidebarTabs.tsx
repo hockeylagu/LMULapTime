@@ -50,7 +50,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
       <button
         type="button"
         onClick={onClosePanel}
-        className="inline-flex items-center justify-center w-7 h-7 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+        className="inline-flex items-center justify-center w-7 h-7 text-lmu-muted hover:text-white rounded-lg hover:bg-lmu-raised transition-colors cursor-pointer shrink-0"
         aria-label="Close side panel"
         title="Close side panel"
       >

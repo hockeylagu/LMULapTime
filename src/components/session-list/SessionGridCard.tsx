@@ -28,7 +28,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
     <div
       onClick={() => onSelectSession(s.id)}
       className={`bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] transition-all duration-200 ease-in-out hover:bg-lmu-cardHover/85 hover:border-lmu-accent/30 hover:-translate-y-0.5 p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
-        empty ? 'border-amber-500/30 bg-amber-950/10' : ''
+        empty ? 'border-lmu-warn-strong/30 bg-lmu-warn-deep/10' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -37,16 +37,16 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <span
               className={`px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
                 s.sessionType === 'Race'
-                  ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
                   : s.sessionType === 'Qualifying'
                   ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                  : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                  : 'bg-lmu-blue/20 text-lmu-cyan border border-lmu-blue/30'
               }`}
             >
               {s.sessionName || s.sessionType}
             </span>
             {empty && (
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/30 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> Empty
               </span>
             )}
@@ -111,7 +111,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
                 {p.positionGain !== null && p.positionGain !== undefined && (
                   <span
                     className={`font-bold text-xs ${
-                      p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-lmu-muted'
+                      p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-muted'
                     }`}
                   >
                     ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
@@ -142,7 +142,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         </div>
       </div>
 
-      <div className="pt-2 flex items-center justify-between text-xs text-lmu-accent font-semibold group">
+      <div className="pt-2 flex items-center justify-between text-xs text-lmu-accent-text font-semibold group">
         <span>Analyze Sector Details</span>
         <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
       </div>

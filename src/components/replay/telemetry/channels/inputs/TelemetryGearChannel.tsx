@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const GEAR_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: 'G7', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
-  { label: 'G4', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
-  { label: 'G1', borderClassName: 'border-b border-amber-400/30', labelClassName: 'text-[8px] text-amber-400 font-mono' },
+  { label: 'G7', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
+  { label: 'G4', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
+  { label: 'G1', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
 ];
 
 export interface TelemetryGearChannelProps {
@@ -65,17 +65,17 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
   const currentGearVal = currentPoint?.gear;
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[60px] border-b border-lmu-border/40 group bg-amber-950/20">
+    <div className="relative flex-1 basis-0 min-h-[60px] border-b border-lmu-border/40 group bg-lmu-warn-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-amber-500/20 text-amber-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-warn-strong/20 text-lmu-warn font-black text-[10px] tracking-wider flex items-center gap-1">
           <Layers className="w-3 h-3" />
           GEAR
         </span>
-        <span className="text-xs font-mono font-bold text-amber-300">
+        <span className="text-xs font-mono font-bold text-lmu-warn-soft">
           {formatGearLabel(currentGearVal)}
         </span>
         {currentComparison && (
-          <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
             Base: {formatGearLabel(currentComparison.baseline.gear)}
           </span>
         )}
@@ -94,11 +94,11 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-amber-400/80 font-mono font-bold text-[11px] text-amber-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn/80 font-mono font-bold text-[11px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {formatGearLabel(currentGearVal)}
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {formatGearLabel(currentComparison.baseline.gear)}
             </span>
           )}

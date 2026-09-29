@@ -24,7 +24,7 @@ export const RivalLadder: React.FC<RivalLadderProps> = ({ beaten, nextUp, onPin 
           onClick={() => onPin(e.driverName)}
           aria-label={`Make ${e.driverName} your rival`}
           title={`Make ${e.driverName} your rival`}
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-lmu-border bg-lmu-bg/60 text-slate-300 hover:text-white hover:border-amber-400/40 cursor-pointer transition-colors"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-lmu-border bg-lmu-bg/60 text-lmu-text-soft hover:text-white hover:border-lmu-warn/40 cursor-pointer transition-colors"
         >
           <span className="font-mono text-lmu-muted">P{e.rank}</span>
           {e.driverName}
@@ -34,7 +34,7 @@ export const RivalLadder: React.FC<RivalLadderProps> = ({ beaten, nextUp, onPin 
       {beaten.length > 0 && (
         <details className="relative ml-1">
           <summary
-            className="list-none cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-emerald-500/30 text-emerald-400"
+            className="list-none cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-lmu-gain-strong/30 text-lmu-gain"
             aria-label={`${beaten.length} rivals beaten`}
           >
             <Check className="w-3 h-3" /> Beaten {beaten.length}
@@ -44,7 +44,7 @@ export const RivalLadder: React.FC<RivalLadderProps> = ({ beaten, nextUp, onPin 
               <li key={t.id} className="flex items-center justify-between gap-3">
                 <span className="truncate">{t.driverName ?? `Ghost ${formatTime(t.targetTime)}`}</span>
                 <span className="text-lmu-muted shrink-0">
-                  <span className="font-mono text-emerald-400 mr-1">{formatTime(t.beatenTime)}</span>
+                  <span className="font-mono text-lmu-gain mr-1">{formatTime(t.beatenTime)}</span>
                   {t.endedAt ? formatDrivenAgo(t.endedAt) : ''}
                 </span>
               </li>

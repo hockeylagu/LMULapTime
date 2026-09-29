@@ -91,13 +91,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-3 cursor-pointer group select-none"
           title="Return to Dashboard"
         >
-          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent shadow-lg shadow-lmu-accent/10 group-hover:scale-105 transition-transform">
+          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text shadow-lg shadow-lmu-accent/10 group-hover:scale-105 transition-transform">
             <Gauge className="w-6 h-6 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-lg text-white tracking-wide uppercase group-hover:text-lmu-gold transition-colors">
-                LMU <span className="text-lmu-accent">Lap Time</span> Analyzer
+                LMU <span className="text-lmu-accent-text">Lap Time</span> Analyzer
               </h1>
             </div>
           </div>
@@ -142,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
             title={scanTooltip}
           >
-            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-accent' : 'group-hover:scale-110 transition-transform'}`} />
+            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-accent-text' : 'group-hover:scale-110 transition-transform'}`} />
             <span className="group-hover:text-white transition-colors">
               {scanStatusText}
             </span>
@@ -154,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="p-2 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent transition-all disabled:opacity-50"
             title="Refresh LMU Directory Scan"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-lmu-accent' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-lmu-accent-text' : ''}`} />
           </button>
         </div>
 

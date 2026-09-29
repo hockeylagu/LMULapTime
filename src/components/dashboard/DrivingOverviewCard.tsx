@@ -120,11 +120,11 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={4} />
-                <span className="text-white font-medium truncate group-hover:text-emerald-400 transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-gain transition-colors">
                   Clean Flying Laps
                 </span>
               </div>
-              <span className="text-emerald-400 font-mono text-[11px] shrink-0 font-semibold">
+              <span className="text-lmu-gain font-mono text-[11px] shrink-0 font-semibold">
                 {(cleanLaps ?? 0).toLocaleString()} ({cleanLapsPercentage ?? 0}%)
               </span>
             </div>
@@ -136,11 +136,11 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={5} />
-                <span className="text-white font-medium truncate group-hover:text-sky-400 transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-info transition-colors">
                   Top Speed Recorded
                 </span>
               </div>
-              <span className="text-sky-400 font-mono text-[11px] shrink-0 font-semibold">
+              <span className="text-lmu-info font-mono text-[11px] shrink-0 font-semibold">
                 {maxTopSpeed && maxTopSpeed > 0 ? `${maxTopSpeed.toFixed(1)} km/h` : 'N/A'}
               </span>
             </div>
@@ -152,7 +152,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={6} />
-                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-text-soft transition-colors">
                   Avg Benchmark Pace
                 </span>
               </div>
@@ -161,7 +161,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
                   {averageBenchmarkPacePercentage.toFixed(1)}% {getPaceCategoryStyle(averageBenchmarkPaceCategory).emoji}
                 </span>
               ) : (
-                <span className="text-slate-300 font-mono text-[11px] shrink-0">N/A</span>
+                <span className="text-lmu-text-soft font-mono text-[11px] shrink-0">N/A</span>
               )}
             </div>
 
@@ -188,11 +188,11 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={8} />
-                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-text-soft transition-colors">
                   Session Breakdown
                 </span>
               </div>
-              <span className="text-slate-300 font-mono text-[11px] shrink-0">
+              <span className="text-lmu-text-soft font-mono text-[11px] shrink-0">
                 {practiceSessionsCount ?? 0}P • {qualifyingSessionsCount ?? 0}Q • {raceSessionsCount ?? 0}R
               </span>
             </div>
@@ -204,11 +204,11 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <RankBadge rank={9} />
-                <span className="text-white font-medium truncate group-hover:text-slate-300 transition-colors">
+                <span className="text-white font-medium truncate group-hover:text-lmu-text-soft transition-colors">
                   Pit Stops Serviced
                 </span>
               </div>
-              <span className="text-slate-300 font-mono text-[11px] shrink-0">
+              <span className="text-lmu-text-soft font-mono text-[11px] shrink-0">
                 {(totalPitStops ?? 0).toLocaleString()} stops
               </span>
             </div>

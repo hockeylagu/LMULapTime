@@ -95,7 +95,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         data-testid="track-circuit-layout-loading"
         className={`${sizeClasses} shrink-0 flex items-center justify-center animate-pulse ${className}`}
       >
-        <div className="w-6 h-6 rounded-lg bg-slate-800/40" />
+        <div className="w-6 h-6 rounded-lg bg-lmu-raised/40" />
       </div>
     );
   }
@@ -108,12 +108,12 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
-        className={`${sizeClasses} shrink-0 flex items-center justify-center text-slate-500 ${interactiveClasses} ${className}`}
+        className={`${sizeClasses} shrink-0 flex items-center justify-center text-lmu-faint ${interactiveClasses} ${className}`}
         title={trackName}
       >
         <svg
           viewBox="0 0 24 24"
-          className={size === 'card' ? 'w-5 h-5 text-slate-500' : 'w-6 h-6 text-slate-500'}
+          className={size === 'card' ? 'w-5 h-5 text-lmu-faint' : 'w-6 h-6 text-lmu-faint'}
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"

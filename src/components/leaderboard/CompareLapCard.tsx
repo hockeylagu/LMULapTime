@@ -75,7 +75,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               {lap.tag || `Lap ${lap.lapNum || '-'}`}
             </span>
             {isRival && (
-              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-300 shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-lmu-warn-soft shrink-0">
                 <Target className="w-3 h-3" /> Your rival
               </span>
             )}
@@ -102,7 +102,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             <button
               type="button"
               onClick={() => onRemoveLap(lap)}
-              className="text-lmu-muted hover:text-rose-400 p-0.5 rounded transition-colors cursor-pointer"
+              className="text-lmu-muted hover:text-lmu-loss p-0.5 rounded transition-colors cursor-pointer"
               title="Remove from comparison"
             >
               <Trash2 className="w-3.5 h-3.5" />

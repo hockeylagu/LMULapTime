@@ -31,8 +31,8 @@ export const BenchmarkLapsSummaryCard: React.FC<BenchmarkLapsSummaryCardProps> =
   return (
     <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
-        <p className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Zap className="w-4 h-4 text-purple-400" />
+        <p className="text-xs font-bold text-lmu-purple uppercase tracking-wider flex items-center gap-1.5">
+          <Zap className="w-4 h-4 text-lmu-purple" />
           <span>Benchmarks {rankedRefLaps.length > 3 && `(${visibleRefLaps.length}/${rankedRefLaps.length})`}</span>
         </p>
       </div>
@@ -55,15 +55,15 @@ export const BenchmarkLapsSummaryCard: React.FC<BenchmarkLapsSummaryCardProps> =
                     rank={idx + 1}
                     color={(r) =>
                       r === 1
-                        ? 'text-purple-300'
+                        ? 'text-lmu-purple-soft'
                         : r === 2
-                        ? 'text-purple-400'
+                        ? 'text-lmu-purple'
                         : r === 3
-                        ? 'text-purple-500'
+                        ? 'text-lmu-purple'
                         : 'text-lmu-muted'
                     }
                   />
-                  <span className="text-white font-medium truncate group-hover:text-purple-300 transition-colors" title={item.track}>
+                  <span className="text-white font-medium truncate group-hover:text-lmu-purple-soft transition-colors" title={item.track}>
                     {item.track}
                   </span>
                 </div>
@@ -85,7 +85,7 @@ export const BenchmarkLapsSummaryCard: React.FC<BenchmarkLapsSummaryCardProps> =
         <button
           type="button"
           onClick={() => setShowMoreBenchmarks(!showMoreBenchmarks)}
-          className="w-full text-center text-[10px] text-lmu-muted hover:text-purple-300 font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+          className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-purple-soft font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
         >
           <span>{showMoreBenchmarks ? 'Show Top 3 Only' : `Show All ${rankedRefLaps.length} Benchmark Laps`}</span>
           <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreBenchmarks ? 'rotate-180' : ''}`} />

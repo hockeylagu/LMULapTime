@@ -79,20 +79,20 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
     >
       {/* Legend & Handling Overlay Toggles */}
       {!compact && (
-        <div className="flex items-center justify-between text-[10px] font-mono px-2.5 py-1.5 border-b border-slate-800/80 bg-lmu-surface">
-          <span className="text-xs font-semibold text-slate-300">Speed & Handling Profile</span>
+        <div className="flex items-center justify-between text-[10px] font-mono px-2.5 py-1.5 border-b border-lmu-border/80 bg-lmu-surface">
+          <span className="text-xs font-semibold text-lmu-text-soft">Speed & Handling Profile</span>
           <div className="flex items-center gap-1">
             {[
-              { label: 'US', active: showUndersteer && hasUS, onClick: () => setShowUndersteer(v => !v), color: 'bg-sky-500/20 border-sky-500/50 text-sky-300' },
-              { label: 'Scrub', active: showScrub && hasScrub, onClick: () => setShowScrub(v => !v), color: 'bg-rose-500/20 border-rose-500/50 text-rose-300' },
-              { label: 'OS', active: showOversteer && hasOS, onClick: () => setShowOversteer(v => !v), color: 'bg-amber-500/20 border-amber-500/50 text-amber-300' },
+              { label: 'US', active: showUndersteer && hasUS, onClick: () => setShowUndersteer(v => !v), color: 'bg-lmu-info-strong/20 border-lmu-info-strong/50 text-lmu-info-soft' },
+              { label: 'Scrub', active: showScrub && hasScrub, onClick: () => setShowScrub(v => !v), color: 'bg-lmu-loss-strong/20 border-lmu-loss-strong/50 text-lmu-loss-soft' },
+              { label: 'OS', active: showOversteer && hasOS, onClick: () => setShowOversteer(v => !v), color: 'bg-lmu-warn-strong/20 border-lmu-warn-strong/50 text-lmu-warn-soft' },
             ].map(btn => (
               <button
                 key={btn.label}
                 type="button"
                 onClick={btn.onClick}
                 className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
-                  btn.active ? btn.color : 'bg-slate-900/60 border-slate-800 text-slate-500'
+                  btn.active ? btn.color : 'bg-lmu-card/60 border-lmu-border text-lmu-faint'
                 }`}
                 title={`Toggle ${btn.label} overlay`}
               >
@@ -131,8 +131,8 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
 
         {/* Apex minimum speed callout */}
         {!compact && (
-          <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-rose-400/80 pointer-events-none -translate-x-1/2">
-            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[8px] font-mono font-bold whitespace-nowrap">
+          <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-lmu-loss/80 pointer-events-none -translate-x-1/2">
+            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-lmu-loss-deep/80 border border-lmu-loss-strong/40 text-lmu-loss-soft text-[8px] font-mono font-bold whitespace-nowrap">
               Apex: {corner.primaryMinSpeedKmh}
             </span>
           </div>
@@ -140,11 +140,11 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
 
         {compact && (
           <>
-            <div className="absolute top-0.5 left-1.5 px-1 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">ENTRY {corner.primaryEntrySpeedKmh}</div>
-            <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-rose-400/70 pointer-events-none -translate-x-1/2">
-              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-rose-500/20 text-rose-300 text-[9px] font-mono font-bold whitespace-nowrap">MIN {corner.primaryMinSpeedKmh}</span>
+            <div className="absolute top-0.5 left-1.5 px-1 rounded bg-lmu-aqua-strong/20 text-lmu-aqua-soft text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">ENTRY {corner.primaryEntrySpeedKmh}</div>
+            <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-lmu-loss/70 pointer-events-none -translate-x-1/2">
+              <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-lmu-loss-strong/20 text-lmu-loss-soft text-[9px] font-mono font-bold whitespace-nowrap">MIN {corner.primaryMinSpeedKmh}</span>
             </div>
-            <div className="absolute top-0.5 right-1.5 px-1 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">EXIT {corner.primaryExitSpeedKmh}</div>
+            <div className="absolute top-0.5 right-1.5 px-1 rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[9px] font-mono font-bold whitespace-nowrap pointer-events-none">EXIT {corner.primaryExitSpeedKmh}</div>
           </>
         )}
 
@@ -157,10 +157,10 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
           >
             <span className={`px-1 py-0.2 rounded text-[8px] font-mono font-bold border whitespace-nowrap shadow-sm ${
               band.isTireScrub
-                ? 'bg-rose-950/90 border-rose-500/60 text-rose-300'
+                ? 'bg-lmu-loss-deep/90 border-lmu-loss-strong/60 text-lmu-loss-soft'
                 : band.type === 'understeer'
-                ? 'bg-sky-950/90 border-sky-500/60 text-sky-300'
-                : 'bg-amber-950/90 border-amber-500/60 text-amber-300'
+                ? 'bg-lmu-info-deep/90 border-lmu-info-strong/60 text-lmu-info-soft'
+                : 'bg-lmu-warn-deep/90 border-lmu-warn-strong/60 text-lmu-warn-soft'
             }`}>
               {band.label} {band.peakDeg > 0 ? `+${band.peakDeg}°` : `${band.peakDeg}°`}
             </span>

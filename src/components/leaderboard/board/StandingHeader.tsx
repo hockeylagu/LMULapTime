@@ -75,7 +75,7 @@ export const StandingHeader: React.FC<StandingHeaderProps> = ({ board }) => {
             key={s.label}
             className={`px-2 py-0.5 rounded-lg border font-mono font-bold ${
               s.rank !== null && s.rank === weakest
-                ?'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                ?'border-lmu-loss-strong/40 bg-lmu-loss-strong/10 text-lmu-loss-soft'
                 : 'border-lmu-border bg-lmu-bg/60 text-white'
             }`}
             title={s.rank !== null && s.rank === weakest ? 'Your weakest sector: the most time to find' : undefined}

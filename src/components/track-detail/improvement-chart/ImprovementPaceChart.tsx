@@ -47,7 +47,7 @@ const PersonalBestLegend: React.FC<PersonalBestLegendProps> = ({ gradient, hidde
       onClick={onToggle}
       title="Click to toggle Personal Best Over Time visibility"
       className={`inline-flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${
-        hidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+        hidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'
       }`}
     >
       <span aria-hidden="true" className="w-5 h-[3px] rounded-full" style={{ backgroundImage: gradient }} />
@@ -159,7 +159,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
               return (
                 <span
                   className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
-                    isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+                    isHidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'
                   }`}
                   title={`Click to toggle ${value} visibility`}
                 >

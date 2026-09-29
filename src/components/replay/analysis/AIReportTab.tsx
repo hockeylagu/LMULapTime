@@ -128,7 +128,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
     <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
       <div className="rounded-xl border border-lmu-border bg-lmu-card/80 p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <BrainCircuit className="w-5 h-5 text-lmu-accent" />
+          <BrainCircuit className="w-5 h-5 text-lmu-accent-text" />
           <h3 className="text-sm font-bold text-white">AI Lap Report</h3>
         </div>
         <p className="text-xs leading-relaxed text-lmu-muted">Lap analytics and driver names used in this comparison will be sent to Google Gemini.</p>
@@ -147,31 +147,31 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
 
       {report && <div className="space-y-3">
         <section className="rounded-xl border border-lmu-border bg-lmu-card/60 p-4">
-          <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-lmu-accent">Overall Summary</h4>
+          <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-lmu-accent-text">Overall Summary</h4>
           <p className="text-sm leading-relaxed text-white">{report.report.overallSummary}</p>
         </section>
         <section className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-lmu-accent">Key Improvements</h4>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-lmu-accent-text">Key Improvements</h4>
           {report.report.improvements.map((item, index) => <article key={`${item.title}-${index}`} className="rounded-xl border border-lmu-border bg-lmu-card/60 p-4">
             <h5 className="text-sm font-bold text-white">
-              {item.cornerNumber !== undefined && <span className="mr-1.5 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-amber-300">#{index + 1} T{item.cornerNumber}</span>}
+              {item.cornerNumber !== undefined && <span className="mr-1.5 rounded bg-lmu-raised px-1.5 py-0.5 font-mono text-xs text-lmu-warn-soft">#{index + 1} T{item.cornerNumber}</span>}
               {item.title}
             </h5>
             <div className="mt-3 space-y-2 text-sm leading-relaxed">
-              <p><strong className="text-emerald-300">Action:</strong> <span className="text-white">{item.action}</span></p>
-              <p><strong className="text-lmu-accent">Why:</strong> <span className="text-lmu-muted">{item.why}</span></p>
-              <p><strong className="text-lmu-accent">Next lap:</strong> <span className="text-lmu-muted">{item.executionCue}</span></p>
-              <p><strong className="text-lmu-accent">Verify:</strong> <span className="text-lmu-muted">{item.verify}</span></p>
+              <p><strong className="text-lmu-gain-soft">Action:</strong> <span className="text-white">{item.action}</span></p>
+              <p><strong className="text-lmu-accent-text">Why:</strong> <span className="text-lmu-muted">{item.why}</span></p>
+              <p><strong className="text-lmu-accent-text">Next lap:</strong> <span className="text-lmu-muted">{item.executionCue}</span></p>
+              <p><strong className="text-lmu-accent-text">Verify:</strong> <span className="text-lmu-muted">{item.verify}</span></p>
             </div>
             {item.evidence && item.evidence.length > 0 && (
               <div className="mt-3 border-t border-lmu-border/60 pt-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted">Measured evidence</p>
-                <ul className="mt-1 space-y-1 text-xs text-slate-300">
+                <ul className="mt-1 space-y-1 text-xs text-lmu-text-soft">
                   {item.evidence.map((evidence, evidenceIndex) => <li key={`${index}-${evidenceIndex}`}>• {evidence}</li>)}
                 </ul>
               </div>
             )}
-            {item.estimatedGainSec !== undefined && <span className="mt-2 inline-block text-xs font-semibold text-emerald-300">Potential lap-time gain: {item.estimatedGainSec.toFixed(3)}s</span>}
+            {item.estimatedGainSec !== undefined && <span className="mt-2 inline-block text-xs font-semibold text-lmu-gain-soft">Potential lap-time gain: {item.estimatedGainSec.toFixed(3)}s</span>}
           </article>)}
         </section>
         <p className="text-right text-[11px] text-lmu-muted">{report.cached ? 'Cached report' : 'Generated now'}{report.tokensUsed ? ` · ${report.tokensUsed.total} tokens` : ''}</p>

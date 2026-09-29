@@ -13,9 +13,9 @@ import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTr
 import { TelemetrySteerOverlayToggles } from './TelemetrySteerOverlayToggles.js';
 
 const STEER_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '-100% L', borderClassName: 'border-b border-indigo-400/30', labelClassName: 'text-[8px] text-indigo-400 font-mono' },
-  { label: '0% Center', borderClassName: 'border-b border-indigo-400/50', labelClassName: 'text-[8px] text-indigo-300 font-mono' },
-  { label: '+100% R', borderClassName: 'border-b border-indigo-400/30', labelClassName: 'text-[8px] text-indigo-400 font-mono' },
+  { label: '-100% L', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[8px] text-lmu-indigo font-mono' },
+  { label: '0% Center', borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[8px] text-lmu-indigo-soft font-mono' },
+  { label: '+100% R', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[8px] text-lmu-indigo font-mono' },
 ];
 
 export interface TelemetrySteerChannelProps {
@@ -142,42 +142,42 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
 
     if (activeEvent) {
       if (showScrub && activeEvent.isTireScrub) {
-        return { label: `SCRUB (+${balance.toFixed(1)}°)`, color: 'text-rose-400' };
+        return { label: `SCRUB (+${balance.toFixed(1)}°)`, color: 'text-lmu-loss' };
       }
       if (showBalance) {
         if (activeEvent.type === 'understeer') {
-          return { label: `US (+${balance.toFixed(1)}°)`, color: 'text-sky-300' };
+          return { label: `US (+${balance.toFixed(1)}°)`, color: 'text-lmu-info-soft' };
         }
-        return { label: `OS (${balance.toFixed(1)}°)`, color: 'text-amber-300' };
+        return { label: `OS (${balance.toFixed(1)}°)`, color: 'text-lmu-warn-soft' };
       }
       return null;
     }
 
     if (showBalance) {
-      if (balance >= 2.0) return { label: `US (+${balance.toFixed(1)}°)`, color: 'text-sky-300' };
-      if (balance <= -1.0) return { label: `OS (${balance.toFixed(1)}°)`, color: 'text-amber-300' };
+      if (balance >= 2.0) return { label: `US (+${balance.toFixed(1)}°)`, color: 'text-lmu-info-soft' };
+      if (balance <= -1.0) return { label: `OS (${balance.toFixed(1)}°)`, color: 'text-lmu-warn-soft' };
     }
     return null;
   }, [showBalance, showScrub, currentPoint, events]);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-indigo-950/20">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-indigo-deep/20">
       {/* Top Left Channel Title & Live Telemetry Values */}
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-indigo-strong/20 text-lmu-indigo font-black text-[10px] tracking-wider flex items-center gap-1">
           <Compass className="w-3 h-3" />
           STEERING
         </span>
-        <span className="text-xs font-mono font-bold text-indigo-300">
+        <span className="text-xs font-mono font-bold text-lmu-indigo-soft">
           {Math.abs(steerPercent).toFixed(1)}% {steerDir}
         </span>
         {currentComparison && (
-          <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
             Base: {Math.abs(baseSteerPercent).toFixed(1)}%
           </span>
         )}
         {cursorBalance && (
-          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-900/90 border border-white/10 ${cursorBalance.color}`}>
+          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-lmu-card/90 border border-white/10 ${cursorBalance.color}`}>
             {cursorBalance.label}
           </span>
         )}
@@ -205,10 +205,10 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
             const leftPct = Math.min(97, Math.max(0, band.xStart / 10));
             const badgeLabel = !isUS ? band.label : isScrub ? band.label : `US ${band.phase}`;
             const badgeClass = !isUS
-              ? 'text-amber-300 bg-amber-950/90 border-amber-400/60 shadow-[0_1px_4px_rgba(245,158,11,0.25)]'
+              ? 'text-lmu-warn-soft bg-lmu-warn-deep/90 border-lmu-warn/60 shadow-[0_1px_4px_rgba(245,158,11,0.25)]'
               : isScrub
-                ? 'text-rose-300 bg-rose-950/90 border-rose-400/70 shadow-[0_1px_4px_rgba(244,63,94,0.3)]'
-                : 'text-sky-300 bg-sky-950/90 border-sky-400/60 shadow-[0_1px_4px_rgba(56,189,248,0.25)]';
+                ? 'text-lmu-loss-soft bg-lmu-loss-deep/90 border-lmu-loss/70 shadow-[0_1px_4px_rgba(244,63,94,0.3)]'
+                : 'text-lmu-info-soft bg-lmu-info-deep/90 border-lmu-info/60 shadow-[0_1px_4px_rgba(56,189,248,0.25)]';
             const titleType = !isUS ? 'Oversteer' : isScrub ? `Tire Scrub (${band.scrubSeverityPct}% severity)` : 'Understeer';
 
             return (
@@ -233,11 +233,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-indigo-400/80 font-mono font-bold text-[11px] text-indigo-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-indigo/80 font-mono font-bold text-[11px] text-lmu-indigo-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {steerPercent > 0 ? `+${steerPercent.toFixed(0)}%` : `${steerPercent.toFixed(0)}%`}
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {baseSteerPercent.toFixed(0)}%
             </span>
           )}

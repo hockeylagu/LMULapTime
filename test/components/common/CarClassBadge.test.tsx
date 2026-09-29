@@ -8,8 +8,8 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="Hyper" carType="Ferrari 499P" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('HY');
-    expect(badge.className).toContain('text-red-400');
-    expect(badge.className).toContain('border-red-500');
+    expect(badge.className).toContain('text-lmu-loss');
+    expect(badge.className).toContain('border-lmu-loss-strong');
     expect(screen.queryByTestId('badge-orange-corner')).not.toBeInTheDocument();
   });
 
@@ -17,8 +17,8 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="LMP2" carType="Oreca 07" category="WEC 2024" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('LMP2');
-    expect(badge.className).toContain('text-sky-400');
-    expect(badge.className).toContain('border-sky-500');
+    expect(badge.className).toContain('text-lmu-info');
+    expect(badge.className).toContain('border-lmu-info-strong');
     expect(screen.queryByTestId('badge-orange-corner')).not.toBeInTheDocument();
   });
 
@@ -26,7 +26,7 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="LMP2_ELMS" carType="Oreca 07" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('LMP2');
-    expect(badge.className).toContain('text-sky-400');
+    expect(badge.className).toContain('text-lmu-info');
     expect(screen.getByTestId('badge-orange-corner')).toBeInTheDocument();
   });
 
@@ -34,8 +34,8 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="LMP3" carType="Ligier JS P325" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('LMP3');
-    expect(badge.className).toContain('text-purple-400');
-    expect(badge.className).toContain('border-purple-500');
+    expect(badge.className).toContain('text-lmu-purple');
+    expect(badge.className).toContain('border-lmu-purple-strong');
     expect(screen.queryByTestId('badge-orange-corner')).not.toBeInTheDocument();
   });
 
@@ -43,8 +43,8 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="GT3" carType="BMW M4 LMGT3" category="WEC 2024" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('GT3');
-    expect(badge.className).toContain('text-emerald-400');
-    expect(badge.className).toContain('border-emerald-500');
+    expect(badge.className).toContain('text-lmu-gain');
+    expect(badge.className).toContain('border-lmu-gain-strong');
     expect(screen.queryByTestId('badge-orange-corner')).not.toBeInTheDocument();
   });
 
@@ -52,7 +52,7 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="GT3" carType="BMW M4 LMGT3" isElms={true} />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('GT3');
-    expect(badge.className).toContain('text-emerald-400');
+    expect(badge.className).toContain('text-lmu-gain');
     expect(screen.getByTestId('badge-orange-corner')).toBeInTheDocument();
   });
 
@@ -60,8 +60,8 @@ describe('CarClassBadge', () => {
     render(<CarClassBadge carClass="GTE" carType="Ferrari 488 GTE EVO" />);
     const badge = screen.getByTestId('car-class-badge');
     expect(badge).toHaveTextContent('GTE');
-    expect(badge.className).toContain('text-amber-400');
-    expect(badge.className).toContain('border-amber-500');
+    expect(badge.className).toContain('text-lmu-warn');
+    expect(badge.className).toContain('border-lmu-warn-strong');
   });
 
   it('returns null when no class info is provided', () => {

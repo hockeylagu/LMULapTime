@@ -61,7 +61,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
       <div className="flex items-center gap-2 justify-self-center min-w-0">
         {drivers.length > 0 && (
           <label className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-xl bg-lmu-card border border-lmu-border hover:border-lmu-accent/50 transition-colors shrink-0">
-            <Users className="w-3.5 h-3.5 text-lmu-accent shrink-0" />
+            <Users className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />
             <select
               aria-label="Select Driver"
               value={selectedDriverSlot ?? ''}
@@ -80,7 +80,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         {trajectory?.laps && trajectory.laps.length > 0 && (
           <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5 shadow-sm">
             <span className="hidden lg:flex items-center gap-1 text-[11px] text-lmu-muted">
-              <Flag className="w-3 h-3 text-lmu-accent" />
+              <Flag className="w-3 h-3 text-lmu-accent-text" />
               Lap:
             </span>
             <button
@@ -129,7 +129,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               type="button"
               onClick={onToggleCompare}
-              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono max-w-[250px] transition-colors cursor-pointer ${baselineError ? 'bg-rose-500/10 border border-rose-500/40 text-rose-400 hover:bg-rose-500/20' : 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50'}`}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-mono max-w-[250px] transition-colors cursor-pointer ${baselineError ? 'bg-lmu-loss-strong/10 border border-lmu-loss-strong/40 text-lmu-loss hover:bg-lmu-loss-strong/20' : 'bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-lmu-warn hover:bg-lmu-warn-strong/20 hover:border-lmu-warn-strong/50'}`}
               title={baselineError ? `${baselineError}. Click to pick another comparison lap` : 'Click to change the comparison lap'}
             >
               <span className="font-bold">vs</span>
@@ -140,7 +140,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               type="button"
               onClick={onRemoveCompare}
-              className="p-1 rounded text-lmu-muted hover:text-rose-300 hover:bg-white/10"
+              className="p-1 rounded text-lmu-muted hover:text-lmu-loss-soft hover:bg-white/10"
               title="Remove comparison lap"
               aria-label="Remove comparison lap"
             >
@@ -149,7 +149,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               type="button"
               onClick={onSwapBaseline}
-              className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-400 text-xs font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded-xl bg-lmu-warn-strong/15 hover:bg-lmu-warn-strong/25 border border-lmu-warn-strong/40 text-lmu-warn text-xs font-bold transition-all cursor-pointer"
               title="Swap the compared and baseline laps"
               aria-label="Swap comparison laps"
             >
@@ -177,13 +177,13 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         )}
 
         {isStationary ? (
-          <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] font-semibold items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-lmu-warn-soft text-[10px] font-semibold items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-lmu-warn animate-pulse" />
             Garage
           </span>
         ) : (
-          <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-lmu-gain-strong/10 border border-lmu-gain-strong/30 text-lmu-gain text-[10px] font-semibold items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain animate-pulse" />
             Track
           </span>
         )}

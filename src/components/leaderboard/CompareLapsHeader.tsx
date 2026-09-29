@@ -48,7 +48,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-lmu-border/50">
     <div className="min-w-0">
       <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-        <ArrowLeftRight className="w-4 h-4 text-lmu-accent" />
+        <ArrowLeftRight className="w-4 h-4 text-lmu-accent-text" />
         Compare Laps
       </h3>
       <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-lmu-muted">
@@ -81,20 +81,20 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
     <div className="flex flex-wrap items-center gap-2">
       {rivalLap && onAddRival && (
         <button type="button" onClick={onAddRival} className={preset} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
-          <Crosshair className="w-3.5 h-3.5 text-amber-300" />
+          <Crosshair className="w-3.5 h-3.5 text-lmu-warn-soft" />
           + Rival ({rivalLap.lapTimeString})
         </button>
       )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
         <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
-          <Trophy className="w-3.5 h-3.5 text-lmu-accent" />
+          <Trophy className="w-3.5 h-3.5 text-lmu-accent-text" />
           + Personal Best ({formatTime(allTimePBObject.lapTime)})
         </button>
       )}
 
       {theoreticalBestSec && (
         <button type="button" onClick={onAddTheoreticalBest} className={preset} title="Add your theoretical optimal lap for this track & category">
-          <Sparkles className="w-3.5 h-3.5 text-lmu-accent" />
+          <Sparkles className="w-3.5 h-3.5 text-lmu-accent-text" />
           + Theoretical Best ({formatTime(theoreticalBestSec)})
         </button>
       )}
@@ -106,7 +106,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           className={preset}
           title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
         >
-          <Award className="w-3.5 h-3.5 text-lmu-accent" />
+          <Award className="w-3.5 h-3.5 text-lmu-accent-text" />
           + All-Time Best ({overallTrackBestObject.lapTimeString})
         </button>
       )}
@@ -115,7 +115,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <button
           type="button"
           onClick={onClearAll}
-          className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-rose-950/40 border border-lmu-border hover:border-rose-500/40 text-xs text-lmu-muted hover:text-rose-400 font-semibold transition-all flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-loss-deep/40 border border-lmu-border hover:border-lmu-loss-strong/40 text-xs text-lmu-muted hover:text-lmu-loss font-semibold transition-all flex items-center gap-1 cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" />
           Clear

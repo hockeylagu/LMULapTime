@@ -19,10 +19,10 @@ function WeatherBadge({ metadata, trajectory }: Pick<ReplayInspectorTitleProps, 
   const maxRain = trajectory?.maxRainIntensity || metadata?.maxRainIntensity;
   const rainSuffix = trajectory?.maxRainIntensity ? `(${trajectory.maxRainIntensity})` : '';
   const tone = condition === 'Wet'
-    ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+    ? 'bg-lmu-azure-strong/10 border-lmu-azure-strong/30 text-lmu-azure'
     : condition === 'Dynamic Weather'
-    ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
-    : 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+    ? 'bg-lmu-aqua-strong/10 border-lmu-aqua-strong/30 text-lmu-aqua'
+    : 'bg-lmu-warn-strong/10 border-lmu-warn-strong/30 text-lmu-warn';
 
   return (
     <span
@@ -31,17 +31,17 @@ function WeatherBadge({ metadata, trajectory }: Pick<ReplayInspectorTitleProps, 
     >
       {condition === 'Wet' ? (
         <>
-          <CloudRain className="w-3 h-3 text-blue-400" />
+          <CloudRain className="w-3 h-3 text-lmu-azure" />
           <span>Wet Track {rainSuffix}</span>
         </>
       ) : condition === 'Dynamic Weather' ? (
         <>
-          <CloudDrizzle className="w-3 h-3 text-cyan-400" />
+          <CloudDrizzle className="w-3 h-3 text-lmu-aqua" />
           <span>Dynamic Rain {rainSuffix}</span>
         </>
       ) : (
         <>
-          <Sun className="w-3 h-3 text-amber-400" />
+          <Sun className="w-3 h-3 text-lmu-warn" />
           <span>Dry Track</span>
         </>
       )}
@@ -63,7 +63,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
     </button>
 
     <div className="flex items-center gap-2.5 min-w-0">
-      <div className="p-2 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent shrink-0">
+      <div className="p-2 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text shrink-0">
         <Video className="w-4 h-4" />
       </div>
       <div className="min-w-0">
@@ -72,7 +72,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
             Replay Intelligence: {replayName}
           </span>
           {metadata?.eventInfo?.eventTitle && (
-            <span className="hidden md:inline px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[10px] shrink-0">
+            <span className="hidden md:inline px-2 py-0.5 rounded-full bg-lmu-gain-strong/10 border border-lmu-gain-strong/30 text-lmu-gain font-semibold text-[10px] shrink-0">
               {metadata.eventInfo.eventTitle}
               {typeof metadata.eventInfo.splitNo === 'number' && ` (Split ${metadata.eventInfo.splitNo})`}
             </span>
@@ -82,13 +82,13 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
         <div className="hidden lg:flex items-center gap-3 text-[11px] text-lmu-muted">
           {(metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName) && (
             <span className="flex items-center gap-1">
-              <Flag className="w-3 h-3 text-lmu-accent" />
+              <Flag className="w-3 h-3 text-lmu-accent-text" />
               {metadata.displayTrack || metadata.trackCourse || metadata.trackName}
             </span>
           )}
           {metadata?.durationSec ? (
             <span className="flex items-center gap-1 font-mono">
-              <Clock className="w-3 h-3 text-amber-400" />
+              <Clock className="w-3 h-3 text-lmu-warn" />
               {formatDuration(metadata.durationSec)}
             </span>
           ) : null}
@@ -99,8 +99,8 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
             </span>
           ) : null}
           {(trajectory?.ambientTemp !== undefined || metadata?.ambientTemp !== undefined) && (
-            <span className="flex items-center gap-1 font-mono text-cyan-300" title="Session Atmospheric & Track Temperature">
-              <Thermometer className="w-3 h-3 text-cyan-400" />
+            <span className="flex items-center gap-1 font-mono text-lmu-aqua-soft" title="Session Atmospheric & Track Temperature">
+              <Thermometer className="w-3 h-3 text-lmu-aqua" />
               <span>
                 {(trajectory?.ambientTemp ?? metadata?.ambientTemp)?.toFixed(1)}°C Air
                 {(trajectory?.trackTemp !== undefined || metadata?.trackTemp !== undefined) &&

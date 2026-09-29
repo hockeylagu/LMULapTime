@@ -14,20 +14,20 @@ export const SessionReferenceAndSafety: React.FC<SessionReferenceAndSafetyProps>
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="px-2.5 py-1 rounded bg-purple-950/60 text-purple-300 border border-purple-500/40 text-xs font-mono">
+      <span className="px-2.5 py-1 rounded bg-lmu-purple-deep/60 text-lmu-purple-soft border border-lmu-purple-strong/40 text-xs font-mono">
         👾 Alien: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.alienSec)}</strong>
       </span>
-      <span className="px-2.5 py-1 rounded bg-amber-950/60 text-amber-300 border border-amber-500/40 text-xs font-mono">
+      <span className="px-2.5 py-1 rounded bg-lmu-warn-deep/60 text-lmu-warn-soft border border-lmu-warn-strong/40 text-xs font-mono">
         🏆 Competitive:{' '}
         <strong className="text-white ml-0.5">{formatTime(refEntry.targets.competitiveSec)}</strong>
       </span>
-      <span className="px-2.5 py-1 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 text-xs font-mono">
+      <span className="px-2.5 py-1 rounded bg-lmu-gain-deep/60 text-lmu-gain-soft border border-lmu-gain-strong/40 text-xs font-mono">
         ⭐ Good: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.goodSec)}</strong>
       </span>
-      <span className="px-2.5 py-1 rounded bg-sky-950/60 text-sky-300 border border-sky-500/40 text-xs font-mono">
+      <span className="px-2.5 py-1 rounded bg-lmu-info-deep/60 text-lmu-info-soft border border-lmu-info-strong/40 text-xs font-mono">
         🏎️ Midpack: <strong className="text-white ml-0.5">{formatTime(refEntry.targets.midpackSec)}</strong>
       </span>
-      <span className="px-2.5 py-1 rounded bg-orange-950/60 text-orange-300 border border-orange-500/40 text-xs font-mono">
+      <span className="px-2.5 py-1 rounded bg-lmu-orange-deep/60 text-lmu-orange-soft border border-lmu-orange-strong/40 text-xs font-mono">
         🐢 Tail-ender:{' '}
         <strong className="text-white ml-0.5">{formatTime(refEntry.targets.tailEnderSec)}</strong>
       </span>

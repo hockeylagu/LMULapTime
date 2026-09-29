@@ -34,7 +34,7 @@ export const VehicleClassPills: React.FC<VehicleClassPillsProps> = ({
         className={`${padAllClass} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
           isAllSelected
             ? 'bg-lmu-accent text-white border-lmu-accent opacity-100'
-            : 'border-slate-800 text-lmu-muted hover:text-white hover:border-slate-700 opacity-40 hover:opacity-100'
+            : 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
         }`}
       >
         ALL

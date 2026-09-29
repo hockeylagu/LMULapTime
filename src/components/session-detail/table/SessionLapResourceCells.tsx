@@ -3,9 +3,9 @@ import { LapData } from '../../../../shared/types/index.js';
 
 const COMPOUND_STYLES: Record<string, string | undefined> = {
   S: 'border-white text-white',
-  M: 'border-yellow-400 text-yellow-400',
-  H: 'border-red-500 text-red-500',
-  W: 'border-sky-400 text-sky-400',
+  M: 'border-lmu-warn text-lmu-warn',
+  H: 'border-lmu-loss-strong text-lmu-loss',
+  W: 'border-lmu-info text-lmu-info',
 };
 
 export const CompoundCell: React.FC<{ lap: LapData }> = ({ lap: l }) => {
@@ -57,10 +57,10 @@ export const FuelCell: React.FC<{ lap: LapData }> = ({ lap: l }) => (
         }`}
       >
         {l.fuel !== null && l.fuel !== undefined && (
-          <span className="text-amber-300 font-bold">⛽ {l.fuel}%</span>
+          <span className="text-lmu-warn-soft font-bold">⛽ {l.fuel}%</span>
         )}
         {l.virtualEnergy !== null && l.virtualEnergy !== undefined && (
-          <span className="text-indigo-300 font-bold">⚡ {l.virtualEnergy}%</span>
+          <span className="text-lmu-indigo-soft font-bold">⚡ {l.virtualEnergy}%</span>
         )}
       </div>
     ) : (

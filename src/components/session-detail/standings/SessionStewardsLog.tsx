@@ -56,10 +56,10 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         description: inc.description,
         badge: inc.isWallImpact ? 'Wall Contact' : inc.type === 'damage' ? 'Damage' : 'Collision',
         badgeClass: inc.isWallImpact
-          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+          ? 'bg-lmu-warn-strong/20 text-lmu-warn-soft border-lmu-warn-strong/40'
           : inc.type === 'damage'
-          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-          : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          ? 'bg-lmu-purple-strong/20 text-lmu-purple-soft border-lmu-purple-strong/40'
+          : 'bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40',
         lapNum: l.lapNum,
       });
     });
@@ -81,7 +81,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         et: pen.elapsedSeconds,
         description: pen.description,
         badge: pen.penalty,
-        badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        badgeClass: 'bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40',
         lapNum: l.lapNum,
       });
     });
@@ -110,13 +110,13 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
         className="flex items-center justify-between cursor-pointer group select-none"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <ShieldAlert className="w-4 h-4 text-rose-300" />
+          <ShieldAlert className="w-4 h-4 text-lmu-loss-soft" />
           <h3 className="text-sm font-bold text-white uppercase tracking-wider group-hover:text-lmu-gold transition-colors">
             Incidents & Stewards Log ({selectedDriver.name})
           </h3>
           <div className="flex items-center gap-1.5 ml-2 flex-wrap">
             {hasIncidents && (
-              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-loss-strong/20 text-lmu-loss-soft border border-lmu-loss-strong/30">
                 <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {selectedDriver.totalIncidents} Incident{(selectedDriver.totalIncidents ?? 0) !== 1 ? 's' : ''}</span>
               </span>
             )}
@@ -133,7 +133,7 @@ export const SessionStewardsLog: React.FC<SessionStewardsLogProps> = ({
               );
             })()}
             {hasPenalties && (
-              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-loss-strong/20 text-lmu-loss-soft border border-lmu-loss-strong/40">
                 <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {selectedDriver.totalPenalties} Penalt{(selectedDriver.totalPenalties ?? 0) !== 1 ? 'ies' : 'y'}</span>
               </span>
             )}

@@ -53,18 +53,18 @@ export const TelemetryBrakeTempsChannel: React.FC<TelemetryBrakeTempsChannelProp
   const hasTemps = temps !== undefined || Boolean(brakeTempsPaths.fl);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-orange-950/20">
+    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-orange-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="p-1 rounded bg-orange-500/20 text-orange-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-orange-strong/20 text-lmu-orange font-black text-[10px] tracking-wider flex items-center gap-1">
           <Thermometer className="w-3 h-3" />
           BRAKE ROTOR TEMPS
         </span>
         {hasTemps && temps ? (
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-            <span className="text-cyan-400">FL: {temps[0]}°C</span>
-            <span className="text-blue-400">FR: {temps[1]}°C</span>
-            <span className="text-amber-400">RL: {temps[2]}°C</span>
-            <span className="text-rose-400">RR: {temps[3]}°C</span>
+            <span className="text-lmu-aqua">FL: {temps[0]}°C</span>
+            <span className="text-lmu-azure">FR: {temps[1]}°C</span>
+            <span className="text-lmu-warn">RL: {temps[2]}°C</span>
+            <span className="text-lmu-loss">RR: {temps[3]}°C</span>
           </div>
         ) : (
           <span className="text-[10px] font-mono text-lmu-muted italic">
@@ -72,16 +72,16 @@ export const TelemetryBrakeTempsChannel: React.FC<TelemetryBrakeTempsChannelProp
           </span>
         )}
         {currentComparison?.baseline.brakeTemps && (
-          <span className="text-[10px] font-mono text-amber-400/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
+          <span className="text-[10px] font-mono text-lmu-warn/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
             Base: {currentComparison.baseline.brakeTemps[0]}° / {currentComparison.baseline.brakeTemps[1]}° / {currentComparison.baseline.brakeTemps[2]}° / {currentComparison.baseline.brakeTemps[3]}°
           </span>
         )}
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxBrakeTemp}°C`, borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
-        { label: `${Math.round(maxBrakeTemp / 2)}°C`, borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
-        { label: '0°C', borderClassName: 'border-b border-orange-400/40', labelClassName: 'text-[9px] text-orange-400 font-mono' },
+        { label: `${maxBrakeTemp}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
+        { label: `${Math.round(maxBrakeTemp / 2)}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
+        { label: '0°C', borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
       ]} />
 
       {isCursorInView && hasTemps && temps && (
@@ -91,11 +91,11 @@ export const TelemetryBrakeTempsChannel: React.FC<TelemetryBrakeTempsChannelProp
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-orange-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-cyan-300">FL:{temps[0]}°</span>
-            <span className="text-blue-300">FR:{temps[1]}°</span>
-            <span className="text-amber-300">RL:{temps[2]}°</span>
-            <span className="text-rose-300">RR:{temps[3]}°</span>
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-orange-strong/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+            <span className="text-lmu-aqua-soft">FL:{temps[0]}°</span>
+            <span className="text-lmu-azure-soft">FR:{temps[1]}°</span>
+            <span className="text-lmu-warn-soft">RL:{temps[2]}°</span>
+            <span className="text-lmu-loss-soft">RR:{temps[3]}°</span>
           </div>
         </div>
       )}

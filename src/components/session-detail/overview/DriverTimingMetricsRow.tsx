@@ -138,11 +138,11 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         <div>
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-lmu-muted uppercase font-semibold">Top 3 Lap Avg</p>
-            <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/40">
+            <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-lmu-aqua-deep/60 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
               True Pace
             </span>
           </div>
-          <h4 className="text-xl font-extrabold text-cyan-300 font-mono mt-0.5">
+          <h4 className="text-xl font-extrabold text-lmu-aqua-soft font-mono mt-0.5">
             {top3Avg ? formatTime(top3Avg) : '--:--.---'}
           </h4>
         </div>
@@ -150,7 +150,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
           <div className="flex items-center justify-between">
             <span>
               Gap to PB:{' '}
-              <strong className="text-cyan-200 font-mono">
+              <strong className="text-lmu-aqua-soft font-mono">
                 {top3DeltaToBest !== null ? `+${top3DeltaToBest.toFixed(3)}s` : '--'}
               </strong>
             </span>
@@ -170,12 +170,12 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               <span
                 className={`text-[9px] font-bold font-mono px-1.5 py-0.2 rounded border whitespace-nowrap ${
                   consistencyScore >= 99
-                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                    ? 'bg-lmu-gain-deep/60 text-lmu-gain-soft border-lmu-gain-strong/40'
                     : consistencyScore >= 97
-                    ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/40'
+                    ? 'bg-lmu-aqua-deep/60 text-lmu-aqua-soft border-lmu-aqua-strong/40'
                     : consistencyScore >= 94
-                    ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
-                    : 'bg-rose-950/60 text-rose-300 border-rose-500/40'
+                    ? 'bg-lmu-warn-deep/60 text-lmu-warn-soft border-lmu-warn-strong/40'
+                    : 'bg-lmu-loss-deep/60 text-lmu-loss-soft border-lmu-loss-strong/40'
                 }`}
                 title={groupsText
                   ? `Pace consistency within each condition (${groupsText} clean laps): a change of conditions is not held against it`
@@ -185,7 +185,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               </span>
             )}
           </div>
-          <h4 className="text-xl font-extrabold text-indigo-300 font-mono mt-0.5">
+          <h4 className="text-xl font-extrabold text-lmu-indigo-soft font-mono mt-0.5">
             {avgLapTime ? formatTime(avgLapTime) : '--:--.---'}
           </h4>
         </div>
@@ -193,7 +193,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
           <div className="flex items-center justify-between">
             <span>
               Gap:{' '}
-              <strong className="text-indigo-200 font-mono">
+              <strong className="text-lmu-indigo-soft font-mono">
                 {deltaToBest !== null ? `+${deltaToBest.toFixed(3)}s` : '--'}
               </strong>
             </span>
@@ -210,7 +210,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             </span>
             {hasMultipleLaps && (
               <span
-                className="text-[8px] uppercase tracking-wider text-amber-400/80 font-semibold"
+                className="text-[8px] uppercase tracking-wider text-lmu-warn/80 font-semibold"
                 title="Lap 1 (Start/Out-lap) is excluded from flying averages"
               >
                 Excl. L1
@@ -218,7 +218,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             )}
           </div>
           {groupsText && (
-            <p className="text-[9px] text-sky-300 truncate" data-testid="consistency-groups"
+            <p className="text-[9px] text-lmu-info-soft truncate" data-testid="consistency-groups"
               title="Consistency is measured within each condition, then combined">
               Per condition: {groupsText}
             </p>
@@ -236,7 +236,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         </div>
         <p className="text-[10px] text-lmu-muted mt-1">
           Potential:{' '}
-          <strong className="text-emerald-400 font-mono">
+          <strong className="text-lmu-gain font-mono">
             {theoGap !== null && theoGap > 0 ? `-${theoGap.toFixed(3)}s` : '0.000s'}
           </strong>
         </p>

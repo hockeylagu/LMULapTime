@@ -75,12 +75,12 @@ export function getWorstTrackLimitSeverity(tls?: LapTrackLimit[]): TrackLimitSev
 export function getTrackLimitBadgeClasses(severity: TrackLimitSeverity): string {
   switch (severity) {
     case 'green':
-      return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      return 'bg-lmu-gain-strong/20 text-lmu-gain-soft border-lmu-gain-strong/40';
     case 'orange':
-      return 'bg-orange-500/20 text-orange-300 border-orange-500/40';
+      return 'bg-lmu-orange-strong/20 text-lmu-orange-soft border-lmu-orange-strong/40';
     case 'yellow':
     default:
-      return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+      return 'bg-lmu-warn-strong/20 text-lmu-warn-soft border-lmu-warn-strong/40';
   }
 }
 
@@ -90,11 +90,11 @@ export function getTrackLimitBadgeClasses(severity: TrackLimitSeverity): string 
 export function getTrackLimitStandingsPillClasses(severity: TrackLimitSeverity): string {
   switch (severity) {
     case 'green':
-      return 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30';
+      return 'bg-lmu-gain-deep/60 text-lmu-gain-soft border-lmu-gain-strong/30';
     case 'orange':
-      return 'bg-orange-950/60 text-orange-300 border-orange-500/40';
+      return 'bg-lmu-orange-deep/60 text-lmu-orange-soft border-lmu-orange-strong/40';
     case 'yellow':
     default:
-      return 'bg-yellow-950/50 text-yellow-300 border-yellow-500/30';
+      return 'bg-lmu-warn-deep/50 text-lmu-warn-soft border-lmu-warn-strong/30';
   }
 }

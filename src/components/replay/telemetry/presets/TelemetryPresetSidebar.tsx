@@ -26,7 +26,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
         <button
           type="button"
           onClick={onCreateNew}
-          className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
+          className="px-2 py-0.5 rounded bg-lmu-info-strong/20 text-lmu-info-soft hover:bg-lmu-info-strong/30 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
           title="Create a new custom telemetry preset"
         >
           <Plus className="w-3 h-3" /> New
@@ -44,12 +44,12 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
               onClick={() => onSelectId(p.id)}
               className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-left transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-sky-500/20 border border-sky-400/40 text-white font-bold'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent'
+                  ? 'bg-lmu-info-strong/20 border border-lmu-info/40 text-white font-bold'
+                  : 'text-lmu-muted hover:bg-white/5 hover:text-lmu-text border border-transparent'
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
-                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain shrink-0" />}
                 <span className="truncate">{p.name}</span>
               </div>
               <span className="text-[9px] text-lmu-muted shrink-0">
@@ -64,7 +64,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
         <button
           type="button"
           onClick={onResetDefaults}
-          className="w-full py-1 px-2 rounded text-[10px] text-lmu-muted hover:text-amber-300 hover:bg-amber-500/10 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          className="w-full py-1 px-2 rounded text-[10px] text-lmu-muted hover:text-lmu-warn-soft hover:bg-lmu-warn-strong/10 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           title="Reset all presets to factory defaults"
         >
           <RotateCcw className="w-3 h-3" /> Reset to Defaults

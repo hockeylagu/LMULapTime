@@ -5,8 +5,8 @@ import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 
 export function consistencyClass(pct: number): string {
   if (pct <= 0.3) return 'text-lmu-green';
-  if (pct <= 0.8) return 'text-amber-400';
-  return 'text-rose-400';
+  if (pct <= 0.8) return 'text-lmu-warn';
+  return 'text-lmu-loss';
 }
 
 export function MetricChart({
@@ -105,7 +105,7 @@ export function MetricRow({
         <td className="px-2 py-1.5 font-bold text-white">{label}</td>
         <td className="px-2 py-1.5 text-right text-lmu-green">{stat ? `${stat.min.toFixed(decimals)}${unit}` : '--'}</td>
         <td className="px-2 py-1.5 text-right text-white">{stat ? `${stat.avg.toFixed(decimals)}${unit}` : '--'}</td>
-        <td className="px-2 py-1.5 text-right text-rose-400">{stat ? `${stat.max.toFixed(decimals)}${unit}` : '--'}</td>
+        <td className="px-2 py-1.5 text-right text-lmu-loss">{stat ? `${stat.max.toFixed(decimals)}${unit}` : '--'}</td>
         <td className="px-2 py-1.5 text-right text-white">{stat ? `±${stat.stdDev.toFixed(decimals)}${unit}` : '--'}</td>
         <td className={`px-2 py-1.5 text-right font-bold ${stat ? consistencyClass(stat.consistencyPct) : 'text-lmu-muted'}`}>
           {stat ? `${stat.consistencyPct.toFixed(1)}%` : '--'}
@@ -132,7 +132,7 @@ export function LeastConsistentBadge({
   consistencyPct: number;
 }) {
   return (
-    <div className="m-3 mb-0 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2 shrink-0">
+    <div className="m-3 mb-0 p-2.5 rounded-lg bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-[11px] text-lmu-warn-soft flex items-start gap-2 shrink-0">
       <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
       <span>
         <span className="font-bold">{label}</span> is your least consistent section

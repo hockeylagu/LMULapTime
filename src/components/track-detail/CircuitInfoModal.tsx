@@ -66,13 +66,13 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-lmu-card border border-lmu-rule/80 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-start justify-between border-b border-lmu-border pb-3">
           <div className="flex items-center gap-3.5">
-            <div className="p-1.5 rounded-xl bg-slate-800/80 border border-slate-700">
+            <div className="p-1.5 rounded-xl bg-lmu-raised/80 border border-lmu-rule">
               <TrackCircuitLayout
                 trackName={trackName}
                 trackCourse={trackCourse}
@@ -91,14 +91,14 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
               <p className="text-xs text-lmu-gold font-medium mt-0.5">
                 {specs.layoutName} {specs.fiaGrade && `• ${specs.fiaGrade}`}
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-lmu-muted">
                 {specs.city}, {specs.country}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-raised transition-colors"
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -110,8 +110,8 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
           {/* Key Circuit Specifications Grid */}
           <div className="grid grid-cols-3 gap-2.5">
             {/* Length */}
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-lmu-accent text-[11px] font-semibold">
+            <div className="p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-lmu-accent-text text-[11px] font-semibold">
                 <Ruler className="w-3.5 h-3.5" />
                 <span>Length</span>
               </div>
@@ -119,15 +119,15 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
                 <div className="text-sm font-bold font-mono text-white">
                   {displayLengthKm} km
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">
+                <div className="text-[10px] text-lmu-muted font-mono">
                   {displayLengthM.toLocaleString()} m ({displayLengthMi} mi)
                 </div>
               </div>
             </div>
 
             {/* Turns */}
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-purple-400 text-[11px] font-semibold">
+            <div className="p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-lmu-purple text-[11px] font-semibold">
                 <Compass className="w-3.5 h-3.5" />
                 <span>Turns</span>
               </div>
@@ -135,15 +135,15 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
                 <div className="text-sm font-bold font-mono text-white">
                   {specs.turnCount} Turns
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-lmu-muted">
                   {specs.direction}
                 </div>
               </div>
             </div>
 
             {/* Elevation Delta */}
-            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-semibold">
+            <div className="p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-lmu-gain text-[11px] font-semibold">
                 <Mountain className="w-3.5 h-3.5" />
                 <span>Elevation</span>
               </div>
@@ -151,7 +151,7 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
                 <div className="text-sm font-bold font-mono text-white">
                   {specs.elevationChangeMeters !== undefined ? `${specs.elevationChangeMeters} m` : 'Flat'}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">
+                <div className="text-[10px] text-lmu-muted font-mono">
                   {specs.elevationChangeMeters !== undefined
                     ? `${Math.round(specs.elevationChangeMeters * 3.28084)} ft Delta`
                     : 'Profile Pending'}
@@ -162,16 +162,16 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
 
           {/* Famous Corners Breakdown */}
           {specs.famousCorners.length > 0 && (
-            <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2">
+            <div className="p-3.5 rounded-xl bg-lmu-raised/40 border border-lmu-rule/50 space-y-2">
               <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Flag className="w-3.5 h-3.5 text-purple-400" />
+                <Flag className="w-3.5 h-3.5 text-lmu-purple" />
                 <span>Notable Corners & Sectors</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {specs.famousCorners.map((corner, i) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium"
+                    className="px-2 py-0.5 rounded-md bg-lmu-raised border border-lmu-rule text-lmu-text-soft text-[11px] font-medium"
                   >
                     {corner}
                   </span>
@@ -182,20 +182,20 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
 
           {/* Timing Gates / Sector Stations */}
           {timingGates && (
-            <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2">
+            <div className="p-3.5 rounded-xl bg-lmu-raised/40 border border-lmu-rule/50 space-y-2">
               <div className="flex items-center gap-2 text-white font-bold text-xs">
                 <Award className="w-3.5 h-3.5 text-lmu-gold" />
                 <span>Official Timing Loops & Sectors</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2 rounded-lg bg-slate-800/70 border border-slate-700">
-                  <div className="text-slate-400">Sector 1 Gate</div>
+                <div className="p-2 rounded-lg bg-lmu-raised/70 border border-lmu-rule">
+                  <div className="text-lmu-muted">Sector 1 Gate</div>
                   <div className="font-mono font-bold text-white mt-0.5">
                     {timingGates.sector1 ? `${Math.round(timingGates.sector1.stationM)} m` : 'N/A'}
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-slate-800/70 border border-slate-700">
-                  <div className="text-slate-400">Sector 2 Gate</div>
+                <div className="p-2 rounded-lg bg-lmu-raised/70 border border-lmu-rule">
+                  <div className="text-lmu-muted">Sector 2 Gate</div>
                   <div className="font-mono font-bold text-white mt-0.5">
                     {timingGates.sector2 ? `${Math.round(timingGates.sector2.stationM)} m` : 'N/A'}
                   </div>
@@ -205,34 +205,34 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
           )}
 
           {/* Track information */}
-          <div className="p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2.5">
+          <div className="p-3.5 rounded-xl bg-lmu-raised/40 border border-lmu-rule/50 space-y-2.5">
             <div className="flex items-center gap-2 text-white font-bold text-xs">
-              <FileCode className="w-3.5 h-3.5 text-sky-400" />
+              <FileCode className="w-3.5 h-3.5 text-lmu-info" />
               <span>Track information</span>
             </div>
 
-            <div className="space-y-2 text-[11px] text-slate-300">
+            <div className="space-y-2 text-[11px] text-lmu-text-soft">
               <div className="flex items-start gap-2">
                 <Layers className="w-3.5 h-3.5 text-lmu-gold shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-white">Physical Road Boundaries: </span>
-                  <span className="text-slate-300">{specs.geometryDescription}</span>
+                  <span className="text-lmu-text-soft">{specs.geometryDescription}</span>
                 </div>
               </div>
 
               <div className="flex items-start gap-2">
-                <FileCode className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <FileCode className="w-3.5 h-3.5 text-lmu-gain shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-white">Parsed From: </span>
-                  <span className="text-slate-300">{specs.parsedFrom}</span>
+                  <span className="text-lmu-text-soft">{specs.parsedFrom}</span>
                 </div>
               </div>
 
               <div className="flex items-start gap-2">
-                <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <Info className="w-3.5 h-3.5 text-lmu-aqua shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-white">Coordinate System: </span>
-                  <span className="text-slate-300">
+                  <span className="text-lmu-text-soft">
                     Pre-aligned 1:1 Metric LMU World Space (scale factor 0.99 &lt; s &lt; 1.01).
                   </span>
                 </div>
@@ -242,12 +242,12 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-          <span>Layout Key: <span className="font-mono text-slate-400">{specs.layoutKey}</span></span>
+        <div className="pt-2 border-t border-lmu-border flex items-center justify-between text-[11px] text-lmu-faint">
+          <span>Layout Key: <span className="font-mono text-lmu-muted">{specs.layoutKey}</span></span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold transition-colors"
+            className="px-4 py-1.5 rounded-lg bg-lmu-raised hover:bg-lmu-rule text-white font-semibold transition-colors"
           >
             Close
           </button>
