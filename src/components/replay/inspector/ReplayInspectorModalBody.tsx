@@ -1,13 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint, ComparableLap } from '../../../../shared/types/index.js';
-import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
 import { CompareLapFilter } from './ReplayCompareLapPicker.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
-import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
-import { TelemetryStripCharts } from '../telemetry/TelemetryStripCharts.js';
+import { ReplayInspectorTelemetryColumn } from './ReplayInspectorTelemetryColumn.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayInspectorSidebar } from './ReplayInspectorSidebar.js';
 import { TelemetryResolution } from '../telemetry/telemetryResolution.js';
@@ -155,11 +154,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   duckdbUnavailableReason,
   onSelectSource,
 }) => {
-  const initialStraight = useMemo(() => {
-    const first = lapSegments.find(s => s.type === 'straight' && s.entryDistM <= 50);
-    return first && first.lengthM >= 30 ? (first as StraightSegmentComparison) : null;
-  }, [lapSegments]);
-
   return (
     <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
       <ReplayInspectorHeader
@@ -205,55 +199,30 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       )}
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 flex flex-col bg-lmu-deep p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
-          <div className="flex-1 min-h-0 w-full">
-            <TelemetryStripCharts
-              points={trajectory?.points || []}
-              currentIndex={currentIndex}
-              onSelectIndex={setCurrentIndex}
-              isLoading={isLoading || isTrajLoading}
-              sectors={trajectory?.sectors}
-              className="w-full h-full"
-              headerContent={
-                <ReplayPerformanceHeader
-                  currentLap={trajectory?.currentLap ?? 1}
-                  currentLapSummary={currentLapSummary}
-                  bestS1Sec={bestSectors.s1}
-                  bestS2Sec={bestSectors.s2}
-                  bestS3Sec={bestSectors.s3}
-                  isCompareMode={isCompareMode}
-                  trajectory={trajectory}
-                  baselineTrajectory={baselineTrajectory ?? null}
-                  lapDeltas={lapDeltas}
-                  formatLapTime={formatLapTime}
-                />
-              }
-              baselinePoints={isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined}
-              zoomRange={chartZoomRange}
-              onZoomRangeChange={setChartZoomRange}
-              telemetryResolution={telemetryResolution}
-              onChangeResolution={handleChangeResolution}
-              rawPointsCount={trajectory?.rawPointsCount}
-              rawSampleRateHz={trajectory?.rawSampleRateHz}
-              vcrRawPointsCount={trajectory?.vcrRawPointsCount}
-              vcrRawSampleRateHz={trajectory?.vcrRawSampleRateHz}
-              duckdbRawPointsCount={trajectory?.duckdbRawPointsCount}
-              duckdbRawSampleRateHz={trajectory?.duckdbRawSampleRateHz}
-              isFullResolution={trajectory?.isFullResolution}
-              selectedCornerMarkers={selectedCornerMarkers}
-              cornerSegments={cornerSegments}
-              initialStraight={initialStraight}
-              selectedCornerNumber={selectedCornerNumber}
-              onSelectCorner={handleSelectCorner}
-              source={trajectory?.source}
-              duckdbFilename={trajectory?.duckdbFilename}
-              hasDuckDb={hasDuckDbTelemetry}
-              duckdbUnavailableReason={duckdbUnavailableReason}
-              onSelectSource={onSelectSource}
-              trackLengthM={trajectory?.trackLengthM}
-            />
-          </div>
-        </div>
+        <ReplayInspectorTelemetryColumn
+          trajectory={trajectory}
+          baselineTrajectory={baselineTrajectory}
+          isCompareMode={isCompareMode}
+          currentIndex={currentIndex}
+          setCurrentIndex={setCurrentIndex}
+          isLoading={isLoading || isTrajLoading}
+          currentLapSummary={currentLapSummary}
+          bestSectors={bestSectors}
+          lapDeltas={lapDeltas}
+          formatLapTime={formatLapTime}
+          chartZoomRange={chartZoomRange}
+          setChartZoomRange={setChartZoomRange}
+          telemetryResolution={telemetryResolution}
+          handleChangeResolution={handleChangeResolution}
+          selectedCornerMarkers={selectedCornerMarkers}
+          cornerSegments={cornerSegments}
+          lapSegments={lapSegments}
+          selectedCornerNumber={selectedCornerNumber}
+          handleSelectCorner={handleSelectCorner}
+          hasDuckDbTelemetry={hasDuckDbTelemetry}
+          duckdbUnavailableReason={duckdbUnavailableReason}
+          onSelectSource={onSelectSource}
+        />
 
         <ReplayInspectorSidebar
           activeTab={activeTab}
