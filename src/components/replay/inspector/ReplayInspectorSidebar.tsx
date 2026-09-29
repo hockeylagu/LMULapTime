@@ -1,9 +1,10 @@
 import React, { useCallback } from 'react';
-import { Activity, BrainCircuit, Timer, X } from 'lucide-react';
+import { Activity, BrainCircuit, Timer } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
+import { ReplayInspectorSidebarTabs } from './ReplayInspectorSidebarTabs.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayMapContainer } from '../map/ReplayMapContainer.js';
 import { AIReportTab } from '../analysis/AIReportTab.js';
@@ -134,51 +135,15 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
           : 'w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px]'
       }`}
     >
-      <div className="px-4 py-2 bg-lmu-card border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab(activeTab === 'corners' ? 'map' : 'corners')}
-            aria-pressed={activeTab === 'corners'}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer border ${
-              activeTab === 'corners'
-                ? 'bg-lmu-accent text-white border-lmu-accent shadow-md'
-                : 'bg-lmu-bg/60 text-lmu-muted hover:text-white border-lmu-border/60 hover:border-lmu-border'
-            }`}
-            title={activeTab === 'corners' ? 'Close Corners Panel' : 'Open Corners Panel'}
-          >
-            <Timer className="w-3.5 h-3.5" /> Corners ({cornerCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab(activeTab === 'ai-report' ? 'map' : 'ai-report')}
-            aria-pressed={activeTab === 'ai-report'}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer border ${
-              activeTab === 'ai-report'
-                ? 'bg-lmu-accent text-white border-lmu-accent shadow-md'
-                : 'bg-lmu-bg/60 text-lmu-muted hover:text-white border-lmu-border/60 hover:border-lmu-border'
-            }`}
-            title={activeTab === 'ai-report' ? 'Close AI Report Panel' : 'Open AI Report Panel'}
-          >
-            <BrainCircuit className="w-3.5 h-3.5" /> AI Report
-          </button>
-        </div>
-
-        {isDoublePanel && (
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('map');
-              handleSelectCorner(null);
-            }}
-            className="inline-flex items-center justify-center w-7 h-7 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            aria-label="Close side panel"
-            title="Close side panel"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      <ReplayInspectorSidebarTabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        cornerCount={cornerCount}
+        onClosePanel={() => {
+          setActiveTab('map');
+          handleSelectCorner(null);
+        }}
+      />
 
       {isDoublePanel ? (
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
