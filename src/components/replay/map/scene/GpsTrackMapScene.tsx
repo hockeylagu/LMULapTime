@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { computeLapComparisons } from '../../../utils/replayComparison.js';
-import { getTrajectoryDistances, getDistancesInReferenceFrame } from '../../../utils/lapAlignment.js';
+import { computeLapComparisons } from '../../../../utils/replayComparison.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame } from '../../../../utils/lapAlignment.js';
 import {
   projectTrajectoryPoints,
   projectBoundaryPoints,
@@ -12,23 +12,23 @@ import {
   computeEffectiveBounds,
   computeBaselineDeltaByIdx,
   projectStartFinishGate,
-} from './replayMapUtils.js';
-import { MapControlsOverlay } from './MapControlsOverlay.js';
-import { HeatmapLegendBar } from './HeatmapLegendBar.js';
+} from '../replayMapUtils.js';
+import { MapControlsOverlay } from '../MapControlsOverlay.js';
+import { HeatmapLegendBar } from '../HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
 import { GpsSceneCarMarkers } from './GpsSceneCarMarkers.js';
-import { useGpsMapPanZoom } from './useGpsMapPanZoom.js';
-import { GpsCircuitMinimap } from './GpsCircuitMinimap.js';
+import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
+import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
-import { useTrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
-import { MAP_COLORS } from '../../../utils/themeColors.js';
+import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
+import { MAP_COLORS } from '../../../../utils/themeColors.js';
 
-import type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
+import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 
-export type { GpsTrackMapSceneProps } from './gpsTrackMapTypes.js';
+export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const {

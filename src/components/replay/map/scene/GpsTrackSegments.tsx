@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { buildTrackLineRuns, getHeatmapColor, MapColorMode, nearestRunVertex, ProjectedPoint, TrackLineRun } from './replayMapUtils.js';
+import { buildTrackLineRuns, getHeatmapColor, MapColorMode, nearestRunVertex, ProjectedPoint, TrackLineRun } from '../replayMapUtils.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];

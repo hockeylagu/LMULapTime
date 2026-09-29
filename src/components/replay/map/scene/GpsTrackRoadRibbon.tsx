@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { MAP_COLORS } from '../../../utils/themeColors.js';
-import { buildRoadRibbonSvgPath, buildClosedSvgPath } from './replayMapUtils.js';
+import { MAP_COLORS } from '../../../../utils/themeColors.js';
+import { buildRoadRibbonSvgPath, buildClosedSvgPath } from '../replayMapUtils.js';
 
 export interface GpsTrackRoadRibbonProps {
   leftSvgPoints: Array<{ sx: number; sy: number }>;

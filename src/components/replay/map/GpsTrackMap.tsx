@@ -1,5 +1,5 @@
 import React from 'react';
-import { GpsTrackMapScene } from './GpsTrackMapScene.js';
+import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
 import type { GpsTrackMapProps } from './gpsTrackMapTypes.js';
 
 export type {

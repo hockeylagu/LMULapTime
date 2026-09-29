@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GpsSceneHudOverlay } from '../../../../src/components/replay/map/GpsSceneHudOverlay.js';
+import { GpsSceneHudOverlay } from '../../../../../src/components/replay/map/scene/GpsSceneHudOverlay.js';
 
 describe('GpsSceneHudOverlay', () => {
   it('renders garage indicator in the bottom-right corner when car is stationary', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { GpsStartFinishLine } from '../../../../src/components/replay/map/GpsStartFinishLine.js';
-import type { ProjectedPoint } from '../../../../src/components/replay/map/replayMapUtils.js';
+import { GpsStartFinishLine } from '../../../../../src/components/replay/map/scene/GpsStartFinishLine.js';
+import type { ProjectedPoint } from '../../../../../src/components/replay/map/replayMapUtils.js';
 
 describe('GpsStartFinishLine', () => {
   const mockPoints: ProjectedPoint[] = [
