@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import {
   speedDeltaClass,
   timeDeltaClass,

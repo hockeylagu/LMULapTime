@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { loadTrackBoundaryGeometry } from '../../../api/trackGeometryApi.js';
+import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 
 export interface TimingGateGeometry {
   name: string;
@@ -49,8 +51,6 @@ export interface TrackBoundaryGeometry {
     center: [number, number];
   }>;
 }
-
-import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
 // Capped with LRU eviction to keep memory low across 21 track geometries.
@@ -112,14 +112,8 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
 
     let fetchPromise = inFlightRequests.get(resolvedKey);
     if (!fetchPromise) {
-      fetchPromise = fetch(`/tracks/${resolvedKey}.json`)
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`Failed to load track geometry: ${res.status}`);
-          }
-          return res.json();
-        })
-        .then((data: TrackBoundaryGeometry) => {
+      fetchPromise = loadTrackBoundaryGeometry<TrackBoundaryGeometry>(resolvedKey)
+        .then((data) => {
           setGeometryCache(resolvedKey, data);
           inFlightRequests.delete(resolvedKey);
           return data;

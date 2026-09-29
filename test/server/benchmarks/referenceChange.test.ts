@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { enrichTrajectoryWithTrackGeometry, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import { computeLapComparisons } from '../../../src/utils/replayComparison.js';
-import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/index.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
 
 describe('Baseline Comparison & Reference Change Invariance', () => {

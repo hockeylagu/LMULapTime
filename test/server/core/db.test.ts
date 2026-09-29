@@ -5,7 +5,7 @@ import os from 'os';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
-import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
+import { parseReplayMetadata } from '../../../server/replay/decode/replayParser.js';
 import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 

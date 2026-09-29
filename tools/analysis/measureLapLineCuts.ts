@@ -21,7 +21,7 @@ import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { getTrackDefinition } from '../../server/tracks/serverTrackSync.js';
 import { projectTrajectoryToCenterline } from '../../server/tracks/trackProjection.js';
 import { cutLapAtLine } from '../../server/tracks/lapLineCut.js';
-import { lapEdgesFromNeighbours } from '../../server/replay/replayLapPoints.js';
+import { lapEdgesFromNeighbours } from '../../server/replay/decode/replayLapPoints.js';
 import { countStationGlitches } from '../../server/tracks/stationGlitches.js';
 
 type EndStatus = 'cut' | `extrapolated (${string})` | `not on the line (${string})`;

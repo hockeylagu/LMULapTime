@@ -8,7 +8,7 @@ import {
   upsertReplayTrajectoryCache,
 } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
 import { replaceReplayDriverLapFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
-import { lapFactsFrom } from '../../../../server/replay/replayFacts.js';
+import { lapFactsFrom } from '../../../../server/replay/decode/replayFacts.js';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 
 const lap = (lapNumber: number): ReplayTrajectoryData => ({

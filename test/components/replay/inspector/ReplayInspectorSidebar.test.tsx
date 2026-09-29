@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReplayInspectorSidebar } from '../../../../src/components/replay/inspector/ReplayInspectorSidebar.js';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
-import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
 import { CornerApexChart } from '../../../../src/components/replay/analysis/CornerApexChart.js';
 
 // Spy on the real chart (it still renders) to check the distances it is given.

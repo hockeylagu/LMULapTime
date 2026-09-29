@@ -50,7 +50,7 @@ This document provides architectural standards, domain rules, coding conventions
 - **Better-SQLite3** with **WAL Mode** (`server/lmu_cache.db` schema and columnar storage managed in `server/core/db.ts` and `server/core/dbSchema.ts`)
 - **DuckDB Node.js Reader** (`server/telemetry/duckdbReader.ts`) for high-throughput 100 Hz columnar querying
 - **Fast-XML-Parser** (`server/sessions/parser.ts`, `server/sessions/sessionXmlStream.ts`) for high-throughput XML ingestion
-- **Custom Binary VCR Parser & Worker** (`server/replay/replayParser.ts`, `server/replay/replayTrajectoryWorker.ts`) for non-blocking replay decoding
+- **Custom Binary VCR Parser & Worker** (`server/replay/decode/replayParser.ts`, `server/replay/worker/replayTrajectoryWorker.ts`) for non-blocking replay decoding
 - **Google Gen AI SDK** (`@google/genai` in `server/ai/aiReport.ts`)
 
 ### Tooling & Native Utilities
@@ -72,7 +72,7 @@ This document provides architectural standards, domain rules, coding conventions
 | `server/core/` | SQLite coordinator (`db.ts`), DDL (`dbSchema.ts`), one store module per table group, `ServerContext` (scans, enrichment) |
 | `server/core/replay/` | Replay cache stores: metadata, trajectories, normalized facts, links, identity, upgrade, race positions |
 | `server/sessions/` | XML parsing (`parser.ts`), lap classification, replay matching and links, pit stops, session analytics |
-| `server/replay/` | `.Vcr` decoding (worker thread), lap slicing, facts, downsampling, trajectory/telemetry services, upgrade runner |
+| `server/replay/` | Trajectory/telemetry services and upgrade runner; `decode/` (`.Vcr` decoding, lap slicing, facts, downsampling) and `worker/` (worker thread, its client and bootstrap) |
 | `server/telemetry/` | DuckDB 100 Hz reader, catalog, session links, fusion with replay coordinates |
 | `server/traffic/` | Every car's 5 Hz track position per replay (worker-built index) and traffic spells |
 | `server/tracks/` | Track geometry, centerline projection, timing line cut, station glitch repair, outlines |
@@ -115,7 +115,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ### D. Replay Binary Stream Safety & Offloading
 - Replay files (`.Vcr`) can exceed 300MB–1GB.
-- Always use worker-thread decoding (`server/replay/replayTrajectoryWorker.ts`) for CPU-heavy slice decoding to prevent blocking the Node.js event loop.
+- Always use worker-thread decoding (`server/replay/worker/replayTrajectoryWorker.ts`) for CPU-heavy slice decoding to prevent blocking the Node.js event loop.
 - Streaming and downsampling functions (`downsampleReplayTrajectory`) must preserve apex minimum speeds, maximum straight speeds, and braking initiation points while preventing frontend memory exhaustion.
 - Cache processed trajectories and columnar channel data in SQLite (`server/core/db.ts`) with appropriate hash/timestamp invalidation.
 

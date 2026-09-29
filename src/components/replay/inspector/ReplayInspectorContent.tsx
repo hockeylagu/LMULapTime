@@ -3,7 +3,7 @@ import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/index.js';
 import { filterCornerConsistencyStats } from '../../../utils/cornerConsistency.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';

@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ReplayInspectorModalBody } from '../../../../src/components/replay/inspector/ReplayInspectorModalBody';
-import { LapSegmentComparison } from '../../../../src/utils/cornerAnalysis';
+import { LapSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorHeader', () => ({
   ReplayInspectorHeader: (props: { replayName?: string | null }) => (

@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
-import { CornerSegmentComparison } from './cornerAnalysis.js';
+import { CornerSegmentComparison } from './cornerAnalysis/index.js';
 import { PointComparison } from './replayComparison.js';
 import { getTrajectoryDistances } from './lapAlignment.js';
 

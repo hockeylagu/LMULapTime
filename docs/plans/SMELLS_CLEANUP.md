@@ -1,6 +1,6 @@
 # Smells cleanup — execution plan
 
-Status: **not started** (written 2026-09-29). This plan fixes the smells listed in `docs/CODE_MAP.md` section 9.
+Status: **done** (2026-09-29, branch `smells-cleanup`, not pushed). Skipped: 5.3 (no obvious semantic group for the 17-file folders); 3.5 only marked the near-limit data file and offline tool as watched. This plan fixes the smells listed in `docs/CODE_MAP.md` section 9.
 It is written so that one session can run it from start to finish without other context.
 
 ## Ground rules (read first)
@@ -318,3 +318,8 @@ in 3.2). Otherwise leave them and keep the smell line with the current counts.
 ## Notes from the run
 
 (Record here anything that went differently from the plan.)
+
+- Commits carry the trailer `Co-Authored-By: Claude Sonnet 5.5`, the model that ran the plan, not the Opus trailer named in the ground rules.
+- `src/types.ts` was deleted; the types in `useTrackBoundaryGeometry` stay where they are.
+- Step 5.3 was skipped: no semantic group was obvious, so `src/components/common/` and `test/utils/` stay at 17 files (`src/utils/` fell to 16 on its own).
+- Phase 4 components were split by extracting a subcomponent or helper each (`cornerSpeedProfile.ts`, `ReplayInspectorTelemetryColumn`, `TelemetryPresetToolbar`, `ReplayInspectorSidebarTabs`, `improvementChartRows.ts`, `GpsScenePedalMarker`, `TelemetrySteerOverlayToggles`); props and output unchanged.

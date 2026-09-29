@@ -1,4 +1,4 @@
-import type { PitService } from '../types/index.js';
+import type { LapData, PitService } from '../types/index.js';
 
 /** Replay pit event codes (docs/VCR_FORMAT.md, Pit Stop & Garage Workflow). */
 const ENTERED_PIT_LANE = 34;
@@ -151,4 +151,16 @@ export function summarisePitService(
     service.unexplainedSec = Math.round(serviceSec - usual);
   }
   return service;
+}
+
+/**
+ * The time each lap of the stop lost against an average lap. The parser's pit loss counts both
+ * laps against two average laps, so that average is (in-lap + out-lap - loss) / 2.
+ */
+export function pitLossPerLap(inLap: LapData, outLap?: LapData): { inLap: number; outLap?: number } | undefined {
+  const total = inLap.pitStopDuration;
+  if (typeof total !== 'number' || !inLap.lapTime) return undefined;
+  if (!outLap?.lapTime) return { inLap: total };
+  const average = (inLap.lapTime + outLap.lapTime - total) / 2;
+  return { inLap: inLap.lapTime - average, outLap: outLap.lapTime - average };
 }

@@ -5,7 +5,7 @@ import { getStoredReplayTrajectory } from '../core/replay/dbReplayTrajectoryStor
 import {
   EnergyPoint, PitStopTimes, classMedianService, lineInPitLane, pitStopsFromEvents, serviceSeconds, stopEnergy, summarisePitService,
 } from '../../shared/domain/pitStops.js';
-import type { ReplayDriverEventFact } from '../replay/replayFacts.js';
+import type { ReplayDriverEventFact } from '../replay/decode/replayFacts.js';
 
 const eventDriverName = (event: ReplayDriverEventFact) =>
   typeof event.detail?.driverName === 'string' ? event.detail.driverName : null;
@@ -34,6 +34,10 @@ function pointsOver(db: DatabaseType, replayName: string, slot: number, stop: Pi
  * stored later (or a new rule) needs no re-parse.
  */
 export function attachPitServices(db: DatabaseType, session: DetailedSession): void {
+  // Session objects are cached: drop what an earlier call attached before any early return.
+  for (const driver of [...(session.drivers ?? []), ...(session.playerDriver ? [session.playerDriver] : [])]) {
+    for (const lap of driver.laps ?? []) delete lap.pitService;
+  }
   const replayName = session.matchingReplayFile?.name;
   if (!replayName) return;
   const events = getDriverEvents(db, replayName).filter((e) => e.kind === 'pit' || e.kind === 'penalty_served');

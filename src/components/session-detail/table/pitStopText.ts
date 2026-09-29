@@ -1,4 +1,5 @@
 import type { LapData, PitService } from '../../../../shared/types/index.js';
+import { pitLossPerLap } from '../../../../shared/domain/pitStops.js';
 
 /** Damage the driver reported on the laps since their previous stop, up to this in-lap. */
 export interface EarlierDamage {
@@ -63,25 +64,13 @@ export function describePitService(service: PitService, damage?: EarlierDamage):
 }
 
 /**
- * The time each lap of the stop lost against an average lap. The parser's pit loss counts both
- * laps against two average laps, so that average is (in-lap + out-lap - loss) / 2.
- */
-function lapLosses(inLap: LapData, outLap?: LapData): { inLap: number; outLap?: number } | undefined {
-  const total = inLap.pitStopDuration;
-  if (typeof total !== 'number' || !inLap.lapTime) return undefined;
-  if (!outLap?.lapTime) return { inLap: total };
-  const average = (inLap.lapTime + outLap.lapTime - total) / 2;
-  return { inLap: inLap.lapTime - average, outLap: outLap.lapTime - average };
-}
-
-/**
  * What one lap of a stop adds to the lap row: the pit entry on the in-lap, the time in the box on
  * whichever lap it fell (the timing line often runs through the pit lane), the pit exit on the
  * out-lap, and each lap's own time lost; the out-lap closes with the whole stop.
  */
 export function describePitStopLap({ inLap, outLap, damageBefore, onOutLap }: LapPitStop): string[] {
   const service = inLap.pitService;
-  const losses = lapLosses(inLap, outLap);
+  const losses = pitLossPerLap(inLap, outLap);
   const lines: string[] = [];
   const beforeLine = service?.laneBeforeLineSec;
   if (!onOutLap) {
