@@ -3,7 +3,7 @@ import type { DetailedSession, DriverData, LapData } from '../core/types.js';
 import { getDriverEvents, getReplayLaps } from '../core/replay/dbReplayLapStore.js';
 import { getStoredReplayTrajectory } from '../core/replay/dbReplayTrajectoryStore.js';
 import {
-  EnergyPoint, PitStopTimes, classMedianService, pitStopsFromEvents, serviceSeconds, stopEnergy, summarisePitService,
+  EnergyPoint, PitStopTimes, classMedianService, lineInPitLane, pitStopsFromEvents, serviceSeconds, stopEnergy, summarisePitService,
 } from '../../shared/domain/pitStops.js';
 import type { ReplayDriverEventFact } from '../replay/replayFacts.js';
 
@@ -28,8 +28,9 @@ function pointsOver(db: DatabaseType, replayName: string, slot: number, stop: Pi
 
 /**
  * Sets `pitService` on every driver's in-laps from the linked replay's pit events: time in the pit
- * lane and on the jacks, the class's usual stop, and for the player the energy refill and a guess
- * at repairs when the stop ran well past both. Read-time only: nothing is stored, so a replay
+ * lane (and where the timing line fell in it) and on the jacks, the class's usual stop, and for
+ * the player the energy refill and a guess at repairs when the stop ran well past both. Read-time
+ * only: nothing is stored, so a replay
  * stored later (or a new rule) needs no re-parse.
  */
 export function attachPitServices(db: DatabaseType, session: DetailedSession): void {
@@ -48,6 +49,10 @@ export function attachPitServices(db: DatabaseType, session: DetailedSession): v
     const own = byName.get(driver.name) ?? [];
     return [driver.name, { stops: pitStopsFromEvents(own.filter((e) => e.kind === 'pit')), own }] as const;
   }));
+  const lapStarts = new Map<number, number[]>();
+  for (const lap of getReplayLaps(db, replayName)) {
+    if (lap.startSec !== null) lapStarts.set(lap.driverSlot, [...(lapStarts.get(lap.driverSlot) ?? []), lap.startSec]);
+  }
   const classOf = (driver: DriverData) => (driver.carClass || '').toLowerCase();
   const playerName = session.playerDriver?.name;
 
@@ -64,7 +69,8 @@ export function attachPitServices(db: DatabaseType, session: DetailedSession): v
       const end = stop.exitSec ?? Infinity;
       const penaltyServed = own.some((e) => e.kind === 'penalty_served' && e.timeSec >= stop.entrySec && e.timeSec <= end);
       const energy = driver.name === playerName && slot !== undefined ? stopEnergy(pointsOver(db, replayName, slot, stop), stop) : undefined;
-      lap.pitService = summarisePitService(stop, { classMedianServiceSec: classMedianService(otherServices), energy, penaltyServed });
+      const lineSec = slot !== undefined ? lineInPitLane(stop, lapStarts.get(slot) ?? []) : undefined;
+      lap.pitService = summarisePitService(stop, { classMedianServiceSec: classMedianService(otherServices), energy, penaltyServed, lineSec });
     }
   }
   if (playerName) {

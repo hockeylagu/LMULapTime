@@ -14,6 +14,13 @@ export interface PitService {
   energyTo?: number;
   /** From on the jacks to the end of the refill; absent when the energy was not recorded or not refilled. */
   refillSec?: number;
+  /**
+   * Pit entry line to the timing line, when the line falls inside the pit lane: the stop then
+   * spans the in-lap and the out-lap, and the rest of the lane is on the out-lap.
+   */
+  laneBeforeLineSec?: number;
+  /** The car went on the jacks after crossing the line: the time in the box is on the out-lap. */
+  serviceAfterLine?: boolean;
   /** A penalty served during the stop: its time in the box is not service. */
   penaltyServed?: boolean;
   /**

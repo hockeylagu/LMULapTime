@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
+import { replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
+import { emptyLapFact } from '../../../server/replay/replayFacts.js';
 import { attachPitServices } from '../../../server/sessions/sessionPitStops.js';
 import type { ReplayDriverEventFact } from '../../../server/replay/replayFacts.js';
 import type { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
@@ -61,6 +62,18 @@ describe('attachPitServices', () => {
     // The other class is not part of the GT3 usual stop, and a penalty served explains a stop.
     expect(session.drivers[3].laps[1].pitService?.penaltyServed).toBe(true);
     expect(session.drivers[4].laps[1].pitService?.classMedianServiceSec).toBeNull();
+  });
+
+  it('reads where the timing line fell in the pit lane from the replay laps', () => {
+    // My replay lap 3 starts at 195 s: 5 s into the pit lane, before the jacks at 200 s.
+    const lapFact = (lapNumber: number, startSec: number) => ({ ...emptyLapFact(lapNumber), startSec, endSec: startSec + 100 });
+    replaceReplayDriverLapFacts(rawDb(db), replayName, 0, [lapFact(2, 95), lapFact(3, 195)], 'v7');
+    const me = driver('Me');
+    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, sizeBytes: 1 }, drivers: [me] } as unknown as DetailedSession;
+
+    attachPitServices(rawDb(db), session);
+
+    expect(me.laps[1].pitService).toMatchObject({ laneBeforeLineSec: 5, serviceAfterLine: true });
   });
 
   it('leaves a session without a linked replay alone', () => {

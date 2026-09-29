@@ -30,18 +30,38 @@ describe('lapDetailSections', () => {
     expect(lapDetailSections(lap({ traffic, isOutLap: true }))).toEqual([]);
   });
 
-  it('adds the stop from the replay under the pit loss, with the damage before it', () => {
-    const pitService = { pitLaneSec: 123.1, serviceSec: 73.2, classMedianServiceSec: 29.3, unexplainedSec: 44 };
-    const inLap = lap({ lapNum: 14, isPitStop: true, pitStopDurationString: '+100.1s', pitService });
-    const pitStop = { inLap, outLapNum: 15, damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
-    const stopSection = [{ label: 'Pit stop', lines: [
-      'Estimated pit loss: +100.1s (laps 14 and 15)',
-      'In the box: 73 s (usual for your class: 29 s) · pit lane 123 s',
+  const pitService = { pitLaneSec: 123.1, serviceSec: 73.2, classMedianServiceSec: 29.3, unexplainedSec: 44 };
+
+  it('splits a stop between its in-lap and its out-lap at the timing line', () => {
+    // The 08/27 Daytona stop: the line runs through the pit lane 13 s after the entry, before the box.
+    const inLap = lap({
+      lapNum: 14, lapTime: 122.366, isPitStop: true, pitStopDuration: 113.1, pitStopDurationString: '+113.1s',
+      pitService: { ...pitService, laneBeforeLineSec: 13.4, serviceAfterLine: true },
+    });
+    const outLap = lap({ lapNum: 15, lapTime: 210.933, isOutLap: true });
+    const stop = { inLap, outLap, damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
+
+    expect(lapDetailSections(inLap, { pitStop: { ...stop, onOutLap: false } })).toEqual([{ label: 'Pit stop', lines: [
+      'Pit entry: into the pit lane 13 s before the line',
+      'Time lost on this lap: +12.3s',
+    ] }]);
+    expect(lapDetailSections(outLap, { pitStop: { ...stop, onOutLap: true } })).toEqual([{ label: 'Pit stop', lines: [
+      'In the box: 73 s (usual for your class: 29 s)',
       "Likely repairs: 44 s longer than your class's usual stop, after the suspension damage on lap 11",
-    ] }];
-    expect(lapDetailSections(inLap, { pitStop })).toEqual(stopSection);
-    // The out-lap shows the same stop: it is where the car sat in the box.
-    expect(lapDetailSections(lap({ lapNum: 15, isOutLap: true }), { pitStop })).toEqual(stopSection);
+      'Pit exit: out of the pit lane 110 s after the line (pit lane 123 s in all)',
+      'Time lost on this lap: +100.8s',
+      'Whole stop: +113.1s over laps 14 and 15',
+    ] }]);
+  });
+
+  it('keeps a stop the line does not cut on the in-lap', () => {
+    const inLap = lap({ lapNum: 5, isPitStop: true, pitStopDuration: 30, pitStopDurationString: '+30.0s', pitService });
+    expect(lapDetailSections(inLap)).toEqual([{ label: 'Pit stop', lines: [
+      'Pit lane: 123 s',
+      'In the box: 73 s (usual for your class: 29 s)',
+      "Likely repairs: 44 s longer than your class's usual stop",
+      'Estimated pit loss: +30.0s',
+    ] }]);
   });
 
   it('adds the pit loss on a pit lap and nothing on a quiet lap', () => {

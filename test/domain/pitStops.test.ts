@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classMedianService, pitStopsFromEvents, stopEnergy, summarisePitService } from '../../shared/domain/pitStops.js';
+import { classMedianService, lineInPitLane, pitStopsFromEvents, stopEnergy, summarisePitService } from '../../shared/domain/pitStops.js';
 
 // The 08/27 Daytona stop: entry 1753.1, on jacks 1768.5, service complete 1841.7, exit 1876.2.
 const events = [
@@ -50,6 +50,16 @@ describe('summarisePitService', () => {
     expect(summarisePitService(stop, { classMedianServiceSec: 29.3, penaltyServed: true }).unexplainedSec).toBeUndefined();
     expect(summarisePitService(stop, { classMedianServiceSec: 60, penaltyServed: false }).unexplainedSec).toBeUndefined();
     expect(summarisePitService(stop, { classMedianServiceSec: null, penaltyServed: false }).unexplainedSec).toBeUndefined();
+  });
+
+  it('finds the timing line in the pit lane and which side of it the box was', () => {
+    // Lap 15 started at 1766.5, in the pit lane and 2 s before the jacks.
+    const lineSec = lineInPitLane(stop, [1534.6, 1644.2, 1766.5, 1977.5]);
+    expect(lineSec).toBe(1766.5);
+    expect(summarisePitService(stop, { classMedianServiceSec: null, penaltyServed: false, lineSec }))
+      .toMatchObject({ laneBeforeLineSec: 13.4, serviceAfterLine: true });
+    expect(summarisePitService(stop, { classMedianServiceSec: null, penaltyServed: false, lineSec: 1800 }).serviceAfterLine).toBeUndefined();
+    expect(lineInPitLane(stop, [1644.2, 1977.5])).toBeUndefined();
   });
 
   it('needs three other stops for a class usual', () => {

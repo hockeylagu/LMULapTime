@@ -33,10 +33,10 @@ describe('lapPitStop', () => {
     { lapNum: 15 },
   ] as LapData[];
 
-  it('gives the in-lap and its out-lap the same stop', () => {
-    const stop = { inLap: laps[2], outLapNum: 14, damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
-    expect(lapPitStop(laps, laps[2], laps[1])).toEqual(stop);
-    expect(lapPitStop(laps, laps[3], laps[2])).toEqual(stop);
+  it('ties the in-lap and its out-lap to the same stop', () => {
+    const stop = { inLap: laps[2], outLap: laps[3], damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
+    expect(lapPitStop(laps, laps[2], laps[1])).toEqual({ ...stop, onOutLap: false });
+    expect(lapPitStop(laps, laps[3], laps[2])).toEqual({ ...stop, onOutLap: true });
   });
 
   it('has no stop on other laps', () => {
