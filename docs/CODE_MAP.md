@@ -165,9 +165,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - Two re-export barrels (`server/core/types.ts`, `src/types.ts`) give the same types two import paths.
 
 **Stale docs and comments**
-- `AGENTS.md` directory layout misses recent modules: `server/replay/garageState.ts`, `server/sessions/sessionPitStops.ts`,
-  `shared/domain/{pitStops,raceTraffic,lapRepresentativeness,sessionRivals,vehicleCatalog}.ts`, `shared/types/*.ts` files,
-  `session-detail/` subfolders, several `src/utils/` files; its test counts (1,450+/164) are behind (1,756/206).
 - `parser.ts` (~line 248) points to `sessionConditions.ts`; the file is `server/core/dbSessionConditions.ts`.
 
 **Known data limits (not code bugs)**
