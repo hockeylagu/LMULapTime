@@ -93,7 +93,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
         {/* Zoomed State Indicator */}
         {isZoomed && (
           <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10 text-[10px] font-mono">
-            <span className="px-1.5 py-0.2 rounded bg-lmu-info-strong/20 text-lmu-info-soft font-bold">
+            <span className="px-1.5 py-px rounded bg-lmu-info-strong/20 text-lmu-info-soft font-bold">
               Zoomed: Frames {viewStart + 1}–{viewEnd + 1}
             </span>
             {spanTimeSec !== undefined && (

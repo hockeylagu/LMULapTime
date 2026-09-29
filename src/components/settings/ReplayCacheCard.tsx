@@ -144,7 +144,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
             <tbody>
               {replays.map(r => (
                 <tr key={r.filename} className="border-t border-lmu-border/50 hover:bg-lmu-card/50">
-                  <td className="px-3 py-2 text-white font-medium truncate max-w-[220px]" title={r.filename}>{r.filename}</td>
+                  <td className="px-3 py-2 text-white font-medium truncate max-w-[196px]" title={r.filename}>{r.filename}</td>
                   <td className="px-2 py-2 text-center whitespace-nowrap">
                     {r.isOnDisk ? (
                       <span
@@ -171,12 +171,12 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
                       {r.replayVersion || r.parserVersion || '—'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{r.driversCount}</td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{formatDuration(r.durationSec)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-gold">{formatBytes(r.fileSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-gold">{formatBytes(r.compressedSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-muted">{formatDate(r.replayDateMs)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{r.trajectoriesCached}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.driversCount}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{formatDuration(r.durationSec)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.fileSizeBytes)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.compressedSizeBytes)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-muted">{formatDate(r.replayDateMs)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.trajectoriesCached}</td>
                 </tr>
               ))}
             </tbody>

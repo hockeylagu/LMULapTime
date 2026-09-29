@@ -140,21 +140,21 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
 
         {cornerEntryPct !== null && (
           <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-aqua/60 pointer-events-none z-10 border-l border-dashed border-lmu-aqua/60">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-aqua-strong/20 text-lmu-aqua-soft text-[10px] font-mono font-bold whitespace-nowrap">
+            <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-aqua-strong/20 text-lmu-aqua-soft text-[10px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} IN
             </span>
           </div>
         )}
         {cornerMinPct !== null && (
           <div style={{ left: `${cornerMinPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-loss/70 pointer-events-none z-10 border-l border-dashed border-lmu-loss/70">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-loss-strong/20 text-lmu-loss-soft text-[10px] font-mono font-bold whitespace-nowrap">
+            <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-loss-strong/20 text-lmu-loss-soft text-[10px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} APEX
             </span>
           </div>
         )}
         {cornerExitPct !== null && (
           <div style={{ left: `${cornerExitPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-gain/60 pointer-events-none z-10 border-l border-dashed border-lmu-gain/60">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[10px] font-mono font-bold whitespace-nowrap">
+            <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[10px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} OUT
             </span>
           </div>

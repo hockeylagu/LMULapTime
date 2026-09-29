@@ -19,6 +19,11 @@
 }
 
 @layer base {
+  /* Native scrollbars, select popups and form controls render dark, like the app */
+  :root {
+    color-scheme: dark;
+  }
+
   a,
   button:not(:disabled),
   [role="button"],
@@ -54,7 +59,7 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #232A36;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {

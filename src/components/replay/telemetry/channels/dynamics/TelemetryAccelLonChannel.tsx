@@ -71,7 +71,7 @@ export const TelemetryAccelLonChannel: React.FC<TelemetryAccelLonChannelProps> =
           <Gauge className="w-3 h-3" />
           LONGITUDINAL G
         </span>
-        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>}
         {hasLonG ? (

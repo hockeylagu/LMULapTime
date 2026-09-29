@@ -38,7 +38,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
       <span>{label}</span>
       {emptyCount > 0 && (
         <span
-          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+          className={`px-1.5 py-px rounded-full text-[10px] font-mono ${
             hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
           }`}
         >
