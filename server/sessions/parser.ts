@@ -580,11 +580,16 @@ export class LmuParser {
       if (isCompletedPitStop(laps[i - 1]) && !laps[i].isPitStop) laps[i].isOutLap = true;
     }
 
-    // Calculate pit stop loss relative to driver's clean reference lap time
-    const refLapTime = avgLapTime || bestLapTime;
-    laps.forEach(lap => {
-      if (lap.isPitStop && lap.lapTime && refLapTime && lap.lapTime > refLapTime) {
-        const pitLoss = parseFloat((lap.lapTime - refLapTime).toFixed(1));
+    // Pit stop loss against the driver's clean reference lap time, kept on the in-lap. A stop spans
+    // two laps (the drive in and, past the line, the box and the drive out), so the out-lap counts too.
+    // Averaged again now the out-laps are marked, so the slow out-lap is not in the reference.
+    const refLapTime = computeAverageLapTime(laps) || bestLapTime;
+    laps.forEach((lap, i) => {
+      const outLap = laps[i + 1]?.isOutLap && laps[i + 1].lapTime ? laps[i + 1] : null;
+      const stopTime = (lap.lapTime ?? 0) + (outLap?.lapTime ?? 0);
+      const normalTime = refLapTime ? refLapTime * (outLap ? 2 : 1) : 0;
+      if (lap.isPitStop && lap.lapTime && refLapTime && stopTime > normalTime) {
+        const pitLoss = parseFloat((stopTime - normalTime).toFixed(1));
         if (pitLoss > 0) {
           lap.pitStopDuration = pitLoss;
           lap.pitStopDurationString = `+${pitLoss}s`;

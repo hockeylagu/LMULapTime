@@ -1,6 +1,6 @@
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import type { LapPlaces } from '../../../utils/lapTrafficText.js';
-import type { LapDetailContext } from './lapDetailSections.js';
+import type { LapDetailContext, LapPitStop } from './lapDetailSections.js';
 import { damageBeforeStop } from './pitStopText.js';
 
 /**
@@ -30,12 +30,24 @@ export function lapPlaces(
   };
 }
 
+/** The stop a lap is part of: its own when it is the in-lap, the previous lap's when it is the out-lap. */
+export function lapPitStop(laps: LapData[], lap: LapData, prevLap: LapData | null): LapPitStop | undefined {
+  const inLap = lap.isPitStop ? lap : lap.isOutLap && prevLap?.isPitStop ? prevLap : undefined;
+  if (!inLap) return undefined;
+  const outLap = inLap === lap ? laps.find((l) => l.lapNum === lap.lapNum + 1 && l.isOutLap) : lap;
+  return {
+    inLap,
+    outLapNum: outLap?.lapNum,
+    damageBefore: inLap.pitService ? damageBeforeStop(laps, inLap) : undefined,
+  };
+}
+
 /** What the rest of the driver's race adds to a lap's expanded row. */
 export function lapDetailContext(
   session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean
 ): LapDetailContext {
   return {
     places: lapPlaces(session, driver, lap, prevLap, isMultiClass),
-    damageBeforeStop: lap.pitService ? damageBeforeStop(driver?.laps ?? [], lap) : undefined,
+    pitStop: lapPitStop(driver?.laps ?? [], lap, prevLap),
   };
 }

@@ -62,6 +62,24 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(chaser?.laps[1].pitStopDurationString).toMatch(/\+\d+(\.\d+)?s/);
     });
 
+    it('counts the in-lap and the out-lap in the pit loss: a stop spans both', () => {
+      const laps = [120, 120, 120, 125, 170, 120];
+      let et = 0;
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0"><RaceResults><TrackVenue>Spa</TrackVenue><Race><Driver>
+  <Name>Stopper</Name><isPlayer>1</isPlayer><CarType>Porsche 963</CarType><CarClass>Hypercar</CarClass>
+  ${laps.map((t, i) => `<Lap num="${i + 1}" p="1"${i === 3 ? ' pit="1"' : ''} et="${(et += t).toFixed(3)}">${t.toFixed(3)}</Lap>`).join('\n  ')}
+</Driver></Race></RaceResults></rFactorXML>`;
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(xml);
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+
+      const stopper = parser.parseSessionXml('pit_test.xml')?.drivers[0];
+      expect(stopper?.laps[4].isOutLap).toBe(true);
+      // 125 + 170 against two 120 s laps, kept on the in-lap only.
+      expect(stopper?.laps[3].pitStopDuration).toBe(55);
+      expect(stopper?.laps[4].pitStopDuration).toBeUndefined();
+    });
+
     it('preserves elapsed time without fabricating false lap times on incomplete laps', () => {
       const xmlWithoutSectors = `<?xml version="1.0" encoding="utf-8"?>
 <rFactorXML version="1.0">

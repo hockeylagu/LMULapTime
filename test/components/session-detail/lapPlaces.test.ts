@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lapClassPosition, lapPlaces } from '../../../src/components/session-detail/table/lapPlaces.js';
+import { lapClassPosition, lapPitStop, lapPlaces } from '../../../src/components/session-detail/table/lapPlaces.js';
 import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
 const lap = (lapNum: number, position: number) => ({ lapNum, position } as LapData);
@@ -21,5 +21,26 @@ describe('lapPlaces', () => {
   it('knows no places on the first lap or without positions', () => {
     expect(lapPlaces(session, me, me.laps[0], null, true)).toBeUndefined();
     expect(lapPlaces(session, me, me.laps[1], lap(1, 0), true)).toBeUndefined();
+  });
+});
+
+describe('lapPitStop', () => {
+  const laps = [
+    { lapNum: 11, incidents: [{ type: 'damage', description: 'New suspension damage reported' }] },
+    { lapNum: 12 },
+    { lapNum: 13, isPitStop: true, pitService: { pitLaneSec: 120, serviceSec: 70, classMedianServiceSec: 30 } },
+    { lapNum: 14, isOutLap: true },
+    { lapNum: 15 },
+  ] as LapData[];
+
+  it('gives the in-lap and its out-lap the same stop', () => {
+    const stop = { inLap: laps[2], outLapNum: 14, damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
+    expect(lapPitStop(laps, laps[2], laps[1])).toEqual(stop);
+    expect(lapPitStop(laps, laps[3], laps[2])).toEqual(stop);
+  });
+
+  it('has no stop on other laps', () => {
+    expect(lapPitStop(laps, laps[4], laps[3])).toBeUndefined();
+    expect(lapPitStop(laps, laps[1], laps[0])).toBeUndefined();
   });
 });
