@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
-import { emptyLapFact } from '../../../server/replay/replayFacts.js';
+import { emptyLapFact } from '../../../server/replay/decode/replayFacts.js';
 import { attachPitServices } from '../../../server/sessions/sessionPitStops.js';
-import type { ReplayDriverEventFact } from '../../../server/replay/replayFacts.js';
+import type { ReplayDriverEventFact } from '../../../server/replay/decode/replayFacts.js';
 import type { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
 
 const replayName = 'Daytona R1 6.Vcr';

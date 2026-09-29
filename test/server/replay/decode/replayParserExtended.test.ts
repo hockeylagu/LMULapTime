@@ -4,13 +4,13 @@ import os from 'os';
 import path from 'path';
 import {
   parseReplayMetadata,
-} from '../../../server/replay/replayParser.js';
+} from '../../../../server/replay/decode/replayParser.js';
 import {
   extractReplayTrajectory,
   extractReplayLapSummaries,
-} from '../../../server/replay/replayTrajectory.js';
-import { LmuParser } from '../../../server/sessions/parser.js';
-import { MockSlice, createSliceVcrBuffer } from '../../utils/mockVcr.js';
+} from '../../../../server/replay/decode/replayTrajectory.js';
+import { LmuParser } from '../../../../server/sessions/parser.js';
+import { MockSlice, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 

@@ -10,7 +10,7 @@ import {
   SessionWeather,
   TireWear,
 } from '../core/types.js';
-import { parseReplayMetadata, detectPlayerName } from '../replay/replayParser.js';
+import { parseReplayMetadata, detectPlayerName } from '../replay/decode/replayParser.js';
 import {
   formatTime,
   formatElapsedSeconds,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLapsFromTelemetry, RawTrajectoryPoint, VcrTimingEvent } from '../../../server/replay/replayLapBuilder.js';
+import { detectLapsFromTelemetry, RawTrajectoryPoint, VcrTimingEvent } from '../../../../server/replay/decode/replayLapBuilder.js';
 
 const SLOT = 1;
 const SPEED_MPS = 50;

@@ -4,10 +4,10 @@ import {
   LapData,
   ReplayLapSummary,
   ReplayTrajectoryData,
-} from '../core/types.js';
+} from '../../core/types.js';
 import { downsampleReplayTrajectory } from './replayParser.js';
-import { enrichTrajectoryWithTrackGeometry } from '../tracks/serverTrackSync.js';
-import { getDisplayTrackName } from '../../shared/domain/formatters.js';
+import { enrichTrajectoryWithTrackGeometry } from '../../tracks/serverTrackSync.js';
+import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 
 export function downsampleTrajectoryResponse(
   trajectory: ReplayTrajectoryData,

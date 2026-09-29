@@ -1,4 +1,4 @@
-import { ReplayPitEvent, ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayPitEvent, ReplayTrajectoryPoint } from '../../core/types.js';
 
 // Pit event codes that bound a stay in the garage. In practice and qualifying, 21 is the car sent
 // back to its garage (it stops where it is and reappears in the stall) and 16 is the pit exit after

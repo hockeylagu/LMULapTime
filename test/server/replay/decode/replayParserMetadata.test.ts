@@ -6,9 +6,9 @@ import {
   parseReplayMetadata,
   detectPlayerName,
   downsampleReplayTrajectory,
-} from '../../../server/replay/replayParser.js';
-import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
-import { createMockVcrBuffer, createSliceVcrBuffer } from '../../utils/mockVcr.js';
+} from '../../../../server/replay/decode/replayParser.js';
+import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { createMockVcrBuffer, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 /**
  * Creates a VCR buffer with drivers encoded in the primary binary parser format:

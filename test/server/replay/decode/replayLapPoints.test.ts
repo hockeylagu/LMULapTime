@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC } from '../../../server/replay/replayLapPoints.js';
-import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC } from '../../../../server/replay/decode/replayLapPoints.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 // 50 m/s, one sample every 0.1 s (5 m); sample i is at time 100 + i * 0.1.
 const samples = (from: number, to: number, jumpAt?: number): ReplayTrajectoryPoint[] =>

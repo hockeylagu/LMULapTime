@@ -22,7 +22,7 @@ Fixtures (`test/fixtures/replays/*.json`) are captured with
 Since phase 4 the server cuts every lap of a recognised track exactly at the start/finish line
 (`server/tracks/lapLineCut.ts`), using the recording of the neighbouring laps stored in the
 cache, so every fixture lap starts at station 0 and ends at the track length.
-Laps are reduced to the requested resolution by `server/replay/trajectoryDownsampler.ts`
+Laps are reduced to the requested resolution by `server/replay/decode/trajectoryDownsampler.ts`
 (Visvalingam-Whyatt over pedals and speed). Since phase 6 the inspector asks for one point every
 2 m of the lap (`pointSpacingM=2`: 2,863 points at Daytona, 6,813 at Le Mans) instead of a fixed
 2400, and the fixtures are captured the same way. `tools/analysis/measureLapDensity.ts` compares

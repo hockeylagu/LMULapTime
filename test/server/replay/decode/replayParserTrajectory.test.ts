@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
-import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
-import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
+import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
+import { MockSlice, createMockVcrBuffer, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 

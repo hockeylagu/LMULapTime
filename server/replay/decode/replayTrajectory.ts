@@ -9,7 +9,7 @@ import {
   ReplayStandingsSnapshot,
   ReplayLapSummary,
   ReplayWeatherEvent,
-} from '../core/types.js';
+} from '../../core/types.js';
 import { detectPlayerName, parseReplayMetadata } from './replayParser.js';
 import {
   RawTrajectoryPoint,
@@ -23,7 +23,7 @@ import {
   ReplayProgressTracker,
   ReplayProgressCallback,
   ReplayLogOptions,
-} from './replayProgress.js';
+} from '../replayProgress.js';
 
 export interface ExtractReplayTrajectoryOptions extends ReplayLogOptions {
   driverSlot?: number;

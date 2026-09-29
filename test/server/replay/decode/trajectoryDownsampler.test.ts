@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { nearestSelectedIndex, pointBudgetForSpacing, selectFeatureSamples } from '../../../server/replay/trajectoryDownsampler.js';
-import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { nearestSelectedIndex, pointBudgetForSpacing, selectFeatureSamples } from '../../../../server/replay/decode/trajectoryDownsampler.js';
+import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 // A lap sampled every 0.1 s at a steady 200 km/h, full throttle, no brake, unless overridden.
 const lap = (count: number, at: (i: number) => Partial<ReplayTrajectoryPoint> = () => ({})): ReplayTrajectoryPoint[] =>

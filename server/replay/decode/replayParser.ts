@@ -5,11 +5,11 @@ import {
   ReplayDriverEntry,
   ReplayEventInfo,
   ReplayTrajectoryData,
-} from '../core/types.js';
+} from '../../core/types.js';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
-} from '../../shared/domain/vehicleMapping.js';
+} from '../../../shared/domain/vehicleMapping.js';
 import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 
 /**
@@ -62,7 +62,7 @@ export type {
   ReplayStreamProgress,
   ReplayProgressCallback,
   ReplayLogOptions,
-} from './replayProgress.js';
+} from '../replayProgress.js';
 
 export interface ParseReplayMetadataOptions {
   playerName?: string;

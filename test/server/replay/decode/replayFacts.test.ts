@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../server/core/types.js';
+import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../../server/core/types.js';
 import {
   conditionsFrom,
   driverEventsFrom,
@@ -9,7 +9,7 @@ import {
   lapSummariesFrom,
   runningOrderFrom,
   withoutReplayFacts,
-} from '../../../server/replay/replayFacts.js';
+} from '../../../../server/replay/decode/replayFacts.js';
 
 const wx = (timeSec: number, rainIntensity: number, ambientTemp = 20): ReplayWeatherEvent => ({ timeSec, rainIntensity, ambientTemp });
 const flag = (timeSec: number, flagState: number, sectorMask = 33): ReplayFlagEvent => ({ timeSec, flagState, flagName: 'x', sectorMask, driverSlot: 255, driverFlag: 0 });

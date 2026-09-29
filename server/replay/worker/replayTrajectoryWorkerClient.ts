@@ -2,9 +2,9 @@ import { Worker } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ReplayTrajectoryData } from '../core/types.js';
-import { ExtractReplayTrajectoryOptions } from './replayTrajectory.js';
-import { ReplayStreamProgress } from './replayProgress.js';
+import { ReplayTrajectoryData } from '../../core/types.js';
+import { ExtractReplayTrajectoryOptions } from '../decode/replayTrajectory.js';
+import { ReplayStreamProgress } from '../replayProgress.js';
 
 type WorkerMessage =
   | { type: 'progress'; progress: ReplayStreamProgress }
@@ -47,7 +47,7 @@ export async function* extractReplayTrajectoryInWorker(
   options: ExtractReplayTrajectoryOptions,
   clientOptions: ReplayWorkerClientOptions = {}
 ): AsyncGenerator<ReplayStreamProgress, ReplayTrajectoryData, void> {
-  const workerPath = clientOptions.workerPath || findWorkerBootstrap(import.meta.url, ['replay', 'replayTrajectoryWorkerBootstrap.mjs']);
+  const workerPath = clientOptions.workerPath || findWorkerBootstrap(import.meta.url, ['replay', 'worker', 'replayTrajectoryWorkerBootstrap.mjs']);
   const worker = new Worker(workerPath, {
     workerData: { filePath, options: { ...options, silent: true } },
   });
