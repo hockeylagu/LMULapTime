@@ -56,18 +56,18 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
   const midWear = Math.round((minTireWear + maxTireWear) / 2);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-amber-950/20">
+    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-warn-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="p-1 rounded bg-amber-500/20 text-amber-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-warn-strong/20 text-lmu-warn font-black text-[10px] tracking-wider flex items-center gap-1">
           <Layers className="w-3 h-3" />
           TIRE WEAR
         </span>
         {hasData && tw ? (
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-            <span className="text-cyan-400">FL: {tw[0].toFixed(1)}%</span>
-            <span className="text-blue-400">FR: {tw[1].toFixed(1)}%</span>
-            <span className="text-amber-400">RL: {tw[2].toFixed(1)}%</span>
-            <span className="text-rose-400">RR: {tw[3].toFixed(1)}%</span>
+            <span className="text-lmu-aqua">FL: {tw[0].toFixed(1)}%</span>
+            <span className="text-lmu-azure">FR: {tw[1].toFixed(1)}%</span>
+            <span className="text-lmu-warn">RL: {tw[2].toFixed(1)}%</span>
+            <span className="text-lmu-loss">RR: {tw[3].toFixed(1)}%</span>
           </div>
         ) : (
           <span className="text-[10px] font-mono text-lmu-muted italic">
@@ -75,16 +75,16 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
           </span>
         )}
         {currentComparison?.baseline.tireWear && (
-          <span className="text-[10px] font-mono text-amber-400/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
+          <span className="text-[10px] font-mono text-lmu-warn/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
             Base: {currentComparison.baseline.tireWear[0].toFixed(1)}% / {currentComparison.baseline.tireWear[1].toFixed(1)}% / {currentComparison.baseline.tireWear[2].toFixed(1)}% / {currentComparison.baseline.tireWear[3].toFixed(1)}%
           </span>
         )}
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxTireWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
-        { label: `${midWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
-        { label: `${minTireWear}%`, borderClassName: 'border-b border-amber-400/40', labelClassName: 'text-[9px] text-amber-400 font-mono' },
+        { label: `${maxTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
+        { label: `${midWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
+        { label: `${minTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
       ]} />
 
       {isCursorInView && hasData && tw && (
@@ -94,11 +94,11 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-cyan-300">FL:{tw[0].toFixed(1)}%</span>
-            <span className="text-blue-300">FR:{tw[1].toFixed(1)}%</span>
-            <span className="text-amber-300">RL:{tw[2].toFixed(1)}%</span>
-            <span className="text-rose-300">RR:{tw[3].toFixed(1)}%</span>
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+            <span className="text-lmu-aqua-soft">FL:{tw[0].toFixed(1)}%</span>
+            <span className="text-lmu-azure-soft">FR:{tw[1].toFixed(1)}%</span>
+            <span className="text-lmu-warn-soft">RL:{tw[2].toFixed(1)}%</span>
+            <span className="text-lmu-loss-soft">RR:{tw[3].toFixed(1)}%</span>
           </div>
         </div>
       )}

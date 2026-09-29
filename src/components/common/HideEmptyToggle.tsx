@@ -29,7 +29,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
       aria-label={ariaLabel}
       className={`h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
         hideEmpty
-          ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
+          ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent-text shadow-sm'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
       } ${className}`}
       title={hideEmpty ? titleHiding : titleShowing}

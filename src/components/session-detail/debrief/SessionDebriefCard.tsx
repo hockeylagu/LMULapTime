@@ -30,7 +30,7 @@ function LapLabel({ lap }: { lap: ComparableLap }) {
 
 function Delta({ delta }: { delta: number | null }) {
   if (delta === null) return null;
-  return <span className={`font-mono font-bold ${delta > 0 ? 'text-rose-400' : 'text-emerald-400'}`}> {formatDelta(delta)}</span>;
+  return <span className={`font-mono font-bold ${delta > 0 ? 'text-lmu-loss' : 'text-lmu-gain'}`}> {formatDelta(delta)}</span>;
 }
 
 /** The analysed lap, the realistic target the corners are ranked against, and the fastest lap for technique. */
@@ -69,7 +69,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
     <div className="bg-lmu-card/75 backdrop-blur-md p-4 rounded-xl border border-lmu-border/70 space-y-3" data-testid="session-debrief">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-lmu-border/50 pb-2">
         <div className="flex items-center gap-1.5">
-          <Crosshair className="w-4 h-4 text-amber-400" />
+          <Crosshair className="w-4 h-4 text-lmu-warn" />
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">Debrief: Where the Time Goes</h3>
         </div>
         <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
@@ -83,7 +83,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           <button
             type="button"
             onClick={requestDebrief}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25 whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 hover:bg-lmu-warn-strong/25 whitespace-nowrap"
           >
             <Crosshair className="w-3.5 h-3.5" /> Show where the time goes
           </button>
@@ -97,8 +97,8 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       {state.status === 'unavailable' && <p className="text-xs text-lmu-muted py-1">{state.reason}</p>}
       {state.status === 'error' && (
         <div className="flex items-center justify-between gap-2 py-1">
-          <p className="text-xs text-rose-400">{state.message}</p>
-          <button type="button" onClick={requestDebrief} className="text-xs font-bold text-sky-400 hover:text-sky-300 whitespace-nowrap">
+          <p className="text-xs text-lmu-loss">{state.message}</p>
+          <button type="button" onClick={requestDebrief} className="text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap">
             Try again
           </button>
         </div>
@@ -120,14 +120,14 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
               ))}
             </ol>
           ) : (
-            <p className="text-xs text-emerald-400 py-1">You matched or beat the reference through every corner.</p>
+            <p className="text-xs text-lmu-gain py-1">You matched or beat the reference through every corner.</p>
           )}
           <p className="text-[11px] text-lmu-muted">
             Ranked by time lost × how often you lose it ({state.debrief.lapsTimed} laps timed) × comparison confidence ({Math.round(state.debrief.confidence * 100)}%).
             {state.debrief.trafficKnown && ' Passes through a corner with another car within a second are left out, and a corner of this lap driven in traffic ranks lower.'}
           </p>
           {state.debrief.caveats.map((caveat) => (
-            <p key={caveat} className="text-[11px] text-amber-300">{caveat}</p>
+            <p key={caveat} className="text-[11px] text-lmu-warn-soft">{caveat}</p>
           ))}
         </>
       )}

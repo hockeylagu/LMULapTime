@@ -69,13 +69,13 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
             </div>
             <div>
               <p className="text-[10px] text-lmu-muted uppercase font-semibold">Finish Avg Pos</p>
-              <h4 className="text-xl font-extrabold text-lmu-accent font-mono">
+              <h4 className="text-xl font-extrabold text-lmu-accent-text font-mono">
                 {formatAveragePosition(finishAveragePosition)}
               </h4>
             </div>
           </div>
         </div>
-        <Flag className="w-8 h-8 text-lmu-accent opacity-50 shrink-0" />
+        <Flag className="w-8 h-8 text-lmu-accent-text opacity-50 shrink-0" />
       </div>
 
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
@@ -132,7 +132,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
           <p className="text-xs text-lmu-muted uppercase font-semibold">Top 3 Lap True Pace</p>
           <h4
             className={`text-2xl font-extrabold mt-0.5 font-mono ${
-              top3Improvement !== null && top3Improvement > 0 ? 'text-cyan-400' : 'text-white'
+              top3Improvement !== null && top3Improvement > 0 ? 'text-lmu-aqua' : 'text-white'
             }`}
           >
             {top3Improvement !== null
@@ -149,7 +149,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
               : 'Multi-lap pace consistency'}
           </p>
         </div>
-        <Activity className="w-8 h-8 text-cyan-400 opacity-50 shrink-0" />
+        <Activity className="w-8 h-8 text-lmu-aqua opacity-50 shrink-0" />
       </div>
     </div>
   );

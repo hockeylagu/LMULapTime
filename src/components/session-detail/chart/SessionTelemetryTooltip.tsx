@@ -84,7 +84,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
-                <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-gold' : 'text-slate-300'}`}>
+                <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-gold' : 'text-lmu-text-soft'}`}>
                   P{d.pos}
                 </span>
                 <span className="truncate">{d.name}</span>
@@ -119,11 +119,11 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       </p>
       {activeChartMetric === 'lapTime' && (
         <>
-          <p className="text-rose-400 font-bold">
+          <p className="text-lmu-loss font-bold">
             Lap Time: {data.lapTimeString || '--:--.---'}
-            {data.isInferred && <span className="text-amber-300 font-normal ml-1">(est)</span>}
+            {data.isInferred && <span className="text-lmu-warn-soft font-normal ml-1">(est)</span>}
           </p>
-          {data.avgLapTime && <p className="text-indigo-300">Session Avg: {data.avgLapTimeString}</p>}
+          {data.avgLapTime && <p className="text-lmu-indigo-soft">Session Avg: {data.avgLapTimeString}</p>}
         </>
       )}
       {activeChartMetric === 'sectors' && (
@@ -134,7 +134,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
         </>
       )}
       {activeChartMetric === 'topSpeed' && (
-        <p className="text-lmu-accent font-bold">Top Speed: {data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : '-'}</p>
+        <p className="text-lmu-accent-text font-bold">Top Speed: {data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : '-'}</p>
       )}
       {activeChartMetric === 'tireWear' && (
         <>
@@ -147,8 +147,8 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       )}
       {activeChartMetric === 'fuelEnergy' && (
         <>
-          {data.fuel !== null && data.fuel !== undefined && <p className="text-amber-400">Fuel: {data.fuel.toFixed(1)}%</p>}
-          {data.virtualEnergy !== null && data.virtualEnergy !== undefined && <p className="text-indigo-400">Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
+          {data.fuel !== null && data.fuel !== undefined && <p className="text-lmu-warn">Fuel: {data.fuel.toFixed(1)}%</p>}
+          {data.virtualEnergy !== null && data.virtualEnergy !== undefined && <p className="text-lmu-indigo">Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
         </>
       )}
     </div>

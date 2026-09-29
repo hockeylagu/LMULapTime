@@ -139,22 +139,22 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         ))}
 
         {cornerEntryPct !== null && (
-          <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-cyan-400/60 pointer-events-none z-10 border-l border-dashed border-cyan-400/60">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-mono font-bold whitespace-nowrap">
+          <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-aqua/60 pointer-events-none z-10 border-l border-dashed border-lmu-aqua/60">
+            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-aqua-strong/20 text-lmu-aqua-soft text-[8px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} IN
             </span>
           </div>
         )}
         {cornerMinPct !== null && (
-          <div style={{ left: `${cornerMinPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-rose-400/70 pointer-events-none z-10 border-l border-dashed border-rose-400/70">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[8px] font-mono font-bold whitespace-nowrap">
+          <div style={{ left: `${cornerMinPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-loss/70 pointer-events-none z-10 border-l border-dashed border-lmu-loss/70">
+            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-loss-strong/20 text-lmu-loss-soft text-[8px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} APEX
             </span>
           </div>
         )}
         {cornerExitPct !== null && (
-          <div style={{ left: `${cornerExitPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-emerald-400/60 pointer-events-none z-10 border-l border-dashed border-emerald-400/60">
-            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-bold whitespace-nowrap">
+          <div style={{ left: `${cornerExitPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-gain/60 pointer-events-none z-10 border-l border-dashed border-lmu-gain/60">
+            <span className="absolute bottom-1 left-1 px-1 py-0.2 rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[8px] font-mono font-bold whitespace-nowrap">
               T{selectedCornerMarkers?.cornerNumber} OUT
             </span>
           </div>
@@ -163,7 +163,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         {dragSelection && (
           <div
             style={{ left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`, width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%` }}
-            className="absolute top-3.5 bottom-0 bg-sky-500/25 border-x-2 border-sky-400 pointer-events-none z-40 backdrop-blur-[1px]"
+            className="absolute top-3.5 bottom-0 bg-lmu-info-strong/25 border-x-2 border-lmu-info pointer-events-none z-40 backdrop-blur-[1px]"
           />
         )}
         </div>
@@ -176,17 +176,17 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
           )}
           {s2Pct !== null && (
             <div style={{ left: `${s2Pct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-blue/50">
-              <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-lmu-blue/20 text-lmu-blue text-[8px] font-mono font-bold">S2</span>
+              <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-lmu-blue/20 text-lmu-cyan text-[8px] font-mono font-bold">S2</span>
             </div>
           )}
           {cornerEntryPct !== null && (
-            <div style={{ left: `${cornerEntryPct}%` }} className="absolute inset-y-0 w-[1px] bg-cyan-400/60" />
+            <div style={{ left: `${cornerEntryPct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-aqua/60" />
           )}
           {cornerMinPct !== null && (
-            <div style={{ left: `${cornerMinPct}%` }} className="absolute inset-y-0 w-[1px] bg-rose-400/70" />
+            <div style={{ left: `${cornerMinPct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-loss/70" />
           )}
           {cornerExitPct !== null && (
-            <div style={{ left: `${cornerExitPct}%` }} className="absolute inset-y-0 w-[1px] bg-emerald-400/60" />
+            <div style={{ left: `${cornerExitPct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-gain/60" />
           )}
         </div>
 

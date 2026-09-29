@@ -85,7 +85,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-lmu-accent" />
+            <TrendingUp className="w-5 h-5 text-lmu-accent-text" />
             {activeChartMetric === 'positions'
               ? 'Driver Position Progression (Same Class)'
               : activeChartMetric === 'tireWear'
@@ -243,7 +243,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
                 return (
                   <span
                     className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
-                      isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+                      isHidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'
                     }`}
                     title={`Click to toggle ${value} visibility`}
                   >

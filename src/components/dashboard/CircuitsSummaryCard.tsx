@@ -87,7 +87,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
         <button
           type="button"
           onClick={() => setShowMoreTracks(!showMoreTracks)}
-          className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-accent font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
+          className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-accent-text font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
         >
           <span>{showMoreTracks ? 'Show Top 3 Only' : `Show All ${sourceTracks.length} Circuits`}</span>
           <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreTracks ? 'rotate-180' : ''}`} />

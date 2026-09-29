@@ -65,10 +65,10 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
         <span
           className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10.5px] ${
             paceTrendDirection === 'improving'
-              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+              ? 'bg-lmu-gain-deep/60 text-lmu-gain border border-lmu-gain-strong/30'
               : paceTrendDirection === 'declining'
-              ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
-              : 'bg-sky-950/60 text-sky-400 border border-sky-500/30'
+              ? 'bg-lmu-warn-deep/60 text-lmu-warn border border-lmu-warn-strong/30'
+              : 'bg-lmu-info-deep/60 text-lmu-info border border-lmu-info-strong/30'
           }`}
         >
           {/* paceDelta is the drop in benchmark %, so positive is faster. */}
@@ -78,7 +78,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
         </span>
       </div>
 
-      <div className="relative w-full h-11 bg-slate-950/60 rounded-md border border-slate-800/80 overflow-hidden">
+      <div className="relative w-full h-11 bg-lmu-deep/60 rounded-md border border-lmu-border/80 overflow-hidden">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full block" preserveAspectRatio="none">
           <defs>
             <linearGradient id="paceSparklineGrad" x1="0" y1="0" x2="0" y2="1">
@@ -110,7 +110,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
               }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 aspect-square rounded-full cursor-pointer transition-transform hover:scale-125 ${
                 isLatest
-                  ? 'w-2.5 h-2.5 border-2 shadow-sm shadow-emerald-500/50'
+                  ? 'w-2.5 h-2.5 border-2 shadow-sm shadow-lmu-gain-strong/50'
                   : 'w-2 h-2 border-[1.5px]'
               }`}
               title={`${c.point.trackName} · ${c.point.bestLapTimeString} (${c.point.pacePercentage}%)`}

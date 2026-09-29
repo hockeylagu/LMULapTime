@@ -85,7 +85,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsInfoModalOpen(true)}
-                    className="p-1 rounded-md bg-slate-800/80 border border-slate-700/60 text-slate-400 hover:text-lmu-accent hover:border-lmu-accent/40 hover:bg-slate-800 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-lmu-accent"
+                    className="p-1 rounded-md bg-lmu-raised/80 border border-lmu-rule/60 text-lmu-muted hover:text-lmu-accent-text hover:border-lmu-accent/40 hover:bg-lmu-raised transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-lmu-accent"
                     title={`View circuit info for ${trackName}`}
                   >
                     <Info className="w-3.5 h-3.5" />
@@ -109,7 +109,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
         {selectedClass !== 'All' && availableCarModels.length > 0 && (
           <div className="pt-3 border-t border-lmu-border/50 flex items-center gap-3 flex-wrap text-xs">
             <span className="text-xs font-semibold text-lmu-muted uppercase flex items-center gap-1.5 shrink-0">
-              <Car className="w-3.5 h-3.5 text-lmu-accent" />
+              <Car className="w-3.5 h-3.5 text-lmu-accent-text" />
               Car Model:
             </span>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -117,7 +117,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                 type="button"
                 onClick={() => setSelectedCarModel('All')}
                 className={`px-3 py-1 rounded-lg font-medium transition-all ${selectedCarModel === 'All'
-                  ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40 font-bold shadow-sm'
+                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/40 font-bold shadow-sm'
                   : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                   }`}
               >

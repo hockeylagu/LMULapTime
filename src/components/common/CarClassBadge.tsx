@@ -34,9 +34,9 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'HY',
       label: 'HY',
-      borderClass: 'border-red-500/90',
-      textClass: 'text-red-400',
-      bgClass: 'bg-red-950/40',
+      borderClass: 'border-lmu-loss-strong/90',
+      textClass: 'text-lmu-loss',
+      bgClass: 'bg-lmu-loss-deep/40',
       hasOrangeCorner: false,
       title: 'Hypercar (HY)',
     };
@@ -48,9 +48,9 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'LMP2',
       label: 'LMP2',
-      borderClass: 'border-sky-500/90',
-      textClass: 'text-sky-400',
-      bgClass: 'bg-sky-950/40',
+      borderClass: 'border-lmu-info-strong/90',
+      textClass: 'text-lmu-info',
+      bgClass: 'bg-lmu-info-deep/40',
       hasOrangeCorner: hasCorner,
       title: hasCorner ? 'LMP2 (ELMS)' : 'LMP2 (WEC)',
     };
@@ -61,9 +61,9 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'LMP3',
       label: 'LMP3',
-      borderClass: 'border-purple-500/90',
-      textClass: 'text-purple-400',
-      bgClass: 'bg-purple-950/40',
+      borderClass: 'border-lmu-purple-strong/90',
+      textClass: 'text-lmu-purple',
+      bgClass: 'bg-lmu-purple-deep/40',
       hasOrangeCorner: false,
       title: 'LMP3',
     };
@@ -79,9 +79,9 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'GT3',
       label: 'GT3',
-      borderClass: 'border-emerald-500/90',
-      textClass: 'text-emerald-400',
-      bgClass: 'bg-emerald-950/40',
+      borderClass: 'border-lmu-gain-strong/90',
+      textClass: 'text-lmu-gain',
+      bgClass: 'bg-lmu-gain-deep/40',
       hasOrangeCorner: hasCorner,
       title: hasCorner ? 'GT3 (ELMS)' : 'GT3 (WEC)',
     };
@@ -92,9 +92,9 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'GTE',
       label: 'GTE',
-      borderClass: 'border-amber-500/90',
-      textClass: 'text-amber-400',
-      bgClass: 'bg-amber-950/40',
+      borderClass: 'border-lmu-warn-strong/90',
+      textClass: 'text-lmu-warn',
+      bgClass: 'bg-lmu-warn-deep/40',
       hasOrangeCorner: false,
       title: 'GTE',
     };
@@ -105,9 +105,9 @@ export function getCarClassBadgeConfig(
   return {
     badgeType: 'OTHER',
     label: fallbackLabel,
-    borderClass: 'border-slate-700',
-    textClass: 'text-slate-300',
-    bgClass: 'bg-slate-900/60',
+    borderClass: 'border-lmu-rule',
+    textClass: 'text-lmu-text-soft',
+    bgClass: 'bg-lmu-card/60',
     hasOrangeCorner: false,
     title: carClass || carType || '',
   };
@@ -184,7 +184,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
         selected === true
           ? 'brightness-110 opacity-100 z-10'
           : selected === false
-          ? 'opacity-40 hover:opacity-100'
+          ? 'grayscale hover:grayscale-0'
           : 'hover:brightness-110'
       }`
     : '';
@@ -199,7 +199,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
           viewBox="0 0 10 10"
           aria-hidden="true"
         >
-          <polygon points="0,0 10,0 10,10" className="fill-amber-500" />
+          <polygon points="0,0 10,0 10,10" className="fill-lmu-warn-strong" />
         </svg>
       )}
     </>

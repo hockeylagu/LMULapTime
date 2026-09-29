@@ -43,7 +43,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
     <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 rounded-xl bg-lmu-dark border border-lmu-border/60 shrink-0">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5 pl-1">
-          <Flag className="w-3.5 h-3.5 text-lmu-accent" />
+          <Flag className="w-3.5 h-3.5 text-lmu-accent-text" />
           Lap {currentLap}
         </span>
         {currentLapSummary.isBest && (
@@ -52,12 +52,12 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           </span>
         )}
         {currentLapSummary.isOutlap && (
-          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px]">
+          <span className="px-2 py-0.5 rounded-full bg-lmu-warn-strong/20 border border-lmu-warn-strong/40 text-lmu-warn-soft font-bold text-[10px]">
             Outlap
           </span>
         )}
         <span
-          className={`text-xs font-mono font-bold ${currentLapSummary.isBest ? 'text-lmu-gold font-extrabold' : 'text-emerald-400'}`}
+          className={`text-xs font-mono font-bold ${currentLapSummary.isBest ? 'text-lmu-gold font-extrabold' : 'text-lmu-gain'}`}
           title="Replay GPS Lap Time"
         >
           {formatLapTime(currentLapSummary.lapTimeSec)}
@@ -65,9 +65,9 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
 
         {/* Overall Lap Delta Pill against Baseline */}
         {isCompareMode && baselineTrajectory && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-950/20 border border-amber-500/40 text-[11px] font-mono shadow-sm">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-lmu-warn-deep/20 border border-lmu-warn-strong/40 text-[11px] font-mono shadow-sm">
             {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
-              <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}>
                 Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})
               </span>
             ) : (
@@ -84,35 +84,35 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           {isCompareMode && lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
             <span
               className={`text-[10px] font-bold ${
-                lapDeltas.s1Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                lapDeltas.s1Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
               }`}
             >
               {lapDeltas.s1Delta <= 0 ? '' : '+'}{lapDeltas.s1Delta.toFixed(3)}s
             </span>
           )}
         </div>
-        <span className="text-white/20">|</span>
+        <span className="text-lmu-faint" aria-hidden="true">|</span>
         <div className="flex items-center gap-1.5">
           <span className="text-lmu-muted text-[10px]">S2</span>
           <span className={`font-bold ${isS2Best ? 'text-lmu-blue' : 'text-white'}`}>{currentLapSummary.s2Sec?.toFixed(3) ?? '--'}s</span>
           {isCompareMode && lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
             <span
               className={`text-[10px] font-bold ${
-                lapDeltas.s2Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                lapDeltas.s2Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
               }`}
             >
               {lapDeltas.s2Delta <= 0 ? '' : '+'}{lapDeltas.s2Delta.toFixed(3)}s
             </span>
           )}
         </div>
-        <span className="text-white/20">|</span>
+        <span className="text-lmu-faint" aria-hidden="true">|</span>
         <div className="flex items-center gap-1.5">
           <span className="text-lmu-muted text-[10px]">S3</span>
           <span className={`font-bold ${isS3Best ? 'text-lmu-green' : 'text-white'}`}>{currentLapSummary.s3Sec?.toFixed(3) ?? '--'}s</span>
           {isCompareMode && lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
             <span
               className={`text-[10px] font-bold ${
-                lapDeltas.s3Delta <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                lapDeltas.s3Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
               }`}
             >
               {lapDeltas.s3Delta <= 0 ? '' : '+'}{lapDeltas.s3Delta.toFixed(3)}s

@@ -21,8 +21,8 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
 
   return (
     <div className="flex flex-col bg-lmu-deep p-2.5 rounded-lg border border-lmu-border/40 min-w-0">
-      <div className="flex items-center justify-between h-7 border-b border-slate-800/80 pb-1 w-full min-w-0">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold text-rose-400 uppercase tracking-wider whitespace-nowrap">
+      <div className="flex items-center justify-between h-7 border-b border-lmu-border/80 pb-1 w-full min-w-0">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold text-lmu-loss uppercase tracking-wider whitespace-nowrap">
           <CircleDot className="w-3.5 h-3.5 shrink-0" />
           <span>Rotation Phase</span>
         </span>
@@ -34,11 +34,11 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
       </div>
 
       {/* Hero Speed Metric */}
-      <div className="flex items-center justify-between h-8 py-1 border-b border-slate-800/60 min-w-0">
-        <span className="text-slate-400 text-[10px] uppercase font-semibold text-left whitespace-nowrap">Min Speed</span>
+      <div className="flex items-center justify-between h-8 py-1 border-b border-lmu-border/60 min-w-0">
+        <span className="text-lmu-muted text-[10px] uppercase font-semibold text-left whitespace-nowrap">Min Speed</span>
         <div className="flex items-center gap-1 shrink-0 text-right whitespace-nowrap">
           <span className="text-sm font-bold text-white">{corner.primaryMinSpeedKmh}</span>
-          <span className="text-[10px] text-slate-400">km/h</span>
+          <span className="text-[10px] text-lmu-muted">km/h</span>
           {isCompareMode && (
             <span className={`ml-1 text-[10px] ${speedDeltaClass(corner.minSpeedDeltaKmh)}`}>
               {formatSpeedDelta(corner.minSpeedDeltaKmh)}
@@ -48,9 +48,9 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
       </div>
 
       {/* Consistent 4-Row Breakdown */}
-      <div className="flex flex-col text-[10px] divide-y divide-slate-800/40">
+      <div className="flex flex-col text-[10px] divide-y divide-lmu-border/40">
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
-          <span className="text-slate-400 text-left whitespace-nowrap" title="Effective Turn Radius">
+          <span className="text-lmu-muted text-left whitespace-nowrap" title="Effective Turn Radius">
             Radius
           </span>
           <span
@@ -64,9 +64,9 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
           <span
             title="Vehicle rotation progress at 15% throttle application"
-            className="text-slate-400 text-left whitespace-nowrap flex items-center gap-1"
+            className="text-lmu-muted text-left whitespace-nowrap flex items-center gap-1"
           >
-            <RotateCw className="w-2.5 h-2.5 text-sky-400 shrink-0" />
+            <RotateCw className="w-2.5 h-2.5 text-lmu-info shrink-0" />
             <span>Rotation</span>
           </span>
           <span
@@ -81,7 +81,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
               <>
                 <span>{corner.primaryRotationAtThrottlePct}%</span>
                 {isCompareMode && corner.rotationAtThrottleDeltaPct !== null && corner.rotationAtThrottleDeltaPct !== undefined && (
-                  <span className="ml-1 text-[9px] font-normal text-slate-400">
+                  <span className="ml-1 text-[9px] font-normal text-lmu-muted">
                     ({corner.rotationAtThrottleDeltaPct > 0 ? '+' : ''}{corner.rotationAtThrottleDeltaPct}%)
                   </span>
                 )}
@@ -93,7 +93,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
         </div>
 
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
-          <span className="text-slate-400 text-left whitespace-nowrap" title="Peak Yaw Rate">
+          <span className="text-lmu-muted text-left whitespace-nowrap" title="Peak Yaw Rate">
             Peak Yaw Rate
           </span>
           <span className="shrink-0 text-right whitespace-nowrap text-white font-bold">
@@ -104,7 +104,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
         {/* Row 4: Apex Space Left / Margin to Inside Apex Curb */}
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
           <span
-            className="text-slate-400 text-left whitespace-nowrap"
+            className="text-lmu-muted text-left whitespace-nowrap"
             title={
               isCompareMode
                 ? 'Apex Margin Delta: difference in distance to apex curb compared to baseline (negative = closer to apex)'
@@ -119,10 +119,10 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                 <span
                   className={
                     corner.apexSpaceDeltaM < 0
-                      ? 'text-emerald-400 font-bold font-mono'
+                      ? 'text-lmu-gain font-bold font-mono'
                       : corner.apexSpaceDeltaM > 0
-                      ? 'text-amber-400 font-bold font-mono'
-                      : 'text-slate-400 font-mono'
+                      ? 'text-lmu-warn font-bold font-mono'
+                      : 'text-lmu-muted font-mono'
                   }
                   title={
                     corner.apexSpaceDeltaM < 0
@@ -140,21 +140,21 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                 </span>
               ) : trackUsage?.apexSpaceLeftM !== undefined ? (
                 <span className="text-white font-bold" title={`${trackUsage.apexSpaceLeftM.toFixed(1)}m from apex curb`}>
-                  {trackUsage.apexSpaceLeftM.toFixed(1)}m <span className="text-[9px] text-slate-400 font-normal">left</span>
+                  {trackUsage.apexSpaceLeftM.toFixed(1)}m <span className="text-[9px] text-lmu-muted font-normal">left</span>
                 </span>
               ) : (
-                <span className="text-slate-500">--</span>
+                <span className="text-lmu-faint">--</span>
               )
             ) : trackUsage?.apexSpaceLeftM !== undefined ? (
               <span
                 className={
                   trackUsage.apexSpaceLeftM < 0
-                    ? 'text-rose-400 font-bold'
+                    ? 'text-lmu-loss font-bold'
                     : trackUsage.apexSpaceLeftM <= 0.2
-                    ? 'text-emerald-400 font-bold'
+                    ? 'text-lmu-gain font-bold'
                     : trackUsage.apexSpaceLeftM <= 0.8
                     ? 'text-white font-bold'
-                    : 'text-amber-400 font-bold'
+                    : 'text-lmu-warn font-bold'
                 }
                 title={
                   trackUsage.apexSpaceLeftM < 0
@@ -173,7 +173,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                     ? '0.0m'
                     : `${trackUsage.apexSpaceLeftM.toFixed(1)}m`}
                 </span>{' '}
-                <span className="text-[9px] text-slate-400 font-normal">
+                <span className="text-[9px] text-lmu-muted font-normal">
                   {trackUsage.apexSpaceLeftM < 0 ? 'cut' : 'left'}
                 </span>
               </span>
@@ -182,7 +182,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                 {Math.abs(trackUsage.apexMarginM).toFixed(1)}m
               </span>
             ) : (
-              <span className="text-slate-500">Center</span>
+              <span className="text-lmu-faint">Center</span>
             )}
           </span>
         </div>

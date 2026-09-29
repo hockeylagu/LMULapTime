@@ -32,7 +32,7 @@ const SECTOR_BEST_CLASS = ['text-lmu-gold', 'text-lmu-blue', 'text-lmu-green'] a
 
 const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: number | null }> = ({ sector, time, rank }) => (
   <td className="px-3 py-2 text-right whitespace-nowrap">
-    <span className={rank === 1 ? `${SECTOR_BEST_CLASS[sector]} font-bold` : 'text-slate-300'}>{time !== null ? formatTime(time) : '—'}</span>
+    <span className={rank === 1 ? `${SECTOR_BEST_CLASS[sector]} font-bold` : 'text-lmu-text-soft'}>{time !== null ? formatTime(time) : '—'}</span>
     {rank !== null && <span className="ml-1 text-[10px] text-lmu-muted">P{rank}</span>}
   </td>
 );
@@ -46,10 +46,10 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
       <tr aria-label={`${row.label} pace, ${row.percent}%`}>
         <td colSpan={LEADERBOARD_COLUMNS} className="px-2 py-0.5">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-lmu-muted">
-            <span className="flex-1 border-t border-dashed border-slate-600" />
+            <span className="flex-1 border-t border-dashed border-lmu-rule-strong" />
             <span>{row.percent}% {row.label}</span>
             <span className="font-mono normal-case">{formatTime(row.time)}</span>
-            <span className="flex-1 border-t border-dashed border-slate-600" />
+            <span className="flex-1 border-t border-dashed border-lmu-rule-strong" />
           </div>
         </td>
       </tr>
@@ -74,18 +74,18 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   const canPin = Boolean(onPin && !isRival && vsYou !== null && vsYou < 0);
   const pace = benchmarkPace(entry.bestLap.lapTime, benchmark);
   const rowClass = entry.isPlayer
-    ? 'bg-amber-400/10 text-white'
+    ? 'bg-lmu-warn/10 text-white'
     : isRival
-      ? 'bg-amber-400/5 text-white shadow-[inset_3px_0_0_0_rgba(251,191,36,0.8)]'
-      : 'hover:bg-white/[0.03] text-slate-200';
+      ? 'bg-lmu-warn/5 text-white shadow-[inset_3px_0_0_0_rgba(251,191,36,0.8)]'
+      : 'hover:bg-white/[0.03] text-lmu-text';
   return (
     <tr className={rowClass}>
       <td className="px-3 py-2 font-bold text-white w-10">{row.rank ?? '—'}</td>
       <td className="px-3 py-2 max-w-[14rem] font-sans">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`truncate ${entry.isPlayer ? 'font-extrabold text-amber-300' : 'font-semibold'}`}>{entry.driverName}</span>
-          {entry.isPlayer && <span className="text-[9px] font-bold uppercase px-1 rounded bg-amber-400/20 text-amber-300">You</span>}
-          {isRival && <span className="text-[9px] font-bold uppercase px-1 rounded border border-amber-400/50 text-amber-300">Rival</span>}
+          <span className={`truncate ${entry.isPlayer ? 'font-extrabold text-lmu-warn-soft' : 'font-semibold'}`}>{entry.driverName}</span>
+          {entry.isPlayer && <span className="text-[9px] font-bold uppercase px-1 rounded bg-lmu-warn/20 text-lmu-warn-soft">You</span>}
+          {isRival && <span className="text-[9px] font-bold uppercase px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft">Rival</span>}
         </div>
         <div className="text-[10px] text-lmu-muted truncate">{entry.bestLap.carType} · {formatDrivenAgo(entry.bestLap.timestamp)}</div>
       </td>
@@ -94,13 +94,13 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
         {pace ? <PaceBadge category={pace.category} percentage={pace.percentage} showPercentage size="xs" /> : <span className="text-lmu-muted">-</span>}
       </td>
       <td className="px-3 py-2 text-right text-lmu-muted">{entry.rank === 1 ? '' : formatGap(entry.gapToLeader)}</td>
-      <td className={`px-3 py-2 text-right ${vsYou === null ? '' : vsYou < 0 ? 'text-amber-300' : 'text-emerald-400'}`}>
+      <td className={`px-3 py-2 text-right ${vsYou === null ? '' : vsYou < 0 ? 'text-lmu-warn-soft' : 'text-lmu-gain'}`}>
         {vsYou === null ? '' : formatGap(vsYou)}
       </td>
       <SectorCell sector={0} time={entry.bestS1} rank={entry.s1Rank} />
       <SectorCell sector={1} time={entry.bestS2} rank={entry.s2Rank} />
       <SectorCell sector={2} time={entry.bestS3} rank={entry.s3Rank} />
-      <td className="px-3 py-2 text-right text-slate-300">{formatTime(entry.top3Average)}</td>
+      <td className="px-3 py-2 text-right text-lmu-text-soft">{formatTime(entry.top3Average)}</td>
       <td className="px-2 py-2 text-right whitespace-nowrap font-sans">
         {onPick && (
           <button
@@ -109,7 +109,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
             aria-pressed={isCompared}
             title={isCompared ? `Take ${entry.driverName}'s lap out of the comparison` : `Add ${entry.driverName}'s best lap to the comparison`}
             aria-label={`Pick ${entry.driverName}'s lap to compare`}
-            className={`p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${isCompared ? 'text-lmu-accent' : 'text-lmu-muted hover:text-white'}`}
+            className={`p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${isCompared ? 'text-lmu-accent-text' : 'text-lmu-muted hover:text-white'}`}
           >
             {isCompared ? <SquareCheck className="w-3.5 h-3.5" /> : <SquarePlus className="w-3.5 h-3.5" />}
           </button>
@@ -120,7 +120,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
             onClick={() => onPin?.(entry.driverName)}
             title={`Make ${entry.driverName} your rival`}
             aria-label={`Make ${entry.driverName} your rival`}
-            className="p-1 rounded-lg text-lmu-muted hover:text-amber-300 hover:bg-lmu-border cursor-pointer"
+            className="p-1 rounded-lg text-lmu-muted hover:text-lmu-warn-soft hover:bg-lmu-border cursor-pointer"
           >
             <Crosshair className="w-3.5 h-3.5" />
           </button>
@@ -158,7 +158,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
                 : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
             }
             aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
-            className="p-1 rounded-lg text-lmu-muted enabled:hover:text-sky-300 enabled:hover:bg-lmu-border enabled:cursor-pointer disabled:opacity-30"
+            className="p-1 rounded-lg text-lmu-muted enabled:hover:text-lmu-info-soft enabled:hover:bg-lmu-border enabled:cursor-pointer disabled:opacity-30"
           >
             <Activity className="w-3.5 h-3.5" />
           </button>

@@ -34,7 +34,7 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
               fill="none"
               strokeWidth={4}
               strokeLinejoin="round"
-              className={selected ? 'stroke-lmu-accent' : 'stroke-slate-400'}
+              className={selected ? 'stroke-lmu-accent' : 'stroke-lmu-muted'}
             />
           </svg>
         ) : (

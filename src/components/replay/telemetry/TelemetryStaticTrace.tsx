@@ -25,11 +25,18 @@ function areStaticTracePropsEqual(previous: TelemetryStaticTraceProps, next: Tel
   });
 }
 
+const OPACITY_CLASS = /(^|\s)opacity-\d+(?=\s|$)/g;
+const TEXT_COLOR_CLASS = /(^|\s)text-(?:lmu-[a-z-]+|white)(?:\/\d+)?(?=\s|$)/g;
+
 /**
  * A channel's traces, on their own compositor layer (`will-change: transform`): the scrub cursor
  * and the value badges move over them on every frame, and without a layer of its own each move
  * re-rasterises every trace path under them (a full-resolution lap is one path of ~25,000 vertices
  * per trace). Drawn before the grid so the grid lines stay on top, as they were.
+ *
+ * The grid is drawn twice on the same flex layout: the lines, dimmed by the channel's grid opacity,
+ * then the scale labels at full strength in the neutral muted tier, so a label stays readable
+ * (4.5:1) however faint its line is. The channel's color stays on its trace.
  */
 export const TelemetryStaticTrace: React.FC<TelemetryStaticTraceProps> = React.memo(({
   chart,
@@ -40,9 +47,16 @@ export const TelemetryStaticTrace: React.FC<TelemetryStaticTraceProps> = React.m
     <div className="absolute inset-0 will-change-transform" data-testid="telemetry-trace-layer">
       {chart}
     </div>
-    <div className={gridClassName}>
+    <div className={gridClassName} aria-hidden="true">
       {gridLines.map(({ label, borderClassName, labelClassName }) => (
-        <div key={label} className={`${borderClassName} w-full ${labelClassName}`}>{label}</div>
+        <div key={label} className={`${borderClassName} w-full ${labelClassName}`}>{' '}</div>
+      ))}
+    </div>
+    <div className={gridClassName.replace(OPACITY_CLASS, '$1')}>
+      {gridLines.map(({ label, labelClassName }) => (
+        <div key={label} className={`border-b border-transparent w-full ${labelClassName.replace(TEXT_COLOR_CLASS, '$1')} text-lmu-muted`}>
+          {label}
+        </div>
       ))}
     </div>
   </>

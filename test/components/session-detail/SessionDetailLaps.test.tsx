@@ -603,7 +603,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(screen.getAllByTitle(/Contact with Archie Porter/i).length).toBe(1);
     const tlBadge = screen.getByTitle(/Track limits violation \(\+0\.25 pts\)/i);
     expect(tlBadge).toBeInTheDocument();
-    expect(tlBadge.className).toContain('text-yellow-300');
+    expect(tlBadge.className).toContain('text-lmu-warn-soft');
     expect(screen.getByText('Drive Thru')).toBeInTheDocument();
 
     // Verify Expandable Incidents & Stewards Log toggle
@@ -715,10 +715,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(badges.length).toBe(2);
 
     // Lap 1: No Further Action -> Green (emerald)
-    expect(badges[0].className).toContain('text-emerald-300');
+    expect(badges[0].className).toContain('text-lmu-gain-soft');
 
     // Lap 2: 0.75 pts -> Orange
-    expect(badges[1].className).toContain('text-orange-300');
+    expect(badges[1].className).toContain('text-lmu-orange-soft');
   });
 
   it('opens replay with lap number when clicking row Replay button and updates URL params', async () => {

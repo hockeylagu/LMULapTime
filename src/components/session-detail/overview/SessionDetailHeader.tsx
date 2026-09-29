@@ -82,17 +82,17 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               }\nClick to inspect trajectory and telemetry`}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
                 hasDuckDb
-                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25'
+                  ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/15 text-lmu-warn-soft hover:bg-lmu-warn-strong/25'
                   : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
               }`}
             >
               {hasDuckDb ? (
-                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+                <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
               ) : (
                 <Video className="w-4 h-4 text-lmu-green" />
               )}
               <span>{hasDuckDb ? 'Open Telemetry' : 'Open Replay'}</span>
-              {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400">100Hz</span>}
+              {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-lmu-warn">100Hz</span>}
             </button>
           )}
 
@@ -112,7 +112,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all shadow-sm cursor-pointer ${
                 relatedSession.type === 'qualifying'
                   ? 'bg-lmu-gold/10 text-lmu-gold border-lmu-gold/30 hover:bg-lmu-gold/20 hover:border-lmu-gold'
-                  : 'bg-lmu-accent/10 text-lmu-accent border-lmu-accent/30 hover:bg-lmu-accent/20 hover:border-lmu-accent'
+                  : 'bg-lmu-accent/10 text-lmu-accent-text border-lmu-accent/30 hover:bg-lmu-accent/20 hover:border-lmu-accent'
               }`}
             >
               {relatedSession.type === 'qualifying' ? (
@@ -122,7 +122,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 </>
               ) : (
                 <>
-                  <Trophy className="w-4 h-4 text-lmu-accent" />
+                  <Trophy className="w-4 h-4 text-lmu-accent-text" />
                   <span>Go to Race ({relatedSession.target.sessionName || 'R1'})</span>
                 </>
               )}
@@ -141,9 +141,9 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span
                     className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                      session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                      session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
                       : session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                      : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                      : 'bg-lmu-blue/20 text-lmu-cyan border border-lmu-blue/30'
                     }`}
                   >
                     {session.sessionName} ({session.sessionType})
@@ -199,15 +199,15 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all shadow-sm cursor-pointer group shrink-0 ml-auto md:ml-0"
                 title="View Rules, Server Configuration & Conditions"
               >
-                <Sliders className="w-3.5 h-3.5 text-lmu-accent group-hover:rotate-12 transition-transform shrink-0" />
-                <span className="text-slate-300">Rules & Config:</span>
+                <Sliders className="w-3.5 h-3.5 text-lmu-accent-text group-hover:rotate-12 transition-transform shrink-0" />
+                <span className="text-lmu-text-soft">Rules & Config:</span>
                 {hasSettings && modeLabel && (
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold text-[11px] border border-slate-700/60">
+                  <span className="px-2 py-0.5 rounded bg-lmu-raised text-lmu-info-soft font-semibold text-[11px] border border-lmu-rule/60">
                     {modeLabel}
                   </span>
                 )}
                 {durationLabel && (
-                  <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-semibold text-[11px] border border-slate-700/60">
+                  <span className="px-2 py-0.5 rounded bg-lmu-raised text-lmu-warn-soft font-mono font-semibold text-[11px] border border-lmu-rule/60">
                     {durationLabel}
                   </span>
                 )}

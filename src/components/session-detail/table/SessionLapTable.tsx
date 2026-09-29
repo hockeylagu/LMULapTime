@@ -109,7 +109,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Clock className="w-4 h-4 text-lmu-accent" />
+            <Clock className="w-4 h-4 text-lmu-accent-text" />
             <span>Lap Timing & Telemetry ({selectedDriver?.laps?.length || 0} Laps)</span>
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
@@ -139,7 +139,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
                 carClass
               )}&sessionId=${encodeURIComponent(session.id)}${lapNum ? `&lapNum=${lapNum}` : ''}`);
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-lmu-accent/20 hover:bg-lmu-accent/30 border border-lmu-accent/40 text-lmu-accent text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-1.5 rounded-xl bg-lmu-accent/20 hover:bg-lmu-accent/30 border border-lmu-accent/40 text-lmu-accent-text text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
             title="Compare your best lap from this session"
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />

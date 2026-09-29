@@ -24,9 +24,9 @@ export const RankBadge: React.FC<RankBadgeProps> = ({
       rank === 1
         ? firstPlaceColor
         : rank === 2
-        ? 'text-slate-300'
+        ? 'text-lmu-text-soft'
         : rank === 3
-        ? 'text-amber-600'
+        ? 'text-lmu-warn-strong'
         : 'text-lmu-muted';
   }
 

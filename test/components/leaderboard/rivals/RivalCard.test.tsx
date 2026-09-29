@@ -47,9 +47,9 @@ describe('RivalCard', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
     expect(screen.getByText(/Your best sectors close/)).toHaveTextContent('Your best sectors close 0.200 of the 0.300 s: the rest is new pace.');
     const sectors = screen.getByLabelText('Sector by sector');
-    expect(within(sectors).getByText('S1 -0.050')).toHaveClass('text-emerald-300');
+    expect(within(sectors).getByText('S1 -0.050')).toHaveClass('text-lmu-gain-soft');
     expect(within(sectors).getByText('S2 +0.100')).toBeInTheDocument();
-    expect(within(sectors).getByText('S3 +0.250')).toHaveClass('text-rose-300');
+    expect(within(sectors).getByText('S3 +0.250')).toHaveClass('text-lmu-loss-soft');
     expect(screen.getByRole('button', { name: /Analyse in Compare laps/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Where's the time/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Gap after each session')).toHaveTextContent('0.50→0.30');

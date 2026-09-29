@@ -126,8 +126,8 @@ describe('DashboardHero', () => {
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
     expect(replayBtn).toHaveTextContent('Launch Replay');
-    expect(replayBtn.className).toContain('text-emerald-400');
-    expect(replayBtn.className).toContain('border-emerald-500/30');
+    expect(replayBtn.className).toContain('text-lmu-gain');
+    expect(replayBtn.className).toContain('border-lmu-gain-strong/30');
 
     fireEvent.click(replayBtn);
     expect(onOpenReplay).toHaveBeenCalledWith('session-new', 2);
@@ -143,7 +143,7 @@ describe('DashboardHero', () => {
     const badge = screen.getByTestId('hero-session-type-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Race');
-    expect(badge.className).toContain('text-lmu-accent');
+    expect(badge.className).toContain('text-lmu-accent-text');
     expect(badge.className).toContain('bg-lmu-accent/20');
   });
 
@@ -167,8 +167,8 @@ describe('DashboardHero', () => {
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
     expect(replayBtn).toHaveTextContent('Launch 100Hz Replay');
-    expect(replayBtn.className).toContain('text-amber-300');
-    expect(replayBtn.className).toContain('border-amber-500/40');
+    expect(replayBtn.className).toContain('text-lmu-warn-soft');
+    expect(replayBtn.className).toContain('border-lmu-warn-strong/40');
   });
 
   it('renders pace sparkline and recent momentum metrics', () => {

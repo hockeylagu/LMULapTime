@@ -76,7 +76,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
             (displayPosDelta ?? 0) > 0
               ? 'text-lmu-green'
               : (displayPosDelta ?? 0) < 0
-              ? 'text-rose-400'
+              ? 'text-lmu-loss'
               : 'text-white'
           }`}
         >
@@ -113,7 +113,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
       {/* Pit Stops */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
         <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Pit Stops</p>
-        <p className="text-base font-mono font-extrabold text-amber-300 mt-0.5">
+        <p className="text-base font-mono font-extrabold text-lmu-warn-soft mt-0.5">
           {selectedDriver.pitStopsCount ?? 0}
           <span className="text-[10px] font-normal text-lmu-muted ml-1">stops</span>
         </p>
@@ -127,12 +127,12 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
         <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Incidents & Limits</p>
         <p className="text-base font-mono font-extrabold mt-0.5">
           {(selectedDriver.totalIncidents ?? 0) === 0 && (selectedDriver.totalPenalties ?? 0) === 0 ? (
-            <span className="text-emerald-400 text-sm flex items-center justify-center gap-1 font-bold">
+            <span className="text-lmu-gain text-sm flex items-center justify-center gap-1 font-bold">
               <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Clean</span>
             </span>
           ) : (
-            <span className="text-rose-400 text-sm flex items-center justify-center gap-1 font-bold">
+            <span className="text-lmu-loss text-sm flex items-center justify-center gap-1 font-bold">
               <span>{selectedDriver.totalIncidents ?? 0}x</span>
               <span className="text-[10px] font-normal text-lmu-muted font-sans truncate">
                 ({selectedDriver.totalTrackLimits ?? 0} TL

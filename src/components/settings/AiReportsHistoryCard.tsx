@@ -23,11 +23,11 @@ export const AiReportsHistoryCard: React.FC = () => {
     <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
-          <History className="w-5 h-5 text-lmu-accent" />
+          <History className="w-5 h-5 text-lmu-accent-text" />
           <h3 className="text-base font-bold text-white uppercase tracking-wider">AI Lap Report History</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30">
+          <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30">
             {reports?.length ?? 0} Cached
           </span>
           <button
@@ -46,7 +46,7 @@ export const AiReportsHistoryCard: React.FC = () => {
         Every generated Gemini lap report is cached in SQLite so it can be re-displayed instantly without spending tokens again.
       </p>
 
-      {error && <p className="text-xs font-semibold text-lmu-accent">{error}</p>}
+      {error && <p className="text-xs font-semibold text-lmu-accent-text">{error}</p>}
 
       {reports && reports.length === 0 && !isLoading && (
         <p className="text-xs text-lmu-muted italic">No AI reports generated yet.</p>

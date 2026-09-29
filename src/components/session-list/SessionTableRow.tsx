@@ -28,15 +28,15 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
     <tr
       onClick={() => onSelectSession(s.id)}
       className={`hover:bg-lmu-card/60 transition-colors cursor-pointer group ${
-        empty ? 'bg-amber-950/10' : ''
+        empty ? 'bg-lmu-warn-deep/10' : ''
       }`}
     >
       {/* Track */}
       {showTrackColumn && (
         <td className="px-3.5 py-3 font-medium text-white">
           <div className="flex items-center gap-2">
-            <MapPin className="w-3.5 h-3.5 text-lmu-accent shrink-0" />
-            <span className="font-bold text-white group-hover:text-lmu-accent transition-colors">
+            <MapPin className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />
+            <span className="font-bold text-white group-hover:text-lmu-accent-text transition-colors">
               {displayTrack || 'Circuit'}
             </span>
           </div>
@@ -49,10 +49,10 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
           <span
             className={`px-2 py-0.5 text-[11px] font-bold rounded uppercase tracking-wider ${
               s.sessionType === 'Race'
-                ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
+                ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
                 : s.sessionType === 'Qualifying'
                 ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                : 'bg-lmu-blue/20 text-lmu-cyan border border-lmu-blue/30'
             }`}
           >
             {s.sessionName || s.sessionType}
@@ -66,7 +66,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               {p.positionGain !== null && p.positionGain !== undefined && (
                 <span
                   className={`ml-1 font-bold ${
-                    p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-lmu-muted'
+                    p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-muted'
                   }`}
                 >
                   ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
@@ -82,7 +82,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
             </span>
           ) : null}
           {empty && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/30 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" /> Empty
             </span>
           )}
@@ -152,7 +152,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               e.stopPropagation();
               onSelectSession(s.id);
             }}
-            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center group/btn"
+            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent-text hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center group/btn"
             title={`Analyze ${displayTrack || 'Session'} Details`}
             aria-label={`Analyze ${displayTrack || 'Session'}`}
           >

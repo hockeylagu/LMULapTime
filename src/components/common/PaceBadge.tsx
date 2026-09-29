@@ -42,7 +42,7 @@ export const PaceBadge: React.FC<PaceBadgeProps> = ({
       {showEmoji && <span>{style.emoji}</span>}
       <span>{style.label}</span>
       {showPercentage && percentage != null && (
-        <span className="opacity-80">({formatPacePercentage(percentage)})</span>
+        <span>({formatPacePercentage(percentage)})</span>
       )}
     </span>
   );

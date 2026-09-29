@@ -65,7 +65,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
       <div className="flex flex-wrap items-center gap-3">
         {/* Track Filter */}
         <div className="h-9 flex-1 min-w-[200px] inline-flex items-center gap-2 bg-lmu-bg border border-lmu-border rounded-xl px-3 text-xs text-white">
-          <MapPin className="w-3.5 h-3.5 text-lmu-accent shrink-0 pointer-events-none" />
+          <MapPin className="w-3.5 h-3.5 text-lmu-accent-text shrink-0 pointer-events-none" />
           <select
             ref={trackSelectRef}
             value={selectedTrack}

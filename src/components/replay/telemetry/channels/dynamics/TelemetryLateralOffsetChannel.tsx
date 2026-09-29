@@ -55,14 +55,14 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
   const hasOffset = offsetM !== undefined || Boolean(lateralOffsetPath);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-teal-950/20">
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-teal-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-teal-500/20 text-teal-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-teal-strong/20 text-lmu-teal font-black text-[10px] tracking-wider flex items-center gap-1">
           <GitCommit className="w-3 h-3" />
           LATERAL OFFSET
         </span>
         {hasOffset ? (
-          <span className="text-xs font-mono font-bold text-teal-300">
+          <span className="text-xs font-mono font-bold text-lmu-teal-soft">
             {offsetM !== undefined ? `${offsetM > 0 ? `+${offsetM.toFixed(2)}` : offsetM.toFixed(2)}m` : '0.00m'}
           </span>
         ) : (
@@ -71,16 +71,16 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
           </span>
         )}
         {currentComparison?.baseline.lateralOffsetM !== undefined && (
-          <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
             Base: {currentComparison.baseline.lateralOffsetM.toFixed(2)}m
           </span>
         )}
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+10m Right', borderClassName: 'border-b border-teal-400/30', labelClassName: 'text-[8px] text-teal-400 font-mono' },
-        { label: '0m Center', borderClassName: 'border-b border-teal-400/50', labelClassName: 'text-[8px] text-teal-300 font-mono' },
-        { label: '-10m Left', borderClassName: 'border-b border-teal-400/30', labelClassName: 'text-[8px] text-teal-400 font-mono' },
+        { label: '+10m Right', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[8px] text-lmu-teal font-mono' },
+        { label: '0m Center', borderClassName: 'border-b border-lmu-teal/50', labelClassName: 'text-[8px] text-lmu-teal-soft font-mono' },
+        { label: '-10m Left', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[8px] text-lmu-teal font-mono' },
       ]} />
 
       {isCursorInView && hasOffset && (
@@ -90,11 +90,11 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-teal-400/80 font-mono font-bold text-[11px] text-teal-200 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-teal/80 font-mono font-bold text-[11px] text-lmu-teal-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
             {offsetM !== undefined ? `${offsetM > 0 ? `+${offsetM.toFixed(2)}` : offsetM.toFixed(2)}m` : '0.00m'}
           </span>
           {currentComparison?.baseline.lateralOffsetM !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {currentComparison.baseline.lateralOffsetM.toFixed(2)}m
             </span>
           )}

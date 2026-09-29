@@ -38,29 +38,29 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
   return (
     <div className={`flex flex-col gap-2 p-2 pt-0 font-mono text-[11px] ${className}`}>
       {/* Milestone / Phase Delta Summary Strip */}
-      <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 rounded-lg bg-lmu-deep border border-lmu-border/50 text-[10px] text-slate-300 gap-1.5">
-        <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
+      <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 rounded-lg bg-lmu-deep border border-lmu-border/50 text-[10px] text-lmu-text-soft gap-1.5">
+        <span className="text-lmu-muted font-bold uppercase tracking-wider text-[9px]">
           {isCompareMode ? 'Phase Deltas' : 'Corner Flow'}
         </span>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[10px]">
           {isCompareMode ? (
             <>
               <span>
-                <span className="text-cyan-400 font-semibold">Entry:</span>{' '}
+                <span className="text-lmu-aqua font-semibold">Entry:</span>{' '}
                 <span className={timeDeltaClass(corner.phaseTiming?.entry?.timeDeltaSec ?? 0)}>
                   {corner.phaseTiming?.entry ? formatTimeDelta(corner.phaseTiming.entry.timeDeltaSec) : '--'}
                 </span>
               </span>
-              <span className="text-slate-700">•</span>
+              <span className="text-lmu-faint">•</span>
               <span>
-                <span className="text-rose-400 font-semibold">Rotation:</span>{' '}
+                <span className="text-lmu-loss font-semibold">Rotation:</span>{' '}
                 <span className={timeDeltaClass(corner.phaseTiming?.rotation?.timeDeltaSec ?? 0)}>
                   {corner.phaseTiming ? formatTimeDelta(corner.phaseTiming.rotation.timeDeltaSec) : '--'}
                 </span>
               </span>
-              <span className="text-slate-700">•</span>
+              <span className="text-lmu-faint">•</span>
               <span>
-                <span className="text-emerald-400 font-semibold">Exit:</span>{' '}
+                <span className="text-lmu-gain font-semibold">Exit:</span>{' '}
                 <span className={timeDeltaClass(corner.phaseTiming?.exit?.timeDeltaSec ?? 0)}>
                   {corner.phaseTiming ? formatTimeDelta(corner.phaseTiming.exit.timeDeltaSec) : '--'}
                 </span>
@@ -69,17 +69,17 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
           ) : (
             <>
               <span>
-                <span className="text-cyan-400 font-semibold">Entry:</span>{' '}
+                <span className="text-lmu-aqua font-semibold">Entry:</span>{' '}
                 <span className="text-white font-bold">{corner.exitDistM > corner.entryDistM ? `${Math.round(corner.minDistM - corner.entryDistM)}m` : '--'}</span>
               </span>
-              <span className="text-slate-700">•</span>
+              <span className="text-lmu-faint">•</span>
               <span>
-                <span className="text-rose-400 font-semibold">Apex:</span>{' '}
+                <span className="text-lmu-loss font-semibold">Apex:</span>{' '}
                 <span className="text-white font-bold">{corner.primaryMinSpeedKmh} km/h</span>
               </span>
-              <span className="text-slate-700">•</span>
+              <span className="text-lmu-faint">•</span>
               <span>
-                <span className="text-emerald-400 font-semibold">Exit:</span>{' '}
+                <span className="text-lmu-gain font-semibold">Exit:</span>{' '}
                 <span className="text-white font-bold">{corner.primaryExitSpeedKmh} km/h</span>
               </span>
             </>

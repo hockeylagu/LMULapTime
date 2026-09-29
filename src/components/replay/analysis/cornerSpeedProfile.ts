@@ -129,11 +129,11 @@ export function computeCornerSpeedProfile(input: CornerSpeedProfileInput): Corne
     const ev = handlingEvents.find(e => currentDistM >= e.startDistM && currentDistM <= e.endDistM);
     const balanceDeg = pt?.understeerDeg;
     if (ev) {
-      const color = ev.isTireScrub ? 'text-rose-300 border-rose-500/60 bg-rose-950/90' : ev.type === 'understeer' ? 'text-sky-300 border-sky-500/60 bg-sky-950/90' : 'text-amber-300 border-amber-500/60 bg-amber-950/90';
+      const color = ev.isTireScrub ? 'text-lmu-loss-soft border-lmu-loss-strong/60 bg-lmu-loss-deep/90' : ev.type === 'understeer' ? 'text-lmu-info-soft border-lmu-info-strong/60 bg-lmu-info-deep/90' : 'text-lmu-warn-soft border-lmu-warn-strong/60 bg-lmu-warn-deep/90';
       currentHandling = { label: ev.isTireScrub ? 'SCRUB' : ev.type === 'understeer' ? 'US' : 'OS', color, deg: ev.peakDeg };
     } else if (balanceDeg !== undefined) {
-      if (balanceDeg >= 2.0) currentHandling = { label: 'US', color: 'text-sky-300 border-sky-500/60 bg-sky-950/90', deg: balanceDeg };
-      else if (balanceDeg <= -1.0) currentHandling = { label: 'OS', color: 'text-amber-300 border-amber-500/60 bg-amber-950/90', deg: balanceDeg };
+      if (balanceDeg >= 2.0) currentHandling = { label: 'US', color: 'text-lmu-info-soft border-lmu-info-strong/60 bg-lmu-info-deep/90', deg: balanceDeg };
+      else if (balanceDeg <= -1.0) currentHandling = { label: 'OS', color: 'text-lmu-warn-soft border-lmu-warn-strong/60 bg-lmu-warn-deep/90', deg: balanceDeg };
     }
   }
 

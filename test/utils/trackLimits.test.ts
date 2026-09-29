@@ -127,14 +127,14 @@ describe('trackLimits utility', () => {
   });
 
   describe('badge and pill classes', () => {
-    it('returns emerald classes for green', () => {
-      expect(getTrackLimitBadgeClasses('green')).toContain('emerald');
-      expect(getTrackLimitStandingsPillClasses('green')).toContain('emerald');
+    it('returns gain classes for green', () => {
+      expect(getTrackLimitBadgeClasses('green')).toContain('lmu-gain');
+      expect(getTrackLimitStandingsPillClasses('green')).toContain('lmu-gain');
     });
 
-    it('returns yellow classes for yellow', () => {
-      expect(getTrackLimitBadgeClasses('yellow')).toContain('yellow');
-      expect(getTrackLimitStandingsPillClasses('yellow')).toContain('yellow');
+    it('returns warn classes for yellow', () => {
+      expect(getTrackLimitBadgeClasses('yellow')).toContain('lmu-warn');
+      expect(getTrackLimitStandingsPillClasses('yellow')).toContain('lmu-warn');
     });
 
     it('returns orange classes for orange', () => {

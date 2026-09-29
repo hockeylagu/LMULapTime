@@ -1,11 +1,11 @@
 export function speedDeltaClass(delta: number): string {
   if (Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
+  return delta > 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function timeDeltaClass(delta: number): string {
   if (Math.abs(delta) < 0.02) return 'text-lmu-muted';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
+  return delta < 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function formatSpeedDelta(delta: number): string {
@@ -26,12 +26,12 @@ export function formatBrakingDelta(delta: number | null): string {
 
 export function brakingDeltaClass(delta: number | null): string {
   if (delta === null || Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
+  return delta > 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function throttleDeltaClass(delta: number | null): string {
   if (delta === null || Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-rose-400 font-medium';
+  return delta < 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function formatDistPoint(distM: number | null): string {
@@ -39,8 +39,8 @@ export function formatDistPoint(distM: number | null): string {
 }
 
 export function timeDeltaBadgeClass(delta: number): string {
-  if (Math.abs(delta) < 0.02) return 'bg-slate-800 text-slate-300 border-slate-700/60';
+  if (Math.abs(delta) < 0.02) return 'bg-lmu-raised text-lmu-text-soft border-lmu-rule/60';
   return delta < 0
-    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-    : 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+    ? 'bg-lmu-gain-strong/15 text-lmu-gain border-lmu-gain-strong/30'
+    : 'bg-lmu-loss-strong/15 text-lmu-loss border-lmu-loss-strong/30';
 }

@@ -66,7 +66,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <ListOrdered className="w-4 h-4 text-lmu-accent" />
+            <ListOrdered className="w-4 h-4 text-lmu-accent-text" />
             Leaderboard · {carClassLabel(carClass)}
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
@@ -94,7 +94,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
       </div>
 
       {error && (
-        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">{error}</p>
+        <p role="alert" className="px-4 py-3 rounded-xl border border-lmu-loss-strong/30 bg-lmu-loss-strong/10 text-sm text-lmu-loss-soft">{error}</p>
       )}
       {loading && <LoadingState size="compact" title="Loading leaderboard" showQuote={false} />}
 

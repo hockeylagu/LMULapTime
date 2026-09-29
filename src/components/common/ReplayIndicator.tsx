@@ -35,7 +35,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   const activeDuckFilename = duckdbFilename || replay.duckdbFilename;
 
   const indicatorClassName = isDuckDb
-    ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/40 shrink-0 ${className}`
+    ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 shrink-0 ${className}`
     : `inline-flex p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20 shrink-0 ${className}`;
 
   const title = isDuckDb
@@ -50,13 +50,13 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
           event.stopPropagation();
           onClick();
         }}
-        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-amber-500/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
+        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
         title={`${title} - Open telemetry`}
         aria-label="Open replay telemetry"
       >
         {isDuckDb ? (
           <>
-            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+            <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
           </>
         ) : (
@@ -70,7 +70,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
     <span className={indicatorClassName} title={title}>
       {isDuckDb ? (
         <>
-          <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
+          <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
           <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
         </>
       ) : (

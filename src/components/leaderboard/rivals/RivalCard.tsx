@@ -25,7 +25,7 @@ const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bol
 export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
   const { status, error } = rival;
   if (error) {
-    return <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">{error}</p>;
+    return <p role="alert" className="px-4 py-3 rounded-xl border border-lmu-loss-strong/30 bg-lmu-loss-strong/10 text-sm text-lmu-loss-soft">{error}</p>;
   }
   if (!status?.rival || !player || status.gap === null) return null;
 
@@ -35,10 +35,10 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
   const closed = progress !== null ? Math.round(progress * 100) : null;
 
   return (
-    <section aria-label="Your rival" className="bg-gradient-to-br from-amber-500/10 via-lmu-card/80 to-lmu-card/75 backdrop-blur-md border border-amber-400/20 p-6 rounded-2xl space-y-4">
+    <section aria-label="Your rival" className="bg-gradient-to-br from-lmu-warn-strong/10 via-lmu-card/80 to-lmu-card/75 backdrop-blur-md border border-lmu-warn/20 p-6 rounded-2xl space-y-4">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-lmu-warn-soft flex items-center gap-1.5">
             {target.kind === 'ghost' ? <Ghost className="w-3.5 h-3.5" /> : <Target className="w-3.5 h-3.5" />}
             {target.kind === 'ghost' ? 'Ghost target' : target.pinned ? 'Your chosen rival' : 'Your rival'}
           </div>
@@ -57,7 +57,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
           </p>
         </div>
         <div className="text-left md:text-right shrink-0">
-          <div className="text-3xl font-extrabold font-mono text-amber-300 leading-none">
+          <div className="text-3xl font-extrabold font-mono text-lmu-warn-soft leading-none">
             {gap > 0 ? gap.toFixed(3) : 'Beaten'}
             {gap > 0 && <span className="text-sm text-lmu-muted ml-1">s</span>}
           </div>
@@ -71,7 +71,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
         <div>
           <div className="h-2 rounded-full bg-lmu-bg border border-lmu-border overflow-hidden" role="progressbar"
             aria-label="Gap closed since this rival was set" aria-valuemin={0} aria-valuemax={100} aria-valuenow={closed}>
-            <div className="h-full bg-gradient-to-r from-amber-500 to-emerald-400" style={{ width: `${Math.max(2, closed)}%` }} />
+            <div className="h-full bg-gradient-to-r from-lmu-warn-strong to-lmu-gain" style={{ width: `${Math.max(2, closed)}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-lmu-muted mt-1 font-mono">
             <span>set at {formatTime(target.startTime)}</span>

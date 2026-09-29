@@ -109,11 +109,11 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
                 showPedalMarkers
-                  ? 'bg-rose-500/20 border-rose-500/60 text-rose-300 shadow-sm'
+                  ? 'bg-lmu-loss-strong/20 border-lmu-loss-strong/60 text-lmu-loss-soft shadow-sm'
                   : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
               }`}
             >
-              <Disc className="w-3 h-3 text-rose-400" />
+              <Disc className="w-3 h-3 text-lmu-loss" />
               <span>Pedal Points</span>
             </button>
           )}
@@ -126,11 +126,11 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'primary'
-                    ? 'text-lmu-muted bg-slate-800/40 opacity-60'
-                    : 'text-sky-300 bg-sky-950/40 border border-sky-500/40 hover:text-white hover:bg-sky-900/50'
+                    ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
+                    : 'text-lmu-info-soft bg-lmu-info-deep/40 border border-lmu-info-strong/40 hover:text-white hover:bg-lmu-info-deep/50'
                 }`}
               >
-                <span className="w-2.5 h-1 rounded-sm bg-sky-400 shrink-0" />
+                <span className="w-2.5 h-1 rounded-sm bg-lmu-info shrink-0" />
                 {fadedLine === 'primary' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Mine
               </button>
@@ -139,11 +139,11 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 title={fadedLine === 'baseline' ? 'Show baseline line' : 'Fade baseline line'}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'baseline'
-                    ? 'text-lmu-muted bg-slate-800/40 opacity-60'
-                    : 'text-amber-300 bg-amber-950/40 border border-amber-500/40 hover:text-white hover:bg-amber-900/50'
+                    ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
+                    : 'text-lmu-warn-soft bg-lmu-warn-deep/40 border border-lmu-warn-strong/40 hover:text-white hover:bg-lmu-warn-deep/50'
                 }`}
               >
-                <span className="w-2.5 h-0 border-b-2 border-dashed border-amber-400 shrink-0" />
+                <span className="w-2.5 h-0 border-b-2 border-dashed border-lmu-warn shrink-0" />
                 {fadedLine === 'baseline' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Baseline
               </button>
@@ -157,7 +157,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             aria-pressed={showFrictionCircle}
             className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
               showFrictionCircle
-                ? 'bg-sky-500/20 border-sky-500/60 text-sky-300 shadow-sm'
+                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-lmu-info-soft shadow-sm'
                 : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
             }`}
           >

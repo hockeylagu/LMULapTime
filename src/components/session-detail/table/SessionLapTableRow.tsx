@@ -156,7 +156,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
             : isSessionBest
             ? 'text-lmu-blue font-bold'
             : isInferredLap
-            ? 'text-amber-300/80 italic font-mono'
+            ? 'text-lmu-warn-soft/80 italic font-mono'
             : 'text-white'
         }`}
       >
@@ -184,7 +184,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         </span>
         {theoGapLap !== null && (
           <span
-            className="block text-[10px] text-emerald-400/80 font-mono"
+            className="block text-[10px] text-lmu-gain/80 font-mono"
             title={`Gap to Theoretical Optimal (${formatTime(theoBest)})`}
           >
             +{theoGapLap.toFixed(3)}s vs opt
