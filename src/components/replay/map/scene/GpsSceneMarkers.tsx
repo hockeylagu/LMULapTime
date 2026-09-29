@@ -197,7 +197,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               textAnchor="middle"
               dominantBaseline="central"
               className={`font-mono font-bold select-none pointer-events-none ${
-                m.isSelected ? 'fill-white text-[13.5px]' : m.isDimmed ? 'fill-lmu-text text-[12px]' : 'fill-lmu-text text-[12px]'
+                m.isSelected ? 'fill-white text-sm' : m.isDimmed ? 'fill-lmu-text text-xs' : 'fill-lmu-text text-xs'
               }`}
             >
               T{m.cornerNumber}

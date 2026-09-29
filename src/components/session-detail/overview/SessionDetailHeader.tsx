@@ -172,7 +172,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
           {/* Driver Selector */}
           <div className="flex items-center gap-3 bg-lmu-bg p-2 rounded-xl border border-lmu-border">
-            <span className="text-xs font-semibold text-lmu-muted uppercase">Driver:</span>
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Driver:</span>
             <select
               value={selectedDriverName}
               onChange={(e) => setSelectedDriverName(e.target.value)}

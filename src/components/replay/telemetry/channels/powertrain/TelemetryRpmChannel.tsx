@@ -87,9 +87,9 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxRpm} rpm`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
-        { label: `${Math.round(maxRpm / 2)} rpm`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
-        { label: '0 rpm', borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
+        { label: `${maxRpm} rpm`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
+        { label: `${Math.round(maxRpm / 2)} rpm`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
+        { label: '0 rpm', borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
       ]} />
 
       {isCursorInView && hasRpmData && (
@@ -100,7 +100,7 @@ export const TelemetryRpmChannel: React.FC<TelemetryRpmChannelProps> = React.mem
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-purple/80 font-mono font-bold text-[11px] text-lmu-purple-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-            {currentRpm?.toLocaleString() ?? 0} <span className="text-[9px] font-normal text-lmu-purple/70">rpm</span>
+            {currentRpm?.toLocaleString() ?? 0} <span className="text-[10px] font-normal text-lmu-purple/70">rpm</span>
           </span>
           {currentComparison?.baseline.engineRpm !== undefined && (
             <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">

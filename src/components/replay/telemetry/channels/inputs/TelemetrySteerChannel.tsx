@@ -13,9 +13,9 @@ import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTr
 import { TelemetrySteerOverlayToggles } from './TelemetrySteerOverlayToggles.js';
 
 const STEER_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '-100% L', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[8px] text-lmu-indigo font-mono' },
-  { label: '0% Center', borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[8px] text-lmu-indigo-soft font-mono' },
-  { label: '+100% R', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[8px] text-lmu-indigo font-mono' },
+  { label: '-100% L', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
+  { label: '0% Center', borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[10px] text-lmu-indigo-soft font-mono' },
+  { label: '+100% R', borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
 ];
 
 export interface TelemetrySteerChannelProps {
@@ -214,7 +214,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
             return (
               <div
                 key={band.id}
-                className={`absolute top-0 px-1 py-0.2 text-[8px] sm:text-[9px] font-mono font-black tracking-wider whitespace-nowrap border-b border-r rounded-br ${badgeClass}`}
+                className={`absolute top-0 px-1 py-0.2 text-[10px] sm:text-[10px] font-mono font-black tracking-wider whitespace-nowrap border-b border-r rounded-br ${badgeClass}`}
                 style={{ left: `${leftPct}%` }}
                 title={`${titleType} (${band.phase}): Peak ${band.peakDeg}°`}
               >

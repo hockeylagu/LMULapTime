@@ -35,7 +35,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
 
       {/* Hero Speed Metric */}
       <div className="flex items-center justify-between h-8 py-1 border-b border-lmu-border/60 min-w-0">
-        <span className="text-lmu-muted text-[10px] uppercase font-semibold text-left whitespace-nowrap">Min Speed</span>
+        <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-semibold text-left whitespace-nowrap">Min Speed</span>
         <div className="flex items-center gap-1 shrink-0 text-right whitespace-nowrap">
           <span className="text-sm font-bold text-white">{corner.primaryMinSpeedKmh}</span>
           <span className="text-[10px] text-lmu-muted">km/h</span>
@@ -81,7 +81,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
               <>
                 <span>{corner.primaryRotationAtThrottlePct}%</span>
                 {isCompareMode && corner.rotationAtThrottleDeltaPct !== null && corner.rotationAtThrottleDeltaPct !== undefined && (
-                  <span className="ml-1 text-[9px] font-normal text-lmu-muted">
+                  <span className="ml-1 text-[10px] font-normal text-lmu-muted">
                     ({corner.rotationAtThrottleDeltaPct > 0 ? '+' : ''}{corner.rotationAtThrottleDeltaPct}%)
                   </span>
                 )}
@@ -140,7 +140,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                 </span>
               ) : trackUsage?.apexSpaceLeftM !== undefined ? (
                 <span className="text-white font-bold" title={`${trackUsage.apexSpaceLeftM.toFixed(1)}m from apex curb`}>
-                  {trackUsage.apexSpaceLeftM.toFixed(1)}m <span className="text-[9px] text-lmu-muted font-normal">left</span>
+                  {trackUsage.apexSpaceLeftM.toFixed(1)}m <span className="text-[10px] text-lmu-muted font-normal">left</span>
                 </span>
               ) : (
                 <span className="text-lmu-faint">--</span>
@@ -173,7 +173,7 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
                     ? '0.0m'
                     : `${trackUsage.apexSpaceLeftM.toFixed(1)}m`}
                 </span>{' '}
-                <span className="text-[9px] text-lmu-muted font-normal">
+                <span className="text-[10px] text-lmu-muted font-normal">
                   {trackUsage.apexSpaceLeftM < 0 ? 'cut' : 'left'}
                 </span>
               </span>

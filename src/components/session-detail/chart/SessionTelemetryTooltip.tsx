@@ -71,7 +71,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-2 font-mono min-w-[240px]">
         <div className="font-bold text-white flex items-center justify-between border-b border-lmu-border/60 pb-1 font-sans">
           <span>{data.lapNum}</span>
-          <span className="text-[10px] text-lmu-muted uppercase font-semibold">
+          <span className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">
             {selectedDriver.carClass || 'Class'} Standings
           </span>
         </div>

@@ -64,14 +64,14 @@ export function LapSelectorDropdown({
                 />
                 <span className={isExcluded ? 'text-lmu-muted line-through' : 'text-white'}>Lap {lapNumber}</span>
                 {!isValid && (
-                  <span className="px-1 rounded bg-lmu-loss-strong/15 border border-lmu-loss-strong/30 text-lmu-loss text-[9px] font-bold uppercase">
+                  <span className="px-1 rounded bg-lmu-loss-strong/15 border border-lmu-loss-strong/30 text-lmu-loss text-[10px] font-bold uppercase tracking-wider">
                     Invalid
                   </span>
                 )}
                 {isValid && nonRepresentativeReason && (
                   <span
                     title={NON_REPRESENTATIVE_LABELS[nonRepresentativeReason].title}
-                    className="px-1 rounded bg-lmu-warn-strong/15 border border-lmu-warn-strong/30 text-lmu-warn text-[9px] font-bold uppercase"
+                    className="px-1 rounded bg-lmu-warn-strong/15 border border-lmu-warn-strong/30 text-lmu-warn text-[10px] font-bold uppercase tracking-wider"
                   >
                     {NON_REPRESENTATIVE_LABELS[nonRepresentativeReason].label}
                   </span>

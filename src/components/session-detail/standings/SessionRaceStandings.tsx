@@ -87,7 +87,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
             setSortDescending(false);
           }
         }}
-        className="inline-flex items-center gap-1 uppercase hover:text-white"
+        className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-white"
         title={`Sort by ${label}`}
       >
         {label}
@@ -129,7 +129,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
 
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left text-xs text-lmu-muted">
-          <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
+          <thead className="bg-lmu-bg/80 uppercase tracking-wider font-semibold text-white border-b border-lmu-border">
             <tr>
               {sortHeader('position', 'Pos', 'text-center')}
               {sortHeader('gain', '+/-', 'text-center')}

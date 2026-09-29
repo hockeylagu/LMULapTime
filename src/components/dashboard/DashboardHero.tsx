@@ -107,7 +107,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                     <h3 className="text-base font-bold text-white tracking-wide truncate">{latestOuting.trackName}</h3>
                     <span
                       data-testid="hero-session-type-badge"
-                      className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-bold shrink-0 ${
+                      className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold shrink-0 ${
                         latestOuting.sessionType === 'Race'
                           ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
                           : latestOuting.sessionType === 'Qualifying'

@@ -82,9 +82,9 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
         </div>
 
         <TelemetryStaticTrace chart={throttleSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain' },
-          { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain' },
-          { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain' },
+          { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
         ]} />
 
         {isCursorInView && (
@@ -99,7 +99,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             }`}>
               {(currentPoint?.throttle ?? 0).toFixed(0)}%
               {currentPoint?.tcActive && (
-                <span className="text-[9px] font-black px-1 rounded bg-lmu-warn-strong text-black ml-1">TC</span>
+                <span className="text-[10px] font-black px-1 rounded bg-lmu-warn-strong text-black ml-1">TC</span>
               )}
             </span>
             {currentComparison && (
@@ -129,9 +129,9 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
         </div>
 
         <TelemetryStaticTrace chart={brakeSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss' },
-          { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss' },
-          { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss' },
+          { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
         ]} />
 
         {isCursorInView && (
@@ -146,7 +146,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             }`}>
               {(currentPoint?.brake ?? 0).toFixed(0)}%
               {currentPoint?.absActive && (
-                <span className="text-[9px] font-black px-1 rounded bg-lmu-aqua text-black ml-1">ABS</span>
+                <span className="text-[10px] font-black px-1 rounded bg-lmu-aqua text-black ml-1">ABS</span>
               )}
             </span>
             {currentComparison && (

@@ -81,7 +81,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       {zoomDisplay && (
         <span
           className={`${
-            isVert ? 'w-7 h-4.5 text-[9px]' : 'w-11 h-7 text-[10px]'
+            isVert ? 'w-7 h-4.5 text-[10px]' : 'w-11 h-7 text-[10px]'
           } flex items-center justify-center font-mono text-lmu-muted font-bold select-none tabular-nums shrink-0`}
         >
           {zoomDisplay}

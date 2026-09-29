@@ -144,8 +144,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Cpu className="w-3 h-3 text-lmu-info" />
               Standard
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.standard} m</span>
-            <span className="text-[9px] text-lmu-info-soft/80 mt-0.5">Lighter payload</span>
+            <span className="text-[10px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.standard} m</span>
+            <span className="text-[10px] text-lmu-info-soft/80 mt-0.5">Lighter payload</span>
           </button>
 
           <button
@@ -164,8 +164,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Zap className="w-3 h-3 text-lmu-gain" />
               High
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.high} m</span>
-            <span className="text-[9px] text-lmu-gain-soft/80 mt-0.5">Default</span>
+            <span className="text-[10px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.high} m</span>
+            <span className="text-[10px] text-lmu-gain-soft/80 mt-0.5">Default</span>
           </button>
 
           <button
@@ -184,8 +184,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <Sparkles className="w-3 h-3 text-lmu-purple" />
               Full Raw
             </div>
-            <span className="text-[9px] text-lmu-muted mt-1 font-mono">{fullRawLabel}</span>
-            <span className="text-[9px] text-lmu-purple-soft/80 mt-0.5">1:1 Raw Telemetry</span>
+            <span className="text-[10px] text-lmu-muted mt-1 font-mono">{fullRawLabel}</span>
+            <span className="text-[10px] text-lmu-purple-soft/80 mt-0.5">1:1 Raw Telemetry</span>
           </button>
         </div>
       </div>
@@ -213,11 +213,11 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${source === 'duckdb' ? 'bg-lmu-warn animate-pulse' : 'bg-lmu-warn/40'}`} />
                 ⚡ 100Hz DuckDB
               </div>
-              <span className="text-[9px] text-lmu-muted mt-1 font-mono">
+              <span className="text-[10px] text-lmu-muted mt-1 font-mono">
                 {duckdbResolutionLabel}
               </span>
               {duckdbUnavailableReason && (
-                <span className="text-[9px] text-lmu-warn-soft/90 mt-1 leading-tight">{duckdbUnavailableReason}</span>
+                <span className="text-[10px] text-lmu-warn-soft/90 mt-1 leading-tight">{duckdbUnavailableReason}</span>
               )}
             </button>
 
@@ -233,7 +233,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               <div className="flex items-center gap-1.5 font-bold text-[11px] text-lmu-info-soft">
                 🎬 Native VCR
               </div>
-              <span className="text-[9px] text-lmu-muted mt-1 font-mono">{vcrResolutionLabel}</span>
+              <span className="text-[10px] text-lmu-muted mt-1 font-mono">{vcrResolutionLabel}</span>
             </button>
           </div>
         </div>

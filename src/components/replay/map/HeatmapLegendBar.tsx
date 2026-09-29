@@ -16,7 +16,7 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
     >
       {colorBy === 'speed' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Speed:</span>
+          <span className="font-bold text-white uppercase tracking-wider">Speed:</span>
           <span className="flex items-center gap-1 text-lmu-info">
             <span className="w-2 h-2 rounded-full bg-lmu-info-strong" /> Apex
           </span>
@@ -37,7 +37,7 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
 
       {colorBy === 'pedal' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Pedal:</span>
+          <span className="font-bold text-white uppercase tracking-wider">Pedal:</span>
           <span className="flex items-center gap-1 text-lmu-loss">
             <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> Brake
           </span>
@@ -54,7 +54,7 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
 
       {colorBy === 'delta' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Delta:</span>
+          <span className="font-bold text-white uppercase tracking-wider">Delta:</span>
           <span className="flex items-center gap-1 text-lmu-gain">
             <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Gaining
           </span>

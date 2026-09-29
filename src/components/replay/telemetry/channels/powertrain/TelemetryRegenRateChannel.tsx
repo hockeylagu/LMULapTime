@@ -87,9 +87,9 @@ export const TelemetryRegenRateChannel: React.FC<TelemetryRegenRateChannelProps>
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxRegen} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
-        { label: `${Math.round(maxRegen / 2)} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
-        { label: '0 kW', borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[9px] text-lmu-purple-soft font-mono' },
+        { label: `${maxRegen} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
+        { label: `${Math.round(maxRegen / 2)} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
+        { label: '0 kW', borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
       ]} />
 
       {isCursorInView && hasRegenData && (

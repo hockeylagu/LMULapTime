@@ -82,9 +82,9 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
-        { label: `${midWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
-        { label: `${minTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[9px] text-lmu-warn font-mono' },
+        { label: `${maxTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+        { label: `${midWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+        { label: `${minTireWear}%`, borderClassName: 'border-b border-lmu-warn/40', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
       ]} />
 
       {isCursorInView && hasData && tw && (

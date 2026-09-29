@@ -79,9 +79,11 @@ export default {
           teal: family(FAMILIES.teal),
         }
       },
+      // The faces LMU's own platform renders (Windows): named first so a bare `monospace` never triggers the
+      // browsers' 13px generic-monospace quirk; system-ui stands in for Segoe UI off Windows.
       fontFamily: {
-        sans: ['Segoe UI', 'sans-serif'],
-        mono: ['monospace'],
+        sans: ['Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['Consolas', 'monospace'],
       }
     },
   },

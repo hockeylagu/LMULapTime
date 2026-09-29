@@ -62,7 +62,7 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
           <Compass className="w-3 h-3" />
           BODY SLIP ANGLE (BETA)
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {hasSlipAngle ? (
@@ -82,9 +82,9 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+12° Slip Right', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[8px] text-lmu-violet font-mono' },
-        { label: '0° In-Line', borderClassName: 'border-b border-lmu-violet/50', labelClassName: 'text-[8px] text-lmu-violet-soft font-mono' },
-        { label: '-12° Slip Left', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[8px] text-lmu-violet font-mono' },
+        { label: '+12° Slip Right', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
+        { label: '0° In-Line', borderClassName: 'border-b border-lmu-violet/50', labelClassName: 'text-[10px] text-lmu-violet-soft font-mono' },
+        { label: '-12° Slip Left', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
       ]} />
 
       {isCursorInView && hasSlipAngle && (

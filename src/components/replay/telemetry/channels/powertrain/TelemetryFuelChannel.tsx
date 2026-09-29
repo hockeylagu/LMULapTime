@@ -87,9 +87,9 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxFuel} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[9px] text-lmu-gain-soft font-mono' },
-        { label: `${Math.round(maxFuel / 2)} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[9px] text-lmu-gain-soft font-mono' },
-        { label: '0 L', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[9px] text-lmu-gain-soft font-mono' },
+        { label: `${maxFuel} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
+        { label: `${Math.round(maxFuel / 2)} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
+        { label: '0 L', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
       ]} />
 
       {isCursorInView && hasFuelData && (

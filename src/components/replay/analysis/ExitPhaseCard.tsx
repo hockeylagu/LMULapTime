@@ -43,7 +43,7 @@ export const ExitPhaseCard: React.FC<ExitPhaseCardProps> = ({
 
       {/* Hero Speed Metric */}
       <div className="flex items-center justify-between h-8 py-1 border-b border-lmu-border/60 min-w-0">
-        <span className="text-lmu-muted text-[10px] uppercase font-semibold text-left whitespace-nowrap">Exit Speed</span>
+        <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-semibold text-left whitespace-nowrap">Exit Speed</span>
         <div className="flex items-center gap-1 shrink-0 text-right whitespace-nowrap">
           <span className="text-sm font-bold text-white">{corner.primaryExitSpeedKmh}</span>
           <span className="text-[10px] text-lmu-muted">km/h</span>
@@ -83,7 +83,7 @@ export const ExitPhaseCard: React.FC<ExitPhaseCardProps> = ({
             ) : initialThrottleOffset !== null ? (
               <>
                 <span>{initialThrottleOffset}m</span>{' '}
-                <span className="text-[9px] text-lmu-muted font-normal">
+                <span className="text-[10px] text-lmu-muted font-normal">
                   {initialThrottleOffset === 0 ? 'apex' : 'past'}
                 </span>
               </>
@@ -119,7 +119,7 @@ export const ExitPhaseCard: React.FC<ExitPhaseCardProps> = ({
             ) : fullThrottleOffset !== null ? (
               <>
                 <span>{fullThrottleOffset}m</span>{' '}
-                <span className="text-[9px] text-lmu-muted font-normal">
+                <span className="text-[10px] text-lmu-muted font-normal">
                   {fullThrottleOffset === 0 ? 'apex' : 'past'}
                 </span>
               </>
@@ -181,7 +181,7 @@ export const ExitPhaseCard: React.FC<ExitPhaseCardProps> = ({
                 </span>
               ) : exitSpaceLeftM !== undefined ? (
                 <span className="text-white font-bold" title={`${exitSpaceLeftM.toFixed(1)}m space left to track edge`}>
-                  {exitSpaceLeftM.toFixed(1)}m <span className="text-[9px] text-lmu-muted font-normal">left</span>
+                  {exitSpaceLeftM.toFixed(1)}m <span className="text-[10px] text-lmu-muted font-normal">left</span>
                 </span>
               ) : trackUsage?.totalSweepM !== undefined ? (
                 <span className="text-white font-bold" title={`${trackUsage.totalSweepM}m total lateral sweep`}>
@@ -218,7 +218,7 @@ export const ExitPhaseCard: React.FC<ExitPhaseCardProps> = ({
                     ? '0.0m'
                     : `${exitSpaceLeftM.toFixed(1)}m`}
                 </span>{' '}
-                <span className="text-[9px] text-lmu-muted font-normal">
+                <span className="text-[10px] text-lmu-muted font-normal">
                   {exitSpaceLeftM < 0 ? 'off-track' : 'left'}
                 </span>
               </span>

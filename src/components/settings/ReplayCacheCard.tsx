@@ -128,7 +128,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
       {replays && replays.length > 0 && (
         <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-lmu-border">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-lmu-bg text-lmu-muted uppercase text-[10px]">
+            <thead className="sticky top-0 bg-lmu-bg text-lmu-muted uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="text-left font-semibold px-3 py-2 max-w-[160px]">Replay</th>
                 <th className="text-center font-semibold px-2 py-2">Disk</th>

@@ -108,7 +108,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
         {/* Specific Car Model Sub-Filter Row */}
         {selectedClass !== 'All' && availableCarModels.length > 0 && (
           <div className="pt-3 border-t border-lmu-border/50 flex items-center gap-3 flex-wrap text-xs">
-            <span className="text-xs font-semibold text-lmu-muted uppercase flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider flex items-center gap-1.5 shrink-0">
               <Car className="w-3.5 h-3.5 text-lmu-accent-text" />
               Car Model:
             </span>

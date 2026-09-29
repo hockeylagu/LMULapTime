@@ -74,7 +74,7 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
           <Scale className="w-3 h-3" />
           HANDLING BALANCE
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {hasBalance ? (
@@ -94,9 +94,9 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+8° Understeer (Front Push)', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
-        { label: '0° Neutral Balance', borderClassName: 'border-b border-lmu-warn/50', labelClassName: 'text-[8px] text-lmu-warn-soft font-mono' },
-        { label: '-8° Oversteer (Rear Loose)', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[8px] text-lmu-loss font-mono' },
+        { label: '+8° Understeer (Front Push)', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+        { label: '0° Neutral Balance', borderClassName: 'border-b border-lmu-warn/50', labelClassName: 'text-[10px] text-lmu-warn-soft font-mono' },
+        { label: '-8° Oversteer (Rear Loose)', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
       ]} />
 
       {isCursorInView && hasBalance && (

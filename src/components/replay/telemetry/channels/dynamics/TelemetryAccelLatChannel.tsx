@@ -71,7 +71,7 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
           <Compass className="w-3 h-3" />
           LATERAL G
         </span>
-        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>}
         {hasLatG ? (
@@ -91,9 +91,9 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+3.0G Right', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[8px] text-lmu-info font-mono' },
-        { label: '0.0G Center', borderClassName: 'border-b border-lmu-info/50', labelClassName: 'text-[8px] text-lmu-info-soft font-mono' },
-        { label: '-3.0G Left', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[8px] text-lmu-info font-mono' },
+        { label: '+3.0G Right', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
+        { label: '0.0G Center', borderClassName: 'border-b border-lmu-info/50', labelClassName: 'text-[10px] text-lmu-info-soft font-mono' },
+        { label: '-3.0G Left', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
       ]} />
 
       {isCursorInView && hasLatG && (

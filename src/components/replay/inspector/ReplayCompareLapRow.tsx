@@ -29,7 +29,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
           <span className="truncate">{lap.sessionName || 'Session'} ({lap.sessionType || 'Session'})</span>
           {Boolean(lap.hasRain || lap.weatherCondition === 'Wet' || lap.weatherCondition === 'Dynamic Weather') && (
             <span
-              className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-lmu-azure-strong/20 text-lmu-azure border border-lmu-azure-strong/30 shrink-0"
+              className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[10px] font-bold bg-lmu-azure-strong/20 text-lmu-azure border border-lmu-azure-strong/30 shrink-0"
               title={lap.weatherCondition || 'Wet Session'}
             >
               <CloudRain className="w-2.5 h-2.5" />

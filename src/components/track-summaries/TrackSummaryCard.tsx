@@ -62,7 +62,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
         <div className="grid grid-cols-2 gap-3 pt-3 border-t border-lmu-border/60">
           <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50 flex flex-col justify-between">
             <div>
-              <p className="text-xs text-lmu-muted font-semibold uppercase">Session Best</p>
+              <p className="text-xs text-lmu-muted font-semibold uppercase tracking-wider">Session Best</p>
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
                   {formatTime(t.bestLapTime)}
@@ -81,7 +81,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
           </div>
 
           <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50">
-            <p className="text-xs text-lmu-muted font-semibold uppercase">Theoretical Best</p>
+            <p className="text-xs text-lmu-muted font-semibold uppercase tracking-wider">Theoretical Best</p>
             <h4 className="text-xl font-extrabold text-lmu-green font-mono mt-0.5">
               {formatTime(t.theoreticalBest)}
             </h4>

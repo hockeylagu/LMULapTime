@@ -234,7 +234,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                       {/* Top speed can occur mid-straight (lift before braking) - show the actual
                           exit-boundary speed too when it differs, e.g. the lap's finish-line straight. */}
                       {Math.abs(s.primaryTopSpeedKmh - s.primaryExitSpeedKmh) >= 1 && (
-                        <div className="text-[9px] leading-tight text-lmu-muted">
+                        <div className="text-[10px] leading-tight text-lmu-muted">
                           exit {s.primaryExitSpeedKmh}
                           {!selfAnalysis && <span className={`ml-0.5 ${speedDeltaClass(s.exitSpeedDeltaKmh)}`}>{formatSpeedDelta(s.exitSpeedDeltaKmh)}</span>}
                         </div>

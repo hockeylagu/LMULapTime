@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const SPEED_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '250 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info' },
-  { label: '125 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info' },
-  { label: '0 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info' },
+  { label: '250 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info' },
+  { label: '125 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info' },
+  { label: '0 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info' },
 ];
 
 export interface TelemetrySpeedChannelProps {
@@ -87,7 +87,7 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-lmu-badge text-lmu-info-soft border border-lmu-info/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
-            {currentPoint?.speedKmh ?? 0} <span className="text-[9px] font-normal text-lmu-info/70">km/h</span>
+            {currentPoint?.speedKmh ?? 0} <span className="text-[10px] font-normal text-lmu-info/70">km/h</span>
           </span>
           {currentComparison && (
             <span className={`px-1.5 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${

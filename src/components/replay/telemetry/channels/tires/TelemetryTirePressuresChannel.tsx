@@ -82,9 +82,9 @@ export const TelemetryTirePressuresChannel: React.FC<TelemetryTirePressuresChann
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxTirePressure} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info font-mono' },
-        { label: `${midPres} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info font-mono' },
-        { label: `${minTirePressure} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info font-mono' },
+        { label: `${maxTirePressure} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info font-mono' },
+        { label: `${midPres} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info font-mono' },
+        { label: `${minTirePressure} kPa`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info font-mono' },
       ]} />
 
       {isCursorInView && hasData && tp && (
@@ -99,7 +99,7 @@ export const TelemetryTirePressuresChannel: React.FC<TelemetryTirePressuresChann
             <span className="text-lmu-azure-soft">FR:{tp[1].toFixed(1)}</span>
             <span className="text-lmu-warn-soft">RL:{tp[2].toFixed(1)}</span>
             <span className="text-lmu-loss-soft">RR:{tp[3].toFixed(1)}</span>
-            <span className="text-lmu-info text-[9px]">kPa</span>
+            <span className="text-lmu-info text-[10px]">kPa</span>
           </div>
         </div>
       )}

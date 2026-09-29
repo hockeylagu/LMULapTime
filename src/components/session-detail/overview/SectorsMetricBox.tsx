@@ -49,7 +49,7 @@ export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriv
       className="col-span-2 p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between"
       data-testid="sectors-metric"
     >
-      <div className={`grid ${columns} gap-x-2 text-[10px] text-lmu-muted uppercase font-semibold`}>
+      <div className={`grid ${columns} gap-x-2 text-[10px] text-lmu-muted uppercase tracking-wider font-semibold`}>
         <span>Sectors</span>
         <span className="text-right">Best</span>
         <span className="text-right">Avg</span>

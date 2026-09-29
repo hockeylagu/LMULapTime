@@ -48,7 +48,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
           <span className="font-bold truncate max-w-[120px] sm:max-w-[150px]">
             {activePreset?.name ?? 'Channels'}
           </span>
-          <span className="px-1 py-0.2 rounded bg-lmu-info-strong/20 text-lmu-info-soft text-[9px] font-bold">
+          <span className="px-1 py-0.2 rounded bg-lmu-info-strong/20 text-lmu-info-soft text-[10px] font-bold">
             {activePreset?.channels.length ?? 0}
           </span>
           <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -73,7 +73,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
           className="absolute left-0 mt-1 w-64 rounded-xl bg-lmu-surface border border-lmu-border shadow-2xl z-50 py-1.5 backdrop-blur-md animate-fadeIn text-[11px] font-mono"
           data-testid="telemetry-preset-menu"
         >
-          <div className="px-3 py-1 text-[9px] font-bold text-lmu-muted uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
+          <div className="px-3 py-1 text-[10px] font-bold text-lmu-muted uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
             <span>Telemetry Presets</span>
             <button
               type="button"
@@ -111,7 +111,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                     )}
                     <span className="truncate">{p.name}</span>
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-lmu-muted font-bold shrink-0">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-lmu-muted font-bold shrink-0">
                     {p.channels.length} ch
                   </span>
                 </button>

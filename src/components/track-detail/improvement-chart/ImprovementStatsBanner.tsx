@@ -48,7 +48,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
-          <p className="text-xs text-lmu-muted uppercase font-semibold">Total Sessions</p>
+          <p className="text-xs text-lmu-muted uppercase tracking-wider font-semibold">Total Sessions</p>
           <h4 className="text-2xl font-extrabold text-white mt-0.5">{trackDataCount}</h4>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {selectedCarModel !== 'All' ? `${selectedCarModel}` : `${selectedCarClass === 'All' ? 'All Classes' : selectedCarClass}`}
@@ -59,16 +59,16 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
 
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-lmu-muted uppercase font-semibold">Positions</p>
+          <p className="text-xs text-lmu-muted uppercase tracking-wider font-semibold">Positions</p>
           <div className="grid grid-cols-2 gap-3 mt-1">
             <div>
-              <p className="text-[10px] text-lmu-muted uppercase font-semibold">Quali Avg Pos</p>
+              <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Quali Avg Pos</p>
               <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
                 {formatAveragePosition(qualifyingAveragePosition)}
               </h4>
             </div>
             <div>
-              <p className="text-[10px] text-lmu-muted uppercase font-semibold">Finish Avg Pos</p>
+              <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Finish Avg Pos</p>
               <h4 className="text-xl font-extrabold text-lmu-accent-text font-mono">
                 {formatAveragePosition(finishAveragePosition)}
               </h4>
@@ -80,7 +80,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
 
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
-          <p className="text-xs text-lmu-muted uppercase font-semibold">
+          <p className="text-xs text-lmu-muted uppercase tracking-wider font-semibold">
             Your Best ({selectedCarModel !== 'All' ? selectedCarModel : selectedCarClass === 'All' ? 'Overall' : selectedCarClass})
           </p>
           <div className="flex items-baseline gap-2 mt-0.5">
@@ -104,7 +104,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
 
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
-          <p className="text-xs text-lmu-muted uppercase font-semibold">Overall Pace Improvement</p>
+          <p className="text-xs text-lmu-muted uppercase tracking-wider font-semibold">Overall Pace Improvement</p>
           <h4
             className={`text-2xl font-extrabold mt-0.5 font-mono ${
               totalImprovement !== null && totalImprovement > 0 ? 'text-lmu-green' : 'text-white'
@@ -129,7 +129,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
 
       <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-xl flex items-center justify-between">
         <div>
-          <p className="text-xs text-lmu-muted uppercase font-semibold">Top 3 Lap True Pace</p>
+          <p className="text-xs text-lmu-muted uppercase tracking-wider font-semibold">Top 3 Lap True Pace</p>
           <h4
             className={`text-2xl font-extrabold mt-0.5 font-mono ${
               top3Improvement !== null && top3Improvement > 0 ? 'text-lmu-aqua' : 'text-white'

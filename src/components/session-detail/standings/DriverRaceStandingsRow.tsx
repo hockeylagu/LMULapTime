@@ -20,7 +20,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
       {/* Starting Grid */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Starting Grid</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Starting Grid</p>
         <p className="text-base font-mono font-extrabold text-white mt-0.5 whitespace-nowrap">
           {isMultiClass && selectedDriver.classGridPosition ? (
             <>
@@ -41,7 +41,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
 
       {/* Finish Position */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Finish Position</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Finish Position</p>
         <p
           className={`text-base font-mono font-extrabold mt-0.5 whitespace-nowrap ${
             selectedDriver.classPosition === 1 || (!isMultiClass && selectedDriver.position === 1)
@@ -68,7 +68,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
 
       {/* Position Delta */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">
           {isMultiClass ? 'Class Pos Delta' : 'Position Delta'}
         </p>
         <p
@@ -95,7 +95,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
 
       {/* Laps Led */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Laps Led (P1)</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Laps Led (P1)</p>
         <p className="text-base font-mono font-extrabold text-lmu-gold mt-0.5">
           {selectedDriver.lapsLedCount ?? 0}
           <span className="text-[10px] font-normal text-lmu-muted ml-1">laps</span>
@@ -104,7 +104,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
 
       {/* Peak Position */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Peak Position</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Peak Position</p>
         <p className="text-base font-mono font-extrabold text-lmu-cyan mt-0.5">
           {selectedDriver.highestPosition ? `P${selectedDriver.highestPosition}` : '-'}
         </p>
@@ -112,7 +112,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
 
       {/* Pit Stops */}
       <div className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center">
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Pit Stops</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Pit Stops</p>
         <p className="text-base font-mono font-extrabold text-lmu-warn-soft mt-0.5">
           {selectedDriver.pitStopsCount ?? 0}
           <span className="text-[10px] font-normal text-lmu-muted ml-1">stops</span>
@@ -124,7 +124,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({
         className="p-2 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 text-center cursor-help"
         title={`Incidents: ${selectedDriver.totalIncidents ?? 0}\nTrack Limits: ${selectedDriver.totalTrackLimits ?? 0}\nPenalties: ${selectedDriver.totalPenalties ?? 0}`}
       >
-        <p className="text-[10px] uppercase font-semibold text-lmu-muted truncate">Incidents & Limits</p>
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted truncate">Incidents & Limits</p>
         <p className="text-base font-mono font-extrabold mt-0.5">
           {(selectedDriver.totalIncidents ?? 0) === 0 && (selectedDriver.totalPenalties ?? 0) === 0 ? (
             <span className="text-lmu-gain text-sm flex items-center justify-center gap-1 font-bold">

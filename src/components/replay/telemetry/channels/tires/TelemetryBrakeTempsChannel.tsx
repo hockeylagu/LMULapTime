@@ -79,9 +79,9 @@ export const TelemetryBrakeTempsChannel: React.FC<TelemetryBrakeTempsChannelProp
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxBrakeTemp}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
-        { label: `${Math.round(maxBrakeTemp / 2)}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
-        { label: '0°C', borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[9px] text-lmu-orange font-mono' },
+        { label: `${maxBrakeTemp}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[10px] text-lmu-orange font-mono' },
+        { label: `${Math.round(maxBrakeTemp / 2)}°C`, borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[10px] text-lmu-orange font-mono' },
+        { label: '0°C', borderClassName: 'border-b border-lmu-orange/40', labelClassName: 'text-[10px] text-lmu-orange font-mono' },
       ]} />
 
       {isCursorInView && hasTemps && temps && (

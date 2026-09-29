@@ -78,9 +78,9 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+10m Right', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[8px] text-lmu-teal font-mono' },
-        { label: '0m Center', borderClassName: 'border-b border-lmu-teal/50', labelClassName: 'text-[8px] text-lmu-teal-soft font-mono' },
-        { label: '-10m Left', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[8px] text-lmu-teal font-mono' },
+        { label: '+10m Right', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[10px] text-lmu-teal font-mono' },
+        { label: '0m Center', borderClassName: 'border-b border-lmu-teal/50', labelClassName: 'text-[10px] text-lmu-teal-soft font-mono' },
+        { label: '-10m Left', borderClassName: 'border-b border-lmu-teal/30', labelClassName: 'text-[10px] text-lmu-teal font-mono' },
       ]} />
 
       {isCursorInView && hasOffset && (
