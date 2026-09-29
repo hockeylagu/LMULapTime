@@ -281,6 +281,20 @@ These are the only shadows the app uses; everything else (`shadow-sm` on pills, 
 ### Named Rules
 **The Flat Wall Rule.** Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light.
 
+## Motion
+
+Motion reports state and keeps continuity. It is never decoration. A driver scrubbing a lap is reading traces, and anything that moves on its own competes with the playhead.
+
+- **Feedback (100–150 ms):** color, border and opacity transitions on hover, press and selection (`transition-colors`, `transition-opacity`). Hover never scales, rotates or lifts a surface. Two exceptions: a chevron may nudge 2–4px toward where it leads, and a tiny target (a map marker or a sparkline dot) may grow to confirm it is under the pointer.
+- **Enter (150 ms, ease-out):** overlays arrive with `animate-fade-in` (modals, scrims, full-screen views, inline banners). Anchored menus and popovers use `animate-pop-in`, a fade plus a 4px drop from their anchor. Keyframes live in `src/index.css` (`@theme`). Nothing animates out; a closing overlay unmounts.
+- **Loops:** only while work is running: `animate-spin` on a busy control, `animate-pulse` on skeletons, loading text and the scan in progress. A live state such as ABS, TC, pit limiter, the selected corner or the car on the map is shown by fill, rim and position. It does not flash.
+- **Content motion:** the playhead, the car on the map and chart updates move because the data moves. They are driven by playback (`requestAnimationFrame`), not by CSS.
+
+### Named Rules
+**The Still Wall Rule.** When the user is not acting and nothing is loading, nothing on screen moves except the data itself.
+
+**The Reduced Motion Rule.** Under `prefers-reduced-motion: reduce`, a global rule in `src/index.css` makes transitions and enter animations instant and stops loops. A spinner keeps turning, slower, so running work still reads as running. JavaScript smooth scrolling checks the same media query.
+
 ## Shapes
 
 Soft, consistent rectangles. The radius grows with the size of the thing: 4px (`rounded`) for status pills and small badges, 5px for segment buttons, 6–8px (`rounded-md`, `rounded-lg`) for buttons, nav tabs and inputs, 12px (`rounded-xl`) for compact panels and control groups, and 16px (`rounded-2xl`) for top-level panels. `rounded-full` is for status dots, progress tracks and avatars only.
@@ -320,7 +334,7 @@ A signature filter control (session type, car class, sort). It is a 36px `lmu-bg
 - **Selects:** transparent inline selects with semibold white text, sitting inside a pill or toolbar well.
 
 ### Navigation
-A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur) and a hairline bottom border. On the left is the brand mark (a red-tinted gauge tile plus the uppercase wordmark with "Lap Time" in red). In the center is a tab group in an `lmu-card` well with a 12px radius. Tabs are 14px medium with a 16px icon. The active tab is solid red with white text; inactive tabs are muted and lift to `lmu-border/50` on hover. On the right are status and refresh controls. Legacy details to drop in polish: the pulsing gauge icon and the colored shadow under the active tab.
+A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur) and a hairline bottom border. On the left is the brand mark (a red-tinted gauge tile plus the uppercase wordmark with "Lap Time" in red). In the center is a tab group in an `lmu-card` well with a 12px radius. Tabs are 14px medium with a 16px icon. The active tab is solid red with white text; inactive tabs are muted and lift to `lmu-border/50` on hover. On the right are status and refresh controls; the film icon pulses only while a replay scan is running.
 
 ### Telemetry Traces & Track Map (signature)
 Recharts traces on the dark base use `CHART_COLORS.grid` (`lmu-border`) gridlines and `lmu-muted` axes; legend labels are `lmu-text-soft` (the swatch carries the series color). Telemetry strip grid lines take the channel color dimmed, while their scale labels stay `lmu-muted` at full strength (`TelemetryStaticTrace`). Channels always use their `TELEMETRY_COLORS` hue (speed is sky, the baseline is amber, throttle is emerald, brake is red, steering is indigo). The 2D map draws the road surface and boundaries in `MAP_COLORS` line work, with racing lines colored by speed, pedal or lateral G. Monospace labels on the map obey the 10px floor.
@@ -344,4 +358,4 @@ Recharts traces on the dark base use `CHART_COLORS.grid` (`lmu-border`) gridline
 - **Don't** dim text with `opacity-*`; step down a text tier or desaturate.
 - **Don't** add a light theme.
 - **Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.
-- **Don't** use decorative pulse or ping animation on static chrome; reserve `animate-spin` and `animate-pulse` for real loading or live-sync states.
+- **Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule).

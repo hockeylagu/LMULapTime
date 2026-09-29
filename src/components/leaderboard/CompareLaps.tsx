@@ -184,7 +184,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       />
 
       {telemetryError && (
-        <div className="p-3 rounded-xl border border-lmu-loss-strong/40 bg-lmu-loss-deep/40 text-lmu-loss-soft text-xs flex items-center justify-between gap-3 animate-fadeIn">
+        <div className="p-3 rounded-xl border border-lmu-loss-strong/40 bg-lmu-loss-deep/40 text-lmu-loss-soft text-xs flex items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-lmu-loss shrink-0" />
             <span>{telemetryError}</span>

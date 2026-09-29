@@ -172,7 +172,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`}
               pointerEvents="none"
             >
-              <circle r="8" fill={MAP_COLORS.apex} opacity="0.3" className="animate-ping" />
+              <circle r="8" fill={MAP_COLORS.apex} opacity="0.3" />
               <circle r="4.5" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
               <g transform="translate(0, 14)">
                 <rect x="-16" y="-7" width="32" height="14" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity="0.95" />
@@ -189,7 +189,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               fill={m.isSelected ? MAP_COLORS.apex : MAP_COLORS.markerUnselected}
               stroke={m.isSelected ? CHART_COLORS.white : m.isDimmed ? MAP_COLORS.markerDimmed : MAP_COLORS.markerMuted}
               strokeWidth={m.isSelected ? 2.2 : 1.6}
-              className={m.isSelected ? 'animate-pulse' : 'transition-transform group-hover:scale-110'}
+              className={m.isSelected ? undefined : 'transition-transform group-hover:scale-110'}
             />
             <text
               x="0"

@@ -30,7 +30,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-lmu-gain font-bold">THR</span>
           {currentPoint?.tcActive && (
-            <span className="px-1 py-0.2 rounded text-[10px] font-black bg-lmu-warn-strong text-black animate-pulse">
+            <span className="px-1 py-0.2 rounded text-[10px] font-black bg-lmu-warn-strong text-black">
               TC
             </span>
           )}
@@ -46,7 +46,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-lmu-loss font-bold">BRK</span>
           {currentPoint?.absActive && (
-            <span className="px-1 py-0.2 rounded text-[10px] font-black bg-lmu-aqua text-black animate-pulse">
+            <span className="px-1 py-0.2 rounded text-[10px] font-black bg-lmu-aqua text-black">
               ABS
             </span>
           )}
@@ -67,7 +67,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       {/* Status / Track State */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
-          ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15 animate-pulse'
+          ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15'
           : currentPoint?.isOffTrack
           ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/15'
           : (currentPoint?.rainIntensity ?? 0) > 0

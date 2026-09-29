@@ -49,14 +49,14 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
     )}
     {baselineGhostPos && (
       <g transform={`translate(${baselineGhostPos.sx.toFixed(1)}, ${baselineGhostPos.sy.toFixed(1)}) scale(${markerScale})`} opacity={baselineOpacity}>
-        <circle r="11" fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" opacity="0.5" className="animate-pulse" />
+        <circle r="11" fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" opacity="0.5" />
         <circle r="6" fill={TELEMETRY_COLORS.baseline} stroke={CHART_COLORS.white} strokeWidth="2" filter="url(#ghostGlow)" />
       </g>
     )}
 
     {currentPos && (
       <g transform={`translate(${currentPos.sx}, ${currentPos.sy}) scale(${markerScale})`} opacity={primaryOpacity}>
-        <circle r="12" fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" className="animate-ping opacity-50" />
+        <circle r="12" fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" opacity="0.5" />
         <circle r="6.5" fill={TELEMETRY_COLORS.primary} stroke={CHART_COLORS.white} strokeWidth="2.2" filter="url(#carGlow)" />
       </g>
     )}

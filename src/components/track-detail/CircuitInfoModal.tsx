@@ -62,7 +62,7 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={`${specs.officialName} Circuit Information`}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div

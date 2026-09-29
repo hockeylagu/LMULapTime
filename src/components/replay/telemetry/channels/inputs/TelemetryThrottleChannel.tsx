@@ -75,7 +75,7 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
           {(currentPoint?.throttle ?? 0).toFixed(1)}%
         </span>
         {currentPoint?.tcActive && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider animate-pulse">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
             TC CUT
           </span>
         )}

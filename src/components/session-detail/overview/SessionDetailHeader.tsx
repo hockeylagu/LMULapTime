@@ -199,7 +199,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all cursor-pointer group shrink-0 ml-auto md:ml-0"
                 title="View Rules, Server Configuration & Conditions"
               >
-                <Sliders className="w-3.5 h-3.5 text-lmu-accent-text group-hover:rotate-12 transition-transform shrink-0" />
+                <Sliders className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />
                 <span className="text-lmu-text-soft">Rules & Config:</span>
                 {hasSettings && modeLabel && (
                   <span className="px-2 py-0.5 rounded bg-lmu-raised text-lmu-info-soft font-semibold text-[11px] border border-lmu-rule/60">

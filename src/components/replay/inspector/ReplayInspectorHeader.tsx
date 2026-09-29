@@ -178,17 +178,17 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 
         {isStationary ? (
           <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-lmu-warn-soft text-[10px] font-semibold items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-lmu-warn animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-lmu-warn" />
             Garage
           </span>
         ) : (
           <span className="hidden sm:flex px-2 py-0.5 rounded-full bg-lmu-gain-strong/10 border border-lmu-gain-strong/30 text-lmu-gain text-[10px] font-semibold items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain" />
             Track
           </span>
         )}
 
-        <span className={`min-w-[92px] text-[10px] text-lmu-muted animate-pulse hidden md:inline ${isTrajLoading ? '' : 'invisible'}`}>
+        <span className={`min-w-[92px] text-[10px] text-lmu-muted hidden md:inline ${isTrajLoading ? 'animate-pulse' : 'invisible'}`}>
             Loading driver...
         </span>
       </div>

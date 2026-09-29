@@ -53,7 +53,7 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
       lap: boardLapToComparable(player, carClass, boardLapTag(player)),
       analyse,
     }));
-    compareRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    compareRef.current?.scrollIntoView?.({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   };
   const onCompare = (entry: LeaderboardEntry) => compare(entry, false);
   const onAnalyse = (entry: LeaderboardEntry) => compare(entry, true);

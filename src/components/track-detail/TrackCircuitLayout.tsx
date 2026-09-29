@@ -81,7 +81,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     : 'h-[54px] w-[72px]';
 
   const interactiveClasses = onClick
-    ? 'cursor-pointer hover:scale-105 transition-transform'
+    ? 'cursor-pointer hover:opacity-80 transition-opacity'
     : 'pointer-events-none';
 
   const pathD = useMemo(() => {
