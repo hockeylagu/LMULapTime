@@ -61,159 +61,31 @@ This document provides architectural standards, domain rules, coding conventions
 
 ## 3. Directory Layout
 
-> **Start with [`docs/CODE_MAP.md`](docs/CODE_MAP.md)**: how data flows from each source to the screen, the entry file of each
-> feature, which cache version to bump, recipes for common changes, and the list of known smells. Update it in the same
-> commit when you add or move a module, endpoint, table, route or cache version, or fix or find a smell.
+> **File-level map: [`docs/CODE_MAP.md`](docs/CODE_MAP.md).** It traces how data flows from each source to the screen, names
+> the entry file of each feature, lists which cache version to bump, gives recipes for common changes, and keeps the list of
+> known smells. Read it before searching the code, and update it in the same commit when you add or move a module,
+> endpoint, table, route or cache version, or find or fix a smell.
 
-```
-LMULapTime/
-├── docs/                           # Reverse-engineered formats, specs & setup guides
-│   ├── CODE_MAP.md                 # Where things live, data flows, recipes & known smells (read first)
-│   ├── TELEMETRY_FORMAT.md         # DuckDB 100 Hz table schema & telemetry channels
-│   ├── XML_FORMAT.md               # LMU XML Results log schema specification
-│   ├── VCR_FORMAT.md               # Binary VCR header and stream packet layout
-│   ├── VCR_ANALYSIS.md             # Technical deep-dive on binary decoding
-│   ├── TRACK_BOUNDARIES_PIPELINE.md# Track boundary synthesis and addition guide
-│   └── LMU_REST_API.md             # Embedded REST API (:6397) & Swagger reference
-├── server/                         # Modular Express backend & ingestion pipeline
-│   ├── ai/                         # Gemini AI race engineer analysis (aiReport.ts)
-│   ├── benchmarks/                 # Google Sheets benchmark scraper & diff engine
-│   ├── core/                       # Database abstraction, modular stores, context & types
-│   │   ├── db.ts                   # SQLite instance, transactions, schema initialization
-│   │   ├── dbAiReportStore.ts      # AI race engineer coaching reports
-│   │   ├── dbMetadataStore.ts      # Key-value system cache metadata & version tags
-│   │   ├── dbReferenceLaptimeStore.ts # Community alien benchmark targets cache
-│   │   ├── dbRivalStore.ts         # The player's rival per board (layout, class, car): user state, never cleared
-│   │   ├── replay/                 # Replay cache stores (one row per driver lap, plus replay-wide facts)
-│   │   │   ├── dbRacePositionStore.ts # Per-replay race positions index (built from the stored laps)
-│   │   │   ├── dbReplayIdentity.ts # Replay file fingerprinting, versioning & collision protection
-│   │   │   ├── dbReplayIngestStore.ts # Atomic replay lap ingest operations
-│   │   │   ├── dbReplayLapStore.ts # Normalized replay facts: laps, time-keyed conditions, driver events, running order
-│   │   │   ├── dbReplayLinkStore.ts # Session-to-replay link tracking & withdrawal
-│   │   │   ├── dbReplayMetadataStore.ts # Replay headers, driver rosters & layout metadata
-│   │   │   ├── dbReplaySync.ts     # Replay sync queries and transaction wrappers
-│   │   │   ├── dbReplayTrajectoryStore.ts # Trajectory compression, decimation & columnar persistence
-│   │   │   ├── dbReplayUpgrade.ts  # Replay parser versioning & background upgrade state
-│   │   │   ├── replayTrajectoryCodec.ts # Trajectory encoding / decoding
-│   │   ├── dbSchema.ts             # DDL definitions, tables and index setup
-│   │   ├── dbSessionConditions.ts  # Linked replay rain on session laps: classifies stored sessions again
-│   │   ├── dbSessionStore.ts       # Session queries, standings, and summaries
-│   │   ├── dbSessionSync.ts        # Bulk session XML persistence transactions
-│   │   ├── dbTelemetryStore.ts     # Columnar 100 Hz DuckDB telemetry persistence
-│   │   ├── serverContext.ts        # Background scanner lifecycle and state coordinator
-│   │   ├── backgroundScan.ts       # Drains a sync iterator one step per event-loop turn into its scan status
-│   │   └── types.ts                # Core shared domain interfaces and telemetry models
-│   ├── data/tracks/                # Pre-aligned 2D track boundary geometries & index.json
-│   ├── replay/                     # Binary .Vcr parser, downsampler & worker thread decoder
-│   │   ├── replayCacheService.ts   # Replay cache inspection & management
-│   │   ├── replayFacts.ts          # Decoded trajectory -> normalized replay fact rows (pure)
-│   │   ├── replayLapBuilder.ts     # Timing loop detection & lap slicing
-│   │   ├── replayLapPoints.ts      # Trajectory point slicing and indexing
-│   │   ├── replayMetadataService.ts # Driver roster and replay header extraction
-│   │   ├── replayParser.ts         # Header, driver index & slice packet decoder
-│   │   ├── replayProgress.ts       # Progress reporting event emitter
-│   │   ├── replayServiceTypes.ts   # Replay service interfaces and DTOs
-│   │   ├── replayTelemetryService.ts # Telemetry slice fusion and extraction
-│   │   ├── replayTrajectory.ts     # Spatial coordinate extraction & transformations
-│   │   ├── replayTrajectoryService.ts # Trajectory retrieval and point projection
-│   │   ├── replayTrajectoryWorker.ts # Node worker thread implementation
-│   │   ├── replayTrajectoryWorkerClient.ts # Worker thread client pool
-│   │   ├── replayTransforms.ts     # Trajectory coordinate rotations and conversions
-│   │   ├── replayUpgradeRunner.ts  # Background legacy replay re-parser & upgrade service
-│   │   └── trajectoryDownsampler.ts # Feature-preserving trajectory downsampling
-│   ├── routes/                     # Domain-scoped Express routers
-│   │   ├── aiRoutes.ts             # /api/ai/* endpoints
-│   │   ├── leaderboardRoutes.ts    # /api/leaderboard/* and /api/rivals/* endpoints
-│   │   ├── referenceRoutes.ts      # /api/reference-laptimes/* endpoints
-│   │   ├── replayRoutes.ts         # /api/replays/* endpoints
-│   │   ├── sessionRoutes.ts        # /api/sessions/* endpoints
-│   │   └── systemRoutes.ts         # /api/system/* health, config & upgrade endpoints
-│   ├── sessions/                   # XML session results parsing & analytics
-│   │   ├── parser.ts               # LmuParser class and driver profile detector
-│   │   ├── replayMatching.ts       # Deterministic session-to-replay correlation & validation
-│   │   ├── sessionReplayLinks.ts   # Applies the matching rules to stored links: link, re-check, withdraw, one session per replay
-│   │   ├── sessionAnalytics.ts     # True Pace, sector averages, fuel/tire curves
-│   │   ├── sessionLapClassification.ts # Lap conditions, non-representative laps and averages (one entry point)
-│   │   ├── sessionPitStops.ts      # Each in-lap's stop from the linked replay (read time): box time vs class, refill, likely repairs
-│   │   ├── sessionXmlStream.ts     # Streaming XML parser
-│   │   └── sessionXmlTypes.ts      # Raw XML schema interfaces
-│   ├── telemetry/                  # 100 Hz DuckDB telemetry processing
-│   │   ├── duckdbReader.ts         # Direct DuckDB columnar reader
-│   │   ├── telemetryCatalog.ts     # File indexing and metadata extractor
-│   │   ├── telemetryFusion.ts      # Merges DuckDB channels with VCR coordinates
-│   │   ├── telemetryLinks.ts       # Persistent session DuckDB links & multi-file mapping
-│   │   └── telemetryMatcher.ts     # Matches session XMLs with telemetry files
-│   ├── traffic/                    # Every car's 5 Hz track position per replay (worker-built index) and traffic spells: battles, lapping, multiclass
-│   ├── tracks/                     # Server track projection & timing loop geometry
-│   │   ├── lapLineCut.ts           # Timing loop boundary interpolation & channel preservation
-│   │   ├── serverTrackSync.ts      # Disk to DB track geometry sync
-│   │   ├── stationGlitches.ts      # Lap distance glitch repair & monotonic enforcement
-│   │   ├── trackOutline.ts         # Small SVG outline of each layout for the track ribbon
-│   │   └── trackProjection.ts      # Local coordinate transform utilities
-│   └── index.ts                    # Express application entry point & router mounting
-├── shared/                         # Pure domain logic & shared TypeScript types
-│   ├── types/                      # Canonical domain models (DetailedSession, LapData, etc.)
-│   └── domain/                     # Pure mathematical, formatting & circuit resolution engines
-│       ├── circuitDefinitions.ts   # Canonical specs for all 32 circuits & layouts
-│       ├── circuitSpecs.ts         # Single source of truth circuit resolution engine
-│       ├── formatters.ts           # Lap time formatters & math
-│       ├── lapComparison.ts        # Delta interpolation, sector calculations & consistency
-│       ├── lapConditions.ts        # Wet tyres / rain per lap (dry is the default)
-│       ├── leaderboard.ts          # Real drivers met on each layout, ranked per class on their dry representative laps
-│       ├── paceCategory.ts         # Pace percentages & vehicle class matching
-│       ├── pitStops.ts             # Pit stops from replay pit events, energy refill, unexplained time (a guess at repairs)
-│       ├── rivals.ts               # Rival picking (about 0.3 s ahead, or a ghost time), beating & progress
-│       ├── trackSummaryUtils.ts    # Multi-session track aggregation helpers
-│       └── vehicleMapping.ts       # Car class categorization & model identification
-├── public/tracks/                  # Mirrored track boundary JSON files for client map
-├── src/                            # React 19 frontend
-│   ├── App.tsx                     # Root component, tabs, hash routing & global state
-│   ├── api/                        # The only place the client calls the server (fetchJson/postJson, replay, reference & leaderboard loaders)
-│   ├── components/                 # Modular UI feature packages (<= 300 lines per file)
-│   │   ├── common/                 # Badges, modals, pills, grids, selectors
-│   │   ├── dashboard/              # Cockpit hero, driving overview, sparklines, car/track summaries
-│   │   ├── leaderboard/            # Leaderboard page: track ribbon, leaderboard, rival card & two-lap comparison
-│   │   │   ├── board/              # Leaderboard rows, standing header & board actions
-│   │   │   ├── debrief/            # Where one lap loses time to another: sector gaps & corner debrief
-│   │   │   ├── ribbon/             # Track ribbon of the layouts driven, with class pills
-│   │   │   └── rivals/             # Rival card, ladder of rivals beaten & gap trend
-│   │   ├── navbar/                 # Navigation header & background scan badge
-│   │   ├── replay/                 # Replay studio, track map & telemetry strip
-│   │   │   ├── analysis/           # Corner phase cards (Entry/Rotation/Exit), speed tables, AI tab
-│   │   │   ├── inspector/          # Replay layout header, sidebar, lap picker, timeline footer
-│   │   │   ├── map/                # 2D GPS track map scene, ribbons, friction circle, pan/zoom
-│   │   │   └── telemetry/          # Multi-channel strip charts (channels/ [inputs, dynamics, tires, powertrain] & presets/)
-│   │   ├── session-detail/         # Multiclass standings, multi-metric charts, stewards log
-│   │   ├── session-list/           # Filterable & searchable session history
-│   │   ├── settings/               # Path configuration, rescan triggers, cache stats
-│   │   ├── track-detail/           # Circuit layout telemetry, progression, benchmarks
-│   │   └── track-summaries/        # Multi-track summary grid
-│   ├── utils/                      # Frontend math, physics, graphics & telemetry utilities
-│   │   ├── aiReportPayload.ts      # Telemetry evidence builder for AI Race Engineer
-│   │   ├── computedTelemetry.ts    # Dynamic channel derivation (G-forces, slip, balance)
-│   │   ├── cornerAnalysis.ts       # Turn detection, 3-phase corner metrics & deficit scoring
-│   │   ├── cornerConsistency.ts    # Corner-by-corner repeatability scoring
-│   │   ├── handlingBalanceDetection.ts # Real-time understeer / oversteer gradient calculation
-│   │   ├── lapAlignment.ts         # Distance & station lap alignment, pedal onset synchronization
-│   │   ├── lapConsistency.ts       # Flying lap standard deviation & consistency rating
-│   │   ├── replayComparison.ts     # Replay trajectory alignment & deltas
-│   │   ├── telemetryPostProcessing.ts # Waveform smoothing and decimation
-│   │   ├── themeColors.ts          # Centralized motorsport color palette tokens
-│   │   ├── trackLimits.ts          # Boundary collision and lateral offset evaluation
-│   │   └── urlParams.ts            # Hash-based navigation and query string persistence
-│   └── index.css                   # Tailwind CSS imports & theme utilities
-├── test/                           # Automated test suite (1,450+ tests across 164 files)
-│   ├── components/                 # React component tests mirrored by feature domain (<= 20 files per folder)
-│   ├── domain/                     # Pure shared/domain engines (circuit specs, formatters, lap comparison, pace, vehicles)
-│   ├── fixtures/                   # Mock XML logs, binary VCR samples, telemetry files
-│   ├── server/                     # Backend suites mirroring server/ (ai, benchmarks, core, replay, routes, sessions, telemetry, tracks)
-│   ├── utils/                      # Unit tests for src/utils algorithms & lap alignment (golden tests), mockVcr.ts
-│   └── setup.ts                    # Vitest environment setup
-├── tools/                          # C# recorder and standalone TSX utilities
-├── package.json                    # Node scripts and dependencies
-├── tsconfig.json                   # TypeScript configuration
-└── vitest.config.ts                # Test runner & coverage configuration
-```
+| Folder | Holds |
+|---|---|
+| `docs/` | Reverse-engineered formats (`XML_FORMAT`, `VCR_FORMAT`, `VCR_ANALYSIS`, `TELEMETRY_FORMAT`), `TRACK_BOUNDARIES_PIPELINE`, `LMU_REST_API`, `CODE_MAP`, `plans/` |
+| `server/core/` | SQLite coordinator (`db.ts`), DDL (`dbSchema.ts`), one store module per table group, `ServerContext` (scans, enrichment) |
+| `server/core/replay/` | Replay cache stores: metadata, trajectories, normalized facts, links, identity, upgrade, race positions |
+| `server/sessions/` | XML parsing (`parser.ts`), lap classification, replay matching and links, pit stops, session analytics |
+| `server/replay/` | `.Vcr` decoding (worker thread), lap slicing, facts, downsampling, trajectory/telemetry services, upgrade runner |
+| `server/telemetry/` | DuckDB 100 Hz reader, catalog, session links, fusion with replay coordinates |
+| `server/traffic/` | Every car's 5 Hz track position per replay (worker-built index) and traffic spells |
+| `server/tracks/` | Track geometry, centerline projection, timing line cut, station glitch repair, outlines |
+| `server/routes/` | One Express router per domain (`ai`, `leaderboard`, `reference`, `replay`, `session`, `system`) |
+| `server/ai/`, `server/benchmarks/` | Gemini race engineer; Google Sheets benchmark scraper and diff |
+| `server/data/tracks/`, `public/tracks/` | 1:1 track boundary JSON per layout (exempt from the 20-file limit) |
+| `shared/domain/` | Pure deterministic engines: circuits, vehicles, lap comparison, conditions, pace, pit stops, traffic, leaderboard, rivals |
+| `shared/types/` | Canonical data contracts (`index.ts` for sessions and laps, plus leaderboard, pit stops, traffic, AI) |
+| `src/api/` | The only place the client calls the server |
+| `src/components/<feature>/` | UI by feature: `dashboard`, `session-list`, `session-detail`, `track-summaries`, `track-detail`, `leaderboard`, `replay`, `settings`, `navbar`, `common` |
+| `src/utils/` | Client algorithms: corner analysis, lap alignment, replay comparison, computed telemetry, debrief ranking, text helpers, theme colors |
+| `test/` | Mirrors the source tree (`server/<domain>/`, `domain/`, `utils/`, `components/<feature>/`, `api/`) plus `fixtures/` |
+| `tools/` | C# live telemetry recorder and TSX analysis scripts (track boundaries, vehicle catalog) |
 
 ---
 
@@ -276,7 +148,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements (`db.prepare(...)`).
 - WAL mode is mandatory: `PRAGMA journal_mode = WAL;`.
-- **Modular Store Architecture**: Database operations are decomposed into domain-specific store modules under `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`, `dbTelemetryStore.ts`, `dbReferenceLaptimeStore.ts`, `dbAiReportStore.ts`, `dbMetadataStore.ts`, `dbRivalStore.ts`), with the replay cache stores in `server/core/replay/` (`dbReplayMetadataStore.ts`, `dbReplayTrajectoryStore.ts`, `dbReplayIngestStore.ts`, `dbReplayLinkStore.ts`, `dbReplayIdentity.ts`, `dbReplayUpgrade.ts`, `dbReplaySync.ts`, `dbRacePositionStore.ts`). `db.ts` serves as the database instance coordinator, pragma configurator, and transaction runner.
+- **Modular Store Architecture**: one store module per table group under `server/core/` (`db<Name>Store.ts`: functions taking the better-sqlite3 `Database`), with the replay cache stores in `server/core/replay/`. `db.ts` is the instance coordinator, pragma configurator and transaction runner; DDL lives in `dbSchema.ts`. The table list is in `docs/CODE_MAP.md`.
 - Use columnar tables for high-frequency telemetry data to maintain sub-millisecond query performance and compact storage.
 - Always use parameterized queries (`stmt.run(arg1, arg2)`) to guard against SQL injection and handle player/track names containing special characters or apostrophes.
 - Wrap bulk operations (e.g., scanning hundreds of XML files or saving hundreds of benchmark rows) in transactions: `db.transaction(...)`.
@@ -315,7 +187,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 
 ## 6. Testing & Quality Assurance
 
-The repository maintains an extensive automated test suite with **over 1,450 tests across 164 test files**. Any change must preserve this coverage and run with zero warnings.
+The repository keeps an extensive automated test suite (counts in `docs/CODE_MAP.md`). Any change must preserve this coverage and run with zero warnings.
 
 ### Key Test Commands
 - **Run all tests**: `npm test`
@@ -338,6 +210,6 @@ The repository maintains an extensive automated test suite with **over 1,450 tes
 1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/sessions/`), replay decoding (`server/replay/`), telemetry ingestion (`server/telemetry/`), track geometry & timing loops (`server/tracks/`), database cache (`server/core/`), track boundaries (`tools/analysis/buildAllTrackBoundaries.ts`), or UI views (`src/components/`).
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
-   - Run `npm test` to verify no regressions across the 1,450+ unit/integration tests.
+   - Run `npm test` to verify no regressions across the full suite.
    - Run `npm run build` to verify clean TypeScript compilation and bundle generation.
 4. **Never bypass layout matching**: Any function dealing with tracks, laps, or reference times must account for track layout variants via `shared/domain/circuitSpecs.ts`.
