@@ -106,7 +106,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
                 {currentComparison.deltaTimeSec <= 0 ? '' : '+'}
                 {currentComparison.deltaTimeSec.toFixed(3)}s
               </span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider ${
+              <span className={`text-[10px] px-1.5 py-px rounded font-bold uppercase tracking-wider ${
                 currentComparison.deltaTimeSec <= 0 ? 'bg-lmu-gain-strong/20 text-lmu-gain-soft' : 'bg-lmu-loss-strong/20 text-lmu-loss-soft'
               }`}>
                 {currentComparison.deltaTimeSec <= 0 ? 'Ahead' : 'Behind'}

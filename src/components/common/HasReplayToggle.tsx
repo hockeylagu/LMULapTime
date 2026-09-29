@@ -38,7 +38,7 @@ export const HasReplayToggle: React.FC<HasReplayToggleProps> = ({
       <span>{label}</span>
       {replayCount > 0 && (
         <span
-          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+          className={`px-1.5 py-px rounded-full text-[10px] font-mono ${
             hasReplayOnly ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
           }`}
         >

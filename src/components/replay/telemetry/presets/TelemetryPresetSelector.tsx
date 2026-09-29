@@ -48,7 +48,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
           <span className="font-bold truncate max-w-[120px] sm:max-w-[150px]">
             {activePreset?.name ?? 'Channels'}
           </span>
-          <span className="px-1 py-0.2 rounded bg-lmu-info-strong/20 text-lmu-info-soft text-[10px] font-bold">
+          <span className="px-1 py-px rounded bg-lmu-info-strong/20 text-lmu-info-soft text-[10px] font-bold">
             {activePreset?.channels.length ?? 0}
           </span>
           <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -111,7 +111,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                     )}
                     <span className="truncate">{p.name}</span>
                   </div>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-lmu-muted font-bold shrink-0">
+                  <span className="text-[10px] px-1.5 py-px rounded bg-white/10 text-lmu-muted font-bold shrink-0">
                     {p.channels.length} ch
                   </span>
                 </button>

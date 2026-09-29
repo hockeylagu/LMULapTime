@@ -209,6 +209,8 @@ Telemetry, map, wheel-corner, pace-category and opponent colors used by charts a
 
   Every tier passes 4.5:1 on `lmu-bg` and `lmu-card`. `lmu-faint` drops to 4.26:1 on solid `lmu-raised`, so on a raised chip use `lmu-muted` or brighter.
 
+The root declares `color-scheme: dark` (`src/index.css`), so native scrollbars, select popups and form controls render dark without per-component styling.
+
 ### Contrast
 | Pair | Ratio |
 |---|---|

@@ -155,7 +155,7 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
             style={{ left: `${(band.xStart + band.width / 2) / 10}%` }}
             className="absolute top-1 -translate-x-1/2 pointer-events-none z-10"
           >
-            <span className={`px-1 py-0.2 rounded text-[10px] font-mono font-bold border whitespace-nowrap ${
+            <span className={`px-1 py-px rounded text-[10px] font-mono font-bold border whitespace-nowrap ${
               band.isTireScrub
                 ? 'bg-lmu-loss-deep/90 border-lmu-loss-strong/60 text-lmu-loss-soft'
                 : band.type === 'understeer'
@@ -176,7 +176,7 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
                   {currentSpeed} km/h
                 </span>
                 {currentHandling && (
-                  <span className={`px-1 py-0.2 rounded border text-[10px] font-mono font-bold whitespace-nowrap ${currentHandling.color}`}>
+                  <span className={`px-1 py-px rounded border text-[10px] font-mono font-bold whitespace-nowrap ${currentHandling.color}`}>
                     {currentHandling.label} {currentHandling.deg > 0 ? `+${currentHandling.deg.toFixed(1)}°` : `${currentHandling.deg.toFixed(1)}°`}
                   </span>
                 )}

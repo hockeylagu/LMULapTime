@@ -138,7 +138,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         <div>
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Top 3 Lap Avg</p>
-            <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-lmu-aqua-deep/60 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
+            <span className="text-[10px] font-bold font-mono px-1.5 py-px rounded bg-lmu-aqua-deep/60 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
               True Pace
             </span>
           </div>
@@ -168,7 +168,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Session Lap Average</p>
             {consistencyScore !== null && (
               <span
-                className={`text-[10px] font-bold font-mono px-1.5 py-0.2 rounded border whitespace-nowrap ${
+                className={`text-[10px] font-bold font-mono px-1.5 py-px rounded border whitespace-nowrap ${
                   consistencyScore >= 99
                     ? 'bg-lmu-gain-deep/60 text-lmu-gain-soft border-lmu-gain-strong/40'
                     : consistencyScore >= 97

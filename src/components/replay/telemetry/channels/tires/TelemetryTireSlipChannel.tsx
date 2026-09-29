@@ -78,21 +78,21 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
           <Disc className="w-3 h-3" />
           TIRE SLIP & LOCKUP
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {isLockup && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5">
+          <span className="px-1.5 py-px rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5">
             <AlertTriangle className="w-2.5 h-2.5" /> LOCKUP
           </span>
         )}
         {isAbs && !isLockup && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
+          <span className="px-1.5 py-px rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
             ABS
           </span>
         )}
         {isTc && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-info-strong text-black font-black text-[10px] tracking-wider">
+          <span className="px-1.5 py-px rounded bg-lmu-info-strong text-black font-black text-[10px] tracking-wider">
             TC
           </span>
         )}

@@ -177,7 +177,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           </span>
         )}
         {cursorBalance && (
-          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-lmu-card/90 border border-white/10 ${cursorBalance.color}`}>
+          <span className={`text-[10px] font-mono font-bold px-1.5 py-px rounded bg-lmu-card/90 border border-white/10 ${cursorBalance.color}`}>
             {cursorBalance.label}
           </span>
         )}
@@ -214,7 +214,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
             return (
               <div
                 key={band.id}
-                className={`absolute top-0 px-1 py-0.2 text-[10px] sm:text-[10px] font-mono font-black tracking-wider whitespace-nowrap border-b border-r rounded-br ${badgeClass}`}
+                className={`absolute top-0 px-1 py-px text-[10px] sm:text-[10px] font-mono font-black tracking-wider whitespace-nowrap border-b border-r rounded-br ${badgeClass}`}
                 style={{ left: `${leftPct}%` }}
                 title={`${titleType} (${band.phase}): Peak ${band.peakDeg}°`}
               >

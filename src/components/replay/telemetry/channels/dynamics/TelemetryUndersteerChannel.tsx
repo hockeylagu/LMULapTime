@@ -74,7 +74,7 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
           <Scale className="w-3 h-3" />
           HANDLING BALANCE
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {hasBalance ? (
