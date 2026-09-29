@@ -76,6 +76,18 @@ describe('attachPitServices', () => {
     expect(me.laps[1].pitService).toMatchObject({ laneBeforeLineSec: 5, serviceAfterLine: true });
   });
 
+  it('clears the pit details when the session loses its replay', () => {
+    const me = driver('Me');
+    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, sizeBytes: 1 }, drivers: [me], playerDriver: me } as unknown as DetailedSession;
+    attachPitServices(rawDb(db), session);
+    expect(me.laps[1].pitService).toBeDefined();
+
+    delete session.matchingReplayFile;
+    attachPitServices(rawDb(db), session);
+
+    expect(session.drivers[0].laps.some((l) => l.pitService)).toBe(false);
+  });
+
   it('leaves a session without a linked replay alone', () => {
     const session = { id: 's', drivers: [driver('Me')] } as unknown as DetailedSession;
     attachPitServices(rawDb(db), session);

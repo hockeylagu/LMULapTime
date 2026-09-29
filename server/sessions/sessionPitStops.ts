@@ -34,6 +34,10 @@ function pointsOver(db: DatabaseType, replayName: string, slot: number, stop: Pi
  * stored later (or a new rule) needs no re-parse.
  */
 export function attachPitServices(db: DatabaseType, session: DetailedSession): void {
+  // Session objects are cached: drop what an earlier call attached before any early return.
+  for (const driver of [...(session.drivers ?? []), ...(session.playerDriver ? [session.playerDriver] : [])]) {
+    for (const lap of driver.laps ?? []) delete lap.pitService;
+  }
   const replayName = session.matchingReplayFile?.name;
   if (!replayName) return;
   const events = getDriverEvents(db, replayName).filter((e) => e.kind === 'pit' || e.kind === 'penalty_served');
