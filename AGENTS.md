@@ -60,10 +60,14 @@ This document provides architectural standards, domain rules, coding conventions
 
 ## 3. Directory Layout
 
+> **Start with [`docs/CODE_MAP.md`](docs/CODE_MAP.md)**: how data flows from each source to the screen, the entry file of each
+> feature, which cache version to bump, recipes for common changes, and the list of known smells. Update it in the same
+> commit when you add or move a module, endpoint, table, route or cache version, or fix or find a smell.
+
 ```
 LMULapTime/
 ├── docs/                           # Reverse-engineered formats, specs & setup guides
-│   ├── LMU_SETUP_AND_TELEMETRY_GUIDE.md # Methodical setup development workflow
+│   ├── CODE_MAP.md                 # Where things live, data flows, recipes & known smells (read first)
 │   ├── TELEMETRY_FORMAT.md         # DuckDB 100 Hz table schema & telemetry channels
 │   ├── XML_FORMAT.md               # LMU XML Results log schema specification
 │   ├── VCR_FORMAT.md               # Binary VCR header and stream packet layout
