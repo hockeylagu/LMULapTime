@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lapClassPosition, lapPitStop, lapPlaces } from '../../../src/components/session-detail/table/lapPlaces.js';
+import { lapPitStop, lapPlaces } from '../../../src/components/session-detail/table/lapPlaces.js';
 import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
 const lap = (lapNum: number, position: number) => ({ lapNum, position } as LapData);
@@ -12,8 +12,7 @@ const session = {
 } as DetailedSession;
 
 describe('lapPlaces', () => {
-  it('counts the places in class in a multiclass session, overall otherwise', () => {
-    expect(lapClassPosition(session, me, me.laps[0], true)).toBe(3);
+  it('reads the places in class in a multiclass session, overall otherwise', () => {
     expect(lapPlaces(session, me, me.laps[1], me.laps[0], true)).toEqual({ from: 3, to: 2, inClass: true });
     expect(lapPlaces(session, me, me.laps[1], me.laps[0], false)).toEqual({ from: 5, to: 3, inClass: false });
   });

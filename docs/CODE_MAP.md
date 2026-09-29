@@ -156,8 +156,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 **Logic in the wrong place / duplicated**
 - `parser.ts` computes the clean-lap average three times in one parse: `avgLapTime` before out-laps are marked (line ~525), again as
   the pit-loss reference after marking, and again in `classifySessionLaps`. The first one is stale by design; one ordered pass would be clearer.
-- Deterministic race maths in the UI folder: per-lap pit loss split (`table/pitStopText.ts`, `lapLosses`) and class position per lap
-  (`table/lapPlaces.ts`, `lapClassPosition`) belong in `shared/domain/` by the "deterministic logic first" rule.
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
 - Version constants are spread across five files; the table in section 5 is the index.
 
