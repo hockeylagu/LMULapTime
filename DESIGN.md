@@ -261,9 +261,9 @@ Data families only separate categories. Never use a signal color decoratively, a
 
 ## Layout
 
-Desktop-first and dense. Content sits in a centered column capped at 1500px (`max-w-[1500px]`), with 16px side gutters that grow to 32px from the `lg` breakpoint. The sticky navbar spans the full width, with its contents in the same column.
+Desktop only and dense. The design width is 1500px: content sits in a centered 1500px column (`max-w-[1500px]`) with 32px side gutters (`px-8`), and the sticky navbar spans the full width with its contents in the same column. The column stays 1500px on wider monitors so one screen holds one question, and a little vertical scrolling beats spreading data left and right. Below the floor (`min-w-[1480px]` on the app root, a 1500px window less its scrollbar) the page scrolls sideways instead of reflowing.
 
-Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between inline items are 4–8px (`gap-1`, `gap-1.5`, `gap-2`, the three most used values). Groups are 12–16px apart and panel padding is 16–24px. Chips and badges use 2px vertical padding. Grids of summary cards collapse from multi-column to a single column at `md`/`lg`; mobile is not a design target (see PRODUCT.md), but layouts must not overflow horizontally.
+Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between inline items are 4–8px (`gap-1`, `gap-1.5`, `gap-2`, the three most used values). Groups are 12–16px apart and panel padding is 16–24px. Chips and badges use 2px vertical padding. Laptops, tablets and phones are not the audience (see PRODUCT.md): new work needs no `sm`/`md`/`lg` variants, and the existing ones are inert above the floor.
 
 **The Timing Sheet Rule.** Density is a feature. Prefer rows, tables and label-over-value stacks to spacious cards. Reach for whitespace only to separate questions, not to decorate an answer.
 
