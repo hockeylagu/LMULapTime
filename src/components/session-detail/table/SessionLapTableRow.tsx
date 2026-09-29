@@ -9,7 +9,8 @@ import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
-import { lapClassPosition, lapDetailContext } from './lapPlaces.js';
+import { lapClassPosition } from '../../../../shared/domain/lapPlaces.js';
+import { lapDetailContext } from './lapPlaces.js';
 
 const COMPOUND_STYLES: Record<string, string | undefined> = {
   S: 'border-white text-white',
