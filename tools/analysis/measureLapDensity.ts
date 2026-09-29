@@ -14,10 +14,10 @@
  */
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
-import { selectFeatureSamples } from '../../server/replay/trajectoryDownsampler.js';
+import { selectFeatureSamples } from '../../server/replay/decode/trajectoryDownsampler.js';
 import { applyTelemetryPostProcessing } from '../../src/utils/telemetryPostProcessing.js';
 import { computeLapComparisons } from '../../src/utils/replayComparison.js';
-import { computeLapSegmentComparisons, CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons, CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis/index.js';
 
 const API = 'http://localhost:3001/api/replays';
 

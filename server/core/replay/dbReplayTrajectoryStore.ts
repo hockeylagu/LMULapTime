@@ -3,7 +3,7 @@ import { ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
 import { getReplayLaps } from './dbReplayLapStore.js';
-import { lapSummariesFrom } from '../../replay/replayFacts.js';
+import { lapSummariesFrom } from '../../replay/decode/replayFacts.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not

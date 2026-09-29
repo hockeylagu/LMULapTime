@@ -4,8 +4,8 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, ReplaySyncProgress } from '../dbSchema.js';
 import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus } from './dbReplayIngestStore.js';
-import { parseReplayMetadata } from '../../replay/replayParser.js';
-import { extractReplayTrajectoryInWorker } from '../../replay/replayTrajectoryWorkerClient.js';
+import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
+import { extractReplayTrajectoryInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 
 // Rows written by an older, still compatible parser version are served as they are, but while LMU
 // still has the .Vcr they can be decoded again at the current version. That is this upgrade: one

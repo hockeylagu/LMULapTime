@@ -5,7 +5,7 @@ import { selectCleanLapCandidates } from '../../../../shared/domain/lapCompariso
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchReplayTraffic, fetchReplayTrajectory } from '../../../api/replayApi.js';
-import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput } from '../../../utils/cornerConsistency.js';
 import { pickAttainableSameCarLap, pickFastestSameCarLap } from '../../../utils/referenceLaps.js';
 import { describeLapTraffic } from '../../../utils/lapTrafficText.js';

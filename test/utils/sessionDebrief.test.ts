@@ -5,7 +5,7 @@ import {
   rankDebriefCorners,
   spellCoversCorner,
 } from '../../src/utils/sessionDebrief.js';
-import type { CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis.js';
+import type { CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis/index.js';
 import type { CornerConsistencyStat } from '../../src/utils/cornerConsistency.js';
 import type { ReplayTrajectoryData } from '../../shared/types/index.js';
 

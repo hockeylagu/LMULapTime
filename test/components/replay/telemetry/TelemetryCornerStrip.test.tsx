@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TelemetryCornerStrip } from '../../../../src/components/replay/telemetry/TelemetryCornerStrip.js';
-import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
 import { PointComparison } from '../../../../src/utils/replayComparison.js';
 
 const mockCorners: CornerSegmentComparison[] = [

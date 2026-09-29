@@ -7,7 +7,7 @@ import {
 import {
   applyPureOfficialLapValidation,
   downsampleTrajectoryResponse,
-} from '../../../server/replay/replayTransforms.js';
+} from '../../../server/replay/decode/replayTransforms.js';
 import {
   DetailedSession,
   DriverData,

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CornerSpeedGraph } from '../../../../src/components/replay/analysis/CornerSpeedGraph.js';
-import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 describe('CornerSpeedGraph', () => {

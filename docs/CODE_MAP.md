@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against `main` at d41e20b (2026-09-29): 358 source files, 206 test files, 1756 tests.
+Last checked against branch `smells-cleanup` (2026-09-29): 376 source files, 213 test files, 1772 tests.
 
 ---
 
@@ -12,7 +12,7 @@ Last checked against `main` at d41e20b (2026-09-29): 358 source files, 206 test 
 | Source | Files on disk | Ingest entry | Stored in (SQLite, `server/lmu_cache.db`) |
 |---|---|---|---|
 | XML results log | `UserData/LOG/Results/*.xml` | `server/core/dbSessionSync.ts` → `LmuParser.parseSessionXml` (`server/sessions/parser.ts`) | `sessions` (one compressed `DetailedSession` per file) |
-| Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
+| Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/worker/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
 | DuckDB 100 Hz telemetry | `UserData/Telemetry/*.duckdb` | `server/telemetry/telemetryCatalog.ts` → `duckdbReader.ts` | `telemetry_metadata`, `telemetry_lap_cache` |
 
 Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (user state, never cleared),
@@ -36,8 +36,9 @@ code that drops replay rows because the file is gone.
 
 1. **Parse** (`server/sessions/parser.ts`, `parseSessionXml`), in order:
    - raw XML shapes: `sessionXmlTypes.ts`; streaming events (incidents, track limits, penalties, damage): `sessionXmlStream.ts` / `parseStreamEvents`;
-   - `parseDriver` → per lap `parseLap`; missing lap times inferred (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop`
-     in `shared/domain/lapComparison.ts`), pit loss on the in-lap (`pitStopDuration`, spans in-lap + out-lap);
+   - `parseDriver` → per lap `parseLap`; then `applyLapTiming` (`sessionLapTiming.ts`), in one ordered pass: missing lap times inferred
+     (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop` in `shared/domain/lapComparison.ts`), pit loss on the in-lap
+     (`pitStopDuration`, spans in-lap + out-lap);
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): who was around the car on each lap;
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): conditions (`shared/domain/lapConditions.ts`), non-representative
      laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average;
@@ -60,9 +61,9 @@ code that drops replay rows because the file is gone.
 
 ## 3. Life of a replay lap (VCR → telemetry studio)
 
-- Decode: `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
+- Decode (all in `server/replay/decode/`): `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
   (`extractReplayTrajectory`) → laps sliced by `replayLapBuilder.ts` / `replayLapPoints.ts` → garage/pit state `garageState.ts`.
-- Always on a worker: `replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayCacheService` (`replayCacheService.ts`).
+- Always on a worker: `worker/replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayCacheService` (`replayCacheService.ts`).
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
@@ -72,9 +73,9 @@ code that drops replay rows because the file is gone.
 - Traffic: `GET /api/replays/:name/traffic` → `server/traffic/raceTrafficService.ts` → race positions index
   (`racePositions.ts`, built on a worker by `racePositionsWorkerClient.ts`, stored by `dbRacePositionStore.ts`) → `trafficSpells.ts`.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
-  `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map, boundaries via
+  `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, boundaries via
   `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; channels by subsystem; `presets/`),
-  `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis.ts`, `lapAlignment.ts`,
+  `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
   `replayComparison.ts`, `computedTelemetry.ts`, `handlingBalanceDetection.ts`, `telemetryPostProcessing.ts`).
 
 ## 4. Other features at a glance
@@ -90,16 +91,16 @@ code that drops replay rows because the file is gone.
 | Settings & scans | `systemRoutes.ts` (`/status`, `/scan`, `/scan/status`, `/cache/clear`), `/replays/cache`, `/replays/upgrade` | | `components/settings/` |
 
 Client routes (`src/App.tsx`): `/dashboard`, `/tracks`, `/track/:trackName`, `/leaderboard`, `/session/:sessionId`,
-`/telemetry`, `/settings` (`/compare` redirects). All server calls go through `src/api/apiClient.ts`.
+`/telemetry`, `/settings` (`/compare` redirects). All server calls go through `src/api/apiClient.ts` (static track JSON via `src/api/trackGeometryApi.ts`).
 
-Types: canonical in `shared/types/` (`index.ts` for sessions/laps, `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
-`server/core/types.ts` and `src/types.ts` only re-export them.
+Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
+`server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
 
 ## 5. Cache versions: what to bump
 
 | Constant | File | Bump when | Effect |
 |---|---|---|---|
-| `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (local const in `syncSessionsFromDir`) | a parser/lap classification rule changes | every stored session re-parsed from XML |
+| `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (exported const) | a parser/lap classification rule changes | every stored session re-parsed from XML |
 | `REPLAY_CACHE_VERSION` | `server/core/dbSchema.ts` | decoded replay rows change | on-disk replays decoded again in the background (deleted ones kept as they are) |
 | `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbSchema.ts` | DuckDB lap cache shape changes | lap cache rebuilt |
 | `RACE_POSITIONS_VERSION` | `server/traffic/racePositions.ts` | race positions index changes | index rebuilt on demand |
@@ -111,7 +112,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 ## 6. Recipes
 
 - **New lap/driver fact from the XML**: raw shape in `sessionXmlTypes.ts` → read it in `parser.ts` (`parseLap` / `parseDriver` /
-  `parseStreamEvents`) → field on `LapData`/`DriverData` in `shared/types/index.ts` → bump `DB_PARSER_VERSION` → test in
+  `parseStreamEvents`) → field on `LapData`/`DriverData` in `shared/types/session.ts` → bump `DB_PARSER_VERSION` → test in
   `test/server/sessions/` (`parserStream.test.ts` builds XML inline).
 - **New fact from the linked replay on a session**: follow `server/sessions/sessionPitStops.ts`: read the replay tables with
   `dbReplayLapStore.ts`, keep the pure maths in `shared/domain/`, attach in `GET /session/:id`. Test with an in-memory
@@ -142,30 +143,20 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
 
 **Size limits close to the edge**
-- Files near the 1,000-line limit: `src/utils/cornerAnalysis.ts` (891), `shared/domain/circuitDefinitions.ts` (873),
-  `shared/types/index.ts` (859), `server/sessions/parser.ts` (827), `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
-- Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
-  `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
-  `ImprovementChart.tsx` (291), `GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
-- Folders near 20 files: `src/components/replay/map/` (19), `server/replay/` (18 with the `.mjs`), `src/components/common/`,
-  `src/utils/`, `test/utils/` (17 each).
+- Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
+- Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`;
+  `src/components/replay/inspector/` is at 18 and `test/components/replay/telemetry/` at 17.
+- Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
 
 **Logic in the wrong place / duplicated**
-- `parser.ts` computes the clean-lap average three times in one parse: `avgLapTime` before out-laps are marked (line ~525), again as
-  the pit-loss reference after marking, and again in `classifySessionLaps`. The first one is stale by design; one ordered pass would be clearer.
-- Deterministic race maths in the UI folder: per-lap pit loss split (`table/pitStopText.ts`, `lapLosses`) and class position per lap
-  (`table/lapPlaces.ts`, `lapClassPosition`) belong in `shared/domain/` by the "deterministic logic first" rule.
-- `GET /session/:id` repeats `enrichSessionsWithTelemetry` + `attachPitServices` in two branches, and both mutate the cached
-  session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
-- Version constants are spread across five files, and `DB_PARSER_VERSION` is a local const inside `syncSessionsFromDir`
-  (not exported, not findable by import).
+- `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
+- Version constants are spread across five files; the table in section 5 is the index.
+- `lapClassPosition` (`shared/domain/lapPlaces.ts`) matches car classes by lowercased name instead of `mapVehicleIdToClass`.
+- The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
+  benchmark pace fields.
 
 **Rule exceptions**
-- `src/components/replay/map/useTrackBoundaryGeometry.ts` calls raw `fetch` for `/tracks/*.json` (a static file, not `/api`), outside `src/api/`.
-- Two re-export barrels (`server/core/types.ts`, `src/types.ts`) give the same types two import paths.
-
-**Stale docs and comments**
-- `parser.ts` (~line 248) points to `sessionConditions.ts`; the file is `server/core/dbSessionConditions.ts`.
+- `server/core/types.ts` is a re-export barrel: server code imports types through it, so the same types have two import paths.
 
 **Known data limits (not code bugs)**
 - Pit repairs are a guess: neither the VCR nor the XML has repair or damage state. Validating against the LMU REST API is deferred.

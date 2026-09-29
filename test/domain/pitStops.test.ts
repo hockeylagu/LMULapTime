@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classMedianService, lineInPitLane, pitStopsFromEvents, stopEnergy, summarisePitService } from '../../shared/domain/pitStops.js';
+import type { LapData } from '../../shared/types/index.js';
+import { classMedianService, lineInPitLane, pitLossPerLap, pitStopsFromEvents, stopEnergy, summarisePitService } from '../../shared/domain/pitStops.js';
 
 // The 08/27 Daytona stop: entry 1753.1, on jacks 1768.5, service complete 1841.7, exit 1876.2.
 const events = [
@@ -65,5 +66,20 @@ describe('summarisePitService', () => {
   it('needs three other stops for a class usual', () => {
     expect(classMedianService([30, 20])).toBeNull();
     expect(classMedianService([30, 20, 40])).toBe(30);
+  });
+});
+
+describe('pitLossPerLap', () => {
+  const lap = (lapNum: number, lapTime: number, pitStopDuration?: number) => ({ lapNum, lapTime, pitStopDuration } as LapData);
+
+  it('splits the stop between the in-lap and the out-lap around an average lap', () => {
+    const losses = pitLossPerLap(lap(1, 122.366, 113.1), lap(2, 210.933));
+    expect(losses?.inLap).toBeCloseTo(12.3, 1);
+    expect(losses?.outLap).toBeCloseTo(100.8, 1);
+  });
+
+  it('gives the in-lap the whole stop without an out-lap time, and nothing without a stop', () => {
+    expect(pitLossPerLap(lap(1, 120, 40))).toEqual({ inLap: 40 });
+    expect(pitLossPerLap(lap(1, 120))).toBeUndefined();
   });
 });
