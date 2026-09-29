@@ -36,8 +36,9 @@ code that drops replay rows because the file is gone.
 
 1. **Parse** (`server/sessions/parser.ts`, `parseSessionXml`), in order:
    - raw XML shapes: `sessionXmlTypes.ts`; streaming events (incidents, track limits, penalties, damage): `sessionXmlStream.ts` / `parseStreamEvents`;
-   - `parseDriver` → per lap `parseLap`; missing lap times inferred (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop`
-     in `shared/domain/lapComparison.ts`), pit loss on the in-lap (`pitStopDuration`, spans in-lap + out-lap);
+   - `parseDriver` → per lap `parseLap`; then `applyLapTiming` (`sessionLapTiming.ts`), in one ordered pass: missing lap times inferred
+     (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop` in `shared/domain/lapComparison.ts`), pit loss on the in-lap
+     (`pitStopDuration`, spans in-lap + out-lap);
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): who was around the car on each lap;
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): conditions (`shared/domain/lapConditions.ts`), non-representative
      laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average;
@@ -143,7 +144,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit: `src/utils/cornerAnalysis.ts` (891), `shared/domain/circuitDefinitions.ts` (873),
-  `shared/types/index.ts` (859), `server/sessions/parser.ts` (827), `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
+  `shared/types/index.ts` (859), `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
   `ImprovementChart.tsx` (291), `GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
@@ -151,8 +152,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
   `src/utils/`, `test/utils/` (17 each).
 
 **Logic in the wrong place / duplicated**
-- `parser.ts` computes the clean-lap average three times in one parse: `avgLapTime` before out-laps are marked (line ~525), again as
-  the pit-loss reference after marking, and again in `classifySessionLaps`. The first one is stale by design; one ordered pass would be clearer.
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
 - Version constants are spread across five files; the table in section 5 is the index.
 
