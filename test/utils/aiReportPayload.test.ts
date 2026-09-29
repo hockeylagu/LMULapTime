@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildAiLapEvidence } from '../../src/utils/aiReportPayload.js';
 import { ReplayTrajectoryData } from '../../server/core/types.js';
-import type { CornerSegmentComparison } from '../../src/utils/cornerAnalysis.js';
+import type { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/index.js';
 import type { DebriefCorner } from '../../src/utils/sessionDebrief.js';
 
 const trajectory: ReplayTrajectoryData = {

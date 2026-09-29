@@ -1,6 +1,6 @@
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { fetchReplayTrajectory } from '../../../api/replayApi.js';
-import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/index.js';
 import { comparisonConfidence, DebriefCorner, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import type { TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';

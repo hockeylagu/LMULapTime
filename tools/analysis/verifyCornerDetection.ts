@@ -17,7 +17,7 @@ import path from 'path';
 import readline from 'readline';
 import { interpolatePointAtDistance } from '../../src/utils/replayComparison.js';
 import { computeCumulativeDistances } from '../../src/utils/lapAlignment.js';
-import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis.js';
+import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/index.js';
 import { extractReplayTrajectory } from '../../server/replay/replayTrajectory.js';
 import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 

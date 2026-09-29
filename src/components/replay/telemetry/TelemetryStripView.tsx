@@ -1,7 +1,7 @@
 import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
-import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';

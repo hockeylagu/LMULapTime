@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { Activity, BrainCircuit, Timer, X } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';

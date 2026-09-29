@@ -1,5 +1,5 @@
 import { AiLapEvidence, ReplayLapSummary, ReplayTrajectoryData } from '../../shared/types/index.js';
-import { LapSegmentComparison } from './cornerAnalysis.js';
+import { LapSegmentComparison } from './cornerAnalysis/index.js';
 import type { DebriefCorner } from './sessionDebrief.js';
 
 const round = (value: number): number => Number(value.toFixed(3));
