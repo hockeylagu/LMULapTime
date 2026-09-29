@@ -222,7 +222,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
                       onSelectActivePreset(currentPreset.id);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-lmu-info-strong hover:bg-lmu-info text-lmu-deep font-bold text-xs shadow-lg shadow-lmu-info-strong/20 cursor-pointer transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg bg-lmu-info-strong hover:bg-lmu-info text-lmu-deep font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" /> Apply & Use Preset
                   </button>

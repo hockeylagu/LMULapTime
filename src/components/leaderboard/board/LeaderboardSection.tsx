@@ -62,7 +62,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
   );
 
   return (
-    <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4" aria-label="Leaderboard">
+    <section className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4" aria-label="Leaderboard">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">

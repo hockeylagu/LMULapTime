@@ -324,7 +324,7 @@ export default function App() {
       </main>
 
       {!isTelemetryRoute && (
-        <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07]">
+        <footer className="border-t border-lmu-border py-4 px-6 text-center text-xs text-lmu-muted">
           <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
         </footer>
       )}

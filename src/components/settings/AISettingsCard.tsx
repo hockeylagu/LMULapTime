@@ -62,7 +62,7 @@ export const AISettingsCard: React.FC = () => {
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl p-6 space-y-4">
+    <div className="bg-lmu-card border border-lmu-border rounded-2xl p-6 space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
           <BrainCircuit className="h-5 w-5 text-lmu-accent-text" />

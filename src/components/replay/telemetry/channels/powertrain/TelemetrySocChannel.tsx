@@ -97,7 +97,7 @@ export const TelemetrySocChannel: React.FC<TelemetrySocChannelProps> = React.mem
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-warn-soft border border-lmu-warn-strong/40 shadow-sm">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-warn-soft border border-lmu-warn-strong/40">
             {currentSoc !== undefined ? `${currentSoc.toFixed(1)}%` : '--'}
           </span>
         </div>

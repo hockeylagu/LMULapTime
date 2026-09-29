@@ -47,16 +47,12 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
   return (
     <div
       data-testid="dashboard-hero-command-center"
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-lmu-card via-lmu-surface to-lmu-deep border border-lmu-info-strong/20 shadow-xl shadow-black/50 p-5 ${className}`}
+      className={`relative overflow-hidden rounded-2xl bg-lmu-card border border-lmu-border p-5 ${className}`}
     >
-      {/* Background motorsport telemetry glow accents */}
-      <div className="absolute top-0 right-1/4 w-96 h-32 bg-lmu-info-strong/5 blur-3xl pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 left-10 w-80 h-28 bg-lmu-gain-strong/5 blur-3xl pointer-events-none rounded-full" />
-
       {/* Driver Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-lmu-border/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-lmu-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lmu-info-strong/20 to-lmu-info-strong/10 border border-lmu-info/30 flex items-center justify-center text-lmu-info shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-lmu-info-deep border border-lmu-info-strong/30 flex items-center justify-center text-lmu-info">
             <Activity className="w-5 h-5" />
           </div>
           <div>
@@ -193,7 +189,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
-                className={`flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer border ${
+                className={`flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                   latestOuting.hasDuckDbTelemetry
                     ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/15 text-lmu-warn-soft hover:bg-lmu-warn-strong/25 hover:border-lmu-warn-strong/60'
                     : 'border-lmu-gain-strong/30 bg-lmu-gain-strong/10 text-lmu-gain hover:bg-lmu-gain-strong/20 hover:border-lmu-gain-strong/50'

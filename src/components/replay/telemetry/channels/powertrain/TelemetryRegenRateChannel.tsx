@@ -99,7 +99,7 @@ export const TelemetryRegenRateChannel: React.FC<TelemetryRegenRateChannelProps>
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-lmu-badge text-lmu-purple-soft border border-lmu-purple-strong/40 shadow-sm">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-lmu-badge text-lmu-purple-soft border border-lmu-purple-strong/40">
             {currentRegen !== undefined ? `${currentRegen.toFixed(1)}kW` : '--'}
           </span>
         </div>

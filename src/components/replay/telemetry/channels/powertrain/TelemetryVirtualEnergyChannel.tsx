@@ -97,7 +97,7 @@ export const TelemetryVirtualEnergyChannel: React.FC<TelemetryVirtualEnergyChann
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-aqua-soft border border-lmu-aqua-strong/40 shadow-sm">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
             {currentVe !== undefined ? `${currentVe.toFixed(1)}%` : '--'}
           </span>
         </div>

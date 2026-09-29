@@ -60,7 +60,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   };
 
   return (
-    <div className={embedded ? 'p-4 space-y-2 border-b border-lmu-border/50' : 'bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl space-y-2'}>
+    <div className={embedded ? 'p-4 space-y-2 border-b border-lmu-border/50' : 'bg-lmu-card border border-lmu-border p-4 rounded-2xl space-y-2'}>
       {/* Row 1: Content Scope (Track, Car Class, Session Type) */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Track Filter */}

@@ -59,7 +59,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           aria-label="Follow car"
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             followCar
-              ? 'bg-lmu-accent text-white shadow-sm'
+              ? 'bg-lmu-accent text-white'
               : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
           }`}
           title={followCar ? 'Follow Car (Active)' : 'Follow Car'}

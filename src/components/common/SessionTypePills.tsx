@@ -39,7 +39,7 @@ export const SessionTypePills: React.FC<SessionTypePillsProps> = ({
             title={type}
             className={`${btnHeight} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
               isSelected
-                ? 'bg-lmu-accent text-white border-lmu-accent opacity-100 shadow-sm'
+                ? 'bg-lmu-accent text-white border-lmu-accent opacity-100'
                 : 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
             }`}
           >

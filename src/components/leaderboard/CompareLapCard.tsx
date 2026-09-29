@@ -66,7 +66,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
       <div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color }} />
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
             <span
               className={`text-xs font-bold uppercase tracking-wider truncate ${
                 lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'

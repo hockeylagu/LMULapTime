@@ -78,7 +78,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         )}
 
         {trajectory?.laps && trajectory.laps.length > 0 && (
-          <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5 shadow-sm">
+          <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5">
             <span className="hidden lg:flex items-center gap-1 text-[11px] text-lmu-muted">
               <Flag className="w-3 h-3 text-lmu-accent-text" />
               Lap:
@@ -207,7 +207,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         <button
           onClick={onTogglePlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lmu-accent hover:bg-lmu-accent/90 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lmu-accent hover:bg-lmu-accent/90 text-white font-bold text-xs transition-all cursor-pointer"
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           <span className="hidden sm:inline">{isPlaying ? 'Pause' : 'Play'}</span>
@@ -220,7 +220,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               onClick={() => onSelectPlaybackSpeed(spd)}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 playbackSpeed === spd
-                  ? 'bg-lmu-accent text-white shadow'
+                  ? 'bg-lmu-accent text-white'
                   : 'bg-lmu-card text-lmu-muted hover:text-white border border-lmu-border'
               }`}
             >

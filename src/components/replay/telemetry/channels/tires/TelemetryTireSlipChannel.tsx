@@ -82,7 +82,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {isLockup && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5 animate-pulse">
             <AlertTriangle className="w-2.5 h-2.5" /> LOCKUP
           </span>
         )}

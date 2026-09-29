@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T14:15:28.339Z",
+  "generatedAt": "2026-09-29T14:24:00.535Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -637,7 +637,7 @@
   ],
   "narrative": {
     "northStar": "The Engineer's Pit Wall",
-    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal. The translucent \"glass\" cards, background blurs, glow blobs and gradients in the current code are legacy, and polish work removes them rather than extending them.",
+    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
     "keyCharacteristics": [
       "Dark only, near-black blue base; no light theme.",
       "Numbers first: lap times, deltas and units in bold monospace.",
@@ -684,7 +684,7 @@
       },
       {
         "name": "The Flat Wall Rule",
-        "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays only. No glow halos, no gradient panels, no decorative light.",
+        "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light.",
         "section": "elevation"
       }
     ],

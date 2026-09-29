@@ -80,7 +80,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               title={`Matching Replay: ${session.matchingReplayFile.name}${
                 hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
               }\nClick to inspect trajectory and telemetry`}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                 hasDuckDb
                   ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/15 text-lmu-warn-soft hover:bg-lmu-warn-strong/25'
                   : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
@@ -109,7 +109,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                   ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
                   : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
               }
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all shadow-sm cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 relatedSession.type === 'qualifying'
                   ? 'bg-lmu-gold/10 text-lmu-gold border-lmu-gold/30 hover:bg-lmu-gold/20 hover:border-lmu-gold'
                   : 'bg-lmu-accent/10 text-lmu-accent-text border-lmu-accent/30 hover:bg-lmu-accent/20 hover:border-lmu-accent'
@@ -132,7 +132,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
       </div>
 
       {/* Session Title Card */}
-      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+      <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-4">
@@ -196,7 +196,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
-                className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all shadow-sm cursor-pointer group shrink-0 ml-auto md:ml-0"
+                className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all cursor-pointer group shrink-0 ml-auto md:ml-0"
                 title="View Rules, Server Configuration & Conditions"
               >
                 <Sliders className="w-3.5 h-3.5 text-lmu-accent-text group-hover:rotate-12 transition-transform shrink-0" />

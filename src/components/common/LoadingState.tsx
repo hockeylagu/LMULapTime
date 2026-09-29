@@ -53,19 +53,12 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   return (
     <div
       data-testid={dataTestId}
-      className={`w-full flex flex-col items-center justify-center text-center bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl select-none ${
+      className={`w-full flex flex-col items-center justify-center text-center bg-lmu-card border border-lmu-border rounded-2xl select-none ${
         isPage ? 'py-16 sm:py-24 px-6 min-h-[300px]' : 'py-8 sm:py-12 px-4 min-h-[160px]'
       } ${className}`}
     >
       {/* Motorsport Dual-Ring Tachometer Spinner */}
       <div className="relative mb-5 flex items-center justify-center">
-        {/* Subtle Ambient Pulse Background */}
-        <div
-          className={`absolute rounded-full bg-lmu-accent/15 blur-md animate-pulse ${
-            isPage ? 'w-16 h-16' : 'w-12 h-12'
-          }`}
-        />
-
         {/* Outer Rotating Track Accent Ring */}
         <div
           className={`border-4 border-lmu-accent/20 border-t-lmu-accent rounded-full animate-spin ${
@@ -74,7 +67,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         />
 
         {/* Inner Tachometer Center Point */}
-        <div className="absolute w-2 h-2 rounded-full bg-lmu-accent shadow-[0_0_8px_rgba(230,57,70,0.8)]" />
+        <div className="absolute w-2 h-2 rounded-full bg-lmu-accent" />
       </div>
 
       {/* Main Title */}
@@ -97,7 +90,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       {showQuote && activeQuote && (
         <div
           data-testid="loading-quote-badge"
-          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 shadow-sm max-w-xl animate-fadeIn"
+          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 max-w-xl animate-fadeIn"
         >
           <Radio className="w-3.5 h-3.5 text-lmu-accent-text shrink-0 animate-pulse" />
           <span className="text-lmu-muted font-sans font-semibold tracking-wide uppercase text-[10px]">

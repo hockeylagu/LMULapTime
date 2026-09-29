@@ -42,7 +42,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 ${className}`}>
       {/* Alien ~100% */}
-      <div className="backdrop-blur-md border border-lmu-purple-strong/30 bg-lmu-purple-deep/20 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-purple-strong/30 bg-lmu-purple-deep/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-purple-deep text-lmu-purple-soft border border-lmu-purple-strong/40">
           👾 Alien (~100%)
         </span>
@@ -53,7 +53,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Competitive 101% */}
-      <div className="backdrop-blur-md border border-lmu-warn-strong/30 bg-lmu-warn-deep/20 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-warn-strong/30 bg-lmu-warn-deep/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-warn-deep text-lmu-warn-soft border border-lmu-warn-strong/40">
           🏆 Competitive (101%)
         </span>
@@ -64,7 +64,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Good 102% */}
-      <div className="backdrop-blur-md border border-lmu-gain-strong/30 bg-lmu-gain-deep/20 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-gain-strong/30 bg-lmu-gain-deep/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-gain-deep text-lmu-gain-soft border border-lmu-gain-strong/40">
           ⭐ Good (102%)
         </span>
@@ -75,7 +75,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Midpack 104% */}
-      <div className="backdrop-blur-md border border-lmu-info-strong/30 bg-lmu-info-deep/20 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-info-strong/30 bg-lmu-info-deep/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-info-deep text-lmu-info-soft border border-lmu-info-strong/40">
           🏎️ Midpack (104%)
         </span>
@@ -86,7 +86,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Tail-ender 106% */}
-      <div className="backdrop-blur-md border border-lmu-orange-strong/30 bg-lmu-orange-deep/20 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-orange-strong/30 bg-lmu-orange-deep/20 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-orange-deep text-lmu-orange-soft border border-lmu-orange-strong/40">
           🐢 Tail-ender (106%)
         </span>
@@ -97,7 +97,7 @@ export const BenchmarkTargetsGrid: React.FC<BenchmarkTargetsGridProps> = ({
       </div>
 
       {/* Offline 107% */}
-      <div className="backdrop-blur-md border border-lmu-rule/40 bg-lmu-card/30 p-3.5 rounded-xl text-center space-y-1">
+      <div className="border border-lmu-rule/40 bg-lmu-card/30 p-3.5 rounded-xl text-center space-y-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-lmu-raised text-lmu-muted border border-lmu-rule">
           💤 Offline (&gt;107%)
         </span>

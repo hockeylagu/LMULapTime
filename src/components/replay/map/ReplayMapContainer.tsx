@@ -94,7 +94,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                   onClick={() => onChangeColorBy(mode)}
                   title={`Color by ${mode}`}
                   className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
-                    colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white shadow-sm font-bold' : 'text-lmu-muted hover:text-white'
+                    colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
                   }`}
                 >
                   {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
@@ -109,7 +109,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
                 showPedalMarkers
-                  ? 'bg-lmu-loss-strong/20 border-lmu-loss-strong/60 text-lmu-loss-soft shadow-sm'
+                  ? 'bg-lmu-loss-strong/20 border-lmu-loss-strong/60 text-lmu-loss-soft'
                   : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
               }`}
             >
@@ -157,7 +157,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             aria-pressed={showFrictionCircle}
             className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
               showFrictionCircle
-                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-lmu-info-soft shadow-sm'
+                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-lmu-info-soft'
                 : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
             }`}
           >

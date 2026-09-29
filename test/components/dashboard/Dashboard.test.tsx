@@ -153,7 +153,7 @@ describe('Dashboard component', () => {
     expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Monza').length).toBeGreaterThan(0);
 
-    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.backdrop-blur-md');
+    const sessionCard = screen.getByText('2026/05/28 14:00').closest('div.cursor-pointer');
     expect(sessionCard).not.toBeNull();
     if (sessionCard) {
       fireEvent.click(sessionCard);

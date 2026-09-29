@@ -24,7 +24,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         type="button"
         onClick={onOpenTelemetry}
         aria-label="Telemetry"
-        className={`p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer shadow-sm ${
+        className={`p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer ${
           session.matchingReplayFile
             ? 'bg-lmu-gain-strong/15 hover:bg-lmu-gain-strong/30 text-lmu-gain-soft hover:text-lmu-gain-soft border border-lmu-gain-strong/40'
             : 'bg-lmu-accent/20 hover:bg-lmu-accent/35 text-lmu-accent-text hover:text-white border border-lmu-accent/40'
