@@ -1,5 +1,5 @@
 import type { ReplayTrajectoryData, TrafficSpell } from '../../shared/types/index.js';
-import type { CornerSegmentComparison, LapSegmentComparison } from './cornerAnalysis.js';
+import type { CornerSegmentComparison, LapSegmentComparison } from './cornerAnalysis/index.js';
 import type { CornerConsistencyStat } from './cornerConsistency.js';
 
 /** A corner costing less than this against the reference is not worth working on. */

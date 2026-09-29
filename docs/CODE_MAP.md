@@ -75,7 +75,7 @@ code that drops replay rows because the file is gone.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
   `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map, boundaries via
   `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; channels by subsystem; `presets/`),
-  `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis.ts`, `lapAlignment.ts`,
+  `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
   `replayComparison.ts`, `computedTelemetry.ts`, `handlingBalanceDetection.ts`, `telemetryPostProcessing.ts`).
 
 ## 4. Other features at a glance
@@ -143,7 +143,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
 
 **Size limits close to the edge**
-- Files near the 1,000-line limit: `src/utils/cornerAnalysis.ts` (891), `shared/domain/circuitDefinitions.ts` (873),
+- Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (873),
   `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),

@@ -14,7 +14,7 @@ import {
   computeLapSegmentComparisons,
   CornerSegmentComparison,
   LapSegmentComparison,
-} from '../../../src/utils/cornerAnalysis.js';
+} from '../../../src/utils/cornerAnalysis/index.js';
 import { computeCornerConsistencyStats } from '../../../src/utils/cornerConsistency.js';
 import {
   computeBaselineDeltaByIdx,

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import {
   detectHandlingBalanceEvents,
 } from '../../../utils/handlingBalanceDetection.js';

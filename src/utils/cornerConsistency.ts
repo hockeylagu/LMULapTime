@@ -16,7 +16,7 @@ import {
   THROTTLE_ON_THRESHOLD_PCT,
   THROTTLE_ON_MIN_HOLD_SEC,
   throttleOnsetLookbackM,
-} from './cornerAnalysis.js';
+} from './cornerAnalysis/index.js';
 
 export interface LapMetricSample {
   lapNumber: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import {
   timeDeltaClass,
   formatTimeDelta,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeLapSegmentComparisons,
   CornerSegmentComparison,
-} from '../../src/utils/cornerAnalysis.js';
+} from '../../src/utils/cornerAnalysis/index.js';
 import {
   computeCornerConsistencyStats,
   filterCornerConsistencyStats,

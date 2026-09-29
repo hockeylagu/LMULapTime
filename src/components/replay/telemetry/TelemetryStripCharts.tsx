@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { computeBaselineChartSamples, computeLapComparisons } from '../../../utils/replayComparison.js';
 import { computeStartFinishOffset } from '../../../utils/lapAlignment.js';
-import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis.js';
+import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { computeTelemetryChartPaths } from './telemetryChartPaths.js';
 import { TelemetryStripView } from './TelemetryStripView.js';
 import { TelemetryPreset, loadTelemetryPresets, saveTelemetryPresets, loadActivePresetId, saveActivePresetId, resetTelemetryPresetsToDefault } from './presets/telemetryPresets.js';
