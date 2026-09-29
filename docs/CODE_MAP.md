@@ -143,7 +143,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
 
 **Size limits close to the edge**
-- Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (873),
+- Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
   `ImprovementChart.tsx` (291), `GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
