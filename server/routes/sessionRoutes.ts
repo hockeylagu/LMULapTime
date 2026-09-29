@@ -66,6 +66,13 @@ export function filterSessions(sessions: DetailedSession[], options: SessionFilt
 export function createSessionRouter(context: ServerContext): Router {
   const router = Router();
 
+  /** Telemetry links and pit details are worked out on every read, on the (cached) session object. */
+  const withReadTimeDetails = (session: DetailedSession): DetailedSession => {
+    context.enrichSessionsWithTelemetry([session]);
+    attachPitServices(context.sessionDb.getDb(), session);
+    return session;
+  };
+
   router.get('/sessions', (req, res) => {
     const forceRefresh = req.query.refresh === 'true';
     const filters = parseSessionFilters(req.query as Record<string, unknown>);
@@ -81,23 +88,11 @@ export function createSessionRouter(context: ServerContext): Router {
     const { id } = req.params;
     res.setHeader('Cache-Control', 'private, max-age=120');
 
-    const cached = context.sessionDb.getSessionById(id);
-    if (cached) {
-      context.enrichSessionsWithTelemetry([cached]);
-      attachPitServices(context.sessionDb.getDb(), cached);
-      return res.json(cached);
-    }
-
     const singleFilePath = path.join(context.resultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
-    if (fs.existsSync(singleFilePath)) {
-      const parsed = context.parseAndCacheFile(singleFilePath);
-      if (parsed) {
-        context.enrichSessionsWithTelemetry([parsed]);
-        attachPitServices(context.sessionDb.getDb(), parsed);
-        return res.json(parsed);
-      }
-    }
-    return res.status(404).json({ error: 'Session not found' });
+    const session = context.sessionDb.getSessionById(id)
+      ?? (fs.existsSync(singleFilePath) ? context.parseAndCacheFile(singleFilePath) : null);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    return res.json(withReadTimeDetails(session));
   });
 
   router.get('/progression', (req, res) => {
