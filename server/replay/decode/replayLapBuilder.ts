@@ -1,4 +1,4 @@
-import { ReplayLapSummary, ReplayPitEvent } from '../core/types.js';
+import { ReplayLapSummary, ReplayPitEvent } from '../../core/types.js';
 
 export interface RawTrajectoryPoint {
   sTime: number;

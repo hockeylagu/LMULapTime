@@ -5,7 +5,7 @@ import { getStoredReplayTrajectory } from '../core/replay/dbReplayTrajectoryStor
 import {
   EnergyPoint, PitStopTimes, classMedianService, lineInPitLane, pitStopsFromEvents, serviceSeconds, stopEnergy, summarisePitService,
 } from '../../shared/domain/pitStops.js';
-import type { ReplayDriverEventFact } from '../replay/replayFacts.js';
+import type { ReplayDriverEventFact } from '../replay/decode/replayFacts.js';
 
 const eventDriverName = (event: ReplayDriverEventFact) =>
   typeof event.detail?.driverName === 'string' ? event.detail.driverName : null;

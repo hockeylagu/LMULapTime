@@ -2,9 +2,9 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { parseReplayMetadata } from '../../../server/replay/replayParser.js';
-import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
-import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
+import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
+import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 describe('replayWeather - Class 1 Type 10 meteorology decoding', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-vcr-weather-test-'));

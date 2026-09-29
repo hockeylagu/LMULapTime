@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayTrajectoryPoint } from '../../core/types.js';
 
 /**
  * Channels whose shape the downsampler preserves, with the swing that counts as "one unit":

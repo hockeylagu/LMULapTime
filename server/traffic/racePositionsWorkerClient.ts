@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { findWorkerBootstrap } from '../replay/replayTrajectoryWorkerClient.js';
+import { findWorkerBootstrap } from '../replay/worker/replayTrajectoryWorkerClient.js';
 import type { StoredLapBlob } from './lapSamples.js';
 import type { RacePositions } from './racePositions.js';
 

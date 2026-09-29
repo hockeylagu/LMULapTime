@@ -8,10 +8,10 @@ import {
   applyPureOfficialLapValidation,
   downsampleTrajectoryResponse,
   enrichTrajectoryGeometryResponse,
-} from './replayTransforms.js';
+} from './decode/replayTransforms.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { stripLapEdgeSamples } from '../tracks/serverTrackSync.js';
-import { pointBudgetForSpacing } from './trajectoryDownsampler.js';
+import { pointBudgetForSpacing } from './decode/trajectoryDownsampler.js';
 
 export class ReplayTrajectoryService {
   public constructor(

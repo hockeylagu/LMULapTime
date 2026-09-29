@@ -2,8 +2,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
-import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
+import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 function contactPayload(magnitude: number, otherParty: number): Buffer {
   const payload = Buffer.alloc(33);

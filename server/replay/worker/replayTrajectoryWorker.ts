@@ -1,7 +1,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { ReplayTrajectoryData } from '../core/types.js';
-import { ExtractReplayTrajectoryOptions, extractReplayTrajectory } from './replayTrajectory.js';
-import { ReplayStreamProgress } from './replayProgress.js';
+import { ReplayTrajectoryData } from '../../core/types.js';
+import { ExtractReplayTrajectoryOptions, extractReplayTrajectory } from '../decode/replayTrajectory.js';
+import { ReplayStreamProgress } from '../replayProgress.js';
 
 interface ReplayWorkerData {
   filePath: string;

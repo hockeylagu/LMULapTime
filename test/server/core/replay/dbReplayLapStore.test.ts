@@ -13,7 +13,7 @@ import {
   replaceReplayDriverLapFacts,
   replaceReplayWideFacts,
 } from '../../../../server/core/replay/dbReplayLapStore.js';
-import { emptyLapFact } from '../../../../server/replay/replayFacts.js';
+import { emptyLapFact } from '../../../../server/replay/decode/replayFacts.js';
 
 const name = 'Facts_R1.Vcr';
 const bounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 };

@@ -12,7 +12,7 @@ Last checked against `main` at d41e20b (2026-09-29): 358 source files, 206 test 
 | Source | Files on disk | Ingest entry | Stored in (SQLite, `server/lmu_cache.db`) |
 |---|---|---|---|
 | XML results log | `UserData/LOG/Results/*.xml` | `server/core/dbSessionSync.ts` → `LmuParser.parseSessionXml` (`server/sessions/parser.ts`) | `sessions` (one compressed `DetailedSession` per file) |
-| Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
+| Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/worker/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
 | DuckDB 100 Hz telemetry | `UserData/Telemetry/*.duckdb` | `server/telemetry/telemetryCatalog.ts` → `duckdbReader.ts` | `telemetry_metadata`, `telemetry_lap_cache` |
 
 Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (user state, never cleared),
@@ -61,9 +61,9 @@ code that drops replay rows because the file is gone.
 
 ## 3. Life of a replay lap (VCR → telemetry studio)
 
-- Decode: `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
+- Decode (all in `server/replay/decode/`): `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
   (`extractReplayTrajectory`) → laps sliced by `replayLapBuilder.ts` / `replayLapPoints.ts` → garage/pit state `garageState.ts`.
-- Always on a worker: `replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayCacheService` (`replayCacheService.ts`).
+- Always on a worker: `worker/replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayCacheService` (`replayCacheService.ts`).
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
@@ -147,7 +147,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
   `ImprovementChart.tsx` (291), `scene/GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
-- Folders near 20 files: `server/replay/` (18 with the `.mjs`), `src/components/common/`,
+- Folders near 20 files: `src/components/common/`,
   `src/utils/`, `test/utils/` (17 each).
 
 **Logic in the wrong place / duplicated**

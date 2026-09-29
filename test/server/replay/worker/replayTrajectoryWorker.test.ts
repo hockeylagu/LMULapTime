@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { extractReplayTrajectoryInWorker } from '../../../server/replay/replayTrajectoryWorkerClient.js';
-import { createMockVcrBuffer } from '../../utils/mockVcr.js';
+import { extractReplayTrajectoryInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
+import { createMockVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 const steamReplaysDir = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';

@@ -2,10 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { ReplaySyncProgress, ReplaySyncResult } from '../dbSchema.js';
-import { factsDriverSlot, withoutReplayFacts } from '../../replay/replayFacts.js';
-import { parseReplayMetadata } from '../../replay/replayParser.js';
-import { extractReplayTrajectory } from '../../replay/replayTrajectory.js';
-import { extractReplayTrajectoryInWorker } from '../../replay/replayTrajectoryWorkerClient.js';
+import { factsDriverSlot, withoutReplayFacts } from '../../replay/decode/replayFacts.js';
+import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
+import { extractReplayTrajectory } from '../../replay/decode/replayTrajectory.js';
+import { extractReplayTrajectoryInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 import { isReplayDriverSettled, ReplayDriverIngest, ReplayDriverIngestStatus } from './dbReplayIngestStore.js';
 
 export interface ReplaySyncHost {

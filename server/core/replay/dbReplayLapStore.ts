@@ -13,7 +13,7 @@ import {
   lapFactsFrom,
   lapSpanFrom,
   replayWideFactsFrom,
-} from '../../replay/replayFacts.js';
+} from '../../replay/decode/replayFacts.js';
 
 // The normalized replay tables (see dbSchema.ts): replay_facts, replay_laps, replay_conditions,
 // replay_driver_events and replay_running_order. Writers run inside the caller's transaction.

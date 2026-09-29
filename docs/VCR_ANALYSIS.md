@@ -601,7 +601,7 @@ Daytona R1 10 and Algarve R1 19 (VE 4–97 %, 267,000 samples), every sample is 
 `VE% × 2.55`. **Scale: `VE% = byte0 / 2.55` (0.39 % resolution).** Byte 2 was `64` from 426 to
 435 s, just before pit entry (449.4 s). That could be a pit-request flag; unconfirmed.
 
-**App impact:** `server/replay/replayTrajectory.ts` already computes `b0/255*100`, which is VE %,
+**App impact:** `server/replay/decode/replayTrajectory.ts` already computes `b0/255*100`, which is VE %,
 but stores it as `fuelPct` in `driverFuel`. What the replay studio shows as "fuel" is therefore
 virtual energy. On cars without a VE system (checked: GTE, `Fuji Speedway R1 29/30`) the packet is still
 sent, but all three bytes are 0 for the whole session, so it carries neither fuel nor VE. The parser
@@ -700,7 +700,7 @@ packets as 0, 2 and 6: `0/8` poses, `0/51` VE, `2/24`/`2/25` player chassis, `6/
 | Qualifying | 66 | 65 | 66 | 66 | 66 |
 | Race | 71 | 69 | 71 | 69 | 69 |
 
-**App impact:** `server/replay/replayTrajectory.ts` tests `evClass === 1` for weather (1/10),
+**App impact:** `server/replay/decode/replayTrajectory.ts` tests `evClass === 1` for weather (1/10),
 tyre compound (1/16), contacts (1/17) and VE (1/51), and `evClass === 3` for flags (3/10). None
 of these branches fires on a practice or qualifying replay. Gate on `h >>> 30` instead.
 

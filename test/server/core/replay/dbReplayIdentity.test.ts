@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { archivedReplayName } from '../../../../server/core/replay/dbReplayIdentity.js';
 import { getReplayFactsVersion, getReplayLaps, replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
-import { emptyLapFact } from '../../../../server/replay/replayFacts.js';
+import { emptyLapFact } from '../../../../server/replay/decode/replayFacts.js';
 import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
 import type { DuckDbFileInfo } from '../../../../server/telemetry/telemetryMatcher.js';
 

@@ -5,7 +5,7 @@ import {
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
   ReplayWeatherEvent,
-} from '../core/types.js';
+} from '../../core/types.js';
 
 // Turns a decoded trajectory into the rows of the normalized replay tables (dbSchema.ts): each
 // fact once, at its own level. Every lap blob of a replay holds the same replay-wide arrays (the

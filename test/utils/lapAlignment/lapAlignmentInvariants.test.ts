@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
-import { downsampleTrajectoryPoints } from '../../../server/replay/trajectoryDownsampler.js';
+import { downsampleTrajectoryPoints } from '../../../server/replay/decode/trajectoryDownsampler.js';
 import {
   computeLapComparisons,
   interpolatePointAtDistance,

@@ -8,7 +8,7 @@ import {
   computeStartFinishOffset,
 } from '../../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
-import { extractReplayTrajectory } from '../../../server/replay/replayTrajectory.js';
+import { extractReplayTrajectory } from '../../../server/replay/decode/replayTrajectory.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../../server/tracks/serverTrackSync.js';
 import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
 import { LAP_PAIRS, loadLapPair } from '../../utils/lapAlignment/lapPairFixture.js';
