@@ -262,7 +262,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
+    <div className="min-h-screen min-w-[1480px] bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
       {!isTelemetryRoute && (
         <Navbar
@@ -273,8 +273,8 @@ export default function App() {
         />
       )}
 
-      {/* Main Content Area */}
-      <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6'}>
+      {/* Main Content Area: a fixed 1500px column; the 1480px floor above (a 1500px window less its scrollbar) scrolls sideways rather than reflowing */}
+      <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-8 py-6'}>
 
         {loading ? (
           <LoadingState

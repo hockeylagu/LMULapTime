@@ -27,7 +27,7 @@ Success means the driver leaves a session review knowing a few specific, correct
 
 ## Operating Context
 
-- Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. It is not a live second-monitor companion while driving. Mobile is not a target.
+- Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. It is not a live second-monitor companion while driving. The design width is a fixed 1500px column on a large monitor (the driver uses 2560 wide); laptops, tablets and mobile are not targets.
 - A Node/Express server on port 3001 plus the Vite client; started with `npm run dev` / `launch.bat`.
 - Sources: `UserData/LOG/Results/*.xml`, `UserData/Telemetry/*.duckdb`, `UserData/Replays/*.Vcr`, and optionally LMU's embedded REST API. Replays can be several hundred MB to 1 GB and are decoded in workers and cached. The cache is the source of truth once replays are deleted.
 - Main areas: dashboard, sessions and session detail (debrief), tracks and track detail, leaderboard and rivals, telemetry/replay studio (`#/telemetry`), settings.
