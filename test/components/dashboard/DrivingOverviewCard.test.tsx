@@ -17,7 +17,7 @@ describe('DrivingOverviewCard', () => {
       />
     );
 
-    expect(screen.getByText('Avg Benchmark Pace')).toBeInTheDocument();
+    expect(screen.getByText('Avg benchmark pace')).toBeInTheDocument();
     expect(screen.getByText(/102\.4%/)).toBeInTheDocument();
     expect(screen.queryByText('Average Speed')).not.toBeInTheDocument();
   });
@@ -36,9 +36,9 @@ describe('DrivingOverviewCard', () => {
       />
     );
 
-    expect(screen.getByText('Avg Benchmark Pace')).toBeInTheDocument();
-    const label = screen.getByText('Avg Benchmark Pace');
-    const row = label.closest('div.group');
+    expect(screen.getByText('Avg benchmark pace')).toBeInTheDocument();
+    const label = screen.getByText('Avg benchmark pace');
+    const row = label.parentElement;
     expect(row).not.toBeNull();
     expect(row!.textContent).toContain('N/A');
   });
@@ -58,8 +58,28 @@ describe('DrivingOverviewCard', () => {
       />
     );
 
-    expect(screen.queryByText('Avg Benchmark Pace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Avg benchmark pace')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /show all driving stats/i }));
     expect(setShowMore).toHaveBeenCalledWith(true);
+  });
+
+  it('leads with the totals and a distance fun fact', () => {
+    render(
+      <DrivingOverviewCard
+        sessionsCount={929}
+        totalLaps={4425}
+        totalDistanceKm={25384}
+        totalDrivingSeconds={149 * 3600 + 360}
+        maxTopSpeed={332}
+        maxTopSpeedTrack="Circuit de la Sarthe"
+      />
+    );
+
+    expect(screen.getByText('4,425')).toBeInTheDocument();
+    expect(screen.getByText('25,384')).toBeInTheDocument();
+    expect(screen.getByText('149h')).toBeInTheDocument();
+    const facts = screen.getByTestId('overview-fun-facts');
+    expect(facts).toHaveTextContent('Around the Earth63%');
+    expect(facts).toHaveTextContent('Top speed · Circuit de la Sarthe332.0 km/h');
   });
 });

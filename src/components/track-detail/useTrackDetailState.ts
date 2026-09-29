@@ -79,6 +79,14 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null });
   };
 
+  /**
+   * Clears every session filter in one URL write; separate setters would each undo the previous one.
+   * `showEmpty` also lists empty sessions (the empty-state recovery); otherwise they stay hidden, the default.
+   */
+  const resetSessionFilters = (showEmpty = false) => {
+    updateSearchParams(searchParams, setSearchParams, { model: null, type: null, q: null, hideEmpty: !showEmpty, hasReplay: null });
+  };
+
   useEffect(() => {
     if (prevCarClassRef.current !== selectedCarClass) {
       prevCarClassRef.current = selectedCarClass;
@@ -116,6 +124,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     setHideEmpty,
     hasReplay,
     setHasReplay,
+    resetSessionFilters,
     selectedCarModel,
     setSelectedCarModel,
     filterType,

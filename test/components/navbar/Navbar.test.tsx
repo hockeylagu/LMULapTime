@@ -101,7 +101,7 @@ describe('Navbar component', () => {
       />
     );
 
-    expect(screen.getByText('Syncing Sessions... 5/20')).toBeInTheDocument();
+    expect(screen.getByText('Syncing Sessions… 5/20')).toBeInTheDocument();
     expect(screen.getByTitle('Syncing Session: session_5.xml')).toBeInTheDocument();
 
     // Rerender during replay sync
@@ -123,7 +123,7 @@ describe('Navbar component', () => {
       />
     );
 
-    expect(screen.getByText('Syncing Replays... 12/50')).toBeInTheDocument();
+    expect(screen.getByText('Syncing Replays… 12/50')).toBeInTheDocument();
     expect(screen.getByTitle('Syncing Replay: monza_replay.Vcr')).toBeInTheDocument();
 
     // Rerender during telemetry sync
@@ -146,7 +146,7 @@ describe('Navbar component', () => {
       />
     );
 
-    expect(screen.getByText('Syncing Telemetry... 3/8')).toBeInTheDocument();
+    expect(screen.getByText('Syncing Telemetry… 3/8')).toBeInTheDocument();
     expect(screen.getByTitle('Syncing Telemetry: spa_telemetry.duckdb')).toBeInTheDocument();
   });
 });

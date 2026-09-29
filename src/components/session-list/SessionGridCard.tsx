@@ -1,8 +1,9 @@
 import React from 'react';
-import { Car, ChevronRight, AlertCircle } from 'lucide-react';
+import { Car, ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './sessionListTypes.js';
+import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface SessionGridCardProps {
@@ -27,29 +28,13 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   return (
     <div
       onClick={() => onSelectSession(s.id)}
-      className={`bg-lmu-card border border-lmu-border transition-all duration-200 ease-in-out hover:bg-lmu-cardHover hover:border-lmu-rule p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
-        empty ? 'border-lmu-warn-strong/30 bg-lmu-warn-deep/10' : ''
-      }`}
+      className={`bg-lmu-card border border-lmu-border transition-all duration-200 ease-in-out hover:bg-lmu-cardHover hover:border-lmu-rule p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden group`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span
-              className={`px-2 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                s.sessionType === 'Race'
-                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
-                  : s.sessionType === 'Qualifying'
-                  ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                  : 'bg-lmu-blue/20 text-lmu-cyan border border-lmu-blue/30'
-              }`}
-            >
-              {s.sessionName || s.sessionType}
-            </span>
-            {empty && (
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/30 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Empty
-              </span>
-            )}
+            <SessionTypeChip session={s} />
+            {empty && <EmptyChip />}
           </div>
 
           {showTrackColumn && displayTrack && (
@@ -77,7 +62,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         {/* Row 1: Car & Best Lap */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 truncate min-w-0">
-            <Car className="w-3.5 h-3.5 text-lmu-cyan shrink-0" />
+            <Car className="w-3.5 h-3.5 text-lmu-muted shrink-0" />
             <span className="text-white font-medium truncate" title={p?.carType || 'N/A'}>
               {p ? p.carType : 'N/A'}
             </span>
@@ -87,7 +72,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
           </div>
           <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
             <span className="text-[10px] text-lmu-muted uppercase tracking-wider">Best:</span>
-            <span className="font-bold text-sm text-lmu-gold">
+            <span className="font-bold text-sm text-white tabular-nums">
               {p?.bestLapTimeString || '--:--.---'}
             </span>
           </div>
@@ -99,36 +84,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <span className="text-lmu-muted text-xs">
               Laps: <strong className="text-white font-mono">{p ? p.lapsCount : 0}</strong>
             </span>
-            {s.sessionType === 'Race' && p?.position ? (
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white"
-                title={p.gridPosition ? `Started P${p.gridPosition} → Finished P${p.position}` : `Finished P${p.position}`}
-              >
-                <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Finish:</span>
-                <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-white'}`}>
-                  P{p.position}
-                </strong>
-                {p.positionGain !== null && p.positionGain !== undefined && (
-                  <span
-                    className={`font-bold text-xs ${
-                      p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-muted'
-                    }`}
-                  >
-                    ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
-                  </span>
-                )}
-              </span>
-            ) : (s.sessionType === 'Qualifying' || s.sessionName?.toLowerCase().includes('quali')) && p?.position ? (
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white"
-                title={`Qualified P${p.position}`}
-              >
-                <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Qual:</span>
-                <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-lmu-cyan'}`}>
-                  P{p.position}
-                </strong>
-              </span>
-            ) : null}
+            <FinishPosition session={s} label />
           </div>
 
           {pace && (
@@ -142,7 +98,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         </div>
       </div>
 
-      <div className="pt-2 flex items-center justify-between text-xs text-lmu-accent-text font-semibold group">
+      <div className="pt-2 flex items-center justify-between text-xs text-lmu-muted group-hover:text-white transition-colors font-semibold">
         <span>Analyze Sector Details</span>
         <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
       </div>

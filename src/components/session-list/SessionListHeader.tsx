@@ -24,11 +24,12 @@ export const SessionViewModeToggle: React.FC<SessionViewModeToggleProps> = ({
       onClick={() => onViewModeChange('grid')}
       className={`h-[24px] w-[24px] inline-flex items-center justify-center rounded-[5px] transition-all cursor-pointer box-border ${
         viewMode === 'grid'
-          ? 'bg-lmu-accent text-white font-bold'
+          ? 'bg-lmu-raised text-white'
           : 'text-lmu-muted hover:text-white'
       }`}
       title="Cards view"
       aria-label="Cards view"
+      aria-pressed={viewMode === 'grid'}
     >
       <LayoutGrid className="w-3.5 h-3.5" />
     </button>
@@ -37,11 +38,12 @@ export const SessionViewModeToggle: React.FC<SessionViewModeToggleProps> = ({
       onClick={() => onViewModeChange('table')}
       className={`h-[24px] w-[24px] inline-flex items-center justify-center rounded-[5px] transition-all cursor-pointer box-border ${
         viewMode === 'table'
-          ? 'bg-lmu-accent text-white font-bold'
+          ? 'bg-lmu-raised text-white'
           : 'text-lmu-muted hover:text-white'
       }`}
       title="Table view"
       aria-label="Table view"
+      aria-pressed={viewMode === 'table'}
     >
       <TableIcon className="w-3.5 h-3.5" />
     </button>

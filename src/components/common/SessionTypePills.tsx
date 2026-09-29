@@ -1,4 +1,10 @@
 import React from 'react';
+import { getSessionTypeStyle } from './sessionTypeStyles.js';
+
+/** "All" is the resting state: selected, but narrowing nothing, so it stays neutral. */
+export const SEGMENT_RESTING = 'bg-lmu-raised text-white border-lmu-rule';
+/** A choice that narrows the list shows in red, unless it has a hue of its own (session types, car classes). */
+export const SEGMENT_NARROWED = 'bg-lmu-accent text-white border-lmu-accent';
 
 export const SESSION_TYPE_OPTIONS = ['All', 'Practice', 'Qualifying', 'Race'] as const;
 
@@ -30,19 +36,26 @@ export const SessionTypePills: React.FC<SessionTypePillsProps> = ({
       {options.map((type) => {
         const isSelected = selectedType === type;
         const displayLabel = type === 'All' ? 'ALL' : type;
+        const style = getSessionTypeStyle(type);
         return (
           <button
             key={type}
             type="button"
             onClick={() => onSelectType(type)}
             aria-label={type}
+            aria-pressed={isSelected}
             title={type}
-            className={`${btnHeight} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
-              isSelected
-                ? 'bg-lmu-accent text-white border-lmu-accent opacity-100'
-                : 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
+            className={`${btnHeight} inline-flex items-center justify-center gap-1.5 font-mono leading-none rounded-[5px] border transition-colors whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
+              !isSelected
+                ? 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
+                : type === 'All'
+                ? SEGMENT_RESTING
+                : style
+                ? style.chip
+                : SEGMENT_NARROWED
             }`}
           >
+            {style && !isSelected && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} aria-hidden="true" />}
             {displayLabel}
           </button>
         );

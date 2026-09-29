@@ -40,6 +40,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     setHideEmpty,
     hasReplay,
     setHasReplay,
+    resetSessionFilters,
     selectedCarModel,
     setSelectedCarModel,
     filterType,
@@ -248,15 +249,10 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         }
         viewMode={sessionViewMode}
         onViewModeChange={setSessionListViewMode}
+        onClearFilters={selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay ? () => resetSessionFilters() : undefined}
         onResetFilters={
           selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
-            ? () => {
-                setFilterType('All');
-                setSearchQuery('');
-                setHideEmpty(false);
-                setHasReplay(false);
-                setSelectedCarModel('All');
-              }
+            ? () => resetSessionFilters(true)
             : undefined
         }
       />

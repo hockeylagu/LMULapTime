@@ -87,6 +87,15 @@ describe('CarClassBadge', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
+  it('fades an unselected filter badge with a contrast-safe hue, not opacity', () => {
+    render(<CarClassBadge carClass="GT3" isElms selected={false} onClick={vi.fn()} aria-label="LMGT3" />);
+    const btn = screen.getByRole('button', { name: 'LMGT3' });
+    expect(btn.className).toContain('text-lmu-gain-faded');
+    expect(btn.className).toContain('hover:text-lmu-gain');
+    expect(btn.className).not.toContain('opacity-');
+    expect(screen.getByTestId('badge-orange-corner').querySelector('polygon')).toHaveClass('fill-lmu-warn-faded');
+  });
+
   it('renders VehicleClassPills without duplicating text next to badges', () => {
     const onSelect = vi.fn();
     render(<VehicleClassPills selectedClass="LMGT3" onSelectClass={onSelect} />);

@@ -9,7 +9,7 @@ export const LMU_COLORS = {
   cardHover: '#1A202C',
   border: '#232A36',
   accent: '#DC3441',
-  accentText: '#F26B74',
+  accentText: '#FF4D55',
   gold: '#FFB703',
   blue: '#219EBC',
   cyan: '#8ECAE6',

@@ -3,6 +3,10 @@ import { Link, NavLink, useLocation } from 'react-router';
 import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, Trophy, Film } from 'lucide-react';
 import { ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
 
+/** Status chips on the right: an inset well like the tab group, lifting to white on hover. */
+const STATUS_CHIP =
+  'h-8 flex items-center gap-2 px-3 rounded-lg bg-lmu-bg border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-rule cursor-pointer transition-colors';
+
 export interface NavbarProps {
   status: {
     resultsExist: boolean;
@@ -24,9 +28,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const location = useLocation();
   const tabSearch = location.pathname === '/telemetry' ? '' : location.search;
   const tabClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${isActive
+    `flex items-center gap-2 h-8 px-3.5 rounded-lg text-sm font-medium transition-colors ${isActive
       ? 'bg-lmu-accent text-white'
-      : 'text-lmu-muted hover:text-white hover:bg-lmu-border/50'
+      : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/60'
     }`;
 
   const isScanRunning = Boolean(
@@ -45,17 +49,17 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (fullStatus?.sessionScan?.running) {
       const p = fullStatus.sessionScan.processed ?? 0;
       const t = fullStatus.sessionScan.total ?? 0;
-      return t > 0 ? `Syncing Sessions... ${p}/${t}` : 'Syncing Sessions...';
+      return t > 0 ? `Syncing Sessions… ${p}/${t}` : 'Syncing Sessions…';
     }
 
     if (replayScanStatus.running) {
-      return `Syncing Replays... ${replayScanStatus.processed}/${replayScanStatus.total}`;
+      return `Syncing Replays… ${replayScanStatus.processed}/${replayScanStatus.total}`;
     }
 
     if (fullStatus?.telemetryScan?.running) {
       const p = fullStatus.telemetryScan.processed;
       const t = fullStatus.telemetryScan.total;
-      return t > 0 ? `Syncing Telemetry... ${p}/${t}` : 'Syncing Telemetry...';
+      return t > 0 ? `Syncing Telemetry… ${p}/${t}` : 'Syncing Telemetry…';
     }
 
     const totalReplays = replayScanStatus.result?.total ?? status?.replaysCount ?? 0;
@@ -82,29 +86,26 @@ export const Navbar: React.FC<NavbarProps> = ({
   })();
 
   return (
-    <header className="sticky top-0 z-50 bg-lmu-card/75 backdrop-blur-md border-b border-lmu-border px-8 py-3.5">
-      <div className="max-w-[1500px] w-full mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-lmu-card/75 backdrop-blur-md border-b border-lmu-border px-8 py-3">
+      {/* Equal side columns keep the tabs on the page's true center line. */}
+      <div className="max-w-[1500px] w-full mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-6">
 
         {/* Brand logo & title */}
         <Link
           to={{ pathname: '/dashboard', search: tabSearch }}
-          className="flex items-center gap-3 cursor-pointer group select-none"
+          className="justify-self-start flex items-center gap-3 cursor-pointer group select-none rounded-xl"
           title="Return to Dashboard"
         >
-          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text">
-            <Gauge className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-extrabold text-lg text-white tracking-wide uppercase group-hover:text-lmu-gold transition-colors">
-                LMU <span className="text-lmu-accent-text">Lap Time</span> Analyzer
-              </h1>
-            </div>
-          </div>
+          <span className="w-10 h-10 grid place-items-center rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text transition-colors group-hover:bg-lmu-accent/20 group-hover:border-lmu-accent/50">
+            <Gauge className="w-5 h-5" />
+          </span>
+          <h1 className="font-extrabold text-lg text-white tracking-wide uppercase leading-none">
+            LMU <span className="text-lmu-accent-text">Lap Time</span> Analyzer
+          </h1>
         </Link>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-lmu-card p-1 rounded-xl border border-lmu-border">
+        <nav aria-label="Main" className="flex items-center gap-1 bg-lmu-bg p-1 rounded-xl border border-lmu-border">
           <NavLink to={{ pathname: '/dashboard', search: tabSearch }} className={tabClass}>
             <Gauge className="w-4 h-4" />
             Dashboard
@@ -127,34 +128,37 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Directory & Scan Status */}
-        <div className="flex items-center gap-3 text-xs">
+        <div className="justify-self-end flex items-center gap-2 text-xs">
           <Link
             to={{ pathname: '/dashboard', search: tabSearch }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
-            title="Return to Dashboard"
+            className={STATUS_CHIP}
+            title={status?.resultsExist === false ? 'No LMU results found yet' : 'Return to Dashboard'}
           >
-            <span className={`w-2 h-2 rounded-full ${status?.resultsExist ? 'bg-lmu-green' : 'bg-lmu-accent'}`} />
-            <span className="group-hover:text-white transition-colors">{status ? `${status.sessionsCount} Sessions` : 'Scanning...'}</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${!status ? 'bg-lmu-muted' : status.resultsExist ? 'bg-lmu-gain' : 'bg-lmu-warn'}`}
+              aria-hidden="true"
+            />
+            <span className="tabular-nums">{status ? `${status.sessionsCount.toLocaleString()} Sessions` : 'Scanning…'}</span>
           </Link>
 
           <Link
             to={{ pathname: '/settings', search: tabSearch }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
+            className={STATUS_CHIP}
             title={scanTooltip}
           >
-            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-accent-text' : ''}`} />
-            <span className="group-hover:text-white transition-colors">
-              {scanStatusText}
-            </span>
+            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-info' : ''}`} />
+            <span className="tabular-nums">{scanStatusText}</span>
           </Link>
 
           <button
+            type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="p-2 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent transition-all disabled:opacity-50"
+            className="h-8 w-8 grid place-items-center rounded-lg bg-lmu-bg border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors cursor-pointer disabled:cursor-default disabled:hover:text-lmu-muted disabled:hover:border-lmu-border"
             title="Refresh LMU Directory Scan"
+            aria-label="Refresh LMU directory scan"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-lmu-accent-text' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-lmu-info' : ''}`} />
           </button>
         </div>
 
