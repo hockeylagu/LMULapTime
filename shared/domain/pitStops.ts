@@ -116,13 +116,19 @@ export function stopEnergy(points: EnergyPoint[], stop: PitStopTimes): StopEnerg
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
+/** The time the car crossed the timing line inside the pit lane (a lap starting in it), if it did. */
+export function lineInPitLane(stop: PitStopTimes, lapStartsSec: number[]): number | undefined {
+  return lapStartsSec.find((sec) => sec > stop.entrySec && sec < (stop.exitSec ?? Infinity));
+}
+
 /**
- * One stop as shown on the in-lap. Time in the box beyond both the refill and the class's usual
- * stop, with no penalty served, is kept as `unexplainedSec`: a guess at repairs, never a fact.
+ * One stop as shown on its in-lap and out-lap. Time in the box beyond both the refill and the
+ * class's usual stop, with no penalty served, is kept as `unexplainedSec`: a guess at repairs,
+ * never a fact.
  */
 export function summarisePitService(
   stop: PitStopTimes,
-  context: { classMedianServiceSec: number | null; energy?: StopEnergy; penaltyServed: boolean },
+  context: { classMedianServiceSec: number | null; energy?: StopEnergy; penaltyServed: boolean; lineSec?: number },
 ): PitService {
   const serviceSec = serviceSeconds(stop);
   const service: PitService = {
@@ -130,6 +136,10 @@ export function summarisePitService(
     serviceSec: serviceSec !== null ? round1(serviceSec) : null,
     classMedianServiceSec: context.classMedianServiceSec !== null ? round1(context.classMedianServiceSec) : null,
   };
+  if (context.lineSec !== undefined) {
+    service.laneBeforeLineSec = round1(context.lineSec - stop.entrySec);
+    if (stop.jacksSec !== null && stop.jacksSec >= context.lineSec) service.serviceAfterLine = true;
+  }
   if (context.energy) {
     service.energyFrom = Math.round(context.energy.from);
     service.energyTo = Math.round(context.energy.to);

@@ -9,14 +9,14 @@ const service: PitService = {
 describe('describePitService', () => {
   it('gives the time in the box against the class, the refill and a guess at repairs after damage', () => {
     expect(describePitService(service, { lapNum: 11, description: 'New suspension damage reported' })).toEqual([
-      'In the box: 73 s (usual for your class: 29 s) · pit lane 123 s',
+      'In the box: 73 s (usual for your class: 29 s)',
       'Energy: 32% → 100% (refill 27 s)',
       "Likely repairs: 44 s longer than the refill and your class's usual stop, after the suspension damage on lap 11",
     ]);
   });
 
   it('describes a drive-through, a stop without refill and a penalty served', () => {
-    expect(describePitService({ pitLaneSec: 31, serviceSec: null, classMedianServiceSec: null })).toEqual(['No service: pit lane 31 s']);
+    expect(describePitService({ pitLaneSec: 31, serviceSec: null, classMedianServiceSec: null })).toEqual(['No stop in the box: drive-through']);
     expect(describePitService({ pitLaneSec: null, serviceSec: 40, classMedianServiceSec: null, energyFrom: 50, energyTo: 50, penaltyServed: true }))
       .toEqual(['In the box: 40 s', 'Energy: no refill (50%)', 'Penalty: served during the stop']);
   });

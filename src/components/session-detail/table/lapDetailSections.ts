@@ -1,13 +1,6 @@
 import type { LapData } from '../../../../shared/types/index.js';
 import { describeLapTraffic, describeNonRepresentative, type LapPlaces } from '../../../utils/lapTrafficText.js';
-import { describePitService, type EarlierDamage } from './pitStopText.js';
-
-/** The pit stop an in-lap or its out-lap belongs to: a stop always spans both laps. */
-export interface LapPitStop {
-  inLap: LapData;
-  outLapNum?: number;
-  damageBefore?: EarlierDamage;
-}
+import { describePitStopLap, type LapPitStop } from './pitStopText.js';
 
 /** What the rest of the driver's race adds to a lap: the places it won or lost, the stop it is part of. */
 export interface LapDetailContext {
@@ -56,19 +49,10 @@ export function lapDetailSections(lap: LapData, context: LapDetailContext = {}):
   if (lap.incidents?.length) sections.push({ label: 'Incidents', lines: lap.incidents.map((i) => i.description) });
   if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => withoutTrackLimitsPrefix(tl.description)) });
   if (lap.penalties?.length) sections.push({ label: 'Penalties', lines: lap.penalties.map((p) => p.description) });
-  const pitStop = context.pitStop ?? (lap.isPitStop ? { inLap: lap } : undefined);
-  const pitLines = pitStop ? pitStopLines(pitStop) : [];
+  const pitStop = context.pitStop ?? (lap.isPitStop ? { inLap: lap, onOutLap: false } : undefined);
+  const pitLines = pitStop ? describePitStopLap(pitStop) : [];
   if (pitLines.length > 0) sections.push({ label: 'Pit stop', lines: pitLines });
   return sections;
-}
-
-/** The stop on both of its laps, e.g. "Estimated pit loss: +100.1s (laps 14 and 15)", then the service. */
-function pitStopLines({ inLap, outLapNum, damageBefore }: LapPitStop): string[] {
-  const laps = outLapNum !== undefined ? ` (laps ${inLap.lapNum} and ${outLapNum})` : '';
-  return [
-    ...(inLap.pitStopDurationString ? [`Estimated pit loss: ${inLap.pitStopDurationString}${laps}`] : []),
-    ...(inLap.pitService ? describePitService(inLap.pitService, damageBefore) : []),
-  ];
 }
 
 /** The incidents, track limits and penalties of a lap as one tooltip, or undefined when there are none. */

@@ -1,7 +1,7 @@
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import type { LapPlaces } from '../../../utils/lapTrafficText.js';
-import type { LapDetailContext, LapPitStop } from './lapDetailSections.js';
-import { damageBeforeStop } from './pitStopText.js';
+import type { LapDetailContext } from './lapDetailSections.js';
+import { damageBeforeStop, type LapPitStop } from './pitStopText.js';
 
 /**
  * The driver's position at the end of a lap: in their class in a multiclass session (the cars of
@@ -34,11 +34,12 @@ export function lapPlaces(
 export function lapPitStop(laps: LapData[], lap: LapData, prevLap: LapData | null): LapPitStop | undefined {
   const inLap = lap.isPitStop ? lap : lap.isOutLap && prevLap?.isPitStop ? prevLap : undefined;
   if (!inLap) return undefined;
-  const outLap = inLap === lap ? laps.find((l) => l.lapNum === lap.lapNum + 1 && l.isOutLap) : lap;
+  const onOutLap = inLap !== lap;
   return {
     inLap,
-    outLapNum: outLap?.lapNum,
+    outLap: onOutLap ? lap : laps.find((l) => l.lapNum === lap.lapNum + 1 && l.isOutLap),
     damageBefore: inLap.pitService ? damageBeforeStop(laps, inLap) : undefined,
+    onOutLap,
   };
 }
 
