@@ -146,7 +146,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (873),
-  `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
   `tools/analysis/trackBoundaryBuilders.ts` (852); tests `GpsTrackMap.test.tsx` (961), `replayParserExtended.test.ts` (901).
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
