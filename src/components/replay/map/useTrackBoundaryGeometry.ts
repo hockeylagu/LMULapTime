@@ -50,6 +50,7 @@ export interface TrackBoundaryGeometry {
   }>;
 }
 
+import { loadTrackBoundaryGeometry } from '../../../api/trackGeometryApi.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
@@ -112,14 +113,8 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
 
     let fetchPromise = inFlightRequests.get(resolvedKey);
     if (!fetchPromise) {
-      fetchPromise = fetch(`/tracks/${resolvedKey}.json`)
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`Failed to load track geometry: ${res.status}`);
-          }
-          return res.json();
-        })
-        .then((data: TrackBoundaryGeometry) => {
+      fetchPromise = loadTrackBoundaryGeometry<TrackBoundaryGeometry>(resolvedKey)
+        .then((data) => {
           setGeometryCache(resolvedKey, data);
           inFlightRequests.delete(resolvedKey);
           return data;
