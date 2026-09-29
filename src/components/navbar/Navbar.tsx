@@ -91,8 +91,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-3 cursor-pointer group select-none"
           title="Return to Dashboard"
         >
-          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text group-hover:scale-105 transition-transform">
-            <Gauge className="w-6 h-6 animate-pulse" />
+          <div className="p-2.5 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text">
+            <Gauge className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
             title="Return to Dashboard"
           >
-            <span className={`w-2 h-2 rounded-full ${status?.resultsExist ? 'bg-lmu-green' : 'bg-lmu-accent'} group-hover:scale-110 transition-transform`} />
+            <span className={`w-2 h-2 rounded-full ${status?.resultsExist ? 'bg-lmu-green' : 'bg-lmu-accent'}`} />
             <span className="group-hover:text-white transition-colors">{status ? `${status.sessionsCount} Sessions` : 'Scanning...'}</span>
           </Link>
 
@@ -142,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lmu-card border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-accent/60 cursor-pointer transition-all group"
             title={scanTooltip}
           >
-            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-accent-text' : 'group-hover:scale-110 transition-transform'}`} />
+            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-accent-text' : ''}`} />
             <span className="group-hover:text-white transition-colors">
               {scanStatusText}
             </span>

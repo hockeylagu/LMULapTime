@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T14:24:00.535Z",
+  "generatedAt": "2026-09-29T14:28:27.899Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -686,6 +686,16 @@
         "name": "The Flat Wall Rule",
         "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light.",
         "section": "elevation"
+      },
+      {
+        "name": "The Still Wall Rule",
+        "body": "When the user is not acting and nothing is loading, nothing on screen moves except the data itself.",
+        "section": "motion"
+      },
+      {
+        "name": "The Reduced Motion Rule",
+        "body": "Under `prefers-reduced-motion: reduce`, a global rule in `src/index.css` makes transitions and enter animations instant and stops loops. A spinner keeps turning, slower, so running work still reads as running. JavaScript smooth scrolling checks the same media query.",
+        "section": "motion"
       }
     ],
     "dos": [
@@ -705,7 +715,7 @@
       "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.",
       "**Don't** add a light theme.",
       "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
-      "**Don't** use decorative pulse or ping animation on static chrome; reserve `animate-spin` and `animate-pulse` for real loading or live-sync states."
+      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule)."
     ]
   }
 }

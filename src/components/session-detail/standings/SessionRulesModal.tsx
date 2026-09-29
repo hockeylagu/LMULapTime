@@ -36,7 +36,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Session Rules & Configuration"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div

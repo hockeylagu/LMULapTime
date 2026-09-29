@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/*
+ * Motion (DESIGN.md, Motion): state and continuity only. Overlays arrive in 150 ms; nothing loops unless work is
+ * running (spinners, skeletons, the scan in progress).
+ */
+@theme {
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-pop-in: pop-in 150ms ease-out;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
+
+  @keyframes pop-in {
+    from { opacity: 0; translate: 0 -4px; }
+  }
+}
+
 @layer base {
   a,
   button:not(:disabled),
@@ -42,4 +59,21 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #DC3441;
+}
+
+/* Reduced motion: state changes land instantly and loops stop; a spinner keeps turning, slower, so work still reads as running. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

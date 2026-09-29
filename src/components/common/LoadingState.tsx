@@ -90,7 +90,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       {showQuote && activeQuote && (
         <div
           data-testid="loading-quote-badge"
-          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 max-w-xl animate-fadeIn"
+          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 max-w-xl animate-fade-in"
         >
           <Radio className="w-3.5 h-3.5 text-lmu-accent-text shrink-0 animate-pulse" />
           <span className="text-lmu-muted font-sans font-semibold tracking-wide uppercase text-[10px]">

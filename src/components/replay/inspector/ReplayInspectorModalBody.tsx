@@ -155,7 +155,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   onSelectSource,
 }) => {
   return (
-    <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
+    <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fade-in">
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={activeReplayName || replayName}

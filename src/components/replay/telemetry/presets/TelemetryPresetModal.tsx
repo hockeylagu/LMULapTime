@@ -128,7 +128,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in select-none"
       onClick={onClose}
     >
       <div
