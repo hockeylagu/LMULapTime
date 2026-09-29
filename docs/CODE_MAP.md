@@ -144,7 +144,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (873),
-  `src/components/replay/telemetry/telemetryChartPaths.ts` (803),
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
   `ImprovementChart.tsx` (291), `GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
