@@ -21,7 +21,7 @@ export const SessionTableView: React.FC<SessionTableViewProps> = ({
   return (
     <div className="overflow-x-auto custom-scrollbar">
       <table className="w-full text-left text-xs text-lmu-muted">
-        <thead className="bg-lmu-bg/80 uppercase tracking-wider font-semibold text-white border-b border-lmu-border">
+        <thead className="bg-lmu-bg/80 uppercase tracking-wider text-[10px] font-bold text-lmu-muted border-b border-lmu-border">
           <tr>
             {showTrackColumn && <th className="px-3.5 py-3">Track / Layout</th>}
             <th className="px-3.5 py-3">Session</th>

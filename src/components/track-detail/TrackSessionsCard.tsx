@@ -24,6 +24,8 @@ export interface TrackSessionsCardProps {
   setSortBy: (val: TrackDetailSortOption) => void;
   getPaceBadge: (s: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
   onResetFilters?: () => void;
+  /** Present while a filter narrows the list; shows the toolbar's Clear filters action. */
+  onClearFilters?: () => void;
   viewMode: 'grid' | 'table';
   onViewModeChange: (mode: 'grid' | 'table') => void;
 }
@@ -48,6 +50,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   setSortBy,
   getPaceBadge,
   onResetFilters,
+  onClearFilters,
   viewMode,
   onViewModeChange,
 }) => {
@@ -67,6 +70,7 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
         sortBy={sortBy}
         setSortBy={setSortBy}
         viewToggle={<SessionViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />}
+        onClearFilters={onClearFilters}
       />
       <SessionList
         sessions={sortedSessions}

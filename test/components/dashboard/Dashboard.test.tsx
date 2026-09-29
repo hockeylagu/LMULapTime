@@ -147,9 +147,8 @@ describe('Dashboard component', () => {
       />
     );
 
-    expect(screen.getByText('Driving Overview')).toBeInTheDocument();
-    expect(screen.getByText('Distance Driven')).toBeInTheDocument();
-    expect(screen.getByText('Driving Time')).toBeInTheDocument();
+    expect(screen.getByText('Totals')).toBeInTheDocument();
+    expect(screen.getByText('Driving')).toBeInTheDocument();
     expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Monza').length).toBeGreaterThan(0);
 
@@ -379,13 +378,12 @@ describe('Dashboard component', () => {
       />
     );
 
-    // Header sessions badge
-    expect(screen.getByText('5 Sessions')).toBeInTheDocument();
-    // Total laps row
-    expect(screen.getByText('22 laps')).toBeInTheDocument();
-    // Distance Driven and Driving Time
-    expect(screen.getByText('Distance Driven')).toBeInTheDocument();
-    expect(screen.getByText('Driving Time')).toBeInTheDocument();
+    // Header sessions count
+    expect(screen.getByText('5 sessions')).toBeInTheDocument();
+    // Total laps figure
+    const totals = screen.getByText('Totals').closest('div.rounded-2xl') as HTMLElement;
+    expect(within(totals).getByText('22')).toBeInTheDocument();
+    expect(within(totals).getByText('Driving')).toBeInTheDocument();
     // Footer tracks count removed as requested
     expect(screen.queryByText(/Across 4 Unique Circuits/i)).not.toBeInTheDocument();
   });
@@ -438,11 +436,10 @@ describe('Dashboard component', () => {
     );
 
     // 2 completed laps displayed in Circuits, Cars, and Driving Overview (1 valid + 1 invalid, excluding incomplete lap 3)
-    const lapBadges = screen.getAllByText('2 laps');
-    expect(lapBadges.length).toBeGreaterThanOrEqual(1);
+    const totals = screen.getByText('Totals').closest('div.rounded-2xl') as HTMLElement;
+    expect(within(totals).getByText('2')).toBeInTheDocument();
     // Distance driven: (7004 / 1000) * 2 = 14.008 km -> 14 km
-    expect(screen.getAllByText(/14\s*km/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Total Laps Driven')).toBeInTheDocument();
+    expect(within(totals).getByText('14')).toBeInTheDocument();
   });
 
   it('renders empty search state and provides Reset All Filters button', () => {
@@ -658,8 +655,8 @@ describe('Dashboard component', () => {
     expect(screen.getAllByText('8').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('12').length).toBeGreaterThanOrEqual(1);
     // And total laps across both layouts in overview and cars card
-    expect(screen.getByText('20 laps')).toBeInTheDocument();
-    expect(screen.getAllByText('20').length).toBeGreaterThanOrEqual(1);
+    const totals = screen.getByText('Totals').closest('div.rounded-2xl') as HTMLElement;
+    expect(within(totals).getByText('20')).toBeInTheDocument();
   });
 
   it('synchronizes card expansion across all cards and reveals extended driving overview statistics', () => {
@@ -738,8 +735,8 @@ describe('Dashboard component', () => {
     );
 
     // Initially, extended driving stats should not be visible (collapsed)
-    expect(screen.queryByText('Clean Flying Laps')).not.toBeInTheDocument();
-    expect(screen.queryByText('Top Speed Recorded')).not.toBeInTheDocument();
+    expect(screen.queryByText('Clean flying laps')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pit stops')).not.toBeInTheDocument();
 
     // Find any "+ More" or "Show All" button on any card (e.g. on Driving Overview or Circuits or Cars)
     const expandButton = screen.getByRole('button', { name: /Show All Driving Stats/i });
@@ -750,13 +747,13 @@ describe('Dashboard component', () => {
 
     // ALL cards should now be in expanded state!
     // 1. Driving overview displays all extra stats
-    expect(screen.getByText('Clean Flying Laps')).toBeInTheDocument();
-    expect(screen.getByText('Top Speed Recorded')).toBeInTheDocument();
-    expect(screen.getByText('312.5 km/h')).toBeInTheDocument();
-    expect(screen.getByText('Avg Benchmark Pace')).toBeInTheDocument();
-    expect(screen.getByText('Race Podiums & Wins')).toBeInTheDocument();
-    expect(screen.getByText('Session Breakdown')).toBeInTheDocument();
-    expect(screen.getByText('Pit Stops Serviced')).toBeInTheDocument();
+    expect(screen.getByText('Clean flying laps')).toBeInTheDocument();
+    expect(screen.getByText('Avg benchmark pace')).toBeInTheDocument();
+    expect(screen.getByText('Race wins · podiums')).toBeInTheDocument();
+    expect(screen.getByText('Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Pit stops')).toBeInTheDocument();
+    // The top speed is a fun fact, shown whether or not the card is expanded
+    expect(screen.getByTestId('overview-fun-facts')).toHaveTextContent('312.5 km/h');
 
     // 2. The collapse buttons are visible on cards (e.g. "Show Top 3 Only")
     const collapseButtons = screen.getAllByRole('button', { name: /Show Top 3 Only/i });
@@ -766,8 +763,8 @@ describe('Dashboard component', () => {
     fireEvent.click(collapseButtons[0]);
 
     // All cards collapse back together
-    expect(screen.queryByText('Clean Flying Laps')).not.toBeInTheDocument();
-    expect(screen.queryByText('Top Speed Recorded')).not.toBeInTheDocument();
+    expect(screen.queryByText('Clean flying laps')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pit stops')).not.toBeInTheDocument();
   });
 
   it('opens replay on the best lap of the session when launch replay button is clicked in dashboard hero', () => {

@@ -27,9 +27,10 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
       type="button"
       onClick={() => onToggle(!hideEmpty)}
       aria-label={ariaLabel}
+      aria-pressed={hideEmpty}
       className={`h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
         hideEmpty
-          ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent-text'
+          ? 'bg-lmu-raised border-lmu-rule text-white'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
       } ${className}`}
       title={hideEmpty ? titleHiding : titleShowing}
@@ -39,7 +40,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
       {emptyCount > 0 && (
         <span
           className={`px-1.5 py-px rounded-full text-[10px] font-mono ${
-            hideEmpty ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
+            hideEmpty ? 'bg-lmu-bg text-lmu-text-soft' : 'bg-lmu-border text-lmu-muted'
           }`}
         >
           {emptyCount}

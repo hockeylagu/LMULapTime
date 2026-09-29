@@ -28,7 +28,7 @@ describe('CircuitsSummaryCard', () => {
     expect(countEl).toHaveClass('text-white');
     expect(countEl.nextElementSibling).toHaveClass('text-lmu-muted');
     expect(countEl.nextElementSibling?.textContent).toBe('laps');
-    expect(screen.queryByText('2653')).not.toBeInTheDocument();
+    expect(screen.queryByText('2,653')).not.toBeInTheDocument();
   });
 
   it('switches to distance when the Km toggle is clicked', () => {
@@ -43,7 +43,7 @@ describe('CircuitsSummaryCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Km' }));
 
-    const kmEl = screen.getByText('2653');
+    const kmEl = screen.getByText('4,143');
     expect(kmEl).toBeInTheDocument();
     expect(kmEl).toHaveClass('text-white');
     expect(kmEl.nextElementSibling).toHaveClass('text-lmu-muted');

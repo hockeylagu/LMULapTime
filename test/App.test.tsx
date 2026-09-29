@@ -97,7 +97,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: /LMU Lap Time Analyzer/i })).toBeInTheDocument();
     });
   });
@@ -115,7 +115,7 @@ describe('App component', () => {
     render(<App />);
 
     expect(await screen.findByTestId('app-loading-state')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Driving Overview')).toBeInTheDocument(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText('Totals')).toBeInTheDocument(), { timeout: 4000 });
     expect(sessionAttempts).toBe(2);
   });
 
@@ -123,7 +123,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     const tracksTab = screen.getByRole('link', { name: /tracks/i });
@@ -144,7 +144,7 @@ describe('App component', () => {
     fireEvent.click(dashboardTab);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 
@@ -181,7 +181,7 @@ describe('App component', () => {
     fireEvent.click(backBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 
@@ -206,7 +206,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     // Select track filter
@@ -236,7 +236,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     const refreshBtn = screen.getByTitle(/Refresh LMU Directory Scan/i);
@@ -244,7 +244,7 @@ describe('App component', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true');
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 

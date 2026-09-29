@@ -1,10 +1,12 @@
 /**
  * Colors say what they mean, not which hue they are (DESIGN.md, Colors). Signal and data families share four steps:
  * `soft` (secondary text on dark), the bare name (primary text, icons, lines), `strong` (fills and borders, usually
- * with an opacity modifier) and `deep` (tinted wells). The hue values are Tailwind v4's own, so a role renders exactly
+ * with an opacity modifier), `deep` (tinted wells) and `faded` (the base hue at low chroma, for unselected filters: still
+ * 4.5:1 on lmu-bg, unlike an opacity fade). The hue values are Tailwind v4's own, so a role renders exactly
  * as the hue it replaced; retune a role here, never in a component.
  */
-const family = ([soft, base, strong, deep]) => ({ soft, DEFAULT: base, strong, deep });
+const hueOf = (oklch) => oklch.match(/([\d.]+)\)$/)[1];
+const family = ([soft, base, strong, deep]) => ({ soft, DEFAULT: base, strong, deep, faded: `oklch(62% 0.06 ${hueOf(base)})` });
 
 // [soft, base, strong, deep] = Tailwind v4 [300, 400, 500, 950] of the hue named in the comment
 const FAMILIES = {
@@ -57,7 +59,7 @@ export default {
           // Brand: the fill carries white text at 4.5:1; red text on dark uses accent-text
           accent: {
             DEFAULT: '#DC3441',
-            text: '#F26B74',
+            text: '#FF4D55',
           },
           // Sectors 1, 2, 3 (SECTOR_COLORS)
           gold: '#FFB703',

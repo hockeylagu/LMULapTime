@@ -100,7 +100,8 @@ describe('DashboardHero', () => {
     expect(screen.getByText(/Chevrolet Corvette Z06 LMGT3.R/)).toBeInTheDocument();
     expect(screen.getByText('4:00.470')).toBeInTheDocument();
     expect(screen.getByText('P8')).toBeInTheDocument();
-    expect(screen.getByText('(+7)')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-finish-gain')).toHaveTextContent('+7');
+    expect(screen.getByTestId('hero-finish')).toHaveTextContent('from P15');
     expect(screen.getByText('(102.4%)')).toBeInTheDocument();
 
     // Verify track circuit layout outline element is rendered instead of a map pin
@@ -138,13 +139,12 @@ describe('DashboardHero', () => {
     expect(onSelectSession).toHaveBeenCalledWith('session-new');
   });
 
-  it('renders red badge for Race session type', () => {
+  it('renders the Race badge in race red', () => {
     render(<DashboardHero sessions={mockSessions} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
     const badge = screen.getByTestId('hero-session-type-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Race');
     expect(badge.className).toContain('text-lmu-accent-text');
-    expect(badge.className).toContain('bg-lmu-accent/20');
   });
 
   it('renders yellow 100Hz replay button when session has DuckDB telemetry', () => {
@@ -175,11 +175,11 @@ describe('DashboardHero', () => {
     render(<DashboardHero sessions={mockSessions} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
 
     expect(screen.getByTestId('dashboard-pace-sparkline')).toBeInTheDocument();
-    expect(screen.getByText(/Recent Form & Momentum/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Recent form$/i)).toBeInTheDocument();
     expect(screen.getByText('Clean Lap Rate')).toBeInTheDocument();
     expect(screen.getByText('Lap Consistency')).toBeInTheDocument();
     expect(screen.getByText('Race Net Positions')).toBeInTheDocument();
-    expect(screen.getByText('+7')).toBeInTheDocument(); // net positions
+    expect(screen.getAllByText('+7')).toHaveLength(2); // finish gain and net positions
   });
 
   it('renders nothing when sessions list is empty', () => {

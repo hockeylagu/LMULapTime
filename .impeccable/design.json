@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T14:45:55.959Z",
+  "generatedAt": "2026-09-29T22:07:38.961Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -262,16 +262,16 @@
       "lmu-accent-text": {
         "role": "primary",
         "displayName": "Pit Lane Red Text",
-        "canonical": "#F26B74",
+        "canonical": "#FF4D55",
         "tonalRamp": [
-          "#46060A",
-          "#750A11",
-          "#A40E18",
-          "#D3131F",
-          "#EC2C39",
-          "#F26972",
-          "#F8ABB0",
-          "#FDE8E9"
+          "#4D0003",
+          "#800006",
+          "#B30008",
+          "#E6000A",
+          "#FF1A24",
+          "#FF5C63",
+          "#FFA3A7",
+          "#FFE5E7"
         ]
       },
       "lmu-gold": {
@@ -616,7 +616,7 @@
       "refersTo": "status-pill",
       "description": "Tinted signal pills: pit stop, out lap, gain, loss.",
       "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-pill--pit\">PIT STOP</span><span class=\"ds-pill ds-pill--out\">Out Lap</span><span class=\"ds-pill ds-pill--gain\">-0.214</span><span class=\"ds-pill ds-pill--loss\">+0.387</span></div>",
-      "css": ".ds-pills{display:flex;gap:8px}.ds-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font:700 11px 'Segoe UI',system-ui,sans-serif;letter-spacing:.03em;border:1px solid transparent}.ds-pill--pit{background:rgba(220,52,65,.2);color:#F26B74}.ds-pill--out{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.3);color:#00D3F2}.ds-pill--gain{font-family:Consolas,monospace;background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#00D492}.ds-pill--loss{font-family:Consolas,monospace;background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.3);color:#FF637E}"
+      "css": ".ds-pills{display:flex;gap:8px}.ds-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font:700 11px 'Segoe UI',system-ui,sans-serif;letter-spacing:.03em;border:1px solid transparent}.ds-pill--pit{background:rgba(220,52,65,.2);color:#FF4D55}.ds-pill--out{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.3);color:#00D3F2}.ds-pill--gain{font-family:Consolas,monospace;background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#00D492}.ds-pill--loss{font-family:Consolas,monospace;background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.3);color:#FF637E}"
     },
     {
       "name": "Readout Panel",
@@ -637,19 +637,24 @@
   ],
   "narrative": {
     "northStar": "The Engineer's Pit Wall",
-    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
+    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\r\n\r\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\r\n\r\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
     "keyCharacteristics": [
-      "Dark only, near-black blue base; no light theme.",
-      "Numbers first: lap times, deltas and units in bold monospace.",
-      "Uppercase, tracked, 10px labels above values.",
-      "One brand red for identity and selection; every other hue is a fixed-meaning signal.",
-      "Flat tonal layering with hairline borders; no glow, no glass.",
-      "Dense desktop layout inside a 1500px column."
+      "Dark only, near-black blue base; no light theme.\r",
+      "Numbers first: lap times, deltas and units in bold monospace.\r",
+      "Uppercase, tracked, 10px labels above values.\r",
+      "One brand red for identity and selection; every other hue is a fixed-meaning signal.\r",
+      "Flat tonal layering with hairline borders; no glow, no glass.\r",
+      "Dense desktop layout inside a 1500px column.\r"
     ],
     "rules": [
       {
         "name": "The Signal Rule",
         "body": "Every signal family means one fixed thing:",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning Before Calm Rule",
+        "body": "When removing color, keep every distinction a color draws: two states that had two colors keep two looks (the hero replay button stays amber for 100 Hz telemetry and green for a replay only). Only a color that separates nothing may go neutral.",
         "section": "colors"
       },
       {
@@ -659,7 +664,7 @@
       },
       {
         "name": "The No Dimmed Text Rule",
-        "body": "Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or desaturate a colored control (`grayscale` when off, full color when selected).",
+        "body": "Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or fade a colored control through its family's `faded` step (the base hue at `oklch(62% 0.06 h)`, still 4.5:1 on `lmu-bg`), full color when selected or hovered.",
         "section": "colors"
       },
       {
@@ -699,23 +704,23 @@
       }
     ],
     "dos": [
-      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).",
-      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
-      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
-      "**Do** separate surfaces by tone and a `lmu-border` hairline.",
-      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.",
-      "**Do** give every interactive control a visible `focus-visible` ring.",
-      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values."
+      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).\r",
+      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.\r",
+      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.\r",
+      "**Do** separate surfaces by tone and a `lmu-border` hairline.\r",
+      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.\r",
+      "**Do** give every interactive control a visible `focus-visible` ring.\r",
+      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.\r"
     ],
     "donts": [
-      "**Don't** render any text below 10px.",
-      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
-      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.",
-      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
-      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.",
-      "**Don't** add a light theme.",
-      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
-      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule)."
+      "**Don't** render any text below 10px.\r",
+      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.\r",
+      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.\r",
+      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.\r",
+      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.\r",
+      "**Don't** add a light theme.\r",
+      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.\r",
+      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule).\r"
     ]
   }
 }

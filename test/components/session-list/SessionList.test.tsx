@@ -85,8 +85,8 @@ describe('SessionList component', () => {
     expect(screen.getByText('Empty')).toBeInTheDocument();
 
     // Check race finish badge and quali badge
-    expect(screen.getByText(/Finish:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Qual:/i)).toBeInTheDocument();
+    expect(screen.getByText('Finish')).toBeInTheDocument();
+    expect(screen.getByText('Qual')).toBeInTheDocument();
     expect(screen.getByText('P2')).toBeInTheDocument();
     expect(screen.getByText('P3')).toBeInTheDocument();
 

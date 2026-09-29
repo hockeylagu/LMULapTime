@@ -19,7 +19,7 @@ colors:
   lmu-muted: "#8D99AE"
   lmu-faint: "#7F8BA1"
   lmu-accent: "#DC3441"
-  lmu-accent-text: "#F26B74"
+  lmu-accent-text: "#FF4D55"
   lmu-gold: "#FFB703"
   lmu-blue: "#219EBC"
   lmu-cyan: "#8ECAE6"
@@ -167,7 +167,7 @@ The palette is a cold, near-black instrument panel with one hot brand red and a 
 There is one color vocabulary: the `lmu-*` tokens in `tailwind.config.js` (`theme.extend.colors.lmu`), mirrored for charts and SVG in `src/utils/themeColors.ts`. Colors are named for what they mean, never for their hue. Raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) are not used; a new need gets a role here first, then the component uses the role.
 
 ### Primary
-- **Pit Lane Red** (`lmu-accent`, #DC3441): brand wordmark, active nav tab, selected segment, primary buttons, pit stop badges, scrollbar hover, text selection. The fill is tuned so white text on it passes 4.5:1. Red *text* on a dark surface uses **Pit Lane Red Text** (`lmu-accent-text`, #F26B74), which passes on every surface and on its own 20% tint. Treat red as the one "this is selected / this is us" color.
+- **Pit Lane Red** (`lmu-accent`, #DC3441): brand wordmark, active nav tab, selected segment, primary buttons, pit stop badges, scrollbar hover, text selection. The fill is tuned so white text on it passes 4.5:1. Red *text* on a dark surface uses **Pit Lane Red Text** (`lmu-accent-text`, #FF4D55), which passes on every surface and on its own 20% tint. Treat red as the one "this is selected / this is us" color; its one category use is the race session chip.
 
 ### Secondary
 - **Sector Gold** (`lmu-gold`): sector 1, first place, highlighted player rows, compare lap 1. Paired with `lmu-blue` (sector 2) and `lmu-green` (sector 3) through `SECTOR_COLORS`.
@@ -190,8 +190,8 @@ The values are Tailwind v4's own 300/400/500/950 of the hue named below, so a ro
   - **Gain** (`lmu-gain`, emerald): time gained, personal bests, clean laps, positive trends.
   - **Loss** (`lmu-loss`, rose): time lost, penalties, incidents, negative trends.
   - **Warn** (`lmu-warn`, amber): warnings, moderate deltas, inferred or uncertain values, the baseline trace.
-  - **Info** (`lmu-info`, sky): the primary telemetry trace, driver name, informational highlights.
-- **Data categories**, for telemetry channels, pace categories, car classes and conditions: **Aqua** (cyan), **Azure** (blue), **Indigo**, **Violet**, **Purple**, **Orange**, **Teal**. They separate categories and carry no judgement.
+  - **Info** (`lmu-info`, sky): the primary telemetry trace and informational highlights inside data views. Not for identity or decoration: the driver name is plain white (it is content, and red belongs to the app and to selection), and dashboard card headers are neutral (`lmu-text-soft` with a muted icon), all four alike: a hue on a header icon is decoration, so benchmark purple stays on the pace categories it describes.
+- **Data categories**, for telemetry channels, pace categories, car classes, session types and conditions: **Aqua** (cyan), **Azure** (blue), **Indigo**, **Violet**, **Purple**, **Orange**, **Teal**. They separate categories and carry no judgement.
 
 Telemetry, map, wheel-corner, pace-category and opponent colors used by charts and SVG are fixed lookup tables in `src/utils/themeColors.ts` (`TELEMETRY_COLORS`, `MAP_COLORS`, `WHEEL_CORNER_COLORS`, `PACE_CHART_COLORS`, `OPPONENT_COLORS`). Use them by name; never pick a new hue inline for a channel that already has one.
 
@@ -235,9 +235,11 @@ Two cases fail and must not be used:
 
 Data families only separate categories. Never use a signal color decoratively, and never let two signals trade meanings between views. A scale label or legend is neutral text. The channel's color lives on its trace or swatch.
 
+**The Meaning Before Calm Rule.** When removing color, keep every distinction a color draws: two states that had two colors keep two looks (the hero replay button stays amber for 100 Hz telemetry and green for a replay only). Only a color that separates nothing may go neutral.
+
 **The One Red Rule.** Pit Lane Red marks identity and the current selection. A screen shows it on the active tab, the selected control and at most a handful of alerts. It never fills a panel.
 
-**The No Dimmed Text Rule.** Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or desaturate a colored control (`grayscale` when off, full color when selected).
+**The No Dimmed Text Rule.** Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or fade a colored control through its family's `faded` step (the base hue at `oklch(62% 0.06 h)`, still 4.5:1 on `lmu-bg`), full color when selected or hovered.
 
 ## Typography
 
@@ -314,12 +316,18 @@ Compact and assertive, labelled in uppercase.
 - **Focus:** today most controls use `focus:outline-none` with a border shift to red, and only one uses `focus-visible:ring`. That is a gap: every interactive control needs a visible `focus-visible` ring (2px `lmu-accent`).
 
 ### Segmented Pills
-A signature filter control (session type, car class, sort). It is a 36px `lmu-bg` well with a hairline border and 12px radius, holding 24px-tall monospace uppercase segments with a 5px radius. The selected segment is solid red with white text. Unselected segments have a hairline and `lmu-faint` text at full opacity, brightening to white on hover (The No Dimmed Text Rule). Car-class pills keep their class color when selected and go `grayscale` when off.
+A signature filter control (session type, car class, sort). It is a 36px `lmu-bg` well with a hairline border and 12px radius, holding 24px-tall monospace uppercase segments with a 5px radius. Red means the list is narrowed: a selected segment that filters is solid red with white text (session-type and car-class pills take their own chip look instead), while a selected "All" rests neutral (`lmu-raised` fill, `lmu-rule` hairline, white text; `SEGMENT_RESTING` / `SEGMENT_NARROWED` in `common/SessionTypePills.tsx`). On/off toggles (Hide Empty, Has Replay), the grid/table switch and the current page are neutral `lmu-raised` when on, never red. Unselected segments have a hairline and `lmu-faint` text at full opacity, brightening to white on hover (The No Dimmed Text Rule). Car-class pills keep their class color when selected; when off they fade to the class's `faded` step with a 30% border and no fill, and return to full color on hover. The ELMS corner fades with them.
+
+### Session List (dashboard and track detail)
+- **Toolbar** (`SessionFilterParts.tsx`): two rows. Row one finds and orders (search, track select, sort, view mode); row two narrows (class, session type, toggles) and ends with a neutral "Clear filters" that shows only while something narrows the list. Search focus moves the border to `lmu-muted`.
+- **Session type colors** (`common/sessionTypeStyles.ts`), rising with the stakes: practice neutral (`lmu-raised` chip, muted dot), qualifying amber (`lmu-warn` tint), race red (`lmu-accent` 20% tint with `lmu-accent-text`). Purple is never a session color: it means best lap and alien pace; gold stays with P1. The session chip (R1, Q1, P1, 34px minimum so names line up) and the dashboard hero's type tag use these; the type filter pills show the dot when off and the chip when chosen, so the filter doubles as the legend. Warm-up and other types stay neutral.
+- **Rows and cards:** the best lap is white (gold is kept for P1); a race finish reads `P7 +3` with the gain in `lmu-gain`, a loss in `lmu-loss`, `±0` muted; an empty session is an amber-text chip on a rim with no row tint. Track names are plain white; the open chevron is muted until hover. Kept in color: car class, pace category and the telemetry source (amber 100 Hz, green replay).
+- **Pagination** (`SessionPagination.tsx`): 25 per page, a hairline above, "1–25 of 219 sessions" in muted text with mono numbers, then prev/next and a page window (first, last, neighbours, ellipsis) in 28px mono steps.
 
 ### Status Pills & Badges
 - **Style:** 4px radius, 2px × 8px padding, 10–12px bold label, the family's `strong` step at about 15–20% background with a 30% border and its `soft` or base step as text.
 - **Lap status** (`LapStatusBadge`): pit stop is red, out lap is cyan, and valid or incomplete show as an icon plus label, with inferred and invalid told apart by icon and color. This is the canonical lap status presentation; reuse it rather than re-deriving it.
-- **Rank** (`RankBadge`): monospace `#n`. First is gold, second is `lmu-text-soft`, third is `lmu-warn-strong`, and the rest are muted.
+- **Ranked summary list** (`RankedList` in `dashboard/DashboardSummaryParts.tsx`): the first item is a headline: value first at the hero's 28px mono extrabold (`LEADER_VALUE`), then the name in white, then one muted detail line (the leader's share of your laps or distance, or the car and lap time); the Totals card uses the same three lines (figures, labels, session count) and the same row style below, so all four dividers align. The rest are quiet numbered rows (`lmu-faint` numbers, `lmu-text-soft` names and values). A "most driven" order is not a podium, so ranks take no gold, silver or bronze. A pace category shows as a small dot in its category color on the rows, and as its name in that color on the headline. The laps/km `UnitToggle` beside it is neutral: `lmu-raised` for the selected unit, muted for the other.
 - **Car class** (`CarClassBadge`) and **pace category** (`PaceBadge`, `PACE_CATEGORY_STYLES`) carry fixed per-class and per-category colors.
 
 ### Cards / Panels
@@ -332,11 +340,11 @@ A signature filter control (session type, car class, sort). It is a 36px `lmu-bg
 
 ### Inputs / Fields
 - **Style:** `lmu-bg` well, hairline border, 8px radius (12px for the large search field, which gets a leading icon and monospace text), 14px white text.
-- **Focus:** the border shifts to Pit Lane Red. A `focus-visible` ring is still owed (see Buttons).
+- **Focus:** the border shifts to Pit Lane Red (the session search field uses `lmu-muted`, since red there would read as a filter). A `focus-visible` ring is still owed (see Buttons).
 - **Selects:** transparent inline selects with semibold white text, sitting inside a pill or toolbar well.
 
 ### Navigation
-A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur) and a hairline bottom border. On the left is the brand mark (a red-tinted gauge tile plus the uppercase wordmark with "Lap Time" in red). In the center is a tab group in an `lmu-card` well with a 12px radius. Tabs are 14px medium with a 16px icon. The active tab is solid red with white text; inactive tabs are muted and lift to `lmu-border/50` on hover. On the right are status and refresh controls; the film icon pulses only while a replay scan is running.
+A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur) and a hairline bottom border, laid out as a three-column grid with equal sides so the tabs sit on the page's true center line. On the left is the brand mark: a 40px red-tinted gauge tile (it deepens on hover; the wordmark never changes color) and the uppercase wordmark with "Lap Time" in red. In the center is a tab group in an inset `lmu-bg` well with a 12px radius; tabs are 32px, 14px medium with a 16px icon. The active tab is solid red with white text; inactive tabs are muted and lift to `lmu-raised/60` on hover. On the right are 32px status chips and the refresh button in the same inset well, muted, lifting to white with an `lmu-rule` border on hover (never red). The sessions dot is `lmu-gain` when LMU results exist and `lmu-warn` when none do; while a scan runs the film icon pulses and the refresh icon spins in `lmu-info`. A running refresh stays at full strength with a default cursor rather than fading.
 
 ### Telemetry Traces & Track Map (signature)
 Recharts traces on the dark base use `CHART_COLORS.grid` (`lmu-border`) gridlines and `lmu-muted` axes; legend labels are `lmu-text-soft` (the swatch carries the series color). Telemetry strip grid lines take the channel color dimmed, while their scale labels stay `lmu-muted` at full strength (`TelemetryStaticTrace`). Channels always use their `TELEMETRY_COLORS` hue (speed is sky, the baseline is amber, throttle is emerald, brake is red, steering is indigo). The 2D map draws the road surface and boundaries in `MAP_COLORS` line work, with racing lines colored by speed, pedal or lateral G. Monospace labels on the map obey the 10px floor.

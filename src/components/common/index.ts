@@ -3,7 +3,6 @@ export * from './VehicleClassPills';
 export * from './SessionTypePills';
 export * from './HideEmptyToggle';
 export * from './SortDropdown';
-export * from './RankBadge';
 export * from './SectorSplitsRow';
 export * from './ReplayIndicator';
 export * from './BenchmarkTargetsGrid';
