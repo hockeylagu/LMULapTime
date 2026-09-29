@@ -99,7 +99,7 @@ Types: canonical in `shared/types/` (`index.ts` for sessions/laps, `leaderboard.
 
 | Constant | File | Bump when | Effect |
 |---|---|---|---|
-| `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (local const in `syncSessionsFromDir`) | a parser/lap classification rule changes | every stored session re-parsed from XML |
+| `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (exported const) | a parser/lap classification rule changes | every stored session re-parsed from XML |
 | `REPLAY_CACHE_VERSION` | `server/core/dbSchema.ts` | decoded replay rows change | on-disk replays decoded again in the background (deleted ones kept as they are) |
 | `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbSchema.ts` | DuckDB lap cache shape changes | lap cache rebuilt |
 | `RACE_POSITIONS_VERSION` | `server/traffic/racePositions.ts` | race positions index changes | index rebuilt on demand |
@@ -159,8 +159,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - Deterministic race maths in the UI folder: per-lap pit loss split (`table/pitStopText.ts`, `lapLosses`) and class position per lap
   (`table/lapPlaces.ts`, `lapClassPosition`) belong in `shared/domain/` by the "deterministic logic first" rule.
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
-- Version constants are spread across five files, and `DB_PARSER_VERSION` is a local const inside `syncSessionsFromDir`
-  (not exported, not findable by import).
+- Version constants are spread across five files; the table in section 5 is the index.
 
 **Rule exceptions**
 - `src/components/replay/map/useTrackBoundaryGeometry.ts` calls raw `fetch` for `/tracks/*.json` (a static file, not `/api`), outside `src/api/`.
