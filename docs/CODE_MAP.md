@@ -139,7 +139,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 
 ## 9. Smells that need attention
 
-Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed.
+Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit: `src/utils/cornerAnalysis.ts` (891), `shared/domain/circuitDefinitions.ts` (873),
