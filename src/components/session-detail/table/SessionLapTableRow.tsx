@@ -9,7 +9,7 @@ import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
-import { lapClassPosition, lapPlaces } from './lapPlaces.js';
+import { lapClassPosition, lapDetailContext } from './lapPlaces.js';
 
 const COMPOUND_STYLES: Record<string, string | undefined> = {
   S: 'border-white text-white',
@@ -100,7 +100,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const compoundStyle = COMPOUND_STYLES[compoundLetter];
 
   const eventsTooltip = lapEventsTooltip(l);
-  const detailSections = lapDetailSections(l, lapPlaces(session, selectedDriver, l, prevLap, isMultiClass));
+  const detailSections = lapDetailSections(l, lapDetailContext(session, selectedDriver, l, prevLap, isMultiClass));
 
   const incompleteTooltip = eventsTooltip
     ? `Incomplete Lap:\n${eventsTooltip}`

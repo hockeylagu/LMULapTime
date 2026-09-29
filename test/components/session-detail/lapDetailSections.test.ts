@@ -30,6 +30,17 @@ describe('lapDetailSections', () => {
     expect(lapDetailSections(lap({ traffic, isOutLap: true }))).toEqual([]);
   });
 
+  it('adds the stop from the replay under the pit loss, with the damage before it', () => {
+    const pitService = { pitLaneSec: 123.1, serviceSec: 73.2, classMedianServiceSec: 29.3, unexplainedSec: 44 };
+    expect(lapDetailSections(lap({ isPitStop: true, pitStopDurationString: '+8.9s', pitService }), {
+      damageBeforeStop: { lapNum: 11, description: 'New suspension damage reported' },
+    })).toEqual([{ label: 'Pit stop', lines: [
+      'Estimated pit loss: +8.9s',
+      'In the box: 73 s (usual for your class: 29 s) · pit lane 123 s',
+      "Likely repairs: 44 s longer than your class's usual stop, after the suspension damage on lap 11",
+    ] }]);
+  });
+
   it('adds the pit loss on a pit lap and nothing on a quiet lap', () => {
     expect(lapDetailSections(lap({ isPitStop: true, pitStopDurationString: '+13.0s' }))).toEqual([
       { label: 'Pit stop', lines: ['Estimated pit loss: +13.0s'] },

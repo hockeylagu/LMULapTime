@@ -1,4 +1,7 @@
 import type { LapTraffic } from './raceTraffic.js';
+import type { PitService } from './pitStops.js';
+
+export type { PitService } from './pitStops.js';
 
 export type {
   LapTraffic, ReplayLapTraffic, ReplayTrafficResponse, TrafficCar, TrafficGap, TrafficSpell, TrafficSpellKind,
@@ -146,6 +149,7 @@ export interface LapData {
   elapsedTimeString?: string; // Formatted MM:SS or HH:MM:SS
   pitStopDuration?: number | null; // Estimated pit lane / stop time in seconds
   pitStopDurationString?: string; // Formatted pit duration (e.g. "32.4s")
+  pitService?: PitService; // The stop on this in-lap, from the linked replay, added when the session is read
   gapToLeader?: number | null; // Gap to session leader at lap finish (seconds)
   gapToLeaderString?: string; // Formatted gap (e.g. "+4.215s" or "LEADER")
   isPitStop: boolean;

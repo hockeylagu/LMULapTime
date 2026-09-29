@@ -1,5 +1,12 @@
 import type { LapData } from '../../../../shared/types/index.js';
 import { describeLapTraffic, describeNonRepresentative, type LapPlaces } from '../../../utils/lapTrafficText.js';
+import { describePitService, type EarlierDamage } from './pitStopText.js';
+
+/** What the rest of the driver's race adds to a lap: the places it won or lost, the damage before a stop. */
+export interface LapDetailContext {
+  places?: LapPlaces;
+  damageBeforeStop?: EarlierDamage;
+}
 
 export interface LapDetailSection {
   label: string;
@@ -23,7 +30,7 @@ export function withoutTrackLimitsPrefix(description: string): string {
  * conditions, why it is left out of the average, the cars around the driver, incidents, track
  * limits, penalties and the pit stop. Empty when there is nothing to add.
  */
-export function lapDetailSections(lap: LapData, places?: LapPlaces): LapDetailSection[] {
+export function lapDetailSections(lap: LapData, context: LapDetailContext = {}): LapDetailSection[] {
   const sections: LapDetailSection[] = [];
   if (lap.conditions) {
     const lines = [
@@ -37,13 +44,17 @@ export function lapDetailSections(lap: LapData, places?: LapPlaces): LapDetailSe
   }
   // Cars going by while the driver is in or out of the pits are not a fight.
   const inPits = lap.isPitStop || lap.isOutLap === true;
-  const traffic = inPits ? [] : describeLapTraffic(lap.traffic, places);
+  const traffic = inPits ? [] : describeLapTraffic(lap.traffic, context.places);
   if (traffic.length > 0) sections.push({ label: 'Around you', lines: traffic });
   if (lap.incidents?.length) sections.push({ label: 'Incidents', lines: lap.incidents.map((i) => i.description) });
   if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => withoutTrackLimitsPrefix(tl.description)) });
   if (lap.penalties?.length) sections.push({ label: 'Penalties', lines: lap.penalties.map((p) => p.description) });
-  if (lap.isPitStop && lap.pitStopDurationString) {
-    sections.push({ label: 'Pit stop', lines: [`Estimated pit loss: ${lap.pitStopDurationString}`] });
+  if (lap.isPitStop) {
+    const lines = [
+      ...(lap.pitStopDurationString ? [`Estimated pit loss: ${lap.pitStopDurationString}`] : []),
+      ...(lap.pitService ? describePitService(lap.pitService, context.damageBeforeStop) : []),
+    ];
+    if (lines.length > 0) sections.push({ label: 'Pit stop', lines });
   }
   return sections;
 }
