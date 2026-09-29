@@ -148,7 +148,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
   and `tools/analysis/trackBoundaryBuilders.ts` (852, an offline tool). Watch them; split by circuit family or builder if they grow.
 - Components at or near 300 lines:
-  `scene/GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
+  `TelemetrySteerChannel.tsx` (287).
 - Folders near 20 files: `src/components/common/`,
   `src/utils/`, `test/utils/` (17 each).
 
