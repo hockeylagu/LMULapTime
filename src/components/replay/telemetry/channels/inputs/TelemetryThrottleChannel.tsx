@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const THROTTLE_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
-  { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
-  { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
+  { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+  { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+  { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
 ];
 
 export interface TelemetryThrottleChannelProps {
@@ -75,7 +75,7 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
           {(currentPoint?.throttle ?? 0).toFixed(1)}%
         </span>
         {currentPoint?.tcActive && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[8px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]">
             TC CUT
           </span>
         )}

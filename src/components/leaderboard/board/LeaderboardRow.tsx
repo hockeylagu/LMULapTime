@@ -84,8 +84,8 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
       <td className="px-3 py-2 max-w-[14rem] font-sans">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`truncate ${entry.isPlayer ? 'font-extrabold text-lmu-warn-soft' : 'font-semibold'}`}>{entry.driverName}</span>
-          {entry.isPlayer && <span className="text-[9px] font-bold uppercase px-1 rounded bg-lmu-warn/20 text-lmu-warn-soft">You</span>}
-          {isRival && <span className="text-[9px] font-bold uppercase px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft">Rival</span>}
+          {entry.isPlayer && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded bg-lmu-warn/20 text-lmu-warn-soft">You</span>}
+          {isRival && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft">Rival</span>}
         </div>
         <div className="text-[10px] text-lmu-muted truncate">{entry.bestLap.carType} · {formatDrivenAgo(entry.bestLap.timestamp)}</div>
       </td>

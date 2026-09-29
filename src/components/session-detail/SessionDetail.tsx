@@ -73,7 +73,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         {loadError && <p role="alert" className="text-sm text-lmu-loss mb-4">{loadError}</p>}
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase"
+          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider"
         >
           Return to Dashboard
         </button>

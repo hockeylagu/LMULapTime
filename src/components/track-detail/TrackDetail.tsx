@@ -70,7 +70,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         <p className="text-lg font-bold text-white mb-3">Track Not Found</p>
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase"
+          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider"
         >
           Return to Tracks
         </button>

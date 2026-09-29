@@ -147,10 +147,10 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = React.memo(
         transform={`translate(${lineData.labelX}, ${lineData.labelY}) scale(${markerScale ?? (1 / lineData.effectiveZoom)})`}
       >
         <rect
-          x="-17"
-          y="-7.5"
-          width="34"
-          height="15"
+          x="-20"
+          y="-8.5"
+          width="40"
+          height="17"
           rx="3"
           fill={MAP_COLORS.markerBg}
           stroke={TELEMETRY_COLORS.primary}
@@ -163,10 +163,10 @@ export const GpsStartFinishLine: React.FC<GpsStartFinishLineProps> = React.memo(
           textAnchor="middle"
           dominantBaseline="central"
           fill={TELEMETRY_COLORS.primary}
-          fontSize="8"
-          fontFamily="monospace"
+          fontSize="10"
+          fontFamily="Consolas, monospace"
           fontWeight="bold"
-          letterSpacing="0.08em"
+          letterSpacing="0.05em"
         >
           START
         </text>

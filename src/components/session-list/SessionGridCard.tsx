@@ -86,7 +86,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             )}
           </div>
           <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
-            <span className="text-[10px] text-lmu-muted uppercase">Best:</span>
+            <span className="text-[10px] text-lmu-muted uppercase tracking-wider">Best:</span>
             <span className="font-bold text-sm text-lmu-gold">
               {p?.bestLapTimeString || '--:--.---'}
             </span>
@@ -104,7 +104,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
                 className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm"
                 title={p.gridPosition ? `Started P${p.gridPosition} → Finished P${p.position}` : `Finished P${p.position}`}
               >
-                <span className="text-lmu-muted text-[10px] uppercase font-sans font-semibold">Finish:</span>
+                <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Finish:</span>
                 <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-white'}`}>
                   P{p.position}
                 </strong>
@@ -123,7 +123,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
                 className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-xs font-mono text-white shadow-sm"
                 title={`Qualified P${p.position}`}
               >
-                <span className="text-lmu-muted text-[10px] uppercase font-sans font-semibold">Qual:</span>
+                <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-sans font-semibold">Qual:</span>
                 <strong className={`text-xs font-extrabold ${p.position === 1 ? 'text-lmu-gold' : 'text-lmu-cyan'}`}>
                   P{p.position}
                 </strong>

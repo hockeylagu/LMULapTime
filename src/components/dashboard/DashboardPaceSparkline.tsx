@@ -63,7 +63,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
       <div className="flex items-center justify-between text-[11px]">
         <span className="text-lmu-muted uppercase tracking-wider font-semibold font-mono">Pace Trajectory</span>
         <span
-          className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10.5px] ${
+          className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
             paceTrendDirection === 'improving'
               ? 'bg-lmu-gain-deep/60 text-lmu-gain border border-lmu-gain-strong/30'
               : paceTrendDirection === 'declining'

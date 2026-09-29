@@ -82,9 +82,9 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxSuspPos} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
-        { label: `${midSusp} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
-        { label: `${minSuspPos} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
+        { label: `${maxSuspPos} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+        { label: `${midSusp} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+        { label: `${minSuspPos} mm`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
       ]} />
 
       {isCursorInView && hasData && susp && (
@@ -99,7 +99,7 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
             <span className="text-lmu-azure-soft">FR:{susp[1].toFixed(1)}</span>
             <span className="text-lmu-warn-soft">RL:{susp[2].toFixed(1)}</span>
             <span className="text-lmu-loss-soft">RR:{susp[3].toFixed(1)}</span>
-            <span className="text-lmu-gain text-[9px]">mm</span>
+            <span className="text-lmu-gain text-[10px]">mm</span>
           </div>
         </div>
       )}

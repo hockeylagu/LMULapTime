@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const BRAKE_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss font-mono' },
-  { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss font-mono' },
-  { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss font-mono' },
+  { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
+  { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
+  { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
 ];
 
 export interface TelemetryBrakeChannelProps {
@@ -75,12 +75,12 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
           {(currentPoint?.brake ?? 0).toFixed(1)}%
         </span>
         {currentPoint?.absActive && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-aqua text-black font-black text-[8px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.5)]">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-aqua text-black font-black text-[10px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.5)]">
             ABS ACTIVE
           </span>
         )}
         {currentPoint?.wheelLockActive && !currentPoint?.absActive && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[8px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
             LOCKUP
           </span>
         )}

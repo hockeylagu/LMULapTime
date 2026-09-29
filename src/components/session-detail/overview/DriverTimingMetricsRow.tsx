@@ -97,14 +97,14 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
         <div>
           <div className="flex items-center justify-between gap-1">
             <p
-              className={`text-[10px] uppercase font-semibold flex items-center gap-1 ${
+              className={`text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1 ${
                 isCurrentSessionAllTimePB ? 'text-lmu-gold font-bold' : 'text-lmu-blue font-semibold'
               }`}
             >
               {isCurrentSessionAllTimePB ? `⭐ Personal Best` : '★ Session Best'}
             </p>
             {bestLapNum && (
-              <span className="text-[9px] text-lmu-muted group-hover/card:text-lmu-gold transition-colors font-sans flex items-center gap-0.5">
+              <span className="text-[10px] text-lmu-muted group-hover/card:text-lmu-gold transition-colors font-sans flex items-center gap-0.5">
                 <Activity className="w-2.5 h-2.5" />
                 <span>L{bestLapNum} Telemetry →</span>
               </span>
@@ -137,8 +137,8 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
       <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between">
-            <p className="text-[10px] text-lmu-muted uppercase font-semibold">Top 3 Lap Avg</p>
-            <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-lmu-aqua-deep/60 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
+            <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Top 3 Lap Avg</p>
+            <span className="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-lmu-aqua-deep/60 text-lmu-aqua-soft border border-lmu-aqua-strong/40">
               True Pace
             </span>
           </div>
@@ -155,7 +155,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               </strong>
             </span>
           </div>
-          <p className="text-[9px] text-lmu-muted truncate" title="Average of 3 fastest valid flying laps">
+          <p className="text-[10px] text-lmu-muted truncate" title="Average of 3 fastest valid flying laps">
             Repeatable Pace Trend
           </p>
         </div>
@@ -165,10 +165,10 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
       <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between">
-            <p className="text-[10px] text-lmu-muted uppercase font-semibold">Session Lap Average</p>
+            <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Session Lap Average</p>
             {consistencyScore !== null && (
               <span
-                className={`text-[9px] font-bold font-mono px-1.5 py-0.2 rounded border whitespace-nowrap ${
+                className={`text-[10px] font-bold font-mono px-1.5 py-0.2 rounded border whitespace-nowrap ${
                   consistencyScore >= 99
                     ? 'bg-lmu-gain-deep/60 text-lmu-gain-soft border-lmu-gain-strong/40'
                     : consistencyScore >= 97
@@ -203,14 +203,14 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between text-[9px] text-lmu-muted">
+          <div className="flex items-center justify-between text-[10px] text-lmu-muted">
             <span>
               Clean Laps: <strong className="text-white font-mono">{cleanLapsCount}</strong> /{' '}
               {totalLapsCount}
             </span>
             {hasMultipleLaps && (
               <span
-                className="text-[8px] uppercase tracking-wider text-lmu-warn/80 font-semibold"
+                className="text-[10px] uppercase tracking-wider text-lmu-warn/80 font-semibold"
                 title="Lap 1 (Start/Out-lap) is excluded from flying averages"
               >
                 Excl. L1
@@ -218,7 +218,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
             )}
           </div>
           {groupsText && (
-            <p className="text-[9px] text-lmu-info-soft truncate" data-testid="consistency-groups"
+            <p className="text-[10px] text-lmu-info-soft truncate" data-testid="consistency-groups"
               title="Consistency is measured within each condition, then combined">
               Per condition: {groupsText}
             </p>
@@ -229,7 +229,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
       {/* 4. Theoretical Best */}
       <div className="p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between">
         <div>
-          <p className="text-[10px] text-lmu-muted uppercase font-semibold">Theoretical Best</p>
+          <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Theoretical Best</p>
           <h4 className="text-xl font-extrabold text-lmu-green font-mono mt-0.5">
             {selectedDriver.theoreticalBestString}
           </h4>

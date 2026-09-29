@@ -32,7 +32,7 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
               <Fuel className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Fuel Usage</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Avg Fuel Usage</p>
               <p className="text-xs font-mono font-bold text-white">
                 {selectedDriver.avgFuelPerLap}% <span className="text-[10px] font-normal text-lmu-muted">/ clean lap</span>
               </p>
@@ -46,7 +46,7 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Fuel Stint</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Est. Fuel Stint</p>
               <p className="text-xs font-mono font-bold text-lmu-warn-soft">
                 ~{selectedDriver.estFuelStintLaps} <span className="text-[10px] font-normal text-lmu-muted">laps / tank</span>
               </p>
@@ -63,7 +63,7 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
               <Zap className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Virtual Energy</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Avg Virtual Energy</p>
               <p className="text-xs font-mono font-bold text-white">
                 {selectedDriver.avgVePerLap}% <span className="text-[10px] font-normal text-lmu-muted">/ lap</span>
               </p>
@@ -80,7 +80,7 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Energy Stint (VE)</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Est. Energy Stint (VE)</p>
               <p className="text-xs font-mono font-bold text-lmu-indigo-soft">
                 ~{selectedDriver.estVeStintLaps} <span className="text-[10px] font-normal text-lmu-muted">laps / stint</span>
               </p>

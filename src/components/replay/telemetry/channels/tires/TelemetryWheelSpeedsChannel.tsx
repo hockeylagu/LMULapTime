@@ -79,9 +79,9 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxWheelSpeed} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[9px] text-lmu-aqua font-mono' },
-        { label: `${Math.round(maxWheelSpeed / 2)} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[9px] text-lmu-aqua font-mono' },
-        { label: '0 km/h', borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[9px] text-lmu-aqua font-mono' },
+        { label: `${maxWheelSpeed} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: `${Math.round(maxWheelSpeed / 2)} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: '0 km/h', borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
       ]} />
 
       {isCursorInView && hasData && ws && (
@@ -96,7 +96,7 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
             <span className="text-lmu-azure-soft">FR:{ws[1].toFixed(0)}</span>
             <span className="text-lmu-warn-soft">RL:{ws[2].toFixed(0)}</span>
             <span className="text-lmu-loss-soft">RR:{ws[3].toFixed(0)}</span>
-            <span className="text-lmu-aqua text-[9px]">km/h</span>
+            <span className="text-lmu-aqua text-[10px]">km/h</span>
           </div>
         </div>
       )}

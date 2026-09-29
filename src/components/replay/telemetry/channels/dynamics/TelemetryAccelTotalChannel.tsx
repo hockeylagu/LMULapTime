@@ -75,7 +75,7 @@ export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProp
           <Activity className="w-3 h-3" />
           COMBINED G
         </span>
-        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        {source !== 'duckdb' && <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>}
         {hasTotalG ? (
@@ -95,9 +95,9 @@ export const TelemetryAccelTotalChannel: React.FC<TelemetryAccelTotalChannelProp
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '4.0G Max Grip', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[8px] text-lmu-loss font-mono' },
-        { label: '2.0G', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[8px] text-lmu-loss-soft font-mono' },
-        { label: '0.0G Rest', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[8px] text-lmu-loss font-mono' },
+        { label: '4.0G Max Grip', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
+        { label: '2.0G', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss-soft font-mono' },
+        { label: '0.0G Rest', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
       ]} />
 
       {isCursorInView && hasTotalG && (

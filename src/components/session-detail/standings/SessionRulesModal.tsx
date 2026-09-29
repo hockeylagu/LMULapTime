@@ -69,7 +69,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Gamepad2 className="w-4 h-4 text-lmu-info shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Mode Setting</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Mode Setting</div>
                 <div className="text-xs font-bold text-white">{settings.modeSetting}</div>
               </div>
             </div>
@@ -79,7 +79,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50 sm:col-span-2">
               <Globe className="w-4 h-4 text-lmu-aqua shrink-0" />
               <div className="min-w-0">
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Server Name</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Server Name</div>
                 <div className="text-xs font-bold text-lmu-aqua-soft truncate" title={settings.serverName}>
                   {settings.serverName}
                 </div>
@@ -91,7 +91,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Shield className="w-4 h-4 text-lmu-warn shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Damage Multiplier</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Damage Multiplier</div>
                 <div className="text-xs font-bold font-mono text-white">
                   <span className={settings.damageMultiplier > 0 ? 'text-lmu-warn-soft' : 'text-lmu-gain-soft'}>
                     {settings.damageMultiplier}%
@@ -105,7 +105,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Fuel className="w-4 h-4 text-lmu-gain shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Fuel Multiplier</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Fuel Multiplier</div>
                 <div className="text-xs font-bold font-mono text-white">{settings.fuelMultiplier}x</div>
               </div>
             </div>
@@ -115,7 +115,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Disc className="w-4 h-4 text-lmu-warn shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Tire Wear Rate</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Tire Wear Rate</div>
                 <div className="text-xs font-bold font-mono text-white">{settings.tireMultiplier}x</div>
               </div>
             </div>
@@ -129,7 +129,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
                 <Snowflake className="w-4 h-4 text-lmu-info shrink-0" />
               )}
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Tire Blankets</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Tire Blankets</div>
                 <div className="text-xs font-bold text-white">
                   {settings.tireWarmers ? 'Warm Tires' : 'Cold Tires (No Warmers)'}
                 </div>
@@ -141,7 +141,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Wrench className="w-4 h-4 text-lmu-purple shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Car Setups</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Car Setups</div>
                 <div className="text-xs font-bold text-white">
                   {settings.fixedSetups ? 'Fixed Setup' : 'Open Setup'}
                 </div>
@@ -153,7 +153,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Clock className="w-4 h-4 text-lmu-info shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Duration</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Duration</div>
                 <div className="text-xs font-bold font-mono text-white">{settings.durationMinutes} min</div>
               </div>
             </div>
@@ -163,7 +163,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Flag className="w-4 h-4 text-lmu-gain shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Lap Count</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Lap Count</div>
                 <div className="text-xs font-bold font-mono text-white">{settings.raceLaps} Laps</div>
               </div>
             </div>
@@ -175,7 +175,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
                 : weather === 'Dynamic Weather' ? <CloudDrizzle className="w-4 h-4 text-lmu-aqua shrink-0" />
                 : <Sun className="w-4 h-4 text-lmu-warn shrink-0" />}
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Weather</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Weather</div>
                 <div className="text-xs font-bold text-white">
                   {WEATHER_LABEL[weather]}
                   {conditions?.maxRainIntensity ? <span className="font-mono text-lmu-text-soft"> · max rain {conditions.maxRainIntensity}/25</span> : null}
@@ -188,7 +188,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Thermometer className="w-4 h-4 text-lmu-aqua shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Air Temperature</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Air Temperature</div>
                 <div className="text-xs font-bold font-mono text-white">{conditions.ambientTemp.toFixed(1)}°C</div>
               </div>
             </div>
@@ -198,7 +198,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             <div className="flex items-center gap-3 p-3 rounded-xl bg-lmu-raised/60 border border-lmu-rule/50">
               <Thermometer className="w-4 h-4 text-lmu-orange shrink-0" />
               <div>
-                <div className="text-[10px] uppercase font-semibold text-lmu-muted">Track Temperature</div>
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Track Temperature</div>
                 <div className="text-xs font-bold font-mono text-white">{conditions.trackTemp.toFixed(1)}°C</div>
               </div>
             </div>

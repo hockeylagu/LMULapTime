@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { TelemetryStaticTrace } from '../../../../src/components/replay/telemetry/TelemetryStaticTrace.js';
 
 describe('TelemetryStaticTrace', () => {
-  const gridLines = [{ label: '100%', borderClassName: 'border-b', labelClassName: 'text-[9px]' }];
+  const gridLines = [{ label: '100%', borderClassName: 'border-b', labelClassName: 'text-[10px]' }];
 
   it('puts the traces on their own layer, under the grid lines', () => {
     render(
@@ -22,7 +22,7 @@ describe('TelemetryStaticTrace', () => {
     render(
       <TelemetryStaticTrace
         chart={<svg />}
-        gridLines={[{ label: '250 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[9px] text-lmu-info font-mono' }]}
+        gridLines={[{ label: '250 km/h', borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info font-mono' }]}
         gridClassName="absolute inset-0 flex opacity-20"
       />
     );

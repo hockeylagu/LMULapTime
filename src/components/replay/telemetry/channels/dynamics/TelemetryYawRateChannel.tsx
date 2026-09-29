@@ -69,7 +69,7 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
           <RotateCw className="w-3 h-3" />
           YAW RATE
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {hasYawRate ? (
@@ -89,9 +89,9 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '+90°/s Rotation Right', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[8px] text-lmu-aqua font-mono' },
-        { label: '0°/s In-Line', borderClassName: 'border-b border-lmu-aqua/50', labelClassName: 'text-[8px] text-lmu-aqua-soft font-mono' },
-        { label: '-90°/s Rotation Left', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[8px] text-lmu-aqua font-mono' },
+        { label: '+90°/s Rotation Right', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: '0°/s In-Line', borderClassName: 'border-b border-lmu-aqua/50', labelClassName: 'text-[10px] text-lmu-aqua-soft font-mono' },
+        { label: '-90°/s Rotation Left', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
       ]} />
 
       {isCursorInView && hasYawRate && (

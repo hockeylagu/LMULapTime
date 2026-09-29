@@ -45,35 +45,35 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
       {/* Cache Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Sessions</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Sessions</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.sessionsCount ?? status?.sessionsCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Database Size</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Database Size</span>
           <span className="text-base font-bold text-lmu-gold font-mono mt-0.5 block">
             {formatBytes(status?.sqliteCache?.dbSizeBytes)}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Replays</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Replays</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.replaysCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Telemetry</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Telemetry</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.telemetryFilesCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border col-span-2">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Last Delta Sync / Update</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Last Delta Sync / Update</span>
           <span className="text-xs font-medium text-white font-mono mt-1 block truncate">
             {cacheLastSyncedStr}
           </span>

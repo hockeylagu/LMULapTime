@@ -78,21 +78,21 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
           <Disc className="w-3 h-3" />
           TIRE SLIP & LOCKUP
         </span>
-        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[8px] tracking-wider flex items-center gap-0.5">
+        <span className="px-1 py-0.2 rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>
         {isLockup && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[9px] tracking-wider flex items-center gap-0.5 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]">
             <AlertTriangle className="w-2.5 h-2.5" /> LOCKUP
           </span>
         )}
         {isAbs && !isLockup && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[9px] tracking-wider">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
             ABS
           </span>
         )}
         {isTc && (
-          <span className="px-1.5 py-0.2 rounded bg-lmu-info-strong text-black font-black text-[9px] tracking-wider">
+          <span className="px-1.5 py-0.2 rounded bg-lmu-info-strong text-black font-black text-[10px] tracking-wider">
             TC
           </span>
         )}
@@ -113,9 +113,9 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: '100% Saturation / Skid', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[8px] text-lmu-loss font-mono' },
-        { label: '50% Dynamic Grip', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn-soft font-mono' },
-        { label: '0% Free Rolling', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[8px] text-lmu-gain font-mono' },
+        { label: '100% Saturation / Skid', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
+        { label: '50% Dynamic Grip', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn-soft font-mono' },
+        { label: '0% Free Rolling', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
       ]} />
 
       {isCursorInView && hasSlip && (

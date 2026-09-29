@@ -61,15 +61,15 @@ typography:
     fontWeight: 700
     letterSpacing: "0.05em"
   readout-small:
-    fontFamily: "monospace"
+    fontFamily: "Consolas, monospace"
     fontSize: "11px"
     fontWeight: 700
   readout:
-    fontFamily: "monospace"
+    fontFamily: "Consolas, monospace"
     fontSize: "12px"
     fontWeight: 700
   readout-large:
-    fontFamily: "monospace"
+    fontFamily: "Consolas, monospace"
     fontSize: "18px"
     fontWeight: 800
 rounded:
@@ -239,12 +239,10 @@ Data families only separate categories. Never use a signal color decoratively, a
 
 ## Typography
 
-**Display / Body Font:** Segoe UI (with `sans-serif`)
-**Readout Font:** the system `monospace`
+**Display / Body Font:** Segoe UI (`system-ui`, then `sans-serif` off Windows)
+**Readout Font:** Consolas (then `monospace`)
 
-**Character:** A plain Windows UI face in heavy weights over a stark system monospace. It is utilitarian by design; the character comes from weight, case and tracking, not from a display face.
-
-`index.html` also loads Outfit and JetBrains Mono from Google Fonts, but neither is wired into Tailwind or used anywhere. That request is dead weight and polish should remove it; the rendered fonts above are the canonical ones.
+**Character:** A plain Windows UI face in heavy weights over a stark monospace: the faces LMU's own platform renders, with zero web fonts. It is utilitarian by design; the character comes from weight, case and tracking, not from a display face. The mono stack names Consolas first so a bare `monospace` never triggers the browsers' 13px generic-monospace sizing quirk; SVG text sets `fontFamily="Consolas, monospace"` for the same reason.
 
 ### Hierarchy
 - **Brand** (800, 18px, uppercase, 0.025em tracking): the navbar wordmark only.
@@ -257,7 +255,9 @@ Data families only separate categories. Never use a signal color decoratively, a
 ### Named Rules
 **The Readout Rule.** Every number a driver compares (lap time, delta, position, speed, temperature, percentage) is set in `font-mono` with its unit. Prose numbers in a sentence may stay proportional.
 
-**The 10px Floor.** No text renders below 10px. The existing 8px and 9px sizes (`text-[8px]`, `text-[9px]`, about 180 uses) are drift; polish raises them to 10px or restructures the element. SVG map labels follow the same floor at their rendered scale.
+**The 10px Floor.** No text renders below 10px, and sizes stay on the ramp: 10, 11, 12 (`text-xs`), 14 (`text-sm`) and up. Off-ramp sizes (`text-[9px]`, `text-[10.5px]`, `text-[13.5px]`) are drift. SVG labels follow the same floor at their rendered scale (the friction circle's 128-unit viewBox draws at 116px, so its labels are 11 units). Where 10px does not fit, restructure the element instead of shrinking the text.
+
+**The Label Rule.** Uppercase text always carries `tracking-wider`; caps without tracking read cramped at 10–12px.
 
 ## Layout
 
@@ -341,5 +341,5 @@ Recharts traces on the dark base use `CHART_COLORS.grid` (`lmu-border`) gridline
 - **Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.
 - **Don't** dim text with `opacity-*`; step down a text tier or desaturate.
 - **Don't** add a light theme.
-- **Don't** add web fonts; Segoe UI and system monospace are the rendered fonts, and the unused Outfit / JetBrains Mono request is slated for removal.
+- **Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.
 - **Don't** use decorative pulse or ping animation on static chrome; reserve `animate-spin` and `animate-pulse` for real loading or live-sync states.

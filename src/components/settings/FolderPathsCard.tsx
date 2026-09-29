@@ -53,7 +53,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase">Results Log Directory</span>
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Results Log Directory</span>
             <span
               className={`inline-flex items-center gap-1 text-xs font-bold ${
                 status?.resultsExist ? 'text-lmu-green' : 'text-lmu-accent-text'
@@ -75,7 +75,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
 
         <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase">Replays (.VCR) Directory</span>
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Replays (.VCR) Directory</span>
             <span
               className={`inline-flex items-center gap-1 text-xs font-bold ${
                 status?.replaysExist ? 'text-lmu-green' : 'text-lmu-accent-text'
@@ -97,7 +97,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
 
         <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase">Telemetry (.duckdb)</span>
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Telemetry (.duckdb)</span>
             <span
               className={`inline-flex items-center gap-1 text-xs font-bold ${
                 status?.telemetryExist ? 'text-lmu-green' : 'text-lmu-accent-text'
@@ -148,7 +148,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
       {/* Path Form */}
       <form onSubmit={onScanPaths} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase mb-1.5 flex items-center justify-between">
+          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5 flex items-center justify-between">
             <span>Player Driver Profile Name</span>
             <span className="text-lmu-accent-text text-[11px] font-normal normal-case">
               (Auto-detected from LMU settings.json or user editable)
@@ -170,7 +170,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase mb-1.5">
+          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5">
             UserData Results XML Folder Path
           </label>
           <div className="relative">
@@ -185,7 +185,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase mb-1.5">
+          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5">
             UserData Replays (.VCR) Folder Path
           </label>
           <div className="relative">
@@ -200,7 +200,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase mb-1.5 flex items-center justify-between">
+          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5 flex items-center justify-between">
             <span>UserData Telemetry (.duckdb) Folder Path</span>
             <span className="text-lmu-accent-text text-[11px] font-normal normal-case">
               (Primary telemetry source for main driver)

@@ -22,7 +22,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
   return (
     <div className="w-full md:w-56 bg-lmu-deep border-b md:border-b-0 md:border-r border-lmu-border/60 flex flex-col shrink-0">
       <div className="p-2.5 flex items-center justify-between border-b border-white/5 shrink-0">
-        <span className="text-[10px] uppercase font-bold text-lmu-muted">Presets</span>
+        <span className="text-[10px] uppercase tracking-wider font-bold text-lmu-muted">Presets</span>
         <button
           type="button"
           onClick={onCreateNew}
@@ -52,7 +52,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
                 {isActive && <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain shrink-0" />}
                 <span className="truncate">{p.name}</span>
               </div>
-              <span className="text-[9px] text-lmu-muted shrink-0">
+              <span className="text-[10px] text-lmu-muted shrink-0">
                 {p.channels.length}
               </span>
             </button>

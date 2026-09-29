@@ -20,7 +20,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
       type="button"
       onClick={onToggleBalance}
       title={showBalance ? 'Hide Understeer / Oversteer Overlay' : 'Show Understeer / Oversteer Overlay'}
-      className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider transition-all flex items-center gap-1.5 ${
+      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider transition-all flex items-center gap-1.5 ${
         showBalance
           ? 'bg-lmu-raised text-lmu-text border border-lmu-info-strong/40 shadow-[0_0_8px_rgba(56,189,248,0.2)]'
           : 'text-lmu-faint hover:text-lmu-text-soft hover:bg-lmu-raised/40'
@@ -47,7 +47,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
       aria-label="Tire Push Overlay"
       onClick={onToggleScrub}
       title={showScrub ? 'Remove Tire Scrub Zones' : 'Add Tire Scrub Zones'}
-      className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider transition-all flex items-center gap-1 ml-0.5 ${
+      className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider transition-all flex items-center gap-1 ml-0.5 ${
         showScrub
           ? 'bg-lmu-loss-deep/80 text-lmu-loss-soft border border-lmu-loss-strong/60 shadow-[0_0_8px_rgba(244,63,94,0.3)]'
           : 'text-lmu-faint hover:text-lmu-loss-soft hover:bg-lmu-raised/40'

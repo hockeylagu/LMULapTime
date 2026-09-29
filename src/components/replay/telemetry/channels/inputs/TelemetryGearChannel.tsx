@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const GEAR_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: 'G7', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
-  { label: 'G4', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
-  { label: 'G1', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[8px] text-lmu-warn font-mono' },
+  { label: 'G7', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+  { label: 'G4', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+  { label: 'G1', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
 ];
 
 export interface TelemetryGearChannelProps {

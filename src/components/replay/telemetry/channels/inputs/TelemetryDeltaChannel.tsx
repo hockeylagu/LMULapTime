@@ -85,9 +85,9 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
   ), [deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
 
   const gridLines = useMemo<readonly TelemetryGridLine[]>(() => [
-    { label: `-${maxDeltaSec.toFixed(1)}s (Faster)`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[9px] text-lmu-gain font-mono' },
-    { label: '0.00s (Equal)', borderClassName: 'border-b border-white/60', labelClassName: 'text-[9px] text-white font-mono' },
-    { label: `+${maxDeltaSec.toFixed(1)}s (Slower)`, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[9px] text-lmu-loss font-mono' },
+    { label: `-${maxDeltaSec.toFixed(1)}s (Faster)`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+    { label: '0.00s (Equal)', borderClassName: 'border-b border-white/60', labelClassName: 'text-[10px] text-white font-mono' },
+    { label: `+${maxDeltaSec.toFixed(1)}s (Slower)`, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
   ], [maxDeltaSec]);
 
   return (
@@ -106,7 +106,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
                 {currentComparison.deltaTimeSec <= 0 ? '' : '+'}
                 {currentComparison.deltaTimeSec.toFixed(3)}s
               </span>
-              <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider ${
                 currentComparison.deltaTimeSec <= 0 ? 'bg-lmu-gain-strong/20 text-lmu-gain-soft' : 'bg-lmu-loss-strong/20 text-lmu-loss-soft'
               }`}>
                 {currentComparison.deltaTimeSec <= 0 ? 'Ahead' : 'Behind'}
@@ -128,7 +128,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
         </div>
 
         {/* Dynamic Gain/Loss legend */}
-        <div className="hidden sm:flex items-center gap-3 text-[9px] font-mono">
+        <div className="hidden sm:flex items-center gap-3 text-[10px] font-mono">
           <span className="flex items-center gap-1 text-lmu-gain font-semibold">
             <span className="w-2.5 h-2 rounded-sm bg-lmu-gain-strong/70 border border-lmu-gain/60 inline-block" />
             Vibrant Green = Gaining Time

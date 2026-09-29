@@ -57,7 +57,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
               className="flex items-center justify-between p-2.5 rounded-lg bg-lmu-gain-deep/20 border border-lmu-gain-strong/20 text-xs"
             >
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-lmu-gain-strong/20 text-lmu-gain border border-lmu-gain-strong/40">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-gain-strong/20 text-lmu-gain border border-lmu-gain-strong/40">
                   NEW
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>
@@ -81,7 +81,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
               className="flex items-center justify-between p-2.5 rounded-lg bg-lmu-warn-deep/20 border border-lmu-warn-strong/20 text-xs"
             >
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/40">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/40">
                   UPDATED
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>
@@ -119,7 +119,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
               className="flex items-center justify-between p-2.5 rounded-lg bg-lmu-loss-deep/20 border border-lmu-loss-strong/20 text-xs"
             >
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-lmu-loss-strong/20 text-lmu-loss border border-lmu-loss-strong/40">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-loss-strong/20 text-lmu-loss border border-lmu-loss-strong/40">
                   REMOVED
                 </span>
                 <span className="font-semibold text-white">{item.trackName}</span>

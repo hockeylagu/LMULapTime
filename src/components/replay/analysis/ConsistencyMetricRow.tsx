@@ -31,9 +31,9 @@ export function MetricChart({
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={LMU_COLORS.border} vertical={false} />
-          <XAxis dataKey="lap" tick={{ fontSize: 9, fill: LMU_COLORS.muted }} axisLine={{ stroke: LMU_COLORS.border }} tickLine={false} />
+          <XAxis dataKey="lap" tick={{ fontSize: 10, fill: LMU_COLORS.muted }} axisLine={{ stroke: LMU_COLORS.border }} tickLine={false} />
           <YAxis
-            tick={{ fontSize: 9, fill: LMU_COLORS.muted }}
+            tick={{ fontSize: 10, fill: LMU_COLORS.muted }}
             width={36}
             axisLine={false}
             tickLine={false}
