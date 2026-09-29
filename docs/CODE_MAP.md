@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against `main` at d41e20b (2026-09-29): 358 source files, 206 test files, 1756 tests.
+Last checked against branch `smells-cleanup` (2026-09-29): 376 source files, 212 test files, 1770 tests.
 
 ---
 
@@ -144,8 +144,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
-- Folders near 20 files: `src/components/common/`,
-  `src/utils/`, `test/utils/` (17 each).
+- Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`.
 
 **Logic in the wrong place / duplicated**
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
