@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { GpsSceneMarkers } from '../../../../src/components/replay/map/GpsSceneMarkers.js';
-import type { CornerMarkerPoint, PedalMarkerPoint } from '../../../../src/components/replay/map/GpsSceneMarkers.js';
+import { GpsSceneMarkers } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
+import type { CornerMarkerPoint, PedalMarkerPoint } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
 
 describe('GpsSceneMarkers', () => {
   const mockCorner: CornerMarkerPoint = {

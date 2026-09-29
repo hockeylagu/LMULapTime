@@ -1,5 +1,5 @@
 import React from 'react';
-import { CHART_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { CHART_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 export interface GpsSceneCarMarkersProps {
   viewBox: string;

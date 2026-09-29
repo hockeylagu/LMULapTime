@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { PEDAL_MARKER_LINE_HALF_LEN, PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from './replayMapUtils.js';
-import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { PEDAL_MARKER_LINE_HALF_LEN, PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from '../replayMapUtils.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 export interface CornerMarkerPoint {
   cornerNumber: number;

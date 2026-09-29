@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import type { ProjectedPoint, DispersedCornerMarker } from './replayMapUtils.js';
-import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import type { ProjectedPoint, DispersedCornerMarker } from '../replayMapUtils.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 export interface GpsStartFinishLineProps {
   svgPoints: ProjectedPoint[];

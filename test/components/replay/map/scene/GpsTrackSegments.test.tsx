@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { GpsTrackSegments } from '../../../../src/components/replay/map/GpsTrackSegments.js';
-import type { ProjectedPoint } from '../../../../src/components/replay/map/replayMapUtils.js';
+import { GpsTrackSegments } from '../../../../../src/components/replay/map/scene/GpsTrackSegments.js';
+import type { ProjectedPoint } from '../../../../../src/components/replay/map/replayMapUtils.js';
 
 /** jsdom has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
 function withIdentityCtm(el: Element): Element {

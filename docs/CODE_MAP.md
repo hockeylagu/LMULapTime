@@ -73,7 +73,7 @@ code that drops replay rows because the file is gone.
 - Traffic: `GET /api/replays/:name/traffic` → `server/traffic/raceTrafficService.ts` → race positions index
   (`racePositions.ts`, built on a worker by `racePositionsWorkerClient.ts`, stored by `dbRacePositionStore.ts`) → `trafficSpells.ts`.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
-  `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map, boundaries via
+  `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, boundaries via
   `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; channels by subsystem; `presets/`),
   `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
   `replayComparison.ts`, `computedTelemetry.ts`, `handlingBalanceDetection.ts`, `telemetryPostProcessing.ts`).
@@ -149,8 +149,8 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
   and `tools/analysis/trackBoundaryBuilders.ts` (852, an offline tool). Watch them; split by circuit family or builder if they grow.
 - Components at or near 300 lines: `SessionLapTableRow.tsx` (300 exactly), `CornerSpeedGraph.tsx` (298),
   `ReplayInspectorModalBody.tsx` (295), `TelemetryPresetModal.tsx` (295), `ReplayInspectorSidebar.tsx` (292),
-  `ImprovementChart.tsx` (291), `GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
-- Folders near 20 files: `src/components/replay/map/` (19), `server/replay/` (18 with the `.mjs`), `src/components/common/`,
+  `ImprovementChart.tsx` (291), `scene/GpsSceneMarkers.tsx` (290), `TelemetrySteerChannel.tsx` (287).
+- Folders near 20 files: `server/replay/` (18 with the `.mjs`), `src/components/common/`,
   `src/utils/`, `test/utils/` (17 each).
 
 **Logic in the wrong place / duplicated**
