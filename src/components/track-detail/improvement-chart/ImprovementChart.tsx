@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatTime, matchesSessionType, compareSessions } from '../../../../shared/domain/formatters.js';
+import { matchesSessionType, compareSessions } from '../../../../shared/domain/formatters.js';
 import { matchesCarClass, matchesTrack } from '../../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 import { ImprovementHeader } from './ImprovementHeader.js';
@@ -10,7 +10,8 @@ import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 export type { TimeRangeFilter, ImprovementMetric };
 
 export { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';
-import { buildPersonalBestSeries, calculateLapPrDelta, formatSessionAxisLabel } from './improvementChartUtils.js';
+import { buildPersonalBestSeries } from './improvementChartUtils.js';
+import { buildImprovementChartRows, getImprovementAxisBounds } from './improvementChartRows.js';
 
 export interface SessionProgressionPoint {
   sessionId: string;
@@ -152,85 +153,8 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
   const latestTheoreticalGap = trackData.length > 0 ? trackData[trackData.length - 1].theoreticalGap ?? null : null;
   const personalBestSeries = buildPersonalBestSeries(trackData.map((p) => p.bestLapTime));
-  let personalBestBenchmarkCategory: PaceCategory | null = null;
-
-  const chartData = trackData.map((p, index) => {
-    let movingAvg: number | null = null;
-    const windowStart = Math.max(0, index - 2);
-    const windowSessions = trackData.slice(windowStart, index + 1).filter((w) => w.bestLapTime !== null && w.bestLapTime > 0);
-    if (windowSessions.length > 0) {
-      const sum = windowSessions.reduce((acc, curr) => acc + (curr.bestLapTime as number), 0);
-      movingAvg = parseFloat((sum / windowSessions.length).toFixed(3));
-    }
-
-    const shortSession = p.sessionName || p.sessionType.slice(0, 4);
-    const dateFormatted = p.dateString.split(' ')[0] || p.dateString;
-    const uniqueKey = `${dateFormatted} ${shortSession} #${index + 1}`;
-    const personalBestImproved =
-      p.bestLapTime !== null &&
-      p.bestLapTime > 0 &&
-      p.bestLapTime === personalBestSeries[index] &&
-      (index === 0 || personalBestSeries[index - 1] !== personalBestSeries[index]);
-
-    if (personalBestImproved && p.benchmarkCategory) {
-      personalBestBenchmarkCategory = p.benchmarkCategory;
-    }
-
-    return {
-      chartKey: uniqueKey,
-      shortSession,
-      axisLabel: formatSessionAxisLabel(p.dateString, shortSession),
-      fullDate: p.dateString,
-      sessionId: p.sessionId,
-      session: p.sessionName ? `${p.sessionType} (${p.sessionName})` : p.sessionType,
-      car: p.carType,
-      weather: p.weatherInfo,
-      bestLap: p.bestLapTime,
-      top3Avg: p.top3AvgLapTime ?? null,
-      top3AvgStr: p.top3AvgLapTime ? formatTime(p.top3AvgLapTime) : null,
-      movingAvg,
-      avgLap: p.avgLapTime,
-      bestPr: personalBestSeries[index],
-      lapPrDelta: calculateLapPrDelta(p.bestLapTime, index > 0 ? personalBestSeries[index - 1] : null),
-      personalBestImproved,
-      benchmarkCategory: p.benchmarkCategory ?? null,
-      benchmarkPercentage: p.benchmarkPercentage ?? null,
-      personalBestBenchmarkCategory,
-      theoretical: p.theoreticalBest,
-      theoreticalGap: p.theoreticalGap ?? null,
-      consistencyScore: p.consistencyScore ?? null,
-      s1: p.bestS1,
-      s2: p.bestS2,
-      s3: p.bestS3,
-      lapStr: formatTime(p.bestLapTime),
-      theoreticalStr: formatTime(p.theoreticalBest),
-      avgLapStr: formatTime(p.avgLapTime),
-      cleanLaps: p.cleanLapsCount,
-      replay: p.matchingReplayFile,
-    };
-  });
-
-  const validTimes = (
-    displayedMetric === 'sectors'
-      ? trackData.flatMap((p) => [p.bestS1, p.bestS2, p.bestS3])
-      : displayedMetric === 'bestPr'
-      ? chartData.map((c) => c.bestPr)
-      : displayedMetric === 'consistency'
-      ? chartData.map((c) => c.consistencyScore).filter((c): c is number => c !== null && c > 0)
-      : [...trackData.flatMap((p) => [p.bestLapTime, p.avgLapTime, p.top3AvgLapTime]), ...chartData.map((c) => c.movingAvg)]
-  ).filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
-
-  const minTime =
-    displayedMetric === 'consistency'
-      ? validTimes.length > 0
-        ? Math.max(70, Math.floor(Math.min(...validTimes) - 2))
-        : 80
-      : validTimes.length > 0
-      ? Math.max(0, Math.floor(Math.min(...validTimes) - 2))
-      : 0;
-
-  const maxTime =
-    displayedMetric === 'consistency' ? 100 : validTimes.length > 0 ? Math.ceil(Math.max(...validTimes) + 2) : 100;
+  const chartData = buildImprovementChartRows(trackData, personalBestSeries);
+  const { minTime, maxTime } = getImprovementAxisBounds(displayedMetric, trackData, chartData);
 
   return (
     <div className="space-y-6">
