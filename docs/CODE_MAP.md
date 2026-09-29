@@ -165,9 +165,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - `src/components/replay/map/useTrackBoundaryGeometry.ts` calls raw `fetch` for `/tracks/*.json` (a static file, not `/api`), outside `src/api/`.
 - Two re-export barrels (`server/core/types.ts`, `src/types.ts`) give the same types two import paths.
 
-**Stale docs and comments**
-- `parser.ts` (~line 248) points to `sessionConditions.ts`; the file is `server/core/dbSessionConditions.ts`.
-
 **Known data limits (not code bugs)**
 - Pit repairs are a guess: neither the VCR nor the XML has repair or damage state. Validating against the LMU REST API is deferred.
 

@@ -246,7 +246,7 @@ export class LmuParser {
 
       // With contacts and the cars met on track attached to their laps, tag the wet laps and mark
       // the laps that do not show the driver's pace. Rain comes later, with the linked replay's
-      // conditions (sessionConditions.ts).
+      // conditions (server/core/dbSessionConditions.ts).
       annotateLapTraffic(drivers);
       classifySessionLaps(drivers);
 
