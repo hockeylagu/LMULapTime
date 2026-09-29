@@ -130,6 +130,7 @@ LMULapTime/
 │   │   ├── sessionReplayLinks.ts   # Applies the matching rules to stored links: link, re-check, withdraw, one session per replay
 │   │   ├── sessionAnalytics.ts     # True Pace, sector averages, fuel/tire curves
 │   │   ├── sessionLapClassification.ts # Lap conditions, non-representative laps and averages (one entry point)
+│   │   ├── sessionPitStops.ts      # Each in-lap's stop from the linked replay (read time): box time vs class, refill, likely repairs
 │   │   ├── sessionXmlStream.ts     # Streaming XML parser
 │   │   └── sessionXmlTypes.ts      # Raw XML schema interfaces
 │   ├── telemetry/                  # 100 Hz DuckDB telemetry processing
@@ -156,6 +157,7 @@ LMULapTime/
 │       ├── lapConditions.ts        # Wet tyres / rain per lap (dry is the default)
 │       ├── leaderboard.ts          # Real drivers met on each layout, ranked per class on their dry representative laps
 │       ├── paceCategory.ts         # Pace percentages & vehicle class matching
+│       ├── pitStops.ts             # Pit stops from replay pit events, energy refill, unexplained time (a guess at repairs)
 │       ├── rivals.ts               # Rival picking (about 0.3 s ahead, or a ghost time), beating & progress
 │       ├── trackSummaryUtils.ts    # Multi-session track aggregation helpers
 │       └── vehicleMapping.ts       # Car class categorization & model identification

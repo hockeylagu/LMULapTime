@@ -9,6 +9,7 @@ import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
 import { DetailedSession } from '../core/types.js';
 import { queryString } from './queryParams.js';
+import { attachPitServices } from '../sessions/sessionPitStops.js';
 
 export interface SessionFilterOptions {
   track?: string;
@@ -83,6 +84,7 @@ export function createSessionRouter(context: ServerContext): Router {
     const cached = context.sessionDb.getSessionById(id);
     if (cached) {
       context.enrichSessionsWithTelemetry([cached]);
+      attachPitServices(context.sessionDb.getDb(), cached);
       return res.json(cached);
     }
 
@@ -91,6 +93,7 @@ export function createSessionRouter(context: ServerContext): Router {
       const parsed = context.parseAndCacheFile(singleFilePath);
       if (parsed) {
         context.enrichSessionsWithTelemetry([parsed]);
+        attachPitServices(context.sessionDb.getDb(), parsed);
         return res.json(parsed);
       }
     }

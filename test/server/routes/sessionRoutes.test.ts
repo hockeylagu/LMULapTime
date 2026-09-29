@@ -253,7 +253,7 @@ describe('sessionRoutes and filterSessions', () => {
 
   describe('GET /api/session/:id', () => {
     let resultsDir: string;
-    const sessionDb = { getSessionById: vi.fn() };
+    const sessionDb = { getSessionById: vi.fn(), getDb: vi.fn() };
     const enrichSessionsWithTelemetry = vi.fn();
     const parseAndCacheFile = vi.fn();
 
