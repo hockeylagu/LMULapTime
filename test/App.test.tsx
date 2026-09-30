@@ -130,10 +130,10 @@ describe('App component', () => {
     fireEvent.click(tracksTab);
 
     await waitFor(() => {
-      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
     });
 
-    const settingsTab = screen.getByRole('link', { name: /settings/i });
+    const settingsTab = screen.getByRole('link', { name: /^Settings$/ });
     fireEvent.click(settingsTab);
 
     await waitFor(() => {
@@ -198,7 +198,7 @@ describe('App component', () => {
     fireEvent.click(backBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
     });
   });
 

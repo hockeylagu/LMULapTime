@@ -123,7 +123,7 @@ describe('TrackCircuitLayout', () => {
     await screen.findByTestId(/track-circuit-layout/);
   });
 
-  it('renders card size with h-[46px] w-[62px] matching vertical space in TrackSummaryCard', () => {
+  it('renders the larger square outline used beside track card information', () => {
     render(
       <TrackCircuitLayout
         trackName="Circuit de Spa-Francorchamps"
@@ -134,7 +134,7 @@ describe('TrackCircuitLayout', () => {
 
     const layoutContainer = screen.getByTestId('track-circuit-layout');
     expect(layoutContainer).toBeInTheDocument();
-    expect(layoutContainer.className).toContain('h-[46px]');
-    expect(layoutContainer.className).toContain('w-[62px]');
+    expect(layoutContainer.className).toContain('h-[128px]');
+    expect(layoutContainer.className).toContain('w-[128px]');
   });
 });

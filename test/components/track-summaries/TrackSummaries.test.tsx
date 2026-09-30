@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as renderComponent, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router';
+import userEvent from '@testing-library/user-event';
+import { invalidateReferenceLaptimes } from '../../../src/api/referenceApi.js';
 import { TrackSummaries, TrackSessionSummary } from '../../../src/components/track-summaries/index.js';
+
+const render = (ui: ReactNode) => renderComponent(ui, { wrapper: MemoryRouter });
 
 describe('TrackSummaries component', () => {
   beforeEach(() => {
+    invalidateReferenceLaptimes();
     global.fetch = vi.fn().mockImplementation(() =>
       Promise.resolve({
         ok: true,
@@ -61,12 +68,12 @@ describe('TrackSummaries component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
     });
     expect(screen.getByText('Spa')).toBeInTheDocument();
     expect(screen.getByText('Monza')).toBeInTheDocument();
 
-    const spaCard = screen.getByText('Spa').closest('div.cursor-pointer');
+    const spaCard = screen.getByRole('link', { name: 'View Spa records' });
     expect(spaCard).not.toBeNull();
     if (spaCard) {
       fireEvent.click(spaCard);
@@ -155,7 +162,7 @@ describe('TrackSummaries component', () => {
       />
     );
 
-    expect(await screen.findByText('1 Sessions • 4 Total Laps')).toBeInTheDocument();
+    expect(await screen.findByText('1 Session • 4 Total Laps')).toBeInTheDocument();
     expect(screen.getAllByText('2:20.000')).toHaveLength(2);
   });
 
@@ -185,7 +192,7 @@ describe('TrackSummaries component', () => {
       />
     );
 
-    expect(await screen.findByRole('heading', { level: 2, name: /2 Tracks/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Tracks (2)' })).toBeInTheDocument();
     expect(screen.getByText('Test Circuit (Layout A)')).toBeInTheDocument();
     expect(screen.getByText('Test Circuit (Layout B)')).toBeInTheDocument();
   });
@@ -201,7 +208,95 @@ describe('TrackSummaries component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 2, name: /Track Records & Benchmarks \(0 Tracks\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Tracks (0)' })).toBeInTheDocument();
     });
+    expect(screen.getByText('No track records yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Check the results folder in Settings' })).toHaveAttribute('href', '/settings');
+  });
+
+  it('opens a track with Enter and retains class context in native links', async () => {
+    const user = userEvent.setup();
+    const onSelectTrack = vi.fn();
+    render(<TrackSummaries sessions={mockSessions} onSelectTrack={onSelectTrack} selectedCarClass="LMGT3" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    const link = screen.getByRole('link', { name: 'View Monza records' });
+    expect(link).toHaveAttribute('href', '/track/Monza?carClass=LMGT3');
+    link.focus();
+    await user.keyboard('{Enter}');
+    expect(onSelectTrack).toHaveBeenCalledWith('Monza');
+    onSelectTrack.mockClear();
+    // jsdom cannot open another tab; cancel only the simulated browser default.
+    document.addEventListener('click', event => event.preventDefault(), { once: true });
+    fireEvent.click(link, { ctrlKey: true });
+    expect(onSelectTrack).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'LMGT3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Hypercar' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('No sessions recorded for this class.')).toBeInTheDocument();
+  });
+
+  it('shows the API error and retries without discarding track records', async () => {
+    const user = userEvent.setup();
+    let referenceRequests = 0;
+    global.fetch = vi.fn().mockImplementation((path: string) => {
+      if (path === '/api/reference-laptimes') {
+        referenceRequests += 1;
+        if (referenceRequests === 1) return Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({ error: 'Benchmark service is offline' }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ entries: {} }) });
+    });
+    render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Benchmark service is offline');
+    expect(screen.getByRole('link', { name: 'View Monza records' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await screen.findByRole('link', { name: 'Review benchmarks in Settings' });
+    expect(referenceRequests).toBe(2);
+  });
+
+  it('announces benchmark loading and disables pace sorting until valid targets arrive', async () => {
+    let finish: ((value: { ok: boolean; json: () => Promise<unknown> }) => void) | undefined;
+    global.fetch = vi.fn().mockImplementation((path: string) => path === '/api/reference-laptimes'
+      ? new Promise(resolve => { finish = resolve; })
+      : Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading benchmark targets');
+    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
+    finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'LMGT3', target100Sec: 100 } } }) });
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeEnabled());
+  });
+
+  it('explains absent lap and sector data instead of presenting placeholders as records', async () => {
+    const incomplete = { ...mockSessions[0], playerDriver: { ...mockSessions[0].playerDriver!, bestLapTime: null, bestS1: null, bestS2: null, bestS3: null } };
+    render(<TrackSummaries sessions={[incomplete]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    expect(screen.getByText('No completed lap time recorded.')).toBeInTheDocument();
+    expect(screen.queryByText('--:--.---')).not.toBeInTheDocument();
+  });
+
+  it('keeps long Unicode names and encoded navigation intact', async () => {
+    const name = `Circuit Étoile & 東京 🏎️ ${'LongLayout'.repeat(15)}`;
+    render(<TrackSummaries sessions={[{ ...mockSessions[0], trackVenue: name }]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    expect(screen.getByRole('heading', { name })).toHaveAttribute('dir', 'auto');
+    expect(screen.getByRole('link', { name: `View ${name} records` })).toHaveAttribute('href', `/track/${encodeURIComponent(name)}`);
+  });
+
+  it('qualifies a sector sum slower than the recorded best', async () => {
+    const inconsistent = { ...mockSessions[0], playerDriver: { ...mockSessions[0].playerDriver!, bestLapTime: 120 } };
+    render(<TrackSummaries sessions={[inconsistent]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    expect(screen.getByText('Sector timing differs from the recorded best.')).toBeInTheDocument();
+    expect(screen.getByText('2:00.000')).toBeInTheDocument();
+    expect(screen.getByText('2:02.000')).toBeInTheDocument();
+  });
+
+  it('keeps a recorded best visible when sector timings are incomplete', async () => {
+    const partial = { ...mockSessions[0], playerDriver: { ...mockSessions[0].playerDriver!, bestS2: null } };
+    render(<TrackSummaries sessions={[partial]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    expect(screen.getByText('2:02.000')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Complete sector timings needed')).toBeInTheDocument();
   });
 });

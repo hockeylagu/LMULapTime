@@ -195,7 +195,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
   const isFaded = isButton && selected === false;
   const colorClasses = isFaded ? config.fadedClass : `${config.borderClass} ${config.textClass} ${config.bgClass}`;
   const interactiveClasses = isButton
-    ? `cursor-pointer focus:outline-none transition-colors ${
+    ? `cursor-pointer focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 transition-colors ${
         selected === true ? 'brightness-110 opacity-100 z-10' : selected === false ? '' : 'hover:brightness-110'
       }`
     : '';
@@ -225,6 +225,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
         data-testid="car-class-badge"
         onClick={onClick}
         aria-label={effectiveAriaLabel}
+        aria-pressed={selected}
         title={title || config.title}
         className={sharedClasses}
       >

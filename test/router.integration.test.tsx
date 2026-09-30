@@ -65,7 +65,7 @@ describe('HashRouter integration', () => {
     fireEvent.click(screen.getByRole('link', { name: /tracks/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
       expect(window.location.hash).toContain('#/tracks');
     });
 

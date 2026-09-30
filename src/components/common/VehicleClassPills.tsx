@@ -33,7 +33,7 @@ export const VehicleClassPills: React.FC<VehicleClassPillsProps> = ({
         aria-label="All"
         aria-pressed={isAllSelected}
         title="All"
-        className={`${padAllClass} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
+        className={`${padAllClass} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
           isAllSelected ? SEGMENT_RESTING : 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
         }`}
       >
