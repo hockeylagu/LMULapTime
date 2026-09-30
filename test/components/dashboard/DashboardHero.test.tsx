@@ -102,7 +102,7 @@ describe('DashboardHero', () => {
     expect(screen.getByText('P8')).toBeInTheDocument();
     expect(screen.getByTestId('hero-finish-gain')).toHaveTextContent('+7');
     expect(screen.getByTestId('hero-finish')).toHaveTextContent('from P15');
-    expect(screen.getByText('(102.4%)')).toBeInTheDocument();
+    expect(screen.getByTitle('Benchmark Pace: Good (102.4%)')).toBeInTheDocument();
 
     // Verify track circuit layout outline element is rendered instead of a map pin
     const circuitLayout = screen.getByTestId('track-circuit-layout');
