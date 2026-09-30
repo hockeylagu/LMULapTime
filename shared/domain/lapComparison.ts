@@ -271,43 +271,6 @@ export function filterLapsByCarCategory(
   });
 }
 
-export interface LapToLapDeltaResult {
-  delta: number | null;
-  formatted: string;
-  deltaClass: string;
-  isFaster: boolean | null;
-}
-
-/**
- * Computes difference from previous completed lap to current lap (Lap N - Lap N-1).
- * Negative delta = faster than previous lap (improvement).
- * Positive delta = slower than previous lap.
- */
-export function computeLapToLapDelta(
-  prevLapTime: number | null | undefined,
-  currentLapTime: number | null | undefined
-): LapToLapDeltaResult {
-  if (
-    prevLapTime === null ||
-    prevLapTime === undefined ||
-    currentLapTime === null ||
-    currentLapTime === undefined ||
-    prevLapTime <= 0 ||
-    currentLapTime <= 0
-  ) {
-    return { delta: null, formatted: '--', deltaClass: 'text-lmu-muted', isFaster: null };
-  }
-
-  const delta = parseFloat((currentLapTime - prevLapTime).toFixed(3));
-  if (Math.abs(delta) < 0.0005) {
-    return { delta: 0, formatted: '±0.000s', deltaClass: 'text-white font-semibold', isFaster: false };
-  }
-  if (delta < 0) {
-    return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-lmu-gain font-bold', isFaster: true };
-  }
-  return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-lmu-loss font-medium', isFaster: false };
-}
-
 /**
  * Computes average of the top N cleanest/fastest flying laps in a session.
  */

@@ -1,14 +1,20 @@
 import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, Video, Timer, Trophy, ChevronRight, Sliders, Zap } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ArrowLeft, ChevronRight, Sliders } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
-import { SessionReferenceAndSafety } from '../standings/SessionReferenceAndSafety.js';
+import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
+import { ReplayLaunchButton } from '../../common/ReplayLaunchButton.js';
+import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
+
+/** The neutral jump buttons of the header: the icon carries the only color. */
+const JUMP_BUTTON =
+  'inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-lmu-border bg-lmu-card text-xs font-semibold text-lmu-text-soft hover:text-white hover:border-lmu-rule transition-colors cursor-pointer';
 
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
@@ -18,7 +24,8 @@ export interface SessionDetailHeaderProps {
   onBack: () => void;
   relatedSession: { type: 'qualifying' | 'race'; target: CandidateRelatedSession } | null;
   handleNavigateToSession: (id: string) => void;
-  refEntry: ReferenceLaptimeEntry | null;
+  /** Benchmark targets of the layout and class: the circuit's ladder under its name. */
+  refEntry?: ReferenceLaptimeEntry | null;
 }
 
 export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
@@ -61,13 +68,20 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   const hasDuckDb = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
   const duckFilename = session.duckdbFilename || session.matchingReplayFile?.duckdbFilename;
 
+  // The course and event lines often just repeat the display name; keep only what adds to it.
+  const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+  const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const subtitle = [...new Set([session.trackCourse, session.trackEvent].filter((t): t is string => Boolean(t)))]
+    .filter((part) => !squash(trackName).includes(squash(part)))
+    .join(' • ');
+
   return (
     <>
       {/* Top Action Bar */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-accent transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Sessions
@@ -75,25 +89,15 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
         <div className="flex items-center gap-3">
           {session.matchingReplayFile && (
-            <button
+            <ReplayLaunchButton
+              hasDuckDb={hasDuckDb}
               onClick={() => handleOpenReplay()}
               title={`Matching Replay: ${session.matchingReplayFile.name}${
-                hasDuckDb ? `\n⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
-              }\nClick to inspect trajectory and telemetry`}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                hasDuckDb
-                  ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/15 text-lmu-warn-soft hover:bg-lmu-warn-strong/25'
-                  : 'border-lmu-green/20 bg-lmu-green/10 text-lmu-green hover:bg-lmu-green/20'
-              }`}
-            >
-              {hasDuckDb ? (
-                <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
-              ) : (
-                <Video className="w-4 h-4 text-lmu-green" />
-              )}
-              <span>{hasDuckDb ? 'Open Telemetry' : 'Open Replay'}</span>
-              {hasDuckDb && <span className="text-[10px] font-mono uppercase tracking-wider text-lmu-warn">100Hz</span>}
-            </button>
+                hasDuckDb ? `
+⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
+              }
+Click to inspect trajectory and telemetry`}
+            />
           )}
 
           {relatedSession && (
@@ -109,113 +113,97 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                   ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
                   : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
               }
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                relatedSession.type === 'qualifying'
-                  ? 'bg-lmu-gold/10 text-lmu-gold border-lmu-gold/30 hover:bg-lmu-gold/20 hover:border-lmu-gold'
-                  : 'bg-lmu-accent/10 text-lmu-accent-text border-lmu-accent/30 hover:bg-lmu-accent/20 hover:border-lmu-accent'
-              }`}
+              className={JUMP_BUTTON}
             >
-              {relatedSession.type === 'qualifying' ? (
-                <>
-                  <Timer className="w-4 h-4 text-lmu-gold" />
-                  <span>Go to Quali ({relatedSession.target.sessionName || 'Q1'})</span>
-                </>
-              ) : (
-                <>
-                  <Trophy className="w-4 h-4 text-lmu-accent-text" />
-                  <span>Go to Race ({relatedSession.target.sessionName || 'R1'})</span>
-                </>
-              )}
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  getSessionTypeStyle(relatedSession.type === 'qualifying' ? 'Qualifying' : 'Race')?.dot
+                }`}
+                aria-hidden="true"
+              />
+              <span>
+                {relatedSession.type === 'qualifying'
+                  ? `Go to qualifying (${relatedSession.target.sessionName || 'Q1'})`
+                  : `Go to race (${relatedSession.target.sessionName || 'R1'})`}
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
             </button>
           )}
         </div>
       </div>
 
       {/* Session Title Card */}
-      <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-4">
-              <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="session" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span
-                    className={`px-2.5 py-0.5 text-xs font-bold rounded uppercase tracking-wider ${
-                      session.sessionType === 'Race' ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30'
-                      : session.sessionType === 'Qualifying' ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                      : 'bg-lmu-blue/20 text-lmu-cyan border border-lmu-blue/30'
-                    }`}
-                  >
-                    {session.sessionName} ({session.sessionType})
-                  </span>
-                  <span className="text-xs text-lmu-muted">{session.timeString}</span>
-                </div>
-                <h2
-                  onClick={() => {
-                    const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-                    const carClass = normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType);
-                    const suffix = carClass ? `?carClass=${encodeURIComponent(carClass)}` : '';
-                    navigate(`/track/${encodeURIComponent(trackName)}${suffix}`);
-                  }}
-                  className="text-2xl font-extrabold text-white cursor-pointer hover:text-lmu-gold transition-colors inline-flex items-center gap-2 group max-w-full min-w-0"
-                  title={`View ${getDisplayTrackName(session.trackVenue, session.trackCourse)} Track Details`}
+      <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="session" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap text-xs text-lmu-muted">
+                <span
+                  className={`px-2 py-0.5 font-bold rounded border uppercase tracking-wider ${
+                    getSessionTypeStyle(session.sessionType, session.sessionName)?.chip ?? 'bg-lmu-raised text-lmu-text-soft border-lmu-rule'
+                  }`}
                 >
-                  <span className="truncate">{getDisplayTrackName(session.trackVenue, session.trackCourse)}</span>
-                  <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-lmu-gold group-hover:translate-x-0.5 transition-all shrink-0" />
-                </h2>
-                <p className="text-xs text-lmu-muted mt-0.5 truncate">
-                  {session.trackCourse} • {session.trackEvent || 'Session'}
-                </p>
+                  {session.sessionName} ({session.sessionType})
+                </span>
+                <span className="font-mono">{session.timeString}</span>
+                {hasSettings && modeLabel && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft">{modeLabel}</span></>}
+                {durationLabel && <><span aria-hidden="true">·</span><span className="font-mono text-lmu-text-soft">{durationLabel}</span></>}
+                {hasConditions && session.matchingReplayFile && (
+                  <><span aria-hidden="true">·</span><SessionConditions replay={session.matchingReplayFile} /></>
+                )}
               </div>
+              <h2 className="mt-1.5 text-2xl font-extrabold text-white max-w-full min-w-0">
+                <Link to={`/track/${encodeURIComponent(trackName)}${normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType) ? `?carClass=${encodeURIComponent(normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType))}` : ''}`}
+                  className="inline-flex items-center gap-2 group max-w-full min-w-0 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
+                  title={`View ${trackName} Track Details`}>
+                <span className="truncate">{trackName}</span>
+                <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                </Link>
+              </h2>
+              {subtitle && <p className="text-xs text-lmu-muted mt-0.5 truncate">{subtitle}</p>}
             </div>
           </div>
 
-          {/* Driver Selector */}
-          <div className="flex items-center gap-3 bg-lmu-bg p-2 rounded-xl border border-lmu-border">
-            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Driver:</span>
-            <select
-              value={selectedDriverName}
-              onChange={(e) => setSelectedDriverName(e.target.value)}
-              className="bg-lmu-card border border-lmu-border rounded-lg px-3 py-1.5 text-sm text-white font-medium focus:outline-none focus:border-lmu-accent"
-            >
-              {(session.drivers || []).map((d) => (
-                <option key={d.name} value={d.name}>
-                  {d.isPlayer ? '⭐ ' : ''}
-                  {d.name} ({d.carType})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Lap Reference & Rules Row */}
-        {(refEntry || hasSettings || hasConditions) && (
-          <div className="pt-3 border-t border-lmu-border/50 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <SessionReferenceAndSafety refEntry={refEntry} selectedDriver={selectedDriver} />
+          {/* The rules of the session and whose laps the page shows, one row of 32px controls */}
+          <div className="flex items-center gap-2 shrink-0">
             {(hasSettings || hasConditions) && (
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
-                className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-card/80 hover:bg-lmu-card border border-lmu-border hover:border-lmu-accent text-xs font-semibold text-white transition-all cursor-pointer group shrink-0 ml-auto md:ml-0"
+                className={JUMP_BUTTON}
                 title="View Rules, Server Configuration & Conditions"
               >
-                <Sliders className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />
-                <span className="text-lmu-text-soft">Rules & Config:</span>
-                {hasSettings && modeLabel && (
-                  <span className="px-2 py-0.5 rounded bg-lmu-raised text-lmu-info-soft font-semibold text-[11px] border border-lmu-rule/60">
-                    {modeLabel}
-                  </span>
-                )}
-                {durationLabel && (
-                  <span className="px-2 py-0.5 rounded bg-lmu-raised text-lmu-warn-soft font-mono font-semibold text-[11px] border border-lmu-rule/60">
-                    {durationLabel}
-                  </span>
-                )}
-                {hasConditions && session.matchingReplayFile && <SessionConditions replay={session.matchingReplayFile} />}
+                <Sliders className="w-3.5 h-3.5 text-lmu-muted shrink-0" aria-hidden="true" />
+                Rules & Config
               </button>
             )}
+            <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors">
+              <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider">Driver</span>
+              <select
+                value={selectedDriverName}
+                onChange={(e) => setSelectedDriverName(e.target.value)}
+                className="h-full bg-transparent pr-1 text-sm text-white font-semibold focus:outline-none cursor-pointer"
+              >
+                {(session.drivers || []).map((d) => (
+                  <option key={d.name} value={d.name} className="bg-lmu-card text-white">
+                    {d.isPlayer ? '⭐ ' : ''}
+                    {d.name} ({d.carType})
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        )}
+        </div>
+
+        {/* The circuit's benchmark, under its name as on the track page; the best lap's band is marked */}
+        <div className="mt-4 pt-4 border-t border-lmu-border/60">
+          {refEntry ? (
+            <BenchmarkLadder benchmark={refEntry} current={selectedDriver?.bestLapPaceCategory} />
+          ) : (
+            <p className="text-xs text-lmu-muted">No benchmark for this layout and class yet. Update the benchmarks in Settings.</p>
+          )}
+        </div>
       </div>
 
       <SessionRulesModal

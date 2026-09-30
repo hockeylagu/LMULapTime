@@ -57,7 +57,6 @@ export function useSessionDetailData({
     if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
     return '';
   });
-  const [showIncidentsLog, setShowIncidentsLog] = useState<boolean>(false);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -304,8 +303,6 @@ export function useSessionDetailData({
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
-    showIncidentsLog,
-    setShowIncidentsLog,
     chartMetric,
     setChartMetric,
     hiddenSeries,

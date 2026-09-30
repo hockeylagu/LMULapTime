@@ -5,7 +5,6 @@ import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
 import { SessionDebriefCard } from './debrief/SessionDebriefCard.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
-import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
 import { DetailedSession, SessionProgressionPoint } from '../../../shared/types/index.js';
 import { LoadingState } from '../common/index.js';
@@ -32,8 +31,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
-    showIncidentsLog,
-    setShowIncidentsLog,
     chartMetric,
     setChartMetric,
     hiddenSeries,
@@ -132,14 +129,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         hasVirtualEnergyData={hasVirtualEnergyData}
         isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
       />
-
-      {selectedDriver && (
-        <SessionStewardsLog
-          selectedDriver={selectedDriver}
-          showIncidentsLog={showIncidentsLog}
-          setShowIncidentsLog={setShowIncidentsLog}
-        />
-      )}
 
       <SessionRaceStandings
         session={session}

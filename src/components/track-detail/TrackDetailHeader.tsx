@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
-import { BenchmarkTargetsGrid } from '../common/BenchmarkTargetsGrid.js';
+import { BenchmarkLadder } from '../common/BenchmarkLadder.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 
@@ -143,7 +143,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
         {/* Merged Reference Lap Times: only times, no title or subtitle */}
         {currentBenchmark ? (
           <div className="pt-3 border-t border-lmu-border/50">
-            <BenchmarkTargetsGrid benchmark={currentBenchmark} variant="grid" />
+            <BenchmarkLadder benchmark={currentBenchmark} />
           </div>
         ) : (
           <div className="pt-3 border-t border-lmu-border/50 py-3 text-center text-xs text-lmu-muted">

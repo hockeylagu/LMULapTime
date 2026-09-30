@@ -69,6 +69,9 @@ export default {
           blue: '#219EBC',
           cyan: '#8ECAE6',
           green: '#2A9D8F',
+          // Lap records: personal best takes precedence over the session best.
+          'personal-best': '#FFB703',
+          'session-best': family(['oklch(86% 0.06 246.489047)', 'oklch(76.412151% 0.11091167 246.489047)', 'oklch(65% 0.11 246.489047)', 'oklch(28% 0.035 246.489047)']),
           // Signals: one fixed meaning each
           gain: family(FAMILIES.gain),
           loss: family(FAMILIES.loss),

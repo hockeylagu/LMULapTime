@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc, Sun, CloudRain, CloudDrizzle, Thermometer } from 'lucide-react';
 import { DetailedSession, SessionSettings } from '../../../../shared/types/index.js';
 
@@ -19,20 +20,51 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
   settings = {},
   conditions,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const siblings = [...document.body.children].filter((node): node is HTMLElement => node instanceof HTMLElement && node !== dialog);
+    const originalInert = siblings.map(node => node.inert);
+    siblings.forEach(node => { node.inert = true; });
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusable = () => [...dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], select:not([disabled]), input:not([disabled]), [tabindex="0"]')];
+    const focusFirst = () => (focusable()[0] ?? dialog).focus();
+    focusFirst();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { e.preventDefault(); closeRef.current(); }
+      if (e.key !== 'Tab') return;
+      const controls = focusable();
+      const first = controls[0] ?? dialog;
+      const last = controls[controls.length - 1] ?? dialog;
+      if (!dialog.contains(document.activeElement) || (e.shiftKey && document.activeElement === first) || (!e.shiftKey && document.activeElement === last)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      }
     };
+    const onFocus = (e: FocusEvent) => { if (e.target instanceof Node && !dialog.contains(e.target)) focusFirst(); };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+    document.addEventListener('focusin', onFocus);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('focusin', onFocus);
+      siblings.forEach((node, index) => { node.inert = originalInert[index]; });
+      document.body.style.overflow = overflow;
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
   const weather = conditions?.weatherCondition;
 
-  return (
+  return createPortal(
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="Session Rules & Configuration"
@@ -58,6 +90,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
             onClick={onClose}
             className="p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-raised transition-colors"
             title="Close"
+            aria-label="Close rules"
           >
             <X className="w-5 h-5" />
           </button>
@@ -215,6 +248,6 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 };

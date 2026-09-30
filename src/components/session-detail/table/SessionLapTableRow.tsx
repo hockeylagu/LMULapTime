@@ -3,21 +3,33 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
-import { computeLapToLapDelta, isRacingLap } from '../../../../shared/domain/lapComparison.js';
+import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { CompoundCell, FuelCell, TireWearCell } from './SessionLapResourceCells.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
-import { lapDetailSections, lapEventsTooltip } from './lapDetailSections.js';
-import { lapClassPosition } from '../../../../shared/domain/lapPlaces.js';
-import { lapDetailContext } from './lapPlaces.js';
+import { lapEventsTooltip, type LapDetailSection } from './lapDetailSections.js';
+
+/** A row that opens on Enter: the focus ring sits inside the row, so the table's edge does not clip it. */
+const FOCUS_ROW = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent';
+
+/** A sector time; the driver's best of the sector takes its sector color and says so to screen readers. */
+const SectorCell: React.FC<{ time: number | null; sector: 1 | 2 | 3; isBest: boolean; bestClass: string }> = ({
+  time, sector, isBest, bestClass,
+}) => (
+  <td className={`px-3 py-2.5 text-right ${isBest ? `${bestClass} font-bold` : 'text-lmu-text-soft'}`} title={isBest ? `Your best sector ${sector}` : undefined}>
+    {formatTime(time)}
+    {isBest && <span className="sr-only"> (best sector {sector})</span>}
+  </td>
+);
 
 export interface SessionLapTableRowProps {
   session: DetailedSession;
   selectedDriver?: DriverData;
   lap: LapData;
-  prevLap: LapData | null;
+  lapClassPos: number;
+  detailSections: LapDetailSection[];
   bestLap: number | null;
   bestS1: number | null;
   bestS2: number | null;
@@ -37,7 +49,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   session,
   selectedDriver,
   lap: l,
-  prevLap,
+  lapClassPos,
+  detailSections,
   bestLap,
   bestS1,
   bestS2,
@@ -71,16 +84,14 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   if (displayLapTime && bestLap) {
     const delta = displayLapTime - bestLap;
     if (Math.abs(delta) < 0.0005 && isRacing) {
-      deltaStr = isLapAllTimePB ? '⭐ Personal Best' : '★ Session Best';
+      deltaStr = isLapAllTimePB ? 'Personal best' : 'Session best';
     } else {
       deltaStr = `+${delta.toFixed(3)}s`;
     }
   }
 
-  const lapToLap = computeLapToLapDelta(prevLap?.lapTime, displayLapTime);
-
   const theoGapLap =
-    isRacing && !isSessionBest
+    isRacing
       ? computeTheoreticalGap(displayLapTime, theoBest)
       : null;
 
@@ -88,10 +99,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
   const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
 
-  const lapClassPos = lapClassPosition(session, selectedDriver, l, isMultiClass);
-
   const eventsTooltip = lapEventsTooltip(l);
-  const detailSections = lapDetailSections(l, lapDetailContext(session, selectedDriver, l, prevLap, isMultiClass));
 
   const incompleteTooltip = eventsTooltip
     ? `Incomplete Lap:\n${eventsTooltip}`
@@ -116,21 +124,28 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     <>
     <tr
       onClick={handleOpenTelemetry}
-      className={`hover:bg-lmu-card/70 transition-colors cursor-pointer group ${
-        isLapAllTimePB ? 'bg-lmu-gold/15' : isSessionBest ? 'bg-lmu-blue/10' : ''
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        handleOpenTelemetry();
+      }}
+      tabIndex={0}
+      aria-label={`Lap ${l.lapNum}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: open its telemetry`}
+      className={`transition-colors cursor-pointer group ${FOCUS_ROW} ${
+        isLapAllTimePB ? 'bg-lmu-personal-best/8 hover:bg-lmu-personal-best/12' : isSessionBest ? 'bg-lmu-session-best-strong/10 hover:bg-lmu-session-best-strong/15' : 'hover:bg-lmu-cardHover'
       }`}
       title={`Click to open telemetry for Lap ${l.lapNum}`}
     >
       <td
-        className="px-3 py-2.5 font-bold text-white whitespace-nowrap"
+        className="px-3 py-2.5 font-semibold text-lmu-text-soft whitespace-nowrap"
         title={l.elapsedTimeString ? `Session Time: ${l.elapsedTimeString}` : undefined}
       >
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1.5">
           {detailSections.length > 0 ? (
             <button
               type="button"
               onClick={(event) => { event.stopPropagation(); onToggleExpanded(l.lapNum); }}
-              className="-ml-1 p-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/10"
+              className="w-5 h-5 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-lmu-accent"
               aria-expanded={isExpanded}
               aria-label={`${isExpanded ? 'Hide' : 'Show'} what happened on lap ${l.lapNum}`}
               title={`${isExpanded ? 'Hide' : 'Show'} what happened on this lap`}
@@ -138,31 +153,43 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
             </button>
           ) : (
-            <span className="w-4" aria-hidden="true" />
+            <span className="w-5" aria-hidden="true" />
           )}
           {l.lapNum}
         </span>
       </td>
       <td
-        className="px-3 py-2.5 text-lmu-muted font-mono"
+        className="px-3 py-2.5 text-right text-sm font-semibold text-lmu-text-soft"
         title={isMultiClass && l.position ? `Class: P${lapClassPos} (Overall: P${l.position})` : undefined}
       >
-        {lapClassPos ? (isMultiClass ? `P${lapClassPos}` : lapClassPos) : l.position || '-'}
+        {lapClassPos ? `P${lapClassPos}` : l.position ? `P${l.position}` : '-'}
       </td>
       <td
-        className={`px-3 py-2.5 text-right font-bold ${
+        className={`px-3 py-2.5 text-right text-sm font-bold ${
           isLapAllTimePB
-            ? 'text-lmu-gold font-extrabold'
+            ? 'text-lmu-personal-best font-extrabold'
             : isSessionBest
-            ? 'text-lmu-blue font-bold'
-            : isInferredLap
-            ? 'text-lmu-warn-soft/80 italic font-mono'
+            ? 'text-lmu-session-best font-bold'
+            : isInferredLap || !l.isValid
+            ? 'text-white italic font-mono'
             : 'text-white'
         }`}
       >
         {isInferredLap ? `~${displayLapTimeString}` : displayLapTimeString}
       </td>
-      <td className="px-3 py-2.5 text-center font-sans">
+      <td className="px-3 py-2.5 text-right font-semibold text-xs whitespace-nowrap">
+        <span
+          className={
+            isLapAllTimePB ? 'text-lmu-personal-best font-extrabold font-sans' : isSessionBest ? 'text-lmu-session-best font-bold font-sans' : 'text-lmu-text-soft'
+          }
+        >
+          {deltaStr}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-lmu-text-soft" title={`Gap to Theoretical Optimal (${formatTime(theoBest)})`}>
+        {theoGapLap !== null ? `+${theoGapLap.toFixed(3)}s` : <span className="text-lmu-faint">--</span>}
+      </td>
+      <td className="px-3 py-2.5 font-sans">
         {isRacing && l.paceCategory ? (
           <PaceBadge
             category={l.paceCategory}
@@ -174,49 +201,13 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           <span className="text-lmu-muted text-xs">-</span>
         )}
       </td>
-      <td className="px-3 py-2.5 text-right font-semibold text-xs">
-        <span
-          className={
-            isLapAllTimePB ? 'text-lmu-gold font-extrabold' : isSessionBest ? 'text-lmu-blue font-bold' : 'text-white'
-          }
-        >
-          {deltaStr}
-        </span>
-        {theoGapLap !== null && (
-          <span
-            className="block text-[10px] text-lmu-gain/80 font-mono"
-            title={`Gap to Theoretical Optimal (${formatTime(theoBest)})`}
-          >
-            +{theoGapLap.toFixed(3)}s vs opt
-          </span>
-        )}
-      </td>
-      <td
-        className={`px-3 py-2.5 text-right font-semibold text-xs ${lapToLap.deltaClass}`}
-        title={
-          prevLap
-            ? `Lap-to-lap delta vs Lap ${prevLap.lapNum} (${formatTime(prevLap.lapTime)}): ${lapToLap.formatted}`
-            : 'Initial lap'
-        }
-      >
-        {lapToLap.formatted}
-      </td>
-      <td className={`px-3 py-2.5 text-right ${isS1Best ? 'text-lmu-gold font-bold' : ''}`}>
-        {formatTime(l.s1)}
-      </td>
-      <td className={`px-3 py-2.5 text-right ${isS2Best ? 'text-lmu-blue font-bold' : ''}`}>
-        {formatTime(l.s2)}
-      </td>
-      <td className={`px-3 py-2.5 text-right ${isS3Best ? 'text-lmu-green font-bold' : ''}`}>
-        {formatTime(l.s3)}
-      </td>
-      <td className="px-3 py-2.5 text-right text-white">
-        {l.topSpeed ? `${l.topSpeed.toFixed(1)} km/h` : '-'}
-      </td>
+      <SectorCell time={l.s1} sector={1} isBest={isS1Best} bestClass="text-lmu-gold" />
+      <SectorCell time={l.s2} sector={2} isBest={isS2Best} bestClass="text-lmu-blue" />
+      <SectorCell time={l.s3} sector={3} isBest={isS3Best} bestClass="text-lmu-green" />
       <CompoundCell lap={l} />
       {hasTireWearData && <TireWearCell lap={l} />}
       {hasFuelData && <FuelCell lap={l} />}
-      <td className="px-3 py-2.5 text-center font-sans">
+      <td className="px-3 py-2.5 text-left font-sans">
         <SessionLapStatusBadge
           lap={l}
           isPitStop={l.isPitStop}
@@ -236,7 +227,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       </td>
     </tr>
     {isExpanded && detailSections.length > 0 && (
-      <SessionLapDetailsRow lapNum={l.lapNum} sections={detailSections} columnCount={columnCount} />
+      <SessionLapDetailsRow lapNum={l.lapNum} lap={l} sections={detailSections} columnCount={columnCount} />
     )}
     </>
   );

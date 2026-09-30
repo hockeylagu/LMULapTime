@@ -1,11 +1,12 @@
 import React from 'react';
-import { Zap, Video, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useDashboardTrends } from './useDashboardTrends.js';
 import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
+import { ReplayLaunchButton } from '../common/ReplayLaunchButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
@@ -172,29 +173,12 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center gap-3 mt-5">
             {latestOuting.hasReplay && onOpenReplay && (
-              <button
-                type="button"
+              <ReplayLaunchButton
+                hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
-                className={`inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                  latestOuting.hasDuckDbTelemetry
-                    ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/10 text-lmu-warn-soft hover:bg-lmu-warn-strong/20 hover:border-lmu-warn-strong/60'
-                    : 'border-lmu-gain-strong/30 bg-lmu-gain-strong/10 text-lmu-gain hover:bg-lmu-gain-strong/20 hover:border-lmu-gain-strong/50'
-                }`}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}
-              >
-                {latestOuting.hasDuckDbTelemetry ? (
-                  <>
-                    <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
-                    <span>Launch 100Hz Replay</span>
-                  </>
-                ) : (
-                  <>
-                    <Video className="w-3.5 h-3.5 text-lmu-gain" />
-                    <span>Launch Replay</span>
-                  </>
-                )}
-              </button>
+              />
             )}
             <button
               type="button"

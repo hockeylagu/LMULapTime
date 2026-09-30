@@ -64,4 +64,29 @@ describe('SessionRulesModal', () => {
     rerender(<SessionRulesModal isOpen={false} onClose={onClose} settings={baseSettings} />);
     expect(screen.queryByText('Rules & Server Configuration')).not.toBeInTheDocument();
   });
+
+  it('contains keyboard focus and restores focus and page interaction on close', () => {
+    const view = (isOpen: boolean) => <><button>Open rules</button><SessionRulesModal isOpen={isOpen} onClose={vi.fn()} settings={baseSettings} /></>;
+    const { rerender, container } = render(view(false));
+    const trigger = screen.getByRole('button', { name: 'Open rules' });
+    trigger.focus();
+    const overflow = document.body.style.overflow;
+    const originalInert = container.inert;
+    rerender(view(true));
+    const first = screen.getByRole('button', { name: 'Close rules' });
+    const last = screen.getByRole('button', { name: /^Close$/ });
+    expect(first).toHaveFocus();
+    expect(container.inert).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(first).toHaveFocus();
+    trigger.focus();
+    expect(first).toHaveFocus();
+    rerender(view(false));
+    expect(trigger).toHaveFocus();
+    expect(container.inert).toBe(originalInert);
+    expect(document.body.style.overflow).toBe(overflow);
+  });
 });

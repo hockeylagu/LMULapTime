@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lapDetailSections, lapEventsTooltip } from '../../../src/components/session-detail/table/lapDetailSections.js';
 import type { LapData } from '../../../shared/types/index.js';
+import { lapEventTime } from '../../../src/components/session-detail/table/SessionLapDetailsRow.js';
 
 const lap = (overrides: Partial<LapData>): LapData => ({
   lapNum: 9, position: 5, lapTime: 100.358, lapTimeString: '1:40.358', s1: null, s2: null, s3: null, topSpeed: null,
@@ -8,6 +9,24 @@ const lap = (overrides: Partial<LapData>): LapData => ({
 } as LapData);
 
 describe('lapDetailSections', () => {
+  it('reports timing-line position changes even without traffic evidence', () => {
+    expect(lapDetailSections(lap({}), { places: { from: 5, to: 3, inClass: true } })).toEqual([
+      { label: 'Position gained', lines: ['P5 → P3 · 2 places gained'] },
+    ]);
+    expect(lapDetailSections(lap({ isPitStop: true }), { places: { from: 3, to: 4, inClass: false } })[0])
+      .toEqual({ label: 'Position lost', lines: ['P3 → P4 · 1 place lost'] });
+  });
+
+  it('shows measured event offsets and preserves the session clock when an offset cannot be established', () => {
+    const timed = lap({ elapsedSeconds: 500, lapTime: 100 });
+    expect(lapEventTime(timed, 530.5)).toBe('Lap +0:30.5');
+    expect(lapEventTime(timed, 500)).toBe('Lap +0:00.0');
+    expect(lapEventTime(timed, 499)).toBe('Session 8:19.0');
+    expect(lapEventTime(timed, 601)).toBe('Session 10:01.0');
+    expect(lapEventTime(lap({}), 530.5)).toBe('Session 8:50.5');
+    expect(lapEventTime(timed, undefined)).toBeUndefined();
+    expect(lapEventTime(timed, Number.NaN)).toBeUndefined();
+  });
   it('groups what happened on a lap, in the order the table shows it', () => {
     const sections = lapDetailSections(lap({
       nonRepresentativeReason: 'contact',

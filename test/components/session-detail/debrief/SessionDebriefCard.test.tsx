@@ -44,7 +44,9 @@ describe('SessionDebriefCard', () => {
     renderAndAsk();
 
     expect(screen.getByText(/Comparing your best lap with other Peugeot 9x8 laps/)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Comparing laps for your debrief.');
     const row = await screen.findByTestId('debrief-corner-1');
+    expect(screen.getByRole('status')).toHaveTextContent('Your lap debrief is ready.');
     expect(row).toHaveTextContent('T1');
     expect(row).toHaveTextContent('+0.400s');
     expect(row).toHaveTextContent('lost on 2 of 3 laps');
@@ -96,6 +98,7 @@ describe('SessionDebriefCard', () => {
     renderAndAsk();
 
     expect(await screen.findByText('Session store is busy')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Session store is busy');
 
     mockDebriefServer();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
