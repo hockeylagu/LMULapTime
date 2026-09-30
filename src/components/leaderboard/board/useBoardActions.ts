@@ -10,6 +10,8 @@ export interface BoardActions {
   compareRequest: CompareRequest | null;
   /** The compare section, scrolled into view when a pair is asked for. */
   compareRef: React.RefObject<HTMLDivElement | null>;
+  /** Brings the compare section into view. */
+  scrollToCompare: () => void;
   /** Adds a driver's best lap to the comparison, or takes it out. */
   onPick?: (entry: LeaderboardEntry) => void;
   /** Your best lap against a driver's; undefined while you have no lap on the board. */
@@ -25,7 +27,7 @@ export interface BoardActions {
 
 /** The tag a board lap carries in the comparison. */
 export function boardLapTag(entry: LeaderboardEntry): string {
-  return entry.isPlayer ? '⭐ Your best' : `🎯 P${entry.rank} ${entry.driverName}`;
+  return entry.isPlayer ? 'Your best' : `P${entry.rank} ${entry.driverName}`;
 }
 
 /** What the leaderboard rows do: pick laps to compare, compare the player's best with a driver's, here or in telemetry. */
@@ -34,7 +36,9 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
   const [searchParams] = useSearchParams();
   const [compareRequest, setCompareRequest] = useState<CompareRequest | null>(null);
   const compareRef = useRef<HTMLDivElement | null>(null);
-  if (!board || !carClass) return { compareRequest, compareRef };
+  const scrollToCompare = () =>
+    compareRef.current?.scrollIntoView?.({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  if (!board || !carClass) return { compareRequest, compareRef, scrollToCompare };
 
   const onPick = (entry: LeaderboardEntry) => {
     setCompareRequest((previous) => ({
@@ -44,7 +48,7 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
   };
 
   const player = board.player;
-  if (!player) return { compareRequest, compareRef, onPick };
+  if (!player) return { compareRequest, compareRef, scrollToCompare, onPick };
 
   const compare = (entry: LeaderboardEntry, analyse: boolean) => {
     setCompareRequest((previous) => ({
@@ -53,7 +57,7 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
       lap: boardLapToComparable(player, carClass, boardLapTag(player)),
       analyse,
     }));
-    compareRef.current?.scrollIntoView?.({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    scrollToCompare();
   };
   const onCompare = (entry: LeaderboardEntry) => compare(entry, false);
   const onAnalyse = (entry: LeaderboardEntry) => compare(entry, true);
@@ -69,5 +73,5 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
     if (theirs) navigate(buildTelemetryComparePath(searchParams, yours, theirs));
   };
 
-  return { compareRequest, compareRef, onPick, onCompare, onAnalyse, onTelemetry };
+  return { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry };
 }

@@ -87,14 +87,14 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
       )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
         <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
-          <Trophy className="w-3.5 h-3.5 text-lmu-accent-text" />
+          <Trophy className="w-3.5 h-3.5 text-lmu-personal-best" />
           + Personal Best ({formatTime(allTimePBObject.lapTime)})
         </button>
       )}
 
       {theoreticalBestSec && (
         <button type="button" onClick={onAddTheoreticalBest} className={preset} title="Add your theoretical optimal lap for this track & category">
-          <Sparkles className="w-3.5 h-3.5 text-lmu-accent-text" />
+          <Sparkles className="w-3.5 h-3.5 text-lmu-muted" />
           + Theoretical Best ({formatTime(theoreticalBestSec)})
         </button>
       )}
@@ -106,7 +106,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           className={preset}
           title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
         >
-          <Award className="w-3.5 h-3.5 text-lmu-accent-text" />
+          <Award className="w-3.5 h-3.5 text-lmu-muted" />
           + All-Time Best ({overallTrackBestObject.lapTimeString})
         </button>
       )}

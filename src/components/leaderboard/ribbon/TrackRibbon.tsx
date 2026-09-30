@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
 import { TrackRibbonCard } from './TrackRibbonCard.js';
+import { LoadError } from '../LoadError.js';
 
 export interface TrackRibbonProps {
   layouts: LeaderboardLayout[];
@@ -8,10 +9,12 @@ export interface TrackRibbonProps {
   loading: boolean;
   error: string | null;
   onSelect: (layout: LeaderboardLayout) => void;
+  /** Loads the tracks again after an error. */
+  onRetry?: () => void;
 }
 
 /** The layouts the player drove, newest first, as a horizontal strip of cards. */
-export const TrackRibbon: React.FC<TrackRibbonProps> = ({ layouts, selectedLayoutKey, loading, error, onSelect }) => {
+export const TrackRibbon: React.FC<TrackRibbonProps> = ({ layouts, selectedLayoutKey, loading, error, onSelect, onRetry }) => {
   const stripRef = useRef<HTMLDivElement>(null);
 
   // Keep the selected card in view when the selection comes from the URL. Only the strip scrolls:
@@ -27,11 +30,7 @@ export const TrackRibbon: React.FC<TrackRibbonProps> = ({ layouts, selectedLayou
   }, [selectedLayoutKey, layouts]);
 
   if (error) {
-    return (
-      <p role="alert" className="px-4 py-3 rounded-xl border border-lmu-loss-strong/30 bg-lmu-loss-strong/10 text-sm text-lmu-loss-soft">
-        {error}
-      </p>
-    );
+    return <LoadError message={error} onRetry={onRetry} />;
   }
 
   if (loading) {

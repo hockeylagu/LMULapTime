@@ -4,7 +4,7 @@ import { entry } from './leaderboardFixtures.js';
 
 describe('boardLapToComparable', () => {
   it('gives the board lap the id the server gives the same lap, with its replay and times', () => {
-    const lap = boardLapToComparable(entry(2, 'Rival', 100.5), 'LMGT3', '🎯 P2 Rival');
+    const lap = boardLapToComparable(entry(2, 'Rival', 100.5), 'LMGT3', 'P2 Rival');
     expect(lap).toMatchObject({
       id: 's-Rival_Rival_lap_3',
       driverName: 'Rival',
@@ -14,7 +14,7 @@ describe('boardLapToComparable', () => {
       lapTimeString: '1:40.500',
       matchingReplayFile: 'Rival.Vcr',
       isValid: true,
-      tag: '🎯 P2 Rival',
+      tag: 'P2 Rival',
     });
   });
 });

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { LeaderboardSection, LeaderboardSectionProps } from '../../../../src/components/leaderboard/board/LeaderboardSection.js';
 import { rankForTime } from '../../../../src/components/leaderboard/board/StandingHeader.js';
 import { BENCHMARK, board } from './leaderboardFixtures.js';
+import { boardLapId } from '../../../../src/components/leaderboard/board/leaderboardLaps.js';
 
 const renderSection = (props: Partial<LeaderboardSectionProps> = {}) => {
   const handlers = { onScopeChange: vi.fn(), onCompare: vi.fn(), onTelemetry: vi.fn() };
@@ -40,6 +41,7 @@ describe('LeaderboardSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /19 more drivers/ }));
     expect(within(table).getByText('Driver 20')).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Benchmark Pace' })).toBeInTheDocument();
   });
 
   it('compares with a driver and opens the telemetry of both laps', () => {
@@ -85,8 +87,8 @@ describe('LeaderboardSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'My car' }));
     expect(onScopeChange).toHaveBeenCalledWith('car');
     expect(screen.getByRole('columnheader', { name: /Best Lap/ })).toHaveAttribute('aria-sort', 'ascending');
-    fireEvent.click(screen.getByRole('button', { name: 'Sector 2' }));
-    expect(screen.getByRole('columnheader', { name: /Sector 2/ })).toHaveAttribute('aria-sort', 'ascending');
+    fireEvent.click(screen.getByRole('button', { name: 'Best S2' }));
+    expect(screen.getByRole('columnheader', { name: /Best S2/ })).toHaveAttribute('aria-sort', 'ascending');
     expect(screen.getByRole('columnheader', { name: /Best Lap/ })).not.toHaveAttribute('aria-sort');
     expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien pace/ })).not.toBeInTheDocument();
   });
@@ -121,5 +123,41 @@ describe('rankForTime', () => {
     const b = board(10, 8);
     expect(rankForTime(b, 100.25, b.player!)).toBe(4);
     expect(rankForTime(b, 99, b.player!)).toBe(1);
+  });
+});
+
+describe('LeaderboardSection compare bar', () => {
+  it('points to the comparison once another driver is in it', () => {
+    const fixture = board(40, 30, BENCHMARK);
+    const other = fixture.entries.find((e) => !e.isPlayer)!;
+    const player = fixture.entries.find((e) => e.isPlayer)!;
+    const onGoToCompare = vi.fn();
+    const { rerender } = render(
+      <LeaderboardSection board={fixture} loading={false} error={null} carClass="LMGT3" scope="class" playerCarType="Ferrari 296 LMGT3"
+        onScopeChange={vi.fn()} onCompare={vi.fn()} onGoToCompare={onGoToCompare} comparedLapIds={[boardLapId(player)]} />
+    );
+    expect(screen.queryByRole('button', { name: /Go to compare/ })).not.toBeInTheDocument();
+    rerender(
+      <LeaderboardSection board={fixture} loading={false} error={null} carClass="LMGT3" scope="class" playerCarType="Ferrari 296 LMGT3"
+        onScopeChange={vi.fn()} onCompare={vi.fn()} onGoToCompare={onGoToCompare} comparedLapIds={[boardLapId(player), boardLapId(other)]} />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('1 lap from the board in the comparison');
+    fireEvent.click(screen.getByRole('button', { name: /Go to compare/ }));
+    expect(onGoToCompare).toHaveBeenCalled();
+  });
+});
+
+describe('LeaderboardSection hardening', () => {
+  it('offers to load the board again after an error', () => {
+    const retry = vi.fn();
+    renderSection({ board: null, error: 'Database is locked', retry });
+    expect(screen.getByRole('alert')).toHaveTextContent('Database is locked');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalled();
+  });
+
+  it('counts a small field instead of a top percentage', () => {
+    renderSection({ board: board(4, 3, BENCHMARK) });
+    expect(screen.getByText('Your rank').parentElement).toHaveTextContent('P3/4of 4 drivers');
   });
 });

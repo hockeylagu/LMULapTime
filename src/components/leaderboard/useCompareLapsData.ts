@@ -219,7 +219,7 @@ export function useCompareLapsData({
       const pbLapFormatted: ComparableLap = {
         ...pbLap,
         isAllTimePB: true,
-        tag: pbLap.tag || '⭐ Personal Best',
+        tag: pbLap.tag || 'Personal best',
       };
       if (!candidates.some((c) => c.id === pbLapFormatted.id)) {
         candidates.push(pbLapFormatted);
@@ -274,7 +274,7 @@ export function useCompareLapsData({
     // The laps loaded are the player's own (playerOnly), some without the flag.
     const best = apiData.playerBestLap ?? fastest(apiData.laps.filter((l) => l.isPlayer))
       ?? fastest(apiData.laps) ?? apiData.allTimeBestLap ?? null;
-    return best ? { ...best, isAllTimePB: true, tag: best.tag || '⭐ Personal Best' } : null;
+    return best ? { ...best, isAllTimePB: true, tag: best.tag || 'Personal best' } : null;
   }, [apiData.playerBestLap, apiData.allTimeBestLap, apiData.laps]);
 
   const isPBInComparison = Boolean(allTimePBObject && selectedLaps.some((l) => l.id === allTimePBObject.id));
@@ -320,12 +320,12 @@ export function useCompareLapsData({
 
   const overallTrackBestObject: ComparableLap | null = useMemo(() => {
     if (apiData.overallTrackBestLap) {
-      return { ...apiData.overallTrackBestLap, tag: apiData.overallTrackBestLap.tag || '🏆 All-Time Best' };
+      return { ...apiData.overallTrackBestLap, tag: apiData.overallTrackBestLap.tag || 'All-time best' };
     }
     const valid = apiData.laps.filter((l) => l.isValid && l.lapTime && l.lapTime > 0);
     if (valid.length === 0) return null;
     const sorted = [...valid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
-    return sorted.length > 0 ? { ...sorted[0], tag: '🏆 All-Time Best' } : null;
+    return sorted.length > 0 ? { ...sorted[0], tag: 'All-time best' } : null;
   }, [apiData.overallTrackBestLap, apiData.laps]);
 
   const isOverallBestInComparison = Boolean(

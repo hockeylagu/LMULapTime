@@ -40,7 +40,7 @@ export function findLayoutForTrack(layouts: LeaderboardLayout[], track: string |
  */
 export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { layouts, loading, error } = useLeaderboardLayouts();
+  const { layouts, loading, error, retry: retryLayouts } = useLeaderboardLayouts();
   const track = searchParams.get('track') || props.initialTrack || null;
   const carClass = searchParams.get('carClass') || props.initialCarClass || null;
   const selectedLayout = useMemo(() => findLayoutForTrack(layouts, track), [layouts, track]);
@@ -48,7 +48,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
   const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
-  const { compareRequest, compareRef, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
+  const { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
   const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
   const rival = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
   const rivalName = rival.status?.rival?.kind === 'driver' ? rival.status.rival.driverName : null;
@@ -96,6 +96,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
           loading={loading}
           error={error}
           onSelect={selectLayout}
+          onRetry={retryLayouts}
         />
         {selectedLayout && carClass && (
           <LayoutClassPills layout={selectedLayout} selectedCarClass={carClass} onSelect={selectClass} />
@@ -117,6 +118,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
           onTelemetry={onTelemetry}
           comparedLapIds={comparedLapIds}
           onPick={onPick}
+          onGoToCompare={scrollToCompare}
           onOpenSession={props.onSelectSession}
         />
       )}
