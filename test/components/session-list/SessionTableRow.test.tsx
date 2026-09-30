@@ -45,7 +45,7 @@ describe('SessionTableRow', () => {
     expect(screen.getByText('Autodromo Nazionale Monza')).toBeInTheDocument();
     expect(screen.getByText('Race 1')).toBeInTheDocument();
     expect(screen.getByText(/P1/)).toBeInTheDocument();
-    expect(screen.getByText(/\(\+2\)/)).toBeInTheDocument();
+    expect(screen.getByText('+2')).toHaveClass('text-lmu-gain');
     expect(screen.getByText('Porsche 963')).toBeInTheDocument();
     expect(screen.getByTestId('car-class-badge')).toBeInTheDocument();
     expect(screen.getByText('HY')).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe('SessionTableRow', () => {
     );
 
     expect(screen.getByText('Empty')).toBeInTheDocument();
-    expect(screen.getByText('(-4)')).toBeInTheDocument();
+    expect(screen.getByText('-4')).toHaveClass('text-lmu-loss');
     expect(screen.getByText('--:--.---')).toBeInTheDocument();
     expect(screen.getByText('-')).toBeInTheDocument();
   });

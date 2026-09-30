@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, startTransition } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Navbar } from './components/navbar/Navbar.js';
+import { ReferenceLaptimeUpdateToast } from './components/common/ReferenceLaptimeUpdateToast.js';
+import { LoadingState } from './components/common/LoadingState.js';
 import {
-  Navbar,
   Dashboard,
   TrackSummaries,
   SessionDetail,
@@ -9,9 +11,9 @@ import {
   Settings,
   LeaderboardPage,
   ReplayInspectorPage,
-  ReferenceLaptimeUpdateToast,
-  LoadingState,
-} from './components/index.js';
+  prefetchRoutePages,
+  preloadRoutePage,
+} from './routePages.js';
 import { updateSearchParams } from './utils/urlParams';
 import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../shared/types/index.js';
 import { fetchJson, isAbortError } from './api/apiClient.js';
@@ -221,12 +223,25 @@ export default function App() {
         dataRetryTimerRef.current = setTimeout(() => { void fetchData(forceRefresh); }, SERVER_RETRY_MS);
       }
     } finally {
-      if (hasLoadedRef.current) setLoading(false);
+      // A transition keeps the loading screen up while the page chunk resolves, instead of flashing the Suspense
+      // fallback, which React then holds for its reveal throttle (~300 ms).
+      if (hasLoadedRef.current) startTransition(() => setLoading(false));
       setIsRefreshing(false);
     }
   }, [startScanPolling]);
 
   useEffect(() => () => clearTimeout(dataRetryTimerRef.current), []);
+
+  useEffect(() => { preloadRoutePage(location.pathname); }, [location.pathname]);
+
+  // Once the first page is up, fetch the other pages in the background so navigation never waits on a chunk.
+  useEffect(() => {
+    if (loading) return;
+    const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 200));
+    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = idle(() => { void prefetchRoutePages(); });
+    return () => cancel(handle);
+  }, [loading]);
 
   const scanStateRef = useRef({ replay: false, sessions: false, telemetry: false });
   useEffect(() => {
@@ -262,7 +277,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-lmu-bg text-lmu-text flex flex-col font-sans">
+    <div className="min-h-screen min-w-[1480px] bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
       {!isTelemetryRoute && (
         <Navbar
@@ -273,9 +288,11 @@ export default function App() {
         />
       )}
 
-      {/* Main Content Area */}
-      <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6'}>
+      {/* Main Content Area: a fixed 1500px column; the 1480px floor above (a 1500px window less its scrollbar) scrolls sideways rather than reflowing */}
+      <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-8 py-6'}>
 
+        {/* Above the loading switch so a page still downloading keeps the loading screen up (see startTransition). */}
+        <Suspense fallback={<LoadingState size="compact" showQuote={false} title="Loading page" dataTestId="route-loading-state" />}>
         {loading ? (
           <LoadingState
             title="Loading LMU Replay & Timing Database"
@@ -321,10 +338,11 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         )}
+        </Suspense>
       </main>
 
       {!isTelemetryRoute && (
-        <footer className="border-t border-lmu-border/50 py-4 px-6 text-center text-xs text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07]">
+        <footer className="border-t border-lmu-border py-4 px-6 text-center text-xs text-lmu-muted">
           <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
         </footer>
       )}

@@ -63,6 +63,19 @@ export function filterSessions(sessions: DetailedSession[], options: SessionFilt
   return filtered;
 }
 
+/**
+ * A session as the list sends it: no other drivers, and no lap stewards or traffic records, which only the session
+ * page reads (from GET /session/:id). They were over 40% of the list payload. Copies: the cached session is shared.
+ */
+export function toSessionListEntry(session: DetailedSession): Omit<DetailedSession, 'drivers'> {
+  const { drivers: _drivers, ...metadata } = session;
+  const player = metadata.playerDriver;
+  if (!player) return metadata;
+  const { incidents: _incidents, trackLimits: _trackLimits, ...playerSummary } = player;
+  const laps = player.laps?.map(({ traffic: _traffic, incidents: _lapIncidents, trackLimits: _lapTrackLimits, ...lap }) => lap);
+  return { ...metadata, playerDriver: { ...playerSummary, ...(laps ? { laps } : {}) } };
+}
+
 export function createSessionRouter(context: ServerContext): Router {
   const router = Router();
 
@@ -78,10 +91,7 @@ export function createSessionRouter(context: ServerContext): Router {
     const filters = parseSessionFilters(req.query as Record<string, unknown>);
     const sessions = filterSessions(context.loadSessions(forceRefresh), filters);
 
-    res.json(sessions.map(session => {
-      const { drivers, ...metadata } = session;
-      return metadata;
-    }));
+    res.json(sessions.map(toSessionListEntry));
   });
 
   router.get('/session/:id', (req, res) => {

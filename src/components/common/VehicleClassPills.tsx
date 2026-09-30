@@ -1,6 +1,7 @@
 import React from 'react';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { CarClassBadge } from './CarClassBadge.js';
+import { SEGMENT_RESTING } from './SessionTypePills.js';
 
 export interface VehicleClassPillsProps {
   selectedClass: string;
@@ -30,11 +31,10 @@ export const VehicleClassPills: React.FC<VehicleClassPillsProps> = ({
         type="button"
         onClick={() => onSelectClass('All')}
         aria-label="All"
+        aria-pressed={isAllSelected}
         title="All"
-        className={`${padAllClass} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border ${
-          isAllSelected
-            ? 'bg-lmu-accent text-white border-lmu-accent opacity-100'
-            : 'border-slate-800 text-lmu-muted hover:text-white hover:border-slate-700 opacity-40 hover:opacity-100'
+        className={`${padAllClass} inline-flex items-center justify-center font-mono leading-none rounded-[5px] border transition-opacity whitespace-nowrap font-bold uppercase select-none cursor-pointer tracking-wider box-border focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
+          isAllSelected ? SEGMENT_RESTING : 'border-lmu-border text-lmu-faint hover:text-white hover:border-lmu-rule'
         }`}
       >
         ALL

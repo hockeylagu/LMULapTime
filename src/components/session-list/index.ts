@@ -5,3 +5,6 @@ export * from './SessionGridView.js';
 export * from './SessionGridCard.js';
 export * from './SessionTableView.js';
 export * from './SessionTableRow.js';
+
+export * from './SessionPagination.js';
+export * from './useSessionPage.js';

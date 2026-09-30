@@ -109,17 +109,17 @@ describe('TelemetryCornerStrip', () => {
     // Positive delta (loss)
     const t1Delta = screen.getByText('+0.12');
     expect(t1Delta).toBeInTheDocument();
-    expect(t1Delta).toHaveClass('text-rose-400');
+    expect(t1Delta).toHaveClass('text-lmu-loss');
 
     // Negative delta (gain)
     const t2Delta = screen.getByText('-0.08');
     expect(t2Delta).toBeInTheDocument();
-    expect(t2Delta).toHaveClass('text-emerald-400');
+    expect(t2Delta).toHaveClass('text-lmu-gain');
 
     // Zero delta (neutral)
     const t3Delta = screen.getByText('±0.00');
     expect(t3Delta).toBeInTheDocument();
-    expect(t3Delta).toHaveClass('text-slate-400');
+    expect(t3Delta).toHaveClass('text-lmu-muted');
   });
 
   it('highlights the selected corner with active styling and glow', () => {
@@ -132,8 +132,8 @@ describe('TelemetryCornerStrip', () => {
     );
 
     const t2Btn = screen.getByRole('button', { name: 'Turn 2' });
-    expect(t2Btn.className).toContain('border-cyan-400');
-    expect(t2Btn.className).toContain('bg-cyan-950/40');
+    expect(t2Btn.className).toContain('border-lmu-aqua');
+    expect(t2Btn.className).toContain('bg-lmu-aqua-deep/40');
   });
 
   it('triggers onSelectCorner and onJumpToDistance when clicked', () => {
@@ -223,7 +223,7 @@ describe('TelemetryCornerStrip', () => {
 
     const deltaSpan = screen.getByText('-0.05');
     expect(deltaSpan).toBeInTheDocument();
-    expect(deltaSpan).toHaveClass('text-emerald-400');
+    expect(deltaSpan).toHaveClass('text-lmu-gain');
   });
 
   it('displays running delta in corner tooltip when pointComparisons and cumDists are provided in compare mode', () => {

@@ -1,8 +1,9 @@
 import React from 'react';
-import { ChevronRight, AlertCircle, MapPin } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './sessionListTypes.js';
+import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 
 export interface SessionTableRowProps {
@@ -27,65 +28,19 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
   return (
     <tr
       onClick={() => onSelectSession(s.id)}
-      className={`hover:bg-lmu-card/60 transition-colors cursor-pointer group ${
-        empty ? 'bg-amber-950/10' : ''
-      }`}
+      className="hover:bg-lmu-cardHover transition-colors cursor-pointer group"
     >
       {/* Track */}
       {showTrackColumn && (
-        <td className="px-3.5 py-3 font-medium text-white">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-3.5 h-3.5 text-lmu-accent shrink-0" />
-            <span className="font-bold text-white group-hover:text-lmu-accent transition-colors">
-              {displayTrack || 'Circuit'}
-            </span>
-          </div>
-        </td>
+        <td className="px-3.5 py-3 font-semibold text-white">{displayTrack || 'Circuit'}</td>
       )}
 
       {/* Session Type & Name */}
       <td className="px-3.5 py-3">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span
-            className={`px-2 py-0.5 text-[11px] font-bold rounded uppercase tracking-wider ${
-              s.sessionType === 'Race'
-                ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
-                : s.sessionType === 'Qualifying'
-                ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
-            }`}
-          >
-            {s.sessionName || s.sessionType}
-          </span>
-          {s.sessionType === 'Race' && p?.position ? (
-            <span
-              className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-white"
-              title={p.gridPosition ? `Grid: P${p.gridPosition} → Finish: P${p.position}` : `Finish: P${p.position}`}
-            >
-              P{p.position}
-              {p.positionGain !== null && p.positionGain !== undefined && (
-                <span
-                  className={`ml-1 font-bold ${
-                    p.positionGain > 0 ? 'text-lmu-green' : p.positionGain < 0 ? 'text-rose-400' : 'text-lmu-muted'
-                  }`}
-                >
-                  ({p.positionGain > 0 ? `+${p.positionGain}` : p.positionGain})
-                </span>
-              )}
-            </span>
-          ) : (s.sessionType === 'Qualifying' || s.sessionName?.toLowerCase().includes('quali')) && p?.position ? (
-            <span
-              className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-lmu-bg/90 border border-lmu-border/70 text-lmu-cyan"
-              title={`Qualified P${p.position}`}
-            >
-              P{p.position}
-            </span>
-          ) : null}
-          {empty && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" /> Empty
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          <SessionTypeChip session={s} />
+          <FinishPosition session={s} />
+          {empty && <EmptyChip />}
         </div>
       </td>
 
@@ -111,12 +66,12 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
       </td>
 
       {/* Laps */}
-      <td className="px-3.5 py-3 text-center font-mono font-semibold text-white">
+      <td className="px-3.5 py-3 text-center font-mono text-lmu-text-soft tabular-nums">
         {p ? p.lapsCount : 0}
       </td>
 
       {/* Best Lap */}
-      <td className="px-3.5 py-3 text-right font-mono font-bold text-sm text-lmu-gold">
+      <td className="px-3.5 py-3 text-right font-mono font-bold text-sm text-white tabular-nums">
         {p?.bestLapTimeString || '--:--.---'}
       </td>
 
@@ -152,7 +107,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               e.stopPropagation();
               onSelectSession(s.id);
             }}
-            className="p-1.5 rounded-lg bg-lmu-accent/10 hover:bg-lmu-accent text-lmu-accent hover:text-white border border-lmu-accent/20 hover:border-lmu-accent transition-all cursor-pointer shadow-sm shrink-0 flex items-center justify-center group/btn"
+            className="p-1.5 rounded-lg text-lmu-muted group-hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 flex items-center justify-center group/btn"
             title={`Analyze ${displayTrack || 'Session'} Details`}
             aria-label={`Analyze ${displayTrack || 'Session'}`}
           >

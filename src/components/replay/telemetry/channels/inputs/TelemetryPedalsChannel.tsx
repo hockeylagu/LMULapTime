@@ -65,26 +65,26 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
   return (
     <>
       {/* THROTTLE CHANNEL */}
-      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-emerald-950/20">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-          <span className="p-1 rounded bg-emerald-500/20 text-emerald-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+          <span className="p-1 rounded bg-lmu-gain-strong/20 text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
             <Activity className="w-3 h-3" />
             THROTTLE
           </span>
-          <span className="text-xs font-mono font-bold text-emerald-400">
+          <span className="text-xs font-mono font-bold text-lmu-gain">
             {(currentPoint?.throttle ?? 0).toFixed(1)}%
           </span>
           {currentComparison && (
-            <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+            <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
               Base: {currentComparison.baseline.throttle.toFixed(0)}%
             </span>
           )}
         </div>
 
         <TelemetryStaticTrace chart={throttleSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
-          { label: '50%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
-          { label: '0%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400' },
+          { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
         ]} />
 
         {isCursorInView && (
@@ -95,15 +95,15 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             style={{ left: `${cursorPct}%` }}
           >
             <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
-              currentPoint?.tcActive ? 'border-amber-400 text-amber-300' : 'border-emerald-400/80 text-emerald-300'
+              currentPoint?.tcActive ? 'border-lmu-warn text-lmu-warn-soft' : 'border-lmu-gain/80 text-lmu-gain-soft'
             }`}>
               {(currentPoint?.throttle ?? 0).toFixed(0)}%
               {currentPoint?.tcActive && (
-                <span className="text-[9px] font-black px-1 rounded bg-amber-500 text-black ml-1">TC</span>
+                <span className="text-[10px] font-black px-1 rounded bg-lmu-warn-strong text-black ml-1">TC</span>
               )}
             </span>
             {currentComparison && (
-              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn/70 text-lmu-warn-soft font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
                 B: {currentComparison.baseline.throttle.toFixed(0)}%
               </span>
             )}
@@ -112,26 +112,26 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
       </div>
 
       {/* BRAKE CHANNEL */}
-      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-rose-950/20">
+      <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-loss-deep/20">
         <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-          <span className="p-1 rounded bg-rose-500/20 text-rose-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+          <span className="p-1 rounded bg-lmu-loss-strong/20 text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
             <Zap className="w-3 h-3" />
             BRAKE
           </span>
-          <span className="text-xs font-mono font-bold text-rose-400">
+          <span className="text-xs font-mono font-bold text-lmu-loss">
             {(currentPoint?.brake ?? 0).toFixed(1)}%
           </span>
           {currentComparison && (
-            <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+            <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
               Base: {currentComparison.baseline.brake.toFixed(0)}%
             </span>
           )}
         </div>
 
         <TelemetryStaticTrace chart={brakeSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
-          { label: '50%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
-          { label: '0%', borderClassName: 'border-b border-rose-400/40', labelClassName: 'text-[9px] text-rose-400' },
+          { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
         ]} />
 
         {isCursorInView && (
@@ -142,15 +142,15 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
             style={{ left: `${cursorPct}%` }}
           >
             <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
-              currentPoint?.absActive ? 'border-cyan-400 text-cyan-300' : 'border-rose-400/80 text-rose-300'
+              currentPoint?.absActive ? 'border-lmu-aqua text-lmu-aqua-soft' : 'border-lmu-loss/80 text-lmu-loss-soft'
             }`}>
               {(currentPoint?.brake ?? 0).toFixed(0)}%
               {currentPoint?.absActive && (
-                <span className="text-[9px] font-black px-1 rounded bg-cyan-400 text-black ml-1">ABS</span>
+                <span className="text-[10px] font-black px-1 rounded bg-lmu-aqua text-black ml-1">ABS</span>
               )}
             </span>
             {currentComparison && (
-              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-400/70 text-amber-300 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn/70 text-lmu-warn-soft font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
                 B: {currentComparison.baseline.brake.toFixed(0)}%
               </span>
             )}

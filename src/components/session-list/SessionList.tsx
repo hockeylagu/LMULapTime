@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { SessionListHeader } from './SessionListHeader.js';
 import { SessionEmptyState } from './SessionEmptyState.js';
 import { SessionGridView } from './SessionGridView.js';
 import { SessionTableView } from './SessionTableView.js';
 import { useSessionViewMode } from './useSessionViewMode.js';
+import { useSessionPage } from './useSessionPage.js';
+import { SessionPagination } from './SessionPagination.js';
 import { SessionListItem, SessionListProps } from './sessionListTypes.js';
 
 export type { SessionListItem, SessionListProps } from './sessionListTypes.js';
@@ -26,6 +28,16 @@ export const SessionList: React.FC<SessionListProps> = ({
   className = '',
 }) => {
   const { viewMode, setViewMode: handleSetViewMode } = useSessionViewMode(controlledViewMode, onViewModeChange);
+  const { page, pageCount, setPage, start, end } = useSessionPage(sessions.length);
+  const pageSessions = sessions.slice(start, end);
+  const listTopRef = useRef<HTMLDivElement>(null);
+
+  const changePage = (next: number) => {
+    setPage(next);
+    // The pager sits under the list: bring the first row back into view when it has scrolled away.
+    const top = listTopRef.current?.getBoundingClientRect().top;
+    if (top !== undefined && top < 0) listTopRef.current?.scrollIntoView({ block: 'start' });
+  };
 
   const resolvePaceBadge = (s: SessionListItem) => {
     if (getPaceBadge) {
@@ -42,7 +54,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   };
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div ref={listTopRef} className={`space-y-4 scroll-mt-4 ${className}`}>
       {!hideHeader && (
         <SessionListHeader
           headerTitle={headerTitle}
@@ -61,7 +73,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         />
       ) : viewMode === 'grid' ? (
         <SessionGridView
-          sessions={sessions}
+          sessions={pageSessions}
           onSelectSession={onSelectSession}
           onOpenReplay={onOpenReplay}
           showTrackColumn={showTrackColumn}
@@ -69,12 +81,16 @@ export const SessionList: React.FC<SessionListProps> = ({
         />
       ) : (
         <SessionTableView
-          sessions={sessions}
+          sessions={pageSessions}
           onSelectSession={onSelectSession}
           onOpenReplay={onOpenReplay}
           showTrackColumn={showTrackColumn}
           resolvePaceBadge={resolvePaceBadge}
         />
+      )}
+
+      {sessions.length > 0 && (
+        <SessionPagination page={page} pageCount={pageCount} start={start} end={end} total={sessions.length} onPageChange={changePage} />
       )}
     </div>
   );

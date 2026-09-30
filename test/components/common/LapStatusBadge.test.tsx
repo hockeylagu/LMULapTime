@@ -47,7 +47,7 @@ describe('LapStatusBadge', () => {
   it('renders Incomplete in amber for an inferred lap', () => {
     render(<LapStatusBadge isValid={false} isInferred incompleteTooltip="Estimated from elapsed time" />);
     const badge = screen.getByText('Incomplete');
-    expect(badge.className).toContain('text-amber-400');
+    expect(badge.className).toContain('text-lmu-warn');
     expect(badge.getAttribute('title')).toBe('Estimated from elapsed time');
   });
 

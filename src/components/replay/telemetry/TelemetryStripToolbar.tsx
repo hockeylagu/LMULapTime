@@ -93,7 +93,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
         {/* Zoomed State Indicator */}
         {isZoomed && (
           <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10 text-[10px] font-mono">
-            <span className="px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 font-bold">
+            <span className="px-1.5 py-px rounded bg-lmu-info-strong/20 text-lmu-info-soft font-bold">
               Zoomed: Frames {viewStart + 1}–{viewEnd + 1}
             </span>
             {spanTimeSec !== undefined && (
@@ -107,7 +107,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 e.stopPropagation();
                 onResetZoom();
               }}
-              className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-300 font-bold transition-all text-[10px] flex items-center gap-1"
+              className="px-2 py-0.5 rounded bg-lmu-loss-strong/20 hover:bg-lmu-loss-strong/30 border border-lmu-loss-strong/50 text-lmu-loss-soft font-bold transition-all text-[10px] flex items-center gap-1"
               title="Reset zoom to full lap (or double-click chart)"
             >
               ✕ Reset Lap
@@ -136,7 +136,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'scrub'
-                ? 'bg-sky-500 text-white font-bold shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
             title="Scrub timeline (Tip: hold Shift while dragging to zoom)"
@@ -152,7 +152,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'zoom'
-                ? 'bg-sky-500 text-white font-bold shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
             title="Drag to zoom into a track section"
@@ -173,24 +173,24 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
                 telemetryResolution === 'standard' && !isFullResolution
                   ? isResPopoverOpen
-                    ? 'bg-sky-500/30 border-sky-400/70 text-sky-200 font-bold shadow-[0_0_10px_rgba(56,189,248,0.4)]'
-                    : 'bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20'
+                    ? 'bg-lmu-info-strong/30 border-lmu-info/70 text-lmu-info-soft font-bold'
+                    : 'bg-lmu-info-strong/10 border-lmu-info-strong/30 text-lmu-info-soft hover:bg-lmu-info-strong/20'
                   : telemetryResolution === 'high' && !isFullResolution
                   ? isResPopoverOpen
-                    ? 'bg-emerald-500/30 border-emerald-400/70 text-emerald-200 font-bold shadow-[0_0_10px_rgba(16,185,129,0.4)]'
-                    : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                    ? 'bg-lmu-gain-strong/30 border-lmu-gain/70 text-lmu-gain-soft font-bold'
+                    : 'bg-lmu-gain-strong/15 border-lmu-gain-strong/40 text-lmu-gain-soft hover:bg-lmu-gain-strong/25'
                   : isResPopoverOpen
-                  ? 'bg-purple-600/40 border-purple-400/80 text-purple-200 font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-                  : 'bg-purple-500/10 border-purple-500/30 text-purple-300 hover:bg-purple-500/20'
+                  ? 'bg-lmu-purple-strong/40 border-lmu-purple/80 text-lmu-purple-soft font-bold'
+                  : 'bg-lmu-purple-strong/10 border-lmu-purple-strong/30 text-lmu-purple-soft hover:bg-lmu-purple-strong/20'
               }`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
               <Activity className={`w-2.5 h-2.5 ${
                 telemetryResolution === 'standard' && !isFullResolution
-                  ? 'text-sky-400'
+                  ? 'text-lmu-info'
                   : telemetryResolution === 'high' && !isFullResolution
-                  ? 'text-emerald-400'
-                  : 'text-purple-400'
+                  ? 'text-lmu-gain'
+                  : 'text-lmu-purple'
               }`} />
               <span className="whitespace-nowrap">
                 {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 'full' ? 'Full Raw' : `${(pointsCount || 0).toLocaleString()} pts`}
@@ -231,7 +231,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(-1);
             }}
             disabled={currentFrame !== undefined && currentFrame <= 1}
-            className="p-1 rounded bg-black/40 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            className="p-1 rounded bg-black/40 hover:bg-lmu-info-strong/20 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
             title="Move scrub line backward (Left Arrow, Shift for 10 frames)"
             aria-label="Step backward (Left Arrow)"
           >
@@ -248,7 +248,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(1);
             }}
             disabled={currentFrame !== undefined && totalFrames !== undefined && currentFrame >= totalFrames}
-            className="p-1 rounded bg-black/40 hover:bg-sky-500/20 text-slate-400 hover:text-sky-300 disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            className="p-1 rounded bg-black/40 hover:bg-lmu-info-strong/20 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
             title="Move scrub line forward (Right Arrow, Shift for 10 frames)"
             aria-label="Step forward (Right Arrow)"
           >

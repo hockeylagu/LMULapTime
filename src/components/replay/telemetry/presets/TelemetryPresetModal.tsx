@@ -128,7 +128,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in select-none"
       onClick={onClose}
     >
       <div
@@ -139,7 +139,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
         {/* Modal Header */}
         <div className="px-5 py-3.5 bg-lmu-card border-b border-lmu-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-sky-400" />
+            <SlidersHorizontal className="w-4 h-4 text-lmu-info" />
             <h2 className="text-sm font-bold text-white font-mono tracking-wide">
               Telemetry Channel Presets
             </h2>
@@ -187,7 +187,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
 
               {/* Channels List */}
               <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <div className="text-[10px] font-bold text-lmu-muted uppercase tracking-wider mb-2">
                   Telemetry Channels
                 </div>
                 {AVAILABLE_TELEMETRY_CHANNELS.map(channel => {
@@ -222,7 +222,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
                       onSelectActivePreset(currentPreset.id);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-lg shadow-sky-500/20 cursor-pointer transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg bg-lmu-info-strong hover:bg-lmu-info text-lmu-deep font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" /> Apply & Use Preset
                   </button>

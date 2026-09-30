@@ -27,8 +27,8 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
 
   return (
     <div className="flex flex-col bg-lmu-deep p-2.5 rounded-lg border border-lmu-border/40 min-w-0">
-      <div className="flex items-center justify-between h-7 border-b border-slate-800/80 pb-1 w-full min-w-0">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-400 uppercase tracking-wider whitespace-nowrap">
+      <div className="flex items-center justify-between h-7 border-b border-lmu-border/80 pb-1 w-full min-w-0">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold text-lmu-aqua uppercase tracking-wider whitespace-nowrap">
           <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
           <span>Entry Phase</span>
         </span>
@@ -40,11 +40,11 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
       </div>
 
       {/* Hero Speed Metric */}
-      <div className="flex items-center justify-between h-8 py-1 border-b border-slate-800/60 min-w-0">
-        <span className="text-slate-400 text-[10px] uppercase font-semibold text-left whitespace-nowrap">Speed</span>
+      <div className="flex items-center justify-between h-8 py-1 border-b border-lmu-border/60 min-w-0">
+        <span className="text-lmu-muted text-[10px] uppercase tracking-wider font-semibold text-left whitespace-nowrap">Speed</span>
         <div className="flex items-center gap-1 shrink-0 text-right whitespace-nowrap">
           <span className="text-sm font-bold text-white">{corner.primaryEntrySpeedKmh}</span>
-          <span className="text-[10px] text-slate-400">km/h</span>
+          <span className="text-[10px] text-lmu-muted">km/h</span>
           {isCompareMode && (
             <span className={`ml-1 text-[10px] ${speedDeltaClass(corner.entrySpeedDeltaKmh)}`}>
               {formatSpeedDelta(corner.entrySpeedDeltaKmh)}
@@ -54,10 +54,10 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
       </div>
 
       {/* Consistent 4-Row Breakdown */}
-      <div className="flex flex-col text-[10px] divide-y divide-slate-800/40">
+      <div className="flex flex-col text-[10px] divide-y divide-lmu-border/40">
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
           <span
-            className="text-slate-400 text-left whitespace-nowrap"
+            className="text-lmu-muted text-left whitespace-nowrap"
             title={isCompareMode ? 'Braking Point Delta' : 'Brake Point to Apex'}
           >
             {isCompareMode ? 'Brake Δ' : 'Brake to Apex'}
@@ -77,7 +77,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
             ) : brakeDistToApex !== null ? (
               <>
                 <span>{brakeDistToApex}m</span>{' '}
-                <span className="text-[9px] text-slate-400 font-normal">apex</span>
+                <span className="text-[10px] text-lmu-muted font-normal">apex</span>
               </>
             ) : (
               'Flat out'
@@ -87,7 +87,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
 
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
           <span
-            className="text-slate-400 text-left whitespace-nowrap"
+            className="text-lmu-muted text-left whitespace-nowrap"
             title={isCompareMode ? 'Turn-In Delta' : 'Turn-In Point to Apex'}
           >
             {isCompareMode ? 'Turn-In Δ' : 'Turn-In'}
@@ -107,7 +107,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
             ) : turnInDistToApex !== null ? (
               <>
                 <span>{turnInDistToApex}m</span>{' '}
-                <span className="text-[9px] text-slate-400 font-normal">apex</span>
+                <span className="text-[10px] text-lmu-muted font-normal">apex</span>
               </>
             ) : (
               '--'
@@ -116,7 +116,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
         </div>
 
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
-          <span className="text-slate-400 text-left whitespace-nowrap" title="Trail Braking Zone">
+          <span className="text-lmu-muted text-left whitespace-nowrap" title="Trail Braking Zone">
             Trail Brake
           </span>
           <span
@@ -131,7 +131,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
               <>
                 <span>{corner.trailBrakeDistM}m</span>
                 {corner.trailBrakeDurationSec !== undefined && corner.trailBrakeDurationSec > 0 && (
-                  <span className="text-[9px] font-normal text-slate-400 ml-1">({corner.trailBrakeDurationSec}s)</span>
+                  <span className="text-[10px] font-normal text-lmu-muted ml-1">({corner.trailBrakeDurationSec}s)</span>
                 )}
               </>
             ) : (
@@ -143,7 +143,7 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
         {/* Row 4: Track Entry Space Left */}
         <div className="flex items-center justify-between h-7 gap-1.5 min-w-0">
           <span
-            className="text-slate-400 text-left whitespace-nowrap"
+            className="text-lmu-muted text-left whitespace-nowrap"
             title={
               isCompareMode
                 ? 'Entry Space Delta: difference in unused track width on entry compared to baseline (negative = used more track width)'
@@ -158,10 +158,10 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
                 <span
                   className={
                     corner.entrySpaceDeltaM < 0
-                      ? 'text-emerald-400 font-bold font-mono'
+                      ? 'text-lmu-gain font-bold font-mono'
                       : corner.entrySpaceDeltaM > 0
-                      ? 'text-amber-400 font-bold font-mono'
-                      : 'text-slate-400 font-mono'
+                      ? 'text-lmu-warn font-bold font-mono'
+                      : 'text-lmu-muted font-mono'
                   }
                   title={
                     corner.entrySpaceDeltaM < 0
@@ -179,21 +179,21 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
                 </span>
               ) : trackUsage?.entrySpaceLeftM !== undefined ? (
                 <span className="text-white font-bold" title={`${trackUsage.entrySpaceLeftM.toFixed(1)}m space left to outside track edge`}>
-                  {trackUsage.entrySpaceLeftM.toFixed(1)}m <span className="text-[9px] text-slate-400 font-normal">left</span>
+                  {trackUsage.entrySpaceLeftM.toFixed(1)}m <span className="text-[10px] text-lmu-muted font-normal">left</span>
                 </span>
               ) : (
-                <span className="text-slate-500">--</span>
+                <span className="text-lmu-faint">--</span>
               )
             ) : trackUsage?.entrySpaceLeftM !== undefined ? (
               <span
                 className={
                   trackUsage.entrySpaceLeftM < 0
-                    ? 'text-rose-400 font-bold'
+                    ? 'text-lmu-loss font-bold'
                     : trackUsage.entrySpaceLeftM <= 0.2
-                    ? 'text-emerald-400 font-bold'
+                    ? 'text-lmu-gain font-bold'
                     : trackUsage.entrySpaceLeftM <= 0.9
                     ? 'text-white font-bold'
-                    : 'text-amber-400 font-bold'
+                    : 'text-lmu-warn font-bold'
                 }
                 title={
                   trackUsage.entrySpaceLeftM < 0
@@ -212,18 +212,18 @@ export const EntryPhaseCard: React.FC<EntryPhaseCardProps> = ({
                     ? '0.0m'
                     : `${trackUsage.entrySpaceLeftM.toFixed(1)}m`}
                 </span>{' '}
-                <span className="text-[9px] text-slate-400 font-normal">
+                <span className="text-[10px] text-lmu-muted font-normal">
                   {trackUsage.entrySpaceLeftM < 0 ? 'off-track' : 'left'}
                 </span>
               </span>
             ) : trackUsage?.entryOffsetM !== undefined ? (
               <span className="text-white font-bold" title={`${trackUsage.entryOffsetM.toFixed(1)}m from track edge`}>
-                {trackUsage.entryOffsetM.toFixed(1)}m <span className="text-[9px] text-slate-400 font-normal">edge</span>
+                {trackUsage.entryOffsetM.toFixed(1)}m <span className="text-[10px] text-lmu-muted font-normal">edge</span>
               </span>
             ) : corner.straightBrakingDistM ? (
               <span className="text-white font-bold">{corner.straightBrakingDistM}m straight</span>
             ) : (
-              <span className="text-slate-500">--</span>
+              <span className="text-lmu-faint">--</span>
             )}
           </span>
         </div>

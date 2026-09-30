@@ -59,7 +59,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
         type="button"
         onClick={build}
         disabled={state.kind === 'loading'}
-        className="px-2.5 py-1 rounded-lg border border-sky-500/40 text-xs font-bold text-sky-300 hover:bg-sky-500/10 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+        className="px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule-strong transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
       >
         <Search className="w-3.5 h-3.5" />
         {state.kind === 'loading' ? 'Reading both laps…' : "Where's the time?"}
@@ -68,7 +68,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
   }
 
   if (state.kind === 'error') {
-    return <p role="alert" className="text-xs text-rose-300">{state.message}</p>;
+    return <p role="alert" className="text-xs text-lmu-loss-soft">{state.message}</p>;
   }
 
   const { debrief } = state;
@@ -91,7 +91,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
         </ol>
       )}
       {debrief.caveats.map((caveat) => (
-        <p key={caveat} className="text-[11px] text-amber-300/80 pb-1">{caveat}</p>
+        <p key={caveat} className="text-[11px] text-lmu-warn-soft/80 pb-1">{caveat}</p>
       ))}
     </div>
   );

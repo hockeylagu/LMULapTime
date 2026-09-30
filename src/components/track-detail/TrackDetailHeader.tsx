@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
-import { BenchmarkTargetsGrid } from '../common/BenchmarkTargetsGrid.js';
+import { BenchmarkLadder } from '../common/BenchmarkLadder.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 
@@ -48,7 +48,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-accent transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-accent transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Tracks
@@ -60,33 +60,34 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
             const carClass = selectedClass !== 'All' ? selectedClass : 'LMGT3';
             navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-white hover:border-lmu-accent transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-medium text-lmu-text-soft hover:text-lmu-text hover:bg-lmu-cardHover transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
           title="Compare laps on this track"
         >
-          <ArrowLeftRight className="w-4 h-4 text-lmu-gold" />
+          <ArrowLeftRight className="w-4 h-4 text-lmu-muted" />
           Compare Laps
         </button>
       </div>
 
       {/* Track Title Card */}
-      <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3.5">
+      <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl grid grid-cols-[160px_minmax(0,1fr)] items-stretch gap-6">
               <TrackCircuitLayout
                 trackName={trackName}
                 trackCourse={trackCourse}
+                size="header"
               />
+          <div className="min-w-0 space-y-4">
+            <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 max-w-full">
-                  <h2 className="text-3xl font-extrabold text-white truncate" title={trackName}>
+                  <h2 dir="auto" className="text-3xl font-extrabold text-white [overflow-wrap:anywhere]" title={trackName}>
                     {trackName}
                   </h2>
                   <button
                     type="button"
                     onClick={() => setIsInfoModalOpen(true)}
-                    className="p-1 rounded-md bg-slate-800/80 border border-slate-700/60 text-slate-400 hover:text-lmu-accent hover:border-lmu-accent/40 hover:bg-slate-800 transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-lmu-accent"
+                    className="p-1 rounded-md bg-lmu-raised/80 border border-lmu-rule/60 text-lmu-muted hover:text-lmu-accent-text hover:border-lmu-accent/40 hover:bg-lmu-raised transition-all shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
                     title={`View circuit info for ${trackName}`}
+                    aria-label={`View circuit info for ${trackName}`}
                   >
                     <Info className="w-3.5 h-3.5" />
                   </button>
@@ -95,29 +96,28 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   Benchmark Target Lap Times & Personal Telemetry per Vehicle Category
                 </p>
               </div>
-            </div>
-          </div>
-
-          {/* Vehicle Class Filter Buttons (Beside Circuit Title) */}
+          {/* Vehicle class selection at the top right of the header */}
           <VehicleClassPills
             selectedClass={selectedClass}
             onSelectClass={setSelectedClass}
+            className="shrink-0"
           />
-        </div>
+            </div>
 
         {/* Specific Car Model Sub-Filter Row */}
         {selectedClass !== 'All' && availableCarModels.length > 0 && (
           <div className="pt-3 border-t border-lmu-border/50 flex items-center gap-3 flex-wrap text-xs">
-            <span className="text-xs font-semibold text-lmu-muted uppercase flex items-center gap-1.5 shrink-0">
-              <Car className="w-3.5 h-3.5 text-lmu-accent" />
+            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <Car className="w-3.5 h-3.5 text-lmu-accent-text" />
               Car Model:
             </span>
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
+                aria-pressed={selectedCarModel === 'All'}
                 onClick={() => setSelectedCarModel('All')}
-                className={`px-3 py-1 rounded-lg font-medium transition-all ${selectedCarModel === 'All'
-                  ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/40 font-bold shadow-sm'
+                className={`px-3 py-1 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${selectedCarModel === 'All'
+                  ? 'bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/40 font-bold'
                   : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                   }`}
               >
@@ -127,9 +127,11 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                 <button
                   key={car}
                   type="button"
+                  aria-pressed={selectedCarModel === car}
+                  dir="auto"
                   onClick={() => setSelectedCarModel(car)}
-                  className={`px-3 py-1 rounded-lg font-medium transition-all ${selectedCarModel === car
-                    ? 'bg-lmu-accent text-white font-bold shadow-sm'
+                  className={`max-w-full [overflow-wrap:anywhere] px-3 py-1 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${selectedCarModel === car
+                    ? 'bg-lmu-accent text-white font-bold'
                     : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                     }`}
                 >
@@ -143,14 +145,15 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
         {/* Merged Reference Lap Times: only times, no title or subtitle */}
         {currentBenchmark ? (
           <div className="pt-3 border-t border-lmu-border/50">
-            <BenchmarkTargetsGrid benchmark={currentBenchmark} variant="grid" />
+            <BenchmarkLadder benchmark={currentBenchmark} />
           </div>
         ) : (
-          <div className="pt-3 border-t border-lmu-border/50 py-3 text-center text-xs text-lmu-muted">
+          <div role="status" className="pt-3 border-t border-lmu-border/50 py-3 text-center text-xs text-lmu-muted">
             No reference benchmarks found for this track. Update reference lap time benchmarks in Settings.
           </div>
         )}
 
+          </div>
       </div>
 
       <CircuitInfoModal

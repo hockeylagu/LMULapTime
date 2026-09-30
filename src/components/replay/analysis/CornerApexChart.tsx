@@ -49,7 +49,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
       <div className={`flex flex-col bg-lmu-deep rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg p-2 gap-1.5 shrink-0 ${className}`}>
         <div className="flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            <span className="inline-flex items-center h-5 px-1.5 rounded bg-sky-500/20 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap">
+            <span className="inline-flex items-center h-5 px-1.5 rounded bg-lmu-info-strong/20 text-lmu-info font-mono font-bold text-xs shrink-0 whitespace-nowrap">
               Turn {corner.cornerNumber}
             </span>
             {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
@@ -61,7 +61,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
               <button
                 type="button"
                 onClick={onOpenCornersTab}
-                className="inline-flex items-center h-5 px-2 rounded bg-sky-600/35 hover:bg-sky-600/50 border border-sky-500/40 text-sky-300 text-[10px] font-medium transition-colors"
+                className="inline-flex items-center h-5 px-2 rounded bg-lmu-info-strong/35 hover:bg-lmu-info-strong/50 border border-lmu-info-strong/40 text-lmu-info-soft text-[10px] font-medium transition-colors"
                 title="View in Corners Tab"
                 aria-label="View corner technique in Corners tab"
               >
@@ -69,7 +69,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
               </button>
             )}
             {onClose && (
-              <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-5 h-5 text-slate-400 hover:text-white rounded hover:bg-slate-800">
+              <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-5 h-5 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -97,26 +97,26 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
       {/* Master Unified Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-lmu-card border-b border-lmu-border/60 gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
-          <span className="inline-flex items-center h-6 px-2 rounded bg-sky-500/20 border border-sky-500/40 text-sky-400 font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
+          <span className="inline-flex items-center h-6 px-2 rounded bg-lmu-info-strong/20 border border-lmu-info-strong/40 text-lmu-info font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
             Turn {corner.cornerNumber}
           </span>
           {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
             <span
-              className="inline-flex items-center h-6 text-xs text-slate-300 font-mono capitalize shrink-0 whitespace-nowrap"
+              className="inline-flex items-center h-6 text-xs text-lmu-text-soft font-mono capitalize shrink-0 whitespace-nowrap"
               title={`Angle: ${corner.cornerAngleDeg}°, Direction: ${corner.turnDirection}${corner.effectiveRadiusM ? `, Radius: ~${corner.effectiveRadiusM}m` : ''}`}
             >
               {corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? 'left ↰' : 'right ↱'}
               {corner.effectiveRadiusM ? ` (R≈${corner.effectiveRadiusM}m)` : ''}
             </span>
           )}
-          <span className="inline-flex items-center h-6 px-2 rounded bg-slate-800 border border-slate-700/60 text-xs font-mono text-slate-300 shrink-0 whitespace-nowrap" title={`Corner length: ${corner.exitDistM - corner.entryDistM}m`}>
+          <span className="inline-flex items-center h-6 px-2 rounded bg-lmu-raised border border-lmu-rule/60 text-xs font-mono text-lmu-text-soft shrink-0 whitespace-nowrap" title={`Corner length: ${corner.exitDistM - corner.entryDistM}m`}>
             {corner.exitDistM - corner.entryDistM}m
           </span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           {onClose && (
-            <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-6 h-6 text-slate-400 hover:text-white rounded hover:bg-slate-800/60 transition-colors shrink-0">
+            <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-6 h-6 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised/60 transition-colors shrink-0">
               <X className="w-4 h-4" />
             </button>
           )}

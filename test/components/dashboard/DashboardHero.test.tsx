@@ -100,8 +100,9 @@ describe('DashboardHero', () => {
     expect(screen.getByText(/Chevrolet Corvette Z06 LMGT3.R/)).toBeInTheDocument();
     expect(screen.getByText('4:00.470')).toBeInTheDocument();
     expect(screen.getByText('P8')).toBeInTheDocument();
-    expect(screen.getByText('(+7)')).toBeInTheDocument();
-    expect(screen.getByText('(102.4%)')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-finish-gain')).toHaveTextContent('+7');
+    expect(screen.getByTestId('hero-finish')).toHaveTextContent('from P15');
+    expect(screen.getByTitle('Benchmark Pace: Good (102.4%)')).toBeInTheDocument();
 
     // Verify track circuit layout outline element is rendered instead of a map pin
     const circuitLayout = screen.getByTestId('track-circuit-layout');
@@ -126,8 +127,8 @@ describe('DashboardHero', () => {
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
     expect(replayBtn).toHaveTextContent('Launch Replay');
-    expect(replayBtn.className).toContain('text-emerald-400');
-    expect(replayBtn.className).toContain('border-emerald-500/30');
+    expect(replayBtn.className).toContain('text-lmu-gain');
+    expect(replayBtn.className).toContain('border-lmu-gain-strong/30');
 
     fireEvent.click(replayBtn);
     expect(onOpenReplay).toHaveBeenCalledWith('session-new', 2);
@@ -138,13 +139,12 @@ describe('DashboardHero', () => {
     expect(onSelectSession).toHaveBeenCalledWith('session-new');
   });
 
-  it('renders red badge for Race session type', () => {
+  it('renders the Race badge in race red', () => {
     render(<DashboardHero sessions={mockSessions} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
     const badge = screen.getByTestId('hero-session-type-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Race');
-    expect(badge.className).toContain('text-lmu-accent');
-    expect(badge.className).toContain('bg-lmu-accent/20');
+    expect(badge.className).toContain('text-lmu-accent-soft');
   });
 
   it('renders yellow 100Hz replay button when session has DuckDB telemetry', () => {
@@ -167,19 +167,19 @@ describe('DashboardHero', () => {
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
     expect(replayBtn).toHaveTextContent('Launch 100Hz Replay');
-    expect(replayBtn.className).toContain('text-amber-300');
-    expect(replayBtn.className).toContain('border-amber-500/40');
+    expect(replayBtn.className).toContain('text-lmu-warn-soft');
+    expect(replayBtn.className).toContain('border-lmu-warn-strong/40');
   });
 
   it('renders pace sparkline and recent momentum metrics', () => {
     render(<DashboardHero sessions={mockSessions} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
 
     expect(screen.getByTestId('dashboard-pace-sparkline')).toBeInTheDocument();
-    expect(screen.getByText(/Recent Form & Momentum/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Recent form$/i)).toBeInTheDocument();
     expect(screen.getByText('Clean Lap Rate')).toBeInTheDocument();
     expect(screen.getByText('Lap Consistency')).toBeInTheDocument();
     expect(screen.getByText('Race Net Positions')).toBeInTheDocument();
-    expect(screen.getByText('+7')).toBeInTheDocument(); // net positions
+    expect(screen.getAllByText('+7')).toHaveLength(2); // finish gain and net positions
   });
 
   it('renders nothing when sessions list is empty', () => {

@@ -31,7 +31,7 @@ export const LapStatusBadge: React.FC<LapStatusBadgeProps> = ({
   if (status === 'pit') {
     return (
       <span
-        className={`inline-flex items-center rounded px-2 py-0.5 font-semibold bg-lmu-accent/20 text-lmu-accent ${textSize} ${className}`}
+        className={`inline-flex items-center rounded px-2 py-0.5 font-semibold bg-lmu-accent/20 text-lmu-accent-text ${textSize} ${className}`}
         title={pitTooltip}
       >
         PIT STOP
@@ -41,7 +41,7 @@ export const LapStatusBadge: React.FC<LapStatusBadgeProps> = ({
   if (status === 'outlap') {
     return (
       <span
-        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 ${textSize} ${className}`}
+        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold bg-lmu-aqua-strong/15 border border-lmu-aqua-strong/30 text-lmu-aqua ${textSize} ${className}`}
         title={outLapTooltip}
       >
         Out Lap
@@ -59,7 +59,7 @@ export const LapStatusBadge: React.FC<LapStatusBadgeProps> = ({
   if (status === 'inferred') {
     return (
       <span
-        className={`inline-flex items-center gap-1 font-medium text-amber-400 cursor-help ${textSize} ${className}`}
+        className={`inline-flex items-center gap-1 font-medium text-lmu-warn cursor-help ${textSize} ${className}`}
         title={incompleteTooltip}
       >
         <Clock className={iconSize} />

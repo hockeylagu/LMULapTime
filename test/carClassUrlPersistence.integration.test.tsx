@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HashRouter } from 'react-router';
 import App from '../src/App.js';
+import { prefetchRoutePages } from '../src/routePages.js';
 
 const session = {
   id: 's-1',
@@ -80,6 +81,9 @@ function mockApi() {
 }
 
 describe('carClass URL persistence across track navigation', () => {
+  // Pages load lazily; resolve their modules once so the first render of each is not a cold transform.
+  beforeAll(() => prefetchRoutePages(), 30000);
+
   let root: Root | null = null;
   let host: HTMLDivElement | null = null;
 
@@ -125,7 +129,7 @@ describe('carClass URL persistence across track navigation', () => {
       expect(window.location.hash).toContain('carClass=LMH');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /back to tracks/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /back to tracks/i }));
 
     await waitFor(() => {
       expect(window.location.hash).toContain('#/tracks');

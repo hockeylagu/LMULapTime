@@ -121,4 +121,36 @@ describe('CircuitInfoModal', () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it('isolates the page, cycles focus and restores the trigger and scroll state on close', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const originalOverflow = document.body.style.overflow;
+    const { rerender, container } = render(
+      <CircuitInfoModal isOpen onClose={vi.fn()} trackName="Spa" trackGeometry={null} />
+    );
+    const first = screen.getByRole('button', { name: 'Close circuit information' });
+    const last = screen.getByRole('button', { name: /^Close$/ });
+    expect(first).toHaveFocus();
+    expect(container.inert).toBe(true);
+    expect(trigger.inert).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(first).toHaveFocus();
+    trigger.focus();
+    expect(first).toHaveFocus();
+    rerender(<CircuitInfoModal isOpen={false} onClose={vi.fn()} trackName="Spa" trackGeometry={null} />);
+    expect(trigger).toHaveFocus();
+    expect(container.inert).not.toBe(true);
+    expect(document.body.style.overflow).toBe(originalOverflow);
+    trigger.remove();
+  });
+
+  it('falls back to the measured circuit length when XML length is invalid', () => {
+    render(<CircuitInfoModal isOpen onClose={vi.fn()} trackName="Spa" trackGeometry={mockGeometry} xmlTrackLengthMeters={-10} />);
+    expect(screen.getByText('7.004 km')).toBeInTheDocument();
+  });
 });

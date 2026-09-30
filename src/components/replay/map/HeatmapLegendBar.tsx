@@ -16,55 +16,55 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
     >
       {colorBy === 'speed' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Speed:</span>
-          <span className="flex items-center gap-1 text-sky-400">
-            <span className="w-2 h-2 rounded-full bg-sky-600" /> Apex
+          <span className="font-bold text-white uppercase tracking-wider">Speed:</span>
+          <span className="flex items-center gap-1 text-lmu-info">
+            <span className="w-2 h-2 rounded-full bg-lmu-info-strong" /> Apex
           </span>
           <span>→</span>
-          <span className="flex items-center gap-1 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Mid
+          <span className="flex items-center gap-1 text-lmu-gain">
+            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Mid
           </span>
           <span>→</span>
-          <span className="flex items-center gap-1 text-amber-400">
-            <span className="w-2 h-2 rounded-full bg-amber-500" /> High
+          <span className="flex items-center gap-1 text-lmu-warn">
+            <span className="w-2 h-2 rounded-full bg-lmu-warn-strong" /> High
           </span>
           <span>→</span>
-          <span className="flex items-center gap-1 text-fuchsia-400">
-            <span className="w-2 h-2 rounded-full bg-fuchsia-600" /> Max
+          <span className="flex items-center gap-1 text-lmu-purple">
+            <span className="w-2 h-2 rounded-full bg-lmu-purple-strong" /> Max
           </span>
         </div>
       )}
 
       {colorBy === 'pedal' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Pedal:</span>
-          <span className="flex items-center gap-1 text-rose-400">
-            <span className="w-2 h-2 rounded-full bg-rose-500" /> Brake
+          <span className="font-bold text-white uppercase tracking-wider">Pedal:</span>
+          <span className="flex items-center gap-1 text-lmu-loss">
+            <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> Brake
           </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-slate-600" /> Coast
+          <span className="flex items-center gap-1 text-lmu-muted">
+            <span className="w-2 h-2 rounded-full bg-lmu-rule-strong" /> Coast
           </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Throttle
+          <span className="flex items-center gap-1 text-lmu-gain">
+            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Throttle
           </span>
         </div>
       )}
 
       {colorBy === 'delta' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase">Delta:</span>
-          <span className="flex items-center gap-1 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" /> Gaining
+          <span className="font-bold text-white uppercase tracking-wider">Delta:</span>
+          <span className="flex items-center gap-1 text-lmu-gain">
+            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Gaining
           </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-slate-600" /> Even
+          <span className="flex items-center gap-1 text-lmu-muted">
+            <span className="w-2 h-2 rounded-full bg-lmu-rule-strong" /> Even
           </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-rose-400">
-            <span className="w-2 h-2 rounded-full bg-rose-500" /> Losing
+          <span className="flex items-center gap-1 text-lmu-loss">
+            <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> Losing
           </span>
         </div>
       )}

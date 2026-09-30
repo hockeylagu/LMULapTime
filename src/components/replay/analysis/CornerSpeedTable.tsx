@@ -102,7 +102,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-mono font-bold shrink-0 transition-colors cursor-pointer ${
                 c.cornerNumber === selectedCornerNumber
                   ? 'bg-lmu-accent/20 border-lmu-accent text-white'
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
+                  : 'bg-lmu-loss-strong/10 border-lmu-loss-strong/30 text-lmu-loss-soft hover:bg-lmu-loss-strong/20'
               }`}
             >
               <Flag className="w-2.5 h-2.5" />
@@ -153,8 +153,8 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                 {s.type === 'corner' ? (
                   <>
                     <td className="px-2 py-1.5 font-bold text-white">
-                      <span className={`inline-flex items-center gap-1.5 flex-wrap ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : ''}`}>
-                        <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent' : 'text-lmu-muted'}`} />
+                      <span className={`inline-flex items-center gap-1.5 flex-wrap ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent-text' : ''}`}>
+                        <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent-text' : 'text-lmu-muted'}`} />
                         <span>T{s.cornerNumber}</span>
                       </span>
                     </td>
@@ -234,7 +234,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                       {/* Top speed can occur mid-straight (lift before braking) - show the actual
                           exit-boundary speed too when it differs, e.g. the lap's finish-line straight. */}
                       {Math.abs(s.primaryTopSpeedKmh - s.primaryExitSpeedKmh) >= 1 && (
-                        <div className="text-[9px] leading-tight text-lmu-muted">
+                        <div className="text-[10px] leading-tight text-lmu-muted">
                           exit {s.primaryExitSpeedKmh}
                           {!selfAnalysis && <span className={`ml-0.5 ${speedDeltaClass(s.exitSpeedDeltaKmh)}`}>{formatSpeedDelta(s.exitSpeedDeltaKmh)}</span>}
                         </div>

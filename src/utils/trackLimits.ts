@@ -1,6 +1,7 @@
 import { LapTrackLimit } from '../../shared/types/index.js';
 
-export type TrackLimitSeverity = 'green' | 'yellow' | 'orange';
+/** How much a track limit costs: cleared (no further action), a warning, or serious (0.75 points and up). */
+export type TrackLimitSeverity = 'cleared' | 'warning' | 'serious';
 
 /**
  * Checks if a track limit incident was resolved with "No Further Action".
@@ -39,48 +40,49 @@ export function getTrackLimitPoints(tl: LapTrackLimit): number {
 }
 
 /**
- * Determines track limit severity color:
- * - 'green' if No Further Action
- * - 'yellow' for 0.25 or 0.50 points
- * - 'orange' for 0.75 and up
+ * Determines track limit severity:
+ * - 'cleared' if No Further Action
+ * - 'warning' for 0.25 or 0.50 points
+ * - 'serious' for 0.75 and up
  */
 export function getTrackLimitSeverity(tl: LapTrackLimit): TrackLimitSeverity {
   if (isNoFurtherActionTrackLimit(tl)) {
-    return 'green';
+    return 'cleared';
   }
 
   const pts = getTrackLimitPoints(tl);
 
   if (pts >= 0.75 || (tl.currentPoints !== undefined && tl.currentPoints >= 0.75)) {
-    return 'orange';
+    return 'serious';
   }
 
-  return 'yellow';
+  return 'warning';
 }
 
 /**
- * Returns the highest severity among an array of track limits (orange > yellow > green).
+ * Returns the highest severity among an array of track limits (serious > warning > cleared).
  */
 export function getWorstTrackLimitSeverity(tls?: LapTrackLimit[]): TrackLimitSeverity {
-  if (!tls || tls.length === 0) return 'yellow';
+  if (!tls || tls.length === 0) return 'warning';
   const severities = tls.map(getTrackLimitSeverity);
-  if (severities.includes('orange')) return 'orange';
-  if (severities.includes('yellow')) return 'yellow';
-  return 'green';
+  if (severities.includes('serious')) return 'serious';
+  if (severities.includes('warning')) return 'warning';
+  return 'cleared';
 }
 
 /**
- * Returns Tailwind badge classes for a given track limit severity.
+ * Returns Tailwind badge classes for a given track limit severity: neutral when cleared (nothing
+ * was gained or lost), warn for a warning, loss once the points are serious.
  */
 export function getTrackLimitBadgeClasses(severity: TrackLimitSeverity): string {
   switch (severity) {
-    case 'green':
-      return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-    case 'orange':
-      return 'bg-orange-500/20 text-orange-300 border-orange-500/40';
-    case 'yellow':
+    case 'cleared':
+      return 'bg-lmu-raised text-lmu-text-soft border-lmu-rule';
+    case 'serious':
+      return 'bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40';
+    case 'warning':
     default:
-      return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+      return 'bg-lmu-warn-strong/20 text-lmu-warn-soft border-lmu-warn-strong/40';
   }
 }
 
@@ -89,12 +91,12 @@ export function getTrackLimitBadgeClasses(severity: TrackLimitSeverity): string 
  */
 export function getTrackLimitStandingsPillClasses(severity: TrackLimitSeverity): string {
   switch (severity) {
-    case 'green':
-      return 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30';
-    case 'orange':
-      return 'bg-orange-950/60 text-orange-300 border-orange-500/40';
-    case 'yellow':
+    case 'cleared':
+      return 'bg-lmu-raised text-lmu-text-soft border-lmu-rule';
+    case 'serious':
+      return 'bg-lmu-loss-deep/60 text-lmu-loss-soft border-lmu-loss-strong/40';
+    case 'warning':
     default:
-      return 'bg-yellow-950/50 text-yellow-300 border-yellow-500/30';
+      return 'bg-lmu-warn-deep/50 text-lmu-warn-soft border-lmu-warn-strong/30';
   }
 }

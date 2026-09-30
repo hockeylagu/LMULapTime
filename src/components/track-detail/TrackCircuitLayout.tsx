@@ -14,7 +14,7 @@ export interface TrackCircuitLayoutProps {
   layoutKey?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   className?: string;
-  size?: 'detail' | 'card' | 'session';
+  size?: 'detail' | 'card' | 'session' | 'header';
   onClick?: () => void;
 }
 
@@ -76,12 +76,13 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   const effectiveGeometry = propGeometry !== undefined ? propGeometry : fetchedGeometry;
 
   const sizeClasses =
-    size === 'card' ? 'h-[46px] w-[62px]'
+    size === 'header' ? 'relative min-h-[128px] w-[160px] self-stretch [&>svg]:absolute [&>svg]:inset-0'
+    : size === 'card' ? 'h-[128px] w-[128px]'
     : size === 'session' ? 'h-[76px] w-[100px]'
-    : 'h-[54px] w-[72px]';
+    : 'h-[128px] w-[128px]';
 
   const interactiveClasses = onClick
-    ? 'cursor-pointer hover:scale-105 transition-transform'
+    ? 'cursor-pointer hover:opacity-80 transition-opacity'
     : 'pointer-events-none';
 
   const pathD = useMemo(() => {
@@ -95,7 +96,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         data-testid="track-circuit-layout-loading"
         className={`${sizeClasses} shrink-0 flex items-center justify-center animate-pulse ${className}`}
       >
-        <div className="w-6 h-6 rounded-lg bg-slate-800/40" />
+        <div className="w-6 h-6 rounded-lg bg-lmu-raised/40" />
       </div>
     );
   }
@@ -108,12 +109,12 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
-        className={`${sizeClasses} shrink-0 flex items-center justify-center text-slate-500 ${interactiveClasses} ${className}`}
+        className={`${sizeClasses} shrink-0 flex items-center justify-center text-lmu-faint ${interactiveClasses} ${className}`}
         title={trackName}
       >
         <svg
           viewBox="0 0 24 24"
-          className={size === 'card' ? 'w-5 h-5 text-slate-500' : 'w-6 h-6 text-slate-500'}
+          className={size === 'card' ? 'w-5 h-5 text-lmu-faint' : 'w-6 h-6 text-lmu-faint'}
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"

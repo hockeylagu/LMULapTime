@@ -29,7 +29,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
           <span className="truncate">{lap.sessionName || 'Session'} ({lap.sessionType || 'Session'})</span>
           {Boolean(lap.hasRain || lap.weatherCondition === 'Wet' || lap.weatherCondition === 'Dynamic Weather') && (
             <span
-              className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0"
+              className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[10px] font-bold bg-lmu-azure-strong/20 text-lmu-azure border border-lmu-azure-strong/30 shrink-0"
               title={lap.weatherCondition || 'Wet Session'}
             >
               <CloudRain className="w-2.5 h-2.5" />
@@ -55,12 +55,12 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
         }`}
       >
         {isCurrentLap && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-sky-500/20 text-sky-400 border border-sky-500/30">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-lmu-info-strong/20 text-lmu-info border border-lmu-info-strong/30">
             Current
           </span>
         )}
         {isSelected && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-lmu-gain-strong/20 text-lmu-gain border border-lmu-gain-strong/30 flex items-center gap-0.5">
             <Check className="w-3 h-3" /> Baseline
           </span>
         )}

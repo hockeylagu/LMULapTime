@@ -137,6 +137,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     isExpanded,
   });
 
+  const isFiltered = selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay;
+  // One URL update: separate setters would each start from the same params and undo one another.
+  const resetFilters = isFiltered
+    ? () => {
+        setSelectedCarClass('All');
+        legacySetSelectedTrack?.('All');
+        legacySetFilterType?.('All');
+        legacySetSearchQuery?.('');
+        updateSearchParams(searchParams, setSearchParams, { track: null, carClass: null, type: null, q: null, hasReplay: null });
+      }
+    : undefined;
+
   return (
     <div className="space-y-6">
       {/* Driver Command Center: Welcome & Latest Outing Spotlight */}
@@ -181,7 +193,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Sessions View */}
       <div className="space-y-4">
-        <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl overflow-hidden">
+        <div className="bg-lmu-card border border-lmu-border rounded-2xl overflow-hidden">
           <DashboardFilterBar
             tracks={tracks}
             selectedTrack={selectedTrack}
@@ -202,6 +214,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             setSortBy={setSortBy}
             embedded
             viewToggle={<SessionViewModeToggle viewMode={sessionViewMode} onViewModeChange={setSessionListViewMode} />}
+            onClearFilters={resetFilters}
           />
           <SessionList
             sessions={sortedSessions}
@@ -212,16 +225,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onViewModeChange={setSessionListViewMode}
             hideHeader
             className="p-5"
-            onResetFilters={(selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay) ? () => {
-              setSelectedTrack('All');
-              setSelectedCarClass('All');
-              setFilterType('All');
-              setSearchQuery('');
-              setHasReplay(false);
-            } : undefined}
+            onResetFilters={resetFilters}
             hideEmptyNotice={hideEmpty && emptyCount > 0 ? (
               <span>
-                Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className="text-lmu-accent underline hover:text-white">Click here to show empty results</button>.
+                Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className="text-lmu-accent-text underline hover:text-white">Click here to show empty results</button>.
               </span>
             ) : undefined}
           />

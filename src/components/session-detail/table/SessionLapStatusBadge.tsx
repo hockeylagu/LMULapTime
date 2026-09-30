@@ -71,37 +71,37 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   return (
     <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
       {status === 'pit' && (
-        <StatusIcon icon={Wrench} label="Pit Stop" className="text-lmu-accent"
+        <StatusIcon icon={Wrench} label="Pit Stop" className="text-lmu-text-soft"
           title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : 'Pit stop'} />
       )}
       {status === 'outlap' && (
-        <StatusIcon icon={LogOut} label="Out Lap" className="text-cyan-400"
+        <StatusIcon icon={LogOut} label="Out Lap" className="text-lmu-text-soft"
           title="Out lap (rejoining the track from the pit lane, left out of flying pace)" />
       )}
       {status === 'start' && (
-        <StatusIcon icon={Flag} label="Start Lap" className="text-amber-400"
+        <StatusIcon icon={Flag} label="Start Lap" className="text-lmu-text-soft"
           title={isRaceSession
             ? 'Race start lap (standing or rolling start on cold tyres, left out of flying pace)'
             : 'Session start lap (out of the garage, left out of flying pace)'} />
       )}
       {status === 'valid' && <StatusIcon icon={ShieldCheck} label="Valid" className="text-lmu-green" title="Valid lap" />}
-      {status === 'inferred' && <StatusIcon icon={Clock} label="Incomplete" className="text-amber-400" title={incompleteTooltip} />}
-      {status === 'invalid' && <StatusIcon icon={CircleAlert} label="Incomplete" className="text-lmu-gold" title={incompleteTooltip} />}
+      {status === 'inferred' && <StatusIcon icon={Clock} label="Incomplete" className="text-lmu-warn" title={incompleteTooltip} />}
+      {status === 'invalid' && <StatusIcon icon={CircleAlert} label="Incomplete" className="text-lmu-warn" title={incompleteTooltip} />}
 
       {l.conditions?.rain !== undefined && (
-        <StatusIcon icon={CloudRain} label="Rain" className="text-sky-400" title={`${describeRain(l.conditions.rain)}: ${CONDITIONS_NOTE}`} />
+        <StatusIcon icon={CloudRain} label="Rain" className="text-lmu-info" title={`${describeRain(l.conditions.rain)}: ${CONDITIONS_NOTE}`} />
       )}
       {l.conditions?.wetTyres && (
-        <StatusIcon icon={Droplets} label="Wet tyres" className="text-sky-300" title={`On wet tyres: ${CONDITIONS_NOTE}`} />
+        <StatusIcon icon={Droplets} label="Wet tyres" className="text-lmu-info-soft" title={`On wet tyres: ${CONDITIONS_NOTE}`} />
       )}
       {reason && (
         <StatusIcon icon={REASON_ICONS[reason]} label={NON_REPRESENTATIVE_LABELS[reason].label}
-          className={`${badge} bg-amber-500/15 text-amber-300 border-amber-500/40`}
+          className={`${badge} bg-lmu-warn-strong/15 text-lmu-warn-soft border-lmu-warn-strong/40`}
           title={`${describeNonRepresentative(reason, l.traffic)}: left out of the average and consistency`} />
       )}
       {Boolean(l.incidentCount) && (
         <StatusIcon icon={ShieldAlert} label="Incidents" count={l.incidentCount}
-          className={`${badge} bg-rose-500/20 text-rose-300 border-rose-500/40`}
+          className={`${badge} bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40`}
           title={l.incidents?.map((i) => i.description).join('\n') ?? 'Incidents'} />
       )}
       {Boolean(l.trackLimitCount) && (
@@ -111,7 +111,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
       )}
       {Boolean(l.penaltyCount) && (
         <StatusIcon icon={Ban} label={l.penalties?.[0]?.penalty || 'Penalty'}
-          className={`${badge} bg-rose-500/20 text-rose-300 border-rose-500/40`}
+          className={`${badge} bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40`}
           title={l.penalties?.map((p) => p.description).join('\n') ?? 'Penalty'} />
       )}
     </div>

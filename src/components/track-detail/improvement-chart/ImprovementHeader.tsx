@@ -22,10 +22,10 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
   if (embedded) return null;
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
       <div>
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-lmu-accent" />
+        <h2 className="text-xl font-semibold text-lmu-text flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-lmu-muted" />
           Lap & Sector Improvement Over Time
         </h2>
         <p className="text-xs text-lmu-muted mt-1">
@@ -38,7 +38,7 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
         <select
           value={activeTrack}
           onChange={(e) => setSelectedTrack(e.target.value)}
-          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lmu-accent font-medium"
+          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text font-medium"
         >
           {tracks.map((t) => (
             <option key={t} value={t}>

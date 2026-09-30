@@ -44,7 +44,16 @@ export function lapDetailSections(lap: LapData, context: LapDetailContext = {}):
   }
   // Cars going by while the driver is in or out of the pits are not a fight.
   const inPits = lap.isPitStop || lap.isOutLap === true;
-  const traffic = inPits ? [] : describeLapTraffic(lap.traffic, context.places);
+  const places = context.places;
+  if (places && places.from !== places.to) {
+    const gained = places.from > places.to;
+    const count = Math.abs(places.from - places.to);
+    sections.push({
+      label: gained ? 'Position gained' : 'Position lost',
+      lines: [`P${places.from} → P${places.to} · ${count} ${count === 1 ? 'place' : 'places'} ${gained ? 'gained' : 'lost'}`],
+    });
+  }
+  const traffic = inPits ? [] : describeLapTraffic(lap.traffic);
   if (traffic.length > 0) sections.push({ label: 'Around you', lines: traffic });
   if (lap.incidents?.length) sections.push({ label: 'Incidents', lines: lap.incidents.map((i) => i.description) });
   if (lap.trackLimits?.length) sections.push({ label: 'Track limits', lines: lap.trackLimits.map((tl) => withoutTrackLimitsPrefix(tl.description)) });

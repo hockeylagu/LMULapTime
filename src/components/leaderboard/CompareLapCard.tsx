@@ -7,6 +7,9 @@ import { matchesCarClass, getPaceCategoryFromPercentage } from '../../../shared/
 import { PaceBadge, LapStatusBadge } from '../common';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 
+/** A lap's tag without the emoji some stored tags still start with; the card's colour carries the meaning. */
+const plainTag = (tag?: string) => tag?.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '');
+
 export interface CompareLapCardProps {
   lap: ComparableLap;
   isBaseline: boolean;
@@ -66,16 +69,16 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
       <div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color }} />
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
             <span
               className={`text-xs font-bold uppercase tracking-wider truncate ${
-                lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
+                lap.isAllTimePB ? 'text-lmu-personal-best' : lap.isSessionBest ? 'text-lmu-session-best' : 'text-white'
               }`}
             >
-              {lap.tag || `Lap ${lap.lapNum || '-'}`}
+              {plainTag(lap.tag) || `Lap ${lap.lapNum || '-'}`}
             </span>
             {isRival && (
-              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-amber-300 shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-lmu-warn-soft shrink-0">
                 <Target className="w-3 h-3" /> Your rival
               </span>
             )}
@@ -84,7 +87,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <div className="flex items-center gap-1 shrink-0">
             {isBaseline ? (
               <span
-                className="text-[10px] uppercase tracking-wider text-lmu-gold font-semibold px-1.5 py-0.5"
+                className="text-[10px] uppercase tracking-wider text-lmu-warn-soft font-semibold px-1.5 py-0.5"
                 title="The other laps' deltas are measured against this one"
               >
                 Baseline
@@ -93,7 +96,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               <button
                 type="button"
                 onClick={() => onSetBaseline(lap.id)}
-                className="text-[10px] text-lmu-muted hover:text-lmu-gold font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg cursor-pointer"
+                className="text-[10px] text-lmu-muted hover:text-lmu-warn-soft font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg cursor-pointer"
                 title="Set as baseline for deltas"
               >
                 Set Baseline
@@ -102,7 +105,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             <button
               type="button"
               onClick={() => onRemoveLap(lap)}
-              className="text-lmu-muted hover:text-rose-400 p-0.5 rounded transition-colors cursor-pointer"
+              className="text-lmu-muted hover:text-lmu-loss p-0.5 rounded transition-colors cursor-pointer"
               title="Remove from comparison"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -131,7 +134,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <div className="flex items-baseline gap-2 mt-0.5">
             <h4
               className={`text-2xl font-extrabold font-mono ${
-                lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
+                lap.isAllTimePB ? 'text-lmu-personal-best' : lap.isSessionBest ? 'text-lmu-session-best' : 'text-white'
               }`}
             >
               {lap.lapTimeString}
@@ -193,7 +196,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <button
             type="button"
             onClick={() => onSelectSession(lap.sessionId!)}
-            className="text-[11px] text-lmu-muted hover:text-lmu-gold transition-colors font-medium cursor-pointer"
+            className="text-[11px] text-lmu-muted hover:text-white transition-colors font-medium cursor-pointer"
           >
             View Full Session →
           </button>

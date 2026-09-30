@@ -4,7 +4,6 @@ import {
   createTheoreticalBestLap,
   createBenchmarkLaps,
   filterLapsByCarCategory,
-  computeLapToLapDelta,
   computeTopNLapAverage,
   computeConsistencyRating,
   selectCleanLapCandidates,
@@ -54,7 +53,7 @@ describe('lapComparison utility', () => {
       const deltas = computeLapDeltas(baseLap, slowerLap);
       expect(deltas.lapTimeDelta).toBe(0.75);
       expect(deltas.lapTimeDeltaFormatted).toBe('+0.750s');
-      expect(deltas.lapTimeDeltaClass).toContain('text-rose-400');
+      expect(deltas.lapTimeDeltaClass).toContain('text-lmu-loss');
       expect(deltas.s1Delta).toBe(0.2);
       expect(deltas.s1DeltaFormatted).toBe('+0.200s');
       expect(deltas.speedDelta).toBe(-4.5);
@@ -201,47 +200,6 @@ describe('lapComparison utility', () => {
       const result = filterLapsByCarCategory(mixedLaps, 'LMGT3', 'BMW M4 GT3');
       expect(result.length).toBe(1);
       expect(result[0].carType).toBe('BMW M4 GT3');
-    });
-  });
-
-  describe('computeLapToLapDelta', () => {
-    it('returns null and fallback string when previous lap or current lap is missing or invalid', () => {
-      expect(computeLapToLapDelta(null, 120.0)).toEqual({
-        delta: null,
-        formatted: '--',
-        deltaClass: 'text-lmu-muted',
-        isFaster: null,
-      });
-      expect(computeLapToLapDelta(120.0, null)).toEqual({
-        delta: null,
-        formatted: '--',
-        deltaClass: 'text-lmu-muted',
-        isFaster: null,
-      });
-      expect(computeLapToLapDelta(0, 120.0).formatted).toBe('--');
-    });
-
-    it('computes exact zero delta for equal consecutive lap times', () => {
-      const res = computeLapToLapDelta(122.5, 122.5);
-      expect(res.delta).toBe(0);
-      expect(res.formatted).toBe('±0.000s');
-      expect(res.isFaster).toBe(false);
-    });
-
-    it('computes negative delta with emerald styling when current lap is faster than previous lap', () => {
-      const res = computeLapToLapDelta(123.456, 122.123);
-      expect(res.delta).toBe(-1.333);
-      expect(res.formatted).toBe('-1.333s');
-      expect(res.deltaClass).toContain('text-emerald-400');
-      expect(res.isFaster).toBe(true);
-    });
-
-    it('computes positive delta with rose styling when current lap is slower than previous lap', () => {
-      const res = computeLapToLapDelta(122.0, 122.456);
-      expect(res.delta).toBe(0.456);
-      expect(res.formatted).toBe('+0.456s');
-      expect(res.deltaClass).toContain('text-rose-400');
-      expect(res.isFaster).toBe(false);
     });
   });
 

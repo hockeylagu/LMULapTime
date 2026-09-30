@@ -78,18 +78,21 @@ describe('ImprovementPaceChart legend toggle', () => {
 
     // Legend items should exist with clickable titles
     const bestLapLegendItem = screen.getByTitle('Click to toggle Best Lap Time visibility');
+    expect(bestLapLegendItem.tagName).toBe('BUTTON');
+    expect(bestLapLegendItem).toHaveAttribute('aria-pressed', 'true');
     expect(bestLapLegendItem).toBeInTheDocument();
-    expect(bestLapLegendItem.className).toContain('opacity-100 font-semibold');
+    expect(bestLapLegendItem.className).toContain('font-semibold');
     expect(bestLapLegendItem.className).not.toContain('line-through');
 
     // Click to toggle off / hide
     fireEvent.click(bestLapLegendItem);
+    expect(bestLapLegendItem).toHaveAttribute('aria-pressed', 'false');
     expect(bestLapLegendItem.className).toContain('line-through');
-    expect(bestLapLegendItem.className).toContain('opacity-35');
+    expect(bestLapLegendItem.className).toContain('text-lmu-faint');
 
     // Click again to toggle back on / show
     fireEvent.click(bestLapLegendItem);
-    expect(bestLapLegendItem.className).toContain('opacity-100 font-semibold');
+    expect(bestLapLegendItem.className).toContain('font-semibold');
     expect(bestLapLegendItem.className).not.toContain('line-through');
   });
 

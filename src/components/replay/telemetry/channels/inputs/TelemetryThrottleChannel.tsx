@@ -6,9 +6,9 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 
 const THROTTLE_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: '100%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
-  { label: '50%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
-  { label: '0%', borderClassName: 'border-b border-emerald-400/40', labelClassName: 'text-[9px] text-emerald-400 font-mono' },
+  { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+  { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
+  { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
 ];
 
 export interface TelemetryThrottleChannelProps {
@@ -65,22 +65,22 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
   ), [throttleArea, baselineThrottlePath, throttlePath]);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-emerald-950/20">
+    <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-emerald-500/20 text-emerald-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-gain-strong/20 text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
           <Activity className="w-3 h-3" />
           THROTTLE
         </span>
-        <span className="text-xs font-mono font-bold text-emerald-400">
+        <span className="text-xs font-mono font-bold text-lmu-gain">
           {(currentPoint?.throttle ?? 0).toFixed(1)}%
         </span>
         {currentPoint?.tcActive && (
-          <span className="px-1.5 py-0.2 rounded bg-amber-500 text-black font-black text-[8px] tracking-wider animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+          <span className="px-1.5 py-px rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
             TC CUT
           </span>
         )}
         {currentComparison && (
-          <span className="text-[11px] font-mono text-amber-400/90 ml-1 pl-2 border-l border-white/10">
+          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
             Base: {currentComparison.baseline.throttle.toFixed(0)}%
           </span>
         )}
@@ -100,12 +100,12 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
           style={{ left: `${cursorPct}%` }}
         >
           <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
-            currentPoint?.tcActive ? 'border-amber-400 text-amber-300' : 'border-emerald-400/80 text-emerald-300'
+            currentPoint?.tcActive ? 'border-lmu-warn text-lmu-warn-soft' : 'border-lmu-gain/80 text-lmu-gain-soft'
           }`}>
             {(currentPoint?.throttle ?? 0).toFixed(0)}%
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-amber-500/80 font-mono font-bold text-[10px] text-amber-300 shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
               B: {currentComparison.baseline.throttle.toFixed(0)}%
             </span>
           )}

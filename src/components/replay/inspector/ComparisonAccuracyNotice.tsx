@@ -42,8 +42,8 @@ export const ComparisonAccuracyNotice: React.FC<ComparisonAccuracyNoticeProps> =
   const caveats = describeComparisonCaveats(trajectory, baselineTrajectory);
   if (caveats.length === 0) return null;
   return (
-    <div role="note" className="flex items-start gap-1.5 w-full px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[10px] leading-snug">
-      <AlertTriangle className="w-3 h-3 mt-px shrink-0 text-amber-400" />
+    <div role="note" className="flex items-start gap-1.5 w-full px-2 py-1 rounded-lg bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-lmu-warn-soft text-[10px] leading-snug">
+      <AlertTriangle className="w-3 h-3 mt-px shrink-0 text-lmu-warn" />
       <div className="flex flex-col gap-0.5">
         {caveats.map(caveat => <span key={caveat}>{caveat}</span>)}
       </div>

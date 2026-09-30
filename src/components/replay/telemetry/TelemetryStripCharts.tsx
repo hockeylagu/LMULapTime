@@ -153,7 +153,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
-        <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[8px] sm:text-[9px] font-mono font-bold tracking-wider overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[10px] sm:text-[10px] font-mono font-bold tracking-wider overflow-hidden">
           {((sectors.s1Frame > 0 ? pctForIndex(sectors.s1Frame) : 0) > 0) && (
             <div style={{ width: `${Math.max(0, pctForIndex(sectors.s1Frame))}%` }} className="h-full border-r border-lmu-gold/40 bg-lmu-gold/15 text-lmu-gold flex items-center justify-center truncate px-1">SECTOR 1</div>
           )}
@@ -164,7 +164,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
             <div style={{ width: `${Math.max(0, 100 - (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0))}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>
           )}
           {isCursorInView && (
-            <div style={{ left: `${cursorPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-white z-30 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+            <div style={{ left: `${cursorPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-white z-30" />
           )}
         </div>
       )}

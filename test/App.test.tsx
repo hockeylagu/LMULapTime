@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../src/App.js';
+import { prefetchRoutePages } from '../src/routePages.js';
 
 describe('App component', () => {
+  // Pages load lazily; resolve their modules once so the first render of each is not a cold transform.
+  beforeAll(() => prefetchRoutePages(), 30000);
+
   let startupScanStatus: Record<string, unknown>;
 
   const mockStatus = {
@@ -97,7 +101,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: /LMU Lap Time Analyzer/i })).toBeInTheDocument();
     });
   });
@@ -115,7 +119,7 @@ describe('App component', () => {
     render(<App />);
 
     expect(await screen.findByTestId('app-loading-state')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Driving Overview')).toBeInTheDocument(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByText('Totals')).toBeInTheDocument(), { timeout: 4000 });
     expect(sessionAttempts).toBe(2);
   });
 
@@ -123,17 +127,17 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     const tracksTab = screen.getByRole('link', { name: /tracks/i });
     fireEvent.click(tracksTab);
 
     await waitFor(() => {
-      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
     });
 
-    const settingsTab = screen.getByRole('link', { name: /settings/i });
+    const settingsTab = screen.getByRole('link', { name: /^Settings$/ });
     fireEvent.click(settingsTab);
 
     await waitFor(() => {
@@ -144,7 +148,7 @@ describe('App component', () => {
     fireEvent.click(dashboardTab);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 
@@ -181,7 +185,7 @@ describe('App component', () => {
     fireEvent.click(backBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 
@@ -198,7 +202,7 @@ describe('App component', () => {
     fireEvent.click(backBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Track Records & Benchmarks/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /^Tracks \(/ })).toBeInTheDocument();
     });
   });
 
@@ -206,7 +210,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     // Select track filter
@@ -236,7 +240,7 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
 
     const refreshBtn = screen.getByTitle(/Refresh LMU Directory Scan/i);
@@ -244,7 +248,7 @@ describe('App component', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true');
-      expect(screen.getByText('Driving Overview')).toBeInTheDocument();
+      expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });
 

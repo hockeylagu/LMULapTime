@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy } from 'lucide-react';
+import { Link } from 'react-router';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge, SectorSplitsRow, CarClassBadge } from '../common';
 import { PaceCategory } from '../../../shared/types/index.js';
@@ -25,54 +25,73 @@ interface TrackSummaryCardProps {
   track: TrackSummaryItem;
   paceInfo: { category: PaceCategory; pct: number } | null;
   onSelectTrack: (trackName: string) => void;
+  selectedCarClass: string;
+  benchmarkState: 'loading' | 'error' | 'ready';
 }
 
 export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
   track: t,
   paceInfo,
   onSelectTrack,
+  selectedCarClass,
+  benchmarkState,
 }) => {
+  const hasLap = t.bestLapTime !== null && Number.isFinite(t.bestLapTime) && t.bestLapTime > 0;
+  const hasTheoretical = t.theoreticalBest !== null && Number.isFinite(t.theoreticalBest) && t.theoreticalBest > 0;
+  const lastDriven = t.lastSessionTimestamp && Number.isFinite(t.lastSessionTimestamp) && t.lastSessionTimestamp > 0
+    ? new Date(t.lastSessionTimestamp) : null;
+  const validLastDriven = lastDriven && Number.isFinite(lastDriven.getTime()) ? lastDriven : null;
+  const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
   return (
-    <div
-      onClick={() => onSelectTrack(t.trackVenue)}
-      className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] transition-all duration-200 ease-in-out hover:bg-lmu-cardHover/85 hover:border-lmu-accent/30 hover:-translate-y-0.5 p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between"
+    <Link
+      to={`/track/${encodeURIComponent(t.trackVenue)}${suffix}`}
+      aria-label={`View ${t.trackVenue} records`}
+      onClick={event => {
+        if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          onSelectTrack(t.trackVenue);
+        }
+      }}
+      className="min-w-0 bg-lmu-card border border-lmu-border transition-colors duration-200 hover:bg-lmu-cardHover hover:border-lmu-rule p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-4"
     >
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 flex items-center gap-3">
+        <div className="grid grid-cols-[128px_minmax(0,1fr)] items-center gap-5">
             <TrackCircuitLayout
               trackName={t.trackVenue}
               size="card"
             />
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-bold text-white tracking-wide truncate" title={t.trackVenue}>
+          <div className="min-w-0 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-lmu-text break-words" dir="auto">
                 {t.trackVenue}
               </h3>
-              <p className="text-xs text-lmu-muted mt-0.5 truncate">
-                {t.sessionsCount} Sessions • {t.totalLaps} Total Laps
+              <p className="text-xs text-lmu-muted mt-0.5 break-words">
+                {t.sessionsCount} {t.sessionsCount === 1 ? 'Session' : 'Sessions'} • {t.totalLaps} Total Laps
               </p>
+              {validLastDriven && (
+                <p className="text-[11px] text-lmu-muted mt-1">
+                  Last driven <time dateTime={validLastDriven.toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(validLastDriven)}</time>
+                </p>
+              )}
             </div>
-          </div>
-          <span className="p-2 rounded-xl bg-lmu-gold/10 text-lmu-gold border border-lmu-gold/20 shrink-0">
-            <Trophy className="w-5 h-5" />
-          </span>
-        </div>
 
         {/* Best Lap vs Theoretical */}
-        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-lmu-border/60">
-          <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50 flex flex-col justify-between">
+        {hasLap ? <>
+        <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start gap-4 pt-1">
+          <div className="min-w-0 flex flex-col justify-between">
             <div>
-              <p className="text-xs text-lmu-muted font-semibold uppercase">Session Best</p>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <h4 className="text-xl font-extrabold text-lmu-gold font-mono">
+              <p className="text-[10px] text-lmu-muted font-semibold uppercase tracking-wider">Personal Best</p>
+              <div className="mt-0.5 flex items-center gap-3">
+                <h4 className="shrink-0 text-xl font-bold text-lmu-personal-best font-mono">
                   {formatTime(t.bestLapTime)}
                 </h4>
-                {paceInfo && (
-                  <PaceBadge category={paceInfo.category} percentage={paceInfo.pct} showPercentage />
-                )}
+                {paceInfo && <PaceBadge category={paceInfo.category} percentage={paceInfo.pct} showPercentage size="xs" />}
               </div>
-              <div className="flex items-center gap-1.5 mt-1 truncate">
-                <span className="text-[11px] text-white font-medium truncate">{t.bestLapCar || 'Car'}</span>
+              {!paceInfo && <p className="text-[11px] text-lmu-muted mt-1.5">
+                {benchmarkState === 'loading' ? 'Loading benchmark…' : benchmarkState === 'error' ? 'Benchmark unavailable' : 'No matching benchmark'}
+              </p>}
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="text-[11px] text-lmu-text-soft break-words min-w-0" dir="auto">{t.bestLapCar || 'Car not recorded'}</span>
                 {t.bestLapClass && (
                   <CarClassBadge carClass={t.bestLapClass} carType={t.bestLapCar} size="xs" />
                 )}
@@ -80,39 +99,47 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
             </div>
           </div>
 
-          <div className="bg-lmu-bg/60 p-3 rounded-xl border border-lmu-border/50">
-            <p className="text-xs text-lmu-muted font-semibold uppercase">Theoretical Best</p>
-            <h4 className="text-xl font-extrabold text-lmu-green font-mono mt-0.5">
-              {formatTime(t.theoreticalBest)}
+          <div className="min-w-0">
+            <p className="text-[10px] text-lmu-muted font-semibold uppercase tracking-wider">Theoretical Best</p>
+            <h4 className="text-xl font-semibold text-lmu-text-soft font-mono mt-0.5">
+              {hasTheoretical ? formatTime(t.theoreticalBest) : 'Unavailable'}
             </h4>
             <p className="text-[11px] text-lmu-muted mt-1">
-              Optimal S1 + S2 + S3
+              {hasTheoretical ? 'Optimal S1 + S2 + S3' : 'Complete sector timings needed'}
             </p>
+            {hasTheoretical && t.theoreticalBest !== null && t.bestLapTime !== null && t.theoreticalBest > t.bestLapTime + 0.001 && (
+              <p className="text-[11px] text-lmu-warn mt-1">Sector timing differs from the recorded best.</p>
+            )}
           </div>
         </div>
 
-        {/* Sector Splits */}
-        <SectorSplitsRow s1={t.bestS1} s2={t.bestS2} s3={t.bestS3} />
+        </> : <p className="text-xs text-lmu-muted py-4">
+          {t.sessionsCount === 0 ? 'No sessions recorded for this class.' : 'No completed lap time recorded.'}
+        </p>}
+            {hasLap && <SectorSplitsRow s1={t.bestS1} s2={t.bestS2} s3={t.bestS3} className="grid! grid-cols-3 gap-4 text-left" />}
+          </div>
+        </div>
       </div>
 
       {/* Cars driven */}
       {t.carsUsed.length > 0 && (
-        <div className="pt-2 flex flex-wrap gap-1 border-t border-lmu-border/40">
+        <div className="pt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-lmu-border/60">
           {t.carsUsed.slice(0, 4).map(car => (
             <span
               key={car}
-              className="px-2 py-0.5 text-[10px] font-medium rounded bg-lmu-card text-lmu-muted border border-lmu-border"
+              className="text-[11px] text-lmu-muted min-w-0 break-words"
+              dir="auto"
             >
               {car}
             </span>
           ))}
           {t.carsUsed.length > 4 && (
-            <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-lmu-card text-lmu-muted">
+            <span className="text-[11px] text-lmu-muted">
               +{t.carsUsed.length - 4} more
             </span>
           )}
         </div>
       )}
-    </div>
+    </Link>
   );
 };

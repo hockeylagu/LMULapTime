@@ -4,13 +4,13 @@ import { DetailedSession } from '../../../../shared/types/index.js';
 
 type Replay = NonNullable<DetailedSession['matchingReplayFile']>;
 
-const PILL = 'inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 font-semibold text-[11px] border border-slate-700/60';
+const PILL = 'inline-flex items-center gap-1 font-semibold';
 
 export function hasSessionConditions(replay: DetailedSession['matchingReplayFile']): boolean {
   return Boolean(replay?.weatherCondition || replay?.ambientTemp !== undefined);
 }
 
-/** The weather and temperatures of the session, read from its linked replay, as compact pills. */
+/** The weather and temperatures of the session, read from its linked replay, as quiet text: only rain keeps a hue. */
 export const SessionConditions: React.FC<{ replay: Replay }> = ({ replay }) => {
   const rain = replay.maxRainIntensity ? ` ${replay.maxRainIntensity}` : '';
   const air = replay.ambientTemp;
@@ -20,9 +20,9 @@ export const SessionConditions: React.FC<{ replay: Replay }> = ({ replay }) => {
       {replay.weatherCondition && (
         <span
           className={`${PILL} ${
-            replay.weatherCondition === 'Wet' ? 'text-blue-400'
-            : replay.weatherCondition === 'Dynamic Weather' ? 'text-cyan-400'
-            : 'text-amber-400'
+            replay.weatherCondition === 'Wet' ? 'text-lmu-azure'
+            : replay.weatherCondition === 'Dynamic Weather' ? 'text-lmu-aqua'
+            : 'text-lmu-text-soft'
           }`}
           title={replay.maxRainIntensity ? `${replay.weatherCondition} · Max Rain: ${replay.maxRainIntensity}/25` : `${replay.weatherCondition} track`}
         >
@@ -37,10 +37,10 @@ export const SessionConditions: React.FC<{ replay: Replay }> = ({ replay }) => {
       )}
       {air !== undefined && (
         <span
-          className={`${PILL} font-mono text-cyan-300`}
+          className={`${PILL} font-mono text-lmu-text-soft`}
           title={`Air ${air.toFixed(1)}°C${track !== undefined ? ` · Track ${track.toFixed(1)}°C` : ''}`}
         >
-          <Thermometer className="w-3 h-3 text-cyan-400" />
+          <Thermometer className="w-3 h-3 text-lmu-muted" />
           {Math.round(air)}°C{track !== undefined && ` / ${Math.round(track)}°C`}
         </span>
       )}

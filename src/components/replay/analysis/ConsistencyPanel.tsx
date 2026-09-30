@@ -104,7 +104,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                 <td className="px-2 py-1.5 font-bold text-white">{s.label}</td>
                 <td className="px-2 py-1.5 text-right text-lmu-green">{s.count > 0 ? formatLapTime(s.minSec) : '--'}</td>
                 <td className="px-2 py-1.5 text-right text-white">{s.count > 0 ? formatLapTime(s.avgSec) : '--'}</td>
-                <td className="px-2 py-1.5 text-right text-rose-400">{s.count > 0 ? formatLapTime(s.maxSec) : '--'}</td>
+                <td className="px-2 py-1.5 text-right text-lmu-loss">{s.count > 0 ? formatLapTime(s.maxSec) : '--'}</td>
                 <td className="px-2 py-1.5 text-right text-white">{s.count >= 2 ? `±${s.stdDevSec.toFixed(3)}s` : '--'}</td>
                 <td className={`px-2 py-1.5 text-right font-bold ${s.count >= 2 ? consistencyClass(s.consistencyPct) : 'text-lmu-muted'}`}>
                   {s.count >= 2 ? `${s.consistencyPct.toFixed(1)}%` : '--'}
