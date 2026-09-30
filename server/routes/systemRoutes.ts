@@ -70,10 +70,7 @@ export function createSystemRouter(context: ServerContext): Router {
       return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
     }
     context.telemetryCatalog.clear();
-    void context.telemetryCatalog.refresh(context.telemetryDir)
-      .catch((error: unknown) => {
-        console.warn('[SQLite Cache] Telemetry scan warning:', error);
-      });
+    context.runTelemetryScanInBackground();
     const sessionScanStarted = context.runSessionSyncInBackground();
     const sessions = context.loadSessions();
 

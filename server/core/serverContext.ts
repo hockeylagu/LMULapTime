@@ -193,6 +193,8 @@ export class ServerContext {
     if (forceRefresh) {
       const started = this.runSessionSyncInBackground(forceReparse);
       if (!started && forceReparse) this.pendingForcedSessionReparse = true;
+      // DuckDB files of the sessions just driven are found by the same refresh as their results and replays.
+      this.runTelemetryScanInBackground();
     }
     const sessions = this.sessionDb.getAllSessions();
     // getAllSessions returns the same cached objects until sessions change, and enrichment writes
@@ -282,6 +284,22 @@ export class ServerContext {
       this.runReplaySyncInBackground();
     });
     return true;
+  }
+
+  /**
+   * Scans the DuckDB folder for new and changed files (at start, on Refresh, after a folder change),
+   * then matches them to the sessions. A scan already running on the folder is joined.
+   */
+  public runTelemetryScanInBackground(): void {
+    if (typeof this.telemetryCatalog?.refresh !== 'function') return;
+    const telemetryDir = this.currentTelemetryDir;
+    void this.telemetryCatalog.refresh(telemetryDir).then((count) => {
+      console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${telemetryDir}`);
+      this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
+    }).catch((error: unknown) => {
+      // The catalog records the failure as an ingest error.
+      console.warn('[SQLite Cache] Telemetry scan warning:', error);
+    });
   }
 
   public runInitialSessionSyncInBackground(): void {

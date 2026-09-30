@@ -44,20 +44,6 @@ const serverContext = new ServerContext({
   replayCache,
 });
 
-const startTelemetryCatalogRefresh = (): void => {
-  void telemetryCatalog.refresh(serverContext.telemetryDir).then((count) => {
-    console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${serverContext.telemetryDir}`);
-    try {
-      serverContext.enrichSessionsWithTelemetry(sessionDb.getAllSessions());
-    } catch (err) {
-      console.warn('[SQLite Cache] Error enriching sessions after telemetry refresh:', err);
-    }
-  }).catch((error: unknown) => {
-    sessionDb.recordIngestError('duckdb-directory', serverContext.telemetryDir, error);
-    console.warn('[SQLite Cache] Initial telemetry sync warning:', error);
-  });
-};
-
 const startReferenceLaptimeRefresh = (): void => {
   serverContext.runReferenceLaptimeRefreshInBackground(async () => {
     const currentCache = loadReferenceLaptimesFromCache();
@@ -77,7 +63,7 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 serverContext.runInitialSessionSyncInBackground();
-setImmediate(startTelemetryCatalogRefresh);
+setImmediate(() => serverContext.runTelemetryScanInBackground());
 
 app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
