@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T22:07:38.961Z",
+  "generatedAt": "2026-09-30T00:08:21.558Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -272,6 +272,36 @@
           "#FF5C63",
           "#FFA3A7",
           "#FFE5E7"
+        ]
+      },
+      "lmu-accent-soft": {
+        "role": "primary",
+        "displayName": "Pit Lane Red Soft",
+        "canonical": "oklch(80.8% 0.114 19.571)",
+        "tonalRamp": [
+          "#4D0000",
+          "#800000",
+          "#B30000",
+          "#E60000",
+          "#FF1A1A",
+          "#FF5C5C",
+          "#FFA3A3",
+          "#FFE5E5"
+        ]
+      },
+      "lmu-accent-deep": {
+        "role": "primary",
+        "displayName": "Pit Lane Red Deep",
+        "canonical": "oklch(25.8% 0.092 26.042)",
+        "tonalRamp": [
+          "#450809",
+          "#720D0F",
+          "#A01215",
+          "#CE181A",
+          "#E73134",
+          "#EE6D6F",
+          "#F6ADAE",
+          "#FCE8E8"
         ]
       },
       "lmu-gold": {

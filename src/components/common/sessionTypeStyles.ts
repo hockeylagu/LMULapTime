@@ -11,7 +11,7 @@ export interface SessionTypeStyle {
 export const SESSION_TYPE_STYLES: Record<'Practice' | 'Qualifying' | 'Race', SessionTypeStyle> = {
   Practice: { chip: 'bg-lmu-raised text-lmu-text-soft border-lmu-rule', dot: 'bg-lmu-muted' },
   Qualifying: { chip: 'bg-lmu-warn-deep/60 text-lmu-warn-soft border-lmu-warn-strong/40', dot: 'bg-lmu-warn' },
-  Race: { chip: 'bg-lmu-accent/20 text-lmu-accent-text border-lmu-accent/40', dot: 'bg-lmu-accent' },
+  Race: { chip: 'bg-lmu-accent-deep/60 text-lmu-accent-soft border-lmu-accent/70', dot: 'bg-lmu-accent' },
 };
 
 /** The style of a session's type; a qualifying session is sometimes only named so. Null for anything else (warm-up). */
