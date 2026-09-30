@@ -44,7 +44,7 @@ describe('TrackCircuitLayout', () => {
     startFinish: [110, 100],
   };
 
-  it('renders circuit layout SVG with h-[54px] matching vertical space of title and subtitle', () => {
+  it('renders circuit layout SVG with h-[128px] as a larger square beside the track title', () => {
     render(
       <TrackCircuitLayout
         trackName="Circuit de Spa-Francorchamps"
@@ -54,8 +54,8 @@ describe('TrackCircuitLayout', () => {
 
     const layoutContainer = screen.getByTestId('track-circuit-layout');
     expect(layoutContainer).toBeInTheDocument();
-    expect(layoutContainer.className).toContain('h-[54px]');
-    expect(layoutContainer.className).toContain('w-[72px]');
+    expect(layoutContainer.className).toContain('h-[128px]');
+    expect(layoutContainer.className).toContain('w-[128px]');
     expect(layoutContainer.className).not.toContain('bg-');
     expect(layoutContainer.className).not.toContain('border');
     expect(layoutContainer.className).not.toContain('hover:');
@@ -85,11 +85,11 @@ describe('TrackCircuitLayout', () => {
 
     const fallbackContainer = screen.getByTestId('track-circuit-layout-fallback');
     expect(fallbackContainer).toBeInTheDocument();
-    expect(fallbackContainer.className).toContain('h-[54px]');
-    expect(fallbackContainer.className).toContain('w-[72px]');
+    expect(fallbackContainer.className).toContain('h-[128px]');
+    expect(fallbackContainer.className).toContain('w-[128px]');
   });
 
-  it('renders before title in TrackDetailHeader with matching vertical space', async () => {
+  it('renders a full-height outline beside the track header content', async () => {
     const onBack = vi.fn();
     const setSelectedClass = vi.fn();
     const setSelectedCarModel = vi.fn();
@@ -112,12 +112,13 @@ describe('TrackCircuitLayout', () => {
     expect(heading).toBeInTheDocument();
 
     // Verify layout element is present before the title in DOM order
-    const parentContainer = heading.closest('.flex.items-center.gap-3\\.5');
+    const parentContainer = heading.closest('.grid');
     expect(parentContainer).toBeInTheDocument();
 
     const firstChild = parentContainer?.firstElementChild;
     expect(firstChild).toHaveAttribute('data-testid');
-    expect(firstChild?.className).toContain('h-[54px]');
+    expect(firstChild?.className).toContain('w-[160px]');
+    expect(firstChild?.className).toContain('self-stretch');
 
     // Wait for any async geometry resolution to settle cleanly
     await screen.findByTestId(/track-circuit-layout/);

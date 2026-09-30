@@ -162,7 +162,6 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
         <ImprovementChartControls
           activeTrack={activeTrack}
-          displayedSessionsCount={trackData.length}
           totalSessionsCount={allTrackData.length}
           activeRange={activeRange}
           setRange={setRange}

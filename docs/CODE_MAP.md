@@ -98,6 +98,8 @@ Client routes (`src/App.tsx`): `/dashboard`, `/tracks`, `/track/:trackName`, `/l
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
 `server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
 
+Track detail load failures show the API message with retry and clear stale track data; route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
+
 ## 5. Cache versions: what to bump
 
 | Constant | File | Bump when | Effect |

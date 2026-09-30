@@ -6,7 +6,6 @@ export type ImprovementMetric = 'bestLap' | 'sectors' | 'bestPr' | 'consistency'
 
 export interface ImprovementChartControlsProps {
   activeTrack: string;
-  displayedSessionsCount: number;
   totalSessionsCount: number;
   activeRange: TimeRangeFilter;
   setRange: (range: TimeRangeFilter) => void;
@@ -17,7 +16,6 @@ export interface ImprovementChartControlsProps {
 
 export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> = ({
   activeTrack: _activeTrack,
-  displayedSessionsCount,
   totalSessionsCount,
   activeRange,
   setRange,
@@ -28,24 +26,22 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
   return (
     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-lmu-border/50">
       <div>
-        <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-lmu-accent-text" />
+        <h3 className="text-base font-semibold text-lmu-text flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-lmu-muted" />
           <span>Progression Timeline</span>
         </h3>
-        <span className="text-xs text-lmu-muted">
-          Displaying {displayedSessionsCount} of {totalSessionsCount} recorded sessions
-        </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         {/* Range & Session Count Selector */}
         <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
-          <Calendar className="w-3.5 h-3.5 text-lmu-accent-text" />
+          <Calendar className="w-3.5 h-3.5 text-lmu-muted" />
           <span className="text-lmu-muted font-medium">History:</span>
           <select
+            aria-label="Progression history"
             value={activeRange}
             onChange={(e) => setRange(e.target.value as TimeRangeFilter)}
-            className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+            className="bg-transparent text-white font-semibold cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
           >
             <optgroup label="Session Count" className="bg-lmu-card text-white font-semibold">
               <option value="all" className="bg-lmu-card text-white">All Sessions ({totalSessionsCount})</option>
@@ -65,32 +61,35 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
         <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium flex-wrap">
           <button
             type="button"
+            aria-pressed={metric === 'bestLap'}
             onClick={() => setMetric('bestLap')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              metric === 'bestLap' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+            className={`px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
+              metric === 'bestLap' ? 'bg-lmu-raised text-lmu-text font-semibold' : 'text-lmu-muted hover:text-white'
             }`}
           >
             Lap Pace (Best, Top 3 & Trends)
           </button>
           <button
             type="button"
+            aria-pressed={metric === 'sectors'}
             onClick={() => setMetric('sectors')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              metric === 'sectors' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+            className={`px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
+              metric === 'sectors' ? 'bg-lmu-raised text-lmu-text font-semibold' : 'text-lmu-muted hover:text-white'
             }`}
           >
-            Sectors (S1/S2/S3)
+            Sectors
           </button>
           <button
             type="button"
+            aria-pressed={metric === 'bestPr'}
             onClick={() => setMetric('bestPr')}
             disabled={!personalBestEnabled}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
               metric === 'bestPr'
-                ? 'bg-lmu-accent text-white font-bold'
+                ? 'bg-lmu-raised text-lmu-text font-semibold'
                 : personalBestEnabled
                 ? 'text-lmu-muted hover:text-white'
-                : 'text-lmu-muted/40 cursor-not-allowed'
+                : 'text-lmu-faint cursor-not-allowed'
             }`}
             title={personalBestEnabled ? undefined : 'Select a specific car class to view personal-best progression'}
           >
@@ -98,9 +97,10 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
           </button>
           <button
             type="button"
+            aria-pressed={metric === 'consistency'}
             onClick={() => setMetric('consistency')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              metric === 'consistency' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+            className={`px-3 py-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
+              metric === 'consistency' ? 'bg-lmu-raised text-lmu-text font-semibold' : 'text-lmu-muted hover:text-white'
             }`}
           >
             Consistency Rating (%)

@@ -24,8 +24,8 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
   return (
     <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
       <div>
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-lmu-accent-text" />
+        <h2 className="text-xl font-semibold text-lmu-text flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-lmu-muted" />
           Lap & Sector Improvement Over Time
         </h2>
         <p className="text-xs text-lmu-muted mt-1">

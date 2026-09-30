@@ -31,7 +31,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
   });
 
   return (
-    <div className="bg-lmu-card/95 backdrop-blur-md border border-lmu-border p-3.5 rounded-xl shadow-xl space-y-2 text-xs min-w-[210px]">
+    <div className="bg-lmu-card border border-lmu-border p-3.5 rounded-xl space-y-2 text-xs min-w-[210px]">
       <div>
         <div className="flex items-center justify-between gap-2">
           <span className="font-bold text-white text-sm">{data.session}</span>
@@ -42,7 +42,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
           )}
         </div>
         <p className="text-[11px] text-lmu-muted mt-0.5">{data.fullDate}</p>
-        <p className="text-xs text-lmu-gold font-medium mt-0.5 truncate max-w-[200px]" title={data.car}>
+        <p className="text-xs text-lmu-text-soft font-medium mt-0.5 truncate max-w-[200px]" title={data.car}>
           {data.car}
         </p>
       </div>
@@ -99,7 +99,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
       </div>
 
       {onSelectSession && (
-        <p className="text-[10px] text-lmu-accent-text pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
+        <p className="text-[10px] text-lmu-text-soft pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
           Click dot to view session telemetry &rarr;
         </p>
       )}

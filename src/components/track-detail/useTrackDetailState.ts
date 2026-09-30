@@ -6,6 +6,10 @@ import { getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta } from './trackDetailHelpers.js';
+import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
+
+const readSort = (value: string | null): TrackDetailSortOption =>
+  TRACK_DETAIL_SORT_OPTIONS.find(option => option.value === value)?.value ?? 'date-desc';
 
 export interface TrackDetailData {
   trackName: string;
@@ -25,9 +29,11 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   const [filterType, setFilterTypeState] = useState<string>(searchParams.get('type') || 'All');
   const [searchQuery, setSearchQueryState] = useState<string>(searchParams.get('q') || '');
   const [sortBy, setSortByState] = useState<TrackDetailSortOption>(
-    (searchParams.get('sort') as TrackDetailSortOption) || 'date-desc'
+    readSort(searchParams.get('sort'))
   );
   const [data, setData] = useState<TrackDetailData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const prevCarClassRef = useRef(selectedCarClass);
 
   useEffect(() => {
@@ -36,7 +42,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     setSelectedCarModelState(searchParams.get('model') || 'All');
     setFilterTypeState(searchParams.get('type') || 'All');
     setSearchQueryState(searchParams.get('q') || '');
-    setSortByState((searchParams.get('sort') as TrackDetailSortOption) || 'date-desc');
+    setSortByState(readSort(searchParams.get('sort')));
   }, [searchParams]);
 
   const handleOpenReplay = (sessionId: string) => {
@@ -100,6 +106,8 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     let isCurrent = true;
     const controller = new AbortController();
     setLoading(true);
+    setData(null);
+    setError(null);
     fetchJson<TrackDetailData>(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
       .then((resData) => {
         if (!isCurrent) return;
@@ -108,18 +116,20 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
       })
       .catch((err) => {
         if (!isCurrent || isAbortError(err)) return;
-        console.error('Failed to fetch track details:', err);
+        setError(err instanceof Error ? err.message : 'Unable to load track details.');
         setLoading(false);
       });
     return () => {
       isCurrent = false;
       controller.abort();
     };
-  }, [trackName]);
+  }, [trackName, loadAttempt]);
 
   return {
     loading,
     data,
+    error,
+    retry: () => setLoadAttempt(attempt => attempt + 1),
     hideEmpty,
     setHideEmpty,
     hasReplay,

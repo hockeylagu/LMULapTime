@@ -79,7 +79,7 @@ describe('ImprovementChart component', () => {
     const personalBestBtn = screen.getByRole('button', { name: /personal best over time/i });
     fireEvent.click(personalBestBtn);
 
-    const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
+    const sectorsBtn = screen.getByRole('button', { name: /^sectors$/i });
     fireEvent.click(sectorsBtn);
 
     const consistencyBtn = screen.getByRole('button', { name: /consistency rating/i });
@@ -232,6 +232,6 @@ describe('ImprovementChart component', () => {
 
     const consistencyBtn = screen.getByRole('button', { name: /consistency rating/i });
     fireEvent.click(consistencyBtn);
-    expect(consistencyBtn).toHaveClass('bg-lmu-accent');
+    expect(consistencyBtn).toHaveClass('bg-lmu-raised');
   });
 });
