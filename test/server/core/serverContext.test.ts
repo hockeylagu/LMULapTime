@@ -216,6 +216,49 @@ describe('ServerContext background session sync', () => {
     expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.any(LmuParser), true);
   });
 
+  it('rescans the DuckDB folder on Refresh and matches the new files to the sessions', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const sessionDb = {
+      ...storedTelemetryLinks,
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getAllSessions: vi.fn(() => []),
+      getTelemetryMetadata: vi.fn(() => []),
+      syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
+      syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
+    } as unknown as SessionDatabase;
+    const telemetryCatalog = {
+      getFiles: vi.fn(() => []),
+      refresh: vi.fn(() => Promise.resolve(1)),
+    } as unknown as TelemetryCatalog;
+    const context = new ServerContext({
+      resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
+      sessionDb, telemetryCatalog, replayCache: {} as ReplayCacheService,
+    });
+
+    context.loadSessions();
+    expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
+
+    context.loadSessions(true);
+    expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
+    await vi.runAllTimersAsync();
+    expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
+    expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
+  });
+
+  it('only warns when the DuckDB rescan fails in the background', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const telemetryCatalog = { refresh: vi.fn(() => Promise.reject(new Error('folder gone'))) } as unknown as TelemetryCatalog;
+    const context = new ServerContext({
+      resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
+      sessionDb: { getAllStoredReplayFiles: vi.fn(() => []) } as unknown as SessionDatabase, telemetryCatalog, replayCache: {} as ReplayCacheService,
+    });
+
+    context.runTelemetryScanInBackground();
+
+    await vi.runAllTimersAsync();
+    expect(warn).toHaveBeenCalledWith('[SQLite Cache] Telemetry scan warning:', expect.any(Error));
+  });
+
   it('queues a forced session reparse until replay indexing finishes', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),

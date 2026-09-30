@@ -38,11 +38,11 @@ function fakeContext(dir: string) {
     telemetryCatalog: {
       getStatus: vi.fn(() => ({ running: false })),
       clear: vi.fn(),
-      refresh: vi.fn(() => Promise.resolve()),
     },
     hasActiveFileScan: vi.fn(() => false),
     configureDirectories: vi.fn(() => true),
     runSessionSyncInBackground: vi.fn(() => true),
+    runTelemetryScanInBackground: vi.fn(),
     getScanStatus: vi.fn(() => ({ running: false, allComplete: true })),
   };
 }
@@ -119,7 +119,7 @@ describe('system routes', () => {
       expect(res.body).toMatchObject({ success: true, sessionScanStarted: true, replayScanStarted: true, telemetryScanStarted: true, sessionsCount: 3 });
       expect(context.configureDirectories).toHaveBeenCalledWith(folders);
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
-      expect(context.telemetryCatalog.refresh).toHaveBeenCalledWith(context.telemetryDir);
+      expect(context.runTelemetryScanInBackground).toHaveBeenCalled();
       expect(context.runSessionSyncInBackground).toHaveBeenCalled();
     });
 
@@ -130,16 +130,6 @@ describe('system routes', () => {
       expect(res.status).toBe(409);
       expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
       expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
-    });
-
-    it('still answers when the telemetry rescan fails in the background', async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-      context.telemetryCatalog.refresh.mockImplementation(() => Promise.reject(new Error('folder gone')));
-
-      const res = await request(app).post('/api/scan').send(folders);
-
-      expect(res.status).toBe(200);
-      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith('[SQLite Cache] Telemetry scan warning:', expect.any(Error)));
     });
   });
 
