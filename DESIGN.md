@@ -20,6 +20,8 @@ colors:
   lmu-faint: "#7F8BA1"
   lmu-accent: "#DC3441"
   lmu-accent-text: "#FF4D55"
+  lmu-accent-soft: "oklch(80.8% 0.114 19.571)"
+  lmu-accent-deep: "oklch(25.8% 0.092 26.042)"
   lmu-gold: "#FFB703"
   lmu-blue: "#219EBC"
   lmu-cyan: "#8ECAE6"
@@ -167,7 +169,7 @@ The palette is a cold, near-black instrument panel with one hot brand red and a 
 There is one color vocabulary: the `lmu-*` tokens in `tailwind.config.js` (`theme.extend.colors.lmu`), mirrored for charts and SVG in `src/utils/themeColors.ts`. Colors are named for what they mean, never for their hue. Raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) are not used; a new need gets a role here first, then the component uses the role.
 
 ### Primary
-- **Pit Lane Red** (`lmu-accent`, #DC3441): brand wordmark, active nav tab, selected segment, primary buttons, pit stop badges, scrollbar hover, text selection. The fill is tuned so white text on it passes 4.5:1. Red *text* on a dark surface uses **Pit Lane Red Text** (`lmu-accent-text`, #FF4D55), which passes on every surface and on its own 20% tint. Treat red as the one "this is selected / this is us" color; its one category use is the race session chip.
+- **Pit Lane Red** (`lmu-accent`, #DC3441): brand wordmark, active nav tab, selected segment, primary buttons, pit stop badges, scrollbar hover, text selection. The fill is tuned so white text on it passes 4.5:1. Red *text* on a dark surface uses **Pit Lane Red Text** (`lmu-accent-text`, #FF4D55), which passes on every surface and on its own 20% tint. **Pit Lane Red Soft** and **Deep** (`lmu-accent-soft`, `lmu-accent-deep`, Tailwind red 300 and 950) exist only to build the race chip. Treat red as the one "this is selected / this is us" color; its one category use is the race session chip.
 
 ### Secondary
 - **Sector Gold** (`lmu-gold`): sector 1, first place, highlighted player rows, compare lap 1. Paired with `lmu-blue` (sector 2) and `lmu-green` (sector 3) through `SECTOR_COLORS`.
@@ -320,7 +322,7 @@ A signature filter control (session type, car class, sort). It is a 36px `lmu-bg
 
 ### Session List (dashboard and track detail)
 - **Toolbar** (`SessionFilterParts.tsx`): two rows. Row one finds and orders (search, track select, sort, view mode); row two narrows (class, session type, toggles) and ends with a neutral "Clear filters" that shows only while something narrows the list. Search focus moves the border to `lmu-muted`.
-- **Session type colors** (`common/sessionTypeStyles.ts`), rising with the stakes: practice neutral (`lmu-raised` chip, muted dot), qualifying amber (`lmu-warn` tint), race red (`lmu-accent` 20% tint with `lmu-accent-text`). Purple is never a session color: it means best lap and alien pace; gold stays with P1. The session chip (R1, Q1, P1, 34px minimum so names line up) and the dashboard hero's type tag use these; the type filter pills show the dot when off and the chip when chosen, so the filter doubles as the legend. Warm-up and other types stay neutral.
+- **Session type colors** (`common/sessionTypeStyles.ts`), rising with the stakes: practice neutral (`lmu-raised` chip, muted dot), qualifying amber (`lmu-warn` tint), race red (the same tint as qualifying: `lmu-accent-deep` 60% fill, `lmu-accent-soft` text at 9:1, `lmu-accent` 70% border, so the race reads at least as strong as qualifying). Purple is never a session color: it means best lap and alien pace; gold stays with P1. The session chip (R1, Q1, P1, 34px minimum so names line up) and the dashboard hero's type tag use these; the type filter pills show the dot when off and the chip when chosen, so the filter doubles as the legend. Warm-up and other types stay neutral.
 - **Rows and cards:** the best lap is white (gold is kept for P1); a race finish reads `P7 +3` with the gain in `lmu-gain`, a loss in `lmu-loss`, `±0` muted; an empty session is an amber-text chip on a rim with no row tint. Track names are plain white; the open chevron is muted until hover. Kept in color: car class, pace category and the telemetry source (amber 100 Hz, green replay).
 - **Pagination** (`SessionPagination.tsx`): 25 per page, a hairline above, "1–25 of 219 sessions" in muted text with mono numbers, then prev/next and a page window (first, last, neighbours, ellipsis) in 28px mono steps.
 

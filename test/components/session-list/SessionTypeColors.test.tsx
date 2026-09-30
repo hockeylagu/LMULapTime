@@ -19,7 +19,7 @@ describe('session type colors', () => {
 
   it('colors the session chip by its type', () => {
     render(<SessionTypeChip session={{ id: 'r', timeString: '', sessionType: 'Race', sessionName: 'R1' }} />);
-    expect(screen.getByText('R1').className).toContain('text-lmu-accent-text');
+    expect(screen.getByText('R1').className).toContain('text-lmu-accent-soft');
   });
 
   it('keeps the chosen type in its hue and marks the others with a dot', () => {

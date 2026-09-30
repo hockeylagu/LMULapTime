@@ -56,10 +56,13 @@ export default {
           },
           muted: '#8D99AE',
           faint: '#7F8BA1',
-          // Brand: the fill carries white text at 4.5:1; red text on dark uses accent-text
+          // Brand: the fill carries white text at 4.5:1; red text on dark uses accent-text.
+          // soft and deep (Tailwind red 300 and 950) build the race chip, the same tint as the qualifying one
           accent: {
             DEFAULT: '#DC3441',
             text: '#FF4D55',
+            soft: 'oklch(80.8% 0.114 19.571)',
+            deep: 'oklch(25.8% 0.092 26.042)',
           },
           // Sectors 1, 2, 3 (SECTOR_COLORS)
           gold: '#FFB703',

@@ -144,7 +144,7 @@ describe('DashboardHero', () => {
     const badge = screen.getByTestId('hero-session-type-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Race');
-    expect(badge.className).toContain('text-lmu-accent-text');
+    expect(badge.className).toContain('text-lmu-accent-soft');
   });
 
   it('renders yellow 100Hz replay button when session has DuckDB telemetry', () => {
