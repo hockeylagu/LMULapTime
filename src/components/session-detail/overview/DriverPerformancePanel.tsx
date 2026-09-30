@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
-import { Trophy, Gauge } from 'lucide-react';
+import { Timer } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 import { computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';
+import { BestLapBlock } from './BestLapBlock.js';
+import { SectorsMetricBox } from './SectorsMetricBox.js';
 
 export interface DriverPerformancePanelProps {
   session: DetailedSession;
@@ -26,8 +28,8 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
 
   const isRaceSession =
     session.sessionType === 'Race' ||
-    selectedDriver.gridPosition !== null ||
-    selectedDriver.positionGain !== null;
+    (selectedDriver.gridPosition != null && selectedDriver.gridPosition > 0) ||
+    selectedDriver.positionGain != null;
 
   const cleanLaps = useMemo(() => selectCleanLapCandidates(selectedDriver.laps || []), [selectedDriver.laps]);
   const hasMultipleLaps = (selectedDriver.laps || []).filter((l) => l.lapTime !== null && l.lapTime > 0).length > 1;
@@ -90,71 +92,64 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
     return s3Laps.length > 0 ? s3Laps.reduce((sum, l) => sum + (l.s3 || 0), 0) / s3Laps.length : null;
   }, [s3Laps]);
 
+  const finishStatus = selectedDriver.finishStatus;
+  const abnormalFinish = isRaceSession && finishStatus && !/^finished/i.test(finishStatus) ? finishStatus : null;
+
   return (
-    <div className="bg-lmu-card p-4 rounded-xl border border-lmu-border space-y-3">
-      {/* Header: Title / Car Info / Finish Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-lmu-border/50 pb-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            {isRaceSession ? (
-              <Trophy className="w-4 h-4 text-lmu-gold" />
-            ) : (
-              <Gauge className="w-4 h-4 text-lmu-cyan" />
-            )}
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-              {isRaceSession ? 'Race Standings & Position Deltas' : 'Driver Performance & Session Overview'}
+    <section aria-label="Session summary" className="bg-lmu-card rounded-2xl border border-lmu-border">
+      <div className="p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2 border-b border-lmu-border/60 pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider shrink-0 flex items-center gap-2">
+              <Timer className="w-4 h-4 text-lmu-accent-text" aria-hidden="true" />
+              Session summary
             </h3>
-          </div>
-          <span className="text-xs text-lmu-muted hidden sm:inline">•</span>
-          <span className="text-xs text-lmu-text font-semibold truncate max-w-xs flex items-center gap-1.5" title={selectedDriver.carType}>
-            <span className="truncate">{selectedDriver.carType}</span>
-            <CarClassBadge carClass={selectedDriver.carClass} carType={selectedDriver.carType} size="xs" />
-            <span className="text-lmu-muted font-normal">
-              (#{selectedDriver.carNumber})
+            <span className="text-xs text-lmu-muted">·</span>
+            <span className="text-xs text-lmu-text-soft font-semibold truncate flex items-center gap-1.5" title={selectedDriver.carType}>
+              <span className="truncate">{selectedDriver.carType}</span>
+              <CarClassBadge carClass={selectedDriver.carClass} carType={selectedDriver.carType} size="xs" />
+              <span className="text-lmu-muted font-normal">#{selectedDriver.carNumber}</span>
             </span>
-          </span>
+          </div>
+          {abnormalFinish && (
+            <span className="px-2 py-0.5 rounded text-xs font-bold border bg-lmu-loss-deep/60 text-lmu-loss-soft border-lmu-loss-strong/40">
+              {abnormalFinish}
+            </span>
+          )}
         </div>
 
-        {isRaceSession && selectedDriver.finishStatus && (
-          <span
-            className={`px-2.5 py-0.5 rounded text-xs font-bold ${
-              selectedDriver.finishStatus.toLowerCase().includes('dnf')
-                ? 'bg-lmu-loss-deep/60 text-lmu-loss-soft border border-lmu-loss-strong/40'
-                : selectedDriver.classPosition === 1 || selectedDriver.position === 1
-                ? 'bg-lmu-warn-deep/60 text-lmu-warn-soft border border-lmu-warn-strong/40'
-                : 'bg-lmu-gain-deep/60 text-lmu-gain-soft border border-lmu-gain-strong/40'
-            }`}
-          >
-            🏁 {selectedDriver.finishStatus}
-          </span>
-        )}
+        <div className="grid grid-cols-[240px_minmax(0,1fr)_400px] gap-x-6 gap-y-4 items-start">
+          <BestLapBlock
+            session={session}
+            selectedDriver={selectedDriver}
+            isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
+            allTimeCategoryTrackPB={allTimeCategoryTrackPB}
+          />
+          <div className="min-w-0">
+            <DriverTimingMetricsRow
+              selectedDriver={selectedDriver}
+              top3Avg={top3Avg}
+              top3DeltaToBest={top3DeltaToBest}
+              avgLapTime={avgLapTime}
+              deltaToBest={deltaToBest}
+              lapStdDev={lapStdDev}
+              consistencyScore={consistencyScore}
+              cleanLapsCount={consistency.sampleCount}
+              consistencyGroups={consistency.conditionGroups}
+              totalLapsCount={selectedDriver.laps?.length || 0}
+              hasMultipleLaps={hasMultipleLaps}
+              theoGap={theoGap}
+            />
+          </div>
+          <SectorsMetricBox
+            className={isRaceSession ? 'row-span-2 self-center' : 'self-center'}
+            selectedDriver={selectedDriver}
+            drivers={session.drivers ?? []}
+            averages={{ s1: avgS1, s2: avgS2, s3: avgS3, lap: avgLapTime }}
+          />
+          {isRaceSession && <DriverRaceStandingsRow selectedDriver={selectedDriver} isMultiClass={isMultiClass} />}
+        </div>
       </div>
-
-      {isRaceSession && (
-        <DriverRaceStandingsRow selectedDriver={selectedDriver} isMultiClass={isMultiClass} />
-      )}
-
-      <DriverTimingMetricsRow
-        session={session}
-        selectedDriver={selectedDriver}
-        isRaceSession={isRaceSession}
-        isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
-        allTimeCategoryTrackPB={allTimeCategoryTrackPB}
-        top3Avg={top3Avg}
-        top3DeltaToBest={top3DeltaToBest}
-        avgLapTime={avgLapTime}
-        deltaToBest={deltaToBest}
-        lapStdDev={lapStdDev}
-        consistencyScore={consistencyScore}
-        cleanLapsCount={consistency.sampleCount}
-        consistencyGroups={consistency.conditionGroups}
-        totalLapsCount={selectedDriver.laps?.length || 0}
-        hasMultipleLaps={hasMultipleLaps}
-        theoGap={theoGap}
-        avgS1={avgS1}
-        avgS2={avgS2}
-        avgS3={avgS3}
-      />
-    </div>
+    </section>
   );
 };

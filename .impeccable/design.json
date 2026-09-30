@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T00:08:21.558Z",
+  "generatedAt": "2026-09-30T02:51:49.770Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -528,6 +528,36 @@
           "#A3FFF5",
           "#E5FFFC"
         ]
+      },
+      "lmu-personal-best": {
+        "role": "secondary",
+        "displayName": "Personal Best Gold",
+        "canonical": "#FFB703",
+        "tonalRamp": [
+          "#4D3700",
+          "#805B00",
+          "#B38000",
+          "#E6A400",
+          "#FFBD1A",
+          "#FFD05C",
+          "#FFE5A3",
+          "#FFF8E5"
+        ]
+      },
+      "lmu-session-best": {
+        "role": "secondary",
+        "displayName": "Session Best Sky Blue",
+        "canonical": "#75B9F5",
+        "tonalRamp": [
+          "oklch(15% 0.11091167 246.489047)",
+          "oklch(25% 0.11091167 246.489047)",
+          "oklch(35% 0.11091167 246.489047)",
+          "oklch(45% 0.11091167 246.489047)",
+          "oklch(55% 0.11091167 246.489047)",
+          "oklch(65% 0.11091167 246.489047)",
+          "oklch(85% 0.11091167 246.489047)",
+          "oklch(95% 0.11091167 246.489047)"
+        ]
       }
     },
     "typographyMeta": {
@@ -663,18 +693,25 @@
       "description": "Inset field; border shifts to red on focus.",
       "html": "<input class=\"ds-input\" placeholder=\"Search sessions, tracks, cars\" />",
       "css": ".ds-input{width:280px;padding:8px 12px;border-radius:8px;border:1px solid #232A36;background:#0B0E14;color:#fff;font:14px 'Segoe UI',system-ui,sans-serif;outline:none;transition:border-color .15s}.ds-input::placeholder{color:#8D99AE}.ds-input:focus{border-color:#DC3441}.ds-input:focus-visible{box-shadow:0 0 0 2px rgba(220,52,65,.35)}"
+    },
+    {
+      "name": "Lap Best Readouts",
+      "kind": "custom",
+      "description": "Session best in Sky blue; personal best in gold takes precedence. Explicit labels retain the meaning without color.",
+      "html": "<table class=\"ds-best-table\"><tbody><tr class=\"ds-best-session\"><td>7</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open session-best lap telemetry\">1:35.894</button></td><td>Session best</td></tr><tr class=\"ds-best-personal\"><td>8</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open personal-best lap telemetry\">1:35.620</button></td><td>Personal best</td></tr></tbody></table>",
+      "css": ".ds-best-table{width:100%;border-collapse:collapse;background:#151A23;font:700 12px Consolas,monospace}.ds-best-table td{padding:10px 12px;border-bottom:1px solid #232A36;white-space:nowrap}.ds-best-table td:nth-child(2){text-align:right}.ds-best-session{color:#75B9F5;background:oklch(65% 0.11 246.489047 / .1)}.ds-best-personal{color:#FFB703;background:rgb(255 183 3 / .08)}.ds-best-time{border:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer;border-radius:4px}.ds-best-time:hover{text-decoration:underline;text-underline-offset:3px}.ds-best-time:focus-visible{outline:2px solid #DC3441;outline-offset:2px}"
     }
   ],
   "narrative": {
     "northStar": "The Engineer's Pit Wall",
-    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\r\n\r\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\r\n\r\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
+    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
     "keyCharacteristics": [
-      "Dark only, near-black blue base; no light theme.\r",
-      "Numbers first: lap times, deltas and units in bold monospace.\r",
-      "Uppercase, tracked, 10px labels above values.\r",
-      "One brand red for identity and selection; every other hue is a fixed-meaning signal.\r",
-      "Flat tonal layering with hairline borders; no glow, no glass.\r",
-      "Dense desktop layout inside a 1500px column.\r"
+      "Dark only, near-black blue base; no light theme.",
+      "Numbers first: lap times, deltas and units in bold monospace.",
+      "Uppercase, tracked, 10px labels above values.",
+      "One brand red for identity and selection; every other hue is a fixed-meaning signal.",
+      "Flat tonal layering with hairline borders; no glow, no glass.",
+      "Dense desktop layout inside a 1500px column."
     ],
     "rules": [
       {
@@ -704,7 +741,7 @@
       },
       {
         "name": "The 10px Floor",
-        "body": "No text renders below 10px, and sizes stay on the ramp: 10, 11, 12 (`text-xs`), 14 (`text-sm`) and up. Off-ramp sizes (`text-[9px]`, `text-[10.5px]`, `text-[13.5px]`) are drift. SVG labels follow the same floor at their rendered scale (the friction circle's 128-unit viewBox draws at 116px, so its labels are 11 units). Where 10px does not fit, restructure the element instead of shrinking the text.",
+        "body": "No text renders below 10px, and sizes stay on the ramp: 10, 11, 12 (`text-xs`), 13 for expanded event prose, 14 (`text-sm`) and up. Off-ramp sizes (`text-[9px]`, `text-[10.5px]`, `text-[13.5px]`) are drift. SVG labels follow the same floor at their rendered scale (the friction circle's 128-unit viewBox draws at 116px, so its labels are 11 units). Where 10px does not fit, restructure the element instead of shrinking the text.",
         "section": "typography"
       },
       {
@@ -734,23 +771,23 @@
       }
     ],
     "dos": [
-      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).\r",
-      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.\r",
-      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.\r",
-      "**Do** separate surfaces by tone and a `lmu-border` hairline.\r",
-      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.\r",
-      "**Do** give every interactive control a visible `focus-visible` ring.\r",
-      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.\r"
+      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).",
+      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
+      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
+      "**Do** separate surfaces by tone and a `lmu-border` hairline.",
+      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.",
+      "**Do** give every interactive control a visible `focus-visible` ring.",
+      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values."
     ],
     "donts": [
-      "**Don't** render any text below 10px.\r",
-      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.\r",
-      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.\r",
-      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.\r",
-      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.\r",
-      "**Don't** add a light theme.\r",
-      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.\r",
-      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule).\r"
+      "**Don't** render any text below 10px.",
+      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
+      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.",
+      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
+      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.",
+      "**Don't** add a light theme.",
+      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
+      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule)."
     ]
   }
 }

@@ -1,10 +1,6 @@
 import { DetailedSession } from '../../../shared/types/index.js';
 import { parseDateStringToTimestamp, matchesSessionType } from '../../../shared/domain/formatters.js';
 import { matchesTrack } from '../../../shared/domain/paceCategory.js';
-import { CHART_COLORS, OPPONENT_COLORS } from '../../utils/themeColors.js';
-
-export { OPPONENT_COLORS };
-export const PLAYER_HIGHLIGHT_COLOR = CHART_COLORS.playerHighlight; // Vibrant Gold Accent
 
 export interface CandidateRelatedSession {
   id?: string;

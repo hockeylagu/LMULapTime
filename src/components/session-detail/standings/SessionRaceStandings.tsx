@@ -10,6 +10,8 @@ export interface SessionRaceStandingsProps {
   isMultiClass: boolean;
 }
 
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
+
 type SortableColumn = 'position' | 'gain' | 'number' | 'bestLap' | 's1' | 's2' | 's3';
 
 function getBestLap(driver: DriverData) {
@@ -76,7 +78,11 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
     return sortDescending ? -result : result;
   });
   const sortHeader = (column: SortableColumn, label: string, alignment = 'text-left') => (
-    <th className={`px-3.5 py-3 ${alignment}`}>
+    <th
+      scope="col"
+      className={`px-3.5 py-3 ${alignment}`}
+      aria-sort={sortColumn === column ? (sortDescending ? 'descending' : 'ascending') : undefined}
+    >
       <button
         type="button"
         onClick={() => {
@@ -87,21 +93,31 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
             setSortDescending(false);
           }
         }}
-        className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-white"
+        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-white rounded ${FOCUS_RING}`}
         title={`Sort by ${label}`}
       >
         {label}
-        {sortColumn === column && (sortDescending ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
+        {sortColumn === column && (sortDescending
+          ? <ArrowDown className="h-3 w-3" aria-hidden="true" />
+          : <ArrowUp className="h-3 w-3" aria-hidden="true" />)}
       </button>
     </th>
   );
+  // A race is classified by the finish; practice and qualifying by the best lap, so no grid gain or race time.
+  const isRace = session.sessionType === 'Race';
+  const fastestByClass = session.drivers.reduce<Record<string, number>>((fastest, driver) => {
+    const key = isMultiClass ? driver.carClass.trim().toLowerCase() : '';
+    if (driver.bestLapTime !== null && driver.bestLapTime > 0) {
+      fastest[key] = Math.min(fastest[key] ?? Number.POSITIVE_INFINITY, driver.bestLapTime);
+    }
+    return fastest;
+  }, {});
   const overallWinner = session.drivers.find((driver) => driver.position === 1) ?? sortedDrivers[0];
   const leaderFinishLap = overallWinner?.laps
     ? [...overallWinner.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number')
     : undefined;
   const leaderFinishTime = leaderFinishLap?.elapsedSeconds;
   const leaderLaps = overallWinner?.lapsCount ?? 0;
-  const overallWinnerClass = overallWinner?.carClass.trim().toLowerCase();
   const sessionBestSectors = session.drivers.reduce(
     (best, driver) => {
       const bestLap = getBestLap(driver);
@@ -118,31 +134,32 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
           <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-lmu-gold" />
-            <span>Session Classification & Driver Standings ({session.drivers.length} Drivers)</span>
+            <Trophy className="w-4 h-4 text-lmu-muted" aria-hidden="true" />
+            <span>Classification</span>
+            <span className="font-mono font-semibold text-lmu-muted">{session.drivers.length}</span>
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
-            Race classification with finish times and best-lap sectors. Click a driver to inspect their lap telemetry.
+            Select a driver to view their laps.
           </p>
         </div>
       </div>
 
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left text-xs text-lmu-muted">
-          <thead className="bg-lmu-bg/80 uppercase tracking-wider font-semibold text-white border-b border-lmu-border">
+          <thead className="bg-lmu-bg/80 uppercase tracking-wider font-semibold text-[11px] text-lmu-muted border-b border-lmu-border">
             <tr>
               {sortHeader('position', 'Pos', 'text-center')}
-              {sortHeader('gain', '+/-', 'text-center')}
+              {isRace && sortHeader('gain', '+/-', 'text-center')}
               {sortHeader('number', '#', 'text-center')}
-              <th className="px-3.5 py-3">Driver</th>
-              <th className="px-3.5 py-3">Car & Class</th>
-              <th className="px-3.5 py-3 text-center">Laps</th>
+              <th scope="col" className="px-3.5 py-3">Driver</th>
+              <th scope="col" className="px-3.5 py-3">Car & Class</th>
+              <th scope="col" className="px-3.5 py-3 text-center">Laps</th>
               {sortHeader('bestLap', 'Best Lap')}
               {sortHeader('s1', 'S1', 'text-right')}
               {sortHeader('s2', 'S2', 'text-right')}
               {sortHeader('s3', 'S3', 'text-right')}
-              <th className="px-3.5 py-3 text-right">Time</th>
-              <th className="px-3.5 py-3 text-center">Safety</th>
+              <th scope="col" className="px-3.5 py-3 text-right">{isRace ? 'Time' : 'Gap'}</th>
+              <th scope="col" className="px-3.5 py-3 text-left">Safety</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-lmu-border/50">
@@ -154,10 +171,11 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                 selectedDriverName={selectedDriverName}
                 setSelectedDriverName={setSelectedDriverName}
                 isMultiClass={isMultiClass}
-                overallWinnerClass={overallWinnerClass || ''}
                 sessionBestSectors={sessionBestSectors}
                 leaderFinishTime={leaderFinishTime}
                 leaderLaps={leaderLaps}
+                isRace={isRace}
+                fastestInClass={fastestByClass[isMultiClass ? d.carClass.trim().toLowerCase() : ''] ?? null}
               />
             ))}
           </tbody>

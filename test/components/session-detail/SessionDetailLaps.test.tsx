@@ -89,19 +89,16 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Race Standings & Position Deltas/i)).toBeInTheDocument();
+      expect(screen.getByText('Laps led')).toBeInTheDocument();
     });
 
-    // Check race banner elements
-    expect(screen.getByText('Starting Grid')).toBeInTheDocument();
-    expect(screen.getByText('Position Delta')).toBeInTheDocument();
-    expect(screen.getByText('Laps Led (P1)')).toBeInTheDocument();
-    expect(screen.getByText('Peak Position')).toBeInTheDocument();
-    expect(screen.getByText(/Session Classification & Driver Standings/i)).toBeInTheDocument();
-
-    // Check 1-row layout on md+ screens (grid-cols-7)
-    const gridContainer = screen.getByText('Starting Grid').closest('.grid');
-    expect(gridContainer?.className).toContain('md:grid-cols-7');
+    // The race result sits in the session summary: the finish under the best lap, six figures under the benchmark rungs
+    for (const label of ['Finish', 'Places', 'Peak', 'Pit stops', 'Incidents', 'Track limits']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText(/^Classification/i)).toBeInTheDocument();
+    const gridContainer = screen.getByText('Places').closest('.grid');
+    expect(gridContainer?.className).toContain('grid-cols-6');
 
     // Single class session: Class Pos header is hidden
     expect(screen.queryByText('Class Pos')).not.toBeInTheDocument();
@@ -136,25 +133,25 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     const groups = await screen.findByTestId('consistency-groups');
     expect(groups).toHaveTextContent('Per condition: dry 3 · wet 3');
-    expect(screen.getByText(/% Consist/).getAttribute('title')).toMatch(/^Pace consistency within each condition/);
+    expect(screen.getByText('Consistency').closest('[title]')?.getAttribute('title')).toMatch(/^Pace consistency within each condition/);
   });
 
   it('renders session lap average and sector averages with interactive legend toggle', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Session Lap Average')).toBeInTheDocument();
+      expect(screen.getByText('Average')).toBeInTheDocument();
       expect(screen.getByTestId('sectors-metric')).toHaveTextContent('SectorsBestAvg');
     });
 
     // Check that average lap time across 3 laps (123.0 + 122.0 + 135.0)/3 = 126.666 -> '2:06.666' or '2:06.667'
-    expect(screen.getByText(/Clean Laps:/i)).toBeInTheDocument();
+    expect(screen.getByText('Clean laps')).toBeInTheDocument();
     expect(screen.getAllByText(/34\.000/).length).toBeGreaterThan(0);
 
     // Switch to Sectors chart
-    const sectorsBtn = screen.getByRole('button', { name: /sectors \(s1\/s2\/s3\)/i });
+    const sectorsBtn = screen.getByRole('button', { name: /^sectors$/i });
     fireEvent.click(sectorsBtn);
-    expect(sectorsBtn.className).toContain('bg-lmu-accent');
+    expect(sectorsBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders button next to replay to navigate from Race to Quali, and from Quali to Race', async () => {
@@ -282,9 +279,8 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    // In multiclass sessions, the lap table shows a Class Pos header
-    const classPosHeaders = screen.getAllByRole('columnheader', { name: /class pos/i });
-    expect(classPosHeaders.length).toBeGreaterThanOrEqual(1);
+    // In multiclass sessions, the lap table's Pos column is the class position
+    expect(screen.getByTitle(/^Class position \(in /)).toBeInTheDocument();
   });
 
   it('renders lap 2 as valid (not out-lap) when lap 1 is the start of practice with no lap time', async () => {
@@ -445,7 +441,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(screen.queryByText('Out Lap')).not.toBeInTheDocument();
   });
 
-  it('renders incident tooltips on incomplete laps, compact badges, and incidents log', async () => {
+  it('renders incident tooltips on incomplete laps, compact badges, and the stewards tally', async () => {
     const incidentSession = {
       id: 'sess_incidents',
       filename: '2026_05_29_R1.xml',
@@ -588,10 +584,11 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    // Verify Safety Summary pill in Session Title Card
-    expect(screen.getAllByText(/2 Incidents/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/1 Track Limit/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/1 Penalty/).length).toBeGreaterThanOrEqual(1);
+    // The stewards tally under the lap table's heading
+    const tally = screen.getByTestId('lap-stewards-line');
+    expect(tally).toHaveTextContent('2 incidents');
+    expect(tally).toHaveTextContent('1 track limit');
+    expect(tally).toHaveTextContent('1 penalty');
 
     // Verify Incomplete status badge contains incident tooltip details
     const incompleteEl = screen.getByText('Incomplete');
@@ -606,19 +603,14 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(tlBadge.className).toContain('text-lmu-warn-soft');
     expect(screen.getByText('Drive Thru')).toBeInTheDocument();
 
-    // Verify Expandable Incidents & Stewards Log toggle
-    const toggleLogBtn = screen.getByText(/Incidents & Stewards Log/i);
-    expect(toggleLogBtn).toBeInTheDocument();
-
-    // Click to expand log
-    fireEvent.click(toggleLogBtn);
-
-    // After expansion, event descriptions should be visible
+    // The stewards log is folded into the laps: expanding them shows every event
+    expect(screen.queryByText(/Incidents & Stewards Log/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Show lap details/i }));
     expect(screen.getByText(/Contact with Archie Porter/i)).toBeInTheDocument();
     expect(screen.getByText(/Contact with Immovable/i)).toBeInTheDocument();
   });
 
-  it('styles track limit badges as green for No Further Action and orange for 0.75+ points', async () => {
+  it('styles track limit badges neutral for No Further Action and as a loss for 0.75+ points', async () => {
     const sessionWithVariedLimits = {
       id: 'test-session-tl-colors',
       sessionType: 'Race',
@@ -714,11 +706,11 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     const badges = screen.getAllByTitle(/Track limits (review|violation)/i);
     expect(badges.length).toBe(2);
 
-    // Lap 1: No Further Action -> Green (emerald)
-    expect(badges[0].className).toContain('text-lmu-gain-soft');
+    // Lap 1: No Further Action -> neutral, nothing was gained or lost
+    expect(badges[0].className).toContain('text-lmu-text-soft');
 
-    // Lap 2: 0.75 pts -> Orange
-    expect(badges[1].className).toContain('text-lmu-orange-soft');
+    // Lap 2: 0.75 pts -> loss
+    expect(badges[1].className).toContain('text-lmu-loss-soft');
   });
 
   it('opens replay with lap number when clicking row Replay button and updates URL params', async () => {
@@ -803,7 +795,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('opens telemetry when clicking a lap table row or clicking the Best Lap card in timing metrics', async () => {
+  it('opens telemetry when clicking a lap table row or the best lap time in the summary', async () => {
     window.location.hash = '#/session/sess123';
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
@@ -845,12 +837,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     expect(window.location.hash).toContain('lap=1');
 
-    // 2. Click Best Lap card (best lap is Lap 2 with time 122.0)
-    const bestLapCard = screen.getByTitle(/Click to open telemetry for Best Lap/i);
-    fireEvent.click(bestLapCard);
+    // 2. Click the best lap time in the summary (best lap is Lap 2 with time 122.0)
+    fireEvent.click(screen.getByTitle('Open telemetry for Lap 2'));
 
     expect(window.location.hash).toContain('lap=2');
-
     expect(window.location.hash).toContain('replayName=spa_replay.vcr');
   });
 });

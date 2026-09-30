@@ -14,6 +14,8 @@ export const LMU_COLORS = {
   blue: '#219EBC',
   cyan: '#8ECAE6',
   green: '#2A9D8F',
+  personalBest: '#FFB703',
+  sessionBest: '#75B9F5',
   text: '#F8F9FA',
   muted: '#8D99AE',
   faint: '#7F8BA1',
@@ -103,19 +105,4 @@ export const COMPARE_LAP_COLORS = [
   LMU_COLORS.green,
   LMU_COLORS.accent,
   '#8B5CF6',
-] as const;
-
-export const OPPONENT_COLORS = [
-  '#38BDF8', // sky
-  '#34D399', // emerald
-  '#A78BFA', // purple
-  '#F472B6', // pink
-  '#FB923C', // orange
-  '#E2E8F0', // slate
-  '#4ADE80', // green
-  '#2DD4BF', // teal
-  '#818CF8', // indigo
-  '#C084FC', // fuchsia
-  '#F87171', // red
-  '#94A3B8', // cool gray
 ] as const;

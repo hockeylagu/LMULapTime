@@ -66,15 +66,18 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
   const requestDebrief = () => setRequest({ key, attempt: attempt + 1 });
 
   return (
-    <div className="bg-lmu-card p-4 rounded-xl border border-lmu-border space-y-3" data-testid="session-debrief">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-lmu-border/50 pb-2">
-        <div className="flex items-center gap-1.5">
+    <div className="bg-lmu-card p-5 rounded-2xl border border-lmu-border space-y-3" data-testid="session-debrief">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-lmu-border/60 pb-3">
+        <div className="flex items-center gap-2">
           <Crosshair className="w-4 h-4 text-lmu-warn" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Debrief: Where the Time Goes</h3>
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Debrief: Where the Time Goes</h3>
         </div>
         <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
       </div>
 
+      <p role="status" aria-atomic="true" className="sr-only">
+        {state.status === 'loading' ? 'Comparing laps for your debrief.' : state.status === 'ready' ? 'Your lap debrief is ready.' : state.status === 'unavailable' ? 'No lap comparison is available.' : ''}
+      </p>
       {state.status === 'idle' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
           <p className="text-xs text-lmu-muted">
@@ -97,7 +100,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       {state.status === 'unavailable' && <p className="text-xs text-lmu-muted py-1">{state.reason}</p>}
       {state.status === 'error' && (
         <div className="flex items-center justify-between gap-2 py-1">
-          <p className="text-xs text-lmu-loss">{state.message}</p>
+          <p role="alert" className="text-xs text-lmu-loss">{state.message}</p>
           <button type="button" onClick={requestDebrief} className="text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap">
             Try again
           </button>

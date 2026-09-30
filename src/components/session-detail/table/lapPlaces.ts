@@ -6,12 +6,13 @@ import { damageBeforeStop, type LapPitStop } from './pitStopText.js';
 
 /** The driver's place at the end of the previous lap and of this one, when both are known. */
 export function lapPlaces(
-  session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean
+  session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean,
+  positions?: ReadonlyMap<LapData, number>
 ): LapPlaces | undefined {
   if (!prevLap || prevLap.position <= 0 || lap.position <= 0) return undefined;
   return {
-    from: lapClassPosition(session, driver, prevLap, isMultiClass),
-    to: lapClassPosition(session, driver, lap, isMultiClass),
+    from: positions?.get(prevLap) ?? lapClassPosition(session, driver, prevLap, isMultiClass),
+    to: positions?.get(lap) ?? lapClassPosition(session, driver, lap, isMultiClass),
     inClass: isMultiClass,
   };
 }
@@ -31,10 +32,11 @@ export function lapPitStop(laps: LapData[], lap: LapData, prevLap: LapData | nul
 
 /** What the rest of the driver's race adds to a lap's expanded row. */
 export function lapDetailContext(
-  session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean
+  session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean,
+  positions?: ReadonlyMap<LapData, number>
 ): LapDetailContext {
   return {
-    places: lapPlaces(session, driver, lap, prevLap, isMultiClass),
+    places: lapPlaces(session, driver, lap, prevLap, isMultiClass, positions),
     pitStop: lapPitStop(driver?.laps ?? [], lap, prevLap),
   };
 }

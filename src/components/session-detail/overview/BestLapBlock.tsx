@@ -1,0 +1,89 @@
+import React from 'react';
+import { ChevronRight } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { PaceBadge } from '../../common/index.js';
+
+export interface BestLapBlockProps {
+  session: DetailedSession;
+  selectedDriver: DriverData;
+  isCurrentSessionAllTimePB: boolean;
+  allTimeCategoryTrackPB: number | null;
+}
+
+/**
+ * The anchor of the session summary: the best lap, large and white (gold when it is the driver's
+ * personal best here) and its pace band. The time opens the lap's telemetry (the leaderboard when the
+ * session has no replay).
+ */
+export const BestLapBlock: React.FC<BestLapBlockProps> = ({
+  selectedDriver,
+  isCurrentSessionAllTimePB: isPB,
+  allTimeCategoryTrackPB,
+  session,
+}) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const bestLapNum =
+    selectedDriver.bestLapNum ||
+    (selectedDriver.bestLapTime
+      ? selectedDriver.laps?.find(
+          (l) => l.lapTime && Math.abs(l.lapTime - selectedDriver.bestLapTime!) < 0.001
+        )?.lapNum
+      : undefined) ||
+    (selectedDriver.laps && selectedDriver.laps.length > 0 ? selectedDriver.laps[0].lapNum : 1);
+
+  const hasReplay = Boolean(session.matchingReplayFile);
+
+  const openBestLap = () => {
+    if (session.matchingReplayFile) {
+      const telemetryParams = new URLSearchParams(searchParams);
+      telemetryParams.set('replayName', session.matchingReplayFile.name);
+      telemetryParams.set('lap', String(bestLapNum));
+      navigate(`/telemetry?${telemetryParams.toString()}`);
+    } else {
+      const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+      const carClass = selectedDriver.carClass || 'LMGT3';
+      navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+        carClass
+      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`);
+    }
+  };
+
+  return (
+    <div className="min-w-0">
+      <p className={`text-[10px] uppercase tracking-wider font-semibold ${isPB ? 'text-lmu-personal-best' : 'text-lmu-muted'}`}>
+        {isPB ? 'Personal best' : 'Best lap'}
+        {bestLapNum ? ` · L${bestLapNum}` : ''}
+      </p>
+      <button
+        type="button"
+        onClick={openBestLap}
+        title={hasReplay ? `Open telemetry for Lap ${bestLapNum}` : `Open Lap ${bestLapNum} on the leaderboard`}
+        className={`group mt-0.5 inline-flex items-center gap-1.5 font-mono text-3xl font-extrabold leading-tight cursor-pointer rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent ${
+          isPB ? 'text-lmu-personal-best' : 'text-white'
+        }`}
+      >
+        {selectedDriver.bestLapTimeString}
+        <ChevronRight
+          className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all"
+          aria-hidden="true"
+        />
+      </button>
+      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+        <PaceBadge
+          category={selectedDriver.bestLapPaceCategory}
+          percentage={selectedDriver.bestLapPacePercentage}
+          showPercentage={true}
+          size="xs"
+        />
+        {!isPB && allTimeCategoryTrackPB && (
+          <span className="text-[11px] text-lmu-muted" title="Your personal best on this layout in this class">
+            PB <span className="font-mono text-lmu-personal-best">{formatTime(allTimeCategoryTrackPB)}</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -36,7 +36,7 @@ export const PaceBadge: React.FC<PaceBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center font-bold border ${roundClass} ${style.badgeClass} ${sizeClasses} ${className}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap font-bold border ${roundClass} ${style.badgeClass} ${sizeClasses} ${className}`}
       title={`Benchmark Pace: ${style.label}${percentage != null ? ` (${formatPacePercentage(percentage)})` : ''}`}
     >
       {showEmoji && <span>{style.emoji}</span>}

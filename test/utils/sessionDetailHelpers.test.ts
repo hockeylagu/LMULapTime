@@ -1,18 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   findRelatedSession,
-  OPPONENT_COLORS,
-  PLAYER_HIGHLIGHT_COLOR,
   CandidateRelatedSession,
 } from '../../src/components/session-detail/sessionDetailHelpers';
 import { DetailedSession } from '../../server/core/types';
 
 describe('sessionDetailHelpers', () => {
-  it('exports valid color constants', () => {
-    expect(OPPONENT_COLORS.length).toBeGreaterThan(5);
-    expect(PLAYER_HIGHLIGHT_COLOR).toBe('#FBBF24');
-  });
-
   describe('findRelatedSession', () => {
     const baseCurrent: DetailedSession = {
       id: 'session_2026_06_15_R1',

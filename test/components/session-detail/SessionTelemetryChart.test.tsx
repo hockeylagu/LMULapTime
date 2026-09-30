@@ -1,6 +1,8 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { LegendPayload } from 'recharts';
 import type { DetailedSession, DriverData } from '../../../server/core/types.js';
 import { SessionTelemetryChart } from '../../../src/components/session-detail/chart/SessionTelemetryChart.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
@@ -17,14 +19,14 @@ vi.mock('recharts', () => ({
   YAxis: () => null,
   Tooltip: () => null,
   CartesianGrid: () => null,
-  Legend: () => null,
+  Legend: ({ formatter }: { formatter: (value: string, entry: LegendPayload) => React.ReactNode }) => <div>{formatter('Sim Driver', { dataKey: 'Sim Driver', value: 'Sim Driver', color: '#fff', type: 'line' })}</div>,
   Line: () => null,
 }));
 
 const session = mockDetailedSession as unknown as DetailedSession;
 const selectedDriver = session.playerDriver as DriverData;
 
-function renderChart(chartSession = session) {
+function renderChart(chartSession = session, handleLegendClick = vi.fn(), hiddenSeries: Record<string, boolean> = {}) {
   return render(
     <SessionTelemetryChart
       session={chartSession}
@@ -37,13 +39,23 @@ function renderChart(chartSession = session) {
       hasVirtualEnergyData={true}
       isMultiClass={false}
       fuelStrategy={null}
-      hiddenSeries={{}}
-      handleLegendClick={vi.fn()}
+      hiddenSeries={hiddenSeries}
+      handleLegendClick={handleLegendClick}
     />
   );
 }
 
 describe('SessionTelemetryChart navigation', () => {
+  it('exposes legend visibility and activates once from the keyboard', async () => {
+    const toggle = vi.fn();
+    renderChart(session, toggle, { 'Sim Driver': true });
+    const legend = screen.getByRole('button', { name: 'Sim Driver' });
+    expect(legend).toHaveAttribute('aria-pressed', 'false');
+    legend.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(toggle).toHaveBeenCalledTimes(1);
+    expect(toggle).toHaveBeenCalledWith(expect.objectContaining({ dataKey: 'Sim Driver' }));
+  });
   it('opens replay telemetry at the selected lap when a replay is available', () => {
     renderChart();
 

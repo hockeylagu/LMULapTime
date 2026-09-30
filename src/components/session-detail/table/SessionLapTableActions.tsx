@@ -4,6 +4,8 @@ import { ArrowLeftRight, Activity } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
+
 export interface SessionLapTableActionsProps {
   session: DetailedSession;
   lapNum: number;
@@ -23,8 +25,8 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
       <button
         type="button"
         onClick={onOpenTelemetry}
-        aria-label="Telemetry"
-        className={`p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer ${
+        aria-label={`Telemetry for lap ${lapNum}`}
+        className={`p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer ${FOCUS_RING} ${
           session.matchingReplayFile
             ? 'bg-lmu-gain-strong/15 hover:bg-lmu-gain-strong/30 text-lmu-gain-soft hover:text-lmu-gain-soft border border-lmu-gain-strong/40'
             : 'bg-lmu-accent/20 hover:bg-lmu-accent/35 text-lmu-accent-text hover:text-white border border-lmu-accent/40'
@@ -35,7 +37,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
             : `Open Lap ${lapNum} in Telemetry`
         }
       >
-        <Activity className="w-3.5 h-3.5" />
+        <Activity className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
 
       <button
@@ -47,11 +49,11 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
             carClass
           )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`);
         }}
-        aria-label="Compare"
-        className="p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-accent hover:text-white text-lmu-muted border border-lmu-border transition-all flex items-center justify-center cursor-pointer"
+        aria-label={`Compare lap ${lapNum}`}
+        className={`p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-raised hover:text-white text-lmu-muted border border-lmu-border hover:border-lmu-rule transition-all flex items-center justify-center cursor-pointer ${FOCUS_RING}`}
         title={`Compare Lap ${lapNum}`}
       >
-        <ArrowLeftRight className="w-3.5 h-3.5" />
+        <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
     </div>
   );
