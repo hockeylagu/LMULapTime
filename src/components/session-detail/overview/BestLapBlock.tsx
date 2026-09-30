@@ -75,6 +75,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
         <PaceBadge
           category={selectedDriver.bestLapPaceCategory}
           percentage={selectedDriver.bestLapPacePercentage}
+          wet={selectedDriver.bestLapWet}
           showPercentage={true}
           size="xs"
         />

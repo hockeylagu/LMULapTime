@@ -106,4 +106,34 @@ describe('replay rain on the laps of a linked session', () => {
     db.invalidateSessionCache();
     expect(rainByLap(db.getSessionById(session.id))).toEqual([20, 20, 20, 20, 20, 20]);
   });
+
+  it('takes the session weather from every stored condition, not the sampled header scan', () => {
+    db.updateSessionMatchingReplay(session.id, { ...replayLink, hasRain: true, maxRainIntensity: 5, weatherCondition: 'Dynamic Weather' });
+
+    db.invalidateSessionCache();
+    const link = db.getSessionById(session.id)?.matchingReplayFile;
+    expect(link).toMatchObject({ hasRain: true, maxRainIntensity: 18, weatherCondition: 'Wet' });
+  });
+
+  it('leaves a wet best lap unrated against the dry benchmark, and rates it again once dry', () => {
+    const rated = JSON.parse(JSON.stringify(session)) as DetailedSession;
+    const player = rated.drivers[0];
+    player.laps.forEach((l) => Object.assign(l, { paceCategory: 'Offline', pacePercentage: l.lapTime === 130 ? 110 : 101.5 }));
+    Object.assign(player.laps[4], { paceCategory: 'Good', pacePercentage: 103 });
+    Object.assign(player, { bestLapNum: 5, bestLapTime: 130, bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
+    db.upsertSession(rated, 'C:\\results\\17R1.xml', 1, 1);
+
+    db.updateSessionMatchingReplay(session.id, replayLink);
+    db.invalidateSessionCache();
+    const wet = db.getSessionById(session.id);
+    expect(wet?.playerDriver).toMatchObject({ bestLapWet: true });
+    expect(wet?.playerDriver?.bestLapPaceCategory).toBeUndefined();
+    expect(wet?.playerDriver?.bestLapPacePercentage).toBeUndefined();
+
+    db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
+    db.invalidateSessionCache();
+    const dry = db.getSessionById(session.id)?.playerDriver;
+    expect(dry?.bestLapWet).toBeUndefined();
+    expect(dry).toMatchObject({ bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
+  });
 });

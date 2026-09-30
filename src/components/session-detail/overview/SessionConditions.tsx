@@ -1,6 +1,7 @@
 import React from 'react';
 import { CloudRain, CloudDrizzle, Sun, Thermometer } from 'lucide-react';
 import { DetailedSession } from '../../../../shared/types/index.js';
+import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 type Replay = NonNullable<DetailedSession['matchingReplayFile']>;
 
@@ -12,7 +13,7 @@ export function hasSessionConditions(replay: DetailedSession['matchingReplayFile
 
 /** The weather and temperatures of the session, read from its linked replay, as quiet text: only rain keeps a hue. */
 export const SessionConditions: React.FC<{ replay: Replay }> = ({ replay }) => {
-  const rain = replay.maxRainIntensity ? ` ${replay.maxRainIntensity}` : '';
+  const rain = replay.maxRainIntensity ? ` ${formatRain(replay.maxRainIntensity)}` : '';
   const air = replay.ambientTemp;
   const track = replay.trackTemp;
   return (
@@ -24,7 +25,7 @@ export const SessionConditions: React.FC<{ replay: Replay }> = ({ replay }) => {
             : replay.weatherCondition === 'Dynamic Weather' ? 'text-lmu-aqua'
             : 'text-lmu-text-soft'
           }`}
-          title={replay.maxRainIntensity ? `${replay.weatherCondition} · Max Rain: ${replay.maxRainIntensity}/25` : `${replay.weatherCondition} track`}
+          title={replay.maxRainIntensity ? `${replay.weatherCondition} · Max Rain: ${formatRain(replay.maxRainIntensity)}` : `${replay.weatherCondition} track`}
         >
           {replay.weatherCondition === 'Wet' ? (
             <><CloudRain className="w-3 h-3" />Wet{rain}</>

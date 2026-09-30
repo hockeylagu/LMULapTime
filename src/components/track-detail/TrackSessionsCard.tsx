@@ -2,7 +2,7 @@ import React from 'react';
 import { SessionList, SessionListItem } from '../session-list/SessionList.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
-import { PaceCategory } from '../../../shared/types/index.js';
+import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface TrackSessionsCardProps {
   trackName: string;
@@ -22,7 +22,7 @@ export interface TrackSessionsCardProps {
   setSearchQuery: (val: string) => void;
   sortBy: TrackDetailSortOption;
   setSortBy: (val: TrackDetailSortOption) => void;
-  getPaceBadge: (s: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
+  getPaceBadge: (s: SessionListItem) => PaceBadgeValue | null;
   onResetFilters?: () => void;
   /** Present while a filter narrows the list; shows the toolbar's Clear filters action. */
   onClearFilters?: () => void;

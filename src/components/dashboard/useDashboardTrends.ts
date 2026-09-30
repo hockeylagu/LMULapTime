@@ -29,6 +29,7 @@ export interface LatestOutingInfo {
   bestLapNum?: number | null;
   pacePercentage?: number | null;
   paceCategory?: PaceCategory | null;
+  bestLapWet?: boolean;
   position?: number;
   gridPosition?: number | null;
   positionGain?: number | null;
@@ -192,6 +193,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         bestLapNum: getBestLapNumber(p),
         pacePercentage: p.bestLapPacePercentage,
         paceCategory: p.bestLapPaceCategory,
+        bestLapWet: p.bestLapWet,
         position: p.position,
         gridPosition: (p as { gridPosition?: number | null }).gridPosition,
         positionGain: (p as { positionGain?: number | null }).positionGain,

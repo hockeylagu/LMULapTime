@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { annotateLapConditions, lapConditionGroup, RAIN_WET_MIN } from '../../shared/domain/lapConditions.js';
+import { annotateLapConditions, formatRain, replayWeatherCondition, lapConditionGroup, RAIN_WET_MIN } from '../../shared/domain/lapConditions.js';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
 import { computeConsistencyRating } from '../../shared/domain/lapComparison.js';
 import type { LapConditions, NonRepresentativeReason } from '../../shared/types/index.js';
@@ -105,5 +105,17 @@ describe('the lap rules with changing conditions', () => {
 
     expect(rating.conditionGroups).toBeUndefined();
     expect(rating.stdDev).toBe(0.141);
+  });
+});
+
+describe('formatRain', () => {
+  it('shows the raw 0-255 rain as a share of full rain', () => {
+    expect(formatRain(40)).toBe('16%');
+    expect(formatRain(255)).toBe('100%');
+    expect(formatRain(1)).toBe('<1%');
+  });
+
+  it('names the replay weather from its peak rain', () => {
+    expect([0, 1, 16, 17].map(replayWeatherCondition)).toEqual(['Dry', 'Dynamic Weather', 'Dynamic Weather', 'Wet']);
   });
 });

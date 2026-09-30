@@ -76,7 +76,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   };
 
   const benchmarkSortAvailable = benchmarkState === 'ready' && trackList.some(track =>
-    getPaceCategoryForLap(track.bestLapTime, getRefEntryForTrack(track.trackVenue, track.bestLapCar, track.bestLapClass)) !== null
+    getPaceCategoryForLap(track.bestLapWet ? null : track.bestLapTime, getRefEntryForTrack(track.trackVenue, track.bestLapCar, track.bestLapClass)) !== null
   );
 
   useEffect(() => {
@@ -99,8 +99,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       if (sortBy === 'pace-asc') {
         const refA = getRefEntryForTrack(a.trackVenue, a.bestLapCar, a.bestLapClass);
         const refB = getRefEntryForTrack(b.trackVenue, b.bestLapCar, b.bestLapClass);
-        const paceA = getPaceCategoryForLap(a.bestLapTime, refA)?.pct ?? 999;
-        const paceB = getPaceCategoryForLap(b.bestLapTime, refB)?.pct ?? 999;
+        const paceA = getPaceCategoryForLap(a.bestLapWet ? null : a.bestLapTime, refA)?.pct ?? 999;
+        const paceB = getPaceCategoryForLap(b.bestLapWet ? null : b.bestLapTime, refB)?.pct ?? 999;
         return paceA - paceB;
       }
       return 0;
@@ -142,7 +142,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {sortedTrackList.map(t => {
           const refEntry = getRefEntryForTrack(t.trackVenue, t.bestLapCar, t.bestLapClass);
-          const paceInfo = getPaceCategoryForLap(t.bestLapTime, refEntry);
+          const paceInfo = getPaceCategoryForLap(t.bestLapWet ? null : t.bestLapTime, refEntry);
 
           return (
             <TrackSummaryCard

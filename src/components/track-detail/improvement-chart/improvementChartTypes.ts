@@ -15,6 +15,7 @@ export interface SessionProgressionPoint {
   carClass: string;
   driverName: string;
   bestLapTime: number | null;
+  bestLapWet?: boolean; // The best lap was wet: no rating against the dry benchmark
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;

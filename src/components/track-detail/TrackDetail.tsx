@@ -6,7 +6,7 @@ import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/i
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
-import { SessionMeta, getPaceCategoryForLap, buildTrackProgression } from './trackDetailHelpers.js';
+import { SessionMeta, getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { LoadingState } from '../common/index.js';
@@ -158,15 +158,12 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const sortedSessions = [...filteredSessions].sort((a, b) =>
     compareSessionsBySortOption(a, b, sortBy, {
       getPacePercentage: (s) =>
-        getPaceCategoryForLap(
-          s.playerDriver?.bestLapTime || null,
-          findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType)
-        )?.percentage,
+        getSessionBestLapPace(s.playerDriver, findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType))?.percentage,
     })
   );
 
   const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression).map((point) => {
-    const paceInfo = getPaceCategoryForLap(
+    const paceInfo = point.bestLapWet ? null : getPaceCategoryForLap(
       point.bestLapTime,
       findBenchmarkForClass(point.carClass, point.carType)
     );
@@ -180,7 +177,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const bestLapSec = bestLapSession?.playerDriver?.bestLapTime || null;
 
-  const paceInfo = getPaceCategoryForLap(bestLapSec, bestLapBenchmark);
+  const paceInfo = getSessionBestLapPace(bestLapSession?.playerDriver, bestLapBenchmark);
   const currentClassDriverStats = {
     bestTimeStr: bestLapSec ? formatTime(bestLapSec) : '--:--.---',
     bestPaceCat: paceInfo?.category || null,
@@ -246,10 +243,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         sortBy={sortBy}
         setSortBy={setSortBy}
         getPaceBadge={(s) =>
-          getPaceCategoryForLap(
-            s.playerDriver?.bestLapTime || null,
-            findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType)
-          )
+          s.playerDriver?.bestLapWet
+            ? { wet: true }
+            : getPaceCategoryForLap(s.playerDriver?.bestLapTime || null, findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType))
         }
         viewMode={sessionViewMode}
         onViewModeChange={setSessionListViewMode}

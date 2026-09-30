@@ -13,6 +13,7 @@ export interface TrackSummaryItem {
   bestLapDriver: string;
   bestLapCar: string;
   bestLapClass?: string;
+  bestLapWet?: boolean;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;

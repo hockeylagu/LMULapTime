@@ -8,7 +8,7 @@ import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
 
 /** Bumping this re-parses every stored session from its XML. */
-export const DB_PARSER_VERSION = '2.17_lap_traffic_pressure_two_lap_pit_loss';
+export const DB_PARSER_VERSION = '2.18_wet_best_lap_unrated';
 
 export interface SessionXmlSyncParser {
   addReplayEntry(entry: ReplayFileEntry): void;

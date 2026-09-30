@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Clock, CloudDrizzle, CloudRain, Flag, HardDrive, Sun, Thermometer, Video } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 export interface ReplayInspectorTitleProps {
   onClose: () => void;
@@ -17,7 +18,7 @@ function WeatherBadge({ metadata, trajectory }: Pick<ReplayInspectorTitleProps, 
   const condition = trajectory?.weatherCondition || metadata?.weatherCondition;
   if (!condition) return null;
   const maxRain = trajectory?.maxRainIntensity || metadata?.maxRainIntensity;
-  const rainSuffix = trajectory?.maxRainIntensity ? `(${trajectory.maxRainIntensity})` : '';
+  const rainSuffix = trajectory?.maxRainIntensity ? `(${formatRain(trajectory.maxRainIntensity)})` : '';
   const tone = condition === 'Wet'
     ? 'bg-lmu-azure-strong/10 border-lmu-azure-strong/30 text-lmu-azure'
     : condition === 'Dynamic Weather'
@@ -27,7 +28,7 @@ function WeatherBadge({ metadata, trajectory }: Pick<ReplayInspectorTitleProps, 
   return (
     <span
       className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold text-[10px] shrink-0 border ${tone}`}
-      title={maxRain ? `Max Rain Intensity: ${trajectory?.maxRainIntensity ?? metadata?.maxRainIntensity}/25` : 'Track Weather Condition'}
+      title={maxRain ? `Max Rain: ${formatRain(maxRain)}` : 'Track Weather Condition'}
     >
       {condition === 'Wet' ? (
         <>

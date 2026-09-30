@@ -1,6 +1,7 @@
 import React from 'react';
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../shared/domain/formatters.js';
+import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 export interface ReplayTelemetryHudProps {
   currentPoint?: ReplayTelemetryPoint | null;
@@ -93,7 +94,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
             : currentPoint?.isOffTrack
             ? 'OFF TRACK'
             : (currentPoint?.rainIntensity ?? 0) > 0
-            ? `WET (${currentPoint?.rainIntensity})`
+            ? `WET (${formatRain(currentPoint?.rainIntensity ?? 0)})`
             : currentPoint?.inPit
             ? 'PIT LANE'
             : 'ON TRACK'}

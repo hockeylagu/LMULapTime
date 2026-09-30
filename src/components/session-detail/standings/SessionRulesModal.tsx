@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc, Sun, CloudRain, CloudDrizzle, Thermometer } from 'lucide-react';
 import { DetailedSession, SessionSettings } from '../../../../shared/types/index.js';
+import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 export type SessionConditionsInfo = Pick<NonNullable<DetailedSession['matchingReplayFile']>, 'weatherCondition' | 'maxRainIntensity' | 'ambientTemp' | 'trackTemp'>;
 
@@ -211,7 +212,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Weather</div>
                 <div className="text-xs font-bold text-white">
                   {WEATHER_LABEL[weather]}
-                  {conditions?.maxRainIntensity ? <span className="font-mono text-lmu-text-soft"> · max rain {conditions.maxRainIntensity}/25</span> : null}
+                  {conditions?.maxRainIntensity ? <span className="font-mono text-lmu-text-soft"> · max rain {formatRain(conditions.maxRainIntensity)}</span> : null}
                 </div>
               </div>
             </div>

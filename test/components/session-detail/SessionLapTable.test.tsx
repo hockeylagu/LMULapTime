@@ -186,11 +186,11 @@ describe('SessionLapTable traffic', () => {
     );
 
     expect(screen.getAllByText('Rain')).toHaveLength(1);
-    expect(screen.getByText('Rain').closest('[title]')?.getAttribute('title')).toBe('Rain 18/25: judged against your other laps in the same conditions');
+    expect(screen.getByText('Rain').closest('[title]')?.getAttribute('title')).toBe('Rain 7%: judged against your other laps in the same conditions');
     expect(screen.getAllByText('Wet tyres')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Show what happened on lap 2' }));
 
-    expect(screen.getByTestId('lap-details-2')).toHaveTextContent('ConditionsRain 18/25 · On wet tyres: judged against your other laps in the same conditions');
+    expect(screen.getByTestId('lap-details-2')).toHaveTextContent('ConditionsRain 7% · On wet tyres: judged against your other laps in the same conditions');
   });
 });

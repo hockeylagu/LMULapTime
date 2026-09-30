@@ -18,6 +18,7 @@ import {
   detectLapsFromTelemetry,
 } from './replayLapBuilder.js';
 import { buildTrajectoryPoints } from './replayLapPoints.js';
+import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
 import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import {
   ReplayProgressTracker,
@@ -656,7 +657,7 @@ export function extractReplayTrajectory(
         wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
         energyTelemetryAvailable: Boolean(finalPoints.some(p => p.virtualEnergy !== undefined)),
         weatherEvents: replayWeatherEvents.length > 0 ? replayWeatherEvents : undefined,
-        weatherCondition: maxSessionRain > 16 ? 'Wet' : maxSessionRain > 0 ? 'Dynamic Weather' : 'Dry',
+        weatherCondition: replayWeatherCondition(maxSessionRain),
         maxRainIntensity: maxSessionRain > 0 ? maxSessionRain : undefined,
         ambientTemp: currentAmbientTemp,
         tireCompounds: targetSlot !== undefined ? driverTireCompounds.get(targetSlot) : undefined,

@@ -11,6 +11,7 @@ import {
   mapVehicleIdToClass,
 } from '../../../shared/domain/vehicleMapping.js';
 import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
+import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
 
 /**
  * Dynamically detects the LMU player profile name from UserData/player/settings.json,
@@ -145,8 +146,7 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   }
 
   const hasRain = maxRain > 0;
-  const weatherCondition: 'Dry' | 'Wet' | 'Dynamic Weather' =
-    maxRain > 16 ? 'Wet' : maxRain > 0 ? 'Dynamic Weather' : 'Dry';
+  const weatherCondition = replayWeatherCondition(maxRain);
 
   return {
     hasRain,

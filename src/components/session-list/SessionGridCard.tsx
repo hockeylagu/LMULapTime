@@ -4,14 +4,14 @@ import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/form
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
-import { PaceCategory } from '../../../shared/types/index.js';
+import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionGridCardProps {
   session: SessionListItem;
   onSelectSession: (sessionId: string) => void;
   onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
-  paceBadge?: { category: PaceCategory; percentage?: number | null } | null;
+  paceBadge?: PaceBadgeValue | null;
 }
 
 export const SessionGridCard: React.FC<SessionGridCardProps> = ({
@@ -91,6 +91,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <PaceBadge
               category={pace.category}
               percentage={pace.percentage}
+              wet={pace.wet}
               size="xs"
               className="shrink-0"
             />

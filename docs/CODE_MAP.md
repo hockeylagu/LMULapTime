@@ -41,12 +41,14 @@ code that drops replay rows because the file is gone.
      (`pitStopDuration`, spans in-lap + out-lap);
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): who was around the car on each lap;
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): conditions (`shared/domain/lapConditions.ts`), non-representative
-     laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average;
+     laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average, best-lap benchmark rating (a wet best lap is
+     `bestLapWet` and unrated: the targets are dry laps);
    - car class: `shared/domain/vehicleMapping.ts` (`resolveDriverCarClass`, `mapVehicleIdToClass`); layout: `getCircuitSpecification`;
    - replay match: `findMatchingReplay` (`server/sessions/replayMatching.ts`).
 2. **Store**: `dbSessionSync.ts` (holds `DB_PARSER_VERSION`; bumping it re-parses every stored session) → `dbSessionStore.ts`.
 3. **Re-classify with rain**: `server/core/dbSessionConditions.ts` runs `classifySessionLaps` again with the replay's rain when a
-   session gets its replay or the replay's conditions are stored.
+   session gets its replay or the replay's conditions are stored, and sets the link's peak rain and weather from every stored
+   condition (the header scan samples 30 windows and can miss the peak).
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
    - telemetry links (`context.enrichSessionsWithTelemetry`);
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).

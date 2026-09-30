@@ -29,6 +29,7 @@ export interface SessionSummary {
     theoreticalBestString: string;
     bestLapPaceCategory?: PaceCategory | null;
     bestLapPacePercentage?: number | null;
+    bestLapWet?: boolean;
     avgLapTime?: number | null;
     top3LapsCount?: number;
     position?: number;
