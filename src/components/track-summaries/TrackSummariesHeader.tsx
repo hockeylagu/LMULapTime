@@ -8,6 +8,7 @@ export type { TracksSortOption };
 
 interface TrackSummariesHeaderProps {
   totalTracks: number;
+  benchmarkSortAvailable: boolean;
   sortBy: TracksSortOption;
   onSortByChange: (sort: TracksSortOption) => void;
   selectedCarClass: string;
@@ -16,20 +17,21 @@ interface TrackSummariesHeaderProps {
 
 export const TrackSummariesHeader: React.FC<TrackSummariesHeaderProps> = ({
   totalTracks,
+  benchmarkSortAvailable,
   sortBy,
   onSortByChange,
   selectedCarClass,
   onSelectCarClass,
 }) => {
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <Flag className="w-6 h-6 text-lmu-gold" />
-          Track Records & Benchmarks ({totalTracks} Tracks)
+        <h2 className="text-lg font-bold text-lmu-text flex items-center gap-2">
+          <Flag className="w-4 h-4 text-lmu-muted" />
+          Tracks ({totalTracks})
         </h2>
         <p className="text-xs text-lmu-muted mt-1">
-          Aggregated personal best lap times, theoretical limits, and car stats filtered by category
+          Personal bests and benchmark pace
         </p>
       </div>
 
@@ -38,7 +40,7 @@ export const TrackSummariesHeader: React.FC<TrackSummariesHeaderProps> = ({
         <SortDropdown
           value={sortBy}
           onChange={onSortByChange}
-          options={TRACK_SORT_OPTIONS}
+          options={TRACK_SORT_OPTIONS.map(option => ({ ...option, disabled: option.value === 'pace-asc' && !benchmarkSortAvailable }))}
         />
 
         {/* Car Class Filter Buttons */}

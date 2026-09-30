@@ -48,7 +48,7 @@ export const ReplayTimelineFooter: React.FC<ReplayTimelineFooterProps> = React.m
     <div className="p-3 rounded-xl bg-lmu-card/80 border border-lmu-border flex flex-col gap-2 shrink-0">
       <div className="flex items-center justify-between text-xs text-lmu-muted">
         <span className="font-semibold text-white flex items-center gap-1.5">
-          <Activity className="w-3.5 h-3.5 text-lmu-accent" />
+          <Activity className="w-3.5 h-3.5 text-lmu-accent-text" />
           Synchronized Telemetry Cursor
         </span>
         <div className="flex items-center gap-3 font-mono text-[11px]">

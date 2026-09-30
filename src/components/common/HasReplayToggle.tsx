@@ -27,9 +27,10 @@ export const HasReplayToggle: React.FC<HasReplayToggleProps> = ({
       type="button"
       onClick={() => onToggle(!hasReplayOnly)}
       aria-label={ariaLabel}
+      aria-pressed={hasReplayOnly}
       className={`h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl border text-xs font-semibold transition-all shrink-0 cursor-pointer ${
         hasReplayOnly
-          ? 'bg-lmu-accent/20 border-lmu-accent/60 text-lmu-accent shadow-sm'
+          ? 'bg-lmu-raised border-lmu-rule text-white'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
       } ${className}`}
       title={hasReplayOnly ? titleActive : titleInactive}
@@ -38,8 +39,8 @@ export const HasReplayToggle: React.FC<HasReplayToggleProps> = ({
       <span>{label}</span>
       {replayCount > 0 && (
         <span
-          className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-            hasReplayOnly ? 'bg-lmu-accent text-white' : 'bg-lmu-border text-lmu-muted'
+          className={`px-1.5 py-px rounded-full text-[10px] font-mono ${
+            hasReplayOnly ? 'bg-lmu-bg text-lmu-text-soft' : 'bg-lmu-border text-lmu-muted'
           }`}
         >
           {replayCount}

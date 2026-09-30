@@ -164,7 +164,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   };
 
   return (
-    <section aria-label="Compare laps" className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+    <section aria-label="Compare laps" className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <CompareLapsHeader
         selectedTrack={data.selectedTrack}
         allTimePBObject={data.allTimePBObject}
@@ -184,15 +184,15 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       />
 
       {telemetryError && (
-        <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs flex items-center justify-between gap-3 animate-fadeIn">
+        <div className="p-3 rounded-xl border border-lmu-loss-strong/40 bg-lmu-loss-deep/40 text-lmu-loss-soft text-xs flex items-center justify-between gap-3 animate-fade-in">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-lmu-loss shrink-0" />
             <span>{telemetryError}</span>
           </div>
           <button
             type="button"
             onClick={() => setTelemetryError(null)}
-            className="p-1 hover:bg-rose-900/60 rounded text-rose-400 hover:text-white cursor-pointer"
+            className="p-1 hover:bg-lmu-loss-deep/60 rounded text-lmu-loss hover:text-white cursor-pointer"
             title="Dismiss"
           >
             <X className="w-4 h-4" />
@@ -201,7 +201,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       )}
 
       {data.loadError && (
-        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">
+        <p role="alert" className="px-4 py-3 rounded-xl border border-lmu-loss-strong/30 bg-lmu-loss-strong/10 text-sm text-lmu-loss-soft">
           Could not load laps for {data.selectedTrack}: {data.loadError}
         </p>
       )}

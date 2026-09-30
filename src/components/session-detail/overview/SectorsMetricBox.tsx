@@ -4,6 +4,7 @@ import { compareWithSameCarRivals, RivalSectorKey } from '../../../../shared/dom
 import { formatTime } from '../../../../shared/domain/formatters.js';
 
 export interface SectorsMetricBoxProps {
+  className?: string;
   selectedDriver: DriverData;
   drivers: DriverData[];
   averages: Record<RivalSectorKey, number | null>;
@@ -23,13 +24,13 @@ function formatGap(gap: number | null): string {
 }
 
 const gapClass = (gap: number | null) =>
-  gap === null ? 'text-lmu-muted' : gap > 0.0005 ? 'text-rose-400' : 'text-emerald-400';
+  gap === null ? 'text-lmu-muted' : gap > 0.0005 ? 'text-lmu-loss' : 'text-lmu-gain';
 
 /**
  * The driver's best and average sectors, next to the fastest other driver in the same car this
  * session (the class when nobody else drove it), with the sector that costs the most highlighted.
  */
-export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriver, drivers, averages }) => {
+export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriver, drivers, averages, className = '' }) => {
   const comparison = useMemo(() => compareWithSameCarRivals(drivers, selectedDriver), [drivers, selectedDriver]);
   const rows = comparison?.rows ?? [
     { key: 's1' as const, label: 'S1', yours: selectedDriver.bestS1, rival: null, rivalName: null, gap: null },
@@ -46,10 +47,10 @@ export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriv
 
   return (
     <div
-      className="col-span-2 p-2.5 rounded-lg bg-lmu-bg/70 border border-lmu-border/50 flex flex-col justify-between"
+      className={`p-2.5 rounded-lg bg-lmu-bg border border-lmu-border ${className}`}
       data-testid="sectors-metric"
     >
-      <div className={`grid ${columns} gap-x-2 text-[10px] text-lmu-muted uppercase font-semibold`}>
+      <div className={`grid ${columns} gap-x-2 text-[10px] text-lmu-muted uppercase tracking-wider font-semibold`}>
         <span>Sectors</span>
         <span className="text-right">Best</span>
         <span className="text-right">Avg</span>
@@ -65,7 +66,7 @@ export const SectorsMetricBox: React.FC<SectorsMetricBoxProps> = ({ selectedDriv
           <div
             key={row.key}
             className={`grid ${columns} gap-x-2 items-center rounded px-0.5 ${
-              comparison?.biggestGap?.key === row.key ? 'bg-amber-500/10' : ''
+              comparison?.biggestGap?.key === row.key ? 'bg-lmu-warn-strong/10' : ''
             } ${row.key === 'lap' ? 'border-t border-lmu-border/40' : ''}`}
           >
             <span className="text-lmu-muted text-[10px] font-semibold font-sans">{row.label}</span>

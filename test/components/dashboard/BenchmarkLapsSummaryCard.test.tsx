@@ -30,7 +30,7 @@ describe('BenchmarkLapsSummaryCard', () => {
     },
   ];
 
-  it('renders benchmark percentages with category-specific colors', () => {
+  it('leads with the best pace and keeps each category as a colored mark', () => {
     render(
       <BenchmarkLapsSummaryCard
         rankedRefLaps={mockRefLaps}
@@ -41,16 +41,13 @@ describe('BenchmarkLapsSummaryCard', () => {
       />
     );
 
-    const alienPercent = screen.getByText('100.5%');
-    const competitivePercent = screen.getByText('101.8%');
-    const goodPercent = screen.getByText('103.2%');
-
-    // Alien should be purple
-    expect(alienPercent.className).toContain('text-purple-400');
-    // Competitive should be amber/yellow
-    expect(competitivePercent.className).toContain('text-amber-400');
-    // Good should be emerald/green
-    expect(goodPercent.className).toContain('text-emerald-400');
+    // The best percentage carries the pace color; its category label stays neutral.
+    expect(screen.getByText('100.5%')).toHaveClass('text-lmu-purple');
+    expect(screen.getByText('Alien')).toHaveClass('text-lmu-text-soft');
+    expect(screen.getByText('Porsche 963 · 1:30.500')).toBeInTheDocument();
+    // The runners-up keep their category as a colored dot
+    expect(screen.getByTitle('Competitive').className).toContain('text-lmu-warn');
+    expect(screen.getByTitle('Good').className).toContain('text-lmu-gain');
   });
 
   it('invokes onSelectSession when clicking a benchmark entry', () => {

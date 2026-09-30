@@ -93,7 +93,7 @@ export function computeLapDeltas(baseline: ComparableLap, target: ComparableLap)
       return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-lmu-green font-bold' };
     }
     // Slower than baseline (red / orange / yellow)
-    return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-rose-400 font-medium' };
+    return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-lmu-loss font-medium' };
   };
 
   // Delta helper for speed (in km/h)
@@ -110,7 +110,7 @@ export function computeLapDeltas(baseline: ComparableLap, target: ComparableLap)
       return { delta, formatted: `+${delta.toFixed(1)} km/h`, deltaClass: 'text-lmu-cyan font-bold' };
     }
     // Lower top speed
-    return { delta, formatted: `${delta.toFixed(1)} km/h`, deltaClass: 'text-rose-400 font-medium' };
+    return { delta, formatted: `${delta.toFixed(1)} km/h`, deltaClass: 'text-lmu-loss font-medium' };
   };
 
   const lapRes = computeTimeDelta(baseline.lapTime, target.lapTime);
@@ -269,43 +269,6 @@ export function filterLapsByCarCategory(
     }
     return true;
   });
-}
-
-export interface LapToLapDeltaResult {
-  delta: number | null;
-  formatted: string;
-  deltaClass: string;
-  isFaster: boolean | null;
-}
-
-/**
- * Computes difference from previous completed lap to current lap (Lap N - Lap N-1).
- * Negative delta = faster than previous lap (improvement).
- * Positive delta = slower than previous lap.
- */
-export function computeLapToLapDelta(
-  prevLapTime: number | null | undefined,
-  currentLapTime: number | null | undefined
-): LapToLapDeltaResult {
-  if (
-    prevLapTime === null ||
-    prevLapTime === undefined ||
-    currentLapTime === null ||
-    currentLapTime === undefined ||
-    prevLapTime <= 0 ||
-    currentLapTime <= 0
-  ) {
-    return { delta: null, formatted: '--', deltaClass: 'text-lmu-muted', isFaster: null };
-  }
-
-  const delta = parseFloat((currentLapTime - prevLapTime).toFixed(3));
-  if (Math.abs(delta) < 0.0005) {
-    return { delta: 0, formatted: '±0.000s', deltaClass: 'text-white font-semibold', isFaster: false };
-  }
-  if (delta < 0) {
-    return { delta, formatted: `${delta.toFixed(3)}s`, deltaClass: 'text-emerald-400 font-bold', isFaster: true };
-  }
-  return { delta, formatted: `+${delta.toFixed(3)}s`, deltaClass: 'text-rose-400 font-medium', isFaster: false };
 }
 
 /**

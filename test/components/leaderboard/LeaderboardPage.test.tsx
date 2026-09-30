@@ -69,7 +69,7 @@ describe('LeaderboardPage', () => {
     expect(cards[0]).not.toHaveTextContent('🇮🇹');
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
-    expect(await screen.findByRole('heading', { name: /Leaderboard · Hypercar/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH', expect.anything());
   });
 
@@ -104,7 +104,7 @@ describe('LeaderboardPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Compare with Driver 1' }));
     expect(await screen.findAllByTitle('Remove from comparison')).toHaveLength(2);
     expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Driver 1.*1:40\.000/);
-    expect(screen.getAllByText('⭐ Your best').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Your best').length).toBeGreaterThan(0);
     // The baseline card is labelled, not framed.
     expect(screen.getByRole('region', { name: 'Compare laps' }).querySelector('.border-lmu-accent')).toBeNull();
     expect(within(screen.getByRole('region', { name: 'Compare laps' })).getByRole('button', { name: "Where's the time?" })).toBeInTheDocument();

@@ -59,14 +59,14 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
-          <Film className="w-5 h-5 text-lmu-accent" />
+          <Film className="w-5 h-5 text-lmu-accent-text" />
           <h3 className="text-base font-bold text-white uppercase tracking-wider">Cached Replays (.VCR)</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30">
+          <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30">
             {replays?.length ?? 0} Cached
           </span>
           <button
@@ -106,11 +106,11 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
               <div className="flex items-center justify-between">
                 <span className="truncate">{replayScanStatus.currentFile}</span>
                 {replayScanStatus.filePercent !== undefined && replayScanStatus.filePercent !== null && (
-                  <span className="text-sky-400 font-semibold ml-2 shrink-0">{replayScanStatus.filePercent}%</span>
+                  <span className="text-lmu-info font-semibold ml-2 shrink-0">{replayScanStatus.filePercent}%</span>
                 )}
               </div>
               {replayScanStatus.currentStage && (
-                <span className="text-[10px] text-slate-400 font-sans italic truncate">
+                <span className="text-[10px] text-lmu-muted font-sans italic truncate">
                   {replayScanStatus.currentStage}
                 </span>
               )}
@@ -119,7 +119,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
         </div>
       )}
 
-      {error && <p className="text-xs font-semibold text-lmu-accent">{error}</p>}
+      {error && <p className="text-xs font-semibold text-lmu-accent-text">{error}</p>}
 
       {replays && replays.length === 0 && !isLoading && (
         <p className="text-xs text-lmu-muted italic">No replays cached yet. Rescan from the folder paths section below.</p>
@@ -128,7 +128,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
       {replays && replays.length > 0 && (
         <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-lmu-border">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-lmu-bg text-lmu-muted uppercase text-[10px]">
+            <thead className="sticky top-0 bg-lmu-bg text-lmu-muted uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="text-left font-semibold px-3 py-2 max-w-[160px]">Replay</th>
                 <th className="text-center font-semibold px-2 py-2">Disk</th>
@@ -144,11 +144,11 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
             <tbody>
               {replays.map(r => (
                 <tr key={r.filename} className="border-t border-lmu-border/50 hover:bg-lmu-card/50">
-                  <td className="px-3 py-2 text-white font-medium truncate max-w-[220px]" title={r.filename}>{r.filename}</td>
+                  <td className="px-3 py-2 text-white font-medium truncate max-w-[196px]" title={r.filename}>{r.filename}</td>
                   <td className="px-2 py-2 text-center whitespace-nowrap">
                     {r.isOnDisk ? (
                       <span
-                        className="inline-flex items-center justify-center p-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                        className="inline-flex items-center justify-center p-1 rounded bg-lmu-gain-strong/10 text-lmu-gain border border-lmu-gain-strong/30"
                         title="On Disk"
                         aria-label="On Disk"
                         data-testid="replay-on-disk-badge"
@@ -157,26 +157,26 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
                       </span>
                     ) : (
                       <span
-                        className="inline-flex items-center justify-center p-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25"
+                        className="inline-flex items-center justify-center p-1 rounded bg-lmu-warn-strong/10 text-lmu-warn border border-lmu-warn-strong/25"
                         title="Not on Disk"
                         aria-label="Not on Disk"
                         data-testid="replay-not-on-disk-badge"
                       >
-                        <Archive className="w-3.5 h-3.5 text-amber-400/80" />
+                        <Archive className="w-3.5 h-3.5 text-lmu-warn/80" />
                       </span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-center font-mono">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-sky-400 border border-slate-700">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-lmu-raised text-lmu-info border border-lmu-rule">
                       {r.replayVersion || r.parserVersion || '—'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{r.driversCount}</td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{formatDuration(r.durationSec)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-gold">{formatBytes(r.fileSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-gold">{formatBytes(r.compressedSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-lmu-muted">{formatDate(r.replayDateMs)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{r.trajectoriesCached}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.driversCount}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{formatDuration(r.durationSec)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.fileSizeBytes)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.compressedSizeBytes)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-muted">{formatDate(r.replayDateMs)}</td>
+                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.trajectoriesCached}</td>
                 </tr>
               ))}
             </tbody>

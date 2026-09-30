@@ -28,11 +28,11 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         {selectedDriver.avgFuelPerLap !== null && selectedDriver.avgFuelPerLap !== undefined && (
           <div className="flex items-center gap-2.5 p-2 rounded-lg bg-lmu-card/60 border border-lmu-border/40">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+            <div className="p-2 rounded-lg bg-lmu-warn-strong/10 text-lmu-warn border border-lmu-warn-strong/20 shrink-0">
               <Fuel className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Fuel Usage</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Avg Fuel Usage</p>
               <p className="text-xs font-mono font-bold text-white">
                 {selectedDriver.avgFuelPerLap}% <span className="text-[10px] font-normal text-lmu-muted">/ clean lap</span>
               </p>
@@ -42,12 +42,12 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
 
         {selectedDriver.estFuelStintLaps !== null && selectedDriver.estFuelStintLaps !== undefined && (
           <div className="flex items-center gap-2.5 p-2 rounded-lg bg-lmu-card/60 border border-lmu-border/40">
-            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 shrink-0">
+            <div className="p-2 rounded-lg bg-lmu-orange-strong/10 text-lmu-orange border border-lmu-orange-strong/20 shrink-0">
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Fuel Stint</p>
-              <p className="text-xs font-mono font-bold text-amber-300">
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Est. Fuel Stint</p>
+              <p className="text-xs font-mono font-bold text-lmu-warn-soft">
                 ~{selectedDriver.estFuelStintLaps} <span className="text-[10px] font-normal text-lmu-muted">laps / tank</span>
               </p>
             </div>
@@ -59,11 +59,11 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
             className="flex items-center gap-2.5 p-2 rounded-lg bg-lmu-card/60 border border-lmu-border/40"
             title="Virtual Energy consumed per lap (WEC / LMU BoP energy allocation)"
           >
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+            <div className="p-2 rounded-lg bg-lmu-indigo-strong/10 text-lmu-indigo border border-lmu-indigo-strong/20 shrink-0">
               <Zap className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Avg Virtual Energy</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Avg Virtual Energy</p>
               <p className="text-xs font-mono font-bold text-white">
                 {selectedDriver.avgVePerLap}% <span className="text-[10px] font-normal text-lmu-muted">/ lap</span>
               </p>
@@ -76,12 +76,12 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
             className="flex items-center gap-2.5 p-2 rounded-lg bg-lmu-card/60 border border-lmu-border/40"
             title="Estimated laps before 100% Virtual Energy allocation is depleted. In WEC, running out before pitting triggers a 100s stop-and-go penalty."
           >
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <div className="p-2 rounded-lg bg-lmu-purple-strong/10 text-lmu-purple border border-lmu-purple-strong/20 shrink-0">
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-semibold text-lmu-muted">Est. Energy Stint (VE)</p>
-              <p className="text-xs font-mono font-bold text-indigo-300">
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted">Est. Energy Stint (VE)</p>
+              <p className="text-xs font-mono font-bold text-lmu-indigo-soft">
                 ~{selectedDriver.estVeStintLaps} <span className="text-[10px] font-normal text-lmu-muted">laps / stint</span>
               </p>
             </div>
@@ -93,7 +93,7 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
       {fuelStrategy && fuelStrategy.optimalRatio !== null && (
         <div className="pt-2.5 border-t border-lmu-border/50 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <div className="p-1.5 rounded-md bg-lmu-purple-strong/10 text-lmu-purple border border-lmu-purple-strong/20 shrink-0">
               <Scale className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -102,29 +102,29 @@ export const SessionFuelStrategyCard: React.FC<SessionFuelStrategyCardProps> = (
                   Recommended Setup Fuel Ratio:
                 </span>
                 <span
-                  className="px-2 py-0.5 rounded bg-purple-950/90 text-purple-300 border border-purple-500/50 font-mono font-bold text-[11px]"
+                  className="px-2 py-0.5 rounded bg-lmu-purple-deep/90 text-lmu-purple-soft border border-lmu-purple-strong/50 font-mono font-bold text-[11px]"
                   title="Recommended Fuel-to-Energy ratio for LMU Setup (Electronics/Strategy menu). Sets how much physical fuel to carry per % Virtual Energy."
                 >
                   {fuelStrategy.optimalRatio}
                 </span>
                 {fuelStrategy.zeroWasteFuelPct !== null && (
                   <span className="text-lmu-muted text-[10px]">
-                    (Zero-Waste Tank Fill: <strong className="text-amber-300 font-mono">~{fuelStrategy.zeroWasteFuelPct}%</strong> for full VE stint)
+                    (Zero-Waste Tank Fill: <strong className="text-lmu-warn-soft font-mono">~{fuelStrategy.zeroWasteFuelPct}%</strong> for full VE stint)
                   </span>
                 )}
               </div>
               <p className="text-[10px] text-lmu-muted mt-0.5">
                 {fuelStrategy.limiter === 've' ? (
                   <span>
-                    <strong className="text-indigo-300">⚡ Stint Limited by Virtual Energy:</strong> VE allocation runs out ~{fuelStrategy.lapDelta} laps before fuel tank (carrying ~{fuelStrategy.surplusFuelPct}% excess fuel). Set ratio to <strong className="text-white font-mono">{fuelStrategy.optimalRatio}</strong> or use lift-and-coast.
+                    <strong className="text-lmu-indigo-soft">⚡ Stint Limited by Virtual Energy:</strong> VE allocation runs out ~{fuelStrategy.lapDelta} laps before fuel tank (carrying ~{fuelStrategy.surplusFuelPct}% excess fuel). Set ratio to <strong className="text-white font-mono">{fuelStrategy.optimalRatio}</strong> or use lift-and-coast.
                   </span>
                 ) : fuelStrategy.limiter === 'fuel' ? (
                   <span>
-                    <strong className="text-amber-300">⛽ Stint Limited by Fuel Tank:</strong> Physical fuel runs dry ~{fuelStrategy.lapDelta} laps before VE is exhausted. Increase fuel ratio or short-shift.
+                    <strong className="text-lmu-warn-soft">⛽ Stint Limited by Fuel Tank:</strong> Physical fuel runs dry ~{fuelStrategy.lapDelta} laps before VE is exhausted. Increase fuel ratio or short-shift.
                   </span>
                 ) : (
                   <span>
-                    <strong className="text-emerald-300">⚖️ Balanced Stint:</strong> Fuel tank capacity and Virtual Energy allocation run out at approximately the same time. Setup ratio is well balanced.
+                    <strong className="text-lmu-gain-soft">⚖️ Balanced Stint:</strong> Fuel tank capacity and Virtual Energy allocation run out at approximately the same time. Setup ratio is well balanced.
                   </span>
                 )}
               </p>

@@ -24,7 +24,7 @@ describe('HasReplayToggle', () => {
     expect(onToggle).toHaveBeenCalledWith(true);
   });
 
-  it('renders active state with accent styling and active title', () => {
+  it('renders active state as a pressed neutral chip with active title', () => {
     const onToggle = vi.fn();
     render(
       <HasReplayToggle
@@ -35,7 +35,8 @@ describe('HasReplayToggle', () => {
     );
 
     const button = screen.getByRole('button', { name: /Filter sessions with replay/i });
-    expect(button.className).toContain('bg-lmu-accent/20');
+    expect(button.className).toContain('bg-lmu-raised');
+    expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(button).toHaveAttribute('title', expect.stringContaining('Showing only sessions with recorded replay'));
 
     fireEvent.click(button);

@@ -57,37 +57,37 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
           const delta = initialStraight.timeDeltaSec;
           if (Math.abs(delta) < 0.005) {
             metricDisplay = '±0.00';
-            metricClass = 'text-slate-400';
+            metricClass = 'text-lmu-muted';
           } else if (delta > 0) {
             metricDisplay = `+${delta.toFixed(2)}`;
-            metricClass = 'text-rose-400';
+            metricClass = 'text-lmu-loss';
           } else {
             metricDisplay = delta.toFixed(2);
-            metricClass = 'text-emerald-400';
+            metricClass = 'text-lmu-gain';
           }
         } else {
           metricDisplay = `${initialStraight.primaryTimeSec.toFixed(2)}s`;
-          metricClass = 'text-slate-200';
+          metricClass = 'text-lmu-text';
         }
 
         let borderAndBgClass: string;
         if (isCurrent) {
           borderAndBgClass =
-            'border-sky-500/80 bg-sky-950/30 ring-1 ring-sky-500/40 shadow-[0_0_8px_rgba(14,165,233,0.3)]';
+            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40';
         } else if (isCompareMode) {
           if (initialStraight.timeDeltaSec > 0.005) {
             borderAndBgClass =
-              'border-rose-900/60 bg-rose-950/20 hover:border-rose-500/60 hover:bg-rose-950/35';
+              'border-lmu-loss-deep/60 bg-lmu-loss-deep/20 hover:border-lmu-loss-strong/60 hover:bg-lmu-loss-deep/35';
           } else if (initialStraight.timeDeltaSec < -0.005) {
             borderAndBgClass =
-              'border-emerald-900/60 bg-emerald-950/20 hover:border-emerald-500/60 hover:bg-emerald-950/35';
+              'border-lmu-gain-deep/60 bg-lmu-gain-deep/20 hover:border-lmu-gain-strong/60 hover:bg-lmu-gain-deep/35';
           } else {
             borderAndBgClass =
-              'border-slate-800 bg-slate-900/40 hover:border-slate-600 hover:bg-slate-900/60';
+              'border-lmu-border bg-lmu-card/40 hover:border-lmu-rule-strong hover:bg-lmu-card/60';
           }
         } else {
           borderAndBgClass =
-            'border-slate-800/90 bg-slate-900/50 hover:border-sky-500/60 hover:bg-slate-800/60';
+            'border-lmu-border/90 bg-lmu-card/50 hover:border-lmu-info-strong/60 hover:bg-lmu-raised/60';
         }
 
         const stEntryIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, initialStraight.entryDistM) : -1;
@@ -116,7 +116,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
             title={stTooltip}
             className={`flex-1 min-w-[58px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass}`}
           >
-            <span className="text-[10px] font-mono font-bold tracking-wider text-amber-400">
+            <span className="text-[10px] font-mono font-bold tracking-wider text-lmu-warn">
               ST
             </span>
             <span className={`text-[11px] font-mono font-bold leading-tight ${metricClass}`}>
@@ -140,41 +140,41 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
           const delta = c.timeDeltaSec;
           if (Math.abs(delta) < 0.005) {
             metricDisplay = '±0.00';
-            metricClass = 'text-slate-400';
+            metricClass = 'text-lmu-muted';
           } else if (delta > 0) {
             metricDisplay = `+${delta.toFixed(2)}`;
-            metricClass = 'text-rose-400';
+            metricClass = 'text-lmu-loss';
           } else {
             metricDisplay = delta.toFixed(2);
-            metricClass = 'text-emerald-400';
+            metricClass = 'text-lmu-gain';
           }
         } else {
           metricDisplay = `${c.primaryTimeSec.toFixed(2)}s`;
-          metricClass = 'text-slate-200';
+          metricClass = 'text-lmu-text';
         }
 
         // Card outline and background style based on selection and gain/loss
         let borderAndBgClass: string;
         if (isSelected) {
           borderAndBgClass =
-            'border-cyan-400 bg-cyan-950/40 ring-1 ring-cyan-400/60 shadow-[0_0_12px_rgba(34,211,238,0.4)]';
+            'border-lmu-aqua bg-lmu-aqua-deep/40 ring-1 ring-lmu-aqua/60';
         } else if (isCurrent) {
           borderAndBgClass =
-            'border-sky-500/80 bg-sky-950/30 ring-1 ring-sky-500/40 shadow-[0_0_8px_rgba(14,165,233,0.3)]';
+            'border-lmu-info-strong/80 bg-lmu-info-deep/30 ring-1 ring-lmu-info-strong/40';
         } else if (isCompareMode) {
           if (c.timeDeltaSec > 0.005) {
             borderAndBgClass =
-              'border-rose-900/60 bg-rose-950/20 hover:border-rose-500/60 hover:bg-rose-950/35';
+              'border-lmu-loss-deep/60 bg-lmu-loss-deep/20 hover:border-lmu-loss-strong/60 hover:bg-lmu-loss-deep/35';
           } else if (c.timeDeltaSec < -0.005) {
             borderAndBgClass =
-              'border-emerald-900/60 bg-emerald-950/20 hover:border-emerald-500/60 hover:bg-emerald-950/35';
+              'border-lmu-gain-deep/60 bg-lmu-gain-deep/20 hover:border-lmu-gain-strong/60 hover:bg-lmu-gain-deep/35';
           } else {
             borderAndBgClass =
-              'border-slate-800 bg-slate-900/40 hover:border-slate-600 hover:bg-slate-900/60';
+              'border-lmu-border bg-lmu-card/40 hover:border-lmu-rule-strong hover:bg-lmu-card/60';
           }
         } else {
           borderAndBgClass =
-            'border-slate-800/90 bg-slate-900/50 hover:border-sky-500/60 hover:bg-slate-800/60';
+            'border-lmu-border/90 bg-lmu-card/50 hover:border-lmu-info-strong/60 hover:bg-lmu-raised/60';
         }
 
         const entryIdx = cumDists && pointComparisons ? findIndexAtDistance(cumDists, c.entryDistM) : -1;
@@ -199,7 +199,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
           >
             <span
               className={`text-[10px] font-mono font-bold tracking-wider ${
-                isSelected ? 'text-cyan-300' : 'text-sky-400'
+                isSelected ? 'text-lmu-aqua-soft' : 'text-lmu-info'
               }`}
             >
               T{c.cornerNumber}

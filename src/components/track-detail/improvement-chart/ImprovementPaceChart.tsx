@@ -44,15 +44,40 @@ const PersonalBestLegend: React.FC<PersonalBestLegendProps> = ({ gradient, hidde
   <div className="flex justify-center pt-3">
     <button
       type="button"
-      onClick={onToggle}
+      aria-pressed={!hidden}
+      onClick={event => { event.stopPropagation(); onToggle(); }}
       title="Click to toggle Personal Best Over Time visibility"
-      className={`inline-flex items-center gap-1.5 cursor-pointer select-none transition-opacity ${
-        hidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+      className={`inline-flex items-center gap-1.5 cursor-pointer select-none rounded-sm focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${
+        hidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'
       }`}
     >
       <span aria-hidden="true" className="w-5 h-[3px] rounded-full" style={{ backgroundImage: gradient }} />
       <span>Personal Best Over Time</span>
     </button>
+  </div>
+);
+
+interface SeriesLegendProps {
+  payload?: readonly LegendPayload[];
+  hiddenSeries: Record<string, boolean>;
+  onToggle: (entry: LegendPayload) => void;
+}
+
+const SeriesLegend: React.FC<SeriesLegendProps> = ({ payload, hiddenSeries, onToggle }) => (
+  <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 pt-3 text-[11px]">
+    {payload?.map(entry => {
+      const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey ?? '');
+      const hidden = Boolean(hiddenSeries[key]);
+      return (
+        <button key={key} type="button" aria-pressed={!hidden}
+          title={`Click to toggle ${entry.value} visibility`}
+          onClick={event => { event.stopPropagation(); onToggle(entry); }}
+          className={`inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${hidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'}`}>
+          <span aria-hidden="true" className="w-4 h-0 border-t-2" style={{ borderColor: entry.color }} />
+          {entry.value}
+        </button>
+      );
+    })}
   </div>
 );
 
@@ -91,19 +116,19 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
 
   if (chartData.length === 0) {
     return (
-      <div className="py-16 text-center text-lmu-muted">
+      <div role="status" className="py-16 text-center text-lmu-muted">
         No session data found for this track matching current filters.
       </div>
     );
   }
 
   return (
-    <div className="w-full h-[360px] min-h-[330px] pt-2">
-      <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+    <div className="w-full h-[330px] min-h-[300px] pt-2">
+      <ResponsiveContainer width="100%" height="100%" minHeight={270}>
         <LineChart
           key={`${activeTrack}-${selectedCarClass}-${selectedCarModel}-${filterType}-${activeRange}-${chartData.length}-${metric}`}
           data={chartData}
-          margin={{ top: 10, right: 25, left: 10, bottom: chartData.length > 5 ? 35 : 15 }}
+          margin={{ top: 10, right: 25, left: 10, bottom: 0 }}
           onClick={(state) => {
             if (!state) return;
             const stateObj = state as unknown as Record<string, unknown>;
@@ -119,9 +144,11 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             }
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={LMU_COLORS.border} />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={LMU_COLORS.border} />
           <XAxis
             dataKey="chartKey"
+            axisLine={false}
+            tickLine={false}
             stroke={LMU_COLORS.muted}
             tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
             interval={chartData.length > 10 ? 'preserveStartEnd' : 0}
@@ -136,13 +163,14 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
           />
           <YAxis
             domain={[minTime, maxTime]}
+            axisLine={false}
+            tickLine={false}
             stroke={LMU_COLORS.muted}
-            tick={{ fill: LMU_COLORS.muted, fontSize: 12 }}
+            tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
             tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
           />
           <Tooltip content={<ImprovementPaceTooltip metric={metric} onSelectSession={onSelectSession} />} />
           <Legend
-            onClick={handleLegendClick}
             content={
               metric === 'bestPr' ? (
                 <PersonalBestLegend
@@ -150,23 +178,8 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
                   hidden={Boolean(hiddenSeries['bestPr'])}
                   onToggle={() => handleLegendClick({ dataKey: 'bestPr' } as LegendPayload)}
                 />
-              ) : undefined
+              ) : <SeriesLegend hiddenSeries={hiddenSeries} onToggle={handleLegendClick} />
             }
-            wrapperStyle={{ paddingTop: '15px', fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
-            formatter={(value, entry: LegendPayload) => {
-              const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey || '');
-              const isHidden = Boolean(hiddenSeries[key]);
-              return (
-                <span
-                  className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
-                    isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
-                  }`}
-                  title={`Click to toggle ${value} visibility`}
-                >
-                  {value}
-                </span>
-              );
-            }}
           />
           <ImprovementPaceSeries
             metric={metric}

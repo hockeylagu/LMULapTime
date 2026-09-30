@@ -155,7 +155,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   onSelectSource,
 }) => {
   return (
-    <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fadeIn">
+    <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fade-in">
       <ReplayInspectorHeader
         onClose={onClose}
         replayName={activeReplayName || replayName}
@@ -193,7 +193,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       />
 
       {error && (
-        <div role="alert" className="px-4 py-1.5 text-xs text-rose-300 bg-rose-950/40 border-b border-rose-900/60">
+        <div role="alert" className="px-4 py-1.5 text-xs text-lmu-loss-soft bg-lmu-loss-deep/40 border-b border-lmu-loss-deep/60">
           {error}
         </div>
       )}

@@ -22,7 +22,7 @@ export const ReferenceLaptimeUpdateToast: React.FC<ReferenceLaptimeUpdateToastPr
         <Link
           to="/settings"
           onClick={onDismiss}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-lmu-accent hover:text-white hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-lmu-accent-text hover:text-white hover:underline"
         >
           <Settings className="h-3.5 w-3.5" />
           Review in Settings

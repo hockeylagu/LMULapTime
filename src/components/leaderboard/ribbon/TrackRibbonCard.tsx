@@ -22,8 +22,8 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
       title={`${layout.trackName} — ${layout.layoutName}`}
       className={`snap-start shrink-0 w-56 rounded-xl border p-3 text-left transition-all cursor-pointer ${
         selected
-          ? 'border-lmu-accent/70 bg-lmu-accent/10 shadow-[0_0_0_1px_rgba(230,57,70,0.35)]'
-          : 'border-lmu-border bg-lmu-bg/60 hover:border-lmu-accent/40 hover:bg-lmu-card'
+          ? 'border-lmu-rule-strong bg-lmu-raised/50'
+          : 'border-lmu-border bg-lmu-bg/60 hover:border-lmu-rule-strong hover:bg-lmu-card'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -34,7 +34,7 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
               fill="none"
               strokeWidth={4}
               strokeLinejoin="round"
-              className={selected ? 'stroke-lmu-accent' : 'stroke-slate-400'}
+              className={selected ? 'stroke-lmu-text-soft' : 'stroke-lmu-faint'}
             />
           </svg>
         ) : (

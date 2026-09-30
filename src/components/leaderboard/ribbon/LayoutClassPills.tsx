@@ -25,13 +25,13 @@ export const LayoutClassPills: React.FC<LayoutClassPillsProps> = ({ layout, sele
           aria-pressed={selected}
           onClick={() => onSelect(c.carClass)}
           title={badge?.title}
-          className={`h-7 px-3 rounded-[5px] border font-mono text-xs font-bold uppercase tracking-wider transition-opacity cursor-pointer inline-flex items-center gap-2 ${
+          className={`h-7 px-3 rounded-[5px] border font-mono text-xs font-bold uppercase tracking-wider transition-[filter] cursor-pointer inline-flex items-center gap-2 ${
             badge ? `${badge.borderClass} ${badge.textClass} ${badge.bgClass}` : 'border-lmu-border text-lmu-muted'
-          } ${selected ? 'opacity-100 brightness-110' : 'opacity-40 hover:opacity-100'}`}
+          } ${selected ? 'brightness-110' : 'grayscale hover:grayscale-0'}`}
         >
           <span>{carClassLabel(c.carClass)}</span>
           {c.playerRank !== null && (
-            <span className="text-slate-300 font-semibold normal-case">
+            <span className="text-lmu-text-soft font-semibold normal-case">
               P{c.playerRank}/{c.fieldSize}
             </span>
           )}

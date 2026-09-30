@@ -160,7 +160,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                   <button
                     onClick={() => setCornerSubView('compare')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'compare' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      cornerSubView === 'compare' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
                     <Timer className="w-3.5 h-3.5" /> vs Baseline
@@ -168,7 +168,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                   <button
                     onClick={() => setCornerSubView('consistency')}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'consistency' ? 'bg-lmu-accent text-white shadow' : 'text-lmu-muted hover:text-white'
+                      cornerSubView === 'consistency' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
                     <Activity className="w-3.5 h-3.5" /> Consistency
@@ -179,7 +179,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
 
             {activeTab === 'ai-report' && (
               <div className="px-4 py-2.5 bg-lmu-card/50 border-b border-lmu-border/60 flex items-center gap-2 shrink-0 min-h-[41px]">
-                <BrainCircuit className="w-4 h-4 text-lmu-accent shrink-0" />
+                <BrainCircuit className="w-4 h-4 text-lmu-accent-text shrink-0" />
                 <span className="text-xs font-bold text-white">AI Coaching Report</span>
               </div>
             )}

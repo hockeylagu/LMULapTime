@@ -62,13 +62,13 @@ export const AISettingsCard: React.FC = () => {
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl p-6 space-y-4">
+    <div className="bg-lmu-card border border-lmu-border rounded-2xl p-6 space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
-          <BrainCircuit className="h-5 w-5 text-lmu-accent" />
+          <BrainCircuit className="h-5 w-5 text-lmu-accent-text" />
           <h3 className="text-base font-bold uppercase tracking-wider text-white">AI Lap Reports</h3>
         </div>
-        <span className={`rounded px-2.5 py-0.5 text-xs font-semibold ${settings?.configured ? 'bg-emerald-400/15 text-emerald-300' : 'bg-lmu-card text-lmu-muted'}`}>
+        <span className={`rounded px-2.5 py-0.5 text-xs font-semibold ${settings?.configured ? 'bg-lmu-gain/15 text-lmu-gain-soft' : 'bg-lmu-card text-lmu-muted'}`}>
           {settings?.configured ? `Ready (${settings.keySource})` : 'Not configured'}
         </span>
       </div>
@@ -84,7 +84,7 @@ export const AISettingsCard: React.FC = () => {
       </select>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => void save()} disabled={isSaving || !apiKey.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-lmu-accent px-3 py-2 text-xs font-bold text-white disabled:opacity-50 cursor-pointer"><Save className="h-3.5 w-3.5" /> Save Key</button>
-        <button type="button" onClick={() => void remove()} disabled={isSaving || !settings?.configured || settings.keySource === 'environment'} className="inline-flex items-center gap-1.5 rounded-lg border border-lmu-accent/30 bg-lmu-accent/10 hover:bg-lmu-accent/20 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 cursor-pointer"><Trash2 className="h-3.5 w-3.5 text-lmu-accent" /> Remove Session Key</button>
+        <button type="button" onClick={() => void remove()} disabled={isSaving || !settings?.configured || settings.keySource === 'environment'} className="inline-flex items-center gap-1.5 rounded-lg border border-lmu-accent/30 bg-lmu-accent/10 hover:bg-lmu-accent/20 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40 cursor-pointer"><Trash2 className="h-3.5 w-3.5 text-lmu-accent-text" /> Remove Session Key</button>
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-lmu-border px-3 py-2 text-xs font-semibold text-lmu-muted hover:text-white"><ExternalLink className="h-3.5 w-3.5" /> Get Gemini Key</a>
       </div>
       {message && <p role="status" className="text-xs text-lmu-muted">{message}</p>}

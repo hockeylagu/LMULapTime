@@ -13,7 +13,7 @@ export interface ReplayInspectorSidebarTabsProps {
 const tabClass = (isActive: boolean) =>
   `flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer border ${
     isActive
-      ? 'bg-lmu-accent text-white border-lmu-accent shadow-md'
+      ? 'bg-lmu-accent text-white border-lmu-accent'
       : 'bg-lmu-bg/60 text-lmu-muted hover:text-white border-lmu-border/60 hover:border-lmu-border'
   }`;
 
@@ -50,7 +50,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
       <button
         type="button"
         onClick={onClosePanel}
-        className="inline-flex items-center justify-center w-7 h-7 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+        className="inline-flex items-center justify-center w-7 h-7 text-lmu-muted hover:text-white rounded-lg hover:bg-lmu-raised transition-colors cursor-pointer shrink-0"
         aria-label="Close side panel"
         title="Close side panel"
       >

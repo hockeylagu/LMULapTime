@@ -13,79 +13,79 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
     <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 shrink-0">
       {/* Speed & Gear */}
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center justify-between">
-        <span className="text-[9px] text-sky-400 font-bold">SPEED</span>
+        <span className="text-[10px] text-lmu-info font-bold">SPEED</span>
         <div className="flex items-baseline gap-1">
           <span className="text-xs font-black text-white font-mono">{currentPoint?.speedKmh ?? 0}</span>
-          <span className="text-[8px] text-lmu-muted">km/h</span>
+          <span className="text-[10px] text-lmu-muted">km/h</span>
         </div>
-        <span className="text-[8px] text-cyan-400 font-mono font-bold">
+        <span className="text-[10px] text-lmu-aqua font-mono font-bold">
           GEAR {currentGear}
         </span>
       </div>
 
       {/* Throttle */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
-        currentPoint?.tcActive ? 'border-amber-500/70 bg-amber-500/10 shadow-[0_0_8px_rgba(245,158,11,0.25)]' : 'border-lmu-border'
+        currentPoint?.tcActive ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/10' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-emerald-400 font-bold">THR</span>
+          <span className="text-[10px] text-lmu-gain font-bold">THR</span>
           {currentPoint?.tcActive && (
-            <span className="px-1 py-0.2 rounded text-[8px] font-black bg-amber-500 text-black animate-pulse">
+            <span className="px-1 py-px rounded text-[10px] font-black bg-lmu-warn-strong text-black">
               TC
             </span>
           )}
         </div>
-        <span className="text-xs font-black text-emerald-400 font-mono">{(currentPoint?.throttle ?? 0).toFixed(0)}%</span>
-        <span className="text-[8px] text-lmu-muted">{currentPoint?.tcActive ? 'tc active' : 'pedal'}</span>
+        <span className="text-xs font-black text-lmu-gain font-mono">{(currentPoint?.throttle ?? 0).toFixed(0)}%</span>
+        <span className="text-[10px] text-lmu-muted">{currentPoint?.tcActive ? 'tc active' : 'pedal'}</span>
       </div>
 
       {/* Brake */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
-        currentPoint?.absActive ? 'border-cyan-500/70 bg-cyan-500/10 shadow-[0_0_8px_rgba(6,182,212,0.25)]' : 'border-lmu-border'
+        currentPoint?.absActive ? 'border-lmu-aqua-strong/70 bg-lmu-aqua-strong/10' : 'border-lmu-border'
       }`}>
         <div className="flex items-center gap-1">
-          <span className="text-[9px] text-rose-400 font-bold">BRK</span>
+          <span className="text-[10px] text-lmu-loss font-bold">BRK</span>
           {currentPoint?.absActive && (
-            <span className="px-1 py-0.2 rounded text-[8px] font-black bg-cyan-400 text-black animate-pulse">
+            <span className="px-1 py-px rounded text-[10px] font-black bg-lmu-aqua text-black">
               ABS
             </span>
           )}
         </div>
-        <span className="text-xs font-black text-rose-400 font-mono">{(currentPoint?.brake ?? 0).toFixed(0)}%</span>
-        <span className="text-[8px] text-lmu-muted">{currentPoint?.absActive ? 'abs active' : 'pedal'}</span>
+        <span className="text-xs font-black text-lmu-loss font-mono">{(currentPoint?.brake ?? 0).toFixed(0)}%</span>
+        <span className="text-[10px] text-lmu-muted">{currentPoint?.absActive ? 'abs active' : 'pedal'}</span>
       </div>
 
       {/* Steering */}
       <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
-        <span className="text-[9px] text-indigo-400 font-bold">STEER</span>
-        <span className="text-xs font-black text-indigo-300 font-mono">
+        <span className="text-[10px] text-lmu-indigo font-bold">STEER</span>
+        <span className="text-xs font-black text-lmu-indigo-soft font-mono">
           {Math.abs(getSteerPercent(currentPoint?.steerYaw))}% {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
         </span>
-        <span className="text-[8px] text-lmu-muted">input</span>
+        <span className="text-[10px] text-lmu-muted">input</span>
       </div>
 
       {/* Status / Track State */}
       <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
-          ? 'border-fuchsia-500/70 bg-fuchsia-500/15 shadow-[0_0_8px_rgba(217,70,239,0.3)] animate-pulse'
+          ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15'
           : currentPoint?.isOffTrack
-          ? 'border-amber-500/70 bg-amber-500/15 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+          ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/15'
           : (currentPoint?.rainIntensity ?? 0) > 0
-          ? 'border-blue-500/70 bg-blue-500/15 shadow-[0_0_8px_rgba(59,130,246,0.25)]'
+          ? 'border-lmu-azure-strong/70 bg-lmu-azure-strong/15'
           : currentPoint?.inPit
-          ? 'border-blue-500/50 bg-blue-500/10'
+          ? 'border-lmu-azure-strong/50 bg-lmu-azure-strong/10'
           : 'border-lmu-border'
       }`}>
-        <span className="text-[9px] text-purple-400 font-bold">STATUS</span>
+        <span className="text-[10px] text-lmu-purple font-bold">STATUS</span>
         <span className={`text-[11px] font-black font-mono truncate ${
           currentPoint?.pitLimiter
-            ? 'text-fuchsia-300'
+            ? 'text-lmu-purple-soft'
             : currentPoint?.isOffTrack
-            ? 'text-amber-300'
+            ? 'text-lmu-warn-soft'
             : (currentPoint?.rainIntensity ?? 0) > 0
-            ? 'text-blue-300'
+            ? 'text-lmu-azure-soft'
             : currentPoint?.inPit
-            ? 'text-blue-300'
+            ? 'text-lmu-azure-soft'
             : 'text-lmu-muted'
         }`}>
           {currentPoint?.pitLimiter
@@ -98,7 +98,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
             ? 'PIT LANE'
             : 'ON TRACK'}
         </span>
-        <span className="text-[8px] text-lmu-muted">
+        <span className="text-[10px] text-lmu-muted">
           {currentPoint?.pitLimiter
             ? '60 km/h'
             : currentPoint?.isOffTrack

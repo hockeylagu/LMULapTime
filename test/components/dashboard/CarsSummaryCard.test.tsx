@@ -20,12 +20,12 @@ describe('CarsSummaryCard', () => {
       />
     );
 
-    const countEl = screen.getByText('1600');
+    const countEl = screen.getByText('1,600');
     expect(countEl).toBeInTheDocument();
     expect(countEl).toHaveClass('text-white');
     expect(countEl.nextElementSibling).toHaveClass('text-lmu-muted');
     expect(countEl.nextElementSibling?.textContent).toBe('laps');
-    expect(screen.queryByText('7328')).not.toBeInTheDocument();
+    expect(screen.queryByText('7,328')).not.toBeInTheDocument();
   });
 
   it('switches to distance when the Km toggle is clicked', () => {
@@ -41,15 +41,15 @@ describe('CarsSummaryCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Km' }));
 
-    const kmEl = screen.getByText('7328');
+    const kmEl = screen.getByText('7,328');
     expect(kmEl).toBeInTheDocument();
     expect(kmEl).toHaveClass('text-white');
     expect(kmEl.nextElementSibling).toHaveClass('text-lmu-muted');
     expect(kmEl.nextElementSibling?.textContent).toBe('km');
-    expect(screen.queryByText('1600')).not.toBeInTheDocument();
+    expect(screen.queryByText('1,600')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Laps' }));
-    expect(screen.getByText('1600')).toBeInTheDocument();
+    expect(screen.getByText('1,600')).toBeInTheDocument();
   });
 
   it('still invokes onSelectCar when a row is clicked regardless of the active unit', () => {

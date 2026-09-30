@@ -1,6 +1,16 @@
 import React from 'react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/index.js';
+import { LMU_COLORS, SECTOR_COLORS, TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
+
+/** The series' line color as a short stroke before its value; the text stays white so it reads on the dark card. */
+const Swatch: React.FC<{ color: string; dashed?: boolean }> = ({ color, dashed }) => (
+  <span
+    aria-hidden="true"
+    className="inline-block w-2.5 mr-1.5 align-middle border-t-2"
+    style={{ borderColor: color, borderStyle: dashed ? 'dashed' : 'solid' }}
+  />
+);
 
 export interface SessionTelemetryPointData {
   lapNum?: string;
@@ -71,7 +81,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-2 font-mono min-w-[240px]">
         <div className="font-bold text-white flex items-center justify-between border-b border-lmu-border/60 pb-1 font-sans">
           <span>{data.lapNum}</span>
-          <span className="text-[10px] text-lmu-muted uppercase font-semibold">
+          <span className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">
             {selectedDriver.carClass || 'Class'} Standings
           </span>
         </div>
@@ -80,11 +90,11 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
             <div
               key={d.name}
               className={`flex items-center justify-between gap-3 p-1 rounded transition-colors ${
-                d.isPlayer ? 'bg-lmu-gold/20 text-lmu-gold font-bold border border-lmu-gold/40' : 'text-white'
+                d.isPlayer ? 'bg-lmu-accent/15 text-white font-bold border border-lmu-accent/40' : 'text-white'
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
-                <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-gold' : 'text-slate-300'}`}>
+                <span className={`font-mono text-xs font-extrabold shrink-0 ${d.isPlayer ? 'text-lmu-accent-text' : 'text-lmu-text-soft'}`}>
                   P{d.pos}
                 </span>
                 <span className="truncate">{d.name}</span>
@@ -119,36 +129,36 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       </p>
       {activeChartMetric === 'lapTime' && (
         <>
-          <p className="text-rose-400 font-bold">
-            Lap Time: {data.lapTimeString || '--:--.---'}
-            {data.isInferred && <span className="text-amber-300 font-normal ml-1">(est)</span>}
+          <p className="text-white font-bold">
+            <Swatch color={LMU_COLORS.accent} />Lap Time: {data.lapTimeString || '--:--.---'}
+            {data.isInferred && <span className="text-lmu-warn-soft font-normal ml-1">(est)</span>}
           </p>
-          {data.avgLapTime && <p className="text-indigo-300">Session Avg: {data.avgLapTimeString}</p>}
+          {data.avgLapTime && <p className="text-lmu-text-soft"><Swatch color={LMU_COLORS.muted} dashed />Session Avg: {data.avgLapTimeString}</p>}
         </>
       )}
       {activeChartMetric === 'sectors' && (
         <>
-          <p className="text-lmu-gold">S1: {data.s1String}</p>
-          <p className="text-lmu-blue">S2: {data.s2String}</p>
-          <p className="text-lmu-green">S3: {data.s3String}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s1} />S1: {data.s1String}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s2} />S2: {data.s2String}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s3} />S3: {data.s3String}</p>
         </>
       )}
       {activeChartMetric === 'topSpeed' && (
-        <p className="text-lmu-accent font-bold">Top Speed: {data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : '-'}</p>
+        <p className="text-white font-bold"><Swatch color={LMU_COLORS.accent} />Top Speed: {data.topSpeed ? `${data.topSpeed.toFixed(1)} km/h` : '-'}</p>
       )}
       {activeChartMetric === 'tireWear' && (
         <>
-          <p className="text-white font-bold">FL: {data.twFL !== null ? `${data.twFL}%` : '-'}</p>
-          <p className="text-white font-bold">FR: {data.twFR !== null ? `${data.twFR}%` : '-'}</p>
-          <p className="text-white font-bold">RL: {data.twRL !== null ? `${data.twRL}%` : '-'}</p>
-          <p className="text-white font-bold">RR: {data.twRR !== null ? `${data.twRR}%` : '-'}</p>
-          <p className="text-lmu-cyan font-bold">Avg: {data.twAvg !== null ? `${data.twAvg}%` : '-'}</p>
+          <p className="text-white font-bold"><Swatch color={WHEEL_CORNER_COLORS.fl} />FL: {data.twFL !== null ? `${data.twFL}%` : '-'}</p>
+          <p className="text-white font-bold"><Swatch color={WHEEL_CORNER_COLORS.fr} />FR: {data.twFR !== null ? `${data.twFR}%` : '-'}</p>
+          <p className="text-white font-bold"><Swatch color={WHEEL_CORNER_COLORS.rl} />RL: {data.twRL !== null ? `${data.twRL}%` : '-'}</p>
+          <p className="text-white font-bold"><Swatch color={WHEEL_CORNER_COLORS.rr} />RR: {data.twRR !== null ? `${data.twRR}%` : '-'}</p>
+          <p className="text-lmu-text-soft font-bold"><Swatch color={LMU_COLORS.muted} dashed />Avg: {data.twAvg !== null ? `${data.twAvg}%` : '-'}</p>
         </>
       )}
       {activeChartMetric === 'fuelEnergy' && (
         <>
-          {data.fuel !== null && data.fuel !== undefined && <p className="text-amber-400">Fuel: {data.fuel.toFixed(1)}%</p>}
-          {data.virtualEnergy !== null && data.virtualEnergy !== undefined && <p className="text-indigo-400">Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
+          {data.fuel !== null && data.fuel !== undefined && <p className="text-white"><Swatch color={TELEMETRY_COLORS.fuel} />Fuel: {data.fuel.toFixed(1)}%</p>}
+          {data.virtualEnergy !== null && data.virtualEnergy !== undefined && <p className="text-white"><Swatch color={WHEEL_CORNER_COLORS.fl} />Virtual Energy: {data.virtualEnergy.toFixed(1)}%</p>}
         </>
       )}
     </div>

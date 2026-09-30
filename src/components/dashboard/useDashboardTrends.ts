@@ -263,7 +263,8 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
       const oldestPace = chronologicalPace[0].pacePercentage;
       const newestPace = chronologicalPace[chronologicalPace.length - 1].pacePercentage;
       paceDelta = Number((oldestPace - newestPace).toFixed(2));
-      paceTrendDirection = paceDelta >= 0.15 ? 'improving' : paceDelta <= -0.15 ? 'declining' : 'steady';
+      // Under 0.3% the change is lap-to-lap noise (under 0.4 s on a 2-minute lap), not a trend.
+      paceTrendDirection = paceDelta >= 0.3 ? 'improving' : paceDelta <= -0.3 ? 'declining' : 'steady';
     }
 
     // Recent stint stats (clean rate, lap consistency & positions across recent sessions)

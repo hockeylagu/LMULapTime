@@ -1,11 +1,12 @@
 import React from 'react';
+import { Fuel, Zap } from 'lucide-react';
 import { LapData } from '../../../../shared/types/index.js';
 
 const COMPOUND_STYLES: Record<string, string | undefined> = {
-  S: 'border-white text-white',
-  M: 'border-yellow-400 text-yellow-400',
-  H: 'border-red-500 text-red-500',
-  W: 'border-sky-400 text-sky-400',
+  S: 'border-lmu-muted text-lmu-text-soft',
+  M: 'border-lmu-warn text-lmu-warn',
+  H: 'border-lmu-loss-strong text-lmu-loss',
+  W: 'border-lmu-info text-lmu-info',
 };
 
 export const CompoundCell: React.FC<{ lap: LapData }> = ({ lap: l }) => {
@@ -16,7 +17,7 @@ export const CompoundCell: React.FC<{ lap: LapData }> = ({ lap: l }) => {
     <td className="px-3 py-2.5 text-center font-sans text-xs">
       {compoundStyle ? (
         <span
-          className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 text-xs font-bold font-mono leading-none ${compoundStyle}`}
+          className={`inline-flex items-center justify-center w-5 h-5 rounded-full border text-[11px] font-medium font-mono leading-none ${compoundStyle}`}
           title={compound}
         >
           {compoundLetter}
@@ -32,7 +33,7 @@ export const TireWearCell: React.FC<{ lap: LapData }> = ({ lap: l }) => (
   <td className="px-3 py-2.5 text-center font-sans text-xs whitespace-nowrap">
     {l.tireWear ? (
       <span
-        className="px-2 py-0.5 rounded bg-lmu-bg border border-lmu-border/60 text-[11px] font-mono text-lmu-gold font-bold cursor-help inline-block"
+        className="font-mono text-xs text-lmu-text-soft cursor-help"
         title={`4-Tire Average: ${l.tireWear.avg}%\nFL: ${l.tireWear.fl}% | FR: ${l.tireWear.fr}%\nRL: ${l.tireWear.rl}% | RR: ${l.tireWear.rr}%`}
       >
         {l.tireWear.avg}%
@@ -47,7 +48,7 @@ export const FuelCell: React.FC<{ lap: LapData }> = ({ lap: l }) => (
   <td className="px-3 py-2.5 text-center font-sans text-xs whitespace-nowrap">
     {(l.fuel !== null && l.fuel !== undefined) || (l.virtualEnergy !== null && l.virtualEnergy !== undefined) ? (
       <div
-        className="inline-flex items-center gap-2 font-mono text-[11px] cursor-help"
+        className="inline-flex items-center gap-2.5 font-mono text-xs cursor-help"
         title={`Remaining Fuel: ${l.fuel ?? 'N/A'}% ${l.fuelUsed ? `(Consumed: ${l.fuelUsed}%)` : ''}${
           l.virtualEnergy !== null && l.virtualEnergy !== undefined
             ? `\nRemaining Virtual Energy: ${l.virtualEnergy}% ${
@@ -57,10 +58,10 @@ export const FuelCell: React.FC<{ lap: LapData }> = ({ lap: l }) => (
         }`}
       >
         {l.fuel !== null && l.fuel !== undefined && (
-          <span className="text-amber-300 font-bold">⛽ {l.fuel}%</span>
+          <span className="inline-flex items-center gap-1 text-lmu-warn-soft font-semibold"><Fuel className="w-3 h-3" aria-label="Fuel" />{l.fuel}%</span>
         )}
         {l.virtualEnergy !== null && l.virtualEnergy !== undefined && (
-          <span className="text-indigo-300 font-bold">⚡ {l.virtualEnergy}%</span>
+          <span className="inline-flex items-center gap-1 text-lmu-aqua font-semibold"><Zap className="w-3 h-3" aria-label="Virtual energy" />{l.virtualEnergy}%</span>
         )}
       </div>
     ) : (

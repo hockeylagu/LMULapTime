@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Clock, Zap, Gauge, ArrowUpDown, Disc, Fuel, TrendingUp } from 'lucide-react';
+import { Clock, Zap, Gauge, ArrowUpDown, Disc, Fuel, TrendingUp, type LucideIcon } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -34,6 +34,23 @@ export interface SessionTelemetryChartProps {
   handleLegendClick: (e: LegendPayload) => void;
 }
 
+type ChartMetric = SessionTelemetryChartProps['activeChartMetric'];
+
+const METRIC_VIEWS: { metric: ChartMetric; label: string; icon: LucideIcon }[] = [
+  { metric: 'lapTime', label: 'Lap Pace', icon: Clock },
+  { metric: 'sectors', label: 'Sectors', icon: Zap },
+  { metric: 'topSpeed', label: 'Top Speed', icon: Gauge },
+  { metric: 'positions', label: 'Positions', icon: ArrowUpDown },
+  { metric: 'tireWear', label: 'Tire Wear', icon: Disc },
+  { metric: 'fuelEnergy', label: 'Fuel', icon: Fuel },
+];
+
+/** Legend order: you first, then the measured series, then their averages; alphabetical within each group. */
+const legendOrder = (item: LegendPayload) => {
+  const name = String(item.value ?? '');
+  return `${name.endsWith('(You)') ? 0 : name.startsWith('Avg') || name.includes(' Avg') ? 2 : 1}${name}`;
+};
+
 export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   session,
   selectedDriver,
@@ -48,6 +65,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   handleLegendClick,
 }) => {
   const navigate = useNavigate();
+  const [focusedSeries, setFocusedSeries] = React.useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const {
     driversToPlot,
@@ -81,110 +99,54 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
   };
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-5 rounded-2xl relative space-y-4">
+    <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl relative space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-lmu-border/60 pb-3">
         <div>
-          <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-lmu-accent" />
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-lmu-accent-text" aria-hidden="true" />
             {activeChartMetric === 'positions'
-              ? 'Driver Position Progression (Same Class)'
+              ? 'Class positions'
               : activeChartMetric === 'tireWear'
-              ? 'Tire Wear & Degradation Telemetry'
+              ? 'Tire wear'
               : activeChartMetric === 'fuelEnergy'
-              ? 'Fuel Consumption & Virtual Energy Telemetry'
-              : 'Lap & Sector Telemetry Chart'}
+              ? 'Fuel & energy'
+              : 'Lap trends'}
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
             {activeChartMetric === 'positions'
-              ? `Lap-by-lap position chart isolated to ${selectedDriver.carClass || 'same class'} competitors. Click any lap point to open telemetry.`
+              ? `${selectedDriver.carClass || 'Same class'} positions by lap. Select a point for telemetry.`
               : activeChartMetric === 'tireWear'
-              ? 'Individual 4-wheel tire degradation progression and tire wear percentage over stints. Click any lap to open telemetry.'
+              ? 'Wear by wheel across stints. Select a lap for telemetry.'
               : activeChartMetric === 'fuelEnergy'
-              ? 'Fuel tank level, per-lap fuel consumption, and Virtual Energy hybrid management (LMH/LMDh). Click any lap to open telemetry.'
-              : 'Session lap pace progression, session average, and sector splits. Click any lap point to inspect its telemetry.'}
+              ? 'Fuel use and available virtual energy. Select a lap for telemetry.'
+              : 'Select a lap point for telemetry.'}
           </p>
         </div>
 
-        {/* Metric Toggle */}
-        <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-semibold shrink-0 flex-wrap gap-1">
-          <button
-            onClick={() => setChartMetric('lapTime')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeChartMetric === 'lapTime'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            Lap Pace
-          </button>
-          <button
-            onClick={() => setChartMetric('sectors')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeChartMetric === 'sectors'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            Sectors (S1/S2/S3)
-          </button>
-          <button
-            onClick={() => setChartMetric('topSpeed')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeChartMetric === 'topSpeed'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <Gauge className="w-3.5 h-3.5" />
-            Top Speed
-          </button>
-          <button
-            onClick={() => setChartMetric('positions')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeChartMetric === 'positions'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            Positions
-          </button>
-          <button
-            onClick={() => {
-              if (hasTireWearData) setChartMetric('tireWear');
-            }}
-            disabled={!hasTireWearData}
-            title={hasTireWearData ? 'View tire wear telemetry' : 'No tire wear data available in this session'}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              !hasTireWearData
-                ? 'opacity-40 cursor-not-allowed text-lmu-muted'
-                : activeChartMetric === 'tireWear'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <Disc className="w-3.5 h-3.5" />
-            Tire Wear
-          </button>
-          <button
-            onClick={() => {
-              if (hasFuelData) setChartMetric('fuelEnergy');
-            }}
-            disabled={!hasFuelData}
-            title={hasFuelData ? 'View fuel & energy telemetry' : 'No fuel or energy data available'}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              !hasFuelData
-                ? 'opacity-40 cursor-not-allowed text-lmu-muted'
-                : activeChartMetric === 'fuelEnergy'
-                ? 'bg-lmu-accent text-white shadow-sm font-bold'
-                : 'text-lmu-muted hover:text-white'
-            }`}
-          >
-            <Fuel className="w-3.5 h-3.5" />
-            {hasVirtualEnergyData ? 'Fuel & Energy' : 'Fuel'}
-          </button>
+        {/* Metric switch: a view switch, so the selected view rests neutral, never red */}
+        <div role="group" aria-label="Chart view" className="h-8 inline-flex items-center gap-0.5 bg-lmu-bg px-1 rounded-lg border border-lmu-border text-xs font-semibold shrink-0">
+          {METRIC_VIEWS.map(({ metric, label, icon: Icon }) => {
+            const available = metric === 'tireWear' ? hasTireWearData : metric === 'fuelEnergy' ? hasFuelData : true;
+            const selected = activeChartMetric === metric;
+            return (
+              <button
+                key={metric}
+                type="button"
+                aria-pressed={selected}
+                disabled={!available}
+                onClick={() => setChartMetric(metric)}
+                title={available ? undefined : `No ${metric === 'tireWear' ? 'tire wear' : 'fuel or energy'} data in this session`}
+                className={`h-6 px-2.5 inline-flex items-center gap-1.5 rounded-[5px] transition-colors ${
+                  selected
+                    ? 'bg-lmu-raised text-white'
+                    : 'text-lmu-muted hover:text-white disabled:opacity-40 disabled:hover:text-lmu-muted disabled:cursor-not-allowed cursor-pointer'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${selected ? 'text-lmu-text-soft' : ''}`} aria-hidden="true" />
+                {metric === 'fuelEnergy' && hasVirtualEnergyData ? 'Fuel & Energy' : label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -201,8 +163,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             onClick={handleChartClick}
             className="cursor-pointer"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke={LMU_COLORS.border} opacity={0.6} />
-            <XAxis dataKey="lapNum" stroke={LMU_COLORS.muted} fontSize={11} tickLine={false} />
+            <CartesianGrid vertical={false} stroke={LMU_COLORS.border} />
+            <XAxis dataKey="lapNum" stroke={LMU_COLORS.muted} fontSize={11} tickLine={false} axisLine={{ stroke: LMU_COLORS.border }} />
             <YAxis
               reversed={activeChartMetric === 'positions'}
               domain={
@@ -217,6 +179,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               stroke={LMU_COLORS.muted}
               fontSize={11}
               tickLine={false}
+              axisLine={false}
               tickFormatter={(val) => {
                 if (activeChartMetric === 'positions') return `P${val}`;
                 if (activeChartMetric === 'topSpeed') return `${val} km/h`;
@@ -225,6 +188,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               }}
             />
             <Tooltip
+              // The legend is drawn after the tooltip, so without this it paints over a tall tooltip.
+              wrapperStyle={{ zIndex: 20 }}
               content={
                 <SessionTelemetryTooltip
                   activeChartMetric={activeChartMetric}
@@ -235,20 +200,29 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               }
             />
             <Legend
-              onClick={handleLegendClick}
+              onMouseEnter={(entry: LegendPayload) => {
+                if (activeChartMetric === 'positions' && typeof entry.dataKey === 'string') setFocusedSeries(entry.dataKey);
+              }}
+              onMouseLeave={() => setFocusedSeries(null)}
+              itemSorter={legendOrder}
               wrapperStyle={{ paddingTop: 10, fontSize: 12, cursor: 'pointer', userSelect: 'none' }}
               formatter={(value, entry: LegendPayload) => {
                 const key = typeof entry.dataKey === 'function' ? '' : String(entry.dataKey || '');
                 const isHidden = Boolean(hiddenSeries[key]);
                 return (
-                  <span
-                    className={`inline-flex items-center gap-1 cursor-pointer select-none transition-opacity ${
-                      isHidden ? 'opacity-35 line-through text-lmu-muted' : 'opacity-100 font-semibold'
+                  <button
+                    type="button"
+                    onClick={() => handleLegendClick(entry)}
+                    aria-pressed={!isHidden}
+                    onFocus={() => { if (activeChartMetric === 'positions' && typeof entry.dataKey === 'string') setFocusedSeries(entry.dataKey); }}
+                    onBlur={() => setFocusedSeries(null)}
+                    className={`inline-flex items-center gap-1 rounded cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent ${
+                      isHidden ? 'line-through text-lmu-faint' : 'font-semibold text-lmu-text-soft'
                     }`}
                     title={`Click to toggle ${value} visibility`}
                   >
                     {value}
-                  </span>
+                  </button>
                 );
               }}
             />
@@ -262,6 +236,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               avgS3={avgS3}
               hasVirtualEnergyData={hasVirtualEnergyData}
               hiddenSeries={hiddenSeries}
+              focusedSeries={activeChartMetric === 'positions' ? focusedSeries : null}
             />
           </LineChart>
         </ResponsiveContainer>

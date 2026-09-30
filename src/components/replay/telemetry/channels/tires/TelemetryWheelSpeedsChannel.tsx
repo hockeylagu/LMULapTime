@@ -53,18 +53,18 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
   const hasData = ws !== undefined || Boolean(wheelSpeedsPaths.fl);
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-cyan-950/20">
+    <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-aqua-deep/20">
       <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="p-1 rounded bg-cyan-500/20 text-cyan-400 font-black text-[10px] tracking-wider flex items-center gap-1">
+        <span className="p-1 rounded bg-lmu-aqua-strong/20 text-lmu-aqua font-black text-[10px] tracking-wider flex items-center gap-1">
           <Gauge className="w-3 h-3" />
           WHEEL SPEEDS
         </span>
         {hasData && ws ? (
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-            <span className="text-cyan-400">FL: {ws[0].toFixed(0)}</span>
-            <span className="text-blue-400">FR: {ws[1].toFixed(0)}</span>
-            <span className="text-amber-400">RL: {ws[2].toFixed(0)}</span>
-            <span className="text-rose-400">RR: {ws[3].toFixed(0)} km/h</span>
+            <span className="text-lmu-aqua">FL: {ws[0].toFixed(0)}</span>
+            <span className="text-lmu-azure">FR: {ws[1].toFixed(0)}</span>
+            <span className="text-lmu-warn">RL: {ws[2].toFixed(0)}</span>
+            <span className="text-lmu-loss">RR: {ws[3].toFixed(0)} km/h</span>
           </div>
         ) : (
           <span className="text-[10px] font-mono text-lmu-muted italic">
@@ -72,16 +72,16 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
           </span>
         )}
         {currentComparison?.baseline.wheelSpeeds && (
-          <span className="text-[10px] font-mono text-amber-400/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
+          <span className="text-[10px] font-mono text-lmu-warn/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
             Base: {currentComparison.baseline.wheelSpeeds[0].toFixed(0)} / {currentComparison.baseline.wheelSpeeds[1].toFixed(0)} / {currentComparison.baseline.wheelSpeeds[2].toFixed(0)} / {currentComparison.baseline.wheelSpeeds[3].toFixed(0)} km/h
           </span>
         )}
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-        { label: `${maxWheelSpeed} km/h`, borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
-        { label: `${Math.round(maxWheelSpeed / 2)} km/h`, borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
-        { label: '0 km/h', borderClassName: 'border-b border-cyan-400/40', labelClassName: 'text-[9px] text-cyan-400 font-mono' },
+        { label: `${maxWheelSpeed} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: `${Math.round(maxWheelSpeed / 2)} km/h`, borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: '0 km/h', borderClassName: 'border-b border-lmu-aqua/40', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
       ]} />
 
       {isCursorInView && hasData && ws && (
@@ -91,12 +91,12 @@ export const TelemetryWheelSpeedsChannel: React.FC<TelemetryWheelSpeedsChannelPr
           } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-cyan-500/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-cyan-300">FL:{ws[0].toFixed(0)}</span>
-            <span className="text-blue-300">FR:{ws[1].toFixed(0)}</span>
-            <span className="text-amber-300">RL:{ws[2].toFixed(0)}</span>
-            <span className="text-rose-300">RR:{ws[3].toFixed(0)}</span>
-            <span className="text-cyan-400 text-[9px]">km/h</span>
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-aqua-strong/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+            <span className="text-lmu-aqua-soft">FL:{ws[0].toFixed(0)}</span>
+            <span className="text-lmu-azure-soft">FR:{ws[1].toFixed(0)}</span>
+            <span className="text-lmu-warn-soft">RL:{ws[2].toFixed(0)}</span>
+            <span className="text-lmu-loss-soft">RR:{ws[3].toFixed(0)}</span>
+            <span className="text-lmu-aqua text-[10px]">km/h</span>
           </div>
         </div>
       )}

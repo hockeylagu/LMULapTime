@@ -8,6 +8,8 @@ export interface CarClassBadgeConfig {
   borderClass: string;
   textClass: string;
   bgClass: string;
+  /** Unselected filter look: the class hue at low chroma (still 4.5:1), full color back on hover */
+  fadedClass: string;
   hasOrangeCorner: boolean;
   title: string;
 }
@@ -34,9 +36,11 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'HY',
       label: 'HY',
-      borderClass: 'border-red-500/90',
-      textClass: 'text-red-400',
-      bgClass: 'bg-red-950/40',
+      borderClass: 'border-lmu-loss-strong/90',
+      textClass: 'text-lmu-loss',
+      bgClass: 'bg-lmu-loss-deep/40',
+      fadedClass:
+        'border-lmu-loss-strong/30 text-lmu-loss-faded bg-transparent hover:border-lmu-loss-strong/90 hover:text-lmu-loss hover:bg-lmu-loss-deep/40',
       hasOrangeCorner: false,
       title: 'Hypercar (HY)',
     };
@@ -48,9 +52,11 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'LMP2',
       label: 'LMP2',
-      borderClass: 'border-sky-500/90',
-      textClass: 'text-sky-400',
-      bgClass: 'bg-sky-950/40',
+      borderClass: 'border-lmu-info-strong/90',
+      textClass: 'text-lmu-info',
+      bgClass: 'bg-lmu-info-deep/40',
+      fadedClass:
+        'border-lmu-info-strong/30 text-lmu-info-faded bg-transparent hover:border-lmu-info-strong/90 hover:text-lmu-info hover:bg-lmu-info-deep/40',
       hasOrangeCorner: hasCorner,
       title: hasCorner ? 'LMP2 (ELMS)' : 'LMP2 (WEC)',
     };
@@ -61,9 +67,11 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'LMP3',
       label: 'LMP3',
-      borderClass: 'border-purple-500/90',
-      textClass: 'text-purple-400',
-      bgClass: 'bg-purple-950/40',
+      borderClass: 'border-lmu-purple-strong/90',
+      textClass: 'text-lmu-purple',
+      bgClass: 'bg-lmu-purple-deep/40',
+      fadedClass:
+        'border-lmu-purple-strong/30 text-lmu-purple-faded bg-transparent hover:border-lmu-purple-strong/90 hover:text-lmu-purple hover:bg-lmu-purple-deep/40',
       hasOrangeCorner: false,
       title: 'LMP3',
     };
@@ -79,9 +87,11 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'GT3',
       label: 'GT3',
-      borderClass: 'border-emerald-500/90',
-      textClass: 'text-emerald-400',
-      bgClass: 'bg-emerald-950/40',
+      borderClass: 'border-lmu-gain-strong/90',
+      textClass: 'text-lmu-gain',
+      bgClass: 'bg-lmu-gain-deep/40',
+      fadedClass:
+        'border-lmu-gain-strong/30 text-lmu-gain-faded bg-transparent hover:border-lmu-gain-strong/90 hover:text-lmu-gain hover:bg-lmu-gain-deep/40',
       hasOrangeCorner: hasCorner,
       title: hasCorner ? 'GT3 (ELMS)' : 'GT3 (WEC)',
     };
@@ -92,9 +102,11 @@ export function getCarClassBadgeConfig(
     return {
       badgeType: 'GTE',
       label: 'GTE',
-      borderClass: 'border-amber-500/90',
-      textClass: 'text-amber-400',
-      bgClass: 'bg-amber-950/40',
+      borderClass: 'border-lmu-warn-strong/90',
+      textClass: 'text-lmu-warn',
+      bgClass: 'bg-lmu-warn-deep/40',
+      fadedClass:
+        'border-lmu-warn-strong/30 text-lmu-warn-faded bg-transparent hover:border-lmu-warn-strong/90 hover:text-lmu-warn hover:bg-lmu-warn-deep/40',
       hasOrangeCorner: false,
       title: 'GTE',
     };
@@ -105,9 +117,10 @@ export function getCarClassBadgeConfig(
   return {
     badgeType: 'OTHER',
     label: fallbackLabel,
-    borderClass: 'border-slate-700',
-    textClass: 'text-slate-300',
-    bgClass: 'bg-slate-900/60',
+    borderClass: 'border-lmu-rule',
+    textClass: 'text-lmu-text-soft',
+    bgClass: 'bg-lmu-card/60',
+    fadedClass: 'border-lmu-border text-lmu-faint bg-transparent hover:border-lmu-rule hover:text-lmu-text-soft',
     hasOrangeCorner: false,
     title: carClass || carType || '',
   };
@@ -179,13 +192,11 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
     ? 'text-[11px] pl-2.5 pr-3.5 py-0.5'
     : 'text-[11px] px-2.5 py-0.5';
 
+  const isFaded = isButton && selected === false;
+  const colorClasses = isFaded ? config.fadedClass : `${config.borderClass} ${config.textClass} ${config.bgClass}`;
   const interactiveClasses = isButton
-    ? `cursor-pointer focus:outline-none transition-opacity ${
-        selected === true
-          ? 'brightness-110 opacity-100 z-10'
-          : selected === false
-          ? 'opacity-40 hover:opacity-100'
-          : 'hover:brightness-110'
+    ? `cursor-pointer focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 transition-colors ${
+        selected === true ? 'brightness-110 opacity-100 z-10' : selected === false ? '' : 'hover:brightness-110'
       }`
     : '';
 
@@ -199,13 +210,13 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
           viewBox="0 0 10 10"
           aria-hidden="true"
         >
-          <polygon points="0,0 10,0 10,10" className="fill-amber-500" />
+          <polygon points="0,0 10,0 10,10" className={isFaded ? 'fill-lmu-warn-faded' : 'fill-lmu-warn-strong'} />
         </svg>
       )}
     </>
   );
 
-  const sharedClasses = `relative inline-flex items-center justify-center font-mono font-bold uppercase rounded-[5px] border overflow-hidden select-none shrink-0 leading-none box-border ${config.borderClass} ${config.textClass} ${config.bgClass} ${sizeClasses} ${interactiveClasses} ${className}`;
+  const sharedClasses = `relative inline-flex items-center justify-center font-mono font-bold uppercase rounded-[5px] border overflow-hidden select-none shrink-0 leading-none box-border ${colorClasses} ${sizeClasses} ${interactiveClasses} ${className}`;
 
   if (isButton) {
     return (
@@ -214,6 +225,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
         data-testid="car-class-badge"
         onClick={onClick}
         aria-label={effectiveAriaLabel}
+        aria-pressed={selected}
         title={title || config.title}
         className={sharedClasses}
       >

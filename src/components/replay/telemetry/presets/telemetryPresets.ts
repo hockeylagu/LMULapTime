@@ -54,7 +54,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'speed',
     isComputed: false,
     description: 'Vehicle GPS speed with baseline comparison trace',
-    badgeColor: 'text-sky-400 bg-sky-500/20',
+    badgeColor: 'text-lmu-info bg-lmu-info-strong/20',
     lineColor: TELEMETRY_COLORS.primary,
   },
   {
@@ -65,7 +65,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'delta',
     isComputed: false,
     description: 'Running time gain / loss relative to reference baseline lap',
-    badgeColor: 'text-amber-400 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn bg-lmu-warn-strong/20',
     lineColor: TELEMETRY_COLORS.baseline,
   },
   {
@@ -76,7 +76,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'inputs',
     isComputed: false,
     description: 'Driver throttle pedal position and traction control events',
-    badgeColor: 'text-emerald-400 bg-emerald-500/20',
+    badgeColor: 'text-lmu-gain bg-lmu-gain-strong/20',
     lineColor: TELEMETRY_COLORS.throttle,
   },
   {
@@ -87,7 +87,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'inputs',
     isComputed: false,
     description: 'Driver brake pedal pressure, ABS activation, and wheel lockup',
-    badgeColor: 'text-rose-400 bg-rose-500/20',
+    badgeColor: 'text-lmu-loss bg-lmu-loss-strong/20',
     lineColor: TELEMETRY_COLORS.brake,
   },
   {
@@ -98,7 +98,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'engine',
     isComputed: false,
     description: 'Selected forward gear step trace and shift points',
-    badgeColor: 'text-amber-400 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn bg-lmu-warn-strong/20',
     lineColor: TELEMETRY_COLORS.gear,
   },
   {
@@ -109,7 +109,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'inputs',
     isComputed: false,
     description: 'Signed steering input percentage with center zero reference line',
-    badgeColor: 'text-indigo-400 bg-indigo-500/20',
+    badgeColor: 'text-lmu-indigo bg-lmu-indigo-strong/20',
     lineColor: TELEMETRY_COLORS.steer,
   },
   {
@@ -120,7 +120,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'engine',
     isComputed: false,
     description: 'Internal combustion engine revs decoded from binary replay stream',
-    badgeColor: 'text-purple-300 bg-purple-500/20',
+    badgeColor: 'text-lmu-purple-soft bg-lmu-purple-strong/20',
     lineColor: TELEMETRY_COLORS.rpm,
   },
   {
@@ -131,7 +131,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Carbon / steel brake disc temperatures across all 4 corners',
-    badgeColor: 'text-orange-400 bg-orange-500/20',
+    badgeColor: 'text-lmu-orange bg-lmu-orange-strong/20',
     lineColor: TELEMETRY_COLORS.brakeTemp,
   },
   {
@@ -142,7 +142,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Measured ride height in millimetres across all 4 corners',
-    badgeColor: 'text-emerald-400 bg-emerald-500/20',
+    badgeColor: 'text-lmu-gain bg-lmu-gain-strong/20',
     lineColor: TELEMETRY_COLORS.gain,
   },
   {
@@ -153,7 +153,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Individual 4-wheel rotation linear velocity (FL, FR, RL, RR)',
-    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    badgeColor: 'text-lmu-aqua bg-lmu-aqua-strong/20',
     lineColor: WHEEL_CORNER_COLORS.fl,
   },
   {
@@ -164,7 +164,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Dynamic tire air inflation pressures across all 4 wheels',
-    badgeColor: 'text-sky-400 bg-sky-500/20',
+    badgeColor: 'text-lmu-info bg-lmu-info-strong/20',
     lineColor: TELEMETRY_COLORS.primary,
   },
   {
@@ -175,7 +175,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Corner tire tread condition and remaining life (100% = new)',
-    badgeColor: 'text-amber-400 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn bg-lmu-warn-strong/20',
     lineColor: TELEMETRY_COLORS.baseline,
   },
   {
@@ -186,7 +186,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'wheels',
     isComputed: false,
     description: 'Tire carcass and inner rubber bulk temperatures across all 4 wheels',
-    badgeColor: 'text-rose-400 bg-rose-500/20',
+    badgeColor: 'text-lmu-loss bg-lmu-loss-strong/20',
     lineColor: TELEMETRY_COLORS.tireScrub,
   },
   {
@@ -197,7 +197,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'dynamics',
     isComputed: false,
     description: 'Lateral displacement from reference racing line / track centerline',
-    badgeColor: 'text-teal-400 bg-teal-500/20',
+    badgeColor: 'text-lmu-teal bg-lmu-teal-strong/20',
     lineColor: TELEMETRY_COLORS.lateralOffset,
   },
   {
@@ -208,7 +208,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'forces',
     isComputed: true,
     description: 'Computed cornering centripetal load with center zero line (+Right / -Left)',
-    badgeColor: 'text-sky-400 bg-sky-500/20',
+    badgeColor: 'text-lmu-info bg-lmu-info-strong/20',
     lineColor: TELEMETRY_COLORS.primary,
   },
   {
@@ -219,7 +219,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'forces',
     isComputed: true,
     description: 'Computed acceleration and braking deceleration rate (-Braking / +Power)',
-    badgeColor: 'text-amber-400 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn bg-lmu-warn-strong/20',
     lineColor: TELEMETRY_COLORS.baseline,
   },
   {
@@ -230,7 +230,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'forces',
     isComputed: true,
     description: 'Resultant friction circle acceleration vector magnitude (grip utilization)',
-    badgeColor: 'text-rose-400 bg-rose-500/20',
+    badgeColor: 'text-lmu-loss bg-lmu-loss-strong/20',
     lineColor: TELEMETRY_COLORS.tireScrub,
   },
   {
@@ -241,7 +241,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'dynamics',
     isComputed: true,
     description: 'Computed vehicle attitude angle relative to path velocity vector',
-    badgeColor: 'text-violet-400 bg-violet-500/20',
+    badgeColor: 'text-lmu-violet bg-lmu-violet-strong/20',
     lineColor: TELEMETRY_COLORS.slipAngle,
   },
   {
@@ -252,7 +252,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'dynamics',
     isComputed: true,
     description: 'Dynamic steering angle deviation: +Understeer (push) / -Oversteer (loose)',
-    badgeColor: 'text-amber-300 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn-soft bg-lmu-warn-strong/20',
     lineColor: CHART_COLORS.playerHighlight,
   },
   {
@@ -263,7 +263,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'dynamics',
     isComputed: true,
     description: 'Computed vehicle rotation rate showing corner entry agility and rotation',
-    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    badgeColor: 'text-lmu-aqua bg-lmu-aqua-strong/20',
     lineColor: TELEMETRY_COLORS.yawRate,
   },
   {
@@ -274,7 +274,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'energy',
     isComputed: false,
     description: 'Onboard fuel quantity remaining in tank (L)',
-    badgeColor: 'text-emerald-400 bg-emerald-500/20',
+    badgeColor: 'text-lmu-gain bg-lmu-gain-strong/20',
     lineColor: TELEMETRY_COLORS.throttle,
   },
   {
@@ -285,7 +285,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'energy',
     isComputed: false,
     description: 'WEC Hypercar stint virtual energy allocation remaining (%)',
-    badgeColor: 'text-cyan-400 bg-cyan-500/20',
+    badgeColor: 'text-lmu-aqua bg-lmu-aqua-strong/20',
     lineColor: WHEEL_CORNER_COLORS.fl,
   },
   {
@@ -296,7 +296,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'energy',
     isComputed: false,
     description: 'Hybrid powertrain battery state of charge (%)',
-    badgeColor: 'text-amber-400 bg-amber-500/20',
+    badgeColor: 'text-lmu-warn bg-lmu-warn-strong/20',
     lineColor: TELEMETRY_COLORS.baseline,
   },
   {
@@ -307,7 +307,7 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     category: 'energy',
     isComputed: false,
     description: 'Hybrid kinetic regenerative braking energy recovery (kW)',
-    badgeColor: 'text-purple-400 bg-purple-500/20',
+    badgeColor: 'text-lmu-purple bg-lmu-purple-strong/20',
     lineColor: TELEMETRY_COLORS.rpm,
   },
 ];

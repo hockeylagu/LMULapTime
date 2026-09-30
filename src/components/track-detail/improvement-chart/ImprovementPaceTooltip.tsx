@@ -31,7 +31,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
   });
 
   return (
-    <div className="bg-lmu-card/95 backdrop-blur-md border border-lmu-border p-3.5 rounded-xl shadow-xl space-y-2 text-xs min-w-[210px]">
+    <div className="bg-lmu-card border border-lmu-border p-3.5 rounded-xl space-y-2 text-xs min-w-[210px]">
       <div>
         <div className="flex items-center justify-between gap-2">
           <span className="font-bold text-white text-sm">{data.session}</span>
@@ -42,7 +42,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
           )}
         </div>
         <p className="text-[11px] text-lmu-muted mt-0.5">{data.fullDate}</p>
-        <p className="text-xs text-lmu-gold font-medium mt-0.5 truncate max-w-[200px]" title={data.car}>
+        <p className="text-xs text-lmu-text-soft font-medium mt-0.5 truncate max-w-[200px]" title={data.car}>
           {data.car}
         </p>
       </div>
@@ -68,11 +68,11 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
         {metric === 'bestPr' ? (
           <>
             <span>
-              Benchmark: <strong className="text-emerald-300 font-mono">{data.benchmarkPercentage !== null ? `${data.benchmarkPercentage.toFixed(1)}%` : '--'}</strong>
+              Benchmark: <strong className="text-lmu-gain-soft font-mono">{data.benchmarkPercentage !== null ? `${data.benchmarkPercentage.toFixed(1)}%` : '--'}</strong>
             </span>
             <span>
               From Lap PR:{' '}
-              <strong className={`${data.lapPrDelta !== null && data.lapPrDelta < 0 ? 'text-emerald-300' : 'text-lmu-muted'} font-mono`}>
+              <strong className={`${data.lapPrDelta !== null && data.lapPrDelta < 0 ? 'text-lmu-gain-soft' : 'text-lmu-muted'} font-mono`}>
                 {data.lapPrDelta !== null && data.lapPrDelta < 0 ? `${data.lapPrDelta.toFixed(3)}s` : '—'}
               </strong>
             </span>
@@ -81,17 +81,17 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
           <>
             {data.top3AvgStr && (
               <span title="Average of 3 fastest valid laps in session">
-                Top 3: <strong className="text-cyan-300 font-mono">{data.top3AvgStr}</strong>
+                Top 3: <strong className="text-lmu-aqua-soft font-mono">{data.top3AvgStr}</strong>
               </span>
             )}
             {data.theoreticalGap !== null && (
               <span title="Gap between actual PB and theoretical best">
-                Opt Gap: <strong className="text-emerald-300 font-mono">+{data.theoreticalGap.toFixed(3)}s</strong>
+                Opt Gap: <strong className="text-lmu-gain-soft font-mono">+{data.theoreticalGap.toFixed(3)}s</strong>
               </span>
             )}
             {data.consistencyScore !== null && (
               <span title="Pace consistency rating">
-                Consist: <strong className="text-emerald-300 font-mono">{data.consistencyScore.toFixed(1)}%</strong>
+                Consist: <strong className="text-lmu-gain-soft font-mono">{data.consistencyScore.toFixed(1)}%</strong>
               </span>
             )}
           </>
@@ -99,7 +99,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
       </div>
 
       {onSelectSession && (
-        <p className="text-[10px] text-lmu-accent pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
+        <p className="text-[10px] text-lmu-text-soft pt-1.5 border-t border-lmu-border/40 text-center font-semibold cursor-pointer hover:underline">
           Click dot to view session telemetry &rarr;
         </p>
       )}

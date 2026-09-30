@@ -47,7 +47,7 @@ describe('ReplayIndicator', () => {
 
     const indicator = screen.getByTitle('⚡ 100Hz DuckDB Telemetry & Replay: Monza_Practice.Vcr');
     expect(indicator).toBeInTheDocument();
-    expect(indicator.className).toContain('text-amber-300');
+    expect(indicator.className).toContain('text-lmu-warn-soft');
     expect(indicator.className).not.toContain('text-blue');
 
     // Check for zap icon

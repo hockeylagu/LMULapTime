@@ -74,14 +74,14 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
         <line x1={CENTER} y1="8" x2={CENTER} y2="120" stroke={MAP_COLORS.centerline} />
         {trail && <polyline points={trail} fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />}
         <circle cx={current.x} cy={current.y} r="5" fill={gripState.color} stroke={CHART_COLORS.white} strokeWidth="1.5" />
-        <text x="4" y="61" fill={MAP_COLORS.markerDimmed} fontSize="7">L</text>
-        <text x="119" y="61" fill={MAP_COLORS.markerDimmed} fontSize="7">R</text>
-        <text x="68" y="10" fill={MAP_COLORS.markerDimmed} fontSize="7">DRIVE</text>
-        <text x="68" y="124" fill={MAP_COLORS.markerDimmed} fontSize="7">BRAKE</text>
+        <text x="4" y="61" fill={MAP_COLORS.markerDimmed} fontSize="11">L</text>
+        <text x="119" y="61" fill={MAP_COLORS.markerDimmed} fontSize="11">R</text>
+        <text x="68" y="10" fill={MAP_COLORS.markerDimmed} fontSize="11">DRIVE</text>
+        <text x="68" y="124" fill={MAP_COLORS.markerDimmed} fontSize="11">BRAKE</text>
       </svg>
 
       <div className="min-w-0 flex-1">
-        <div className="text-[9px] font-bold tracking-wider text-lmu-muted">EST. GRIP UTILIZATION</div>
+        <div className="text-[10px] font-bold tracking-wider text-lmu-muted">EST. GRIP UTILIZATION</div>
         <div className="mt-1 flex items-baseline gap-2">
           <span className="text-2xl font-black font-mono text-white">{gripState.utilization}%</span>
           <span className="text-[10px] font-black tracking-wide" style={{ color: gripState.color }}>

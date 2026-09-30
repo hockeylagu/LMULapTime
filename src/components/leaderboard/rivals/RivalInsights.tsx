@@ -12,7 +12,7 @@ export const RivalInsights: React.FC<RivalInsightsProps> = ({ status }) => {
   if (gap === null || !status.rival || trend.length < 2) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300" aria-label="Gap after each session">
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-lmu-text-soft" aria-label="Gap after each session">
       <span
         className="text-lmu-muted mr-1"
         title="Your best lap in each of your last sessions here, minus your rival's lap time. Oldest on the left."
@@ -24,7 +24,7 @@ export const RivalInsights: React.FC<RivalInsightsProps> = ({ status }) => {
           {i > 0 && <span className="text-lmu-muted">→</span>}
           <span
             title={`${point.sessionName}: ${formatTime(point.best)}`}
-            className={`font-mono ${point.gap <= 0 ? 'text-emerald-400' : i === trend.length - 1 ? 'text-white font-bold' : 'text-slate-400'}`}
+            className={`font-mono ${point.gap <= 0 ? 'text-lmu-gain' : i === trend.length - 1 ? 'text-white font-bold' : 'text-lmu-muted'}`}
           >
             {point.gap <= 0 ? 'beaten' : point.gap.toFixed(2)}
           </span>

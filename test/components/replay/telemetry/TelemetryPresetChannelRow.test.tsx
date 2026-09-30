@@ -10,7 +10,7 @@ describe('TelemetryPresetChannelRow', () => {
     shortName: 'SPD',
     unit: 'km/h',
     description: 'Vehicle ground velocity',
-    badgeColor: 'bg-sky-500/20 text-sky-400',
+    badgeColor: 'bg-lmu-info-strong/20 text-lmu-info',
     lineColor: '#38bdf8',
     category: 'dynamics',
     isComputed: false,

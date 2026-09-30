@@ -5,7 +5,6 @@ import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
 import { SessionDebriefCard } from './debrief/SessionDebriefCard.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
-import { SessionStewardsLog } from './standings/SessionStewardsLog.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
 import { DetailedSession, SessionProgressionPoint } from '../../../shared/types/index.js';
 import { LoadingState } from '../common/index.js';
@@ -32,8 +31,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
-    showIncidentsLog,
-    setShowIncidentsLog,
     chartMetric,
     setChartMetric,
     hiddenSeries,
@@ -68,12 +65,12 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
 
   if (!session) {
     return (
-      <div className="py-12 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
+      <div className="py-12 text-center text-lmu-muted bg-lmu-card border border-lmu-border rounded-2xl">
         <p className="text-lg font-bold text-white mb-3">{loadError ? 'Could Not Load Session' : 'Session Not Found'}</p>
-        {loadError && <p role="alert" className="text-sm text-rose-400 mb-4">{loadError}</p>}
+        {loadError && <p role="alert" className="text-sm text-lmu-loss mb-4">{loadError}</p>}
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase"
+          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider"
         >
           Return to Dashboard
         </button>
@@ -132,14 +129,6 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         hasVirtualEnergyData={hasVirtualEnergyData}
         isCurrentSessionAllTimePB={isCurrentSessionAllTimePB}
       />
-
-      {selectedDriver && (
-        <SessionStewardsLog
-          selectedDriver={selectedDriver}
-          showIncidentsLog={showIncidentsLog}
-          setShowIncidentsLog={setShowIncidentsLog}
-        />
-      )}
 
       <SessionRaceStandings
         session={session}

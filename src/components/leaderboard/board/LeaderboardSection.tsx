@@ -7,6 +7,8 @@ import { LeaderboardRow } from './LeaderboardRow.js';
 import { StandingHeader } from './StandingHeader.js';
 import { carClassLabel } from './leaderboardFormat.js';
 import { boardLapId } from './leaderboardLaps.js';
+import { CompareBar } from './CompareBar.js';
+import { LoadError } from '../LoadError.js';
 
 export interface LeaderboardSectionProps {
   board: Leaderboard | null;
@@ -29,6 +31,10 @@ export interface LeaderboardSectionProps {
   onPick?: (entry: LeaderboardEntry) => void;
   /** Opens the session of the player's best lap. */
   onOpenSession?: (sessionId: string) => void;
+  /** Brings the comparison below the board into view. */
+  onGoToCompare?: () => void;
+  /** Loads the board again after an error. */
+  retry?: () => void;
 }
 
 const pill = (active: boolean) =>
@@ -37,9 +43,13 @@ const pill = (active: boolean) =>
   }`;
 
 /** The board of the selected layout and class: the player's standing, then every driver met there. */
+/** The board's sectors are each driver's best, which may come from different laps than the best lap. */
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
+const BEST_SECTOR_HINT = 'Best sector from any clean lap, not always from the best lap';
+
 export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
   board, loading, error, carClass, scope, playerCarType, onScopeChange, onCompare, onTelemetry, rivalName, onPin,
-  comparedLapIds = [], onPick, onOpenSession,
+  comparedLapIds = [], onPick, onOpenSession, onGoToCompare, retry,
 }) => {
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);
@@ -48,30 +58,32 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
     [board, sort, showAll, rivalName]
   );
   const sortHeader = (column: LeaderboardSort, label: string, title?: string) => (
-    <th className="px-3 py-3 text-right" title={title} aria-sort={sort === column ? 'ascending' : undefined}>
+    <th scope="col" className="px-3 py-3 text-right" aria-sort={sort === column ? 'ascending' : undefined}>
       <button
         type="button"
         onClick={() => setSort(column)}
-        className="inline-flex items-center gap-1 uppercase hover:text-white"
-        title={`Order by ${label.toLowerCase()}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-wider hover:text-white rounded ${
+          sort === column ? 'text-lmu-text-soft' : ''
+        } ${FOCUS_RING}`}
+        title={`${title ? `${title}. ` : ''}Sort by ${label}`}
       >
         {label}
-        {sort === column && <ArrowUp className="h-3 w-3" />}
+        {sort === column && <ArrowUp className="h-3 w-3" aria-hidden="true" />}
       </button>
     </th>
   );
 
   return (
-    <section className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4" aria-label="Leaderboard">
+    <section className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4" aria-label="Leaderboard">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <ListOrdered className="w-4 h-4 text-lmu-accent" />
-            Leaderboard · {carClassLabel(carClass)}
+            <ListOrdered className="w-4 h-4 text-lmu-accent-text" />
+            {carClassLabel(carClass)} board
           </h3>
           <p className="text-xs text-lmu-muted mt-0.5">
             Best clean dry lap of every driver you met online here{board?.benchmark ? ', with the community pace bands' : ''}.
-            {onPick && ' Tick two drivers to compare their laps.'}
+            {onCompare && ' Compare puts a driver\'s best lap against yours; hover a row for more.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -85,7 +97,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
               disabled={!playerCarType}
               onClick={() => onScopeChange('car')}
               className={`${pill(scope === 'car')} disabled:opacity-40 disabled:cursor-default`}
-              title={playerCarType ?? undefined}
+              title={playerCarType ?? 'No lap of yours in this class yet to pick your car from'}
             >
               My car
             </button>
@@ -94,31 +106,33 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
       </div>
 
       {error && (
-        <p role="alert" className="px-4 py-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-sm text-rose-300">{error}</p>
+        <LoadError message={error} onRetry={retry} />
       )}
       {loading && <LoadingState size="compact" title="Loading leaderboard" showQuote={false} />}
 
       {board && (
         <>
-          <StandingHeader board={board} />
+          <StandingHeader board={board} scope={scope} />
           {board.entries.length === 0 ? (
             <p className="text-sm text-lmu-muted">Nobody has a clean dry lap here in this {scope === 'car' ? 'car' : 'class'} yet.</p>
           ) : (
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left text-xs text-lmu-muted">
-                <thead className="bg-lmu-bg/80 uppercase font-semibold text-white border-b border-lmu-border">
+                <thead className="bg-lmu-bg/80 uppercase tracking-wider font-semibold text-[11px] text-lmu-muted border-b border-lmu-border">
                   <tr>
-                    <th className="px-3 py-3">Pos</th>
-                    <th className="px-3 py-3">Driver</th>
+                    <th scope="col" className="px-3 py-3">Pos</th>
+                    <th scope="col" className="px-3 py-3">Driver</th>
                     {sortHeader('lap', 'Best Lap')}
-                    <th className="px-3 py-3 text-center">Pace Category</th>
-                    <th className="px-3 py-3 text-right">Gap</th>
-                    <th className="px-3 py-3 text-right">Vs You</th>
-                    {sortHeader('s1', 'Sector 1')}
-                    {sortHeader('s2', 'Sector 2')}
-                    {sortHeader('s3', 'Sector 3')}
+                    <th scope="col" className="px-3 py-3 text-center">Benchmark Pace</th>
+                    <th scope="col" className="px-3 py-3 text-right" title="Behind the fastest driver's best lap">Gap</th>
+                    <th scope="col" className="px-3 py-3 text-right" title="Their best lap against yours: negative means faster than you">Vs You</th>
+                    {sortHeader('s1', 'Best S1', BEST_SECTOR_HINT)}
+                    {sortHeader('s2', 'Best S2', BEST_SECTOR_HINT)}
+                    {sortHeader('s3', 'Best S3', BEST_SECTOR_HINT)}
                     {sortHeader('pace', 'Race Pace', 'Best average of three clean laps in one session')}
-                    <th className="px-2 py-3 text-center">Actions</th>
+                    <th scope="col" className="px-2 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-lmu-border/50 font-mono">
@@ -149,6 +163,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
           )}
         </>
       )}
+      {board && <CompareBar board={board} comparedLapIds={comparedLapIds} onGoToCompare={onGoToCompare} />}
     </section>
   );
 };

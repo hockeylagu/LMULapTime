@@ -36,10 +36,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const {
     loading,
     data,
+    error,
+    retry,
     hideEmpty,
     setHideEmpty,
     hasReplay,
     setHasReplay,
+    resetSessionFilters,
     selectedCarModel,
     setSelectedCarModel,
     filterType,
@@ -66,11 +69,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   if (!data) {
     return (
-      <div className="py-12 text-center text-lmu-muted bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] rounded-2xl">
-        <p className="text-lg font-bold text-white mb-3">Track Not Found</p>
+      <div role={error ? 'alert' : 'status'} className="py-12 text-center text-lmu-muted bg-lmu-card border border-lmu-border rounded-2xl">
+        <p className="text-lg font-bold text-white mb-3">{error ? 'Unable to load track details' : 'Track Not Found'}</p>
+        {error && <p className="text-xs mb-4 px-6 break-words">{error}</p>}
+        {error && <button type="button" onClick={retry} className="px-4 py-2 mr-3 bg-lmu-raised text-lmu-text rounded-xl text-xs focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2">Try again</button>}
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase"
+          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           Return to Tracks
         </button>
@@ -125,7 +130,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   const bestLapSession = classTrackSessions.reduce<SessionMeta | null>((best, session) => {
     const lapTime = session.playerDriver?.bestLapTime;
-    if (!lapTime || (best?.playerDriver?.bestLapTime && best.playerDriver.bestLapTime <= lapTime)) return best;
+    if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || (best?.playerDriver?.bestLapTime && best.playerDriver.bestLapTime <= lapTime)) return best;
     return session;
   }, null);
   const bestLapBenchmark = findBenchmarkForClass(
@@ -136,7 +141,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const averagePosition = (sessions: SessionMeta[]): number | null => {
     const positions = sessions
       .map((session) => session.playerDriver?.position)
-      .filter((position): position is number => typeof position === 'number' && position > 0);
+      .filter((position): position is number => typeof position === 'number' && Number.isFinite(position) && position > 0);
     return positions.length > 0
       ? positions.reduce((total, position) => total + position, 0) / positions.length
       : null;
@@ -248,15 +253,10 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         }
         viewMode={sessionViewMode}
         onViewModeChange={setSessionListViewMode}
+        onClearFilters={selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay ? () => resetSessionFilters() : undefined}
         onResetFilters={
           selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
-            ? () => {
-                setFilterType('All');
-                setSearchQuery('');
-                setHideEmpty(false);
-                setHasReplay(false);
-                setSelectedCarModel('All');
-              }
+            ? () => resetSessionFilters(true)
             : undefined
         }
       />

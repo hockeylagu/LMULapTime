@@ -1,8 +1,74 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { DetailedSession, DriverData } from '../../../server/core/types.js';
 import { SessionLapTable } from '../../../src/components/session-detail/table/SessionLapTable.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
+import * as lapPositions from '../../../shared/domain/lapPlaces.js';
+
+describe('SessionLapTable optimal delta', () => {
+  it('reuses rank calculations on sort and expansion, and refreshes them for changed session data', () => {
+    const ranks = vi.spyOn(lapPositions, 'lapClassPositions');
+    const session = mockDetailedSession as unknown as DetailedSession;
+    const driver = session.playerDriver;
+    const view = (data: DetailedSession) => <SessionLapTable session={data} selectedDriver={driver} isMultiClass
+      hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />;
+    const { rerender } = render(view(session));
+    const initialCalls = ranks.mock.calls.length;
+    fireEvent.click(screen.getByTitle('Sort by Pos'));
+    fireEvent.click(screen.getByRole('button', { name: 'Show what happened on lap 3' }));
+    expect(ranks).toHaveBeenCalledTimes(initialCalls);
+    rerender(view({ ...session, drivers: [...session.drivers] }));
+    expect(ranks.mock.calls.length).toBeGreaterThan(initialCalls);
+    ranks.mockRestore();
+  });
+  it('sorts multiclass laps by the class position shown rather than overall position', () => {
+    const base = mockDetailedSession.playerDriver;
+    const selectedDriver = { ...base, carClass: 'LMGT3', laps: [
+      { ...base.laps[0], lapNum: 1, position: 11 },
+      { ...base.laps[1], lapNum: 2, position: 12 },
+    ] } as unknown as DriverData;
+    const rival = { ...selectedDriver, name: 'GT3 rival', laps: [
+      { ...selectedDriver.laps[0], position: 10 },
+      { ...selectedDriver.laps[1], position: 20 },
+    ] };
+    const session = { ...mockDetailedSession, drivers: [selectedDriver, rival] } as unknown as DetailedSession;
+    render(<SessionLapTable session={session} selectedDriver={selectedDriver} isMultiClass
+      hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
+    fireEvent.click(screen.getByTitle('Sort by Pos'));
+    expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Click to open telemetry for Lap 2', 'Click to open telemetry for Lap 1',
+    ]);
+  });
+  it('keeps the optimal gap visible on the best lap, sorts it, and spans the resource columns in details', () => {
+    const selectedDriver = { ...mockDetailedSession.playerDriver, theoreticalBest: 121 } as unknown as DriverData;
+    const session = { ...mockDetailedSession, playerDriver: selectedDriver } as unknown as DetailedSession;
+    const { rerender } = render(
+      <SessionLapTable session={session} selectedDriver={selectedDriver} isMultiClass={false}
+        hasTireWearData hasFuelData hasVirtualEnergyData isCurrentSessionAllTimePB={false} />
+    );
+    const bestRow = screen.getByTitle('Click to open telemetry for Lap 2');
+    expect(within(bestRow).getByText('Session best')).toBeInTheDocument();
+    expect(within(bestRow).getByText('+1.000s')).toBeInTheDocument();
+    expect(within(bestRow).getAllByRole('cell')).toHaveLength(14);
+    expect(screen.getByRole('columnheader', { name: 'Benchmark Pace' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Sort by Δ vs optimal'));
+    expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Click to open telemetry for Lap 2',
+      'Click to open telemetry for Lap 1',
+      'Click to open telemetry for Lap 3',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Show what happened on lap 3' }));
+    expect(screen.getByTestId('lap-details-3').querySelector('td')).toHaveAttribute('colspan', '14');
+
+    rerender(
+      <SessionLapTable session={session} selectedDriver={selectedDriver} isMultiClass={false}
+        hasTireWearData hasFuelData hasVirtualEnergyData isCurrentSessionAllTimePB />
+    );
+    expect(within(bestRow).getByText('Personal best')).toBeInTheDocument();
+    expect(within(bestRow).getByText('+1.000s')).toBeInTheDocument();
+  });
+});
 
 describe('SessionLapTable inferred timing', () => {
   it('marks the elapsed-time estimate from the parser and sorts unavailable laps last', () => {

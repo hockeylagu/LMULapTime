@@ -5,18 +5,16 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 1200,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id: string) {
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'vendor';
-          }
-          if (id.includes('node_modules/recharts/')) {
-            return 'recharts';
-          }
-          if (id.includes('node_modules/lucide-react/')) {
-            return 'lucide';
-          }
+        // Groups rather than manualChunks: manualChunks let react and react-dom's entry files land in the lucide and
+        // recharts chunks, which made every page preload recharts.
+        codeSplitting: {
+          groups: [
+            { name: 'vendor', test: /node_modules[\/](react|react-dom|scheduler)[\/]/, priority: 30 },
+            { name: 'recharts', test: /node_modules[\/]recharts[\/]/, priority: 20 },
+            { name: 'lucide', test: /node_modules[\/]lucide-react[\/]/, priority: 10 },
+          ],
         },
       },
     },

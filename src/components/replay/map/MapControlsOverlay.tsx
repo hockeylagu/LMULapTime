@@ -59,7 +59,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           aria-label="Follow car"
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             followCar
-              ? 'bg-lmu-accent text-white shadow-sm'
+              ? 'bg-lmu-accent text-white'
               : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
           }`}
           title={followCar ? 'Follow Car (Active)' : 'Follow Car'}
@@ -81,8 +81,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       {zoomDisplay && (
         <span
           className={`${
-            isVert ? 'w-7 h-4.5 text-[9px]' : 'w-11 h-7 text-[10px]'
-          } flex items-center justify-center font-mono text-slate-400 font-bold select-none tabular-nums shrink-0`}
+            isVert ? 'w-7 h-4.5 text-[10px]' : 'w-11 h-7 text-[10px]'
+          } flex items-center justify-center font-mono text-lmu-muted font-bold select-none tabular-nums shrink-0`}
         >
           {zoomDisplay}
         </span>

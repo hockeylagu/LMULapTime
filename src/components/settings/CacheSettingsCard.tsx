@@ -27,13 +27,13 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
     : 'Never';
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-6 rounded-2xl space-y-4">
+    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
         <div className="flex items-center gap-2">
-          <Zap className="w-5 h-5 text-lmu-accent" />
+          <Zap className="w-5 h-5 text-lmu-accent-text" />
           <h3 className="text-base font-bold text-white uppercase tracking-wider">Session XML SQLite Cache</h3>
         </div>
-        <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30">
+        <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30">
           {status?.sqliteCache?.sessionsCount ?? status?.sessionsCount ?? 0} Sessions Cached
         </span>
       </div>
@@ -45,35 +45,35 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
       {/* Cache Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Sessions</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Sessions</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.sessionsCount ?? status?.sessionsCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Database Size</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Database Size</span>
           <span className="text-base font-bold text-lmu-gold font-mono mt-0.5 block">
             {formatBytes(status?.sqliteCache?.dbSizeBytes)}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Replays</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Replays</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.replaysCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Cached Telemetry</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Cached Telemetry</span>
           <span className="text-base font-bold text-white font-mono mt-0.5 block">
             {status?.sqliteCache?.telemetryFilesCount ?? 0}
           </span>
         </div>
 
         <div className="bg-lmu-bg p-3.5 rounded-xl border border-lmu-border col-span-2">
-          <span className="text-[11px] font-semibold text-lmu-muted uppercase block">Last Delta Sync / Update</span>
+          <span className="text-[11px] font-semibold text-lmu-muted uppercase tracking-wider block">Last Delta Sync / Update</span>
           <span className="text-xs font-medium text-white font-mono mt-1 block truncate">
             {cacheLastSyncedStr}
           </span>
@@ -94,7 +94,7 @@ export const CacheSettingsCard: React.FC<CacheSettingsCardProps> = ({
             type="button"
             onClick={onClearCache}
             disabled={isClearingCache}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-lmu-accent/10 text-lmu-accent border border-lmu-accent/20 font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/20 transition-all disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-lmu-accent/10 text-lmu-accent-text border border-lmu-accent/20 font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/20 transition-all disabled:opacity-50 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
             {isClearingCache ? 'Clearing...' : 'Clear Cache'}

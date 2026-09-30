@@ -1,12 +1,8 @@
 import React from 'react';
-import { Ban, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { DriverSafetySummary } from './DriverSafetySummary.js';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/formatters.js';
-import {
-  getWorstTrackLimitSeverity,
-  getTrackLimitStandingsPillClasses,
-} from '../../../utils/trackLimits.js';
 
 export interface SessionRaceStandingsRowProps {
   driver: DriverData;
@@ -14,10 +10,13 @@ export interface SessionRaceStandingsRowProps {
   selectedDriverName: string;
   setSelectedDriverName: (name: string) => void;
   isMultiClass: boolean;
-  overallWinnerClass: string;
   sessionBestSectors: { s1: number | null; s2: number | null; s3: number | null };
   leaderFinishTime?: number | null;
   leaderLaps: number;
+  /** A race shows the grid gain and the finish; practice and qualifying the gap of the best lap. */
+  isRace: boolean;
+  /** The fastest best lap of the driver's class (of the session when single-class), for the gap. */
+  fastestInClass: number | null;
 }
 
 function getBestLap(driver: DriverData) {
@@ -30,10 +29,11 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   selectedDriverName,
   setSelectedDriverName,
   isMultiClass,
-  overallWinnerClass,
   sessionBestSectors,
   leaderFinishTime,
   leaderLaps,
+  isRace,
+  fastestInClass,
 }) => {
   const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name));
   const isSelected = d.name === selectedDriverName;
@@ -42,7 +42,8 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   const isBestS2 = bestLap?.s2 === sessionBestSectors.s2;
   const isBestS3 = bestLap?.s3 === sessionBestSectors.s3;
   const overallPosition = d.position > 0 ? `P${d.position}` : '-';
-  const hasDifferentClass = d.carClass.trim().toLowerCase() !== overallWinnerClass;
+  const hasClassPosition = isMultiClass && d.classPosition > 0;
+  const primaryPosition = hasClassPosition ? `P${d.classPosition}` : overallPosition;
   const finishLap = [...d.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number');
   const raceTime = finishLap?.elapsedTimeString || (finishLap?.elapsedSeconds !== undefined && finishLap?.elapsedSeconds !== null
     ? formatElapsedSeconds(finishLap.elapsedSeconds)
@@ -54,41 +55,54 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       ? `+${leaderLaps - d.lapsCount} Lap${leaderLaps - d.lapsCount === 1 ? '' : 's'}`
       : `+${Math.max(0, finishLap.elapsedSeconds - leaderFinishTime).toFixed(3)}s`
     : d.finishGapToLeaderString || '-';
-  const timeOrGap = d.position === 1 && !isNonFinisher ? raceTime : isNonFinisher ? finishStatus : finishGap;
+  const raceTimeOrGap = d.position === 1 && !isNonFinisher ? raceTime : isNonFinisher ? finishStatus : finishGap;
+  const lapGap = d.bestLapTime !== null && d.bestLapTime > 0 && fastestInClass !== null
+    ? d.bestLapTime - fastestInClass < 0.0005 ? 'Fastest' : `+${(d.bestLapTime - fastestInClass).toFixed(3)}s`
+    : 'No time';
+  const timeOrGap = isRace ? raceTimeOrGap : lapGap;
+  const select = () => setSelectedDriverName(d.name);
 
   return (
     <tr
-      onClick={() => setSelectedDriverName(d.name)}
-      className={`hover:bg-lmu-card/60 transition-colors cursor-pointer ${
-        isSelected ? 'bg-lmu-accent/15 border-l-lmu-accent' : isPlayer ? 'bg-lmu-gold/10' : ''
+      onClick={select}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        select();
+      }}
+      tabIndex={0}
+      aria-current={isSelected ? 'true' : undefined}
+      aria-label={`${primaryPosition}${hasClassPosition ? ` in ${d.carClass}, ${overallPosition} overall` : ''} ${d.name}${isPlayer ? ' (you)' : ''}: show their laps`}
+      className={`hover:bg-lmu-card/60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent ${
+        isSelected ? 'bg-lmu-accent/15 border-l-lmu-accent' : ''
       }`}
     >
-      <td className="px-3.5 py-2.5 text-center font-bold text-white font-mono">
-        <div>{overallPosition}{isMultiClass && hasDifferentClass && d.classPosition > 0 ? ` (P${d.classPosition})` : ''}</div>
+      <td className="px-3.5 py-2.5 text-center font-mono whitespace-nowrap"
+        title={hasClassPosition ? `${d.carClass}: ${primaryPosition} · Overall: ${overallPosition}` : undefined}>
+        <div className="inline-flex items-baseline gap-1.5">
+          <span className="text-sm font-bold text-white">{primaryPosition}</span>
+          {hasClassPosition && d.classPosition !== d.position && <span className="text-[11px] font-normal text-lmu-muted" aria-label={`${overallPosition} overall`}>({overallPosition})</span>}
+        </div>
       </td>
-      <td className="px-3.5 py-2.5 text-center font-mono font-bold">
-        <span className={d.positionGain && d.positionGain > 0 ? 'text-lmu-green' : d.positionGain && d.positionGain < 0 ? 'text-rose-400' : 'text-slate-300'}>
-          {d.positionGain === null || d.positionGain === undefined ? '-' : d.positionGain > 0 ? `+${d.positionGain}` : d.positionGain}
-        </span>
-      </td>
+      {isRace && (
+        <td className="px-3.5 py-2.5 text-center font-mono font-bold">
+          <span className={d.positionGain && d.positionGain > 0 ? 'text-lmu-gain' : d.positionGain && d.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-text-soft'}>
+            {d.positionGain === null || d.positionGain === undefined ? '-' : d.positionGain > 0 ? `+${d.positionGain}` : d.positionGain}
+          </span>
+        </td>
+      )}
       <td className="px-3.5 py-2.5 text-center font-mono text-white">
         {d.carNumber || '-'}
       </td>
       <td className="px-3.5 py-2.5 font-medium text-white">
         <div className="flex items-center gap-1.5">
-          {isPlayer && <span className="text-lmu-gold">⭐</span>}
-          <span
-            className={
-              isPlayer ? 'font-bold text-lmu-gold' : isSelected ? 'font-bold text-white' : 'text-white'
-            }
-          >
-            {d.name} {isPlayer ? '(You)' : ''}
-          </span>
+          <span className={isPlayer || isSelected ? 'font-bold text-white' : 'text-white'}>{d.name}</span>
+          {isPlayer && <span className="text-lmu-muted font-normal">(You)</span>}
         </div>
       </td>
       <td className="px-3.5 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-400 font-medium truncate" title={d.carType}>{d.carType}</span>
+          <span className="text-lmu-muted font-medium truncate" title={d.carType}>{d.carType}</span>
           <CarClassBadge carClass={d.carClass} carType={d.carType} size="xs" />
         </div>
       </td>
@@ -98,133 +112,23 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       </td>
       <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS1 ? 'text-lmu-gold font-bold' : 'text-lmu-muted'}`} title={isBestS1 ? 'Session best S1' : undefined}>
         {bestLap?.s1 !== null && bestLap?.s1 !== undefined ? formatTime(bestLap.s1) : '-'}
+        {isBestS1 && <span className="sr-only"> (session best)</span>}
       </td>
       <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS2 ? 'text-lmu-blue font-bold' : 'text-lmu-muted'}`} title={isBestS2 ? 'Session best S2' : undefined}>
         {bestLap?.s2 !== null && bestLap?.s2 !== undefined ? formatTime(bestLap.s2) : '-'}
+        {isBestS2 && <span className="sr-only"> (session best)</span>}
       </td>
       <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS3 ? 'text-lmu-green font-bold' : 'text-lmu-muted'}`} title={isBestS3 ? 'Session best S3' : undefined}>
         {bestLap?.s3 !== null && bestLap?.s3 !== undefined ? formatTime(bestLap.s3) : '-'}
+        {isBestS3 && <span className="sr-only"> (session best)</span>}
       </td>
-      <td className={`px-3.5 py-2.5 text-right font-mono font-semibold ${isNonFinisher ? 'text-rose-300' : 'text-white'}`}>
+      <td className={`px-3.5 py-2.5 text-right font-mono font-semibold ${
+        isRace && isNonFinisher ? 'text-lmu-loss-soft' : !isRace && lapGap === 'Fastest' ? 'text-lmu-text-soft' : 'text-white'
+      }`}>
         {timeOrGap}
       </td>
-      <td className="px-3.5 py-2.5 text-center">
-        {(() => {
-          const incCount = d.totalIncidents ?? d.incidents?.length ?? 0;
-          const tlCount = d.totalTrackLimits ?? d.trackLimits?.length ?? 0;
-          const penCount = d.totalPenalties ?? d.penalties?.length ?? 0;
-          const tooltip = [
-            `Driver: ${d.name}`,
-            `- Contacts / Incidents: ${incCount}x`,
-            `- Track Limits Warnings: ${tlCount}`,
-            `- Penalties: ${penCount}`,
-            ...(d.penalties && d.penalties.length > 0
-              ? [
-                  '',
-                  'Penalties:',
-                  ...d.penalties.map((p) => {
-                    const lapLabel = p.lapNum
-                      ? `Lap ${p.lapNum}`
-                      : p.elapsedSeconds
-                      ? formatElapsedSeconds(p.elapsedSeconds)
-                      : '';
-                    return `  - ${lapLabel ? `${lapLabel}: ` : ''}${p.penalty} (${p.reason})`;
-                  }),
-                ]
-              : []),
-            ...(d.incidents && d.incidents.length > 0
-              ? [
-                  '',
-                  'Incidents:',
-                  ...d.incidents.slice(0, 8).map((inc) => {
-                    const lapLabel = inc.lapNum
-                      ? `Lap ${inc.lapNum}`
-                      : inc.elapsedSeconds
-                      ? formatElapsedSeconds(inc.elapsedSeconds)
-                      : 'Lap ?';
-                    const desc = inc.description || (inc.otherVehicle
-                      ? `Contact with ${inc.otherVehicle}`
-                      : inc.type === 'contact'
-                      ? 'Contact with barrier'
-                      : inc.type || 'Incident');
-                    return `  - ${lapLabel}: ${desc}`;
-                  }),
-                  ...(d.incidents.length > 8 ? [`  ...and ${d.incidents.length - 8} more`] : []),
-                ]
-              : []),
-            ...(d.trackLimits && d.trackLimits.length > 0
-              ? [
-                  '',
-                  'Track Limits:',
-                  ...d.trackLimits.slice(0, 6).map((tl) => {
-                    const lapLabel = tl.lapNum
-                      ? `Lap ${tl.lapNum}`
-                      : tl.elapsedSeconds
-                      ? formatElapsedSeconds(tl.elapsedSeconds)
-                      : 'Warning';
-                    return `  - ${lapLabel}: ${tl.description}`;
-                  }),
-                  ...(d.trackLimits.length > 6 ? [`  ...and ${d.trackLimits.length - 6} more`] : []),
-                ]
-              : []),
-          ].join('\n');
-
-          if (incCount === 0 && penCount === 0 && tlCount === 0) {
-            return (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 cursor-help"
-                title={tooltip}
-              >
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                <span>Clean</span>
-              </span>
-            );
-          }
-
-          if (penCount > 0) {
-            return (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-950/70 text-rose-300 border border-rose-500/40 cursor-help"
-                title={tooltip}
-              >
-                <span className="inline-flex items-center gap-1"><Ban className="w-3 h-3" /> {penCount} Pen</span>
-                {incCount > 0 && <span className="text-[10px] text-rose-200/70 font-mono">({incCount}x)</span>}
-              </span>
-            );
-          }
-
-          const allTls = d.trackLimits && d.trackLimits.length > 0
-            ? d.trackLimits
-            : d.laps?.flatMap((l) => l.trackLimits || []) || [];
-          const tlSeverity = getWorstTrackLimitSeverity(allTls);
-          const tlPillClass = getTrackLimitStandingsPillClasses(tlSeverity);
-
-          if (incCount > 0) {
-            return (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-950/60 text-orange-300 border border-orange-500/30 cursor-help"
-                title={tooltip}
-              >
-                <span className="inline-flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> {incCount}x</span>
-                {tlCount > 0 && (
-                  <span className={`text-[10px] font-mono ${tlSeverity === 'green' ? 'text-emerald-300/80' : tlSeverity === 'orange' ? 'text-orange-300/80' : 'text-yellow-300/70'}`}>
-                    ({tlCount} TL)
-                  </span>
-                )}
-              </span>
-            );
-          }
-
-          return (
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border cursor-help ${tlPillClass}`}
-              title={tooltip}
-            >
-              <AlertTriangle className="w-3 h-3" />
-              <span>{tlCount} TL</span>
-            </span>
-          );
-        })()}
+      <td className="px-3.5 py-2.5 text-left">
+        <DriverSafetySummary driver={d} />
       </td>
     </tr>
   );

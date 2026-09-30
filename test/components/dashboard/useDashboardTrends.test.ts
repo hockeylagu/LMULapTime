@@ -273,30 +273,31 @@ describe('useDashboardTrends', () => {
     expect(result.current.latestOuting?.sessionType).toBe('Race');
   });
 
+  const session = (id: string, timeString: string, carType: string, carClass: string, pace: number): SessionSummary => ({
+    id,
+    filename: `${id}.xml`,
+    trackVenue: 'Bahrain International Circuit',
+    timeString,
+    sessionType: 'Race',
+    sessionName: 'R1',
+    driversCount: 20,
+    playerDriver: {
+      name: 'Samuel Lague',
+      carType,
+      carClass,
+      bestLapTime: 120,
+      bestLapTimeString: '2:00.000',
+      bestS1: null,
+      bestS2: null,
+      bestS3: null,
+      theoreticalBest: null,
+      theoreticalBestString: '',
+      bestLapPacePercentage: pace,
+      lapsCount: 10,
+    },
+  });
+
   it('draws the pace trend in the latest outing car class only', () => {
-    const session = (id: string, timeString: string, carType: string, carClass: string, pace: number): SessionSummary => ({
-      id,
-      filename: `${id}.xml`,
-      trackVenue: 'Bahrain International Circuit',
-      timeString,
-      sessionType: 'Race',
-      sessionName: 'R1',
-      driversCount: 20,
-      playerDriver: {
-        name: 'Samuel Lague',
-        carType,
-        carClass,
-        bestLapTime: 120,
-        bestLapTimeString: '2:00.000',
-        bestS1: null,
-        bestS2: null,
-        bestS3: null,
-        theoreticalBest: null,
-        theoreticalBestString: '',
-        bestLapPacePercentage: pace,
-        lapsCount: 10,
-      },
-    });
     const sessions = [
       session('hy-old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hypercar', 104.0),
       session('gt3-mid', '2026/09/22 10:00:00', 'BMW M4 LMGT3', 'LMGT3', 101.0),
@@ -310,5 +311,15 @@ describe('useDashboardTrends', () => {
     // 104.0% down to 103.4%: faster, with the GT3 101.0% left out of the comparison.
     expect(result.current.paceDelta).toBe(0.6);
     expect(result.current.paceTrendDirection).toBe('improving');
+  });
+
+  it('calls a pace change under 0.3% steady, not a trend', () => {
+    const sessions = [
+      session('old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.14),
+      session('new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.4),
+    ];
+    const { result } = renderHook(() => useDashboardTrends(sessions));
+    expect(result.current.paceDelta).toBe(-0.26);
+    expect(result.current.paceTrendDirection).toBe('steady');
   });
 });

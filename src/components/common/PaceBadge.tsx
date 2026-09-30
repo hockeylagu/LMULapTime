@@ -7,19 +7,19 @@ export interface PaceBadgeProps {
   category?: PaceCategory | null;
   percentage?: number | null;
   showPercentage?: boolean;
-  showEmoji?: boolean;
   size?: 'xs' | 'sm' | 'md';
-  rounded?: 'full' | 'default';
   className?: string;
 }
 
+/**
+ * The benchmark pace of a lap, flat and the same everywhere: the band's color as a dot, its name in that
+ * color, the percentage as a muted readout. No box, so it reads the same in tables, cards and headers.
+ */
 export const PaceBadge: React.FC<PaceBadgeProps> = ({
   category,
   percentage,
   showPercentage = false,
-  showEmoji = true,
   size = 'sm',
-  rounded = 'default',
   className = '',
 }) => {
   if (!category) return null;
@@ -27,22 +27,20 @@ export const PaceBadge: React.FC<PaceBadgeProps> = ({
   const style = getPaceCategoryStyle(category);
 
   const sizeClasses = {
-    xs: 'text-[10px] px-1.5 py-0.5 gap-1',
-    sm: 'text-xs px-2 py-0.5 gap-1.5',
-    md: 'text-sm px-2.5 py-1 gap-1.5',
+    xs: 'text-[11px] gap-1.5',
+    sm: 'text-xs gap-1.5',
+    md: 'text-sm gap-2',
   }[size];
-
-  const roundClass = rounded === 'full' ? 'rounded-full' : 'rounded';
 
   return (
     <span
-      className={`inline-flex items-center font-bold border shadow-sm ${roundClass} ${style.badgeClass} ${sizeClasses} ${className}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap leading-none font-bold ${style.textClass} ${sizeClasses} ${className}`}
       title={`Benchmark Pace: ${style.label}${percentage != null ? ` (${formatPacePercentage(percentage)})` : ''}`}
     >
-      {showEmoji && <span>{style.emoji}</span>}
-      <span>{style.label}</span>
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
+      <span className="tracking-[0.02em]">{style.label}</span>
       {showPercentage && percentage != null && (
-        <span className="opacity-80">({formatPacePercentage(percentage)})</span>
+        <span className="font-mono text-lmu-muted">{formatPacePercentage(percentage)}</span>
       )}
     </span>
   );

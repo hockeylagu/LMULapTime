@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Award, ChevronDown } from 'lucide-react';
-import { RankBadge } from '../common';
+import { Car } from 'lucide-react';
+import { SummaryCard, UnitToggle, RankedList, shareOf } from './DashboardSummaryParts.js';
 
 export interface CarsSummaryCardProps {
   rankedCars: { car: string; laps: number; km: number }[];
@@ -25,69 +25,29 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
     return [...sourceCars].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));
   }, [sourceCars, unit]);
 
+  const total = sourceCars.reduce((sum, item) => sum + (unit === 'km' ? item.km : item.laps), 0);
   const displayCars = showMoreCars ? sortedCars : sortedCars.slice(0, 3);
 
   return (
-    <div className="bg-lmu-card/75 backdrop-blur-md border border-white/[0.07] p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between h-full">
-      <div className="flex items-center justify-between border-b border-lmu-border/50 pb-2 mb-2">
-        <p className="text-xs font-bold text-lmu-cyan uppercase tracking-wider flex items-center gap-1.5">
-          <Award className="w-4 h-4 text-lmu-cyan" />
-          <span>Cars {sourceCars.length > 3 && `(${displayCars.length}/${sourceCars.length})`}</span>
-        </p>
-        <div className="flex items-center gap-0.5 bg-lmu-card/60 rounded-full p-0.5 border border-lmu-border/50">
-          <button
-            type="button"
-            onClick={() => setUnit('laps')}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'laps' ? 'bg-lmu-cyan text-black' : 'text-lmu-muted hover:text-white'}`}
-          >
-            Laps
-          </button>
-          <button
-            type="button"
-            onClick={() => setUnit('km')}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${unit === 'km' ? 'bg-lmu-cyan text-black' : 'text-lmu-muted hover:text-white'}`}
-          >
-            Km
-          </button>
-        </div>
-      </div>
-
-      <div className={`space-y-1.5 flex-1 ${showMoreCars ? 'max-h-60 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
-        {displayCars.length > 0 ? (
-          displayCars.map((item, idx) => (
-            <div
-              key={item.car}
-              onClick={() => onSelectCar(item.car.split(' ')[0] || item.car)}
-              className="flex items-center justify-between text-xs cursor-pointer hover:bg-lmu-card/60 p-1.5 rounded-lg transition-all group"
-              title={`Filter by ${item.car}`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0 mr-2">
-                <RankBadge rank={idx + 1} firstPlaceColor="text-lmu-cyan" />
-                <span className="text-white font-medium truncate group-hover:text-lmu-cyan transition-colors" title={item.car}>
-                  {item.car}
-                </span>
-              </div>
-              <span className="font-mono shrink-0 text-[11px]">
-                <span className="text-white font-medium">{unit === 'km' ? item.km.toFixed(0) : item.laps}</span>{' '}
-                <span className="text-lmu-muted">{unit === 'km' ? 'km' : 'laps'}</span>
-              </span>
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-lmu-muted">No car data</p>
-        )}
-      </div>
-
-      {sourceCars.length > 3 && (
-        <button
-          type="button"
-          onClick={() => setShowMoreCars(!showMoreCars)}
-          className="w-full text-center text-[10px] text-lmu-muted hover:text-lmu-cyan font-semibold pt-2 mt-1 border-t border-lmu-border/30 transition-colors flex items-center justify-center gap-1"
-        >
-          <span>{showMoreCars ? 'Show Top 3 Only' : `Show All ${sourceCars.length} Cars`}</span>
-          <ChevronDown className={`w-3 h-3 transform transition-transform ${showMoreCars ? 'rotate-180' : ''}`} />
-        </button>
-      )}
-    </div>
+    <SummaryCard
+      icon={Car}
+      title="Cars"
+      action={<UnitToggle unit={unit} onChange={setUnit} />}
+      footer={sourceCars.length > 3 ? { expanded: showMoreCars, showAllLabel: `Show All ${sourceCars.length} Cars`, onToggle: () => setShowMoreCars(!showMoreCars) } : null}
+    >
+      <RankedList
+        expanded={showMoreCars}
+        empty="No car data"
+        items={displayCars.map((item, i) => ({
+          key: item.car,
+          name: item.car,
+          value: unit === 'km' ? Math.round(item.km).toLocaleString() : item.laps.toLocaleString(),
+          unit: unit === 'km' ? 'km' : 'laps',
+          detail: i === 0 ? shareOf(unit === 'km' ? item.km : item.laps, total, unit === 'km' ? 'distance' : 'laps') : undefined,
+          title: `Filter by ${item.car}`,
+          onSelect: () => onSelectCar(item.car.split(' ')[0] || item.car),
+        }))}
+      />
+    </SummaryCard>
   );
 };

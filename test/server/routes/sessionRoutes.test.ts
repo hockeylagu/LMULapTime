@@ -15,6 +15,7 @@ import {
   createSessionRouter,
   filterSessions,
   parseSessionFilters,
+  toSessionListEntry,
 } from '../../../server/routes/sessionRoutes.js';
 import { DetailedSession, ReferenceLaptimeEntry } from '../../../server/core/types.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
@@ -228,6 +229,26 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body).toHaveLength(1);
       expect(res.body[0].id).toBe('sess_1');
       expect(res.body[0].drivers).toBeUndefined();
+    });
+
+    it('GET /api/sessions leaves out lap stewards and traffic records without touching the cached session', () => {
+      const session = structuredClone(mockSessions[0]);
+      const player = session.playerDriver!;
+      const lapRecords = { traffic: { passed: [], passedBy: [] }, incidents: [{ elapsedTime: 1 }], trackLimits: [{ elapsedTime: 2 }] };
+      player.laps = [{ ...session.drivers[0].laps[0], ...lapRecords } as unknown as typeof player.laps[number]];
+      player.incidents = lapRecords.incidents as unknown as typeof player.incidents;
+      player.trackLimits = lapRecords.trackLimits as unknown as typeof player.trackLimits;
+
+      const entry = toSessionListEntry(session);
+
+      expect(entry).not.toHaveProperty('drivers');
+      expect(entry.playerDriver).not.toHaveProperty('incidents');
+      expect(entry.playerDriver).not.toHaveProperty('trackLimits');
+      expect(entry.playerDriver?.laps[0]).toEqual(session.drivers[0].laps[0]);
+      expect(entry.playerDriver?.bestLapTimeString).toBe('2:00.000');
+      expect(player.laps[0].traffic).toBeDefined();
+      expect(player.incidents).toHaveLength(1);
+      expect(session.drivers).toHaveLength(1);
     });
 
     it('GET /api/sessions answers a repeated filter instead of failing', async () => {

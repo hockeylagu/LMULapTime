@@ -66,9 +66,10 @@ describe('DashboardPaceSparkline component', () => {
     expect(screen.getByText('Pace Trajectory')).toBeInTheDocument();
     expect(screen.getByText('1.10% faster ↗')).toBeInTheDocument();
 
-    // Range axis labels
-    expect(screen.getByText('103.5% (Past)')).toBeInTheDocument();
-    expect(screen.getByText('102.4% (Latest)')).toBeInTheDocument();
+    // The latest pace is the headline; the axis names the first and last session dates
+    expect(screen.getByText('102.4%')).toBeInTheDocument();
+    expect(screen.getByText('2026/09/20')).toBeInTheDocument();
+    expect(screen.getByText('2026/09/23')).toBeInTheDocument();
 
     // SVG path exists
     const svg = container.querySelector('svg');
@@ -96,11 +97,23 @@ describe('DashboardPaceSparkline component', () => {
       <DashboardPaceSparkline points={points} paceDelta={-1.5} paceTrendDirection="declining" />
     );
     // 102.0% then 103.5% of the benchmark: slower, said in words rather than a signed delta.
-    expect(screen.getByText('1.50% slower ↘')).toBeInTheDocument();
+    expect(screen.getByText('1.50% slower ↘')).toHaveClass('text-lmu-loss');
 
     rerender(
       <DashboardPaceSparkline points={points} paceDelta={0.05} paceTrendDirection="steady" />
     );
     expect(screen.getByText('Steady Pace →')).toBeInTheDocument();
+  });
+
+  it('keeps small changes small', () => {
+    const points: RecentPacePoint[] = [
+      { id: '1', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 110.0 },
+      { id: '2', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:00', pacePercentage: 110.2 },
+    ];
+    const { container } = render(<DashboardPaceSparkline points={points} paceDelta={-0.2} paceTrendDirection="steady" />);
+
+    // A 0.2% change spans well under the chart's height (1.5% minimum range): top dot ~40%, bottom ~60%.
+    const tops = [...container.querySelectorAll<HTMLElement>('.aspect-square.rounded-full')].map(d => parseFloat(d.style.top));
+    expect(Math.abs(tops[1] - tops[0])).toBeLessThan(20);
   });
 });

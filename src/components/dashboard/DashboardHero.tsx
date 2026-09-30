@@ -1,12 +1,14 @@
 import React from 'react';
-import { Gauge, Trophy, Zap, Video, ChevronRight, Calendar, Activity } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useDashboardTrends } from './useDashboardTrends.js';
 import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
-import { PACE_CATEGORY_STYLES } from '../../utils/paceCategoryStyles.js';
+import { PaceBadge } from '../common/PaceBadge.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
+import { ReplayLaunchButton } from '../common/ReplayLaunchButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
+import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
 
 export interface DashboardHeroProps {
@@ -42,83 +44,65 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
     return null;
   }
 
-  const paceStyle = latestOuting.paceCategory ? PACE_CATEGORY_STYLES[latestOuting.paceCategory] : null;
 
   return (
     <div
       data-testid="dashboard-hero-command-center"
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-lmu-card via-lmu-surface to-lmu-deep border border-sky-500/20 shadow-xl shadow-black/50 p-5 ${className}`}
+      className={`relative overflow-hidden rounded-2xl bg-lmu-card border border-lmu-border p-5 ${className}`}
     >
-      {/* Background motorsport telemetry glow accents */}
-      <div className="absolute top-0 right-1/4 w-96 h-32 bg-sky-500/5 blur-3xl pointer-events-none rounded-full" />
-      <div className="absolute bottom-0 left-10 w-80 h-28 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full" />
-
-      {/* Driver Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-sky-600/10 border border-sky-400/30 flex items-center justify-center text-sky-400 shadow-inner">
-            <Activity className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-extrabold text-white tracking-tight">
-              Welcome back, <span className="text-sky-400">{driverName}</span>
-            </h2>
-            <p className="text-xs text-lmu-muted">Here is your latest session telemetry and driving momentum.</p>
-          </div>
-        </div>
-
+      {/* Greeting, and the last day driven on the same line */}
+      <div className="flex items-baseline justify-between gap-6 pb-4 mb-4 border-b border-lmu-border">
+        <h2 className="text-lg font-semibold text-lmu-muted tracking-tight">
+          Welcome back, <span className="font-extrabold text-white">{driverName}</span>
+        </h2>
         {todayActivity && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 self-start sm:self-auto">
-            <Calendar className="w-3.5 h-3.5 text-sky-400" />
-            <span className="text-slate-400">Activity ({todayActivity.dateString}):</span>
-            <span className="text-white font-bold">{todayActivity.sessionsCount}</span>
-            <span className="text-slate-500">runs ·</span>
-            <span className="text-white font-bold">{todayActivity.lapsCount}</span>
-            <span className="text-slate-500">laps ·</span>
-            <span className="text-emerald-400 font-bold">{todayActivity.distanceKm} km</span>
-          </div>
+          <p className="text-xs text-lmu-muted shrink-0">
+            Last on track <span className="font-mono text-lmu-text-soft">{todayActivity.dateString}</span>
+            {' · '}
+            <span className="font-mono font-bold text-white">{todayActivity.sessionsCount}</span>{' '}
+            {todayActivity.sessionsCount === 1 ? 'session' : 'sessions'}
+            {' · '}
+            <span className="font-mono font-bold text-white">{todayActivity.lapsCount}</span>{' '}
+            {todayActivity.lapsCount === 1 ? 'lap' : 'laps'}
+            {' · '}
+            <span className="font-mono font-bold text-white">{todayActivity.distanceKm}</span> km
+          </p>
         )}
       </div>
 
-      {/* Grid: Latest Outing Spotlight + Recent Pace Trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column: Latest Outing Spotlight (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col justify-between rounded-xl bg-slate-950/70 border border-slate-800/80 p-4 hover:border-slate-700/80 transition-colors">
+      {/* Grid: latest session + recent form */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:divide-x lg:divide-lmu-border">
+        {/* Left column: latest session (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col justify-between lg:pr-6">
           <div>
             <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold tracking-wider uppercase text-sky-400">
-                <Gauge className="w-3.5 h-3.5" /> Latest Outing Spotlight
-              </span>
+              <span className="text-xs font-mono font-bold tracking-wider uppercase text-lmu-text-soft">Latest session</span>
               <span className="text-[11px] font-mono text-lmu-muted">{latestOuting.timeString}</span>
             </div>
 
             <div className="flex items-start justify-between gap-3 mt-1">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
                 <TrackCircuitLayout
                   trackName={latestOuting.trackVenue || latestOuting.trackName}
                   trackCourse={latestOuting.trackCourse}
                   trackGeometry={trackGeometry}
-                  size="card"
+                  size="session"
                   onClick={() => onSelectSession(latestOuting.id)}
                   className="shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-white tracking-wide truncate">{latestOuting.trackName}</h3>
+                    <h3 className="text-xl font-bold text-white tracking-tight truncate">{latestOuting.trackName}</h3>
                     <span
                       data-testid="hero-session-type-badge"
-                      className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-bold shrink-0 ${
-                        latestOuting.sessionType === 'Race'
-                          ? 'bg-lmu-accent/20 text-lmu-accent border border-lmu-accent/30'
-                          : latestOuting.sessionType === 'Qualifying'
-                          ? 'bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30'
-                          : 'bg-lmu-blue/20 text-lmu-blue border border-lmu-blue/30'
+                      className={`px-2 py-0.5 rounded border text-[11px] font-mono font-bold shrink-0 ${
+                        getSessionTypeStyle(latestOuting.sessionType)?.chip ?? 'bg-lmu-raised text-lmu-text-soft border-lmu-rule'
                       }`}
                     >
                       {latestOuting.sessionType}
                     </span>
                   </div>
-                  <div className="flex items-center text-xs text-slate-400 mt-1 truncate">
+                  <div className="flex items-center text-sm text-lmu-muted mt-1.5 truncate">
                     <span className="truncate">{latestOuting.carName}</span>
                     {latestOuting.carClass && (
                       <CarClassBadge
@@ -131,93 +115,75 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                   </div>
                 </div>
               </div>
-
-              {/* Race Position Pill */}
-              {latestOuting.sessionType === 'Race' && latestOuting.position && (
-                <div className="flex flex-col items-end shrink-0">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700/80 font-mono">
-                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-xs font-extrabold text-white">P{latestOuting.position}</span>
-                    {latestOuting.positionGain !== null && latestOuting.positionGain !== undefined && (
-                      <span
-                        className={`text-[11px] font-bold ${
-                          latestOuting.positionGain > 0
-                            ? 'text-emerald-400'
-                            : latestOuting.positionGain < 0
-                            ? 'text-rose-400'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        ({latestOuting.positionGain > 0 ? `+${latestOuting.positionGain}` : latestOuting.positionGain})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Lap Metrics Badges */}
-            <div className="flex flex-wrap items-start gap-6 mt-4 pt-3 border-t border-slate-800/60 font-mono">
+            {/* The best lap is the figure; finish, pace and laps support it */}
+            <div className="flex flex-wrap items-end gap-8 mt-4 pt-3 border-t border-lmu-border/60 font-mono">
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400">Best Lap</span>
-                <span className="text-base font-extrabold text-white leading-6 mt-0.5">
+                <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Best Lap</span>
+                <span className="text-[28px] leading-8 font-extrabold text-white tabular-nums mt-0.5">
                   {latestOuting.bestLapTimeString || '--:--.---'}
                 </span>
               </div>
 
-              {paceStyle && latestOuting.pacePercentage && (
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Benchmark Pace</span>
-                  <div className="h-6 flex items-center mt-0.5">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${paceStyle.badgeClass}`}>
-                      <span>{paceStyle.emoji}</span>
-                      <span>{paceStyle.label}</span>
-                      <span>({latestOuting.pacePercentage.toFixed(1)}%)</span>
+              {latestOuting.sessionType === 'Race' && latestOuting.position && (
+                <div className="flex flex-col" data-testid="hero-finish">
+                  <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Finish</span>
+                  <span className="flex items-baseline gap-1.5 mt-0.5">
+                    <span className={`text-xl font-extrabold ${latestOuting.position === 1 ? 'text-lmu-gold' : 'text-white'}`}>
+                      P{latestOuting.position}
                     </span>
+                    {latestOuting.positionGain !== null && latestOuting.positionGain !== undefined && (
+                      <span
+                        data-testid="hero-finish-gain"
+                        className={`text-xs font-bold ${
+                          latestOuting.positionGain > 0
+                            ? 'text-lmu-gain'
+                            : latestOuting.positionGain < 0
+                            ? 'text-lmu-loss'
+                            : 'text-lmu-muted'
+                        }`}
+                      >
+                        {latestOuting.positionGain > 0 ? `+${latestOuting.positionGain}` : latestOuting.positionGain}
+                      </span>
+                    )}
+                    {latestOuting.gridPosition && (
+                      <span className="text-xs text-lmu-muted">from P{latestOuting.gridPosition}</span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {latestOuting.paceCategory && latestOuting.pacePercentage && (
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Benchmark Pace</span>
+                  <div className="h-7 flex items-center mt-0.5">
+                    <PaceBadge category={latestOuting.paceCategory} percentage={latestOuting.pacePercentage} showPercentage />
                   </div>
                 </div>
               )}
 
               <div className="flex flex-col ml-auto text-right">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400">Laps</span>
-                <span className="text-base font-extrabold text-slate-200 leading-6 mt-0.5">
-                  {latestOuting.lapsCount}
-                </span>
+                <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Laps</span>
+                <span className="text-xl font-extrabold text-lmu-text mt-0.5">{latestOuting.lapsCount}</span>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 mt-4 pt-2">
+          <div className="flex items-center gap-3 mt-5">
             {latestOuting.hasReplay && onOpenReplay && (
-              <button
-                type="button"
+              <ReplayLaunchButton
+                hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
-                className={`flex-1 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer border ${
-                  latestOuting.hasDuckDbTelemetry
-                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 hover:border-amber-500/60'
-                    : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50'
-                }`}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}
-              >
-                {latestOuting.hasDuckDbTelemetry ? (
-                  <>
-                    <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                    <span>Launch 100Hz Replay</span>
-                  </>
-                ) : (
-                  <>
-                    <Video className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Launch Replay</span>
-                  </>
-                )}
-              </button>
+              />
             )}
             <button
               type="button"
               onClick={() => onSelectSession(latestOuting.id)}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-lmu-text border border-lmu-rule font-medium text-xs transition-colors cursor-pointer"
               data-testid="hero-inspect-session-btn"
             >
               Session Details
@@ -226,15 +192,13 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Recent Momentum & Pace Progression (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between rounded-xl bg-slate-950/70 border border-slate-800/80 p-4 hover:border-slate-700/80 transition-colors">
+        {/* Right column: recent form (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col justify-between lg:pl-6">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono font-bold tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
-                <Trophy className="w-3.5 h-3.5" /> Recent Form & Momentum
-              </span>
+              <span className="text-xs font-mono font-bold tracking-wider uppercase text-lmu-text-soft">Recent form</span>
               <span className="text-[11px] font-mono text-lmu-muted">
-                Last {recentPaceTrend.length} Stints{paceTrendClass ? ` · ${VEHICLE_CLASS_OPTIONS.find(o => o.id === paceTrendClass)?.label ?? paceTrendClass}` : ''}
+                Last {recentPaceTrend.length} {recentPaceTrend.length === 1 ? 'session' : 'sessions'}{paceTrendClass ? ` · ${VEHICLE_CLASS_OPTIONS.find(o => o.id === paceTrendClass)?.label ?? paceTrendClass}` : ''}
               </span>
             </div>
 
@@ -247,28 +211,28 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
           </div>
 
           {/* Quick Momentum Metrics */}
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/60 font-mono text-xs">
-            <div className="bg-slate-900/60 rounded-lg p-2 border border-slate-800/80">
+          <div className="grid grid-cols-3 gap-4 mt-4 pt-3 border-t border-lmu-border/60 font-mono text-xs">
+            <div>
               <div className="text-[10px] text-lmu-muted uppercase tracking-wider">Clean Lap Rate</div>
               <div className="text-white font-bold mt-0.5">
                 {recentCleanRate !== null ? `${recentCleanRate}%` : 'N/A'}
               </div>
             </div>
-            <div className="bg-slate-900/60 rounded-lg p-2 border border-slate-800/80">
+            <div>
               <div className="text-[10px] text-lmu-muted uppercase tracking-wider">Lap Consistency</div>
               <div className="text-white font-bold mt-0.5">
                 {recentConsistency !== null ? `${recentConsistency}%` : 'N/A'}
               </div>
             </div>
-            <div className="bg-slate-900/60 rounded-lg p-2 border border-slate-800/80">
+            <div>
               <div className="text-[10px] text-lmu-muted uppercase tracking-wider">Race Net Positions</div>
               <div
                 className={`font-bold mt-0.5 ${
                   recentNetPositions > 0
-                    ? 'text-emerald-400'
+                    ? 'text-lmu-gain'
                     : recentNetPositions < 0
-                    ? 'text-rose-400'
-                    : 'text-slate-300'
+                    ? 'text-lmu-loss'
+                    : 'text-lmu-text-soft'
                 }`}
               >
                 {recentNetPositions > 0 ? `+${recentNetPositions}` : recentNetPositions}

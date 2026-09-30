@@ -29,7 +29,7 @@ describe('SectorsMetricBox', () => {
     expect(within(box).getByText('+0.393')).toBeInTheDocument();
     expect(within(box).getByText('-0.332')).toBeInTheDocument();
     expect(within(box).getByText('0:28.255')).toHaveAttribute('title', 'Alexandr Malynych');
-    expect(within(box).getByText('+0.393').parentElement).toHaveClass('bg-amber-500/10');
+    expect(within(box).getByText('+0.393').parentElement).toHaveClass('bg-lmu-warn-strong/10');
     expect(box).not.toHaveTextContent('Biggest gap');
   });
 

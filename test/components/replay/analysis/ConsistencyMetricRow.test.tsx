@@ -38,9 +38,9 @@ describe('ConsistencyMetricRow helpers and components', () => {
   it('consistencyClass returns appropriate color classes based on threshold', () => {
     expect(consistencyClass(0.2)).toBe('text-lmu-green');
     expect(consistencyClass(0.3)).toBe('text-lmu-green');
-    expect(consistencyClass(0.5)).toBe('text-amber-400');
-    expect(consistencyClass(0.8)).toBe('text-amber-400');
-    expect(consistencyClass(0.9)).toBe('text-rose-400');
+    expect(consistencyClass(0.5)).toBe('text-lmu-warn');
+    expect(consistencyClass(0.8)).toBe('text-lmu-warn');
+    expect(consistencyClass(0.9)).toBe('text-lmu-loss');
   });
 
   it('renders MetricRow with null stat displaying dashes', () => {
