@@ -70,13 +70,13 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
       find={
         <>
           <SessionSearchField value={searchQuery} onChange={setSearchQuery} placeholder="Search track, car, file..." />
-          <div className="h-9 w-[300px] inline-flex items-center gap-2 bg-lmu-bg border border-lmu-border rounded-xl px-3 text-xs text-white">
+          <div className="h-9 w-[300px] inline-flex items-center gap-2 bg-lmu-bg border border-lmu-border rounded-xl px-3 text-xs text-white has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
             <MapPin className="w-3.5 h-3.5 text-lmu-muted shrink-0 pointer-events-none" />
             <select
               ref={trackSelectRef}
               value={selectedTrack}
               onChange={(e) => setSelectedTrack(e.target.value)}
-              className="flex-1 min-w-0 bg-transparent text-white font-semibold text-xs focus:outline-none cursor-pointer truncate appearance-none"
+              className="flex-1 min-w-0 bg-transparent text-white font-semibold text-xs outline-none cursor-pointer truncate appearance-none"
               aria-label="Filter by track"
             >
               <option value="All" className="bg-lmu-card text-white">

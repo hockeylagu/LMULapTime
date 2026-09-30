@@ -60,13 +60,13 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
       {/* Center: Driver Selector, Lap Selector & Live State */}
       <div className="flex items-center gap-2 justify-self-center min-w-0">
         {drivers.length > 0 && (
-          <label className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-xl bg-lmu-card border border-lmu-border hover:border-lmu-accent/50 transition-colors shrink-0">
+          <label className="flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-xl bg-lmu-card border border-lmu-border hover:border-lmu-accent/50 transition-colors shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
             <Users className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />
             <select
               aria-label="Select Driver"
               value={selectedDriverSlot ?? ''}
               onChange={e => onSelectDriver(parseInt(e.target.value, 10))}
-              className="bg-transparent text-[11px] font-bold text-white focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] truncate py-0.5"
+              className="bg-transparent text-[11px] font-bold text-white outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] truncate py-0.5"
             >
               {drivers.filter(driver => typeof driver.slot === 'number').map(driver => (
                 <option key={driver.slot} value={driver.slot} className="bg-lmu-bg text-white">
@@ -78,7 +78,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         )}
 
         {trajectory?.laps && trajectory.laps.length > 0 && (
-          <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5">
+          <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
             <span className="hidden lg:flex items-center gap-1 text-[11px] text-lmu-muted">
               <Flag className="w-3 h-3 text-lmu-accent-text" />
               Lap:
@@ -95,7 +95,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               aria-label="Select Lap"
               value={trajectory.currentLap ?? 1}
               onChange={e => onSelectLap(parseInt(e.target.value, 10))}
-              className="bg-transparent text-xs text-white font-bold focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate py-0.5"
+              className="bg-transparent text-xs text-white font-bold outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate py-0.5"
             >
               {trajectory.laps.map(l => (
                 <option key={l.lapNumber} value={l.lapNumber} className="bg-lmu-bg text-white">

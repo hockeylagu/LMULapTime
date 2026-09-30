@@ -85,7 +85,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsInfoModalOpen(true)}
-                    className="p-1 rounded-md bg-lmu-raised/80 border border-lmu-rule/60 text-lmu-muted hover:text-lmu-accent-text hover:border-lmu-accent/40 hover:bg-lmu-raised transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-lmu-accent"
+                    className="p-1 rounded-md bg-lmu-raised/80 border border-lmu-rule/60 text-lmu-muted hover:text-lmu-accent-text hover:border-lmu-accent/40 hover:bg-lmu-raised transition-all shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
                     title={`View circuit info for ${trackName}`}
                     aria-label={`View circuit info for ${trackName}`}
                   >

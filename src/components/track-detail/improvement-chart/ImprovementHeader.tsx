@@ -38,7 +38,7 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
         <select
           value={activeTrack}
           onChange={(e) => setSelectedTrack(e.target.value)}
-          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-lmu-accent font-medium"
+          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text font-medium"
         >
           {tracks.map((t) => (
             <option key={t} value={t}>

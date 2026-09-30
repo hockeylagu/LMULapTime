@@ -161,7 +161,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
               value={playerNameInput}
               onChange={(e) => setPlayerNameInput(e.target.value)}
               placeholder="e.g. Bob"
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-sans focus:outline-none focus:border-lmu-accent"
+              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-sans focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
             />
           </div>
           <p className="text-[11px] text-lmu-muted mt-1">
@@ -179,7 +179,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
               type="text"
               value={resultsDirInput}
               onChange={(e) => setResultsDirInput(e.target.value)}
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-lmu-accent"
+              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
             />
           </div>
         </div>
@@ -194,7 +194,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
               type="text"
               value={replaysDirInput}
               onChange={(e) => setReplaysDirInput(e.target.value)}
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-lmu-accent"
+              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
             />
           </div>
         </div>
@@ -213,7 +213,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
               value={telemetryDirInput}
               onChange={(e) => setTelemetryDirInput(e.target.value)}
               placeholder="C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry"
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-lmu-accent"
+              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
             />
           </div>
         </div>

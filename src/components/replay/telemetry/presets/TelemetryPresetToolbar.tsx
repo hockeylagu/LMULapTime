@@ -42,7 +42,7 @@ export const TelemetryPresetToolbar: React.FC<TelemetryPresetToolbarProps> = ({
               if (e.key === 'Escape') onCancelRename();
             }}
             autoFocus
-            className="bg-black/60 border border-lmu-info-strong rounded px-2.5 py-1 text-xs text-white font-bold font-mono focus:outline-none w-full max-w-xs"
+            className="bg-black/60 border border-lmu-info-strong rounded px-2.5 py-1 text-xs text-white font-bold font-mono focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text w-full max-w-xs"
           />
           <button
             type="button"
