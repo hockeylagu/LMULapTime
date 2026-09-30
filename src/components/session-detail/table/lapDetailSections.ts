@@ -1,6 +1,7 @@
 import type { LapData } from '../../../../shared/types/index.js';
 import { describeLapTraffic, describeNonRepresentative, type LapPlaces } from '../../../utils/lapTrafficText.js';
 import { describePitStopLap, type LapPitStop } from './pitStopText.js';
+import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 /** What the rest of the driver's race adds to a lap: the places it won or lost, the stop it is part of. */
 export interface LapDetailContext {
@@ -16,8 +17,8 @@ export interface LapDetailSection {
 /** How a lap with conditions is judged (shared/domain/lapConditions.ts). */
 export const CONDITIONS_NOTE = 'judged against your other laps in the same conditions';
 
-/** Rain as the replay records it (0-25). */
-export const describeRain = (rain: number): string => `Rain ${rain}/25`;
+/** Rain as the replay records it (raw 0-255), as a share of full rain. */
+export const describeRain = (rain: number): string => `Rain ${formatRain(rain)}`;
 
 /** "Track limits review (No Further Action)" as "Review (No Further Action)", under a Track limits heading. */
 export function withoutTrackLimitsPrefix(description: string): string {

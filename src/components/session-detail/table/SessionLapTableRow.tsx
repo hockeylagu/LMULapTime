@@ -190,10 +190,11 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
         {theoGapLap !== null ? `+${theoGapLap.toFixed(3)}s` : <span className="text-lmu-faint">--</span>}
       </td>
       <td className="px-3 py-2.5 font-sans">
-        {isRacing && l.paceCategory ? (
+        {isRacing && (l.conditions || l.paceCategory) ? (
           <PaceBadge
             category={l.paceCategory}
             percentage={l.pacePercentage}
+            wet={Boolean(l.conditions)}
             showPercentage={true}
             size="sm"
           />

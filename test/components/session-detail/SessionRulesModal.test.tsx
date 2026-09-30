@@ -46,7 +46,7 @@ describe('SessionRulesModal', () => {
       />
     );
     expect(screen.getByText('Wet Track')).toBeInTheDocument();
-    expect(screen.getByText(/max rain 12\/25/)).toBeInTheDocument();
+    expect(screen.getByText(/max rain 5%/)).toBeInTheDocument();
     expect(screen.getByText('18.4°C')).toBeInTheDocument();
     expect(screen.getByText('22.7°C')).toBeInTheDocument();
   });

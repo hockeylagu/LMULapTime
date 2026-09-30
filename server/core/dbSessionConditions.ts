@@ -2,7 +2,16 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession } from './types.js';
 import { getReplayConditions } from './replay/dbReplayLapStore.js';
 import { classifySessionLaps } from '../sessions/sessionLapClassification.js';
-import type { RainOverLap } from '../../shared/domain/lapConditions.js';
+import { replayWeatherCondition, type RainOverLap } from '../../shared/domain/lapConditions.js';
+import type { ReplayConditionFact } from '../replay/decode/replayFacts.js';
+
+/** The rainy spans of a replay's stored conditions; undefined when it has none stored yet. */
+function storedRainSpans(db: DatabaseType, replayName: string | undefined): ReplayConditionFact[] | undefined {
+  if (!replayName) return undefined;
+  const spans = getReplayConditions(db, replayName).filter(c => (c.rain ?? 0) > 0);
+  const hasConditions = spans.length > 0 || db.prepare('SELECT 1 FROM replay_conditions WHERE filename = ? LIMIT 1').get(replayName);
+  return hasConditions ? spans : undefined;
+}
 
 /**
  * Peak rain of a replay over a stretch of session time, from its stored conditions; undefined when
@@ -10,10 +19,8 @@ import type { RainOverLap } from '../../shared/domain/lapConditions.js';
  * (the XML's et) and replay times share one clock: a replay lap starts 0-0.23 s after its et.
  */
 export function replayRainOverLap(db: DatabaseType, replayName: string | undefined): RainOverLap | undefined {
-  if (!replayName) return undefined;
-  const spans = getReplayConditions(db, replayName).filter(c => (c.rain ?? 0) > 0);
-  const hasConditions = spans.length > 0 || db.prepare('SELECT 1 FROM replay_conditions WHERE filename = ? LIMIT 1').get(replayName);
-  if (!hasConditions) return undefined;
+  const spans = storedRainSpans(db, replayName);
+  if (!spans) return undefined;
   return (startSec, endSec) => {
     let peak = 0;
     for (const span of spans) {
@@ -25,11 +32,27 @@ export function replayRainOverLap(db: DatabaseType, replayName: string | undefin
 }
 
 /**
+ * The session's weather from every stored condition of its replay. The link's own figures come from
+ * the replay header scan, which samples 30 windows of the stream and can miss the peak rain.
+ */
+function applyStoredReplayWeather(db: DatabaseType, session: DetailedSession): void {
+  const link = session.matchingReplayFile;
+  const spans = storedRainSpans(db, link?.name);
+  if (!link || !spans) return;
+  const peak = spans.reduce((max, span) => Math.max(max, span.rain ?? 0), 0);
+  link.hasRain = peak > 0;
+  link.weatherCondition = replayWeatherCondition(peak);
+  if (peak > 0) link.maxRainIntensity = peak;
+  else delete link.maxRainIntensity;
+}
+
+/**
  * Classifies a session's laps with its linked replay's rain (sessionLapClassification.ts). The
  * player's copy (playerDriver) is stored apart from `drivers`, so it is replaced by the classified one.
  */
 export function classifySessionConditions(db: DatabaseType, session: DetailedSession): void {
   classifySessionLaps(session.drivers ?? [], replayRainOverLap(db, session.matchingReplayFile?.name));
+  applyStoredReplayWeather(db, session);
   if (session.playerDriver) {
     const player = session.drivers?.find(d => d.name === session.playerDriver?.name);
     if (player) session.playerDriver = player;

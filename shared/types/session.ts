@@ -20,7 +20,7 @@ export type NonRepresentativeReason = 'contact' | 'traffic' | 'offPace';
  */
 export interface LapConditions {
   wetTyres?: boolean; // On wet tyres (the XML compound)
-  rain?: number; // Peak rain during the lap from the linked replay (raw, 0-25); only from RAIN_WET_MIN
+  rain?: number; // Peak rain during the lap from the linked replay (raw, 0-255); only from RAIN_WET_MIN
 }
 
 export interface LapIncident {
@@ -132,8 +132,9 @@ export interface DriverData {
   bestS3: number | null;
   theoreticalBest: number | null;
   theoreticalBestString: string;
-  bestLapPaceCategory?: PaceCategory | null;
+  bestLapPaceCategory?: PaceCategory | null; // The best lap against the dry benchmark; absent when it was wet
   bestLapPacePercentage?: number | null;
+  bestLapWet?: boolean; // The best lap was run in the wet (it carries conditions), so it is not rated against the dry benchmark
   avgLapTime?: number | null;
   avgLapTimeString?: string;
   avgFuelPerLap?: number | null; // Avg fuel consumed per clean lap (%)
@@ -283,6 +284,7 @@ export interface TrackSummary {
   bestLapDriver: string;
   bestLapCar: string;
   bestLapClass?: string;
+  bestLapWet?: boolean; // The track best was run in the wet: no rating against the dry benchmark
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;

@@ -30,6 +30,7 @@ export interface SessionMeta {
     theoreticalBest?: number | null;
     bestLapPaceCategory?: PaceCategory | null;
     bestLapPacePercentage?: number | null;
+    bestLapWet?: boolean;
     avgLapTime?: number | null;
     avgLapTimeString?: string;
     position?: number;
@@ -43,6 +44,11 @@ export function getPaceCategoryForLap(lapTime: number | null, benchmark: Referen
   const percentage = (lapTime / alienSec) * 100;
   const category = getPaceCategoryFromPercentage(percentage);
   return { category, percentage };
+}
+
+/** A session's best lap against the benchmark. A wet best lap has no rating: the targets are dry laps. */
+export function getSessionBestLapPace(driver: SessionMeta['playerDriver'], benchmark: ReferenceLaptimeEntry | null) {
+  return driver?.bestLapWet ? null : getPaceCategoryForLap(driver?.bestLapTime || null, benchmark);
 }
 
 export function buildTrackProgression(
@@ -75,6 +81,7 @@ export function buildTrackProgression(
           carClass: p?.carClass || 'General',
           driverName: p?.name || 'Driver',
           bestLapTime: p?.bestLapTime || null,
+          bestLapWet: p?.bestLapWet,
           bestS1: p?.bestS1 || null,
           bestS2: p?.bestS2 || null,
           bestS3: p?.bestS3 || null,

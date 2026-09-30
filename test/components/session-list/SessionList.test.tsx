@@ -243,4 +243,17 @@ describe('SessionList component', () => {
     expect(customGetPaceBadge).toHaveBeenCalled();
     expect(screen.getAllByText('Good').length).toBeGreaterThan(0);
   });
+
+  it('shows a wet best lap as Wet instead of a rating against the dry benchmark', () => {
+    const wet: SessionListItem = {
+      ...mockSessions[0],
+      id: 'sess-wet',
+      playerDriver: { ...mockSessions[0].playerDriver!, bestLapPaceCategory: undefined, bestLapPacePercentage: undefined, bestLapWet: true },
+    };
+
+    render(<SessionList sessions={[wet]} onSelectSession={vi.fn()} viewMode="table" />);
+
+    expect(screen.getByText('Wet').closest('[title]')?.getAttribute('title')).toBe('Run in the wet: not rated, the benchmark targets are dry laps');
+    expect(screen.queryByText('Alien')).not.toBeInTheDocument();
+  });
 });

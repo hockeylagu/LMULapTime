@@ -44,6 +44,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       return getPaceBadge(s);
     }
     const p = s.playerDriver;
+    if (p?.bestLapWet) return { wet: true };
     if (p?.bestLapPaceCategory) {
       return {
         category: p.bestLapPaceCategory,

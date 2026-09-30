@@ -154,11 +154,11 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                 </div>
               )}
 
-              {latestOuting.paceCategory && latestOuting.pacePercentage && (
+              {(latestOuting.bestLapWet || (latestOuting.paceCategory && latestOuting.pacePercentage)) && (
                 <div className="flex flex-col">
                   <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Benchmark Pace</span>
                   <div className="h-7 flex items-center mt-0.5">
-                    <PaceBadge category={latestOuting.paceCategory} percentage={latestOuting.pacePercentage} showPercentage />
+                    <PaceBadge category={latestOuting.paceCategory} percentage={latestOuting.pacePercentage} wet={latestOuting.bestLapWet} showPercentage />
                   </div>
                 </div>
               )}

@@ -26,6 +26,7 @@ export interface TrackSessionSummary {
     bestS1: number | null;
     bestS2: number | null;
     bestS3: number | null;
+    bestLapWet?: boolean;
     lapsCount?: number;
     isPlayer?: boolean;
   } | null;
@@ -133,6 +134,7 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
         summary.bestLapDriver = p.name;
         summary.bestLapCar = p.carType;
         summary.bestLapClass = p.carClass || '';
+        summary.bestLapWet = 'bestLapWet' in p && p.bestLapWet ? true : undefined;
       }
       summary.bestS1 = minValidTime(summary.bestS1, p.bestS1);
       summary.bestS2 = minValidTime(summary.bestS2, p.bestS2);

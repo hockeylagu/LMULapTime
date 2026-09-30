@@ -1,11 +1,22 @@
 import type { LapConditions } from '../types/index.js';
 
 /**
- * Peak rain (raw replay value, 0-25) from which a lap counts as run in the rain. Measured over 929
+ * Peak rain (raw replay value, 0-255: the engine's `raining` × 255) from which a lap counts as run in the rain. Measured over 929
  * sessions (2026-09-28): against the same driver's dry-tyre median, laps with rain 1-12 are no
  * slower (0.995-0.999), 13-16 are 2.4% slower and 17+ 9.2% slower.
  */
 export const RAIN_WET_MIN = 13;
+
+/** The weather of a replay from its peak rain (raw 0-255), as the replay list and sessions show it. */
+export function replayWeatherCondition(maxRain: number): 'Dry' | 'Wet' | 'Dynamic Weather' {
+  return maxRain > 16 ? 'Wet' : maxRain > 0 ? 'Dynamic Weather' : 'Dry';
+}
+
+/** Raw replay rain (0-255) as the share of full rain it is, e.g. 40 → "16%"; any rain shows at least "<1%". */
+export function formatRain(raw: number): string {
+  const percent = Math.round((raw / 255) * 100);
+  return percent < 1 ? '<1%' : `${percent}%`;
+}
 
 /** Dry is the default; a lap with conditions is wet. */
 export type LapConditionGroup = 'dry' | 'wet';

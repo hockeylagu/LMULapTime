@@ -1,5 +1,6 @@
 import React from 'react';
 import { PaceCategory } from '../../../shared/types/index.js';
+import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionListItem {
   id: string;
@@ -27,6 +28,7 @@ export interface SessionListItem {
     bestLapTimeString: string;
     bestLapPaceCategory?: PaceCategory | null;
     bestLapPacePercentage?: number | null;
+    bestLapWet?: boolean;
     position?: number;
     gridPosition?: number | null;
     positionGain?: number | null;
@@ -39,7 +41,7 @@ export interface SessionListProps {
   onSelectSession: (sessionId: string) => void;
   onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
-  getPaceBadge?: (session: SessionListItem) => { category: PaceCategory; percentage?: number | null } | null;
+  getPaceBadge?: (session: SessionListItem) => PaceBadgeValue | null;
   emptyMessage?: string;
   onResetFilters?: () => void;
   hideEmptyNotice?: React.ReactNode;
