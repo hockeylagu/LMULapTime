@@ -185,7 +185,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
               {sortHeader('lapTime', 'Lap Time', 'w-28 px-3 text-right')}
               {sortHeader('delta', 'Δ vs best', 'w-32 px-3 text-right', `Gap to the selected driver's session best (${formatTime(bestLap)})`)}
               {sortHeader('optimalDelta', 'Δ vs optimal', 'w-32 px-3 text-right', `Gap to the best three sectors combined (${formatTime(theoBest)})`)}
-              <th scope="col" className="w-44 px-3 py-2.5">Pace</th>
+              <th scope="col" className="w-44 px-3 py-2.5">Benchmark Pace</th>
               {sortHeader('s1', 'Sector 1', 'w-32 px-3 text-right')}
               {sortHeader('s2', 'Sector 2', 'w-32 px-3 text-right')}
               {sortHeader('s3', 'Sector 3', 'w-32 px-3 text-right')}

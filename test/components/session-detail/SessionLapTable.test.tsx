@@ -50,6 +50,7 @@ describe('SessionLapTable optimal delta', () => {
     expect(within(bestRow).getByText('Session best')).toBeInTheDocument();
     expect(within(bestRow).getByText('+1.000s')).toBeInTheDocument();
     expect(within(bestRow).getAllByRole('cell')).toHaveLength(14);
+    expect(screen.getByRole('columnheader', { name: 'Benchmark Pace' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle('Sort by Δ vs optimal'));
     expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
