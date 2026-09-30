@@ -41,9 +41,9 @@ describe('BenchmarkLapsSummaryCard', () => {
       />
     );
 
-    // The best lap leads in white, with its category named in the category color
-    expect(screen.getByText('100.5%')).toHaveClass('text-white');
-    expect(screen.getByText('Alien')).toHaveClass('text-lmu-purple');
+    // The best percentage carries the pace color; its category label stays neutral.
+    expect(screen.getByText('100.5%')).toHaveClass('text-lmu-purple');
+    expect(screen.getByText('Alien')).toHaveClass('text-lmu-text-soft');
     expect(screen.getByText('Porsche 963 · 1:30.500')).toBeInTheDocument();
     // The runners-up keep their category as a colored dot
     expect(screen.getByTitle('Competitive').className).toContain('text-lmu-warn');

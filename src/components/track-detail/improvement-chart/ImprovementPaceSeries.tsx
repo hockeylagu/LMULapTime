@@ -21,7 +21,7 @@ const PersonalBestDot: React.FC<PersonalBestDotProps> = ({ cx, cy, payload }) =>
   <circle
     cx={cx}
     cy={cy}
-    r={5}
+    r={2}
     fill={payload?.personalBestBenchmarkCategory ? PACE_CHART_COLORS[payload.personalBestBenchmarkCategory] : PACE_CHART_COLORS.Offline}
     fillOpacity={payload?.personalBestImproved ? 1 : 0.25}
   />
@@ -32,7 +32,7 @@ const PersonalBestActiveDot: React.FC<PersonalBestDotProps> = ({ cx, cy, payload
     ? PACE_CHART_COLORS[payload.personalBestBenchmarkCategory]
     : PACE_CHART_COLORS.Offline;
 
-  return <circle cx={cx} cy={cy} r={8} fill={color} stroke={color} strokeWidth={2} />;
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke={color} strokeWidth={2} />;
 };
 
 export const ImprovementPaceSeries: React.FC<ImprovementPaceSeriesProps> = ({
@@ -44,47 +44,47 @@ export const ImprovementPaceSeries: React.FC<ImprovementPaceSeriesProps> = ({
   if (metric === 'bestLap') {
     return (
       <>
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="bestLap"
           name="Best Lap Time"
           stroke={LMU_COLORS.accent}
-          strokeWidth={3}
-          dot={{ r: 5, fill: LMU_COLORS.accent, cursor: onSelectSession ? 'pointer' : 'default' }}
-          activeDot={{ r: 8, cursor: onSelectSession ? 'pointer' : 'default' }}
+          strokeWidth={2}
+          dot={{ r: 2, fill: LMU_COLORS.accent, cursor: onSelectSession ? 'pointer' : 'default' }}
+          activeDot={{ r: 4, cursor: onSelectSession ? 'pointer' : 'default' }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['bestLap'])}
         />
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="top3Avg"
           name="Top 3 Lap Avg (True Pace)"
           stroke={LMU_COLORS.blue}
-          strokeWidth={2.5}
-          dot={{ r: 4, fill: LMU_COLORS.blue, cursor: onSelectSession ? 'pointer' : 'default' }}
-          activeDot={{ r: 7 }}
+          strokeWidth={2}
+          dot={{ r: 2, fill: LMU_COLORS.blue, cursor: onSelectSession ? 'pointer' : 'default' }}
+          activeDot={{ r: 4 }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['top3Avg'])}
         />
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="movingAvg"
           name="3-Session Moving Avg"
           stroke={LMU_COLORS.gold}
           strokeWidth={2}
           strokeDasharray="6 4"
-          dot={{ r: 3.5, fill: LMU_COLORS.gold }}
+          dot={{ r: 2, fill: LMU_COLORS.gold }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['movingAvg'])}
         />
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="avgLap"
           name="Session Avg Lap"
           stroke={LMU_COLORS.cyan}
           strokeWidth={1.5}
           strokeDasharray="3 3"
-          dot={{ r: 3, fill: LMU_COLORS.cyan }}
+          dot={{ r: 2, fill: LMU_COLORS.cyan }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['avgLap'])}
         />
@@ -109,12 +109,12 @@ export const ImprovementPaceSeries: React.FC<ImprovementPaceSeriesProps> = ({
             ))}
           </linearGradient>
         </defs>
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="bestPr"
           name="Personal Best Over Time"
           stroke="url(#personalBestBenchmarkGradient)"
-          strokeWidth={3}
+          strokeWidth={2}
           dot={<PersonalBestDot />}
           activeDot={<PersonalBestActiveDot />}
           connectNulls={true}
@@ -126,14 +126,14 @@ export const ImprovementPaceSeries: React.FC<ImprovementPaceSeriesProps> = ({
 
   if (metric === 'consistency') {
     return (
-      <Line
+      <Line isAnimationActive={false}
         type="monotone"
         dataKey="consistencyScore"
         name="Pace Consistency Rating (%)"
         stroke={LMU_COLORS.green}
-        strokeWidth={3}
-        dot={{ r: 5, fill: LMU_COLORS.green, cursor: onSelectSession ? 'pointer' : 'default' }}
-        activeDot={{ r: 8 }}
+        strokeWidth={2}
+        dot={{ r: 2, fill: LMU_COLORS.green, cursor: onSelectSession ? 'pointer' : 'default' }}
+        activeDot={{ r: 4 }}
         connectNulls={true}
         hide={Boolean(hiddenSeries['consistencyScore'])}
       />
@@ -143,36 +143,36 @@ export const ImprovementPaceSeries: React.FC<ImprovementPaceSeriesProps> = ({
   if (metric === 'sectors') {
     return (
       <>
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="s1"
           name="Sector 1"
           stroke={LMU_COLORS.gold}
-          strokeWidth={2.5}
-          dot={{ r: 4, fill: LMU_COLORS.gold }}
-          activeDot={{ r: 7 }}
+          strokeWidth={2}
+          dot={{ r: 2, fill: LMU_COLORS.gold }}
+          activeDot={{ r: 4 }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['s1'])}
         />
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="s2"
           name="Sector 2"
           stroke={LMU_COLORS.blue}
-          strokeWidth={2.5}
-          dot={{ r: 4, fill: LMU_COLORS.blue }}
-          activeDot={{ r: 7 }}
+          strokeWidth={2}
+          dot={{ r: 2, fill: LMU_COLORS.blue }}
+          activeDot={{ r: 4 }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['s2'])}
         />
-        <Line
+        <Line isAnimationActive={false}
           type="monotone"
           dataKey="s3"
           name="Sector 3"
           stroke={LMU_COLORS.green}
-          strokeWidth={2.5}
-          dot={{ r: 4, fill: LMU_COLORS.green }}
-          activeDot={{ r: 7 }}
+          strokeWidth={2}
+          dot={{ r: 2, fill: LMU_COLORS.green }}
+          activeDot={{ r: 4 }}
           connectNulls={true}
           hide={Boolean(hiddenSeries['s3'])}
         />

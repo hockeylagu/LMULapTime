@@ -131,7 +131,49 @@ describe('useTrackDetailState', () => {
     });
 
     expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe('Network error');
     consoleErrorSpy.mockRestore();
+  });
+
+  it('clears the previous track on failure and retries the current route without losing filters', async () => {
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => mockTrackData } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: 'Track cache is unavailable' }) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockTrackData, trackName: 'Spa' }) } as Response);
+    const { result, rerender } = renderHook(({ track }) => useTrackDetailState(track, 'Hypercar'), {
+      wrapper: Wrapper, initialProps: { track: 'Monza' },
+    });
+    await waitFor(() => expect(result.current.data?.trackName).toBe('Autodromo Nazionale Monza'));
+    act(() => result.current.setSearchQuery('Ferrari'));
+    rerender({ track: 'Spa' });
+    expect(result.current.data).toBeNull();
+    await waitFor(() => expect(result.current.error).toBe('Track cache is unavailable'));
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.data?.trackName).toBe('Spa'));
+    expect(result.current.error).toBeNull();
+    expect(result.current.searchQuery).toBe('Ferrari');
+  });
+
+  it('ignores late responses after the route changes', async () => {
+    let resolveOld: (value: Response) => void = () => {};
+    vi.spyOn(global, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { resolveOld = resolve; }))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockTrackData, trackName: 'Spa' }) } as Response);
+    const { result, rerender } = renderHook(({ track }) => useTrackDetailState(track, 'Hypercar'), {
+      wrapper: Wrapper, initialProps: { track: 'Monza' },
+    });
+    rerender({ track: 'Spa' });
+    await waitFor(() => expect(result.current.data?.trackName).toBe('Spa'));
+    await act(async () => resolveOld({ ok: true, json: async () => mockTrackData } as Response));
+    expect(result.current.data?.trackName).toBe('Spa');
+  });
+
+  it('falls back to date ordering for invalid route sort values', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: true, json: async () => mockTrackData } as Response);
+    const { result } = renderHook(() => useTrackDetailState('Monza', 'All'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => updateQuery(new URLSearchParams('sort=garbage')));
+    expect(result.current.sortBy).toBe('date-desc');
   });
 
   it('synchronizes filter state when the route query changes externally', async () => {

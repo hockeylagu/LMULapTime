@@ -92,23 +92,23 @@ export const RankedList: React.FC<{ items: RankedItem[]; expanded: boolean; empt
         className={`rounded-lg -mx-1.5 px-1.5 py-1 ${leader.onSelect ? 'cursor-pointer hover:bg-lmu-cardHover transition-colors' : ''}`}
       >
         <div className="flex items-baseline gap-1.5 h-8 font-mono">
-          <span className={LEADER_VALUE}>{leader.value}</span>
+          <span className={leader.marker ? LEADER_VALUE.replace('text-white', leader.marker.className) : LEADER_VALUE}>{leader.value}</span>
           {leader.unit && <span className="text-xs text-lmu-muted">{leader.unit}</span>}
           {leader.marker && (
-            <span className={`text-xs font-sans font-semibold ${leader.marker.className}`}>{leader.marker.label}</span>
+            <span className="text-xs font-sans font-semibold text-lmu-text-soft">{leader.marker.label}</span>
           )}
         </div>
         <div className="text-sm leading-5 font-semibold text-white truncate" title={leader.name}>{leader.name}</div>
         <div className="text-[11px] leading-4 text-lmu-muted truncate">{leader.detail ?? ' '}</div>
       </div>
       {rest.length > 0 && (
-        <div className={`border-t border-lmu-border/60 pt-1.5 space-y-0.5 ${expanded ? 'max-h-48 overflow-y-auto custom-scrollbar pr-0.5' : ''}`}>
+        <div className={`border-t border-lmu-border/60 pt-1.5 space-y-0.5 ${expanded ? 'max-h-48 overflow-y-auto overflow-x-hidden custom-scrollbar pr-0.5' : ''}`}>
           {rest.map((item, i) => (
             <div
               key={item.key}
               onClick={item.onSelect}
               title={item.title}
-              className={`flex items-center justify-between gap-2 text-xs rounded-md -mx-1.5 px-1.5 py-1 ${
+              className={`flex items-center justify-between gap-2 text-xs rounded-md px-1.5 py-1 ${expanded ? '' : '-mx-1.5'} ${
                 item.onSelect ? 'cursor-pointer hover:bg-lmu-cardHover transition-colors' : ''
               }`}
             >

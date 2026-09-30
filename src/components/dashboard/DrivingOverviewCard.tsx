@@ -103,7 +103,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
           </Row>
         ) : null}
         {showMore && (
-          <div className="max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
+          <div className="max-h-48 overflow-y-auto overflow-x-hidden custom-scrollbar pr-0.5">
             <Row label="Clean flying laps" title={`${(cleanLaps ?? 0).toLocaleString()} valid laps out of ${totalLaps.toLocaleString()} total laps`}>
               {(cleanLaps ?? 0).toLocaleString()} ({cleanLapsPercentage ?? 0}%)
             </Row>

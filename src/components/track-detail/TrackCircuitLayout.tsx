@@ -14,7 +14,7 @@ export interface TrackCircuitLayoutProps {
   layoutKey?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   className?: string;
-  size?: 'detail' | 'card' | 'session';
+  size?: 'detail' | 'card' | 'session' | 'header';
   onClick?: () => void;
 }
 
@@ -76,9 +76,10 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   const effectiveGeometry = propGeometry !== undefined ? propGeometry : fetchedGeometry;
 
   const sizeClasses =
-    size === 'card' ? 'h-[128px] w-[128px]'
+    size === 'header' ? 'relative min-h-[128px] w-[160px] self-stretch [&>svg]:absolute [&>svg]:inset-0'
+    : size === 'card' ? 'h-[128px] w-[128px]'
     : size === 'session' ? 'h-[76px] w-[100px]'
-    : 'h-[54px] w-[72px]';
+    : 'h-[128px] w-[128px]';
 
   const interactiveClasses = onClick
     ? 'cursor-pointer hover:opacity-80 transition-opacity'
