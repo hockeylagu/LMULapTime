@@ -133,22 +133,22 @@ Click to inspect trajectory and telemetry`}
       </div>
 
       {/* Session Title Card */}
-      <div className="bg-lmu-card border border-lmu-border p-5 rounded-2xl">
-        <div className="flex items-center justify-between gap-6">
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="session" />
+      <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl grid grid-cols-[160px_minmax(0,1fr)] items-stretch gap-6">
+        <TrackCircuitLayout trackName={session.trackVenue} trackCourse={session.trackCourse} size="header" />
+        <div className="min-w-0 space-y-4">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-lmu-muted">
                 <span
-                  className={`px-2 py-0.5 font-bold rounded border uppercase tracking-wider ${
+                  className={`px-2 py-0.5 font-bold rounded border uppercase tracking-wider shrink-0 ${
                     getSessionTypeStyle(session.sessionType, session.sessionName)?.chip ?? 'bg-lmu-raised text-lmu-text-soft border-lmu-rule'
                   }`}
                 >
                   {session.sessionName} ({session.sessionType})
                 </span>
-                <span className="font-mono">{session.timeString}</span>
-                {hasSettings && modeLabel && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft">{modeLabel}</span></>}
-                {durationLabel && <><span aria-hidden="true">·</span><span className="font-mono text-lmu-text-soft">{durationLabel}</span></>}
+                <span className="font-mono shrink-0">{session.timeString}</span>
+                {hasSettings && modeLabel && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft shrink-0">{modeLabel}</span></>}
+                {durationLabel && <><span aria-hidden="true">·</span><span className="font-mono text-lmu-text-soft shrink-0">{durationLabel}</span></>}
                 {hasConditions && session.matchingReplayFile && (
                   <><span aria-hidden="true">·</span><SessionConditions replay={session.matchingReplayFile} /></>
                 )}
@@ -157,52 +157,52 @@ Click to inspect trajectory and telemetry`}
                 <Link to={`/track/${encodeURIComponent(trackName)}${normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType) ? `?carClass=${encodeURIComponent(normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType))}` : ''}`}
                   className="inline-flex items-center gap-2 group max-w-full min-w-0 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
                   title={`View ${trackName} Track Details`}>
-                <span className="truncate">{trackName}</span>
-                <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <span className="truncate">{trackName}</span>
+                  <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
                 </Link>
               </h2>
               {subtitle && <p className="text-xs text-lmu-muted mt-0.5 truncate">{subtitle}</p>}
             </div>
+
+            {/* The rules of the session and whose laps the page shows, one row of 32px controls */}
+            <div className="flex items-center gap-2 shrink-0">
+              {(hasSettings || hasConditions) && (
+                <button
+                  type="button"
+                  onClick={() => setShowRulesModal(true)}
+                  className={JUMP_BUTTON}
+                  title="View Rules, Server Configuration & Conditions"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-lmu-muted shrink-0" aria-hidden="true" />
+                  Rules & Config
+                </button>
+              )}
+              <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors shrink-0">
+                <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider shrink-0">Driver</span>
+                <select
+                  value={selectedDriverName}
+                  onChange={(e) => setSelectedDriverName(e.target.value)}
+                  className="h-full bg-transparent pr-1 text-sm text-white font-semibold focus:outline-none cursor-pointer"
+                >
+                  {(session.drivers || []).map((d) => (
+                    <option key={d.name} value={d.name} className="bg-lmu-card text-white">
+                      {d.isPlayer ? '⭐ ' : ''}
+                      {d.name} ({d.carType})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
 
-          {/* The rules of the session and whose laps the page shows, one row of 32px controls */}
-          <div className="flex items-center gap-2 shrink-0">
-            {(hasSettings || hasConditions) && (
-              <button
-                type="button"
-                onClick={() => setShowRulesModal(true)}
-                className={JUMP_BUTTON}
-                title="View Rules, Server Configuration & Conditions"
-              >
-                <Sliders className="w-3.5 h-3.5 text-lmu-muted shrink-0" aria-hidden="true" />
-                Rules & Config
-              </button>
+          {/* The circuit's benchmark, under its name as on the track page; the best lap's band is marked */}
+          <div className="pt-3 border-t border-lmu-border/50">
+            {refEntry ? (
+              <BenchmarkLadder benchmark={refEntry} current={selectedDriver?.bestLapPaceCategory} />
+            ) : (
+              <p className="text-xs text-lmu-muted">No benchmark for this layout and class yet. Update the benchmarks in Settings.</p>
             )}
-            <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors">
-              <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider">Driver</span>
-              <select
-                value={selectedDriverName}
-                onChange={(e) => setSelectedDriverName(e.target.value)}
-                className="h-full bg-transparent pr-1 text-sm text-white font-semibold focus:outline-none cursor-pointer"
-              >
-                {(session.drivers || []).map((d) => (
-                  <option key={d.name} value={d.name} className="bg-lmu-card text-white">
-                    {d.isPlayer ? '⭐ ' : ''}
-                    {d.name} ({d.carType})
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
-        </div>
-
-        {/* The circuit's benchmark, under its name as on the track page; the best lap's band is marked */}
-        <div className="mt-4 pt-4 border-t border-lmu-border/60">
-          {refEntry ? (
-            <BenchmarkLadder benchmark={refEntry} current={selectedDriver?.bestLapPaceCategory} />
-          ) : (
-            <p className="text-xs text-lmu-muted">No benchmark for this layout and class yet. Update the benchmarks in Settings.</p>
-          )}
         </div>
       </div>
 
