@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HashRouter } from 'react-router';
 import App from '../src/App.js';
+import { prefetchRoutePages } from '../src/routePages.js';
 
 function mockApi() {
   global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -30,6 +31,9 @@ function mockApi() {
 }
 
 describe('HashRouter integration', () => {
+  // Pages load lazily; resolve their modules once so the first render of each is not a cold transform.
+  beforeAll(() => prefetchRoutePages(), 30000);
+
   let root: Root | null = null;
   let host: HTMLDivElement | null = null;
 

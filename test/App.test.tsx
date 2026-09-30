@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../src/App.js';
+import { prefetchRoutePages } from '../src/routePages.js';
 
 describe('App component', () => {
+  // Pages load lazily; resolve their modules once so the first render of each is not a cold transform.
+  beforeAll(() => prefetchRoutePages(), 30000);
+
   let startupScanStatus: Record<string, unknown>;
 
   const mockStatus = {
