@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T02:51:49.770Z",
+  "generatedAt": "2026-09-30T15:45:59.051Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -588,6 +588,14 @@
       "readout-large": {
         "displayName": "Readout Large",
         "purpose": "Headline values such as best lap."
+      },
+      "table-header": {
+        "displayName": "Table Header",
+        "purpose": "Column labels of every data table, including sort buttons; muted, uppercase, tracked."
+      },
+      "readout-small": {
+        "displayName": "Readout Small",
+        "purpose": "Mono figures in dense tables and chips."
       }
     },
     "shadows": [
@@ -642,9 +650,9 @@
       "name": "Nav Tab Group",
       "kind": "nav",
       "refersTo": "nav-tab-active",
-      "description": "Top-bar tab group; active tab solid Pit Lane Red.",
+      "description": "Center tab group in an inset lmu-bg well; the active tab is solid Pit Lane Red, inactive tabs lift to raised on hover.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-tab ds-nav-tab--active\" href=\"#\">Dashboard</a><a class=\"ds-nav-tab\" href=\"#\">Tracks</a><a class=\"ds-nav-tab\" href=\"#\">Leaderboard</a></nav>",
-      "css": ".ds-nav{display:inline-flex;gap:4px;padding:4px;background:#151A23;border:1px solid #232A36;border-radius:12px;font-family:'Segoe UI',system-ui,sans-serif}.ds-nav-tab{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#8D99AE;text-decoration:none;transition:background .15s,color .15s}.ds-nav-tab:hover{color:#fff;background:rgba(35,42,54,.5)}.ds-nav-tab:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-nav-tab--active,.ds-nav-tab--active:hover{background:#DC3441;color:#fff}"
+      "css": ".ds-nav{display:inline-flex;gap:4px;padding:4px;background:#0B0E14;border:1px solid #232A36;border-radius:12px;font-family:'Segoe UI',system-ui,sans-serif}.ds-nav-tab{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#8D99AE;text-decoration:none;transition:background .15s,color .15s}.ds-nav-tab:hover{color:#fff;background:oklch(27.9% 0.041 260.031 / .6)}.ds-nav-tab:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-nav-tab--active,.ds-nav-tab--active:hover{background:#DC3441;color:#fff}"
     },
     {
       "name": "Primary Button",
@@ -652,7 +660,15 @@
       "refersTo": "button-primary",
       "description": "Main action; uppercase tracked label on red.",
       "html": "<button class=\"ds-btn-primary\">Build debrief</button>",
-      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;border-radius:12px;background:#DC3441;color:#fff;font:700 12px 'Segoe UI',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:opacity .15s}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;border-radius:12px;background:#DC3441;color:#fff;font:700 12px 'Segoe UI',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:opacity .15s}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral 32px lmu-card button for header actions and jumps; the icon carries the only color when it has meaning.",
+      "html": "<button class=\"ds-btn-secondary\"><span class=\"ds-dot\"></span>Rules &amp; Config</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:8px;border:1px solid #232A36;background:#151A23;color:#8D99AE;font:600 12px 'Segoe UI',system-ui,sans-serif;cursor:pointer;transition:color .15s,border-color .15s,background .15s}.ds-btn-secondary:hover{color:#fff;border-color:oklch(37.2% 0.044 257.287);background:#1A202C}.ds-btn-secondary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-dot{width:6px;height:6px;border-radius:9999px;background:oklch(82.8% 0.189 84.429)}"
     },
     {
       "name": "Icon Button",
@@ -660,15 +676,15 @@
       "refersTo": "button-icon",
       "description": "Square icon action in an inset well.",
       "html": "<button class=\"ds-btn-icon\" aria-label=\"Refresh\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/></svg></button>",
-      "css": ".ds-btn-icon{display:inline-flex;align-items:center;justify-content:center;padding:6px;border-radius:8px;background:#0B0E14;border:1px solid #232A36;color:#8D99AE;cursor:pointer;transition:background .15s,color .15s}.ds-btn-icon:hover{background:#1A202C;color:#fff}.ds-btn-icon:focus-visible{outline:2px solid #DC3441;outline-offset:2px}"
+      "css": ".ds-btn-icon{display:inline-flex;align-items:center;justify-content:center;padding:6px;border-radius:8px;background:#0B0E14;border:1px solid #232A36;color:#8D99AE;cursor:pointer;transition:background .15s,color .15s}.ds-btn-icon:hover{background:#1A202C;color:#fff}.ds-btn-icon:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
     },
     {
       "name": "Segmented Pills",
       "kind": "chip",
       "refersTo": "segment-selected",
-      "description": "Signature filter control: monospace uppercase segments in an inset well.",
-      "html": "<div class=\"ds-seg\" role=\"group\"><button class=\"ds-seg-btn ds-seg-btn--on\">ALL</button><button class=\"ds-seg-btn\">Practice</button><button class=\"ds-seg-btn\">Qualifying</button><button class=\"ds-seg-btn\">Race</button></div>",
-      "css": ".ds-seg{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 6px;background:#0B0E14;border:1px solid #232A36;border-radius:12px}.ds-seg-btn{height:24px;padding:0 14px;border-radius:5px;border:1px solid #1D293D;background:transparent;color:#7F8BA1;font:700 12px Consolas,monospace;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:color .15s}.ds-seg-btn:hover{color:#fff;border-color:#314158}.ds-seg-btn:focus-visible{outline:2px solid #DC3441;outline-offset:2px}.ds-seg-btn--on,.ds-seg-btn--on:hover{background:#DC3441;border-color:#DC3441;color:#fff}"
+      "description": "Filter well: red marks a segment that narrows the list; a selected \"All\" and on/off toggles rest neutral (raised).",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button class=\"ds-seg-btn ds-seg-btn--rest\">ALL</button><button class=\"ds-seg-btn\">Practice</button><button class=\"ds-seg-btn\">Qualifying</button><button class=\"ds-seg-btn\">Race</button></div>",
+      "css": ".ds-seg{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 6px;background:#0B0E14;border:1px solid #232A36;border-radius:12px}.ds-seg-btn{height:24px;padding:0 14px;border-radius:5px;border:1px solid #1D293D;background:transparent;color:#7F8BA1;font:700 12px Consolas,monospace;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:color .15s}.ds-seg-btn:hover{color:#fff;border-color:#314158}.ds-seg-btn:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-seg-btn--on,.ds-seg-btn--on:hover{background:#DC3441;border-color:#DC3441;color:#fff}.ds-seg-btn--rest,.ds-seg-btn--rest:hover{background:oklch(27.9% 0.041 260.031);border-color:oklch(37.2% 0.044 257.287);color:#fff}"
     },
     {
       "name": "Status Pills",
@@ -690,48 +706,59 @@
       "name": "Text Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "Inset field; border shifts to red on focus.",
+      "description": "lmu-bg well, hairline, 12px radius; focus shifts the border to red and keyboard focus adds the 2px outline.",
       "html": "<input class=\"ds-input\" placeholder=\"Search sessions, tracks, cars\" />",
-      "css": ".ds-input{width:280px;padding:8px 12px;border-radius:8px;border:1px solid #232A36;background:#0B0E14;color:#fff;font:14px 'Segoe UI',system-ui,sans-serif;outline:none;transition:border-color .15s}.ds-input::placeholder{color:#8D99AE}.ds-input:focus{border-color:#DC3441}.ds-input:focus-visible{box-shadow:0 0 0 2px rgba(220,52,65,.35)}"
+      "css": ".ds-input{width:280px;padding:10px 16px;border-radius:12px;border:1px solid #232A36;background:#0B0E14;color:#fff;font:14px 'Segoe UI',system-ui,sans-serif;outline:none;transition:border-color .15s}.ds-input::placeholder{color:#8D99AE}.ds-input:focus{border-color:#DC3441}.ds-input:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
     },
     {
       "name": "Lap Best Readouts",
       "kind": "custom",
       "description": "Session best in Sky blue; personal best in gold takes precedence. Explicit labels retain the meaning without color.",
       "html": "<table class=\"ds-best-table\"><tbody><tr class=\"ds-best-session\"><td>7</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open session-best lap telemetry\">1:35.894</button></td><td>Session best</td></tr><tr class=\"ds-best-personal\"><td>8</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open personal-best lap telemetry\">1:35.620</button></td><td>Personal best</td></tr></tbody></table>",
-      "css": ".ds-best-table{width:100%;border-collapse:collapse;background:#151A23;font:700 12px Consolas,monospace}.ds-best-table td{padding:10px 12px;border-bottom:1px solid #232A36;white-space:nowrap}.ds-best-table td:nth-child(2){text-align:right}.ds-best-session{color:#75B9F5;background:oklch(65% 0.11 246.489047 / .1)}.ds-best-personal{color:#FFB703;background:rgb(255 183 3 / .08)}.ds-best-time{border:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer;border-radius:4px}.ds-best-time:hover{text-decoration:underline;text-underline-offset:3px}.ds-best-time:focus-visible{outline:2px solid #DC3441;outline-offset:2px}"
+      "css": ".ds-best-table{width:100%;border-collapse:collapse;background:#151A23;font:700 12px Consolas,monospace}.ds-best-table td{padding:10px 12px;border-bottom:1px solid #232A36;white-space:nowrap}.ds-best-table td:nth-child(2){text-align:right}.ds-best-session{color:#75B9F5;background:oklch(65% 0.11 246.489047 / .1)}.ds-best-personal{color:#FFB703;background:rgb(255 183 3 / .08)}.ds-best-time{border:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer;border-radius:4px}.ds-best-time:hover{text-decoration:underline;text-underline-offset:3px}.ds-best-time:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
     }
   ],
   "narrative": {
     "northStar": "The Engineer's Pit Wall",
-    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content.",
+    "overview": "The interface is the timing screen a race engineer reads after the run. It is dense, precise and quiet. Numbers carry the page, and color only speaks when something changed: a gain, a loss, a warning, the selected thing. The driver sits down after a session to find out where the time went, so every panel answers a question with a figure, and the traces stay one step away for anyone who wants to check the working.\n\nThe surface is near-black blue (`lmu-bg`), and content panels are raised by tone rather than by light. A single racing red marks the brand, the active tab and the current selection. Gold, emerald, amber, rose and sky are signal colors with fixed meanings (sectors, gain, warning, loss, data). Type is small and heavily weighted, with uppercase tracked labels over bold monospaced readouts, the way a timing monitor stacks a caption over a value.\n\nDepth is flat and tonal: solid panels on a solid page, with no glass, glow or gradient anywhere in the content. Nothing moves unless the user acts, work is running, or the data itself moves.",
     "keyCharacteristics": [
       "Dark only, near-black blue base; no light theme.",
       "Numbers first: lap times, deltas and units in bold monospace.",
       "Uppercase, tracked, 10px labels above values.",
       "One brand red for identity and selection; every other hue is a fixed-meaning signal.",
       "Flat tonal layering with hairline borders; no glow, no glass.",
-      "Dense desktop layout inside a 1500px column."
+      "Dense desktop layout inside a 1500px column.",
+      "Still at rest: motion reports state, never decorates."
     ],
     "rules": [
       {
-        "name": "The Signal Rule",
-        "body": "Every signal family means one fixed thing:",
-        "section": "colors"
+        "name": "The Still Wall Rule",
+        "body": "When the user is not acting and nothing is loading, nothing on screen moves except the data itself.",
+        "section": "motion"
       },
       {
-        "name": "The Meaning Before Calm Rule",
-        "body": "When removing color, keep every distinction a color draws: two states that had two colors keep two looks (the hero replay button stays amber for 100 Hz telemetry and green for a replay only). Only a color that separates nothing may go neutral.",
+        "name": "The Reduced Motion Rule",
+        "body": "Under `prefers-reduced-motion: reduce`, a global rule in `src/index.css` makes transitions and enter animations instant and stops loops. A spinner keeps turning, slower (2s), so running work still reads as running. JavaScript smooth scrolling checks the same media query.",
+        "section": "motion"
+      },
+      {
+        "name": "The Signal Rule",
+        "body": "Every signal family means one fixed thing: gain is time gained, loss is time lost, warn is a warning or an uncertain value, info is data, and gold, blue and teal are sectors 1, 2 and 3. Data families only separate categories. Never use a signal color decoratively, and never let two signals trade meanings between views. A scale label or legend is neutral text; the channel's color lives on its trace or swatch.",
         "section": "colors"
       },
       {
         "name": "The One Red Rule",
-        "body": "Pit Lane Red marks identity and the current selection. A screen shows it on the active tab, the selected control and at most a handful of alerts. It never fills a panel.",
+        "body": "Pit Lane Red marks identity and the current selection. A screen shows it on the active tab, the selected control, your own row and at most a handful of alerts. It never fills a panel. Identity is red, never gold or amber: gold belongs to P1 and personal bests, amber to the rival.",
+        "section": "colors"
+      },
+      {
+        "name": "The Meaning Before Calm Rule",
+        "body": "When removing color, keep every distinction a color draws: two states that had two colors keep two looks (the replay button stays amber for 100 Hz telemetry and green for a replay only). Only a color that separates nothing may go neutral. Headers, icons and names that separate nothing are neutral.",
         "section": "colors"
       },
       {
         "name": "The No Dimmed Text Rule",
-        "body": "Never dim text with `opacity-*` to show an off, unselected or secondary state; that is how the app ended up with 2:1 labels. Step down a text tier instead (`lmu-faint` for off), or fade a colored control through its family's `faded` step (the base hue at `oklch(62% 0.06 h)`, still 4.5:1 on `lmu-bg`), full color when selected or hovered.",
+        "body": "Never dim text with `opacity-*` to show an off, unselected or secondary state. Step down a text tier instead (`lmu-faint` for off), or fade a colored control through its family's `faded` step, full color when selected or hovered.",
         "section": "colors"
       },
       {
@@ -741,7 +768,7 @@
       },
       {
         "name": "The 10px Floor",
-        "body": "No text renders below 10px, and sizes stay on the ramp: 10, 11, 12 (`text-xs`), 13 for expanded event prose, 14 (`text-sm`) and up. Off-ramp sizes (`text-[9px]`, `text-[10.5px]`, `text-[13.5px]`) are drift. SVG labels follow the same floor at their rendered scale (the friction circle's 128-unit viewBox draws at 116px, so its labels are 11 units). Where 10px does not fit, restructure the element instead of shrinking the text.",
+        "body": "No text renders below 10px, and sizes stay on the ramp: 10, 11, 12 (`text-xs`), 13 for expanded event prose, 14 (`text-sm`) and up. Off-ramp sizes (`text-[9px]`, `text-[10.5px]`, `text-[13.5px]`) are drift. SVG labels follow the same floor at their rendered scale (the friction circle's 128-unit viewBox draws at 116px, so its labels are 11 units). Where 10px does not fit, restructure the element instead of shrinking the text. Modal labels and explanatory text use at least 11px.",
         "section": "typography"
       },
       {
@@ -755,39 +782,39 @@
         "section": "layout"
       },
       {
+        "name": "The One Anchor Rule",
+        "body": "A circuit's page anchors on its outline and benchmark ladder in the header; summaries below are unboxed figures on shared columns, not another grid of tiles.",
+        "section": "layout"
+      },
+      {
         "name": "The Flat Wall Rule",
-        "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light.",
+        "body": "Content panels are solid, opaque and shadowless. Blur is allowed on the sticky navbar and on overlays (modal scrims, tooltips, popovers, map overlays) only, never over data. No glow halos, no gradient panels, no decorative light, no inset tiles behind outlines.",
         "section": "elevation"
-      },
-      {
-        "name": "The Still Wall Rule",
-        "body": "When the user is not acting and nothing is loading, nothing on screen moves except the data itself.",
-        "section": "motion"
-      },
-      {
-        "name": "The Reduced Motion Rule",
-        "body": "Under `prefers-reduced-motion: reduce`, a global rule in `src/index.css` makes transitions and enter animations instant and stops loops. A spinner keeps turning, slower, so running work still reads as running. JavaScript smooth scrolling checks the same media query.",
-        "section": "motion"
       }
     ],
     "dos": [
-      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).",
-      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
-      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
-      "**Do** separate surfaces by tone and a `lmu-border` hairline.",
-      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.",
-      "**Do** give every interactive control a visible `focus-visible` ring.",
-      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values."
+      "Do set every comparable number in `font-mono` with its unit (The Readout Rule).",
+      "Do use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
+      "Do take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
+      "Do separate surfaces by tone and a `lmu-border` hairline.",
+      "Do put a 10px uppercase tracked label above a bold readout for key figures.",
+      "Do give every interactive control a visible `focus-visible` outline (2px, `lmu-accent-text`).",
+      "Do mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.",
+      "Do show the server's error message with a way to try again, in the place that failed.",
+      "Do reuse the canonical pieces (`LapStatusBadge`, `PaceBadge`, `BenchmarkLadder`, `ReplayLaunchButton`, the segmented pills) instead of re-deriving them."
     ],
     "donts": [
-      "**Don't** render any text below 10px.",
-      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
-      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand and selection.",
-      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
-      "**Don't** dim text with `opacity-*`; step down a text tier or desaturate.",
-      "**Don't** add a light theme.",
-      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
-      "**Don't** loop an animation that is not waiting on work (no pulse or ping on chrome, badges or map markers), and don't scale, rotate or lift on hover (The Still Wall Rule)."
+      "Don't render any text below 10px.",
+      "Don't add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
+      "Don't use Pit Lane Red as a panel fill or a decorative accent; it marks brand, identity and selection.",
+      "Don't mark your own row or name in gold or amber; gold is P1 and personal bests, amber is the rival.",
+      "Don't use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
+      "Don't dim text with `opacity-*`; step down a text tier or use the `faded` step.",
+      "Don't box every figure in its own tile, or add a second grid of benchmark targets beside the ladder.",
+      "Don't add a light theme.",
+      "Don't add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
+      "Don't use emoji in the UI; stored tags that carry them are stripped where shown.",
+      "Don't loop an animation that is not waiting on work, and don't scale, rotate or lift on hover (The Still Wall Rule)."
     ]
   }
 }
