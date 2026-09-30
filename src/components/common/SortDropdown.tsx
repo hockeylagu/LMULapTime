@@ -4,6 +4,7 @@ import { ArrowUpDown } from 'lucide-react';
 export interface SortOption<T extends string = string> {
   value: T;
   label: string;
+  disabled?: boolean;
 }
 
 export interface SortDropdownProps<T extends string = string> {
@@ -29,10 +30,10 @@ export function SortDropdown<T extends string = string>({
         aria-label={label || 'Sort'}
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+        className="bg-transparent text-white font-semibold focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-4 cursor-pointer"
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-lmu-card text-white">
+          <option key={opt.value} value={opt.value} disabled={opt.disabled} className="bg-lmu-card text-white">
             {opt.label}
           </option>
         ))}

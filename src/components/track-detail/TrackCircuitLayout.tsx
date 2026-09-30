@@ -76,7 +76,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   const effectiveGeometry = propGeometry !== undefined ? propGeometry : fetchedGeometry;
 
   const sizeClasses =
-    size === 'card' ? 'h-[46px] w-[62px]'
+    size === 'card' ? 'h-[128px] w-[128px]'
     : size === 'session' ? 'h-[76px] w-[100px]'
     : 'h-[54px] w-[72px]';
 
