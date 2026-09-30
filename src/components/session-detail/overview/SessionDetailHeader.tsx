@@ -177,12 +177,12 @@ Click to inspect trajectory and telemetry`}
                   Rules & Config
                 </button>
               )}
-              <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors shrink-0">
+              <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
                 <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider shrink-0">Driver</span>
                 <select
                   value={selectedDriverName}
                   onChange={(e) => setSelectedDriverName(e.target.value)}
-                  className="h-full bg-transparent pr-1 text-sm text-white font-semibold focus:outline-none cursor-pointer"
+                  className="h-full bg-transparent pr-1 text-sm text-white font-semibold outline-none cursor-pointer"
                 >
                   {(session.drivers || []).map((d) => (
                     <option key={d.name} value={d.name} className="bg-lmu-card text-white">

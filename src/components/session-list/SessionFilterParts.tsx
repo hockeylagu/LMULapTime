@@ -14,7 +14,7 @@ export const SessionSearchField: React.FC<{
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-9 pr-8 h-9 text-xs text-white placeholder-lmu-muted focus:outline-none focus:border-lmu-muted transition-colors"
+      className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-9 pr-8 h-9 text-xs text-white placeholder-lmu-muted focus:border-lmu-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text transition-colors"
     />
     {value && (
       <button
