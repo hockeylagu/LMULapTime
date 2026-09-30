@@ -6,6 +6,7 @@ import type { RivalState } from './useRival.js';
 import { RivalInsights } from './RivalInsights.js';
 import { RivalLadder } from './RivalLadder.js';
 import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
+import { LoadError } from '../LoadError.js';
 
 export interface RivalCardProps {
   rival: RivalState;
@@ -24,9 +25,7 @@ const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bol
  */
 export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
   const { status, error } = rival;
-  if (error) {
-    return <p role="alert" className="px-4 py-3 rounded-xl border border-lmu-loss-strong/30 bg-lmu-loss-strong/10 text-sm text-lmu-loss-soft">{error}</p>;
-  }
+  if (error) return <LoadError message={error} onRetry={rival.retry} />;
   if (!status?.rival || !player || status.gap === null) return null;
 
   const { rival: target, rivalEntry, gap, progress } = status;
@@ -43,7 +42,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
             {target.kind === 'ghost' ? 'Ghost target' : target.pinned ? 'Your chosen rival' : 'Your rival'}
           </div>
           {target.kind === 'driver' && rivalEntry ? (
-            <h3 className="text-xl font-extrabold text-white truncate">
+            <h3 className="text-xl font-extrabold text-white truncate" title={rivalEntry.driverName}>
               <span className="font-mono text-lmu-muted mr-2">P{rivalEntry.rank}</span>
               {rivalEntry.driverName}
             </h3>
@@ -74,8 +73,8 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
             <div className="h-full bg-lmu-warn" style={{ width: `${Math.max(2, closed)}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-lmu-muted mt-1 font-mono">
-            <span>set at {formatTime(target.startTime)}</span>
-            <span>{closed > 0 ? `${closed}% closed` : `beat ${formatTime(target.startTime)} to start closing`}</span>
+            <span>you {formatTime(target.startTime)} when set</span>
+            <span>{closed > 0 ? `${closed}% closed` : 'not closed yet'}</span>
             <span>target {formatTime(target.targetTime)}</span>
           </div>
         </div>
@@ -107,8 +106,9 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
             </button>
           )}
         </div>
-        <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} />
+        <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} pending={rival.pending} />
       </div>
+      {rival.actionError && <p role="alert" className="text-xs text-lmu-loss-soft">{rival.actionError}</p>}
     </section>
   );
 };

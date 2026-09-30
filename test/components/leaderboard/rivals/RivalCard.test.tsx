@@ -32,8 +32,12 @@ const status = (extra: Partial<RivalStatus> = {}): RivalStatus => ({
   ...extra,
 });
 
-const renderCard = (s: RivalStatus | null, error: string | null = null) => {
-  const rival: RivalState = { status: s, loading: false, error, pin: vi.fn() };
+const rivalState = (extra: Partial<RivalState> = {}): RivalState => ({
+  status: null, loading: false, error: null, actionError: null, pending: false, pin: vi.fn(), retry: vi.fn(), ...extra,
+});
+
+const renderCard = (s: RivalStatus | null, error: string | null = null, extra: Partial<RivalState> = {}) => {
+  const rival = rivalState({ status: s, error, ...extra });
   const handlers = { onCompare: vi.fn(), onTelemetry: vi.fn() };
   render(<RivalCard rival={rival} player={player} {...handlers} />);
   return { rival, ...handlers };
@@ -58,7 +62,7 @@ describe('RivalCard', () => {
   it('shows the progress bar at 0%, with how to start closing the gap', () => {
     renderCard(status({ progress: 0 }));
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
-    expect(screen.getByText('beat 1:40.200 to start closing')).toBeInTheDocument();
+    expect(screen.getByText('not closed yet')).toBeInTheDocument();
   });
 
   it('shows a ghost target when nobody is within reach', () => {
@@ -70,7 +74,7 @@ describe('RivalCard', () => {
 
   it('leaves out the sector row when a ghost target has nothing to show in it', () => {
     const ghost = status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }), rivalEntry: null, theoreticalGap: null, trend: [] });
-    const { container } = render(<RivalCard rival={{ status: ghost, loading: false, error: null, pin: vi.fn() }} player={{ ...player, theoreticalBest: null }} />);
+    const { container } = render(<RivalCard rival={rivalState({ status: ghost })} player={{ ...player, theoreticalBest: null }} />);
     expect(container.querySelector('.space-y-2')).toBeNull();
   });
 
@@ -99,10 +103,19 @@ describe('RivalCard', () => {
   });
 
   it('shows nothing without a rival, and the error when it could not be loaded', () => {
-    const { unmount } = render(<RivalCard rival={{ status: null, loading: false, error: null, pin: vi.fn() }} player={player} />);
+    const { unmount } = render(<RivalCard rival={rivalState()} player={player} />);
     expect(screen.queryByLabelText('Your rival')).not.toBeInTheDocument();
     unmount();
-    renderCard(null, 'Database is locked');
+    const { rival } = renderCard(null, 'Database is locked');
     expect(screen.getByRole('alert')).toHaveTextContent('Database is locked');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(rival.retry).toHaveBeenCalled();
+  });
+
+  it('keeps the card when a pin fails, and holds the chips while a change is on its way', () => {
+    renderCard(status(), null, { actionError: 'Your rival could not be changed.', pending: true });
+    expect(screen.getByLabelText('Your rival')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Your rival could not be changed.');
+    expect(screen.getByRole('button', { name: 'Make Next your rival' })).toBeDisabled();
   });
 });

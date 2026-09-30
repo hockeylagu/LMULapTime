@@ -59,7 +59,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
         type="button"
         onClick={build}
         disabled={state.kind === 'loading'}
-        className="px-2.5 py-1 rounded-lg border border-lmu-info-strong/40 text-xs font-bold text-lmu-info-soft hover:bg-lmu-info-strong/10 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+        className="px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule-strong transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
       >
         <Search className="w-3.5 h-3.5" />
         {state.kind === 'loading' ? 'Reading both laps…' : "Where's the time?"}

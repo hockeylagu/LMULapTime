@@ -27,13 +27,18 @@ export interface LeaderboardRowProps {
   onOpenSession?: (sessionId: string) => void;
 }
 
+const FOCUS = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
+const ICON_BUTTON = `p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${FOCUS}`;
+/** The row's secondary actions show on hover or keyboard focus, and always on touch screens. */
+const REVEAL = 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100';
+
 /** The best-sector colour of each sector, as the session lap table marks them. */
 const SECTOR_BEST_CLASS = ['text-lmu-gold', 'text-lmu-blue', 'text-lmu-green'] as const;
 
 const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: number | null }> = ({ sector, time, rank }) => (
   <td className="px-3 py-2 text-right whitespace-nowrap">
     <span className={rank === 1 ? `${SECTOR_BEST_CLASS[sector]} font-bold` : 'text-lmu-text-soft'}>{time !== null ? formatTime(time) : '—'}</span>
-    {rank !== null && <span className="ml-1 text-[10px] text-lmu-muted">P{rank}</span>}
+    {rank !== null && <span className="ml-1 text-[11px] text-lmu-muted">P{rank}</span>}
   </td>
 );
 
@@ -59,9 +64,14 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   if (row.kind === 'hidden') {
     return (
       <tr>
-        <td colSpan={LEADERBOARD_COLUMNS} className="px-2 py-1 text-center">
-          <button type="button" onClick={onShowAll} className="text-[11px] text-lmu-muted hover:text-white cursor-pointer">
-            ··· {row.count} more driver{row.count === 1 ? '' : 's'} ···
+        <td />
+        <td colSpan={LEADERBOARD_COLUMNS - 1} className="px-3 py-0.5">
+          <button
+            type="button"
+            onClick={onShowAll}
+            className={`text-[11px] text-lmu-faint hover:text-white hover:underline underline-offset-2 rounded cursor-pointer ${FOCUS}`}
+          >
+            {row.count} more driver{row.count === 1 ? '' : 's'}
           </button>
         </td>
       </tr>
@@ -73,21 +83,20 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   const hasTelemetry = Boolean(entry.bestLap.replayName && player?.bestLap.replayName);
   const canPin = Boolean(onPin && !isRival && vsYou !== null && vsYou < 0);
   const pace = benchmarkPace(entry.bestLap.lapTime, benchmark);
-  const rowClass = entry.isPlayer
-    ? 'bg-lmu-warn/10 text-white'
-    : isRival
-      ? 'bg-lmu-warn/5 text-white shadow-[inset_3px_0_0_0_rgba(251,191,36,0.8)]'
-      : 'hover:bg-white/[0.03] text-lmu-text';
+  // Your row is the one to find at a glance: the identity red; the rival is told by its tag alone.
+  const rowClass = entry.isPlayer ? 'bg-lmu-accent/10 text-white' : 'hover:bg-white/[0.03] text-lmu-text';
+  // Your own row has no Compare, so its few actions stay in view.
+  const reveal = entry.isPlayer ? '' : REVEAL;
   return (
-    <tr className={rowClass}>
-      <td className="px-3 py-2 font-bold text-white w-10">{row.rank ?? '—'}</td>
+    <tr className={`group ${rowClass}`}>
+      <td className={`px-3 py-2 font-bold w-10 ${entry.isPlayer ? 'text-lmu-accent-text' : 'text-white'}`}>{row.rank ?? '—'}</td>
       <td className="px-3 py-2 max-w-[14rem] font-sans">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`truncate ${entry.isPlayer ? 'font-extrabold text-lmu-warn-soft' : 'font-semibold'}`}>{entry.driverName}</span>
-          {entry.isPlayer && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded bg-lmu-warn/20 text-lmu-warn-soft">You</span>}
-          {isRival && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft">Rival</span>}
+          <span className={`truncate ${entry.isPlayer ? 'font-extrabold text-white' : 'font-semibold'}`} title={entry.driverName}>{entry.driverName}</span>
+          {entry.isPlayer && <span className="text-[11px] font-bold px-1.5 rounded bg-lmu-accent/20 text-lmu-accent-soft shrink-0">You</span>}
+          {isRival && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft shrink-0">Rival</span>}
         </div>
-        <div className="text-[10px] text-lmu-muted truncate">{entry.bestLap.carType} · {formatDrivenAgo(entry.bestLap.timestamp)}</div>
+        <div className="text-[11px] text-lmu-muted truncate" title={entry.bestLap.carType}>{entry.bestLap.carType} · {formatDrivenAgo(entry.bestLap.timestamp)}</div>
       </td>
       <td className="px-3 py-2 font-bold text-right text-white">{formatTime(entry.bestLap.lapTime)}</td>
       <td className="px-3 py-2 text-center font-sans">
@@ -102,67 +111,70 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
       <SectorCell sector={2} time={entry.bestS3} rank={entry.s3Rank} />
       <td className="px-3 py-2 text-right text-lmu-text-soft">{formatTime(entry.top3Average)}</td>
       <td className="px-2 py-2 text-right whitespace-nowrap font-sans">
-        {onPick && (
-          <button
-            type="button"
-            onClick={() => onPick(entry)}
-            aria-pressed={isCompared}
-            title={isCompared ? `Take ${entry.driverName}'s lap out of the comparison` : `Add ${entry.driverName}'s best lap to the comparison`}
-            aria-label={`Pick ${entry.driverName}'s lap to compare`}
-            className={`p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${isCompared ? 'text-lmu-accent-text' : 'text-lmu-muted hover:text-white'}`}
-          >
-            {isCompared ? <SquareCheck className="w-3.5 h-3.5" /> : <SquarePlus className="w-3.5 h-3.5" />}
-          </button>
-        )}
-        {canPin && (
-          <button
-            type="button"
-            onClick={() => onPin?.(entry.driverName)}
-            title={`Make ${entry.driverName} your rival`}
-            aria-label={`Make ${entry.driverName} your rival`}
-            className="p-1 rounded-lg text-lmu-muted hover:text-lmu-warn-soft hover:bg-lmu-border cursor-pointer"
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {!entry.isPlayer && onCompare && (
-          <button
-            type="button"
-            onClick={() => onCompare(entry)}
-            title={`Compare your best lap with ${entry.driverName}'s`}
-            aria-label={`Compare with ${entry.driverName}`}
-            className="p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-border cursor-pointer"
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {entry.isPlayer && onOpenSession && (
-          <button
-            type="button"
-            onClick={() => onOpenSession(entry.bestLap.sessionId)}
-            title={`Open the session of your best lap (${entry.bestLap.sessionName})`}
-            aria-label="Open the session of your best lap"
-            className="p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-border cursor-pointer"
-          >
-            <FileText className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {onTelemetry && (
-          <button
-            type="button"
-            onClick={() => onTelemetry(entry)}
-            disabled={!hasTelemetry}
-            title={
-              !hasTelemetry
-                ? entry.isPlayer ? 'Telemetry needs the replay of your lap' : 'Telemetry needs the replay of both laps'
-                : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
-            }
-            aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
-            className="p-1 rounded-lg text-lmu-muted enabled:hover:text-lmu-info-soft enabled:hover:bg-lmu-border enabled:cursor-pointer disabled:opacity-30"
-          >
-            <Activity className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="inline-flex items-center justify-end gap-0.5">
+          {onPick && (
+            <button
+              type="button"
+              onClick={() => onPick(entry)}
+              aria-pressed={isCompared}
+              title={isCompared ? `Take ${entry.driverName}'s lap out of the comparison` : `Add ${entry.driverName}'s best lap to the comparison`}
+              aria-label={`Pick ${entry.driverName}'s lap to compare`}
+              className={`${ICON_BUTTON} ${isCompared ? 'text-lmu-accent-text' : `text-lmu-muted hover:text-white ${reveal}`}`}
+            >
+              {isCompared ? <SquareCheck className="w-3.5 h-3.5" /> : <SquarePlus className="w-3.5 h-3.5" />}
+            </button>
+          )}
+          {canPin && (
+            <button
+              type="button"
+              onClick={() => onPin?.(entry.driverName)}
+              title={`Make ${entry.driverName} your rival`}
+              aria-label={`Make ${entry.driverName} your rival`}
+              className={`${ICON_BUTTON} text-lmu-muted hover:text-lmu-warn-soft ${reveal}`}
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {entry.isPlayer && onOpenSession && (
+            <button
+              type="button"
+              onClick={() => onOpenSession(entry.bestLap.sessionId)}
+              title={`Open the session of your best lap (${entry.bestLap.sessionName})`}
+              aria-label="Open the session of your best lap"
+              className={`${ICON_BUTTON} text-lmu-muted hover:text-white`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onTelemetry && (
+            <button
+              type="button"
+              onClick={() => onTelemetry(entry)}
+              disabled={!hasTelemetry}
+              title={
+                !hasTelemetry
+                  ? entry.isPlayer ? 'Telemetry needs the replay of your lap' : 'Telemetry needs the replay of both laps'
+                  : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
+              }
+              aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
+              className={`${ICON_BUTTON} text-lmu-muted enabled:hover:text-lmu-info-soft disabled:text-lmu-muted/40 disabled:cursor-default ${reveal}`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!entry.isPlayer && onCompare && (
+            <button
+              type="button"
+              onClick={() => onCompare(entry)}
+              title={`Compare your best lap with ${entry.driverName}'s`}
+              aria-label={`Compare with ${entry.driverName}`}
+              className={`ml-1 h-6 px-2 inline-flex items-center gap-1 rounded-md border border-lmu-border text-[11px] font-semibold text-lmu-text-soft hover:text-white hover:border-lmu-rule-strong cursor-pointer ${FOCUS}`}
+            >
+              <ArrowLeftRight className="w-3 h-3" aria-hidden="true" />
+              Compare
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
