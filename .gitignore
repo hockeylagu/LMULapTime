@@ -84,3 +84,6 @@ test/fixtures/replays_api_temp/
 **/.impeccable/live/deferred-svelte-component-accepts.json
 **/.impeccable/live/*.png
 # impeccable-ignore-end
+
+# Impeccable live mode wiring for this machine (kept out of git on purpose, outside the managed block above).
+.impeccable/live/config.json
