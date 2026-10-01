@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon } from 'lucide-react';
-import { ReferenceBenchmarkDiff, ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Settings as SettingsIcon, Search } from 'lucide-react';
+import { AppStatus, ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
 import { CacheSettingsCard } from './CacheSettingsCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
@@ -8,184 +8,123 @@ import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { ReplayUpgradeCard } from './ReplayUpgradeCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
-import { clearSessionDetailCache } from '../session-detail/useSessionDetailData.js';
-import { apiErrorMessage, postJson } from '../../api/apiClient.js';
-import { invalidateReferenceLaptimes } from '../../api/referenceApi.js';
-
-interface ReferenceRefreshResponse {
-  success?: boolean;
-  entriesCount?: number;
-  diff?: ReferenceBenchmarkDiff | null;
-}
+import { SettingsSidebar } from './SettingsSidebar.js';
+import { SETTINGS_SECTIONS, matchesSettingsSection } from './settingsSections.js';
+import { useSettingsActions } from './useSettingsActions.js';
 
 export interface SettingsProps {
-  status: {
-    resultsDir: string;
-    resultsExist: boolean;
-    replaysDir: string;
-    replaysExist: boolean;
-    telemetryDir?: string;
-    telemetryExist?: boolean;
-    playerName?: string;
-    sessionsCount: number;
-    tracksCount: number;
-    referenceLaptimes?: {
-      lastUpdated: string | null;
-      entriesCount: number;
-      lastUpdateDiff?: ReferenceBenchmarkDiff | null;
-    };
-    sqliteCache?: {
-      enabled: boolean;
-      dbPath: string;
-      sessionsCount: number;
-      lastSyncedAt: string | null;
-      dbSizeBytes: number;
-      replaysCount?: number;
-      replayTrajectoriesCount?: number;
-      telemetryFilesCount?: number;
-    };
-  } | null;
+  status: AppStatus | null;
   onUpdatePaths: (resultsDir?: string, replaysDir?: string, telemetryDir?: string) => void;
   replayScanStatus?: ScanStatus | ReplayScanStatus | null;
   onReplayScanTriggered?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, replayScanStatus, onReplayScanTriggered }) => {
-  const [resultsDirInput, setResultsDirInput] = useState<string>(
-    status?.resultsDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\LOG\\Results'
-  );
-  const [replaysDirInput, setReplaysDirInput] = useState<string>(
-    status?.replaysDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays'
-  );
-  const [telemetryDirInput, setTelemetryDirInput] = useState<string>(
-    status?.telemetryDir || 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Telemetry'
-  );
-  const [playerNameInput, setPlayerNameInput] = useState<string>(
-    status?.playerName || ''
-  );
-  const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [isUpdatingLaptimes, setIsUpdatingLaptimes] = useState<boolean>(false);
-  const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
-  const [pathMessage, setPathMessage] = useState<string | null>(null);
-  const [laptimesMessage, setLaptimesMessage] = useState<string | null>(null);
-  const [cacheMessage, setCacheMessage] = useState<string | null>(null);
-  const [updateDiff, setUpdateDiff] = useState<ReferenceBenchmarkDiff | null>(
-    status?.referenceLaptimes?.lastUpdateDiff || null
-  );
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeSectionId, setActiveSectionId] = useState<string>('cache-settings');
+
+  const actions = useSettingsActions({ status, onUpdatePaths, onReplayScanTriggered });
+
   const sessionScanStatus = replayScanStatus && 'sessionScan' in replayScanStatus
     ? replayScanStatus.sessionScan
     : undefined;
 
+  const matchingSections = useMemo(
+    () => SETTINGS_SECTIONS.filter((s) => matchesSettingsSection(s, searchQuery)),
+    [searchQuery]
+  );
+
+  // Update active section when visible matching sections change
   useEffect(() => {
-    if (status?.resultsDir && (!resultsDirInput || resultsDirInput.includes('Le Mans Ultimate\\UserData\\LOG\\Results'))) {
-      setResultsDirInput(status.resultsDir);
+    if (matchingSections.length > 0 && !matchingSections.some((s) => s.id === activeSectionId)) {
+      setActiveSectionId(matchingSections[0].id);
     }
-  }, [status?.resultsDir]);
+  }, [matchingSections, activeSectionId]);
 
+  // Track active section on scroll
   useEffect(() => {
-    if (status?.replaysDir && (!replaysDirInput || replaysDirInput.includes('Le Mans Ultimate\\UserData\\Replays'))) {
-      setReplaysDirInput(status.replaysDir);
-    }
-  }, [status?.replaysDir]);
+    if (typeof IntersectionObserver === 'undefined') return;
 
-  useEffect(() => {
-    if (status?.telemetryDir && (!telemetryDirInput || telemetryDirInput.includes('Le Mans Ultimate\\UserData\\Telemetry'))) {
-      setTelemetryDirInput(status.telemetryDir);
-    }
-  }, [status?.telemetryDir]);
-
-  useEffect(() => {
-    if (status?.playerName && !playerNameInput) {
-      setPlayerNameInput(status.playerName);
-    }
-  }, [status?.playerName]);
-
-  useEffect(() => {
-    if (status?.referenceLaptimes?.lastUpdateDiff) {
-      setUpdateDiff(status.referenceLaptimes.lastUpdateDiff);
-    }
-  }, [status?.referenceLaptimes?.lastUpdateDiff]);
-
-  const handleScanPaths = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsScanning(true);
-    setPathMessage(null);
-
-    postJson<{ success?: boolean; playerName?: string }>('/api/scan', {
-      resultsDir: resultsDirInput,
-      replaysDir: replaysDirInput,
-      telemetryDir: telemetryDirInput,
-      playerName: playerNameInput,
-    })
-      .then((data) => {
-        setIsScanning(false);
-        if (data.success) {
-          onUpdatePaths(resultsDirInput, replaysDirInput, telemetryDirInput);
-          setPathMessage(`Scanning session, replay, and telemetry data in the background. Driver profile: "${data.playerName}"`);
-          onReplayScanTriggered?.();
-        } else {
-          setPathMessage('Failed to scan directories. Please check paths.');
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find((e) => e.isIntersecting);
+        if (visible) {
+          setActiveSectionId(visible.target.id);
         }
-      })
-      .catch((err) => {
-        setIsScanning(false);
-        setPathMessage(`Error scanning: ${apiErrorMessage(err, 'request failed')}`);
-      });
+      },
+      { rootMargin: '-20px 0px -60% 0px', threshold: 0.1 }
+    );
+
+    for (const section of matchingSections) {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [matchingSections]);
+
+  const handleSelectSection = (sectionId: string) => {
+    setActiveSectionId(sectionId);
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
-  const handleUpdateReferenceLaptimes = () => {
-    setIsUpdatingLaptimes(true);
-    setLaptimesMessage(null);
-
-    postJson<ReferenceRefreshResponse>('/api/reference-laptimes/refresh')
-      .then((data) => {
-        setIsUpdatingLaptimes(false);
-        if (data.success) {
-          invalidateReferenceLaptimes();
-          onUpdatePaths();
-          if (data.diff) {
-            setUpdateDiff(data.diff);
-          }
-          const diffSummary = data.diff?.hasChanges
-            ? ` (${data.diff.addedCount} new, ${data.diff.updatedCount} updated, ${data.diff.removedCount} removed)`
-            : ' (no changes detected)';
-          setLaptimesMessage(`Updated ${data.entriesCount} benchmark entries from Google Sheets!${diffSummary}`);
-        } else {
-          setLaptimesMessage('Failed to update reference lap time benchmarks.');
-        }
-      })
-      .catch((err) => {
-        setIsUpdatingLaptimes(false);
-        setLaptimesMessage(`Error updating: ${apiErrorMessage(err, 'request failed')}`);
-      });
-  };
-
-  const handleClearCache = () => {
-    if (!window.confirm('Are you sure you want to clear the SQLite session cache? Cached session data will be deleted and can be rescanned.')) {
-      return;
+  const renderCard = (sectionId: string) => {
+    switch (sectionId) {
+      case 'cache-settings':
+        return (
+          <CacheSettingsCard
+            status={status}
+            isClearingCache={actions.isClearingCache}
+            onClearCache={actions.handleClearCache}
+            cacheMessage={actions.cacheMessage}
+          />
+        );
+      case 'replay-cache':
+        return <ReplayCacheCard replayScanStatus={replayScanStatus} />;
+      case 'replay-upgrade':
+        return <ReplayUpgradeCard replayScanStatus={replayScanStatus} />;
+      case 'ai-settings':
+        return <AISettingsCard />;
+      case 'ai-history':
+        return <AiReportsHistoryCard />;
+      case 'reference-benchmarks':
+        return (
+          <ReferenceLaptimesCard
+            status={status}
+            isUpdatingLaptimes={actions.isUpdatingLaptimes}
+            onUpdateReferenceLaptimes={actions.handleUpdateReferenceLaptimes}
+            laptimesMessage={actions.laptimesMessage}
+            updateDiff={actions.updateDiff}
+          />
+        );
+      case 'folder-paths':
+        return (
+          <FolderPathsCard
+            status={status}
+            resultsDirInput={actions.resultsDirInput}
+            setResultsDirInput={actions.setResultsDirInput}
+            replaysDirInput={actions.replaysDirInput}
+            setReplaysDirInput={actions.setReplaysDirInput}
+            telemetryDirInput={actions.telemetryDirInput}
+            setTelemetryDirInput={actions.setTelemetryDirInput}
+            playerNameInput={actions.playerNameInput}
+            setPlayerNameInput={actions.setPlayerNameInput}
+            isScanning={actions.isScanning}
+            onScanPaths={actions.handleScanPaths}
+            pathMessage={actions.pathMessage}
+            sessionScanStatus={sessionScanStatus}
+          />
+        );
+      default:
+        return null;
     }
-    setIsClearingCache(true);
-    setCacheMessage(null);
-
-    postJson<{ success?: boolean }>('/api/cache/clear')
-      .then((data) => {
-        setIsClearingCache(false);
-        if (data.success) {
-          onUpdatePaths();
-          clearSessionDetailCache();
-          setCacheMessage('Session SQLite cache cleared successfully! You can rescan anytime.');
-        } else {
-          setCacheMessage('Failed to clear SQLite cache.');
-        }
-      })
-      .catch((err) => {
-        setIsClearingCache(false);
-        setCacheMessage(`Error clearing cache: ${apiErrorMessage(err, 'request failed')}`);
-      });
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-[1500px] mx-auto space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-3 bg-lmu-card border border-lmu-border p-6 rounded-2xl">
         <div className="p-3 rounded-xl bg-lmu-accent/10 text-lmu-accent-text border border-lmu-accent/20">
@@ -199,44 +138,64 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         </div>
       </div>
 
-      <CacheSettingsCard
-        status={status}
-        isClearingCache={isClearingCache}
-        onClearCache={handleClearCache}
-        cacheMessage={cacheMessage}
-      />
+      {/* Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[300px_1fr] gap-6 items-start">
+        {/* Left Sidepanel / Table of Contents */}
+        <aside className="lg:sticky lg:top-6 space-y-4">
+          <SettingsSidebar
+            sections={matchingSections}
+            activeSectionId={activeSectionId}
+            onSelectSection={handleSelectSection}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            status={status}
+            totalSectionsCount={SETTINGS_SECTIONS.length}
+          />
+        </aside>
 
-      <ReplayCacheCard replayScanStatus={replayScanStatus} />
+        {/* Right Column / Cards List */}
+        <div className="space-y-6 min-w-0">
+          {searchQuery.trim() && matchingSections.length > 0 && (
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-sky-950/30 border border-sky-800/50 text-xs text-sky-200">
+              <span>
+                Filtering settings by <strong>&quot;{searchQuery}&quot;</strong> ({matchingSections.length} found)
+              </span>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-xs text-sky-400 hover:text-sky-300 font-semibold underline cursor-pointer"
+              >
+                Reset Search
+              </button>
+            </div>
+          )}
 
-      <ReplayUpgradeCard replayScanStatus={replayScanStatus} />
-
-      <AISettingsCard />
-
-      <AiReportsHistoryCard />
-
-      <ReferenceLaptimesCard
-        status={status}
-        isUpdatingLaptimes={isUpdatingLaptimes}
-        onUpdateReferenceLaptimes={handleUpdateReferenceLaptimes}
-        laptimesMessage={laptimesMessage}
-        updateDiff={updateDiff}
-      />
-
-      <FolderPathsCard
-        status={status}
-        resultsDirInput={resultsDirInput}
-        setResultsDirInput={setResultsDirInput}
-        replaysDirInput={replaysDirInput}
-        setReplaysDirInput={setReplaysDirInput}
-        telemetryDirInput={telemetryDirInput}
-        setTelemetryDirInput={setTelemetryDirInput}
-        playerNameInput={playerNameInput}
-        setPlayerNameInput={setPlayerNameInput}
-        isScanning={isScanning}
-        onScanPaths={handleScanPaths}
-        pathMessage={pathMessage}
-        sessionScanStatus={sessionScanStatus}
-      />
+          {matchingSections.length === 0 ? (
+            <div className="bg-lmu-card border border-lmu-border p-12 rounded-2xl text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700 flex items-center justify-center mx-auto text-lmu-muted">
+                <Search className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">No Settings Found</h3>
+              <p className="text-xs text-lmu-muted max-w-sm mx-auto">
+                No settings match &quot;{searchQuery}&quot;. Try searching for cache, replays, AI, benchmarks, or paths.
+              </p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="mt-2 px-4 py-2 rounded-xl bg-lmu-accent text-white text-xs font-bold hover:brightness-110 transition-all cursor-pointer"
+              >
+                Clear Search
+              </button>
+            </div>
+          ) : (
+            matchingSections.map((section) => (
+              <section id={section.id} key={section.id} className="scroll-mt-6">
+                {renderCard(section.id)}
+              </section>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };

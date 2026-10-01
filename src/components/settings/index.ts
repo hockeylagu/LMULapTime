@@ -1,4 +1,7 @@
 export * from './Settings.js';
+export * from './SettingsSidebar.js';
+export * from './settingsSections.js';
+export * from './useSettingsActions.js';
 export * from './CacheSettingsCard.js';
 export * from './ReplayCacheCard.js';
 export * from './ReplayUpgradeCard.js';
