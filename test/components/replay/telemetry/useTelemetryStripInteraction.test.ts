@@ -101,17 +101,17 @@ describe('useTelemetryStripInteraction', () => {
     });
     expect(onSelectIndex).toHaveBeenCalledWith(21);
 
-    // Press Shift+ArrowRight (jump by 10)
+    // Shift steps 0.5 s rather than an arbitrary sample count.
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true }));
     });
-    expect(onSelectIndex).toHaveBeenCalledWith(30);
+    expect(onSelectIndex).toHaveBeenCalledWith(25);
 
-    // Press Shift+ArrowLeft (jump back by 10)
+    // Press Shift+ArrowLeft (back 0.5 s)
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true }));
     });
-    expect(onSelectIndex).toHaveBeenCalledWith(10);
+    expect(onSelectIndex).toHaveBeenCalledWith(15);
   });
 
   it('creates a zoom range from a pointer drag and resets it when the data becomes invalid', () => {
@@ -127,9 +127,9 @@ describe('useTelemetryStripInteraction', () => {
       }),
       { initialProps: { hookPoints: points } }
     );
-    result.current.containerRef.current = {
-      getBoundingClientRect: () => ({ left: 0, width: 100 }),
-    } as unknown as HTMLDivElement;
+    const container = document.createElement('div');
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 100 } as DOMRect);
+    result.current.containerRef.current = container;
 
     act(() => {
       result.current.setInteractionMode('zoom');

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 
 export interface UseGpsMapPanZoomOptions {
   viewBoxSize: number;
@@ -45,6 +46,14 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   followCarRef.current = followCar;
   const currentPosRef = useRef<{ sx: number; sy: number } | undefined>(currentPos);
   currentPosRef.current = currentPos;
+  const autoFollowOnScrubRef = useRef(true);
+  useEffect(() => {
+    if (zoomLevelRef.current > 1 && autoFollowOnScrubRef.current && !followCarRef.current && currentPos) {
+      followCarRef.current = true;
+      panOffsetRef.current = { x: 0, y: 0 };
+      setPanOffset({ x: 0, y: 0 }); setFollowCar(true);
+    }
+  }, [currentPos?.sx, currentPos?.sy]);
 
   const [renderedSize, setRenderedSize] = useState<number>(800);
 
@@ -75,7 +84,13 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
       if (next) {
         panOffsetRef.current = { x: 0, y: 0 };
         setPanOffset({ x: 0, y: 0 });
+      } else if (prev && currentPosRef.current) {
+        const offset = { x: currentPosRef.current.sx - viewBoxSize / 2, y: currentPosRef.current.sy - viewBoxSize / 2 };
+        panOffsetRef.current = offset;
+        setPanOffset(offset);
       }
+      followCarRef.current = next;
+      autoFollowOnScrubRef.current = next;
       return next;
     });
   };
@@ -164,6 +179,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -196,6 +212,8 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="map-controls-overlay"]')) return;
+    containerRef.current?.focus?.({ preventScroll: true });
+    autoFollowOnScrubRef.current = false;
     isDraggingRef.current = true;
     const el = containerRef.current;
     const rect = el?.getBoundingClientRect();
@@ -236,6 +254,8 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
     setFollowCar(false);
+    followCarRef.current = false;
+    autoFollowOnScrubRef.current = true;
   };
 
   const focusOnPoint = (targetX: number, targetY: number, targetZoom = 4.5) => {
@@ -246,10 +266,32 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     setZoomLevel(targetZoom);
     setPanOffset({ x: newPanX, y: newPanY });
     setFollowCar(false);
+    followCarRef.current = false;
+    autoFollowOnScrubRef.current = true;
   };
+
+  const centerOnCar = () => {
+    const position = currentPosRef.current;
+    if (position) focusOnPoint(position.sx, position.sy, zoomLevelRef.current);
+    autoFollowOnScrubRef.current = false;
+  };
+  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = event => {
+    if (replayShortcutBlocked(event) || !isReplaySurfaceTarget(event) || event.repeat) return;
+    if (event.key.toLowerCase() === 'c') { event.preventDefault(); centerOnCar(); }
+    else if (event.key.toLowerCase() === 'f') {
+      event.preventDefault(); handleSetFollowCar(!followCarRef.current);
+    }
+  };
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => keyHandlerRef.current(event);
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, []);
 
   const zoomIn = () =>
     setZoomLevel(z => {
+      if (z === 1 && currentPosRef.current) handleSetFollowCar(true);
       const next = getNextZoom(z, 1);
       zoomLevelRef.current = next;
       return next;
@@ -279,6 +321,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     zoomAtCoords,
     resetPanZoom,
     focusOnPoint,
+    centerOnCar,
     zoomIn,
     zoomOut,
     markerScale,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, RotateCcw, Crosshair } from 'lucide-react';
+import { Plus, Minus, RotateCcw, Crosshair, LocateFixed } from 'lucide-react';
 
 export interface MapControlsOverlayProps {
   onZoomIn: () => void;
@@ -8,6 +8,8 @@ export interface MapControlsOverlayProps {
   zoomDisplay?: string;
   followCar?: boolean;
   onToggleFollowCar?: () => void;
+  onCenterCar?: () => void;
+  isCarOffscreen?: boolean;
   orientation?: 'vertical' | 'horizontal';
   className?: string;
 }
@@ -19,6 +21,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
   zoomDisplay,
   followCar,
   onToggleFollowCar,
+  onCenterCar,
+  isCarOffscreen,
   orientation = 'horizontal',
   className = '',
 }) => {
@@ -52,17 +56,23 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         <Minus className="w-3.5 h-3.5" />
       </button>
 
+      {onCenterCar && <button type="button" onClick={onCenterCar} aria-label="Center on car"
+        title="Center on car · C (keeps zoom)"
+        className="h-7 min-w-7 px-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white text-xs cursor-pointer">
+        <LocateFixed className="w-3.5 h-3.5" />{isCarOffscreen && <span className="whitespace-nowrap">Center car · C</span>}
+      </button>}
       {onToggleFollowCar && (
         <button
           type="button"
           onClick={onToggleFollowCar}
           aria-label="Follow car"
+          aria-pressed={Boolean(followCar)}
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             followCar
               ? 'bg-lmu-accent text-white'
               : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
           }`}
-          title={followCar ? 'Follow Car (Active)' : 'Follow Car'}
+          title={followCar ? 'Follow car · F (active)' : 'Follow car · F'}
         >
           <Crosshair className="w-3.5 h-3.5" />
         </button>

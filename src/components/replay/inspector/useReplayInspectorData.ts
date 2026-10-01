@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
@@ -63,7 +64,7 @@ export function useReplayInspectorData({
   const [baselineDriverName, setBaselineDriverName] = useState<string | null>(initialBaselineDriverName ?? null);
   const [pendingDriverName, setPendingDriverName] = useState<string | null>(null);
   const [pendingLapNumber, setPendingLapNumber] = useState<number | null>(null);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [currentIndex, setCurrentIndexState] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [chartZoomRange, setChartZoomRange] = useState<{ start: number; end: number } | null>(null);
@@ -76,6 +77,21 @@ export function useReplayInspectorData({
   const playbackCursor = useMemo(createPlaybackCursor, []);
   const currentIndexRef = useRef(0);
   currentIndexRef.current = currentIndex;
+  const setCurrentIndex = useCallback((index: number) => {
+    setIsPlaying(false);
+    playbackCursor.clear();
+    currentIndexRef.current = index;
+    setCurrentIndexState(index);
+  }, [playbackCursor]);
+  useEffect(() => {
+    if (!isOpen || !trajectory?.points.length) return;
+    const handle = (event: KeyboardEvent) => {
+      if (event.key !== ' ' || event.repeat || replayShortcutBlocked(event) || !isReplaySurfaceTarget(event)) return;
+      event.preventDefault(); setIsPlaying(playing => !playing);
+    };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [isOpen, trajectory]);
   const hasInitializedRef = useRef<boolean>(false);
   const trajectoryRequestIdRef = useRef(0);
   const trajectoryControllerRef = useRef<AbortController | null>(null);
@@ -497,7 +513,7 @@ export function useReplayInspectorData({
       playbackCursor.publish(points, next);
       if (next.index !== clock.index) {
         currentIndexRef.current = next.index;
-        setCurrentIndex(next.index);
+        setCurrentIndexState(next.index);
       }
       animRef.current = requestAnimationFrame(loop);
     };
