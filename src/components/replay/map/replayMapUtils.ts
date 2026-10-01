@@ -298,7 +298,10 @@ export function computeGhostPosition(
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
 
   const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
-  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, primaryDists[safeIdx]);
+  const index = Math.floor(safeIdx);
+  const nextDist = primaryDists[Math.min(index + 1, primaryDists.length - 1)];
+  const distance = primaryDists[index] + (nextDist - primaryDists[index]) * (safeIdx - index);
+  const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, distance);
 
   return {
     sx: offsetX + (ghostPt.x - minX) * scale,

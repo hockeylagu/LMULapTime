@@ -10,6 +10,8 @@ import { TelemetryPresetModal } from './presets/TelemetryPresetModal.js';
 import { useTelemetryStripInteraction } from './useTelemetryStripInteraction.js';
 import { TelemetryResolution } from './telemetryResolution.js';
 import { LoadingState } from '../../common/index.js';
+import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
+import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -101,6 +103,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const activePreset = presets.find(p => p.id === activePresetId) || presets[0];
 
   const currentPoint = points[safeIndex];
+  const playbackPosition = usePlaybackPosition(points, safeIndex);
 
   const pointComparisons = useMemo(
     () => (baselinePoints && baselinePoints.length > 0 && points.length > 0
@@ -115,10 +118,11 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const currentComparison = pointComparisons[safeIndex] || null;
   const sfCrossing = useMemo(() => computeStartFinishOffset(points, trackLengthM), [points, trackLengthM]);
   const startTimeSec = sfCrossing?.timeSecOffset ?? (points[0]?.timeSec ?? 0);
-  const currentTimeSec = currentPoint ? Math.max(0, (currentPoint.timeSec || 0) - startTimeSec) : 0;
+  const currentTimeSec = currentPoint ? Math.max(0, (playbackPosition?.timeSec ?? currentPoint.timeSec ?? 0) - startTimeSec) : 0;
   const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples), [points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples]);
   const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
-  const cursorPct = pctForIndex(safeIndex);
+  const cursorPct = pctForIndex(safeIndex) + (playbackPosition?.fraction ?? 0)
+    * (pctForIndex(Math.min(safeIndex + 1, points.length - 1)) - pctForIndex(safeIndex));
 
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
@@ -150,7 +154,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onDoubleClick={handleResetZoom}
-      className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip rounded-2xl border border-lmu-border/70 overflow-hidden cursor-crosshair ${className}`}
+      className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip overflow-hidden cursor-crosshair ${className}`}
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
         <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[10px] sm:text-[10px] font-mono font-bold tracking-wider overflow-hidden">
@@ -164,7 +168,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
             <div style={{ width: `${Math.max(0, 100 - (sectors.s2Frame > 0 ? pctForIndex(sectors.s2Frame) : 0))}%` }} className="h-full bg-lmu-green/15 text-lmu-green flex items-center justify-center truncate px-1">SECTOR 3</div>
           )}
           {isCursorInView && (
-            <div style={{ left: `${cursorPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-white z-30" />
+            <TelemetryScrubCursor cursorPct={cursorPct} />
           )}
         </div>
       )}

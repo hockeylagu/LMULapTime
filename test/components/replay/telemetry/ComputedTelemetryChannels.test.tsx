@@ -89,14 +89,14 @@ describe('Computed Telemetry UI Channels', () => {
         accelTotalPath="M 0 95 L 1000 30"
         accelTotalArea="M 0 95 L 1000 30 L 1000 95 Z"
         currentPoint={mockPoint}
-        isCursorInView={false}
+        isCursorInView={true}
         cursorPct={0}
       />
     );
 
     expect(screen.getByText('COMBINED G')).toBeInTheDocument();
     expect(screen.getByText('COMPUTED')).toBeInTheDocument();
-    expect(screen.getAllByText('2.49 G Resultant').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2.49 G').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetrySlipAngleChannel with beta attitude angle', () => {
@@ -104,7 +104,7 @@ describe('Computed Telemetry UI Channels', () => {
       <TelemetrySlipAngleChannel
         slipAnglePath="M 0 50 L 1000 35"
         currentPoint={mockPoint}
-        isCursorInView={false}
+        isCursorInView={true}
         cursorPct={0}
       />
     );
@@ -119,7 +119,7 @@ describe('Computed Telemetry UI Channels', () => {
       <TelemetryUndersteerChannel
         understeerPath="M 0 50 L 1000 40"
         currentPoint={mockPoint}
-        isCursorInView={false}
+        isCursorInView={true}
         cursorPct={0}
       />
     );
@@ -150,7 +150,7 @@ describe('Computed Telemetry UI Channels', () => {
     expect(screen.getByText('TIRE SLIP & LOCKUP')).toBeInTheDocument();
     expect(screen.getByText('COMPUTED')).toBeInTheDocument();
     expect(screen.getByText('LOCKUP')).toBeInTheDocument();
-    expect(screen.getAllByText('94% Saturation').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('94% (LOCKUP)').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetryYawRateChannel with rotation agility readout', () => {
@@ -158,7 +158,7 @@ describe('Computed Telemetry UI Channels', () => {
       <TelemetryYawRateChannel
         yawRatePath="M 0 50 L 1000 35"
         currentPoint={mockPoint}
-        isCursorInView={false}
+        isCursorInView={true}
         cursorPct={0}
       />
     );

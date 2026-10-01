@@ -34,8 +34,8 @@ describe('TelemetryResolutionPopover', () => {
 
     expect(screen.getByText(/Telemetry Resolution & Fidelity/i)).toBeInTheDocument();
     expect(screen.getByText(/60 Hz/i)).toBeInTheDocument();
-    expect(screen.getByText(/7,200 pts/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/2,400 pts/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/7,200 raw pts/i)).toBeInTheDocument();
+    expect(screen.getByText('3.0× fewer points')).toBeInTheDocument();
     expect(screen.getByText(/Trade-off:/i)).toBeInTheDocument();
   });
 
@@ -61,6 +61,9 @@ describe('TelemetryResolutionPopover', () => {
 
     expect(screen.getByText('1,800 pts @ 30 Hz')).toBeInTheDocument();
     expect(screen.getByText('9,600 pts @ 100 Hz')).toBeInTheDocument();
+    expect(screen.queryByText('Recorded samples:')).not.toBeInTheDocument();
+    expect(screen.queryByText(/7,200 raw pts/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Every sample')).toBeInTheDocument();
   });
 
   it('disables DuckDB and explains an incomplete lap fallback', () => {

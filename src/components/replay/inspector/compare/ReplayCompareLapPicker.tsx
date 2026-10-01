@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
-import { ComparableLap } from '../../../../shared/types/index.js';
+import { ComparableLap } from '../../../../../shared/types/index.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 export type RaceTypeFilter = 'all' | 'practice' | 'quali' | 'race';
+type WeatherCondition = NonNullable<ComparableLap['weatherCondition']>;
+type ConditionFilter = 'same' | 'all' | WeatherCondition;
 
 export interface ReplayCompareLapPickerProps {
   laps: ComparableLap[];
@@ -17,8 +19,11 @@ export interface ReplayCompareLapPickerProps {
   currentSessionId?: string | null;
   currentCarType?: string | null;
   currentRaceType?: string | null;
+  currentWeatherCondition?: WeatherCondition | null;
   filter: CompareLapFilter;
   isLoading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onChangeFilter: (filter: CompareLapFilter) => void;
   onClose: () => void;
   onSelectLap: (lap: ComparableLap) => void;
@@ -55,8 +60,11 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   currentSessionId,
   currentCarType,
   currentRaceType,
+  currentWeatherCondition,
   filter,
   isLoading,
+  error,
+  onRetry,
   onChangeFilter,
   onClose,
   onSelectLap,
@@ -64,6 +72,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   const [order, setOrder] = useState<'lap-asc' | 'date-desc' | 'driver-asc'>('lap-asc');
   const [selectedCar, setSelectedCar] = useState<string>('all');
   const [selectedRaceType, setSelectedRaceType] = useState<RaceTypeFilter>('all');
+  const [selectedCondition, setSelectedCondition] = useState<ConditionFilter>('same');
 
   const normalize = (val?: string | null) => (val || '').toLowerCase().trim().replace(/\\/g, '/').split('/').pop() || '';
   const effectiveReplayName = currentReplayName || selectedReplayName || null;
@@ -82,6 +91,13 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
       null
     );
   }, [laps, effectiveReplayName, currentDriverName, currentLapNumber]);
+
+  const exactCurrentLap = laps.find(lap => normalize(lap.matchingReplayFile) === normalize(effectiveReplayName)
+    && Boolean(effectiveReplayName) && lap.lapNum === currentLapNumber
+    && (!currentDriverName || lap.driverName.toLowerCase() === currentDriverName.toLowerCase()));
+  const currentCondition = currentWeatherCondition ?? (exactCurrentLap
+    ? exactCurrentLap.weatherCondition ?? (exactCurrentLap.hasRain ? 'Wet' : 'Dry') : null);
+  const conditionToMatch = selectedCondition === 'same' ? currentCondition : selectedCondition;
 
   const currentCar = useMemo(() => currentCarType || currentLap?.carType || null, [currentCarType, currentLap]);
 
@@ -112,9 +128,11 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
       if (filter === 'player' && !isPlayer) return false;
       if (filter === 'same-sessions' && !isSameSession) return false;
       if (selectedCar !== 'all' && lap.carType !== selectedCar) return false;
+      if (conditionToMatch && conditionToMatch !== 'all'
+        && (lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry')) !== conditionToMatch) return false;
       return matchesRaceType(lap, selectedRaceType);
     });
-  }, [laps, filter, effectiveReplayName, currentSessionId, currentDriverName, selectedCar, selectedRaceType]);
+  }, [laps, filter, effectiveReplayName, currentSessionId, currentDriverName, selectedCar, selectedRaceType, conditionToMatch]);
 
   const orderedLaps = useMemo(() => {
     const sorted = [...filteredLaps].sort((a, b) => {
@@ -127,7 +145,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 pt-12 sm:pt-16 animate-fade-in">
-      <div className="w-full max-w-[1040px] border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
+      <div className="w-full max-w-[1200px] border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-lmu-border/60 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -145,10 +163,10 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center justify-between gap-3 overflow-x-auto">
+            <div className="flex items-center gap-2 shrink-0">
               {/* Session Scope Tabs */}
-              <div className="flex flex-wrap items-center gap-1 rounded-lg bg-lmu-bg border border-lmu-border p-0.5">
+              <div className="flex items-center gap-1 rounded-lg bg-lmu-bg border border-lmu-border p-0.5 shrink-0">
                 {FILTER_OPTIONS.map(option => (
                   <button
                     key={option.key}
@@ -194,6 +212,18 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
                 <option value="quali">{currentRace === 'quali' ? '🏁 Quali (Current)' : 'Quali'}</option>
                 <option value="race">{currentRace === 'race' ? '🏁 Race (Current)' : 'Race'}</option>
               </select>
+              <select
+                aria-label="Filter by condition"
+                value={selectedCondition}
+                onChange={event => setSelectedCondition(event.target.value as ConditionFilter)}
+                className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+              >
+                <option value="same">Same condition{currentCondition ? ` (${currentCondition})` : ''}</option>
+                <option value="all">All conditions</option>
+                <option value="Dry">Dry</option>
+                <option value="Wet">Wet</option>
+                <option value="Dynamic Weather">Dynamic weather</option>
+              </select>
             </div>
 
             {/* Sort Order */}
@@ -201,7 +231,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               aria-label="Order comparison laps"
               value={order}
               onChange={event => setOrder(event.target.value as typeof order)}
-              className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white"
+              className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white shrink-0"
             >
               <option value="lap-asc">Best Lap</option>
               <option value="date-desc">Most recent</option>
@@ -212,8 +242,13 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
         <div className="max-h-96 overflow-y-auto custom-scrollbar px-4 py-2">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-xs text-lmu-muted">
+            <div role="status" className="flex items-center justify-center gap-2 py-8 text-xs text-lmu-muted">
               <LoaderCircle className="w-4 h-4 animate-spin" /> Loading available laps...
+            </div>
+          ) : error ? (
+            <div role="alert" className="py-8 text-center text-xs space-y-2">
+              <p className="text-lmu-loss-soft">{error}</p>
+              {onRetry && <button type="button" onClick={onRetry} className="text-lmu-text-soft underline underline-offset-4">Try again</button>}
             </div>
           ) : orderedLaps.length === 0 ? (
             <p className="py-8 text-center text-xs text-lmu-muted">
@@ -221,6 +256,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               {filter === 'same-sessions' && 'No other replay-backed laps found in this session.'}
               {filter === 'player' && 'No player replay-backed laps found matching your filters.'}
               {filter === 'all' && 'No replay-backed laps found matching your filters.'}
+              <span className="block mt-1">{selectedCondition === 'all' ? 'Try changing your filters.' : 'Try All conditions or change your filters.'}</span>
             </p>
           ) : (
             <div className="space-y-1">

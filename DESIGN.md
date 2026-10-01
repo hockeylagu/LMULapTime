@@ -301,7 +301,7 @@ Two cases fail and must not be used:
 
 ## Layout
 
-Desktop only and dense. The design width is 1500px: content sits in a centered 1500px column (`max-w-[1500px]`) with 32px side gutters (`px-8`), and the sticky navbar spans the full width with its contents in the same column. The column stays 1500px on wider monitors so one screen holds one question, and a little vertical scrolling beats spreading data left and right. Below the floor (`min-w-[1480px]` on the app root, a 1500px window less its scrollbar) the page scrolls sideways instead of reflowing.
+Desktop only and dense. The design width is 1500px: content sits in a centered 1500px column (`max-w-[1500px]`) with 32px side gutters (`px-8`), and the sticky navbar spans the full width with its contents in the same column. The column stays 1500px on wider monitors so one screen holds one question, and a little vertical scrolling beats spreading data left and right. Below the floor (`min-w-[1480px]` on the app root, a 1500px window less its scrollbar) the page scrolls sideways instead of reflowing. The one exception is the telemetry studio (`/telemetry`), a wide workspace designed for a minimum 1920px viewport.
 
 Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between inline items are 4–8px (`gap-1`, `gap-1.5`, `gap-2`, the three most used values). Groups are 12–16px apart and panel padding is 16–24px. Chips and badges use 2px vertical padding. Laptops, tablets and phones are not the audience: new work needs no `sm`/`md`/`lg` variants, and the existing ones are inert above the floor.
 
@@ -452,3 +452,21 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.
 - **Don't** use emoji in the UI; stored tags that carry them are stripped where shown.
 - **Don't** loop an animation that is not waiting on work, and don't scale, rotate or lift on hover (The Still Wall Rule).
+
+Telemetry header: track/layout leads, with primary and baseline driver/lap controls grouped beside it. Event, split, replay filename, duration and file size live in the Info disclosure; weather and temperatures stay visible under the track name. Back is the single page exit; playback groups rewind, play/pause and a native speed selector. Telemetry is a wide workspace designed for a minimum 1920px viewport.
+
+Telemetry charts, GPS map, HUD and corner phases share flat panes with compact toolbars and simple dividers, rather than nested cards. Trace and sector colors stay semantic. Toolbar sector times use sector 1 gold, sector 2 blue, and sector 3 teal only for session-best splits; other splits stay white. The toolbar lap time is gold only for the recorded personal-best replay/lap on the same layout and class, session-best blue otherwise, and white for ordinary laps; no Fastest Lap badge.
+
+Telemetry channels reserve a compact 24px title row: plain colored names at the left, legends and controls at the right. Below it, traces and scale ticks share one plotting area, filling its height with a 6px bottom inset. SVG viewBoxes match each channel’s actual numeric scale; speed ticks use the path’s computed maximum. Live readings appear only on the scrub cursor; status and source indicators remain beside the channel name. Scrub readouts keep one vertical position below the upper scale label throughout the lap, switching sides only near the right edge.
+
+The telemetry resolution popover uses flat fidelity statistics and explanatory text. Mode/source options use a shared neutral selected treatment; channel and source identity do not introduce saturated card fills.
+
+The telemetry preset editor uses flat channel rows, neutral selected presets and controls, and sans-serif UI copy. Color stays on channel identifiers and traces; category labels stay neutral. The apply button does not use telemetry blue as a primary action color. Compare-to-your-best is a neutral action, with gain colors reserved for measured gains.
+
+The telemetry preset dropdown follows the neutral editor selection treatment: white checkmarks, muted management links and a neutral edit action, with no telemetry-blue fills or borders.
+
+Telemetry drag controls use “Move cursor” and “Zoom range” under a quiet “Drag:” label. “Full lap” stays beside them, disabled at full view; it restores the range without resetting playback. A zoomed view shows its duration, with frame bounds in a tooltip.
+
+Resolution choices use semantic color sparingly: cyan Standard, green High, violet Full Raw; the selected source uses amber DuckDB or cyan VCR. Selected options retain aria-pressed, with softly tinted backgrounds and borders. Raw and active sample figures reflect those roles.
+
+Corner analysis uses “Lap analysis” without a baseline and “vs Baseline” when comparing. Selected rows and phase headings use neutral emphasis, with a red selected flag and small aqua/violet/teal phase icons for orientation. Measured gains/losses, track usage warnings and handling bands retain semantic colors; active overlay labels match their event colors on neutral backgrounds. Phase metrics appear once in the three-column breakdown, without a duplicate summary strip. The speed profile's apex marker is neutral.

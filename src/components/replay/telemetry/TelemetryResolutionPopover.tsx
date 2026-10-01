@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Activity, Zap, Cpu, Sparkles, X, Info } from 'lucide-react';
+import { Activity, Zap, Cpu, Sparkles, X, Info, Film } from 'lucide-react';
 import { TELEMETRY_POINT_SPACING_M, TelemetryResolution } from './telemetryResolution.js';
 
 export interface TelemetryResolutionPopoverProps {
@@ -60,26 +60,27 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
 
   if (!isOpen) return null;
 
+  const hasSourceSelector = Boolean((hasDuckDb || duckdbFilename) && onSelectSource);
   const effectiveRaw = rawPointsCount ?? pointsCount;
   const downsampleRatio = effectiveRaw > 0 && pointsCount > 0 ? (effectiveRaw / pointsCount).toFixed(1) : '1.0';
-  const activeSampleLabel = `${(pointsCount || effectiveRaw || 1200).toLocaleString()} pts`;
-  const fullRawLabel = `${(effectiveRaw || pointsCount || 1200).toLocaleString()} pts`;
   const vcrResolutionLabel = `${(vcrRawPointsCount ?? effectiveRaw).toLocaleString()} pts${vcrRawSampleRateHz ? ` @ ${vcrRawSampleRateHz} Hz` : ''}`;
   const duckdbResolutionLabel = `${(duckdbRawPointsCount ?? effectiveRaw).toLocaleString()} pts${duckdbRawSampleRateHz ? ` @ ${duckdbRawSampleRateHz} Hz` : ''}`;
 
   return (
     <div
       ref={popoverRef}
-      className="absolute top-9 right-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-lmu-card border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-pop-in backdrop-blur-md"
+      role="dialog"
+      aria-label="Telemetry resolution"
+      className="absolute top-9 right-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-lmu-card border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-pop-in"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between border-b border-lmu-border/60 pb-2">
         <div className="flex items-center gap-2">
-          <div className="p-1 rounded-lg bg-lmu-aqua-strong/20 text-lmu-aqua">
+          <div className="text-lmu-info">
             <Activity className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-xs">Telemetry Resolution & Fidelity</h4>
+            <h4 className="font-semibold text-white text-xs">Telemetry Resolution & Fidelity</h4>
             <p className="text-[10px] text-lmu-muted">Sample Rate & Precision</p>
           </div>
         </div>
@@ -88,23 +89,26 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
           onClick={onClose}
           className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
           title="Close"
+          aria-label="Close resolution selector"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Replay Fidelity Stats Card */}
-      <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 space-y-1.5 font-mono text-[11px]">
+      <div className="space-y-1.5 text-[11px]">
+        {!hasSourceSelector && (
         <div className="flex items-center justify-between">
-          <span className="text-lmu-muted">Source Max Fidelity:</span>
-          <span className="font-bold text-lmu-warn-soft">
+          <span className="text-lmu-muted">Recorded samples:</span>
+          <span className="font-mono font-semibold text-lmu-warn-soft">
             {effectiveRaw.toLocaleString()} raw pts {rawSampleRateHz ? `@ ${rawSampleRateHz} Hz` : ''}
           </span>
         </div>
+        )}
         <div className="flex items-center justify-between">
-          <span className="text-lmu-muted">Active In Inspector:</span>
-          <span className="font-bold text-lmu-info">
-            {activeSampleLabel} {isFullResolution ? '(100% Full Raw)' : `(${downsampleRatio}x downsampled)`}
+          <span className="text-lmu-muted">Downsampling:</span>
+          <span className={`font-mono font-semibold ${telemetryResolution === 'full' || isFullResolution ? 'text-lmu-violet-soft' : telemetryResolution === 'high' ? 'text-lmu-gain-soft' : 'text-lmu-info-soft'}`}>
+            {isFullResolution || telemetryResolution === 'full' ? 'None · original samples' : `${downsampleRatio}× fewer points`}
           </span>
         </div>
         {isZoomed && zoomedPointsCount !== undefined && (
@@ -116,8 +120,8 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
       </div>
 
       {/* Trade-off explanation */}
-      <div className="flex items-start gap-2 p-2 rounded-lg bg-lmu-card/50 border border-lmu-border/40 text-[10px] text-lmu-muted leading-relaxed">
-        <Info className="w-3.5 h-3.5 text-lmu-accent-text shrink-0 mt-0.5" />
+      <div className="flex items-start gap-2 text-[10px] text-lmu-muted leading-relaxed">
+        <Info className="w-3.5 h-3.5 text-lmu-muted shrink-0 mt-0.5" />
         <span>
           <strong className="text-white font-semibold">Trade-off:</strong> Points are spaced along the lap, so every track gets the same detail.
           Fewer points load faster; scrubbing costs the same at any resolution. Full Raw keeps every recorded sample.
@@ -126,26 +130,27 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
 
       {/* Resolution Selector Options */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted">Select Resolution Mode</label>
-        <div className="grid grid-cols-3 gap-2">
+        <label className="text-[11px] font-medium text-lmu-text-soft">Select Resolution Mode</label>
+        <div className="grid grid-cols-3 gap-1">
           <button
             type="button"
             onClick={() => {
               onChangeResolution('standard');
               onClose();
             }}
-            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+            aria-pressed={telemetryResolution === 'standard' && !isFullResolution}
+            className={`p-2 rounded border text-left flex flex-col justify-between transition-colors cursor-pointer ${
               telemetryResolution === 'standard' && !isFullResolution
-                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white'
-                : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+                ? 'bg-lmu-info-strong/10 border-lmu-info/45 text-lmu-info-soft'
+                : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
             }`}
           >
-            <div className="flex items-center gap-1 font-bold text-[11px]">
+            <div className="flex items-center gap-1 font-semibold text-[11px]">
               <Cpu className="w-3 h-3 text-lmu-info" />
               Standard
             </div>
             <span className="text-[10px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.standard} m</span>
-            <span className="text-[10px] text-lmu-info-soft/80 mt-0.5">Lighter payload</span>
+            <span className="text-[10px] text-lmu-muted mt-0.5">Lighter payload</span>
           </button>
 
           <button
@@ -154,18 +159,19 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               onChangeResolution('high');
               onClose();
             }}
-            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+            aria-pressed={telemetryResolution === 'high' && !isFullResolution}
+            className={`p-2 rounded border text-left flex flex-col justify-between transition-colors cursor-pointer ${
               telemetryResolution === 'high' && !isFullResolution
-                ? 'bg-lmu-gain-strong/20 border-lmu-gain-strong/60 text-white'
-                : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+                ? 'bg-lmu-gain-strong/10 border-lmu-gain/45 text-lmu-gain-soft'
+                : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
             }`}
           >
-            <div className="flex items-center gap-1 font-bold text-[11px]">
+            <div className="flex items-center gap-1 font-semibold text-[11px]">
               <Zap className="w-3 h-3 text-lmu-gain" />
               High
             </div>
             <span className="text-[10px] text-lmu-muted mt-1 font-mono">1 pt / {TELEMETRY_POINT_SPACING_M.high} m</span>
-            <span className="text-[10px] text-lmu-gain-soft/80 mt-0.5">Default</span>
+            <span className="text-[10px] text-lmu-muted mt-0.5">Default</span>
           </button>
 
           <button
@@ -174,26 +180,27 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               onChangeResolution('full');
               onClose();
             }}
-            className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+            aria-pressed={telemetryResolution === 'full' || Boolean(isFullResolution)}
+            className={`p-2 rounded border text-left flex flex-col justify-between transition-colors cursor-pointer ${
               telemetryResolution === 'full' || isFullResolution
-                ? 'bg-lmu-purple-strong/20 border-lmu-purple-strong/60 text-white'
-                : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+                ? 'bg-lmu-violet-strong/10 border-lmu-violet/45 text-lmu-violet-soft'
+                : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
             }`}
           >
-            <div className="flex items-center gap-1 font-bold text-[11px]">
-              <Sparkles className="w-3 h-3 text-lmu-purple" />
+            <div className="flex items-center gap-1 font-semibold text-[11px]">
+              <Sparkles className="w-3 h-3 text-lmu-violet-soft" />
               Full Raw
             </div>
-            <span className="text-[10px] text-lmu-muted mt-1 font-mono">{fullRawLabel}</span>
-            <span className="text-[10px] text-lmu-purple-soft/80 mt-0.5">1:1 Raw Telemetry</span>
+            <span className="text-[10px] text-lmu-muted mt-1 font-mono">Every sample</span>
+            <span className="text-[10px] text-lmu-muted mt-0.5">Maximum detail</span>
           </button>
         </div>
       </div>
 
       {/* Telemetry Data Source Selector */}
-      {(hasDuckDb || duckdbFilename) && onSelectSource && (
+      {hasSourceSelector && onSelectSource && (
         <div className="space-y-1.5 pt-2 border-t border-lmu-border/60">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted">Telemetry Data Source</label>
+          <label className="text-[11px] font-medium text-lmu-text-soft">Telemetry Data Source</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -201,17 +208,18 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                 if (!duckdbUnavailableReason) onSelectSource('duckdb');
               }}
               disabled={Boolean(duckdbUnavailableReason)}
-              className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+              aria-pressed={source === 'duckdb'}
+              className={`p-2 rounded border text-left flex flex-col justify-between transition-colors cursor-pointer ${
                 duckdbUnavailableReason
                   ? 'border-lmu-border/50 bg-black/20 text-lmu-muted opacity-60 cursor-not-allowed'
                   : source === 'duckdb'
-                  ? 'bg-lmu-warn-strong/20 border-lmu-warn-strong/60 text-white'
-                  : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+                  ? 'bg-lmu-warn-strong/10 border-lmu-warn/45 text-lmu-warn-soft'
+                  : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-1.5 font-bold text-[11px] text-lmu-warn-soft">
-                <span className={`inline-block w-1.5 h-1.5 rounded-full ${source === 'duckdb' ? 'bg-lmu-warn' : 'bg-lmu-warn/40'}`} />
-                ⚡ 100Hz DuckDB
+              <div className="flex items-center gap-1.5 font-semibold text-[11px]">
+                <Zap className="w-3 h-3 text-lmu-warn" />
+                100Hz DuckDB
               </div>
               <span className="text-[10px] text-lmu-muted mt-1 font-mono">
                 {duckdbResolutionLabel}
@@ -224,14 +232,16 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
             <button
               type="button"
               onClick={() => onSelectSource('vcr')}
-              className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+              aria-pressed={source === 'vcr'}
+              className={`p-2 rounded border text-left flex flex-col justify-between transition-colors cursor-pointer ${
                 source === 'vcr'
-                  ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-white'
-                  : 'bg-lmu-card/40 hover:bg-lmu-card border-lmu-border text-lmu-muted hover:text-white'
+                  ? 'bg-lmu-info-strong/10 border-lmu-info/45 text-lmu-info-soft'
+                  : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-1.5 font-bold text-[11px] text-lmu-info-soft">
-                🎬 Native VCR
+              <div className="flex items-center gap-1.5 font-semibold text-[11px]">
+                <Film className="w-3 h-3 text-lmu-info" />
+                Native VCR
               </div>
               <span className="text-[10px] text-lmu-muted mt-1 font-mono">{vcrResolutionLabel}</span>
             </button>

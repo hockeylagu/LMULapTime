@@ -76,10 +76,26 @@ code that drops replay rows because the file is gone.
 - Traffic: `GET /api/replays/:name/traffic` → `server/traffic/raceTrafficService.ts` → race positions index
   (`racePositions.ts`, built on a worker by `racePositionsWorkerClient.ts`, stored by `dbRacePositionStore.ts`) → `trafficSpells.ts`.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
-  `inspector/` (data hook `useReplayInspectorData.ts`, sidebar, lap picker, timeline), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, boundaries via
-  `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; channels by subsystem; `presets/`),
+  `inspector/` (data hook `useReplayInspectorData.ts`, `replayPlaybackCursor.ts` publishes frame-by-frame visual interpolation to the charts and map without rerendering the whole inspector between recorded samples; telemetry readouts remain on real samples, `useReplayPersonalBest.ts` (canonical same-layout/class leaderboard identity for the gold lap time), sidebar, timeline, `compare/` (Compare button, comparison lap picker and its rows); HUD assist labels reserve height so TC/ABS toggles do not resize the map), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, racing lines share one non-scaling 28px hit stroke (44px on touch) per continuous section for nearest-sample selection; selected-corner ranges stay stable during playback to avoid rebuilding static paths, boundaries via
+  `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; `TelemetryScrubCursor.tsx` snaps the shared scrub line to physical pixels for stable thickness; channels by subsystem; `presets/`),
   `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
   `replayComparison.ts`, `computedTelemetry.ts`, `handlingBalanceDetection.ts`, `telemetryPostProcessing.ts`).
+  Steering handling warnings use `src/utils/handlingBalance/evidence.ts`: a sustained response deficit or rear slide is required,
+  not just the fixed-ratio Ackermann residual. With aligned comparison samples, events also need at least 0.10 s of local
+  delta growth and a sustained speed deficit. Badge tooltips show evidence and a driving experiment; badges display time
+  loss only when available. The local delta is observed during the event, not attributed entirely to it.
+  The inspector header uses the chart baseline color for its comparison driver. Driver/lap requests, baseline requests and
+  comparison candidates have separate loading/error recovery; canceled or superseded requests cannot replace the selection,
+  and an old baseline is cleared before loading its replacement.
+  `ReplayInspectorTitle.tsx` keeps weather, rain intensity and air/track temperatures visible beneath the circuit name;
+  its two-line header keeps event/split and replay file details in Info. Lap conditions take precedence over replay metadata when present.
+  The comparison picker defaults to Same condition (Dry, Wet or Dynamic Weather), with explicit condition and All conditions
+  overrides; it uses the inspected trajectory's weather before replay metadata and never guesses from another driver's lap.
+  Telemetry channels: `telemetry/TelemetryStaticTrace.tsx` reserves a 24px title row above the plot, whose SVG viewBox and
+  tick positions cover the same scale; live readings appear only on the scrub cursor, at a fixed height through the lap.
+  Gear ticks and viewBox share the G1–G7 path extent (`gearTraceY` in `telemetryChartPathBuilders.ts`). Steering fits a
+  symmetric lap-wide range (primary and comparison, at least ±25%) with manual ±25/50/100% scales; only the trace paths
+  scale, so handling overlays and raw cursor readings are unchanged.
 
 ## 4. Other features at a glance
 
@@ -159,7 +175,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 **Size limits close to the edge**
 - Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
 - Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`;
-  `src/components/replay/inspector/` is at 18 and `test/components/replay/telemetry/` at 17.
+  `src/components/replay/inspector/` is at 17 (comparison picker split into `compare/`) and `test/components/replay/telemetry/` at 17.
 - Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
 
 **Logic in the wrong place / duplicated**

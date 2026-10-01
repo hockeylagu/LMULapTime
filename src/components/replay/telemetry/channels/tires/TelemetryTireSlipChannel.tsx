@@ -25,7 +25,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="tireSlipGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.4" />
@@ -73,8 +73,8 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
 
   return (
     <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-loss-deep/20">
-      <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-lmu-loss-strong/20 text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
+      <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
+        <span className="text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
           <Disc className="w-3 h-3" />
           TIRE SLIP & LOCKUP
         </span>
@@ -96,23 +96,14 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
             TC
           </span>
         )}
-        {hasSlip ? (
-          <span className={`text-xs font-mono font-bold ${slipPct && slipPct > 80 ? 'text-lmu-loss' : slipPct && slipPct > 50 ? 'text-lmu-warn-soft' : 'text-lmu-gain'}`}>
-            {slipPct !== undefined ? `${slipPct}% Saturation` : '0%'}
-          </span>
-        ) : (
-          <span className="text-[10px] font-mono text-lmu-muted italic">
+
+
+        {!(hasSlip) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             Awaiting telemetry
-          </span>
-        )}
-        {baseSlip !== undefined && (
-          <span className="text-[11px] font-mono text-lmu-info/90 ml-1 pl-2 border-l border-white/10">
-            Base: {baseSlip}%
-          </span>
-        )}
+          </span>)}
       </div>
 
-      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-1.5 px-3 pointer-events-none opacity-20" gridLines={[
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
         { label: '100% Saturation / Skid', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
         { label: '50% Dynamic Grip', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn-soft font-mono' },
         { label: '0% Free Rolling', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
@@ -120,9 +111,7 @@ export const TelemetryTireSlipChannel: React.FC<TelemetryTireSlipChannelProps> =
 
       {isCursorInView && hasSlip && (
         <div
-          className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-            cursorPct < 15 ? 'bottom-2' : 'top-2'
-          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+          className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-loss/80 font-mono font-bold text-[11px] text-lmu-loss-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">

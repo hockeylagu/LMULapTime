@@ -52,7 +52,7 @@ describe('TelemetrySlipAngleChannel', () => {
       />
     );
     expect(screen.getAllByText('+2.45°').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Base: 1.85°')).toBeInTheDocument();
+
     expect(screen.getByText('B: 1.85°')).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe('TelemetryUndersteerChannel', () => {
       />
     );
     expect(screen.getAllByText('+2.30° Understeer (Push)').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Base: +1.50°')).toBeInTheDocument();
+
     expect(screen.getByText('B: +1.50°')).toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe('TelemetryUndersteerChannel', () => {
       />
     );
     expect(screen.getAllByText('-2.70° Oversteer (Loose)').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Base: -1.20°')).toBeInTheDocument();
+
     expect(screen.getByText('B: -1.20°')).toBeInTheDocument();
   });
 });
@@ -118,7 +118,7 @@ describe('TelemetryYawRateChannel', () => {
       />
     );
     expect(screen.getAllByText('+35.6°/s R').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Base: +15.2°/s R')).toBeInTheDocument();
+
     expect(screen.getByText('B: +15.2°/s R')).toBeInTheDocument();
   });
 
@@ -128,7 +128,7 @@ describe('TelemetryYawRateChannel', () => {
   });
 
   it('gives no direction to a rate close to zero', () => {
-    render(<TelemetryYawRateChannel yawRatePath="M 0 50 L 1000 50" currentPoint={point({ yawRateDeg: 0.2 })} isCursorInView={false} cursorPct={50} />);
+    render(<TelemetryYawRateChannel yawRatePath="M 0 50 L 1000 50" currentPoint={point({ yawRateDeg: 0.2 })} isCursorInView={true} cursorPct={50} />);
     expect(screen.getByText('+0.2°/s')).toBeInTheDocument();
   });
 });

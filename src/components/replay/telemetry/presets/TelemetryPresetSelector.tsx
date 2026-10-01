@@ -36,19 +36,20 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
 
   return (
     <div ref={containerRef} className="relative z-30">
-      <div className="flex items-center gap-1 bg-black/40 border border-white/10 rounded-lg p-0.5">
+      <div className="flex items-center gap-1 p-0.5">
         <button
           type="button"
           onClick={() => setIsOpen(prev => !prev)}
           className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-lmu-text hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+          aria-expanded={isOpen}
           title="Select telemetry channel preset"
           data-testid="telemetry-preset-dropdown-btn"
         >
-          <SlidersHorizontal className="w-3 h-3 text-lmu-info" />
+          <SlidersHorizontal className="w-3 h-3 text-lmu-muted" />
           <span className="font-bold truncate max-w-[120px] sm:max-w-[150px]">
             {activePreset?.name ?? 'Channels'}
           </span>
-          <span className="px-1 py-px rounded bg-lmu-info-strong/20 text-lmu-info-soft text-[10px] font-bold">
+          <span className="px-1 py-px text-lmu-muted text-[10px] font-bold">
             {activePreset?.channels.length ?? 0}
           </span>
           <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -60,7 +61,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
             setIsOpen(false);
             onOpenManageModal();
           }}
-          className="p-1 rounded text-lmu-muted hover:text-lmu-info-soft hover:bg-white/5 transition-all cursor-pointer"
+          className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-all cursor-pointer"
           title="Customize, rename, or add channel presets"
           data-testid="telemetry-preset-manage-btn"
         >
@@ -70,7 +71,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
 
       {isOpen && (
         <div
-          className="absolute left-0 mt-1 w-64 rounded-xl bg-lmu-surface border border-lmu-border shadow-2xl z-50 py-1.5 backdrop-blur-md animate-pop-in text-[11px] font-mono"
+          className="absolute left-0 mt-1 w-64 rounded-xl bg-lmu-surface border border-lmu-border shadow-2xl z-50 py-1.5 animate-pop-in text-[11px]"
           data-testid="telemetry-preset-menu"
         >
           <div className="px-3 py-1 text-[10px] font-bold text-lmu-muted uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
@@ -81,7 +82,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                 setIsOpen(false);
                 onOpenManageModal();
               }}
-              className="text-lmu-info hover:underline cursor-pointer"
+              className="text-lmu-muted hover:text-white hover:underline cursor-pointer"
             >
               Manage
             </button>
@@ -99,19 +100,20 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                     setIsOpen(false);
                   }}
                   className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
-                    isSelected ? 'bg-lmu-info-strong/20 text-lmu-info-soft font-bold' : 'text-lmu-text-soft hover:bg-white/5 hover:text-white'
+                    isSelected ? 'bg-lmu-raised/70 text-white font-semibold' : 'text-lmu-text-soft hover:bg-white/5 hover:text-white'
                   }`}
+                  aria-pressed={isSelected}
                   data-testid={`telemetry-preset-option-${p.id}`}
                 >
                   <div className="flex items-center gap-2 truncate pr-2">
                     {isSelected ? (
-                      <Check className="w-3.5 h-3.5 text-lmu-info shrink-0" />
+                      <Check className="w-3.5 h-3.5 text-white shrink-0" />
                     ) : (
                       <div className="w-3.5 h-3.5 shrink-0" />
                     )}
                     <span className="truncate">{p.name}</span>
                   </div>
-                  <span className="text-[10px] px-1.5 py-px rounded bg-white/10 text-lmu-muted font-bold shrink-0">
+                  <span className="text-[10px] px-1.5 py-px text-lmu-muted font-mono shrink-0">
                     {p.channels.length} ch
                   </span>
                 </button>
@@ -126,7 +128,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                 setIsOpen(false);
                 onOpenManageModal();
               }}
-              className="w-full py-1 px-2.5 rounded-lg bg-lmu-info-strong/10 hover:bg-lmu-info-strong/20 border border-lmu-info-strong/30 text-lmu-info-soft font-bold flex items-center justify-center gap-1.5 transition-all text-[10px] cursor-pointer"
+              className="w-full py-1 px-2.5 rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised/70 border border-lmu-border text-lmu-text-soft font-semibold flex items-center justify-center gap-1.5 transition-all text-[10px] cursor-pointer"
             >
               <Settings2 className="w-3 h-3" />
               Edit & Rename Presets

@@ -23,12 +23,11 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
   minTireTemp,
   maxTireTemp,
   currentPoint,
-  currentComparison,
   isCursorInView,
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
       {/* Baseline dashed lines */}
       {baselineTireTempsPaths?.fl && (
         <path d={baselineTireTempsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
@@ -57,31 +56,22 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
 
   return (
     <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-loss-deep/20">
-      <div className="absolute top-2 left-3 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="p-1 rounded bg-lmu-loss-strong/20 text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
+      <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
+        <span className="text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
           <Flame className="w-3 h-3" />
           TIRE CARCASS TEMPS
         </span>
-        {hasData && tt ? (
-          <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-            <span className="text-lmu-aqua">FL: {tt[0]}°C</span>
-            <span className="text-lmu-azure">FR: {tt[1]}°C</span>
-            <span className="text-lmu-warn">RL: {tt[2]}°C</span>
-            <span className="text-lmu-loss">RR: {tt[3]}°C</span>
-          </div>
-        ) : (
-          <span className="text-[10px] font-mono text-lmu-muted italic">
+        {!(hasData && tt) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No tire thermal stream recorded
-          </span>
-        )}
-        {currentComparison?.baseline.tireTemps && (
-          <span className="text-[10px] font-mono text-lmu-warn/80 ml-1 pl-2 border-l border-white/10 hidden sm:inline">
-            Base: {currentComparison.baseline.tireTemps[0]}° / {currentComparison.baseline.tireTemps[1]}° / {currentComparison.baseline.tireTemps[2]}° / {currentComparison.baseline.tireTemps[3]}°C
-          </span>
-        )}
+          </span>)}
       </div>
 
-      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+      <div className="absolute top-1 right-3 h-5 flex items-center gap-2 text-[10px] font-mono pointer-events-none">
+        <span className="text-lmu-aqua-soft">FL</span><span className="text-lmu-azure-soft">FR</span>
+        <span className="text-lmu-warn-soft">RL</span><span className="text-lmu-loss-soft">RR</span>
+      </div>
+
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
         { label: `${maxTireTemp}°C`, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
         { label: `${midTemp}°C`, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
         { label: `${minTireTemp}°C`, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
@@ -89,9 +79,7 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
 
       {isCursorInView && hasData && tt && (
         <div
-          className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-            cursorPct < 15 ? 'bottom-2' : 'top-2'
-          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+          className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
           <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-loss-strong/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">

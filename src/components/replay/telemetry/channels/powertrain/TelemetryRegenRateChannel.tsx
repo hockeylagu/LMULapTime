@@ -22,12 +22,11 @@ export const TelemetryRegenRateChannel: React.FC<TelemetryRegenRateChannelProps>
   baselineRegenRatePath,
   maxRegen,
   currentPoint,
-  currentComparison,
   isCursorInView,
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="regenGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.rpm} stopOpacity="0.4" />
@@ -65,28 +64,17 @@ export const TelemetryRegenRateChannel: React.FC<TelemetryRegenRateChannelProps>
 
   return (
     <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-lmu-purple-deep/20">
-      <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-lmu-purple-strong/20 text-lmu-purple-soft font-black text-[10px] tracking-wider flex items-center gap-1">
+      <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
+        <span className="text-lmu-purple-soft font-black text-[10px] tracking-wider flex items-center gap-1">
           <Activity className="w-3 h-3" />
           REGEN RATE
         </span>
-        {hasRegenData ? (
-          <span className="text-xs font-mono font-bold text-lmu-purple-soft">
-            {currentRegen !== undefined ? currentRegen.toFixed(1) : '--'} <span className="text-[10px] font-normal text-lmu-purple/70">kW</span>
-          </span>
-        ) : (
-          <span className="text-[10px] font-mono text-lmu-muted italic">
+        {!(hasRegenData) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No MGU-K regen telemetry recorded
-          </span>
-        )}
-        {currentComparison?.baseline.regenRate !== undefined && (
-          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
-            Base: {currentComparison.baseline.regenRate.toFixed(1)} kW
-          </span>
-        )}
+          </span>)}
       </div>
 
-      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
         { label: `${maxRegen} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
         { label: `${Math.round(maxRegen / 2)} kW`, borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
         { label: '0 kW', borderClassName: 'border-b border-lmu-purple/30', labelClassName: 'text-[10px] text-lmu-purple-soft font-mono' },
@@ -94,9 +82,7 @@ export const TelemetryRegenRateChannel: React.FC<TelemetryRegenRateChannelProps>
 
       {isCursorInView && hasRegenData && (
         <div
-          className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-            cursorPct < 15 ? 'bottom-2' : 'top-2'
-          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+          className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-lmu-badge text-lmu-purple-soft border border-lmu-purple-strong/40">

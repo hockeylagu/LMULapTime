@@ -26,6 +26,7 @@ export interface DeltaGradientStop {
 
 export interface TelemetryChartPathsResult {
   speedPath: string;
+  maxSpeed: number;
   throttlePath: string;
   throttleArea: string;
   brakePath: string;
@@ -200,6 +201,7 @@ export function computeTelemetryChartPaths(
 
   return {
     speedPath: primary.spd,
+    maxSpeed: bounds.maxSpd,
     throttlePath: primary.thr,
     throttleArea: `${primary.thr} L 1000 95 L 0 95 Z`,
     brakePath: primary.brk,

@@ -22,12 +22,11 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
   baselineFuelPath,
   maxFuel,
   currentPoint,
-  currentComparison,
   isCursorInView,
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.fuel} stopOpacity="0.4" />
@@ -65,28 +64,17 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
 
   return (
     <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
-      <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="p-1 rounded bg-lmu-gain-strong/20 text-lmu-gain-soft font-black text-[10px] tracking-wider flex items-center gap-1">
+      <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
+        <span className="text-lmu-gain-soft font-black text-[10px] tracking-wider flex items-center gap-1">
           <Fuel className="w-3 h-3" />
           FUEL LEVEL
         </span>
-        {hasFuelData ? (
-          <span className="text-xs font-mono font-bold text-lmu-gain-soft">
-            {currentFuel !== undefined ? currentFuel.toFixed(1) : '--'} <span className="text-[10px] font-normal text-lmu-gain/70">L</span>
-          </span>
-        ) : (
-          <span className="text-[10px] font-mono text-lmu-muted italic">
+        {!(hasFuelData) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No fuel stream recorded
-          </span>
-        )}
-        {currentComparison?.baseline.fuel !== undefined && (
-          <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
-            Base: {currentComparison.baseline.fuel.toFixed(1)} L
-          </span>
-        )}
+          </span>)}
       </div>
 
-      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
+      <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
         { label: `${maxFuel} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
         { label: `${Math.round(maxFuel / 2)} L`, borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
         { label: '0 L', borderClassName: 'border-b border-lmu-gain/30', labelClassName: 'text-[10px] text-lmu-gain-soft font-mono' },
@@ -94,9 +82,7 @@ export const TelemetryFuelChannel: React.FC<TelemetryFuelChannelProps> = React.m
 
       {isCursorInView && hasFuelData && (
         <div
-          className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-            cursorPct < 15 ? 'bottom-2' : 'top-2'
-          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+          className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/90 text-lmu-gain-soft border border-lmu-gain-strong/40">

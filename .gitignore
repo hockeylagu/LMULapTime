@@ -39,6 +39,7 @@ Thumbs.db
 .cache/
 .temp/
 tmp/
+.tmp/
 
 # Telemetry recorder build output
 tools/telemetry-recorder/bin/

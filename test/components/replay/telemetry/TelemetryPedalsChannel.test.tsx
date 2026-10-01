@@ -45,22 +45,30 @@ describe('TelemetryPedalsChannel component', () => {
     brakeArea: 'M 0 100 L 100 100 L 100 100 L 0 100 Z',
     currentPoint: mockPoint,
     currentComparison: null,
-    isCursorInView: false,
+    isCursorInView: true,
     cursorPct: 50,
   };
+
+  it('keeps the zero-percent strokes inside the SVG viewport with aligned ticks', () => {
+    const { container } = render(<TelemetryPedalsChannel {...defaultProps} />);
+    expect(container.querySelectorAll('svg[viewBox="0 8 1000 89"]')).toHaveLength(2);
+    const zeroTicks = screen.getAllByText('0%').filter(element => element.style.position === 'absolute');
+    expect(zeroTicks).toHaveLength(2);
+    for (const tick of zeroTicks) expect(Number.parseFloat(tick.style.top)).toBeCloseTo(87 / 89 * 100);
+  });
 
   it('renders throttle and brake channels with values', () => {
     render(<TelemetryPedalsChannel {...defaultProps} />);
     expect(screen.getByText('THROTTLE')).toBeInTheDocument();
-    expect(screen.getByText('85.5%')).toBeInTheDocument();
+    expect(screen.getByText('86%')).toBeInTheDocument();
     expect(screen.getByText('BRAKE')).toBeInTheDocument();
-    expect(screen.getByText('0.0%')).toBeInTheDocument();
+    expect(screen.getAllByText('0%').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders baseline values when comparison is provided', () => {
     render(<TelemetryPedalsChannel {...defaultProps} currentComparison={mockComparison} />);
-    expect(screen.getByText('Base: 90%')).toBeInTheDocument();
-    expect(screen.getByText('Base: 0%')).toBeInTheDocument();
+    expect(screen.getByText('B: 90%')).toBeInTheDocument();
+    expect(screen.getByText('B: 0%')).toBeInTheDocument();
   });
 
   it('renders cursor indicator at cursorPct with TC and ABS badges when active', () => {
@@ -78,7 +86,7 @@ describe('TelemetryPedalsChannel component', () => {
         currentPoint={activePedalsPoint}
         currentComparison={mockComparison}
         isCursorInView={true}
-        cursorPct={10} // < 15 -> bottom positioning
+        cursorPct={10} // Early-lap callouts retain their vertical position
       />
     );
 

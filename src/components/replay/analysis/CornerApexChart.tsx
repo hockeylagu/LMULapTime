@@ -46,7 +46,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
 
   if (compact) {
     return (
-      <div className={`flex flex-col bg-lmu-deep rounded-xl border border-lmu-border/70 overflow-hidden shadow-lg p-2 gap-1.5 shrink-0 ${className}`}>
+      <div className={`flex flex-col bg-lmu-deep border-t border-lmu-border/60 overflow-hidden px-2 py-1 gap-1 shrink-0 ${className}`}>
         <div className="flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="inline-flex items-center h-5 px-1.5 rounded bg-lmu-info-strong/20 text-lmu-info font-mono font-bold text-xs shrink-0 whitespace-nowrap">
@@ -95,21 +95,21 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
   return (
     <div className={`flex flex-col bg-lmu-deep overflow-hidden ${className}`}>
       {/* Master Unified Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-lmu-card border-b border-lmu-border/60 gap-2 min-w-0">
+      <div className="flex items-center justify-between px-2 py-1 border-b border-lmu-border/60 gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
-          <span className="inline-flex items-center h-6 px-2 rounded bg-lmu-info-strong/20 border border-lmu-info-strong/40 text-lmu-info font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
+          <span className="inline-flex items-center h-6 text-lmu-text-soft font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
             Turn {corner.cornerNumber}
           </span>
           {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
             <span
-              className="inline-flex items-center h-6 text-xs text-lmu-text-soft font-mono capitalize shrink-0 whitespace-nowrap"
+              className="inline-flex items-center h-6 text-xs text-lmu-muted font-mono capitalize shrink-0 whitespace-nowrap"
               title={`Angle: ${corner.cornerAngleDeg}°, Direction: ${corner.turnDirection}${corner.effectiveRadiusM ? `, Radius: ~${corner.effectiveRadiusM}m` : ''}`}
             >
               {corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? 'left ↰' : 'right ↱'}
               {corner.effectiveRadiusM ? ` (R≈${corner.effectiveRadiusM}m)` : ''}
             </span>
           )}
-          <span className="inline-flex items-center h-6 px-2 rounded bg-lmu-raised border border-lmu-rule/60 text-xs font-mono text-lmu-text-soft shrink-0 whitespace-nowrap" title={`Corner length: ${corner.exitDistM - corner.entryDistM}m`}>
+          <span className="inline-flex items-center h-6 text-xs font-mono text-lmu-muted shrink-0 whitespace-nowrap" title={`Corner length: ${corner.exitDistM - corner.entryDistM}m`}>
             {corner.exitDistM - corner.entryDistM}m
           </span>
         </div>
@@ -124,7 +124,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
       </div>
 
       {/* Speed & Handling Profile Chart with Understeer / Scrub / Oversteer overlay */}
-      <div className="p-2 bg-lmu-deep">
+      <div className="bg-lmu-deep">
         <CornerSpeedGraph
           corner={corner}
           primaryPoints={primaryPoints}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
+import { ReplayPlaybackCursorContext } from './replayPlaybackCursor.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
@@ -46,6 +47,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     isLoading,
     isTrajLoading,
     error,
+    handleRetryLoad, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
     isCompareMode,
     handleToggleCompare,
     baselineReplayName,
@@ -66,6 +68,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     isPlaying,
     setIsPlaying,
     playbackSpeed,
+    playbackCursor,
     setPlaybackSpeed,
     chartZoomRange,
     setChartZoomRange,
@@ -73,7 +76,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     handleChangeResolution,
     handleSelectDriver,
     handleSelectLap,
-    maxSpeed,
     currentPoint,
     currentLapSummary,
     lapDeltas,
@@ -195,6 +197,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   if (!isOpen) return null;
 
   return (
+    <ReplayPlaybackCursorContext.Provider value={playbackCursor}>
     <ReplayInspectorModalBody
       onClose={onClose}
       activeReplayName={activeReplayName}
@@ -207,6 +210,10 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       isLoading={isLoading}
       isTrajLoading={isTrajLoading}
       error={error}
+      handleRetryLoad={handleRetryLoad}
+      compareLapsError={compareLapsError}
+      handleRetryCompareLaps={handleRetryCompareLaps}
+      handleRetryBaseline={handleRetryBaseline}
       isCompareMode={isCompareMode}
       handleToggleCompare={handleToggleCompare}
       baselineReplayName={baselineReplayName}
@@ -232,7 +239,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleChangeResolution={handleChangeResolution}
       handleSelectDriver={handleSelectDriver}
       handleSelectLap={handleSelectLap}
-      maxSpeed={maxSpeed}
       currentPoint={currentPoint}
       currentLapSummary={currentLapSummary}
       lapDeltas={lapDeltas}
@@ -267,6 +273,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       selectedSource={selectedSource}
       onSelectSource={handleSelectSource}
     />
+    </ReplayPlaybackCursorContext.Provider>
   );
 };
 

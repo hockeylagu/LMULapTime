@@ -128,25 +128,27 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
+      aria-label="Telemetry Channel Presets"
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-lmu-dark border border-lmu-border rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+        className="w-full max-w-4xl bg-lmu-dark border border-lmu-border rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
         onClick={e => e.stopPropagation()}
         data-testid="telemetry-preset-modal"
       >
         {/* Modal Header */}
         <div className="px-5 py-3.5 bg-lmu-card border-b border-lmu-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-lmu-info" />
-            <h2 className="text-sm font-bold text-white font-mono tracking-wide">
+            <SlidersHorizontal className="w-4 h-4 text-lmu-muted" />
+            <h2 className="text-sm font-semibold text-white">
               Telemetry Channel Presets
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close telemetry presets"
             className="p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -154,7 +156,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden font-mono text-xs">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden text-xs">
           {/* Preset Sidebar */}
           <TelemetryPresetSidebar
             presets={presets}
@@ -186,7 +188,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
               />
 
               {/* Channels List */}
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-0 pr-1">
                 <div className="text-[10px] font-bold text-lmu-muted uppercase tracking-wider mb-2">
                   Telemetry Channels
                 </div>
@@ -222,7 +224,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
                       onSelectActivePreset(currentPreset.id);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-lmu-info-strong hover:bg-lmu-info text-lmu-deep font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 rounded-lg bg-lmu-raised hover:bg-lmu-card-hover border border-lmu-rule text-white font-semibold text-xs cursor-pointer transition-colors flex items-center gap-1.5"
                   >
                     <Check className="w-3.5 h-3.5" /> Apply & Use Preset
                   </button>

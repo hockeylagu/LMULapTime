@@ -29,7 +29,7 @@ describe('handlingBalanceDetection', () => {
       expect(detectHandlingBalanceEvents([makePoint({})])).toEqual([]);
     });
 
-    it('detects understeer (US) when understeerDeg exceeds threshold under cornering', () => {
+    it('does not warn from a sustained steering residual alone', () => {
       const points: ReplayTrajectoryPoint[] = [];
       // 10 straight points
       for (let i = 0; i < 10; i++) {
@@ -54,12 +54,7 @@ describe('handlingBalanceDetection', () => {
       }
 
       const events = detectHandlingBalanceEvents(points);
-      expect(events.length).toBe(1);
-      expect(events[0].type).toBe('understeer');
-      expect(events[0].label).toMatch(/^US /);
-      expect(events[0].peakDeg).toBe(5.0);
-      expect(events[0].startIdx).toBe(10);
-      expect(events[0].endIdx).toBe(19);
+      expect(events).toEqual([]);
     });
 
     it('detects oversteer (OS) when understeerDeg is strongly negative', () => {
@@ -77,6 +72,7 @@ describe('handlingBalanceDetection', () => {
             yawRateDeg: 25,
             accelLatG: 1.5,
             understeerDeg: -2.8,
+            slipAngleDeg: 4,
           })
         );
       }
@@ -97,7 +93,7 @@ describe('handlingBalanceDetection', () => {
         points.push(makePoint({ timeSec: i * 0.05, speedKmh: 120 }));
       }
       // Driver caught snap oversteer: yaw rate is +20 (rotating right), but steering is -15 (opposite lock left!)
-      for (let i = 10; i < 16; i++) {
+      for (let i = 10; i < 18; i++) {
         points.push(
           makePoint({
             timeSec: i * 0.05,
@@ -105,10 +101,12 @@ describe('handlingBalanceDetection', () => {
             steerYaw: -15, // opposite lock
             yawRateDeg: 20, // vehicle rotating right
             understeerDeg: -0.5,
+            slipAngleDeg: 4,
+            accelLatG: 1,
           })
         );
       }
-      for (let i = 16; i < 22; i++) {
+      for (let i = 18; i < 22; i++) {
         points.push(makePoint({ timeSec: i * 0.05, speedKmh: 125 }));
       }
 
@@ -146,10 +144,12 @@ describe('handlingBalanceDetection', () => {
             z: i * 10,
             timeSec: i * 0.1,
             speedKmh: 100,
-            steerYaw: 18,
             yawRateDeg: 12,
             accelLatG: 1.1,
-            understeerDeg: i >= 5 && i <= 8 ? 5.5 : 0, // Event around dist 50m - 80m
+            understeerDeg: i >= 5 && i <= 9 ? 5.5 : 0,
+            throttle: 50,
+            accelLonG: -0.3,
+            steerYaw: 40,
           })
         );
       }
@@ -205,9 +205,7 @@ describe('handlingBalanceDetection', () => {
         );
       }
       const cleanEvents = detectHandlingBalanceEvents(cleanPoints);
-      expect(cleanEvents.length).toBe(1);
-      expect(cleanEvents[0].isTireScrub).toBe(false);
-      expect(cleanEvents[0].label).toMatch(/^US /);
+      expect(cleanEvents).toEqual([]);
 
       // 2. Excessive tire scrub with steering gain collapse:
       // Driver dumps +20° extra lock, but car yaw rate collapses
@@ -254,6 +252,9 @@ describe('handlingBalanceDetection', () => {
           isCountersteer: false,
           isTireScrub: false,
           scrubSeverityPct: 0,
+          timeLossSec: null,
+          evidence: 'More steering but less rotation',
+          advice: 'Try less steering lock.',
         },
       ];
 
@@ -287,6 +288,9 @@ describe('handlingBalanceDetection', () => {
           isCountersteer: true,
           isTireScrub: false,
           scrubSeverityPct: 0,
+          timeLossSec: 0.2,
+          evidence: 'Rear slide with opposite lock',
+          advice: 'Try a gentler throttle ramp.',
         },
       ];
 

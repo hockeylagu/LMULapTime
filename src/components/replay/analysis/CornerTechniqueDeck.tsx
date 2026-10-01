@@ -1,10 +1,6 @@
 import React from 'react';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import {
-  timeDeltaClass,
-  formatTimeDelta,
-} from './CornerTableFormatters.js';
-import {
   EntryPhaseCard,
   RotationPhaseCard,
   ExitPhaseCard,
@@ -36,59 +32,9 @@ export const CornerTechniqueDeck: React.FC<CornerTechniqueDeckProps> = ({
     : null;
 
   return (
-    <div className={`flex flex-col gap-2 p-2 pt-0 font-mono text-[11px] ${className}`}>
-      {/* Milestone / Phase Delta Summary Strip */}
-      <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 rounded-lg bg-lmu-deep border border-lmu-border/50 text-[10px] text-lmu-text-soft gap-1.5">
-        <span className="text-lmu-muted font-bold uppercase tracking-wider text-[10px]">
-          {isCompareMode ? 'Phase Deltas' : 'Corner Flow'}
-        </span>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[10px]">
-          {isCompareMode ? (
-            <>
-              <span>
-                <span className="text-lmu-aqua font-semibold">Entry:</span>{' '}
-                <span className={timeDeltaClass(corner.phaseTiming?.entry?.timeDeltaSec ?? 0)}>
-                  {corner.phaseTiming?.entry ? formatTimeDelta(corner.phaseTiming.entry.timeDeltaSec) : '--'}
-                </span>
-              </span>
-              <span className="text-lmu-faint">•</span>
-              <span>
-                <span className="text-lmu-loss font-semibold">Rotation:</span>{' '}
-                <span className={timeDeltaClass(corner.phaseTiming?.rotation?.timeDeltaSec ?? 0)}>
-                  {corner.phaseTiming ? formatTimeDelta(corner.phaseTiming.rotation.timeDeltaSec) : '--'}
-                </span>
-              </span>
-              <span className="text-lmu-faint">•</span>
-              <span>
-                <span className="text-lmu-gain font-semibold">Exit:</span>{' '}
-                <span className={timeDeltaClass(corner.phaseTiming?.exit?.timeDeltaSec ?? 0)}>
-                  {corner.phaseTiming ? formatTimeDelta(corner.phaseTiming.exit.timeDeltaSec) : '--'}
-                </span>
-              </span>
-            </>
-          ) : (
-            <>
-              <span>
-                <span className="text-lmu-aqua font-semibold">Entry:</span>{' '}
-                <span className="text-white font-bold">{corner.exitDistM > corner.entryDistM ? `${Math.round(corner.minDistM - corner.entryDistM)}m` : '--'}</span>
-              </span>
-              <span className="text-lmu-faint">•</span>
-              <span>
-                <span className="text-lmu-loss font-semibold">Apex:</span>{' '}
-                <span className="text-white font-bold">{corner.primaryMinSpeedKmh} km/h</span>
-              </span>
-              <span className="text-lmu-faint">•</span>
-              <span>
-                <span className="text-lmu-gain font-semibold">Exit:</span>{' '}
-                <span className="text-white font-bold">{corner.primaryExitSpeedKmh} km/h</span>
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
+    <div className={`flex flex-col gap-0 px-2 font-mono text-[11px] ${className}`}>
       {/* 3-Column Phase-Based Telemetry Strip: Entry → Rotation → Exit */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-0 md:divide-x divide-lmu-border/50">
         <EntryPhaseCard
           corner={corner}
           isCompareMode={isCompareMode}

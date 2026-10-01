@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, ZoomIn, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MousePointer2, ZoomIn, Expand, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
@@ -82,7 +82,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   };
 
   return (
-    <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-lmu-surface border-b border-lmu-border/40 shrink-0 select-none z-[60]">
+    <div className="px-2 py-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-lmu-surface border-b border-lmu-border/40 shrink-0 select-none z-[60]">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
         {headerContent && (
           <div className="min-w-0 flex items-center shrink-0">
@@ -90,29 +90,10 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           </div>
         )}
 
-        {/* Zoomed State Indicator */}
         {isZoomed && (
-          <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10 text-[10px] font-mono">
-            <span className="px-1.5 py-px rounded bg-lmu-info-strong/20 text-lmu-info-soft font-bold">
-              Zoomed: Frames {viewStart + 1}–{viewEnd + 1}
-            </span>
-            {spanTimeSec !== undefined && (
-              <span className="text-lmu-muted hidden sm:inline">
-                ({spanTimeSec.toFixed(2)}s window)
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onResetZoom();
-              }}
-              className="px-2 py-0.5 rounded bg-lmu-loss-strong/20 hover:bg-lmu-loss-strong/30 border border-lmu-loss-strong/50 text-lmu-loss-soft font-bold transition-all text-[10px] flex items-center gap-1"
-              title="Reset zoom to full lap (or double-click chart)"
-            >
-              ✕ Reset Lap
-            </button>
-          </div>
+          <span className="text-[10px] font-mono text-lmu-muted" title={`Zoomed: Frames ${viewStart + 1}–${viewEnd + 1}`}>
+            Zoomed: {spanTimeSec !== undefined ? `${spanTimeSec.toFixed(2)}s` : 'selected range'}
+          </span>
         )}
       </div>
 
@@ -126,8 +107,9 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           />
         )}
 
-        {/* Mode Switch Pills */}
-        <div className="flex items-center p-0.5 rounded-lg bg-black/40 border border-white/10 text-[10px] font-mono">
+        {/* What dragging the chart does; restoring the full lap stays beside it. */}
+        <div role="group" aria-label="Chart drag mode" className="flex items-center gap-0.5 text-[10px] font-mono">
+          <span className="text-lmu-muted mr-1">Drag:</span>
           <button
             type="button"
             onClick={(e) => {
@@ -136,13 +118,14 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'scrub'
-                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
+                ? 'bg-lmu-raised text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
-            title="Scrub timeline (Tip: hold Shift while dragging to zoom)"
+            aria-pressed={interactionMode === 'scrub'}
+            title="Click or drag to move the cursor. Shift + drag selects a zoom range."
           >
-            <Play className="w-2.5 h-2.5 fill-current" />
-            Scrub
+            <MousePointer2 className="w-3 h-3" />
+            Move cursor
           </button>
           <button
             type="button"
@@ -152,13 +135,20 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             }}
             className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
               interactionMode === 'zoom'
-                ? 'bg-lmu-info-strong text-lmu-deep font-bold'
+                ? 'bg-lmu-raised text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
             }`}
-            title="Drag to zoom into a track section"
+            aria-pressed={interactionMode === 'zoom'}
+            title="Drag across the chart to zoom into a range. Double-click to show the full lap."
           >
             <ZoomIn className="w-2.5 h-2.5" />
-            Zoom Range
+            Zoom range
+          </button>
+          <button type="button" disabled={!isZoomed}
+            onClick={(event) => { event.stopPropagation(); onResetZoom(); }}
+            title="Show the full lap. You can also double-click the chart."
+            className="ml-1 pl-2 pr-1 py-0.5 border-l border-lmu-border flex items-center gap-1 text-lmu-muted hover:text-white disabled:opacity-40 disabled:cursor-default">
+            <Expand className="w-3 h-3" /> Full lap
           </button>
         </div>
 
@@ -170,30 +160,12 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 e.stopPropagation();
                 setIsResPopoverOpen(prev => !prev);
               }}
-              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] transition-all cursor-pointer border ${
-                telemetryResolution === 'standard' && !isFullResolution
-                  ? isResPopoverOpen
-                    ? 'bg-lmu-info-strong/30 border-lmu-info/70 text-lmu-info-soft font-bold'
-                    : 'bg-lmu-info-strong/10 border-lmu-info-strong/30 text-lmu-info-soft hover:bg-lmu-info-strong/20'
-                  : telemetryResolution === 'high' && !isFullResolution
-                  ? isResPopoverOpen
-                    ? 'bg-lmu-gain-strong/30 border-lmu-gain/70 text-lmu-gain-soft font-bold'
-                    : 'bg-lmu-gain-strong/15 border-lmu-gain-strong/40 text-lmu-gain-soft hover:bg-lmu-gain-strong/25'
-                  : isResPopoverOpen
-                  ? 'bg-lmu-purple-strong/40 border-lmu-purple/80 text-lmu-purple-soft font-bold'
-                  : 'bg-lmu-purple-strong/10 border-lmu-purple-strong/30 text-lmu-purple-soft hover:bg-lmu-purple-strong/20'
-              }`}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] cursor-pointer text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''}`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
-              <Activity className={`w-2.5 h-2.5 ${
-                telemetryResolution === 'standard' && !isFullResolution
-                  ? 'text-lmu-info'
-                  : telemetryResolution === 'high' && !isFullResolution
-                  ? 'text-lmu-gain'
-                  : 'text-lmu-purple'
-              }`} />
+              <Activity className="w-2.5 h-2.5 text-lmu-muted" />
               <span className="whitespace-nowrap">
-                {rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'} • {isFullResolution || telemetryResolution === 'full' ? 'Full Raw' : `${(pointsCount || 0).toLocaleString()} pts`}
+                <span className={source === 'duckdb' ? 'text-lmu-warn-soft' : 'text-lmu-muted'}>{rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' • Full Raw' : ''}
               </span>
             </button>
 
@@ -231,7 +203,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(-1);
             }}
             disabled={currentFrame !== undefined && currentFrame <= 1}
-            className="p-1 rounded bg-black/40 hover:bg-lmu-info-strong/20 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            className="p-1 rounded hover:bg-white/5 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
             title="Move scrub line backward (Left Arrow, Shift for 10 frames)"
             aria-label="Step backward (Left Arrow)"
           >
@@ -248,7 +220,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(1);
             }}
             disabled={currentFrame !== undefined && totalFrames !== undefined && currentFrame >= totalFrames}
-            className="p-1 rounded bg-black/40 hover:bg-lmu-info-strong/20 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all border border-white/10 cursor-pointer"
+            className="p-1 rounded hover:bg-white/5 text-lmu-muted hover:text-white disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
             title="Move scrub line forward (Right Arrow, Shift for 10 frames)"
             aria-label="Step forward (Right Arrow)"
           >

@@ -29,7 +29,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 80" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         {deltaGradientStops && deltaGradientStops.length > 0 && (
           <linearGradient id="dynamicDeltaGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
@@ -92,42 +92,14 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
 
   return (
     <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-purple-deep/20">
-      <div className="absolute top-2 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-1 left-3 h-5 right-3 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2">
-          <span className="p-1 rounded bg-lmu-purple-strong/20 text-lmu-purple-soft font-black text-[10px] tracking-wider flex items-center gap-1">
+          <span className="text-lmu-purple-soft font-black text-[10px] tracking-wider flex items-center gap-1">
             <Timer className="w-3 h-3" />
             TIME DELTA (Δt)
           </span>
-          {currentComparison ? (
-            <div className="flex items-center gap-1.5 font-mono">
-              <span className={`text-xs font-bold ${
-                currentComparison.deltaTimeSec <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
-              }`}>
-                {currentComparison.deltaTimeSec <= 0 ? '' : '+'}
-                {currentComparison.deltaTimeSec.toFixed(3)}s
-              </span>
-              <span className={`text-[10px] px-1.5 py-px rounded font-bold uppercase tracking-wider ${
-                currentComparison.deltaTimeSec <= 0 ? 'bg-lmu-gain-strong/20 text-lmu-gain-soft' : 'bg-lmu-loss-strong/20 text-lmu-loss-soft'
-              }`}>
-                {currentComparison.deltaTimeSec <= 0 ? 'Ahead' : 'Behind'}
-              </span>
-              {typeof currentComparison.primaryLateralOffsetM === 'number' && (
-                <span className="text-[10px] text-lmu-text-soft bg-lmu-raised/80 px-1.5 py-0.5 rounded border border-lmu-rule/60 ml-1">
-                  <span className="text-lmu-muted">Line: </span>
-                  {currentComparison.primaryLateralOffsetM >= 0 ? '+' : ''}
-                  {currentComparison.primaryLateralOffsetM.toFixed(1)}m
-                  {typeof currentComparison.deltaLateralOffsetM === 'number' && (
-                    <span className="text-lmu-info-soft ml-1">
-                      (Δ {currentComparison.deltaLateralOffsetM >= 0 ? '+' : ''}{currentComparison.deltaLateralOffsetM.toFixed(1)}m)
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
-          ) : null}
         </div>
 
-        {/* Dynamic Gain/Loss legend */}
         <div className="hidden sm:flex items-center gap-3 text-[10px] font-mono">
           <span className="flex items-center gap-1 text-lmu-gain font-semibold">
             <span className="w-2.5 h-2 rounded-sm bg-lmu-gain-strong/70 border border-lmu-gain/60 inline-block" />
@@ -147,14 +119,12 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
       <TelemetryStaticTrace
         chart={chartSvg}
         gridLines={gridLines}
-        gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20"
+        gridClassName="absolute inset-0 pointer-events-none opacity-20"
       />
 
       {isCursorInView && (
         <div
-          className={`absolute pointer-events-none z-50 flex items-center ${
-            cursorPct < 15 ? 'bottom-2' : 'top-2'
-          } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+          className={`absolute pointer-events-none z-50 flex items-center top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
           <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${

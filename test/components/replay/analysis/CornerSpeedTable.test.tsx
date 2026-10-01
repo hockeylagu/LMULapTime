@@ -123,7 +123,7 @@ describe('CornerSpeedTable', () => {
     );
 
     const row = screen.getByText('T1').closest('tr');
-    expect(row?.className).toContain('bg-lmu-accent/15');
+    expect(row?.className).toContain('bg-lmu-raised/60');
   });
 
   it('shows absolute entry/min/exit speeds and brake/throttle points (no deltas) in self-analysis mode', () => {

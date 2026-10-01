@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ReplayCompareLapPicker } from '../../../../src/components/replay/inspector/ReplayCompareLapPicker.js';
-import { ComparableLap } from '../../../../server/core/types.js';
+import { ReplayCompareLapPicker } from '../../../../../src/components/replay/inspector/compare/ReplayCompareLapPicker.js';
+import { ComparableLap } from '../../../../../server/core/types.js';
 
 const mockLaps: ComparableLap[] = [
   {
@@ -102,6 +102,55 @@ const mockLaps: ComparableLap[] = [
 ];
 
 describe('ReplayCompareLapPicker', () => {
+  const conditionLaps: ComparableLap[] = [
+    { ...mockLaps[0], weatherCondition: 'Dry' },
+    { ...mockLaps[1], weatherCondition: 'Wet', hasRain: true },
+    { ...mockLaps[2], weatherCondition: 'Dynamic Weather', hasRain: true },
+  ];
+  const conditionProps = {
+    laps: conditionLaps, selectedReplayName: null, selectedLapNumber: null,
+    currentReplayName: 'Bahrain_Q1_7.Vcr', currentLapNumber: 4, currentDriverName: 'Samuel Lague',
+    filter: 'all' as const, isLoading: false, onChangeFilter: vi.fn(), onClose: vi.fn(), onSelectLap: vi.fn(),
+  };
+
+  it('defaults to the exact current lap condition and allows all or specific conditions', () => {
+    render(<ReplayCompareLapPicker {...conditionProps} />);
+    const condition = screen.getByRole('combobox', { name: 'Filter by condition' });
+    expect(condition).toHaveValue('same');
+    expect(screen.getByRole('option', { name: 'Same condition (Wet)' })).toBeInTheDocument();
+    expect(screen.getByText('1:59.100')).toBeInTheDocument();
+    expect(screen.queryByText('1:59.500')).not.toBeInTheDocument();
+    expect(screen.queryByText('1:59.200')).not.toBeInTheDocument();
+    fireEvent.change(condition, { target: { value: 'all' } });
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.getByText('1:59.200')).toBeInTheDocument();
+    fireEvent.change(condition, { target: { value: 'Dry' } });
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.queryByText('1:59.100')).not.toBeInTheDocument();
+    fireEvent.change(condition, { target: { value: 'Dynamic Weather' } });
+    expect(screen.getByText('1:59.200')).toBeInTheDocument();
+    expect(screen.queryByText('1:59.100')).not.toBeInTheDocument();
+  });
+
+  it('follows loaded weather in Same condition and preserves a manual override', () => {
+    const { rerender } = render(<ReplayCompareLapPicker {...conditionProps} currentWeatherCondition="Dry" />);
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    rerender(<ReplayCompareLapPicker {...conditionProps} currentWeatherCondition="Wet" />);
+    expect(screen.getByText('1:59.100')).toBeInTheDocument();
+    expect(screen.queryByText('1:59.500')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by condition' }), { target: { value: 'Dry' } });
+    rerender(<ReplayCompareLapPicker {...conditionProps} currentWeatherCondition="Dynamic Weather" />);
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Filter by condition' })).toHaveValue('Dry');
+  });
+
+  it('does not infer the current condition from another driver or lap', () => {
+    render(<ReplayCompareLapPicker {...conditionProps} currentDriverName="Different Driver" currentLapNumber={9} />);
+    expect(screen.getByRole('option', { name: /^Same condition$/ })).toBeInTheDocument();
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.getByText('1:59.100')).toBeInTheDocument();
+  });
+
   it('renders all four filter buttons: Same Session Lap, Player, Same Sessions, All Drivers', () => {
     render(
       <ReplayCompareLapPicker

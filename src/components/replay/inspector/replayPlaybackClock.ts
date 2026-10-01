@@ -24,6 +24,17 @@ function isTimed(points: ReplayTrajectoryPoint[]): boolean {
   return points.length > 1 && (points[points.length - 1].timeSec ?? 0) > (points[0].timeSec ?? 0);
 }
 
+/** Visual interpolation only; gaps/teleports and repeated timestamps stay at the sample. */
+export function playbackSampleFraction(points: ReplayTrajectoryPoint[], clock: PlaybackClock): number {
+  const next = points[clock.index + 1];
+  const current = points[clock.index];
+  if (!next || next.isTeleport || !current || Math.hypot(next.x - current.x, next.z - current.z) > 20) return 0;
+  const timed = isTimed(points);
+  const start = sampleTime(points, clock.index, timed);
+  const span = sampleTime(points, clock.index + 1, timed) - start;
+  return span > 0 ? Math.max(0, Math.min(1, (clock.timeSec - start) / span)) : 0;
+}
+
 /** Starts the clock at a sample (play pressed, or the user moved the cursor while playing). */
 export function playbackClockAt(points: ReplayTrajectoryPoint[], index: number): PlaybackClock {
   const i = Math.max(0, Math.min(points.length - 1, index));

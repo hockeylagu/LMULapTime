@@ -2,6 +2,7 @@ import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { CornerSegmentComparison } from './cornerAnalysis/index.js';
 import { PointComparison } from './replayComparison.js';
 import { getTrajectoryDistances } from './lapAlignment.js';
+import { evaluateHandlingEvidence, handlingAdvice, SIGNIFICANT_HANDLING_LOSS_SEC } from './handlingBalance/evidence.js';
 
 export type HandlingBalanceType = 'understeer' | 'oversteer';
 export type HandlingBalancePhase = 'E' | 'M' | 'X' | 'EM' | 'MX';
@@ -23,6 +24,9 @@ export interface HandlingBalanceEvent {
   isCountersteer: boolean;
   isTireScrub: boolean;
   scrubSeverityPct: number;
+  timeLossSec: number | null;
+  evidence: string;
+  advice: string;
 }
 
 export interface VisibleHandlingBand {
@@ -38,11 +42,14 @@ export interface VisibleHandlingBand {
   isCountersteer: boolean;
   isTireScrub: boolean;
   scrubSeverityPct: number;
+  timeLossSec: number | null;
+  evidence: string;
+  advice: string;
 }
 
 const MIN_SPEED_KMH = 35;
-const MIN_EVENT_DURATION_SEC = 0.12; // Minimum ~120ms to reject single kerb spikes
-const MERGE_GAP_DURATION_SEC = 0.40;  // Merge pulses in the same corner into a unified event
+const MIN_EVENT_DURATION_SEC = 0.30; // Time-based at every telemetry resolution, including 100 Hz
+const MERGE_GAP_DURATION_SEC = 0.15; // Bridge brief threshold flicker, not separate corrections
 const UNDERSTEER_THRESHOLD_DEG = 2.0; // Point-level entry threshold for understeer
 const UNDERSTEER_PEAK_MIN_DEG = 3.2;   // Event must reach at least 3.2° push to be classified as genuine understeer
 const OVERSTEER_THRESHOLD_DEG = -1.0;  // Point-level entry threshold for oversteer
@@ -52,7 +59,7 @@ const OVERSTEER_PEAK_MIN_DEG = -1.6;   // Event must reach at least -1.6° or op
  * Derives dynamic handling balance (deg) if not pre-computed on the point.
  */
 function getOrComputeBalanceDeg(p: ReplayTrajectoryPoint): number {
-  if (p.understeerDeg !== undefined) return p.understeerDeg;
+  if (p.understeerDeg !== undefined && Number.isFinite(p.understeerDeg)) return p.understeerDeg;
 
   const spd = p.speedKmh ?? 0;
   const steer = p.steerYaw ?? 0;
@@ -79,7 +86,8 @@ function classifyPointBalance(p: ReplayTrajectoryPoint): {
   isCountersteer: boolean;
 } {
   const spd = p.speedKmh ?? 0;
-  if (spd < MIN_SPEED_KMH) {
+  if (spd < MIN_SPEED_KMH || !Number.isFinite(spd) || !Number.isFinite(p.timeSec) ||
+      !Number.isFinite(p.steerYaw) || !Number.isFinite(p.yawRateDeg) || p.isOffTrack) {
     return { type: null, balanceDeg: 0, isCountersteer: false };
   }
 
@@ -90,7 +98,7 @@ function classifyPointBalance(p: ReplayTrajectoryPoint): {
   const balance = getOrComputeBalanceDeg(p);
 
   // 1. Countersteer / Catching opposite lock: steering opposes vehicle rotation
-  const isCountersteer = steer * yaw < -10 && Math.abs(yaw) >= 3.0;
+  const isCountersteer = steer * yaw < 0 && Math.abs(steer) >= 8 && Math.abs(yaw) >= 8;
 
   // 2. Oversteer check (countersteer, negative balance, or rear slide)
   if (
@@ -183,78 +191,14 @@ export function evaluateTireScrub(
   peakDeg: number,
   pointComparisons?: PointComparison[]
 ): { isTireScrub: boolean; scrubSeverityPct: number } {
-  // Normal cornering slip angles (under 5.5°) represent healthy tire grip, never scrub
-  if (peakDeg < 5.5) {
-    return { isTireScrub: false, scrubSeverityPct: 0 };
-  }
-
-  let hasGainCollapse = false;
-  let hasScrubDrag = false;
-  let hasBaselineDivergence = false;
-
-  const steerAngles: number[] = [];
-  const curvatures: number[] = [];
-
-  for (let i = startIdx; i <= endIdx; i++) {
-    const p = points[i];
-    const steer = Math.abs(p.steerYaw ?? 0);
-    const yaw = Math.abs(p.yawRateDeg ?? 0);
-    const throttle = p.throttle ?? 0;
-    const latG = Math.abs(p.accelLatG ?? 0);
-    const lonG = p.accelLonG ?? 0;
-    const v = Math.max(5, (p.speedKmh ?? 0) / 3.6);
-    const yawRad = (yaw * Math.PI) / 180;
-
-    steerAngles.push(steer);
-    curvatures.push(yawRad / v);
-
-    // 1. True Induced Scrub Drag: applying throttle but car is losing speed under heavy cornering
-    if (throttle > 35 && lonG < -0.10 && latG > 1.0 && steer > 25) {
-      hasScrubDrag = true;
-    }
-
-    // 2. Baseline Divergence: using noticeably more steering lock than baseline without extra speed
-    if (pointComparisons && pointComparisons[i]) {
-      const comp = pointComparisons[i];
-      if (comp.deltaSteer > 15 && comp.deltaSpeedKmh <= 0) {
-        hasBaselineDivergence = true;
-      }
-    }
-  }
-
-  // 3. Steering Gain Collapse: driver added >= 8° steering lock, but vehicle curvature dropped by > 15%
-  if (steerAngles.length >= 4) {
-    const minSteer = Math.min(...steerAngles.slice(0, Math.floor(steerAngles.length / 2) + 1));
-    const maxSteer = Math.max(...steerAngles);
-    const steerGainDelta = maxSteer - minSteer;
-
-    if (steerGainDelta >= 8.0) {
-      const minIdx = steerAngles.indexOf(minSteer);
-      const maxIdx = steerAngles.indexOf(maxSteer);
-
-      if (maxIdx > minIdx) {
-        const curvAtMin = curvatures[minIdx] ?? 0;
-        const curvAtMax = curvatures[maxIdx] ?? 0;
-
-        // Curvature dropped significantly despite adding steering lock
-        if (curvAtMax < curvAtMin * 0.85 && curvAtMin > 0.008) {
-          hasGainCollapse = true;
-        }
-      }
-    }
-  }
-
-  // Heavy push saturation threshold (only at extreme understeer)
-  const isSeverePush = peakDeg >= 11.0;
-
-  const isTireScrub = hasGainCollapse || hasScrubDrag || hasBaselineDivergence || isSeverePush;
-  const scrubSeverityPct = isTireScrub
-    ? Math.min(100, Math.max(25, Math.round((peakDeg / 12.0) * 100)))
-    : 0;
-
+  // A large Ackermann residual alone does not establish tyre scrub.
+  if (peakDeg < 5.5) return { isTireScrub: false, scrubSeverityPct: 0 };
+  const evidence = evaluateHandlingEvidence(points, startIdx, endIdx, pointComparisons);
+  const isTireScrub = evidence.responseCollapse || evidence.scrubDrag;
+  // Proxy index retained for callers; it is not a measured percentage of grip lost.
+  const scrubSeverityPct = isTireScrub ? Math.min(100, Math.round(peakDeg / 12 * 100)) : 0;
   return { isTireScrub, scrubSeverityPct };
 }
-
 /**
  * Deterministically detects understeer and oversteer handling limit events from trajectory points.
  */
@@ -286,7 +230,8 @@ export function detectHandlingBalanceEvents(
     const p = points[i];
     const { type, balanceDeg, isCountersteer } = classifyPointBalance(p);
 
-    if (type !== currentType) {
+    const sampleGap = i > 0 ? (p.timeSec ?? NaN) - (points[i - 1].timeSec ?? NaN) : 0;
+    if (type !== currentType || sampleGap > 0.30 || sampleGap < 0) {
       if (currentType !== null) {
         rawEvents.push({
           type: currentType,
@@ -324,7 +269,7 @@ export function detectHandlingBalanceEvents(
   const filteredEvents = rawEvents.filter((ev) => {
     const tStart = points[ev.startIdx].timeSec ?? 0;
     const tEnd = points[ev.endIdx].timeSec ?? tStart;
-    const durationOk = tEnd - tStart >= MIN_EVENT_DURATION_SEC || ev.endIdx - ev.startIdx >= 3;
+    const durationOk = tEnd - tStart >= MIN_EVENT_DURATION_SEC - 1e-9;
     if (!durationOk) return false;
 
     // Reject normal cornering slip angles: require peak handling limit deficit
@@ -346,7 +291,11 @@ export function detectHandlingBalanceEvents(
     const last = mergedEvents[mergedEvents.length - 1];
     if (last && last.type === ev.type) {
       const gapSec = (points[ev.startIdx].timeSec ?? 0) - (points[last.endIdx].timeSec ?? 0);
-      if (gapSec <= MERGE_GAP_DURATION_SEC) {
+      const sameTurn = (points[last.endIdx].steerYaw ?? 0) * (points[ev.startIdx].steerYaw ?? 0) > 0;
+      const uninterrupted = points.slice(last.endIdx + 1, ev.startIdx).every(p =>
+        !p.isOffTrack && Number.isFinite(p.timeSec) &&
+        [null, ev.type].includes(classifyPointBalance(p).type));
+      if (gapSec >= 0 && gapSec <= MERGE_GAP_DURATION_SEC && sameTurn && uninterrupted) {
         last.endIdx = ev.endIdx;
         last.isCountersteer = last.isCountersteer || ev.isCountersteer;
         last.balanceVals.push(...ev.balanceVals);
@@ -358,7 +307,7 @@ export function detectHandlingBalanceEvents(
   }
 
   // Construct structured handling balance events
-  return mergedEvents.map((ev, idx) => {
+  return mergedEvents.flatMap((ev, idx): HandlingBalanceEvent[] => {
     const startDistM = cumDists[ev.startIdx] ?? 0;
     const endDistM = cumDists[ev.endIdx] ?? startDistM;
     const startTimeSec = points[ev.startIdx].timeSec ?? 0;
@@ -377,6 +326,13 @@ export function detectHandlingBalanceEvents(
 
     const peakSpeedKmh = Math.round(Math.max(0, ...ev.speeds));
 
+    const evidence = evaluateHandlingEvidence(points, ev.startIdx, ev.endIdx, pointComparisons);
+    if (ev.type === 'understeer' && !evidence.responseCollapse && !evidence.scrubDrag && !evidence.excessSteering) return [];
+    if (ev.type === 'oversteer' && !evidence.rearSlide) return [];
+    // A comparison supplies significance, never a lap-wide accumulated deficit.
+    // Missing/partial comparisons cannot establish time cost and are suppressed.
+    if (pointComparisons?.length && (evidence.timeLossSec === null || evidence.timeLossSec < SIGNIFICANT_HANDLING_LOSS_SEC - 1e-9)) return [];
+
     const { isTireScrub, scrubSeverityPct } =
       ev.type === 'understeer'
         ? evaluateTireScrub(points, ev.startIdx, ev.endIdx, peakDeg, pointComparisons)
@@ -385,7 +341,7 @@ export function detectHandlingBalanceEvents(
     const prefix = ev.type === 'understeer' ? (isTireScrub ? 'SCRUB' : 'US') : 'OS';
     const label = `${prefix} ${phase}`;
 
-    return {
+    return [{
       id: `balance-${ev.type}-${idx}-${ev.startIdx}`,
       type: ev.type,
       phase,
@@ -402,7 +358,13 @@ export function detectHandlingBalanceEvents(
       isCountersteer: ev.isCountersteer,
       isTireScrub,
       scrubSeverityPct,
-    };
+      timeLossSec: evidence.timeLossSec === null ? null : Number(evidence.timeLossSec.toFixed(3)),
+      evidence: ev.type === 'oversteer' ? (ev.isCountersteer ? 'Rear slide with opposite lock' : 'Sustained rear slide')
+        : evidence.responseCollapse ? 'More steering but less rotation'
+        : evidence.scrubDrag ? 'Speed falling on throttle without braking'
+        : 'More steering and less speed than the baseline',
+      advice: handlingAdvice(ev.type, phase, isTireScrub),
+    }];
   });
 }
 
@@ -449,6 +411,9 @@ export function computeVisibleHandlingBands(
       isCountersteer: Boolean(ev.isCountersteer),
       isTireScrub: ev.isTireScrub,
       scrubSeverityPct: ev.scrubSeverityPct,
+      timeLossSec: ev.timeLossSec,
+      evidence: ev.evidence,
+      advice: ev.advice,
     });
   }
 

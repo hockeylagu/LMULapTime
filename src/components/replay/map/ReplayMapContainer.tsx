@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CircleDot, Eye, EyeOff, Disc } from 'lucide-react';
+import { CircleDot, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
@@ -79,22 +79,26 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
     () => corners?.find(c => c.cornerNumber === selectedCornerNumber) || null,
     [corners, selectedCornerNumber]
   );
+  const highlightDistRange = useMemo(() => selectedCorner
+    ? { startDistM: selectedCorner.entryDistM, endDistM: selectedCorner.exitDistM }
+    : null, [selectedCorner]);
 
   if (!trajectory) return null;
 
   return (
     <>
-      <div className="flex items-center justify-between px-0.5 shrink-0 text-xs">
+      <div className="flex flex-wrap items-center justify-between px-2 py-1 gap-2 shrink-0 text-xs">
         <div className="flex items-center gap-1.5">
           {onChangeColorBy && (
-            <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
+            <div className="flex items-center gap-1">
               {(['pedal', 'speed', ...(isCompareMode && baselinePoints ? (['delta'] as const) : [])] as const).map(mode => (
                 <button
                   key={mode}
                   onClick={() => onChangeColorBy(mode)}
                   title={`Color by ${mode}`}
+                  aria-pressed={colorBy === mode}
                   className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
-                    colorBy === mode ? 'bg-lmu-card border border-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+                    colorBy === mode ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
                   }`}
                 >
                   {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
@@ -106,11 +110,12 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             <button
               type="button"
               onClick={() => setShowPedalMarkers(v => !v)}
+              aria-pressed={showPedalMarkers}
               title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                 showPedalMarkers
-                  ? 'bg-lmu-loss-strong/20 border-lmu-loss-strong/60 text-lmu-loss-soft'
-                  : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
+                  ? 'bg-lmu-raised text-white'
+                  : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
               }`}
             >
               <Disc className="w-3 h-3 text-lmu-loss" />
@@ -120,18 +125,17 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         </div>
         <div className="flex items-center gap-1.5">
           {baselinePoints ? (
-            <div className="flex items-center gap-1 bg-lmu-bg p-1 rounded-lg border border-lmu-border/60">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
                 title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'primary'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
-                    : 'text-lmu-info-soft bg-lmu-info-deep/40 border border-lmu-info-strong/40 hover:text-white hover:bg-lmu-info-deep/50'
+                    : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
                 }`}
               >
                 <span className="w-2.5 h-1 rounded-sm bg-lmu-info shrink-0" />
-                {fadedLine === 'primary' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Mine
               </button>
               <button
@@ -140,11 +144,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'baseline'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
-                    : 'text-lmu-warn-soft bg-lmu-warn-deep/40 border border-lmu-warn-strong/40 hover:text-white hover:bg-lmu-warn-deep/50'
+                    : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
                 }`}
               >
                 <span className="w-2.5 h-0 border-b-2 border-dashed border-lmu-warn shrink-0" />
-                {fadedLine === 'baseline' ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 Baseline
               </button>
             </div>
@@ -155,10 +158,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             title={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
             aria-label={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
             aria-pressed={showFrictionCircle}
-            className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+            className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
               showFrictionCircle
-                ? 'bg-lmu-info-strong/20 border-lmu-info-strong/60 text-lmu-info-soft'
-                : 'bg-lmu-bg border-lmu-border/60 text-lmu-muted hover:text-white hover:border-lmu-border'
+                ? 'bg-lmu-raised text-white'
+                : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
             }`}
           >
             <CircleDot className="w-4 h-4" />
@@ -168,8 +171,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
       </div>
 
       {/* SINGLE UNIFIED MAP PANE */}
-      <div className="flex flex-col gap-2.5 flex-1 min-h-0 h-full">
-        <div className="flex-1 min-h-0 rounded-xl bg-lmu-deep border border-lmu-border p-2 flex items-center justify-center relative overflow-hidden">
+      <div className="flex flex-col gap-0 flex-1 min-h-0 h-full">
+        <div className="flex-1 min-h-0 bg-lmu-deep p-0 flex items-center justify-center relative overflow-hidden">
           <GpsTrackMap
             points={trajectory.points}
             bounds={trajectory.bounds}
@@ -186,11 +189,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             pedalMarkers={pedalMarkers}
             showPedalMarkers={showPedalMarkers}
             dimNonSelectedTrack={Boolean(selectedCorner)}
-            highlightDistRange={
-              selectedCorner
-                ? { startDistM: selectedCorner.entryDistM, endDistM: selectedCorner.exitDistM }
-                : null
-            }
+            highlightDistRange={highlightDistRange}
             trackVenue={trackVenue}
             trackCourse={trackCourse}
             layoutKey={layoutKey}

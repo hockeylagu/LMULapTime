@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advancePlaybackClock, playbackClockAt } from '../../../../src/components/replay/inspector/replayPlaybackClock.js';
+import { advancePlaybackClock, playbackClockAt, playbackSampleFraction } from '../../../../src/components/replay/inspector/replayPlaybackClock.js';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 const at = (timeSec: number): ReplayTrajectoryPoint => ({ x: 0, y: 0, z: 0, speedKmh: 100, timeSec });
@@ -20,6 +20,17 @@ function play(points: ReplayTrajectoryPoint[], speed: number) {
 }
 
 describe('replay playback clock', () => {
+  it('interpolates sparse playback samples without changing their recorded index', () => {
+    const points = [0, 0.2, 1].map(at);
+    const clock = advancePlaybackClock(points, playbackClockAt(points, 0), 50, 1)!;
+    expect(clock.index).toBe(0);
+    expect(playbackSampleFraction(points, clock)).toBeCloseTo(0.25);
+    expect(playbackSampleFraction(points, { timeSec: 0.6, index: 1 })).toBeCloseTo(0.5);
+    expect(playbackSampleFraction(points, { timeSec: 1, index: 2 })).toBe(0);
+    points[1].isTeleport = true;
+    expect(playbackSampleFraction(points, clock)).toBe(0);
+    expect(playbackSampleFraction([at(0), at(0), at(1)], clock)).toBe(0);
+  });
   // Dense samples through a braking zone, sparse on the straight, as the server serves a lap.
   const uneven = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 2, 4, 6, 8, 10].map(at);
 

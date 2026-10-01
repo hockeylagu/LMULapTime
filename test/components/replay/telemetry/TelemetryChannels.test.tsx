@@ -41,6 +41,12 @@ describe('Authentic VCR Telemetry Channels', () => {
     tireTemps: [88, 89, 94, 95],
   };
 
+  it('keeps the gear-one stroke inside the SVG viewport with its tick aligned', () => {
+    const { container } = render(<TelemetryGearChannel gearPath="M 0 83.6 L 1000 83.6" isCursorInView={false} cursorPct={0} />);
+    expect(container.querySelector('svg[viewBox="0 13 1000 72.57142857142857"]')).toBeInTheDocument();
+    expect(Number.parseFloat(screen.getByText('G1').style.top)).toBeCloseTo(494 / 508 * 100);
+  });
+
   it('renders TelemetryGearChannel with yellow/amber gear styling and label', () => {
     const { container } = render(
       <TelemetryGearChannel
@@ -83,6 +89,16 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(screen.getAllByText(/85%/i).length).toBeGreaterThanOrEqual(1);
   });
 
+  it('fits the steering trace to the lap and supports a full-range override', () => {
+    const { container } = render(<TelemetrySteerChannel steerPath="M 0 50 L 1000 54" points={[{ ...mockPoint, steerYaw: 27 }]} currentPoint={mockPoint} isCursorInView={true} cursorPct={50} />);
+    expect(screen.getByRole('combobox', { name: 'Steering scale' })).toHaveValue('fit');
+    expect(screen.getByText('-25% L')).toBeInTheDocument();
+    expect(container.querySelector('g[transform]')).toHaveAttribute('transform', 'translate(0 50) scale(1 4) translate(0 -50)');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Steering scale' }), { target: { value: '100' } });
+    expect(screen.getByText('-100% L')).toBeInTheDocument();
+    expect(container.querySelector('g[transform]')).toHaveAttribute('transform', 'translate(0 50) scale(1 1) translate(0 -50)');
+  });
+
   it('renders TelemetrySteerChannel with steering input percentage', () => {
     render(
       <TelemetrySteerChannel
@@ -94,8 +110,8 @@ describe('Authentic VCR Telemetry Channels', () => {
     );
 
     expect(screen.getByText(/STEERING/i)).toBeInTheDocument();
-    expect(screen.getByText(/4\.6%/i)).toBeInTheDocument();
-    expect(screen.getByText(/RIGHT/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+5%/i)).toBeInTheDocument();
+    expect(screen.queryByText(/4\.6% RIGHT/i)).not.toBeInTheDocument();
   });
 
   it('renders understeer and oversteer overlay and toggles overlay visibility', () => {
@@ -108,8 +124,8 @@ describe('Authentic VCR Telemetry Channels', () => {
         z: i * 20,
         speedKmh: 130,
         timeSec: i * 0.1,
-        steerYaw: 20,
-        yawRateDeg: 8,
+        steerYaw: i >= 5 && i <= 12 ? 20 + (i - 5) * 4 : 20,
+        yawRateDeg: i >= 5 && i <= 12 ? 20 - (i - 5) * 1.5 : 20,
         accelLatG: 1.2,
         understeerDeg: i >= 5 && i <= 12 ? 5.0 : 0, // US event
       });
@@ -322,10 +338,10 @@ describe('Authentic VCR Telemetry Channels', () => {
     );
 
     expect(screen.getByText(/BRAKE ROTOR TEMPS/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/FL:\s*450°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/FR:\s*445°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RL:\s*380°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RR:\s*375°C/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FL:\s*450°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FR:\s*445°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RL:\s*380°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RR:\s*375°/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetrySuspPosChannel with 4-corner ride height and emerald header', () => {
@@ -341,10 +357,10 @@ describe('Authentic VCR Telemetry Channels', () => {
     );
 
     expect(screen.getByText(/RIDE HEIGHT/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/FL:\s*24\.5mm/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/FR:\s*25\.0mm/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RL:\s*32\.1mm/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RR:\s*31\.8mm/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FL:\s*24\.5/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FR:\s*25\.0/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RL:\s*32\.1/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RR:\s*31\.8/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetryWheelSpeedsChannel with 4-corner wheel speeds and cyan header', () => {
@@ -416,10 +432,10 @@ describe('Authentic VCR Telemetry Channels', () => {
     );
 
     expect(screen.getByText(/TIRE CARCASS TEMPS/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/FL:\s*88°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/FR:\s*89°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RL:\s*94°C/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/RR:\s*95°C/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FL:\s*88°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/FR:\s*89°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RL:\s*94°/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/RR:\s*95°/i).length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -488,7 +504,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     rerender(
       <TelemetryChannelRenderer channelId="accel-total" source="duckdb" {...shared} />
     );
-    expect(screen.getAllByText('1.30 G Resultant').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('1.30 G').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
   });
 
