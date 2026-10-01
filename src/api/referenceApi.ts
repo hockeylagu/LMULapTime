@@ -1,4 +1,8 @@
-import type { ReferenceLaptimesCache } from '../../shared/types/index.js';
+import type {
+  ReferenceLaptimesCache,
+  ReferenceBenchmarkDiff,
+  BenchmarkDiffSummary,
+} from '../../shared/types/index.js';
 import { fetchJson } from './apiClient.js';
 
 // The benchmark table changes only when it is refreshed (Settings, or the check at server start),
@@ -28,4 +32,12 @@ export function loadReferenceLaptimes(): Promise<ReferenceLaptimesCache> {
 export function invalidateReferenceLaptimes(): void {
   pending = null;
   loaded = null;
+}
+
+export function fetchBenchmarkDiffHistory(): Promise<BenchmarkDiffSummary[]> {
+  return fetchJson<BenchmarkDiffSummary[]>('/api/reference-laptimes/diffs');
+}
+
+export function fetchBenchmarkDiffById(id: number): Promise<ReferenceBenchmarkDiff> {
+  return fetchJson<ReferenceBenchmarkDiff>(`/api/reference-laptimes/diffs/${id}`);
 }

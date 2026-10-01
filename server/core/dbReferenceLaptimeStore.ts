@@ -3,7 +3,83 @@ import {
   ReferenceLaptimeEntry,
   ReferenceLaptimesCache,
   ReferenceBenchmarkDiff,
+  BenchmarkDiffSummary,
 } from './types.js';
+
+export function recordBenchmarkDiff(
+  db: DatabaseType,
+  diff: ReferenceBenchmarkDiff,
+  sourceUrl: string = ''
+): number {
+  const stmt = db.prepare(`
+    INSERT INTO benchmark_diff_history (
+      timestamp, source_url, total_entries, added_count, updated_count, removed_count,
+      has_changes, total_affected_sessions, total_category_shifts, diff_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const info = stmt.run(
+    diff.timestamp || new Date().toISOString(),
+    sourceUrl,
+    diff.totalEntries,
+    diff.addedCount,
+    diff.updatedCount,
+    diff.removedCount,
+    diff.hasChanges ? 1 : 0,
+    diff.totalAffectedSessions || 0,
+    diff.totalCategoryShifts || 0,
+    JSON.stringify(diff)
+  );
+
+  return Number(info.lastInsertRowid);
+}
+
+export function getBenchmarkDiffHistory(
+  db: DatabaseType,
+  limit: number = 30
+): BenchmarkDiffSummary[] {
+  const rows = db.prepare(`
+    SELECT
+      id, timestamp, has_changes, added_count, updated_count, removed_count,
+      total_entries, total_affected_sessions, total_category_shifts
+    FROM benchmark_diff_history
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(limit) as {
+    id: number;
+    timestamp: string;
+    has_changes: number;
+    added_count: number;
+    updated_count: number;
+    removed_count: number;
+    total_entries: number;
+    total_affected_sessions: number;
+    total_category_shifts: number;
+  }[];
+
+  return rows.map((r) => ({
+    id: r.id,
+    timestamp: r.timestamp,
+    hasChanges: Boolean(r.has_changes),
+    addedCount: r.added_count,
+    updatedCount: r.updated_count,
+    removedCount: r.removed_count,
+    totalEntries: r.total_entries,
+    totalAffectedSessions: r.total_affected_sessions,
+    totalCategoryShifts: r.total_category_shifts,
+  }));
+}
+
+export function getBenchmarkDiffById(
+  db: DatabaseType,
+  id: number
+): ReferenceBenchmarkDiff | null {
+  const row = db.prepare('SELECT diff_json FROM benchmark_diff_history WHERE id = ?').get(id) as { diff_json: string } | undefined;
+  if (!row) return null;
+  const parsed = JSON.parse(row.diff_json) as ReferenceBenchmarkDiff;
+  parsed.id = id;
+  return parsed;
+}
 
 export function saveReferenceLaptimes(
   db: DatabaseType,
@@ -43,6 +119,8 @@ export function saveReferenceLaptimes(
     setMetadata('reference_laptimes_last_updated', cache.lastUpdated);
     setMetadata('reference_laptimes_source_url', cache.sourceUrl);
     if (cache.lastUpdateDiff) {
+      const diffId = recordBenchmarkDiff(db, cache.lastUpdateDiff, cache.sourceUrl);
+      cache.lastUpdateDiff.id = diffId;
       setMetadata('reference_laptimes_last_diff', JSON.stringify(cache.lastUpdateDiff));
     }
 
@@ -128,5 +206,5 @@ export function getReferenceLaptimeEntry(db: DatabaseType, key: string): Referen
 }
 
 export function clearReferenceLaptimes(db: DatabaseType): void {
-  db.exec("DELETE FROM reference_laptimes; DELETE FROM cache_metadata WHERE key LIKE 'reference_%';");
+  db.exec("DELETE FROM reference_laptimes; DELETE FROM benchmark_diff_history; DELETE FROM cache_metadata WHERE key LIKE 'reference_%';");
 }

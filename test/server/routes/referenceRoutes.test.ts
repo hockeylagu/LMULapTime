@@ -49,4 +49,68 @@ describe('Reference laptime routes', () => {
     expect(response.body).toEqual({ error: 'Reference source unavailable' });
     expect(loadSessions).not.toHaveBeenCalled();
   });
+
+  it('returns benchmark diff history summaries', async () => {
+    const mockHistory = [
+      {
+        id: 1,
+        timestamp: '2026-10-01T10:00:00Z',
+        hasChanges: true,
+        addedCount: 1,
+        updatedCount: 2,
+        removedCount: 0,
+        totalEntries: 187,
+        totalAffectedSessions: 3,
+        totalCategoryShifts: 1,
+      },
+    ];
+
+    const mockSessionDb = {
+      getBenchmarkDiffHistory: vi.fn().mockReturnValue(mockHistory),
+      getBenchmarkDiffById: vi.fn(),
+      recordBenchmarkDiff: vi.fn(),
+    };
+    const ctx = { loadSessions, sessionDb: mockSessionDb } as unknown as ServerContext;
+    const testApp = express();
+    testApp.use('/api', createReferenceRouter(ctx));
+
+    const response = await request(testApp).get('/api/reference-laptimes/diffs');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(mockHistory);
+    expect(mockSessionDb.getBenchmarkDiffHistory).toHaveBeenCalledWith(50);
+  });
+
+  it('returns specific benchmark diff by id and 404 for missing id', async () => {
+    const mockDiff = {
+      id: 42,
+      timestamp: '2026-10-01T10:00:00Z',
+      hasChanges: true,
+      addedCount: 0,
+      updatedCount: 1,
+      removedCount: 0,
+      totalEntries: 187,
+      totalAffectedSessions: 2,
+      totalCategoryShifts: 1,
+      added: [],
+      updated: [],
+      removed: [],
+    };
+
+    const mockSessionDb = {
+      getBenchmarkDiffHistory: vi.fn(),
+      getBenchmarkDiffById: vi.fn().mockImplementation((id: number) => (id === 42 ? mockDiff : null)),
+      recordBenchmarkDiff: vi.fn(),
+    };
+    const ctx = { loadSessions, sessionDb: mockSessionDb } as unknown as ServerContext;
+    const testApp = express();
+    testApp.use('/api', createReferenceRouter(ctx));
+
+    const okRes = await request(testApp).get('/api/reference-laptimes/diffs/42');
+    expect(okRes.status).toBe(200);
+    expect(okRes.body).toMatchObject({ id: 42 });
+
+    const missingRes = await request(testApp).get('/api/reference-laptimes/diffs/999');
+    expect(missingRes.status).toBe(404);
+    expect(missingRes.body).toEqual({ error: 'Benchmark diff not found' });
+  });
 });

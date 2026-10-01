@@ -22,7 +22,23 @@ All DDL is in `server/core/dbSchema.ts`.
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
 
+The route loader keeps its suspended component separate from the preloaded fast path, so resolving a page chunk never skips a previously suspended `use()` call.
+
 ### Background orchestration
+Client freshness is coordinated in `src/api/useAppData.ts`. It polls while sessions, replays,
+telemetry, upgrades or the startup benchmark check are active. `/scan/status` exposes a process-scoped
+`dataRevision` from DB session/replay/telemetry revisions; completion timestamps catch fast scans.
+Changed snapshots reload counts and the atomic `/session-snapshot` session/progression payload together. `sessionDataContext.ts` refreshes
+open track/session details and lets `ReplayIndicator` show the current replay's processing spinner.
+API JSON requests use `no-store`; static track geometry keeps browser caching. Session detail retains
+only mounted same-session data during a revision refresh; switching IDs or remounting fetches fresh.
+Refreshes during a scan are coalesced into one follow-up
+XML scan (preserving a requested force reparse), followed by replay and DuckDB scans.
+`server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker.
+XML publishes ten-session transactions before proceeding; cached sessions whose XML is gone survive.
+Replay discovery finishes and matches every session before decoding associated recordings; per-replay
+jobs expose queued/processing/ready/failed states. Manual refresh retries failed driver decodes.
+
 `server/index.ts` builds one `ServerContext` (`server/core/serverContext.ts`), which owns:
 - the scan jobs (`runInitialSessionSyncInBackground`, `runReplaySyncInBackground`, `runSessionSyncInBackground`), pumped one step per
   event-loop turn by `server/core/backgroundScan.ts`;
@@ -113,7 +129,7 @@ code that drops replay rows because the file is gone.
 | Tracks | `/api/track/:trackName` | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` |
 | Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard`, `/rivals`, `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare) |
 | Lap comparison | `/api/compare/laps` (`sessionAnalytics.ts`) | `lapComparison.ts` | `src/utils/referenceLaps.ts`, `src/utils/telemetryCompareLink.ts` |
-| Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `dbReferenceLaptimeStore.ts` | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards) |
+| Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `server/benchmarks/benchmarkImpact.ts`, `dbReferenceLaptimeStore.ts` (`benchmark_diff_history`) | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards), `settings/ReferenceChangesList.tsx` |
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts` (`PROMPT_VERSION`), `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
 | Settings & scans | `systemRoutes.ts` (`/status`, `/scan`, `/scan/status`, `/cache/clear`), `/replays/cache`, `/replays/upgrade` | | `components/settings/` |
 

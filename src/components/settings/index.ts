@@ -10,3 +10,4 @@ export * from './AiReportsHistoryCard.js';
 export * from './ReferenceLaptimesCard.js';
 export * from './FolderPathsCard.js';
 export * from './ReferenceChangesList.js';
+export * from './BenchmarkImpactBadge.js';
