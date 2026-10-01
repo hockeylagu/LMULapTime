@@ -4,6 +4,7 @@ import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution } from './telemetryResolution.js';
+import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -122,7 +123,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 : 'text-lmu-muted hover:text-white'
             }`}
             aria-pressed={interactionMode === 'scrub'}
-            title="Click or drag to move the cursor. Shift + drag selects a zoom range."
+            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans."
           >
             <MousePointer2 className="w-3 h-3" />
             Move cursor
@@ -152,6 +153,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           </button>
         </div>
 
+        <ReplayShortcutHelp />
         {onChangeResolution && (
           <div className="relative z-[70]">
             <button

@@ -99,10 +99,14 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     handleDoubleClick,
     resetPanZoom,
     focusOnPoint,
+    centerOnCar,
     zoomIn,
     zoomOut,
     markerScale,
   } = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
+  const [viewX, viewY, viewWidth, viewHeight] = currentViewBox.split(' ').map(Number);
+  const isCarOffscreen = Boolean(currentPos && (currentPos.sx < viewX || currentPos.sx > viewX + viewWidth
+    || currentPos.sy < viewY || currentPos.sy > viewY + viewHeight));
 
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
@@ -170,6 +174,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   return (
     <div
       ref={containerRef}
+      tabIndex={0}
+      data-replay-surface="map"
+      aria-label="Track map"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -184,6 +191,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
           zoomDisplay={`${zoomLevel}x`}
           followCar={followCar}
           onToggleFollowCar={() => setFollowCar(f => !f)}
+          onCenterCar={centerOnCar}
+          isCarOffscreen={isCarOffscreen}
           orientation={controlsOrientation ?? (dimNonSelectedTrack ? 'vertical' : 'horizontal')}
           className="top-2 right-2 bottom-auto"
         />

@@ -3,6 +3,41 @@ import { renderHook, act } from '@testing-library/react';
 import { useGpsMapPanZoom } from '../../../../src/components/replay/map/useGpsMapPanZoom.js';
 
 describe('useGpsMapPanZoom', () => {
+  it('centers once with C at the same zoom and toggles follow with F from the chart', () => {
+    const surface = document.createElement('div'); surface.dataset.replaySurface = 'chart'; document.body.append(surface);
+    const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),
+      { initialProps: { position: { sx: 550, sy: 100 } } });
+    act(() => result.current.setZoomLevel(4));
+    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })));
+    expect(result.current.zoomLevel).toBe(4); expect(result.current.followCar).toBe(false);
+    const centered = result.current.currentViewBox;
+    rerender({ position: { sx: 650, sy: 200 } });
+    expect(result.current.currentViewBox).toBe(centered);
+    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })));
+    expect(result.current.followCar).toBe(true);
+    rerender({ position: { sx: 700, sy: 250 } });
+    const followed = result.current.currentViewBox;
+    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })));
+    expect(result.current.followCar).toBe(false);
+    expect(result.current.currentViewBox).toBe(followed);
+    rerender({ position: { sx: 750, sy: 300 } });
+    expect(result.current.currentViewBox).toBe(followed);
+    surface.remove();
+  });
+
+  it('follows a new scrub position while zoomed, then preserves manual map exploration', () => {
+    const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),
+      { initialProps: { position: { sx: 500, sy: 300 } } });
+    act(() => result.current.focusOnPoint(200, 100, 4));
+    rerender({ position: { sx: 600, sy: 350 } });
+    expect(result.current.followCar).toBe(true);
+    act(() => result.current.handlePointerDown({ button: 0, target: document.createElement('div'), clientX: 100, clientY: 100 } as unknown as React.PointerEvent<HTMLDivElement>));
+    expect(result.current.followCar).toBe(false);
+    const view = result.current.currentViewBox;
+    rerender({ position: { sx: 650, sy: 350 } });
+    expect(result.current.currentViewBox).toBe(view);
+  });
+
   it('initializes at zoomLevel=1 and computes default viewBox with BASE_ZOOM=1.5', () => {
     const { result } = renderHook(() =>
       useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })

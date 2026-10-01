@@ -329,12 +329,12 @@ describe('GpsTrackMap', () => {
     );
 
     const followBtn = getByRole('button', { name: 'Follow car' });
-    expect(followBtn).toHaveAttribute('title', 'Follow Car');
+    expect(followBtn).toHaveAttribute('aria-pressed', 'false');
 
     // Activate follow car mode
     fireEvent.pointerDown(followBtn, { button: 0 });
     fireEvent.click(followBtn);
-    expect(followBtn).toHaveAttribute('title', 'Follow Car (Active)');
+    expect(followBtn).toHaveAttribute('aria-pressed', 'true');
 
     const zoomInBtn = getByRole('button', { name: 'Zoom in' });
     const zoomOutBtn = getByRole('button', { name: 'Zoom out' });
@@ -344,14 +344,14 @@ describe('GpsTrackMap', () => {
     fireEvent.click(zoomInBtn);
     expect(getByText('2x')).toBeInTheDocument();
     // Follow car must remain active!
-    expect(followBtn).toHaveAttribute('title', 'Follow Car (Active)');
+    expect(followBtn).toHaveAttribute('aria-pressed', 'true');
 
     // Click Zoom Out
     fireEvent.pointerDown(zoomOutBtn, { button: 0 });
     fireEvent.click(zoomOutBtn);
     expect(getByText('1x')).toBeInTheDocument();
     // Follow car must remain active!
-    expect(followBtn).toHaveAttribute('title', 'Follow Car (Active)');
+    expect(followBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('anchors a corner flag at its distance on the primary lap, whatever the baseline lap length', () => {

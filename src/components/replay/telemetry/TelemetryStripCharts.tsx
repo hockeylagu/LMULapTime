@@ -78,7 +78,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
-  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, zoomRange, onZoomRangeChange, trackLengthM });
+  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, zoomRange, onZoomRangeChange, trackLengthM, enabled: !isLoading });
 
   const [presets, setPresets] = useState<TelemetryPreset[]>(() => loadTelemetryPresets());
   const [activePresetId, setActivePresetId] = useState<string>(() => loadActivePresetId(presets));
@@ -149,6 +149,9 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   return (
     <div
       ref={containerRef}
+      tabIndex={0}
+      data-replay-surface="chart"
+      aria-label="Telemetry charts"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

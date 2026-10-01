@@ -61,6 +61,20 @@ describe('ReplayInspectorModal', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('plays with Space from the chart, pauses on manual seek and leaves native controls alone', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
+      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/trajectory') ? mockTraj : { laps: [] }),
+    }));
+    render(<ReplayInspectorModal isOpen onClose={vi.fn()} replayName="Test_Replay.vcr" />);
+    const chart = await screen.findByLabelText('Telemetry charts');
+    fireEvent.keyDown(chart, { key: ' ' });
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    fireEvent.keyDown(chart, { key: 'Home' });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText('Select Driver'), { key: ' ' });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
   it('fetches and displays metadata and telemetry when open', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
