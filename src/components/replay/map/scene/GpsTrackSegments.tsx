@@ -57,6 +57,10 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
     p => isInDistRange(baselineDists?.[p.idx], highlightDistRange, dimNonSelectedTrack)
   ), [baselineSvgPoints, colorBy, baselineDeltaByIdx, baselineDists, highlightDistRange, dimNonSelectedTrack]);
 
+  // Hit testing needs geometry, not a duplicate of every heatmap colour run.
+  // Keep gaps separate while sharing one wide target along each continuous section.
+  const hitRuns = useMemo(() => buildTrackLineRuns(svgPoints, () => '', () => true), [svgPoints]);
+
   // Clicking the line jumps to the nearest sample of the clicked run.
   const selectNearest = (run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => {
     const at = toSvgCoords(e);
@@ -72,7 +76,7 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
           d={run.d}
           fill="none"
           stroke={run.color}
-          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '3.2' : '2') : '1.4'}
+          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '3.2' : '2.5') : '1.8'}
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeOpacity={run.isHighlighted ? primaryOpacity : 0.45 * primaryOpacity}
@@ -95,6 +99,23 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
           strokeOpacity={run.isHighlighted ? 0.9 * baselineOpacity : 0.4 * baselineOpacity}
           vectorEffect="non-scaling-stroke"
           data-track-line="baseline"
+          pointerEvents="none"
+        />
+      ))}
+      {onSelectIndex && hitRuns.map(run => (
+        <path
+          key={`hit-${run.from}`}
+          d={run.d}
+          fill="none"
+          stroke="transparent"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+          pointerEvents="stroke"
+          className="cursor-pointer stroke-[28px] pointer-coarse:stroke-[44px]"
+          onClick={e => selectNearest(run, e)}
+          data-track-line="hit-target"
+          aria-hidden="true"
         />
       ))}
     </>

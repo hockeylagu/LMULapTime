@@ -13,8 +13,8 @@ export interface ReplayInspectorSidebarTabsProps {
 const tabClass = (isActive: boolean) =>
   `flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer border ${
     isActive
-      ? 'bg-lmu-accent text-white border-lmu-accent'
-      : 'bg-lmu-bg/60 text-lmu-muted hover:text-white border-lmu-border/60 hover:border-lmu-border'
+      ? 'bg-lmu-raised text-white border-transparent'
+      : 'text-lmu-muted hover:text-white border-transparent'
   }`;
 
 /** The Corners / AI Report toggles on top of the inspector sidebar, with a close button while a side panel is open. */
@@ -24,7 +24,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
   cornerCount,
   onClosePanel,
 }) => (
-  <div className="px-4 py-2 bg-lmu-card border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
+  <div className="px-4 py-2 bg-lmu-strip border-b border-lmu-border flex items-center justify-between gap-2 shrink-0">
     <div className="flex items-center gap-1.5">
       <button
         type="button"

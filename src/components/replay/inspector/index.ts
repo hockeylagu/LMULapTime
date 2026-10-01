@@ -5,5 +5,5 @@ export * from './ReplayInspectorSidebar.js';
 export * from './ReplayPerformanceHeader.js';
 export * from './ReplayTelemetryHud.js';
 export * from './ReplayTimelineFooter.js';
-export * from './ReplayCompareLapPicker.js';
+export * from './compare/ReplayCompareLapPicker.js';
 export * from './useReplayInspectorData.js';

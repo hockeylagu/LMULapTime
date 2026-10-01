@@ -49,6 +49,125 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('useReplayInspectorData', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('rolls back a failed driver selection and retries the requested driver', async () => {
+    let fail = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('driverSlot=3')) {
+        if (fail) throw new Error('Telemetry file is busy');
+        return response({ ...trajectory, driverSlot: 3, driverName: 'Other Driver' });
+      }
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.handleSelectDriver(3));
+    await waitFor(() => expect(result.current.error).toContain('Telemetry file is busy'));
+    expect(result.current.selectedDriverSlot).toBe(2);
+    expect(result.current.trajectory?.driverName).toBe('Player Driver');
+    fail = false;
+    act(() => result.current.handleRetryLoad());
+    await waitFor(() => expect(result.current.trajectory?.driverName).toBe('Other Driver'));
+    expect(result.current.selectedDriverSlot).toBe(3);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("keeps another replay's comparison lap when only its metadata fails to load", async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes('Other_Q1.Vcr/metadata')) return response({ error: 'Metadata unavailable' }, false);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('Other_Q1.Vcr')) return response({ ...trajectory, replayName: 'Other_Q1.Vcr', currentLap: 4 });
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true, replayName: metadata.filename,
+      initialCompareMode: true, initialBaselineReplayName: 'Other_Q1.Vcr', initialBaselineLapNumber: 4,
+    }), { wrapper });
+    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(4));
+    expect(result.current.baselineError).toBeNull();
+    expect(result.current.baselineMetadata).toBeNull();
+  });
+
+  it('clears the previous baseline while loading and retries a failed replacement', async () => {
+    let releaseReplacement: (value: Response) => void = () => undefined;
+    const replacement = new Promise<Response>(resolve => { releaseReplacement = resolve; });
+    let fail = true;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      const lap = Number(new URL(url, 'http://localhost').searchParams.get('lap') ?? 2);
+      if (lap === 4 && fail) return replacement;
+      return response({ ...trajectory, currentLap: lap });
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.handleSelectBaselineLap(3));
+    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
+    act(() => result.current.handleSelectBaselineLap(4));
+    expect(result.current.isBaselineLoading).toBe(true);
+    expect(result.current.baselineTrajectory).toBeNull();
+    await act(async () => releaseReplacement(response({ error: 'Lap unavailable' }, false)));
+    await waitFor(() => expect(result.current.baselineError).toBe('Lap unavailable'));
+    fail = false;
+    act(() => result.current.handleRetryBaseline());
+    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(4));
+    expect(result.current.baselineError).toBeNull();
+    act(() => result.current.handleRemoveCompare());
+    expect(result.current.isBaselineLoading).toBe(false);
+  });
+
+  it('reports comparison candidate failures and ignores a superseded filter response', async () => {
+    let releaseOld: (value: Response) => void = () => undefined;
+    const oldResponse = new Promise<Response>(resolve => { releaseOld = resolve; });
+    let candidateRequests = 0;
+    const staleLap: ComparableLap = { id: 'stale', driverName: 'Player Driver', carType: 'GT3', carClass: 'LMGT3', lapTime: 98, lapTimeString: '1:38.000', s1: 30, s2: 34, s3: 34, topSpeed: 200, isValid: true, isPitStop: false, matchingReplayFile: metadata.filename };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) {
+        candidateRequests++;
+        if (candidateRequests === 1) return oldResponse;
+        if (candidateRequests === 2) throw new Error('Comparison cache unavailable');
+        return response({ laps: [] });
+      }
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+    await waitFor(() => expect(candidateRequests).toBe(1));
+    act(() => result.current.setCompareLapFilter('all'));
+    await waitFor(() => expect(result.current.compareLapsError).toBe('Comparison cache unavailable'));
+    await act(async () => releaseOld(response({ laps: [staleLap] })));
+    expect(result.current.availableCompareLaps).toEqual([]);
+    expect(result.current.compareLapsError).toBe('Comparison cache unavailable');
+    act(() => result.current.handleRetryCompareLaps());
+    await waitFor(() => expect(result.current.isCompareLapsLoading).toBe(false));
+    expect(result.current.compareLapsError).toBeNull();
+  });
+
+  it('does not restore telemetry after closing with a driver request pending', async () => {
+    let releaseDriver: (value: Response) => void = () => undefined;
+    const pending = new Promise<Response>(resolve => { releaseDriver = resolve; });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes('/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('driverSlot=3')) return pending;
+      return response(trajectory);
+    });
+    const { result, rerender } = renderHook((props: { isOpen: boolean }) => useReplayInspectorData({ ...props, replayName: metadata.filename }), { wrapper, initialProps: { isOpen: true } });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.handleSelectDriver(3));
+    rerender({ isOpen: false });
+    await act(async () => releaseDriver(response({ ...trajectory, driverSlot: 3 })));
+    expect(result.current.trajectory).toBeNull();
+    expect(result.current.isTrajLoading).toBe(false);
+  });
+
   it('loads metadata and trajectory, resolves the player driver, and exposes lap metrics', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -67,7 +186,7 @@ describe('useReplayInspectorData', () => {
     expect(result.current.selectedDriver?.name).toBe('Player Driver');
     // Speed smoothing is a centred time window, so the recording's end samples keep their values.
     expect(result.current.currentPoint?.speedKmh).toBe(100);
-    expect(result.current.maxSpeed).toBe(180);
+    expect(Math.max(...(result.current.trajectory?.points ?? []).map(p => p.speedKmh ?? 0))).toBe(180);
     expect(result.current.currentLapSummary?.lapTimeSec).toBe(100);
     expect(onLapChange).toHaveBeenCalledWith(2);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'));
@@ -208,6 +327,7 @@ describe('useReplayInspectorData', () => {
       if (url.includes('/metadata')) return response(multiclass);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       if (url.includes('driverName=Other')) return response({ ...trajectory, driverName: 'Other Hypercar', driverSlot: 3 });
+      if (url.includes('driverSlot=4')) return response({ ...trajectory, driverName: 'GT3 Driver', driverSlot: 4 });
       return response(trajectory);
     });
 

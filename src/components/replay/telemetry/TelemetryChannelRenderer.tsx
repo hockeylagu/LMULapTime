@@ -64,7 +64,7 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
 
   switch (channelId) {
     case 'speed':
-      return <TelemetrySpeedChannel speedPath={paths.speedPath} baselineSpeedPath={paths.baselineSpeedPath} {...cursorProps} />;
+      return <TelemetrySpeedChannel speedPath={paths.speedPath} maxSpeed={paths.maxSpeed} baselineSpeedPath={paths.baselineSpeedPath} {...cursorProps} />;
     case 'delta':
       return pointComparisons.length > 0 ? (
         <TelemetryDeltaChannel

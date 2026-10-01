@@ -133,6 +133,12 @@ describe('replayMapUtils', () => {
   });
 
   describe('computeGhostPosition station-domain matching', () => {
+    it('moves the ghost between recorded samples at the primary interpolated distance', () => {
+      const baseline = [0, 10].map(x => ({ x, y: 0, z: 0, speedKmh: 100 }));
+      const ghost = computeGhostPosition([0, 10], [0, 10], baseline, 0.25,
+        { minX: 0, minZ: 0, spanX: 10, spanZ: 10 }, 800, 60);
+      expect(ghost?.point.x).toBeCloseTo(2.5);
+    });
     it('aligns ghost position side-by-side using canonical station rather than divergent odometer distances', () => {
       const primary: ReplayTelemetryPoint[] = [
         { x: -111.03, y: 0, z: -36.83, stationM: 1.36, distM: 0, timeSec: 0, speedKmh: 320 },

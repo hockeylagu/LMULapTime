@@ -26,7 +26,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
         <button
           type="button"
           onClick={onCreateNew}
-          className="px-2 py-0.5 rounded bg-lmu-info-strong/20 text-lmu-info-soft hover:bg-lmu-info-strong/30 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
+          className="px-2 py-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/5 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
           title="Create a new custom telemetry preset"
         >
           <Plus className="w-3 h-3" /> New
@@ -42,9 +42,10 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
               key={p.id}
               type="button"
               onClick={() => onSelectId(p.id)}
+              aria-pressed={isSelected}
               className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-left transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-lmu-info-strong/20 border border-lmu-info/40 text-white font-bold'
+                  ? 'bg-lmu-raised/60 border border-transparent text-white font-semibold'
                   : 'text-lmu-muted hover:bg-white/5 hover:text-lmu-text border border-transparent'
               }`}
             >

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Check, CloudRain } from 'lucide-react';
-import { ComparableLap } from '../../../../shared/types/index.js';
-import { CarClassBadge } from '../../common/CarClassBadge.js';
+import { ComparableLap } from '../../../../../shared/types/index.js';
+import { CarClassBadge } from '../../../common/CarClassBadge.js';
 
 export interface ReplayCompareLapRowProps {
   lap: ComparableLap;

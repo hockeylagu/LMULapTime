@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ReplayLapSummary, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { ReplayLapSummary, ReplayTrajectoryData, ReplayMetadata } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { TelemetryStripCharts } from '../telemetry/TelemetryStripCharts.js';
@@ -7,6 +7,7 @@ import { TelemetryResolution } from '../telemetry/telemetryResolution.js';
 
 export interface ReplayInspectorTelemetryColumnProps {
   trajectory: ReplayTrajectoryData | null;
+  metadata?: ReplayMetadata | null;
   baselineTrajectory: ReplayTrajectoryData | null | undefined;
   isCompareMode: boolean;
   currentIndex: number;
@@ -32,7 +33,7 @@ export interface ReplayInspectorTelemetryColumnProps {
 
 /** The strip-chart column of the replay inspector: the telemetry traces under the performance header. */
 export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryColumnProps> = ({
-  trajectory, baselineTrajectory, isCompareMode, currentIndex, setCurrentIndex, isLoading, currentLapSummary,
+  trajectory, metadata, baselineTrajectory, isCompareMode, currentIndex, setCurrentIndex, isLoading, currentLapSummary,
   bestSectors, lapDeltas, formatLapTime, chartZoomRange, setChartZoomRange, telemetryResolution, handleChangeResolution,
   selectedCornerMarkers, cornerSegments, lapSegments, selectedCornerNumber, handleSelectCorner,
   hasDuckDbTelemetry, duckdbUnavailableReason, onSelectSource,
@@ -43,7 +44,7 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
   }, [lapSegments]);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-lmu-deep p-3 sm:p-4 gap-2.5 min-h-0 overflow-hidden border-r border-lmu-border">
+    <div className="flex-1 min-w-0 flex flex-col bg-lmu-deep gap-0 min-h-0 overflow-hidden border-r border-lmu-border">
       <div className="flex-1 min-h-0 w-full">
         <TelemetryStripCharts
           points={trajectory?.points || []}
@@ -54,6 +55,7 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
           className="w-full h-full"
           headerContent={
             <ReplayPerformanceHeader
+              metadata={metadata}
               currentLap={trajectory?.currentLap ?? 1}
               currentLapSummary={currentLapSummary}
               bestS1Sec={bestSectors.s1}

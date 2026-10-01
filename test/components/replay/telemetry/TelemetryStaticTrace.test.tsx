@@ -34,4 +34,13 @@ describe('TelemetryStaticTrace', () => {
     expect(line).toHaveClass('border-lmu-info/40');
     expect(line?.parentElement).toHaveClass('opacity-20');
   });
+  it('updates explicit tick positions when the scale changes', () => {
+    const chart = <svg />;
+    const { rerender } = render(<TelemetryStaticTrace chart={chart} gridLines={[{ ...gridLines[0], label: 'G4', yPercent: 49.2857 }]} gridClassName="absolute inset-0" />);
+    const label = screen.getByText('G4');
+    expect(label).toHaveStyle({ top: '49.2857%' });
+    expect(label.parentElement?.previousElementSibling?.firstElementChild).toHaveStyle({ top: '49.2857%', height: '0px' });
+    rerender(<TelemetryStaticTrace chart={chart} gridLines={[{ ...gridLines[0], label: 'G4', yPercent: 50 }]} gridClassName="absolute inset-0" />);
+    expect(screen.getByText('G4')).toHaveStyle({ top: '50%' });
+  });
 });

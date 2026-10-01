@@ -4,6 +4,7 @@ export interface TelemetryGridLine {
   label: string;
   borderClassName: string;
   labelClassName: string;
+  yPercent?: number;
 }
 
 export interface TelemetryStaticTraceProps {
@@ -21,7 +22,8 @@ function areStaticTracePropsEqual(previous: TelemetryStaticTraceProps, next: Tel
     const nextLine = next.gridLines[index];
     return line.label === nextLine.label
       && line.borderClassName === nextLine.borderClassName
-      && line.labelClassName === nextLine.labelClassName;
+      && line.labelClassName === nextLine.labelClassName
+      && line.yPercent === nextLine.yPercent;
   });
 }
 
@@ -34,7 +36,9 @@ const TEXT_COLOR_CLASS = /(^|\s)text-(?:lmu-[a-z-]+|white)(?:\/\d+)?(?=\s|$)/g;
  * re-rasterises every trace path under them (a full-resolution lap is one path of ~25,000 vertices
  * per trace). Drawn before the grid so the grid lines stay on top, as they were.
  *
- * The grid is drawn twice on the same flex layout: the lines, dimmed by the channel's grid opacity,
+ * A compact 24px title row stays above the plotting area. The SVG viewBox and ticks
+ * cover the same scale, using the remaining height with only a 6px bottom inset.
+ * The grid is drawn twice at the same explicit tick positions: the lines, dimmed by the channel's grid opacity,
  * then the scale labels at full strength in the neutral muted tier, so a label stays readable
  * (4.5:1) however faint its line is. The channel's color stays on its trace.
  */
@@ -43,21 +47,21 @@ export const TelemetryStaticTrace: React.FC<TelemetryStaticTraceProps> = React.m
   gridLines,
   gridClassName,
 }) => (
-  <>
+  <div className="absolute inset-x-0 top-6 bottom-1.5" data-testid="telemetry-plot-area">
     <div className="absolute inset-0 will-change-transform" data-testid="telemetry-trace-layer">
       {chart}
     </div>
     <div className={gridClassName} aria-hidden="true">
-      {gridLines.map(({ label, borderClassName, labelClassName }) => (
-        <div key={label} className={`${borderClassName} w-full ${labelClassName}`}>{' '}</div>
+      {gridLines.map(({ label, borderClassName, labelClassName, yPercent }, index) => (
+        <div key={label} style={{ position: 'absolute', top: `${yPercent ?? index / Math.max(1, gridLines.length - 1) * 100}%`, left: 12, right: 12, height: 0 }} className={`${borderClassName} ${labelClassName}`}></div>
       ))}
     </div>
     <div className={gridClassName.replace(OPACITY_CLASS, '$1')}>
-      {gridLines.map(({ label, labelClassName }) => (
-        <div key={label} className={`border-b border-transparent w-full ${labelClassName.replace(TEXT_COLOR_CLASS, '$1')} text-lmu-muted`}>
+      {gridLines.map(({ label, labelClassName, yPercent }, index) => (
+        <div key={label} style={{ position: 'absolute', top: `${yPercent ?? index / Math.max(1, gridLines.length - 1) * 100}%`, left: 12, transform: index === 0 ? 'none' : index === gridLines.length - 1 ? 'translateY(-100%)' : 'translateY(-50%)' }} className={`border-b border-transparent w-full ${labelClassName.replace(TEXT_COLOR_CLASS, '$1')} text-lmu-muted`}>
           {label}
         </div>
       ))}
     </div>
-  </>
+  </div>
 ), areStaticTracePropsEqual);

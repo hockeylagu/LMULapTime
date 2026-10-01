@@ -4,6 +4,11 @@ import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { CornerPaths } from './telemetryCornerChartPaths.js';
 import type { DeltaGradientStop, TelemetryChartPathsResult } from './telemetryChartPaths.js';
 
+/** Gear position in the full-height SVG coordinate system (0–100). */
+export function gearTraceY(gear: number): number {
+  return 95 - (gear / 7) * 80;
+}
+
 /** The scales the single-value traces are normalised against. */
 export interface ChartBounds {
   maxSpd: number;
@@ -102,10 +107,10 @@ export function appendScalarPoint(
     const starts = channel.startsWhenDrawn ? t[channel.key] === '' : isFirst;
     t[channel.key] += step(starts ? 'M' : 'L', x, channel.y(v, bounds));
   }
-  // Gear: 1 to 7 -> 95 to 15
-  const gy = 95 - (gear / 7) * 80;
+  // Forward gears occupy the inset range, keeping step strokes off the edges.
+  const gy = gearTraceY(gear);
   if (isFirst) t.gr += step('M', x, gy);
-  else t.gr += step('L', x, 95 - (prevGear / 7) * 80) + step('L', x, gy);
+  else t.gr += step('L', x, gearTraceY(prevGear)) + step('L', x, gy);
 }
 
 /** The scales both laps share, with a floor so a quiet lap keeps a readable axis. */
@@ -236,7 +241,7 @@ export function buildDeltaGradientStops(
 export function emptyChartPaths(): TelemetryChartPathsResult {
   const emptyCorner: CornerPaths = { fl: '', fr: '', rl: '', rr: '' };
   return {
-    speedPath: '', throttlePath: '', throttleArea: '', brakePath: '', brakeArea: '', steerPath: '', gearPath: '',
+    speedPath: '', maxSpeed: 260, throttlePath: '', throttleArea: '', brakePath: '', brakeArea: '', steerPath: '', gearPath: '',
     baselineSpeedPath: '', baselineThrottlePath: '', baselineBrakePath: '', baselineSteerPath: '', baselineGearPath: '',
     deltaTimePath: '', deltaTimeArea: '', deltaGainArea: '', deltaLossArea: '', deltaGradientStops: [], maxDeltaSec: 1,
     rpmPath: '', rpmArea: '', baselineRpmPath: '', maxRpm: 9000,

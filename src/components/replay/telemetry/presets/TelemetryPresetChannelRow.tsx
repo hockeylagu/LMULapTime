@@ -21,41 +21,41 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
 }) => {
   return (
     <div
-      className={`p-2 rounded-xl border flex items-center justify-between gap-2 transition-all ${
+      className={`px-2 py-2 border-b border-lmu-border/50 flex items-center justify-between gap-2 transition-colors ${
         isActive
-          ? 'bg-lmu-info-deep/40 border-lmu-info-strong/40'
-          : 'bg-black/20 border-white/5 text-lmu-muted hover:border-lmu-rule'
+          ? 'bg-lmu-raised/25'
+          : 'text-lmu-muted hover:bg-white/5'
       }`}
     >
-      <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
+      <label className="grid grid-cols-[14px_90px_96px_minmax(0,1fr)] items-center gap-x-2.5 cursor-pointer flex-1 min-w-0">
         <input
           type="checkbox"
           checked={isActive}
           onChange={() => onToggle(channel.id)}
-          className="w-3.5 h-3.5 rounded bg-black border-lmu-rule text-lmu-info-strong focus:ring-0 cursor-pointer"
+          className="w-3.5 h-3.5 rounded bg-black border-lmu-rule accent-lmu-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text cursor-pointer"
         />
-        <span className={`px-1.5 py-px rounded font-black text-[10px] tracking-wider shrink-0 ${channel.badgeColor}`}>
+        <span className={`whitespace-nowrap justify-self-start px-1.5 py-px rounded font-mono font-bold text-[10px] tracking-wider shrink-0 ${channel.badgeColor}`}>
           {channel.shortName}
         </span>
         {channel.isComputed ? (
-          <span className="px-1.5 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5 shrink-0">
+          <span className="whitespace-nowrap justify-self-start px-1.5 py-px rounded text-lmu-muted font-bold text-[10px] tracking-wider flex items-center gap-0.5 shrink-0">
             <Sparkles className="w-2.5 h-2.5" /> COMPUTED
           </span>
         ) : channel.category === 'wheels' ? (
-          <span className="px-1.5 py-px rounded bg-lmu-warn-strong/20 text-lmu-warn-soft font-bold text-[10px] tracking-wider shrink-0">
+          <span className="whitespace-nowrap justify-self-start px-1.5 py-px rounded text-lmu-muted font-bold text-[10px] tracking-wider shrink-0">
             WHEEL / TIRE
           </span>
         ) : channel.category === 'energy' ? (
-          <span className="px-1.5 py-px rounded bg-lmu-gain-strong/20 text-lmu-gain-soft font-bold text-[10px] tracking-wider shrink-0">
+          <span className="whitespace-nowrap justify-self-start px-1.5 py-px rounded text-lmu-muted font-bold text-[10px] tracking-wider shrink-0">
             ENERGY / FUEL
           </span>
         ) : (
-          <span className="px-1.5 py-px rounded bg-lmu-raised text-lmu-muted font-bold text-[10px] tracking-wider shrink-0">
+          <span className="whitespace-nowrap justify-self-start px-1.5 py-px rounded text-lmu-muted font-bold text-[10px] tracking-wider shrink-0">
             DIRECT
           </span>
         )}
         <div className="flex flex-col min-w-0">
-          <span className="text-[11px] font-bold text-white truncate">
+          <span className="text-[12px] font-medium text-white truncate">
             {channel.name}
           </span>
           <span className="text-[10px] text-lmu-muted truncate">
@@ -70,7 +70,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             type="button"
             disabled={isFirst}
             onClick={() => onMove(channel.id, 'up')}
-            className="p-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
             title="Move channel up"
           >
             <ArrowUp className="w-3 h-3" />
@@ -79,7 +79,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             type="button"
             disabled={isLast}
             onClick={() => onMove(channel.id, 'down')}
-            className="p-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
+            className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
             title="Move channel down"
           >
             <ArrowDown className="w-3 h-3" />

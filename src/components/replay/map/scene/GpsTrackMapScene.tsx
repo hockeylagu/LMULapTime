@@ -25,6 +25,7 @@ import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
+import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 
@@ -62,7 +63,14 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     () => projectTrajectoryPoints(effectiveBaselinePoints, effectiveBounds, VIEWBOX_SIZE, PADDING),
     [effectiveBaselinePoints, effectiveBounds]
   );
-  const currentPos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
+  const playbackPosition = usePlaybackPosition(points, currentIndex);
+  const fraction = playbackPosition?.fraction ?? 0;
+  const samplePos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
+  const nextPos = svgPoints[currentIndex + 1] ?? samplePos;
+  const currentPos = useMemo(() => samplePos && nextPos ? {
+    sx: samplePos.sx + (nextPos.sx - samplePos.sx) * fraction,
+    sy: samplePos.sy + (nextPos.sy - samplePos.sy) * fraction,
+  } : samplePos, [samplePos, nextPos, fraction]);
 
   const { leftSvgPoints, rightSvgPoints, centerlineSvgPoints } = useMemo(() => ({
     leftSvgPoints: effectiveGeometry?.leftBoundary ? projectBoundaryPoints(effectiveGeometry.leftBoundary, effectiveBounds, VIEWBOX_SIZE, PADDING) : [],
@@ -121,12 +129,12 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       primaryDists,
       baselineDists,
       effectiveBaselinePoints,
-      currentIndex,
+      currentIndex + fraction,
       effectiveBounds,
       VIEWBOX_SIZE,
       PADDING
     );
-  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, effectiveBounds]);
+  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, fraction, effectiveBounds]);
 
   const pedalMarkerPoints = useMemo(
     () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints),

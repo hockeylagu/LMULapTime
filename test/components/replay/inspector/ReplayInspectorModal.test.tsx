@@ -86,6 +86,19 @@ describe('ReplayInspectorModal', () => {
     expect(driverSelect).toHaveValue('1');
     expect(screen.getByRole('option', { name: /Samuel Lague.*You/i })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Rival Racer/i })).toBeInTheDocument();
+    const file = screen.getByText('Test_Replay.vcr');
+    expect(file).not.toBeVisible();
+    const info = screen.getByText('Info').closest('summary');
+    expect(info).not.toBeNull();
+    fireEvent.click(info!);
+    expect(file).toBeVisible();
+    expect(screen.getByText('8m 20s')).toBeVisible();
+    fireEvent.keyDown(info!, { key: 'Escape' });
+    expect(file).not.toBeVisible();
+    expect(info).toHaveFocus();
+    const playbackSpeed = screen.getByRole('combobox', { name: 'Playback speed' });
+    fireEvent.change(playbackSpeed, { target: { value: '2' } });
+    expect(playbackSpeed).toHaveValue('2');
   });
 
   it('shows the Corners tab for self-analysis even without a baseline lap loaded', async () => {
@@ -148,11 +161,11 @@ describe('ReplayInspectorModal', () => {
     fireEvent.change(screen.getByLabelText(/Select Driver/i), { target: { value: '2' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
-  it('calls onClose when close button clicked', async () => {
+  it('returns through the single Back control', async () => {
     const handleClose = vi.fn();
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
@@ -172,7 +185,8 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
     });
 
-    const closeBtn = screen.getByRole('button', { name: 'Close' });
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    const closeBtn = screen.getByRole('button', { name: 'Back' });
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalled();
   });
@@ -212,7 +226,7 @@ describe('ReplayInspectorModal', () => {
 
     // Verify it called trajectory fetch with driverSlot=2
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -278,25 +292,16 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('0.5x')).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: '0.5×' })).toBeInTheDocument();
     });
 
-    const speedHalf = screen.getByRole('button', { name: '0.5x' });
-    const speed1x = screen.getByRole('button', { name: '1x' });
-    const speed2x = screen.getByRole('button', { name: '2x' });
-
-    expect(speedHalf).toBeInTheDocument();
-    expect(speed1x).toBeInTheDocument();
-    expect(speed2x).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '5x' })).not.toBeInTheDocument();
-
-    // Default speed is 1x
-    expect(speed1x.className).toContain('bg-lmu-accent');
-
-    // Click 0.5x
-    fireEvent.click(speedHalf);
-    expect(speedHalf.className).toContain('bg-lmu-accent');
-    expect(speed1x.className).not.toContain('bg-lmu-accent');
+    const speedSelect = screen.getByRole('combobox', { name: 'Playback speed' });
+    expect(screen.getByRole('option', { name: '1×' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '2×' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '5×' })).not.toBeInTheDocument();
+    expect(speedSelect).toHaveValue('1');
+    fireEvent.change(speedSelect, { target: { value: '0.5' } });
+    expect(speedSelect).toHaveValue('0.5');
 
     // Flush any trailing async state updates (e.g. corner consistency data) that
     // resolve after this test's own assertions so they settle inside act().
@@ -305,7 +310,7 @@ describe('ReplayInspectorModal', () => {
     });
   });
 
-  it('renders fastest lap badge and lap time using the lmu-gold personal-best color set', async () => {
+  it('shows session-best time in blue without a fastest-lap badge', async () => {
     const trajWithBestLap = {
       ...mockTraj,
       currentLap: 1,
@@ -329,13 +334,34 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Fastest Lap/i)).toBeInTheDocument();
+      expect(screen.getByTitle('Session best · Replay GPS lap time')).toHaveClass('text-lmu-session-best');
     });
 
-    const fastestBadge = screen.getByText(/Fastest Lap/i);
-    expect(fastestBadge.className).toContain('bg-lmu-gold/15');
-    expect(fastestBadge.className).toContain('text-lmu-gold');
-    expect(fastestBadge.className).toContain('border-lmu-gold/40');
+    expect(screen.queryByText(/Fastest Lap/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['matching personal record', 'Test_Replay.vcr', 1, true, 'Personal best · Replay GPS lap time', 'text-lmu-personal-best'],
+    ['different replay', 'Other_Replay.vcr', 1, true, 'Session best · Replay GPS lap time', 'text-lmu-session-best'],
+    ['different lap', 'Test_Replay.vcr', 2, false, 'Replay GPS lap time', 'text-white'],
+  ])('colors the lap time for %s', async (_label, replayName, lapNum, isBest, title, color) => {
+    const traj = { ...mockTraj, layoutKey: 'spa_gp', currentLap: 1,
+      laps: [{ lapNumber: 1, lapTimeSec: 135.5, s1Sec: 40, s2Sec: 50, s3Sec: 45.5, isBest }],
+    };
+    const requests: string[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      requests.push(url);
+      const data = url.includes('/metadata') ? mockMeta
+        : url.includes('/trajectory') ? traj
+        : url.includes('/leaderboard') ? { player: { bestLap: { replayName, lapNum } } } : null;
+      return data ? Promise.resolve({ ok: true, json: () => Promise.resolve(data) }) : Promise.reject(new Error('Unknown URL'));
+    });
+    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />);
+    await waitFor(() => {
+      expect(requests.some(url => url.includes('/leaderboard') && url.includes('layout=spa_gp') && url.includes('carClass=LMGT3'))).toBe(true);
+      expect(screen.getByTitle(title)).toHaveClass(color);
+    });
+    expect(screen.queryByText(/Fastest Lap/i)).not.toBeInTheDocument();
   });
 
   it('opens a double-clicked consistency chart lap as the baseline comparison', () => {
@@ -435,7 +461,7 @@ describe('ReplayInspectorModal', () => {
 
     // After swap, baseline loading should request the other lap.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=1'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -488,7 +514,7 @@ describe('ReplayInspectorModal', () => {
 
     // Baseline should still request Lap 2 and compare mode must remain active.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -801,33 +827,33 @@ describe('ReplayInspectorModal', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /pts/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Rate|Hz/i })).toBeInTheDocument();
     });
 
     // Open resolution popover
-    fireEvent.click(screen.getByRole('button', { name: /pts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Rate|Hz/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /🎬 Native VCR/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /100Hz DuckDB/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Native VCR/i })).toBeInTheDocument();
     });
 
     // Click Native VCR button
-    fireEvent.click(screen.getByRole('button', { name: /🎬 Native VCR/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Native VCR/i }));
 
     await waitFor(() => {
       expect(requestedUrls.some(u => u.includes('source=vcr'))).toBe(true);
     });
 
     // Open resolution popover again to switch back
-    fireEvent.click(screen.getByRole('button', { name: /pts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Rate|Hz/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /100Hz DuckDB/i })).toBeInTheDocument();
     });
 
     // Click DuckDB button to switch back
-    fireEvent.click(screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i }));
+    fireEvent.click(screen.getByRole('button', { name: /100Hz DuckDB/i }));
 
     await waitFor(() => {
       expect(requestedUrls.some(u => u.includes('source=duckdb'))).toBe(true);
@@ -853,7 +879,7 @@ describe('ReplayInspectorModal', () => {
 
     await waitFor(() => {
       const row = screen.getAllByText('T1').map(el => el.closest('tr')).find(Boolean);
-      expect(row).toHaveClass('bg-lmu-accent/15');
+      expect(row).toHaveClass('bg-lmu-raised/60');
     });
   });
 });

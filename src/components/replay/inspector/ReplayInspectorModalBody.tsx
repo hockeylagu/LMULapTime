@@ -4,7 +4,7 @@ import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/co
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
-import { CompareLapFilter } from './ReplayCompareLapPicker.js';
+import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayInspectorTelemetryColumn } from './ReplayInspectorTelemetryColumn.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
@@ -23,6 +23,10 @@ export interface ReplayInspectorModalBodyProps {
   isLoading: boolean;
   isTrajLoading: boolean;
   error: string | null;
+  handleRetryLoad?: () => void;
+  compareLapsError?: string | null;
+  handleRetryCompareLaps?: () => void;
+  handleRetryBaseline?: () => void;
   isCompareMode: boolean;
   handleToggleCompare: () => void;
   baselineReplayName: string | null;
@@ -48,7 +52,6 @@ export interface ReplayInspectorModalBodyProps {
   handleChangeResolution: (res: TelemetryResolution) => void;
   handleSelectDriver: (slot: number) => void;
   handleSelectLap: (lapNum: number) => void;
-  maxSpeed: number;
   currentPoint: ReplayTrajectoryPoint | undefined;
   currentLapSummary: ReplayLapSummary | null | undefined;
   lapDeltas: { lapDelta: number | null; s1Delta: number | null; s2Delta: number | null; s3Delta: number | null } | null;
@@ -96,6 +99,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   isLoading,
   isTrajLoading,
   error,
+  handleRetryLoad, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
   isCompareMode,
   handleToggleCompare,
   baselineReplayName,
@@ -121,7 +125,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   handleChangeResolution,
   handleSelectDriver,
   handleSelectLap,
-  maxSpeed,
   currentPoint,
   currentLapSummary,
   lapDeltas,
@@ -182,8 +185,11 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onSelectCompareLap={handleSelectCompareLap}
         isBaselineLoading={isBaselineLoading}
         baselineError={baselineError}
-        isStationary={maxSpeed <= 1}
         isTrajLoading={isTrajLoading}
+        isLoading={isLoading}
+        compareLapsError={compareLapsError}
+        onRetryCompareLaps={handleRetryCompareLaps}
+        onRetryBaseline={handleRetryBaseline}
         isPlaying={isPlaying}
         onTogglePlay={() => setIsPlaying(!isPlaying)}
         onRewind={() => { setIsPlaying(false); setCurrentIndex(0); }}
@@ -195,11 +201,13 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       {error && (
         <div role="alert" className="px-4 py-1.5 text-xs text-lmu-loss-soft bg-lmu-loss-deep/40 border-b border-lmu-loss-deep/60">
           {error}
+          {handleRetryLoad && <button type="button" onClick={handleRetryLoad} disabled={isLoading || isTrajLoading} className="ml-3 underline underline-offset-4 disabled:opacity-40">Try again</button>}
         </div>
       )}
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         <ReplayInspectorTelemetryColumn
+          metadata={metadata}
           trajectory={trajectory}
           baselineTrajectory={baselineTrajectory}
           isCompareMode={isCompareMode}

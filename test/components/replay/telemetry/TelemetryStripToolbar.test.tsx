@@ -21,6 +21,18 @@ describe('TelemetryStripToolbar', () => {
     expect(handleChangeMode).toHaveBeenCalledWith('zoom');
   });
 
+  it('explains drag modes and restores the full lap view', () => {
+    const onReset = vi.fn();
+    const { rerender } = render(<TelemetryStripToolbar interactionMode="scrub" onChangeInteractionMode={vi.fn()} isZoomed={false} viewStart={0} viewEnd={100} onResetZoom={onReset} />);
+    expect(screen.getByRole('group', { name: 'Chart drag mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move cursor' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Full lap' })).toBeDisabled();
+    rerender(<TelemetryStripToolbar interactionMode="zoom" onChangeInteractionMode={vi.fn()} isZoomed={true} viewStart={20} viewEnd={40} spanTimeSec={8.5} onResetZoom={onReset} />);
+    expect(screen.getByText('Zoomed: 8.50s')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Full lap' }));
+    expect(onReset).toHaveBeenCalledOnce();
+  });
+
   it('renders resolution button with sample rate and opens popover on click', () => {
     const handleChangeResolution = vi.fn();
     render(
@@ -39,8 +51,9 @@ describe('TelemetryStripToolbar', () => {
       />
     );
 
-    const resBtn = screen.getByRole('button', { name: /60Hz • 2[,.]?400 pts/i });
+    const resBtn = screen.getByRole('button', { name: /^60Hz$/i });
     expect(resBtn).toBeInTheDocument();
+    expect(resBtn).not.toHaveTextContent(/pts/i);
 
     // Click to open resolution popover
     fireEvent.click(resBtn);
@@ -91,13 +104,14 @@ describe('TelemetryStripToolbar', () => {
     );
 
     // Open resolution popover
-    const resBtn = screen.getByRole('button', { name: /100Hz • 2[,.]?400 pts/i });
+    const resBtn = screen.getByRole('button', { name: /^100Hz$/i });
+    expect(resBtn).not.toHaveTextContent(/pts/i);
     fireEvent.click(resBtn);
 
-    const vcrBtn = screen.getByRole('button', { name: /🎬 Native VCR/i });
+    const vcrBtn = screen.getByRole('button', { name: /Native VCR/i });
     expect(vcrBtn).toBeInTheDocument();
 
-    const duckBtn = screen.getByRole('button', { name: /⚡ 100Hz DuckDB/i });
+    const duckBtn = screen.getByRole('button', { name: /100Hz DuckDB/i });
     expect(duckBtn).toBeInTheDocument();
 
     fireEvent.click(vcrBtn);

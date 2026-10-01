@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { ReplayCompareButton } from '../../../../src/components/replay/inspector/ReplayCompareButton.js';
-import type { ComparableLap, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { ReplayCompareButton } from '../../../../../src/components/replay/inspector/compare/ReplayCompareButton.js';
+import type { ComparableLap, ReplayTrajectoryData } from '../../../../../shared/types/index.js';
 
 const RACE = 'Daytona International Speedway Road Course R1 10.Vcr';
 const PRACTICE = 'Daytona International Speedway Road Course P1 20.Vcr';

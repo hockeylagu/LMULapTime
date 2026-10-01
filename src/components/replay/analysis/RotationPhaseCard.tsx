@@ -20,10 +20,10 @@ export const RotationPhaseCard: React.FC<RotationPhaseCardProps> = ({
   const trackUsage = corner.primaryTrackUsage;
 
   return (
-    <div className="flex flex-col bg-lmu-deep p-2.5 rounded-lg border border-lmu-border/40 min-w-0">
+    <div className="flex flex-col px-2 py-1 min-w-0">
       <div className="flex items-center justify-between h-7 border-b border-lmu-border/80 pb-1 w-full min-w-0">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold text-lmu-loss uppercase tracking-wider whitespace-nowrap">
-          <CircleDot className="w-3.5 h-3.5 shrink-0" />
+        <span className="flex items-center gap-1.5 text-[11px] font-medium text-lmu-text-soft whitespace-nowrap">
+          <CircleDot className="w-3.5 h-3.5 shrink-0 text-lmu-violet" />
           <span>Rotation Phase</span>
         </span>
         {isCompareMode && (

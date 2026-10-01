@@ -81,9 +81,9 @@ describe('CornerSpeedGraph', () => {
     );
 
     const usBtn = screen.getByRole('button', { name: 'US' });
+    expect(usBtn).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(usBtn);
-    // Clicking toggles state
-    expect(usBtn).toBeInTheDocument();
+    expect(usBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('renders synchronized scrub line with current speed and live handling state', () => {
@@ -101,7 +101,7 @@ describe('CornerSpeedGraph', () => {
     expect(screen.getByText('120 km/h')).toBeInTheDocument();
   });
 
-  it('renders a baseline trace and live understeer state at the scrub position', () => {
+  it('renders a baseline trace without a single-sample handling warning', () => {
     render(
       <CornerSpeedGraph
         corner={corner}
@@ -115,7 +115,7 @@ describe('CornerSpeedGraph', () => {
     );
 
     expect(screen.getByText('180 km/h')).toBeInTheDocument();
-    expect(screen.getByText(/US \+2\.8°/)).toBeInTheDocument();
+    expect(screen.queryByText(/US \+2\.8°/)).not.toBeInTheDocument();
     expect(document.querySelectorAll('path')).toHaveLength(2);
   });
 

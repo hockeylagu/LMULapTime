@@ -38,8 +38,8 @@ describe('TelemetryStripCharts', () => {
     // Speed 150 km/h
     expect(screen.getAllByText(/150/i).length).toBeGreaterThanOrEqual(1);
     // Steering 45 deg Left
-    expect(screen.getAllByText(/16\.7%/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/LEFT/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/-17%/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/16\.7% LEFT/i)).not.toBeInTheDocument();
   });
 
   it('triggers onSelectIndex when clicked or scrubbed', () => {
@@ -191,23 +191,23 @@ describe('TelemetryStripCharts', () => {
       />
     );
 
-    const scrubBtn = screen.getByRole('button', { name: /scrub/i });
+    const scrubBtn = screen.getByRole('button', { name: /Move cursor/i });
     const zoomBtn = screen.getByRole('button', { name: /zoom range/i });
 
     expect(scrubBtn).toBeInTheDocument();
     expect(zoomBtn).toBeInTheDocument();
 
     // Default is scrub mode
-    expect(scrubBtn.className).toContain('bg-lmu-info-strong');
+    expect(scrubBtn).toHaveAttribute('aria-pressed', 'true');
 
     // Switch to Zoom Range
     fireEvent.click(zoomBtn);
-    expect(zoomBtn.className).toContain('bg-lmu-info-strong');
-    expect(scrubBtn.className).not.toContain('bg-lmu-info-strong');
+    expect(zoomBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(scrubBtn).toHaveAttribute('aria-pressed', 'false');
 
     // Switch back to Scrub
     fireEvent.click(scrubBtn);
-    expect(scrubBtn.className).toContain('bg-lmu-info-strong');
+    expect(scrubBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('allows selecting a range via drag in Zoom mode and zooming the charts', () => {
@@ -266,7 +266,7 @@ describe('TelemetryStripCharts', () => {
 
     // Should display Zoomed indicator and Reset Lap button
     expect(screen.getByText(/Zoomed:/i)).toBeInTheDocument();
-    const resetBtn = screen.getByRole('button', { name: /✕ Reset Lap/i });
+    const resetBtn = screen.getByRole('button', { name: /Full lap/i });
     expect(resetBtn).toBeInTheDocument();
 
     // Clicking Reset Lap resets the zoom
@@ -344,7 +344,7 @@ describe('TelemetryStripCharts', () => {
       />
     );
 
-    expect(screen.getByText(/Zoomed: Frames 5–11/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/Zoomed: Frames 5–11/i)).toBeInTheDocument();
 
     // Rerender with zoomRange = null resets the zoom banner
     rerender(
@@ -395,7 +395,7 @@ describe('TelemetryStripCharts', () => {
     expect(container.querySelectorAll('.border-dashed').length).toBe(3);
   });
 
-  it('displays lateral line offset when comparison data has lateralOffsetM', () => {
+  it('keeps the default channel header free of line offset readings', () => {
     const primaryPoints: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, speedKmh: 150, timeSec: 0, stationM: 0, lateralOffsetM: 1.2 },
       { x: 50, y: 0, z: 0, speedKmh: 160, timeSec: 1, stationM: 50, lateralOffsetM: 1.5 },
@@ -414,10 +414,10 @@ describe('TelemetryStripCharts', () => {
       />
     );
 
-    // Lateral line offset badge should display "+1.2m" and delta "(Δ +1.0m)"
-    expect(screen.getByText(/Line:/i)).toBeInTheDocument();
-    expect(screen.getByText(/\+1.2m/i)).toBeInTheDocument();
-    expect(screen.getByText(/\(Δ \+1.0m\)/i)).toBeInTheDocument();
+    // Default channels keep comparison readings on the cursor.
+    expect(screen.queryByText(/Line:/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/150/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/B: 148/i)).toBeInTheDocument();
   });
 });
 

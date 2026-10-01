@@ -96,7 +96,7 @@ describe('ReplayInspectorSidebar', () => {
   };
 
   it('renders double panel with GPS map on left and corners table on right when activeTab is corners', () => {
-    render(<ReplayInspectorSidebar {...baseProps} />);
+    const { rerender } = render(<ReplayInspectorSidebar {...baseProps} />);
 
     // Header toggle buttons
     const cornersToggle = screen.getByRole('button', { name: /Corners \(1\)/i });
@@ -115,8 +115,11 @@ describe('ReplayInspectorSidebar', () => {
 
     // Corners table present on the right
     expect(screen.getAllByText('T1').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('button', { name: /vs Baseline/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Lap analysis/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /vs Baseline/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Consistency/i })).toBeInTheDocument();
+    rerender(<ReplayInspectorSidebar {...baseProps} isSelfAnalysis={false} isCompareMode baselineTrajectory={trajectory} />);
+    expect(screen.getByRole('button', { name: /vs Baseline/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders corner details docked under corners table when a corner is selected', () => {
@@ -180,7 +183,7 @@ describe('ReplayInspectorSidebar', () => {
     expect(setActiveTab).toHaveBeenCalledWith('map');
   });
 
-  it('switches between vs Baseline and Consistency subviews in corners tab', () => {
+  it('switches between Lap analysis and Consistency subviews in corners tab', () => {
     const setCornerSubView = vi.fn();
     render(<ReplayInspectorSidebar {...baseProps} setCornerSubView={setCornerSubView} />);
 
@@ -188,8 +191,8 @@ describe('ReplayInspectorSidebar', () => {
     fireEvent.click(consistencyBtn);
     expect(setCornerSubView).toHaveBeenCalledWith('consistency');
 
-    const vsBaselineBtn = screen.getByRole('button', { name: /vs Baseline/i });
-    fireEvent.click(vsBaselineBtn);
+    const lapAnalysisBtn = screen.getByRole('button', { name: /Lap analysis/i });
+    fireEvent.click(lapAnalysisBtn);
     expect(setCornerSubView).toHaveBeenCalledWith('compare');
   });
 

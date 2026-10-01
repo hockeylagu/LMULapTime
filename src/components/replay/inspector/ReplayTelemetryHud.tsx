@@ -11,9 +11,9 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
   const currentGear = Math.min(7, Math.max(1, currentPoint?.gear ?? 1));
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 shrink-0">
+    <div className="grid grid-cols-3 sm:grid-cols-5 gap-0 shrink-0 border-t border-lmu-border divide-x divide-lmu-border">
       {/* Speed & Gear */}
-      <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center justify-between">
+      <div className="px-2 py-1.5 flex flex-col items-center justify-between">
         <span className="text-[10px] text-lmu-info font-bold">SPEED</span>
         <div className="flex items-baseline gap-1">
           <span className="text-xs font-black text-white font-mono">{currentPoint?.speedKmh ?? 0}</span>
@@ -25,13 +25,13 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       </div>
 
       {/* Throttle */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
+      <div className={`px-2 py-1.5 flex flex-col items-center transition-colors ${
         currentPoint?.tcActive ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/10' : 'border-lmu-border'
       }`}>
-        <div className="flex items-center gap-1">
+        <div className="h-[15px] shrink-0 flex items-center gap-1">
           <span className="text-[10px] text-lmu-gain font-bold">THR</span>
           {currentPoint?.tcActive && (
-            <span className="px-1 py-px rounded text-[10px] font-black bg-lmu-warn-strong text-black">
+            <span className="inline-flex h-[15px] items-center px-1 rounded text-[10px] leading-none font-black bg-lmu-warn-strong text-black">
               TC
             </span>
           )}
@@ -41,13 +41,13 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       </div>
 
       {/* Brake */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center transition-colors ${
+      <div className={`px-2 py-1.5 flex flex-col items-center transition-colors ${
         currentPoint?.absActive ? 'border-lmu-aqua-strong/70 bg-lmu-aqua-strong/10' : 'border-lmu-border'
       }`}>
-        <div className="flex items-center gap-1">
+        <div className="h-[15px] shrink-0 flex items-center gap-1">
           <span className="text-[10px] text-lmu-loss font-bold">BRK</span>
           {currentPoint?.absActive && (
-            <span className="px-1 py-px rounded text-[10px] font-black bg-lmu-aqua text-black">
+            <span className="inline-flex h-[15px] items-center px-1 rounded text-[10px] leading-none font-black bg-lmu-aqua text-black">
               ABS
             </span>
           )}
@@ -57,7 +57,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       </div>
 
       {/* Steering */}
-      <div className="p-2 rounded-lg bg-lmu-card border border-lmu-border flex flex-col items-center">
+      <div className="px-2 py-1.5 flex flex-col items-center">
         <span className="text-[10px] text-lmu-indigo font-bold">STEER</span>
         <span className="text-xs font-black text-lmu-indigo-soft font-mono">
           {Math.abs(getSteerPercent(currentPoint?.steerYaw))}% {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
@@ -66,7 +66,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       </div>
 
       {/* Status / Track State */}
-      <div className={`p-2 rounded-lg bg-lmu-card border flex flex-col items-center justify-center transition-colors ${
+      <div className={`px-2 py-1.5 flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
           ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15'
           : currentPoint?.isOffTrack

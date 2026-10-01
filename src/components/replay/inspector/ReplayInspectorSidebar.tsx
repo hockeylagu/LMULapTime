@@ -148,30 +148,32 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       {isDoublePanel ? (
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
           {/* LEFT SUB-PANEL: GPS Map (Always Visible) */}
-          <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 p-3 gap-2.5 overflow-hidden border-b md:border-b-0 md:border-r border-lmu-border">
+          <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 p-0 gap-0 overflow-hidden border-b md:border-b-0 md:border-r border-lmu-border">
             {mapContainer}
           </div>
 
           {/* RIGHT SUB-PANEL: Corners or AI Report */}
           <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 overflow-hidden">
             {activeTab === 'corners' && (
-              <div className="px-3 py-1.5 bg-lmu-card/50 border-b border-lmu-border/60 flex items-center justify-between gap-2 shrink-0">
-                <div className="flex items-center gap-1 bg-lmu-bg p-0.5 rounded-lg border border-lmu-border/60 flex-1 min-w-0">
+              <div className="px-3 py-1.5 border-b border-lmu-border/60 flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-1 flex-1 min-w-0">
                   <button
                     onClick={() => setCornerSubView('compare')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'compare' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
+                    aria-pressed={cornerSubView === 'compare'}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 h-7 rounded text-xs font-medium transition-colors cursor-pointer ${
+                      cornerSubView === 'compare' ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
-                    <Timer className="w-3.5 h-3.5" /> vs Baseline
+                    <Timer className="w-3.5 h-3.5 text-lmu-muted" /> {isSelfAnalysis ? 'Lap analysis' : 'vs Baseline'}
                   </button>
                   <button
                     onClick={() => setCornerSubView('consistency')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                      cornerSubView === 'consistency' ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
+                    aria-pressed={cornerSubView === 'consistency'}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 h-7 rounded text-xs font-medium transition-colors cursor-pointer ${
+                      cornerSubView === 'consistency' ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
                     }`}
                   >
-                    <Activity className="w-3.5 h-3.5" /> Consistency
+                    <Activity className="w-3.5 h-3.5 text-lmu-muted" /> Consistency
                   </button>
                 </div>
               </div>
@@ -248,7 +250,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col min-h-0 h-full p-3 gap-2.5 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 h-full p-0 gap-0 overflow-hidden">
           {mapContainer}
         </div>
       )}

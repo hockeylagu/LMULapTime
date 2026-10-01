@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, Clock, CloudDrizzle, CloudRain, Flag, HardDrive, Sun, Thermometer, Video } from 'lucide-react';
+import React, { useRef } from 'react';
+import { ArrowLeft, CloudRain, CloudSun, Info } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
@@ -13,104 +13,60 @@ export interface ReplayInspectorTitleProps {
 const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s`;
 
-/** The replay's weather, from the loaded lap when it carries one, else from the replay header. */
-function WeatherBadge({ metadata, trajectory }: Pick<ReplayInspectorTitleProps, 'metadata' | 'trajectory'>) {
-  const condition = trajectory?.weatherCondition || metadata?.weatherCondition;
-  if (!condition) return null;
-  const maxRain = trajectory?.maxRainIntensity || metadata?.maxRainIntensity;
-  const rainSuffix = trajectory?.maxRainIntensity ? `(${formatRain(trajectory.maxRainIntensity)})` : '';
-  const tone = condition === 'Wet'
-    ? 'bg-lmu-azure-strong/10 border-lmu-azure-strong/30 text-lmu-azure'
-    : condition === 'Dynamic Weather'
-    ? 'bg-lmu-aqua-strong/10 border-lmu-aqua-strong/30 text-lmu-aqua'
-    : 'bg-lmu-warn-strong/10 border-lmu-warn-strong/30 text-lmu-warn';
+/** Track context stays visible; replay metadata is available in a keyboard-accessible disclosure. */
+export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, replayName, metadata, trajectory }) => {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const summaryRef = useRef<HTMLElement>(null);
+  const track = metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName || 'Telemetry';
+  const eventTitle = metadata?.eventInfo?.eventTitle || metadata?.eventTitle;
+  const weather = trajectory?.weatherCondition || metadata?.weatherCondition;
+  const rain = trajectory?.maxRainIntensity ?? metadata?.maxRainIntensity;
+  const air = trajectory?.ambientTemp ?? metadata?.ambientTemp;
+  const surface = trajectory?.trackTemp ?? metadata?.trackTemp;
+  const conditions = [
+    weather,
+    typeof rain === 'number' && Number.isFinite(rain) && rain > 0 ? `${formatRain(rain)} rain` : null,
+    typeof air === 'number' && Number.isFinite(air) ? `${air.toFixed(1)}°C air` : null,
+    typeof surface === 'number' && Number.isFinite(surface) ? `${surface.toFixed(1)}°C track` : null,
+  ].filter(Boolean).join(' · ');
+  const hasRain = weather === 'Wet' || weather === 'Dynamic Weather' || (rain ?? 0) > 0;
 
   return (
-    <span
-      className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold text-[10px] shrink-0 border ${tone}`}
-      title={maxRain ? `Max Rain: ${formatRain(maxRain)}` : 'Track Weather Condition'}
-    >
-      {condition === 'Wet' ? (
-        <>
-          <CloudRain className="w-3 h-3 text-lmu-azure" />
-          <span>Wet Track {rainSuffix}</span>
-        </>
-      ) : condition === 'Dynamic Weather' ? (
-        <>
-          <CloudDrizzle className="w-3 h-3 text-lmu-aqua" />
-          <span>Dynamic Rain {rainSuffix}</span>
-        </>
-      ) : (
-        <>
-          <Sun className="w-3 h-3 text-lmu-warn" />
-          <span>Dry Track</span>
-        </>
-      )}
-    </span>
-  );
-}
-
-/** The inspector header's left side: back, the replay's name and event, weather, track, length and temperatures. */
-export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, replayName, metadata, trajectory }) => (
-  <div className="flex items-center gap-3 min-w-0">
-    <button
-      type="button"
-      onClick={onClose}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-white/10 text-white font-medium text-xs border border-lmu-border transition-colors shrink-0 cursor-pointer"
-      title="Return to Lap Times"
-    >
-      <ArrowLeft className="w-4 h-4 text-lmu-muted group-hover:text-white" />
-      <span className="hidden sm:inline">Back</span>
-    </button>
-
-    <div className="flex items-center gap-2.5 min-w-0">
-      <div className="p-2 rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text shrink-0">
-        <Video className="w-4 h-4" />
-      </div>
+    <div className="flex items-center gap-4 min-w-0">
+      <button type="button" onClick={onClose} title="Return to previous page"
+        className="flex items-center gap-1.5 py-1.5 text-lmu-muted hover:text-white text-xs shrink-0 cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
       <div className="min-w-0">
-        <div className="flex items-center gap-2 truncate">
-          <span className="min-w-24 text-xs sm:text-sm font-bold text-white tracking-wide truncate">
-            Replay Intelligence: {replayName}
-          </span>
-          {metadata?.eventInfo?.eventTitle && (
-            <span className="hidden md:inline min-w-0 truncate px-2 py-0.5 rounded-full bg-lmu-gain-strong/10 border border-lmu-gain-strong/30 text-lmu-gain font-semibold text-[10px]">
-              {metadata.eventInfo.eventTitle}
-              {typeof metadata.eventInfo.splitNo === 'number' && ` (Split ${metadata.eventInfo.splitNo})`}
-            </span>
-          )}
-          <WeatherBadge metadata={metadata} trajectory={trajectory} />
-        </div>
-        <div className="hidden lg:flex items-center gap-3 text-[11px] text-lmu-muted whitespace-nowrap">
-          {(metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName) && (
-            <span className="flex items-center gap-1 min-w-0">
-              <Flag className="w-3 h-3 text-lmu-accent-text shrink-0" />
-              <span className="truncate">{metadata.displayTrack || metadata.trackCourse || metadata.trackName}</span>
-            </span>
-          )}
-          {metadata?.durationSec ? (
-            <span className="flex items-center gap-1 shrink-0 font-mono">
-              <Clock className="w-3 h-3 text-lmu-warn" />
-              {formatDuration(metadata.durationSec)}
-            </span>
-          ) : null}
-          {metadata?.fileSizeBytes ? (
-            <span className="flex items-center gap-1 shrink-0">
-              <HardDrive className="w-3 h-3 text-lmu-muted" />
-              {formatBytes(metadata.fileSizeBytes)}
-            </span>
-          ) : null}
-          {(trajectory?.ambientTemp !== undefined || metadata?.ambientTemp !== undefined) && (
-            <span className="flex items-center gap-1 shrink-0 font-mono text-lmu-aqua-soft" title="Session Atmospheric & Track Temperature">
-              <Thermometer className="w-3 h-3 text-lmu-aqua" />
-              <span>
-                {(trajectory?.ambientTemp ?? metadata?.ambientTemp)?.toFixed(1)}°C Air
-                {(trajectory?.trackTemp !== undefined || metadata?.trackTemp !== undefined) &&
-                  ` · ${(trajectory?.trackTemp ?? metadata?.trackTemp)?.toFixed(1)}°C Track`}
-              </span>
-            </span>
-          )}
-        </div>
+        <h1 className="text-sm font-bold text-white truncate" title={track}>{track}</h1>
+        {conditions && <div aria-label="Track conditions" className="flex items-center gap-1.5 text-[11px] leading-4 text-lmu-text-soft" title={conditions}>
+          {hasRain ? <CloudRain aria-hidden="true" className="w-3 h-3 shrink-0 text-lmu-azure" /> : <CloudSun aria-hidden="true" className="w-3 h-3 shrink-0 text-lmu-muted" />}
+          <span className="truncate">{conditions}</span>
+        </div>}
       </div>
+      <details ref={detailsRef} className="relative shrink-0" onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          if (detailsRef.current) detailsRef.current.open = false;
+          summaryRef.current?.focus();
+        }
+      }}>
+        <summary ref={summaryRef} className="list-none flex items-center gap-1.5 text-[11px] text-lmu-muted hover:text-white cursor-pointer rounded px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text [&::-webkit-details-marker]:hidden">
+          <Info className="w-3.5 h-3.5" /> Info
+        </summary>
+        <div className="absolute top-full left-0 mt-2 w-[360px] max-h-[70vh] overflow-y-auto bg-lmu-card border border-lmu-border rounded-xl p-4 text-xs shadow-lg">
+          <h2 className="font-semibold text-white mb-3">Replay information</h2>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-lmu-text-soft">
+            {eventTitle && <><dt className="text-lmu-muted">Event</dt><dd>{eventTitle}</dd></>}
+            {typeof metadata?.eventInfo?.splitNo === 'number' && <><dt className="text-lmu-muted">Split</dt><dd className="font-mono">Split {metadata.eventInfo.splitNo}</dd></>}
+            <dt className="text-lmu-muted">File</dt><dd className="break-all">{replayName || metadata?.filename || 'Loading…'}</dd>
+            {metadata && <>
+              <dt className="text-lmu-muted">Duration</dt><dd className="font-mono">{formatDuration(metadata.durationSec)}</dd>
+              <dt className="text-lmu-muted">File size</dt><dd className="font-mono">{formatBytes(metadata.fileSizeBytes)}</dd>
+            </>}
+          </dl>
+        </div>
+      </details>
     </div>
-  </div>
-);
+  );
+};

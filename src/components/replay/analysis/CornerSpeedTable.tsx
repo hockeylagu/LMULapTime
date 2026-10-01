@@ -63,19 +63,21 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
       <div className="flex items-center justify-between px-3 py-1.5 shrink-0 text-[11px] font-mono text-lmu-muted border-b border-lmu-border/60 gap-2">
         <span className="truncate">{selfAnalysis ? primaryLabel : `${primaryLabel} vs ${baselineLabel}`}</span>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center bg-lmu-bg p-0.5 rounded border border-lmu-border/60">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => setTableMode('speed')}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
-                tableMode === 'speed' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+              aria-pressed={tableMode === 'speed'}
+              className={`px-2 h-6 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                tableMode === 'speed' ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-muted hover:text-white'
               }`}
             >
               Speed
             </button>
             <button
               onClick={() => setTableMode('technique')}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
-                tableMode === 'technique' ? 'bg-lmu-accent text-white font-bold' : 'text-lmu-muted hover:text-white'
+              aria-pressed={tableMode === 'technique'}
+              className={`px-2 h-6 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                tableMode === 'technique' ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-muted hover:text-white'
               }`}
             >
               Technique
@@ -115,7 +117,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
       <div className={selectedCornerChart ? 'shrink-0' : 'min-h-0 overflow-y-auto flex-1'}>
         <table className="w-full text-[11px] font-mono border-collapse">
           <thead className="sticky top-0 bg-lmu-card border-b border-lmu-border z-10">
-            <tr className="text-lmu-muted uppercase tracking-wider text-[10px]">
+            <tr className="text-lmu-muted uppercase tracking-wider text-[11px]">
               <th className="px-2 py-1.5 text-left">Segment</th>
               {tableMode === 'speed' ? (
                 <>
@@ -124,7 +126,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                   <th className="px-2 py-1.5 text-right">Exit/Top</th>
                   <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Brake' : 'Brake Δ'}</th>
                   <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Throttle' : 'Thr Δ'}</th>
-                  <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Length' : 'Δ Time'}</th>
+                  <th className="px-2 py-1.5 text-right">{selfAnalysis ? 'Time' : 'Δ Time'}</th>
                 </>
               ) : (
                 <>
@@ -143,7 +145,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               <tr
                 key={s.segmentIndex}
                 className={`border-t border-lmu-border/40 hover:bg-lmu-card/50 transition-colors cursor-pointer ${
-                  s.type === 'corner' && s.cornerNumber === selectedCornerNumber ? 'bg-lmu-accent/15' : ''
+                  s.type === 'corner' && s.cornerNumber === selectedCornerNumber ? 'bg-lmu-raised/60' : ''
                 }`}
                 onClick={() => {
                   onSelectDistance?.(s.type === 'corner' ? s.minDistM : Math.round((s.entryDistM + s.exitDistM) / 2));
@@ -153,7 +155,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                 {s.type === 'corner' ? (
                   <>
                     <td className="px-2 py-1.5 font-bold text-white">
-                      <span className={`inline-flex items-center gap-1.5 flex-wrap ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent-text' : ''}`}>
+                      <span className="inline-flex items-center gap-1.5 flex-wrap">
                         <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent-text' : 'text-lmu-muted'}`} />
                         <span>T{s.cornerNumber}</span>
                       </span>

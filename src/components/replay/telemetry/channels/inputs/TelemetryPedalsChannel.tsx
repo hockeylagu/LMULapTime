@@ -31,7 +31,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
   cursorPct,
 }) => {
   const throttleSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 8 1000 89" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="throttleGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.throttle} stopOpacity="0.8" />
@@ -47,7 +47,7 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
   ), [throttleArea, baselineThrottlePath, throttlePath]);
 
   const brakeSvg = useMemo(() => (
-    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 8 1000 89" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="brakeGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.brake} stopOpacity="0.8" />
@@ -66,32 +66,23 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
     <>
       {/* THROTTLE CHANNEL */}
       <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
-        <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-          <span className="p-1 rounded bg-lmu-gain-strong/20 text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
+        <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
+          <span className="text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
             <Activity className="w-3 h-3" />
             THROTTLE
           </span>
-          <span className="text-xs font-mono font-bold text-lmu-gain">
-            {(currentPoint?.throttle ?? 0).toFixed(1)}%
-          </span>
-          {currentComparison && (
-            <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
-              Base: {currentComparison.baseline.throttle.toFixed(0)}%
-            </span>
-          )}
+
         </div>
 
-        <TelemetryStaticTrace chart={throttleSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
-          { label: '50%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
-          { label: '0%', borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+        <TelemetryStaticTrace chart={throttleSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
+          { label: '100%', yPercent: 2 / 89 * 100, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '50%', yPercent: 50, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
+          { label: '0%', yPercent: 87 / 89 * 100, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain' },
         ]} />
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-              cursorPct < 15 ? 'bottom-2' : 'top-2'
-            } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
           >
             <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
@@ -113,32 +104,23 @@ export const TelemetryPedalsChannel: React.FC<TelemetryPedalsChannelProps> = Rea
 
       {/* BRAKE CHANNEL */}
       <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-loss-deep/20">
-        <div className="absolute top-2 left-3 z-20 flex items-center gap-2 pointer-events-none">
-          <span className="p-1 rounded bg-lmu-loss-strong/20 text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
+        <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
+          <span className="text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
             <Zap className="w-3 h-3" />
             BRAKE
           </span>
-          <span className="text-xs font-mono font-bold text-lmu-loss">
-            {(currentPoint?.brake ?? 0).toFixed(1)}%
-          </span>
-          {currentComparison && (
-            <span className="text-[11px] font-mono text-lmu-warn/90 ml-1 pl-2 border-l border-white/10">
-              Base: {currentComparison.baseline.brake.toFixed(0)}%
-            </span>
-          )}
+
         </div>
 
-        <TelemetryStaticTrace chart={brakeSvg} gridClassName="absolute inset-0 flex flex-col justify-between py-2 px-3 pointer-events-none opacity-20" gridLines={[
-          { label: '100%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
-          { label: '50%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
-          { label: '0%', borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+        <TelemetryStaticTrace chart={brakeSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
+          { label: '100%', yPercent: 2 / 89 * 100, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '50%', yPercent: 50, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
+          { label: '0%', yPercent: 87 / 89 * 100, borderClassName: 'border-b border-lmu-loss/40', labelClassName: 'text-[10px] text-lmu-loss' },
         ]} />
 
         {isCursorInView && (
           <div
-            className={`absolute pointer-events-none z-50 flex items-center gap-1 ${
-              cursorPct < 15 ? 'bottom-2' : 'top-2'
-            } ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
+            className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
             style={{ left: `${cursorPct}%` }}
           >
             <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${

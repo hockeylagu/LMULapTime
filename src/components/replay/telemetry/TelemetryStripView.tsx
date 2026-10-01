@@ -8,6 +8,7 @@ import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryResolution } from './telemetryResolution.js';
+import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];
@@ -191,7 +192,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         </div>
 
         {isCursorInView && (
-          <div style={{ left: `${cursorPct}%` }} className="absolute inset-y-0 w-[1.5px] bg-white pointer-events-none z-30" />
+          <TelemetryScrubCursor cursorPct={cursorPct} />
         )}
       </div>
 

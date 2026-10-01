@@ -7,6 +7,7 @@ import {
 } from '../../../utils/handlingBalanceDetection.js';
 import { buildHandlingBands, computeCornerSpeedProfile } from './cornerSpeedProfile.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { computeLapComparisons } from '../../../utils/replayComparison.js';
 
 export interface CornerSpeedGraphProps {
   corner: CornerSegmentComparison;
@@ -41,8 +42,9 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
 
   // Detect handling balance and tire scrub events across this corner
   const handlingEvents = useMemo(() => {
-    return detectHandlingBalanceEvents(primaryPoints, [corner]);
-  }, [primaryPoints, corner]);
+    const comparisons = baselinePoints?.length ? computeLapComparisons(primaryPoints, baselinePoints) : undefined;
+    return detectHandlingBalanceEvents(primaryPoints, [corner], undefined, comparisons);
+  }, [primaryPoints, baselinePoints, corner]);
 
   const bands = useMemo(() => buildHandlingBands(handlingEvents, corner), [handlingEvents, corner]);
 
@@ -75,26 +77,27 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
   return (
     <div
       data-chart="speed-profile"
-      className={`relative flex flex-col bg-lmu-deep rounded-lg border border-lmu-border/60 overflow-hidden justify-between ${className}`}
+      className={`relative flex flex-col bg-lmu-deep overflow-hidden justify-between ${className}`}
     >
       {/* Legend & Handling Overlay Toggles */}
       {!compact && (
-        <div className="flex items-center justify-between text-[10px] font-mono px-2.5 py-1.5 border-b border-lmu-border/80 bg-lmu-surface">
-          <span className="text-xs font-semibold text-lmu-text-soft">Speed & Handling Profile</span>
+        <div className="flex items-center justify-between text-[10px] font-mono px-2.5 py-1.5 border-b border-lmu-border/50">
+          <span className="text-[11px] font-medium text-lmu-muted">Speed & Handling Profile</span>
           <div className="flex items-center gap-1">
             {[
-              { label: 'US', active: showUndersteer && hasUS, onClick: () => setShowUndersteer(v => !v), color: 'bg-lmu-info-strong/20 border-lmu-info-strong/50 text-lmu-info-soft' },
-              { label: 'Scrub', active: showScrub && hasScrub, onClick: () => setShowScrub(v => !v), color: 'bg-lmu-loss-strong/20 border-lmu-loss-strong/50 text-lmu-loss-soft' },
-              { label: 'OS', active: showOversteer && hasOS, onClick: () => setShowOversteer(v => !v), color: 'bg-lmu-warn-strong/20 border-lmu-warn-strong/50 text-lmu-warn-soft' },
+              { label: 'US', name: 'understeer', pressed: showUndersteer, active: showUndersteer && hasUS, color: 'text-lmu-info-soft', onClick: () => setShowUndersteer(v => !v) },
+              { label: 'Scrub', name: 'tire scrub', pressed: showScrub, active: showScrub && hasScrub, color: 'text-lmu-loss-soft', onClick: () => setShowScrub(v => !v) },
+              { label: 'OS', name: 'oversteer', pressed: showOversteer, active: showOversteer && hasOS, color: 'text-lmu-warn-soft', onClick: () => setShowOversteer(v => !v) },
             ].map(btn => (
               <button
                 key={btn.label}
                 type="button"
                 onClick={btn.onClick}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
-                  btn.active ? btn.color : 'bg-lmu-card/60 border-lmu-border text-lmu-faint'
+                aria-pressed={btn.pressed}
+                className={`px-1.5 h-6 min-w-6 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                  btn.active ? `bg-lmu-raised ${btn.color}` : 'text-lmu-muted hover:bg-lmu-raised/50 hover:text-white'
                 }`}
-                title={`Toggle ${btn.label} overlay`}
+                title={`Toggle ${btn.name} overlay`}
               >
                 {btn.label}
               </button>
@@ -131,9 +134,9 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
 
         {/* Apex minimum speed callout */}
         {!compact && (
-          <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-[1.5px] bg-lmu-loss/80 pointer-events-none -translate-x-1/2">
-            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-lmu-loss-deep/80 border border-lmu-loss-strong/40 text-lmu-loss-soft text-[10px] font-mono font-bold whitespace-nowrap">
-              Apex: {corner.primaryMinSpeedKmh}
+          <div style={{ left: `${minPct}%` }} className="absolute top-0 bottom-0 w-px bg-lmu-muted/50 pointer-events-none -translate-x-1/2">
+            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-lmu-deep text-lmu-text-soft text-[10px] font-mono font-medium whitespace-nowrap">
+              Apex: {corner.primaryMinSpeedKmh} km/h
             </span>
           </div>
         )}
