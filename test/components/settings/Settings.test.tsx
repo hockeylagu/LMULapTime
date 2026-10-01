@@ -28,6 +28,24 @@ describe('Settings component', () => {
       if (url.includes('/api/reference-laptimes/refresh')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, entriesCount: 190 }) });
       }
+      if (url.includes('/api/replays/cache')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.includes('/api/replays/upgrade')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ pendingReplays: 0, pendingDrivers: 0, status: { running: false, enabled: false } }),
+        });
+      }
+      if (url.includes('/api/ai/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }),
+        });
+      }
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
   });
@@ -285,4 +303,73 @@ describe('Settings component', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('filters settings cards and TOC items via search input and clears search', async () => {
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await screen.findByText(/no replays cached yet/i);
+
+    const searchInput = screen.getByRole('textbox', { name: /search settings/i });
+    expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+    expect(screen.getByText('Reference Lap Time Benchmarks')).toBeInTheDocument();
+
+    // Search for "gemini" -> should show AI sections and hide SQLite Cache
+    fireEvent.change(searchInput, { target: { value: 'gemini' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Filtering settings by/i)).toBeInTheDocument();
+      expect(screen.getByText('AI Lap Reports')).toBeInTheDocument();
+      expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
+      expect(screen.queryByText('Session XML SQLite Cache')).not.toBeInTheDocument();
+    });
+
+    // Clear search using the clear button in the input or reset button
+    const clearBtn = screen.getByRole('button', { name: /clear search/i });
+    fireEvent.click(clearBtn);
+
+    await waitFor(() => {
+      expect(searchInput).toHaveValue('');
+      expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+    });
+    await screen.findByText(/no replays cached yet/i);
+  });
+
+  it('shows empty state when no settings match and clears via empty state button', async () => {
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await screen.findByText(/no replays cached yet/i);
+
+    const searchInput = screen.getByRole('textbox', { name: /search settings/i });
+    fireEvent.change(searchInput, { target: { value: 'nonexistenttermxyz' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('No Settings Found')).toBeInTheDocument();
+      expect(screen.getByText(/No settings match "nonexistenttermxyz"/i)).toBeInTheDocument();
+      expect(screen.queryByText('Session XML SQLite Cache')).not.toBeInTheDocument();
+    });
+
+    const clearBtn = screen.getByRole('button', { name: 'Clear Search' });
+    fireEvent.click(clearBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('No Settings Found')).not.toBeInTheDocument();
+      expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+    });
+    await screen.findByText(/no replays cached yet/i);
+  });
+
+  it('navigates to section and scrolls element into view on TOC button click', async () => {
+    const scrollIntoViewMock = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await screen.findByText(/no replays cached yet/i);
+
+    const tocNav = screen.getByRole('navigation', { name: /settings table of contents/i });
+    expect(tocNav).toBeInTheDocument();
+
+    const aiButton = screen.getByRole('button', { name: /AI Race Engineer/i });
+    fireEvent.click(aiButton);
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
 });
+
