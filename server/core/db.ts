@@ -8,6 +8,8 @@ import {
   SessionMetadata,
   ReferenceLaptimeEntry,
   ReferenceLaptimesCache,
+  ReferenceBenchmarkDiff,
+  BenchmarkDiffSummary,
   ReplayMetadata,
   ReplayTrajectoryData,
   ReplayCacheSummary,
@@ -32,6 +34,7 @@ import {
   syncReplaysFromDir as runSyncReplaysFromDir,
   cacheAllLapsForDriver,
   ReplaySyncHost,
+  ReplayAsyncSyncOptions,
 } from './replay/dbReplaySync.js';
 import {
   deleteReplayDriverLaps,
@@ -106,6 +109,9 @@ import {
   getReferenceLaptimesCache,
   getReferenceLaptimeEntry,
   clearReferenceLaptimes,
+  recordBenchmarkDiff,
+  getBenchmarkDiffHistory,
+  getBenchmarkDiffById,
 } from './dbReferenceLaptimeStore.js';
 import {
   getAllSessions as fetchAllSessions,
@@ -154,6 +160,7 @@ export type {
 export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayUpgradeHost {
   private db: DatabaseType;
   private dbPath: string;
+  private sessionRevision = 0;
   private replayMetadataRevision = 0;
   private telemetryMetadataRevision = 0;
   private allSessionsCache: DetailedSession[] | null = null;
@@ -272,7 +279,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     const archivedAs = archiveReplacedRecording(this.db, filename, { mtime, size, metadata });
     if (archivedAs) {
       console.log(`[SQLite Cache] ${filename} now holds another recording; the stored one is kept as ${archivedAs}`);
-      this.allSessionsCache = null;
+      this.invalidateSessionCache();
       this.telemetryMetadataRevision++;
     }
     upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
@@ -393,10 +400,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public syncReplaysAsyncIterator(
     replaysDir: string,
-    options: {
-      playerName?: string;
-      shouldStop?: () => boolean;
-    } = {}
+    options: ReplayAsyncSyncOptions = {}
   ): AsyncGenerator<ReplaySyncProgress, ReplaySyncResult, void> {
     return runSyncReplaysAsyncIterator(this, replaysDir, options);
   }
@@ -475,8 +479,11 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   // --- Sessions Cache & Sync ---
 
+  public getSessionRevision(): number { return this.sessionRevision; }
+
   public invalidateSessionCache(): void {
     this.allSessionsCache = null;
+    this.sessionRevision++;
   }
 
   public getAllSessions(): DetailedSession[] {
@@ -506,7 +513,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void {
     insertOrUpdateSession(this.db, session, filePath, mtime, size);
-    this.allSessionsCache = null;
+    this.invalidateSessionCache();
   }
 
   /** Links a replay to the session, whose laps then get that replay's conditions. */
@@ -536,7 +543,9 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
    * place: callers such as the replay links hold on to them.
    */
   public reclassifyStoredSessions(which: { ids: string[] } | { replayName: string }): void {
-    for (const session of reclassifyStoredSessions(this.db, which)) {
+    const updated = reclassifyStoredSessions(this.db, which);
+    if (updated.length > 0) this.sessionRevision++;
+    for (const session of updated) {
       const cached = this.allSessionsCache?.find(s => s.id === session.id);
       if (!cached) continue;
       Object.assign(cached, session);
@@ -552,7 +561,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     resultsDir: string,
     parser: SessionXmlSyncParser,
     forceReparse = false
-  ): Generator<SessionSyncProgress, SyncResult, void> {
+  ): Generator<SessionSyncProgress, SyncResult, DetailedSession | null | undefined> {
     return yield* runSyncSessionsIterator(this, resultsDir, parser, forceReparse);
   }
 
@@ -578,7 +587,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   }
 
   public clearCache(): void {
-    this.allSessionsCache = null;
+    this.invalidateSessionCache();
     clearSessionCache(this.db);
   }
 
@@ -598,6 +607,18 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public clearReferenceLaptimes(): void {
     clearReferenceLaptimes(this.db);
+  }
+
+  public getBenchmarkDiffHistory(limit: number = 30): BenchmarkDiffSummary[] {
+    return getBenchmarkDiffHistory(this.db, limit);
+  }
+
+  public getBenchmarkDiffById(id: number): ReferenceBenchmarkDiff | null {
+    return getBenchmarkDiffById(this.db, id);
+  }
+
+  public recordBenchmarkDiff(diff: ReferenceBenchmarkDiff, sourceUrl?: string): number {
+    return recordBenchmarkDiff(this.db, diff, sourceUrl);
   }
 
   // --- General Cache Diagnostics & Lifecycle ---

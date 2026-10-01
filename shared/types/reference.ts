@@ -27,6 +27,24 @@ export interface ReferenceLaptimeEntry {
   recordLaptimeSec?: number;
 }
 
+export interface LapCategoryShift {
+  driverName: string;
+  lapTimeSec: number;
+  lapTimeString: string;
+  sessionId: string;
+  sessionName: string;
+  lapNumber: number;
+  oldCategory: PaceCategory;
+  newCategory: PaceCategory;
+}
+
+export interface BenchmarkItemImpact {
+  affectedSessionsCount: number;
+  affectedLapsCount: number;
+  categoryShiftsCount: number;
+  categoryShifts: LapCategoryShift[];
+}
+
 export interface ReferenceBenchmarkDiffItem {
   key: string;
   trackName: string;
@@ -40,18 +58,34 @@ export interface ReferenceBenchmarkDiffItem {
   diffSec?: number;
   oldPatch?: string;
   newPatch?: string;
+  impact?: BenchmarkItemImpact;
 }
 
 export interface ReferenceBenchmarkDiff {
+  id?: number;
   timestamp: string;
   hasChanges: boolean;
   addedCount: number;
   updatedCount: number;
   removedCount: number;
   totalEntries: number;
+  totalAffectedSessions?: number;
+  totalCategoryShifts?: number;
   added: ReferenceBenchmarkDiffItem[];
   updated: ReferenceBenchmarkDiffItem[];
   removed: ReferenceBenchmarkDiffItem[];
+}
+
+export interface BenchmarkDiffSummary {
+  id: number;
+  timestamp: string;
+  hasChanges: boolean;
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+  totalEntries: number;
+  totalAffectedSessions: number;
+  totalCategoryShifts: number;
 }
 
 export interface ReferenceLaptimesCache {

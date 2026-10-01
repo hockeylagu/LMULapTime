@@ -138,6 +138,22 @@ export function initDbSchema(db: DatabaseType): void {
 
     CREATE INDEX IF NOT EXISTS idx_ref_track_class ON reference_laptimes(track_name, car_class);
 
+    CREATE TABLE IF NOT EXISTS benchmark_diff_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      source_url TEXT,
+      total_entries INTEGER NOT NULL,
+      added_count INTEGER NOT NULL,
+      updated_count INTEGER NOT NULL,
+      removed_count INTEGER NOT NULL,
+      has_changes INTEGER NOT NULL,
+      total_affected_sessions INTEGER NOT NULL DEFAULT 0,
+      total_category_shifts INTEGER NOT NULL DEFAULT 0,
+      diff_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_benchmark_diff_history_ts ON benchmark_diff_history(timestamp DESC);
+
     CREATE TABLE IF NOT EXISTS cache_metadata (
       key TEXT PRIMARY KEY,
       value TEXT

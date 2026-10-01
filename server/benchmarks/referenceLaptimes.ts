@@ -5,7 +5,9 @@ import {
   findReferenceEntry,
   normalizeCarClass,
 } from '../../shared/domain/paceCategory.js';
+import { isMainThread } from 'node:worker_threads';
 import { getSessionDatabase } from '../core/db.js';
+import { enrichBenchmarkDiffWithImpact } from './benchmarkImpact.js';
 
 const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
@@ -171,6 +173,12 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
   };
 }
 
+/** Worker parsing receives the main thread's benchmarks without opening its SQLite database. */
+export function setWorkerReferenceLaptimes(cache: ReferenceLaptimesCache | null): void {
+  if (isMainThread) throw new Error('Benchmark snapshots are only used by ingest workers');
+  cachedData = cache;
+}
+
 export function resetCachedReferenceLaptimes(): void {
   cachedData = null;
 }
@@ -186,7 +194,7 @@ export function isReferenceLaptimesCacheFresh(
 }
 
 export function loadReferenceLaptimesFromCache(): ReferenceLaptimesCache | null {
-  if (cachedData) return cachedData;
+  if (cachedData || !isMainThread) return cachedData;
 
   try {
     const db = getSessionDatabase();
@@ -214,7 +222,16 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
   const cache = parseReferenceCsv(csvText);
 
   // Compute diff against previous cache
-  const diff = computeReferenceBenchmarkDiff(currentCache?.entries || {}, cache.entries);
+  let diff = computeReferenceBenchmarkDiff(currentCache?.entries || {}, cache.entries);
+
+  try {
+    const db = getSessionDatabase();
+    const sessions = db.getAllSessions();
+    diff = enrichBenchmarkDiffWithImpact(diff, sessions);
+  } catch (err) {
+    console.warn('[Benchmark Impact] Unable to compute session impact for diff:', err);
+  }
+
   cache.lastUpdateDiff = diff;
 
   // Persist directly to SQLite database

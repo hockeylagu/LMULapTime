@@ -189,7 +189,7 @@ describe('useReplayInspectorData', () => {
     expect(Math.max(...(result.current.trajectory?.points ?? []).map(p => p.speedKmh ?? 0))).toBe(180);
     expect(result.current.currentLapSummary?.lapTimeSec).toBe(100);
     expect(onLapChange).toHaveBeenCalledWith(2);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'), expect.anything());
   });
 
   it('asks for one point every 2 m by default, and every sample at full resolution', async () => {

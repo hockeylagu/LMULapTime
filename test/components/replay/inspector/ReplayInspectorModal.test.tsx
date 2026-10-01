@@ -287,7 +287,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     // Verify it requested the baseline trajectory
-    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/trajectory'));
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/trajectory'), expect.anything());
   });
 
   it('renders playback speed options 0.5x, 1x, and 2x while omitting 5x', async () => {
