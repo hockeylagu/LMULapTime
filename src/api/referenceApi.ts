@@ -34,10 +34,10 @@ export function invalidateReferenceLaptimes(): void {
   loaded = null;
 }
 
-export function fetchBenchmarkDiffHistory(): Promise<BenchmarkDiffSummary[]> {
-  return fetchJson<BenchmarkDiffSummary[]>('/api/reference-laptimes/diffs');
+export function fetchBenchmarkDiffHistory(init?: RequestInit): Promise<BenchmarkDiffSummary[]> {
+  return fetchJson<BenchmarkDiffSummary[]>('/api/reference-laptimes/diffs', init);
 }
 
-export function fetchBenchmarkDiffById(id: number): Promise<ReferenceBenchmarkDiff> {
-  return fetchJson<ReferenceBenchmarkDiff>(`/api/reference-laptimes/diffs/${id}`);
+export function fetchBenchmarkDiffById(id: number, init?: RequestInit): Promise<ReferenceBenchmarkDiff> {
+  return fetchJson<ReferenceBenchmarkDiff>(`/api/reference-laptimes/diffs/${id}`, init);
 }

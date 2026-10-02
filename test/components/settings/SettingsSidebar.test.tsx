@@ -1,46 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SettingsSidebar } from '../../../src/components/settings/SettingsSidebar.js';
-import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';
-import { AppStatus } from '../../../shared/types/index.js';
+import { SETTINGS_SECTIONS, matchesSettingsSection } from '../../../src/components/settings/settingsSections.js';
 
 describe('SettingsSidebar component', () => {
-  const mockStatus: AppStatus = {
-    resultsDir: 'C:\\LMU\\Results',
-    resultsExist: true,
-    replaysDir: 'C:\\LMU\\Replays',
-    replaysExist: true,
-    telemetryDir: 'C:\\LMU\\Telemetry',
-    telemetryExist: true,
-    playerName: 'MaxVerstappen',
-    sessionsCount: 35,
-    tracksCount: 6,
-    referenceLaptimes: {
-      lastUpdated: '2026-05-28T12:00:00Z',
-      entriesCount: 187,
-    },
-    sqliteCache: {
-      enabled: true,
-      dbPath: 'C:\\LMU\\lmu_cache.db',
-      sessionsCount: 35,
-      replaysCount: 12,
-      lastSyncedAt: '2026-05-28T12:00:00Z',
-      dbSizeBytes: 1048576,
-    },
-  };
-
-  it('renders search input, table of contents, and system overview', () => {
+  it('renders search input and table of contents without a system overview', () => {
     const onSelectSection = vi.fn();
     const onSearchChange = vi.fn();
 
     render(
       <SettingsSidebar
         sections={SETTINGS_SECTIONS}
-        activeSectionId="cache-settings"
+        activeSectionId="overview"
         onSelectSection={onSelectSection}
         searchQuery=""
         onSearchChange={onSearchChange}
-        status={mockStatus}
         totalSectionsCount={SETTINGS_SECTIONS.length}
       />
     );
@@ -48,10 +22,7 @@ describe('SettingsSidebar component', () => {
     expect(screen.getByRole('textbox', { name: /search settings/i })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: /settings table of contents/i })).toBeInTheDocument();
 
-    // Check system overview
-    expect(screen.getByText('System Overview')).toBeInTheDocument();
-    expect(screen.getAllByText('MaxVerstappen').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('187')).toBeInTheDocument();
+    expect(screen.queryByText('System Overview')).not.toBeInTheDocument();
   });
 
   it('handles search input change and clear button click', () => {
@@ -60,11 +31,10 @@ describe('SettingsSidebar component', () => {
     const { rerender } = render(
       <SettingsSidebar
         sections={SETTINGS_SECTIONS}
-        activeSectionId="cache-settings"
+        activeSectionId="overview"
         onSelectSection={vi.fn()}
         searchQuery=""
         onSearchChange={onSearchChange}
-        status={mockStatus}
         totalSectionsCount={SETTINGS_SECTIONS.length}
       />
     );
@@ -81,7 +51,6 @@ describe('SettingsSidebar component', () => {
         onSelectSection={vi.fn()}
         searchQuery="replay"
         onSearchChange={onSearchChange}
-        status={mockStatus}
         totalSectionsCount={SETTINGS_SECTIONS.length}
       />
     );
@@ -99,11 +68,10 @@ describe('SettingsSidebar component', () => {
     render(
       <SettingsSidebar
         sections={SETTINGS_SECTIONS}
-        activeSectionId="cache-settings"
+        activeSectionId="overview"
         onSelectSection={onSelectSection}
         searchQuery=""
         onSearchChange={vi.fn()}
-        status={mockStatus}
         totalSectionsCount={SETTINGS_SECTIONS.length}
       />
     );
@@ -112,5 +80,12 @@ describe('SettingsSidebar component', () => {
     fireEvent.click(benchmarkBtn);
 
     expect(onSelectSection).toHaveBeenCalledWith('reference-benchmarks');
+  });
+});
+
+describe('settings search for the replay upgrade', () => {
+  it.each(['upgrade', 'version', 'outdated', 'archived', 'decode'])('finds Cached Replays by "%s"', (word) => {
+    const section = SETTINGS_SECTIONS.find((candidate) => candidate.id === 'replay-cache');
+    expect(section && matchesSettingsSection(section, word)).toBe(true);
   });
 });

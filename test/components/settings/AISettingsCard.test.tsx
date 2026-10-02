@@ -3,8 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AISettingsCard } from '../../../src/components/settings/AISettingsCard.js';
 
 describe('AISettingsCard component', () => {
+  const confirmSpy = vi.fn();
   beforeEach(() => {
-    vi.stubGlobal('confirm', vi.fn());
+    confirmSpy.mockReset();
+    vi.stubGlobal('confirm', confirmSpy);
   });
 
   afterEach(() => {
@@ -36,7 +38,7 @@ describe('AISettingsCard component', () => {
     render(<AISettingsCard />);
 
     await waitFor(() => {
-      expect(screen.getByText('Unable to read AI settings.')).toBeInTheDocument();
+      expect(screen.getByText('Network error')).toBeInTheDocument();
     });
   });
 
@@ -56,7 +58,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Not configured')).toBeInTheDocument();
+      expect(screen.getByText('Optional · not set up')).toBeInTheDocument();
     });
 
     const input = screen.getByLabelText(/Gemini API key/i);
@@ -92,7 +94,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Not configured')).toBeInTheDocument();
+      expect(screen.getByText('Optional · not set up')).toBeInTheDocument();
     });
 
     const input = screen.getByLabelText(/Gemini API key/i);
@@ -120,7 +122,6 @@ describe('AISettingsCard component', () => {
   });
 
   it('removes session key when confirmed', async () => {
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
     global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/ai/settings' && options?.method === 'POST') {
         return Promise.resolve({
@@ -142,13 +143,16 @@ describe('AISettingsCard component', () => {
     const removeBtn = screen.getByRole('button', { name: /Remove Session Key/i });
     fireEvent.click(removeBtn);
 
+    expect(screen.getByText(/turn AI reports off/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove key' }));
+
     await waitFor(() => {
       expect(screen.getByText('Gemini key removed from the server session.')).toBeInTheDocument();
     });
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('cancels key removal when confirm dialog is rejected', async () => {
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+  it('cancels key removal from the inline confirm without calling the server', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }),
@@ -162,7 +166,10 @@ describe('AISettingsCard component', () => {
 
     const removeBtn = screen.getByRole('button', { name: /Remove Session Key/i });
     fireEvent.click(removeBtn);
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
+    expect(screen.queryByRole('button', { name: 'Remove key' })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1); // Only the initial loadSettings
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 });

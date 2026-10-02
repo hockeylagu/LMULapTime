@@ -1,18 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AlertCircle, Search } from 'lucide-react';
 import { AppStatus, ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
+import { FOCUS_RING, SECONDARY_BUTTON } from '../common/buttonStyles.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { CacheSettingsCard } from './CacheSettingsCard.js';
+import { OverviewCard } from './OverviewCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
 import { SettingsSidebar } from './SettingsSidebar.js';
+import { useReplayCache } from './replays/useReplayCache.js';
+import { useAiSettings } from './hooks/useAiSettings.js';
+import { useDeepLinkAlign } from './hooks/useDeepLinkAlign.js';
 import {
   SETTINGS_SECTIONS,
   getMissingPaths,
+  resolveSectionId,
   matchesSettingsSection,
   orderSettingsSections,
 } from './settingsSections.js';
@@ -35,11 +40,18 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const actions = useSettingsActions({ status, onUpdatePaths, onReplayScanTriggered });
-
   const sessionScanStatus = replayScanStatus && 'sessionScan' in replayScanStatus
     ? replayScanStatus.sessionScan
     : undefined;
+  const telemetryScanStatus = replayScanStatus && 'telemetryScan' in replayScanStatus
+    ? replayScanStatus.telemetryScan
+    : undefined;
+  // The server refuses to rescan or clear while any file scan runs, so the buttons wait instead of failing.
+  const isScanRunning = !!(replayScanStatus?.running || sessionScanStatus?.running || telemetryScanStatus?.running);
+
+  const actions = useSettingsActions({ status, onUpdatePaths, onReplayScanTriggered, isScanRunning });
+  const replay = useReplayCache(replayScanStatus);
+  const ai = useAiSettings();
 
   const missingPaths = getMissingPaths(status);
   const setupNeeded = missingPaths.length > 0;
@@ -51,37 +63,48 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
 
   const { activeId: activeSectionId, pin } = useSettingsScrollspy(matchingSections.map((s) => s.id));
 
-  const goToSection = (sectionId: string, updateUrl: boolean) => {
+  const goToSection = (sectionId: string, updateUrl: boolean, behavior: ScrollBehavior = scrollBehavior()) => {
     const el = document.getElementById(sectionId);
     if (!el) return;
     pin(sectionId);
-    el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    el.scrollIntoView({ behavior, block: 'start' });
     document.getElementById(`${sectionId}-heading`)?.focus({ preventScroll: true });
     if (updateUrl) updateSearchParams(searchParams, setSearchParams, { section: sectionId });
   };
 
-  // Open on the section named by ?section=<id>.
-  useEffect(() => {
+  // Open on the section named by ?section=<id>. Cards above it load after the first paint, so the
+  // alignment is repeated (instantly) while the page grows, until the reader scrolls.
+  const requestedSection = useRef<string | null>(null);
+  if (requestedSection.current === null) {
     const requested = searchParams.get('section');
-    if (requested && SETTINGS_SECTIONS.some((s) => s.id === requested)) goToSection(requested, false);
+    requestedSection.current = resolveSectionId(requested) ?? '';
+  }
+  useEffect(() => {
+    if (requestedSection.current) goToSection(requestedSection.current, false, 'auto');
     // Only the first render honours the link; later changes come from the TOC itself.
   }, []);
+  useDeepLinkAlign(requestedSection.current || null, (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'auto', block: 'start' });
+  });
 
   const renderCard = (sectionId: string) => {
     switch (sectionId) {
-      case 'cache-settings':
+      case 'overview':
         return (
-          <CacheSettingsCard
+          <OverviewCard
             status={status}
+            replay={replay}
+            ai={ai}
             isClearingCache={actions.isClearingCache}
+            isScanRunning={isScanRunning}
             onClearCache={actions.handleClearCache}
             cacheMessage={actions.cacheMessage}
           />
         );
       case 'replay-cache':
-        return <ReplayCacheCard replayScanStatus={replayScanStatus} />;
+        return <ReplayCacheCard replay={replay} replayScanStatus={replayScanStatus} />;
       case 'ai-settings':
-        return <AISettingsCard />;
+        return <AISettingsCard ai={ai} />;
       case 'ai-history':
         return <AiReportsHistoryCard />;
       case 'reference-benchmarks':
@@ -107,6 +130,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
             playerNameInput={actions.playerNameInput}
             setPlayerNameInput={actions.setPlayerNameInput}
             isScanning={actions.isScanning}
+            isScanRunning={isScanRunning}
+            pathErrors={actions.pathErrors}
             onScanPaths={actions.handleScanPaths}
             pathMessage={actions.pathMessage}
             sessionScanStatus={sessionScanStatus}
@@ -120,9 +145,9 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
   return (
     <div className="w-full max-w-[1500px] mx-auto space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-lmu-text">Application Settings</h2>
+        <h2 className="text-lg font-extrabold tracking-tight text-lmu-text">Application Settings</h2>
         <p className="text-xs text-lmu-muted mt-1">
-          Folder paths, session and replay caches, AI lap reports and reference benchmarks
+          What the app has stored, reference benchmarks, AI lap reports, cached replays and folder paths
         </p>
       </div>
 
@@ -133,7 +158,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
           <button
             type="button"
             onClick={() => goToSection('folder-paths', true)}
-            className="font-semibold text-lmu-text underline underline-offset-2 hover:text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+            className={`font-semibold text-lmu-text underline underline-offset-2 hover:decoration-2 cursor-pointer ${FOCUS_RING}`}
           >
             Fix folder paths
           </button>
@@ -148,7 +173,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
             onSelectSection={(id) => goToSection(id, true)}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            status={status}
             totalSectionsCount={SETTINGS_SECTIONS.length}
           />
         </aside>
@@ -159,14 +183,14 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
               <div className="flex items-center justify-center mx-auto text-lmu-muted">
                 <Search className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-white">No Settings Found</h3>
+              <h3 className="text-sm font-bold text-lmu-text">No settings found</h3>
               <p className="text-xs text-lmu-muted max-w-sm mx-auto">
                 No settings match &quot;{searchQuery}&quot;. Try searching for cache, replays, AI, benchmarks, or paths.
               </p>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="mt-2 px-4 py-2 rounded-lg bg-lmu-card border border-lmu-rule text-lmu-text-soft text-xs font-semibold hover:bg-lmu-card-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+                className={`${SECONDARY_BUTTON} mt-2`}
               >
                 Clear search
               </button>

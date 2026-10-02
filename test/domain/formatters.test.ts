@@ -34,6 +34,12 @@ describe('formatters utility', () => {
       expect(formatTime(60)).toBe('1:00.000');
       expect(formatTime('142.789')).toBe('2:22.789');
     });
+
+    it('carries rounded milliseconds into the next unit instead of showing 60.000', () => {
+      expect(formatTime(59.9996)).toBe('1:00.000');
+      expect(formatTime(119.9999)).toBe('2:00.000');
+      expect(formatTime(Infinity)).toBe('--:--.---');
+    });
   });
 
   describe('formatElapsedSeconds', () => {
@@ -55,6 +61,11 @@ describe('formatters utility', () => {
       expect(formatElapsedSeconds(3600)).toBe('1:00:00.0');
       expect(formatElapsedSeconds(3665.2)).toBe('1:01:05.2');
       expect(formatElapsedSeconds(7325.8)).toBe('2:02:05.8');
+    });
+
+    it('carries rounded tenths into the next unit instead of showing 60.0', () => {
+      expect(formatElapsedSeconds(59.96)).toBe('1:00.0');
+      expect(formatElapsedSeconds(3599.96)).toBe('1:00:00.0');
     });
   });
 

@@ -29,6 +29,9 @@ export function createAiRouter(sessionDb: SessionDatabase): Router {
     if (apiKey !== undefined && typeof apiKey !== 'string') {
       return res.status(400).json({ error: 'The Gemini API key must be a string.', errorCode: 'invalid_request' });
     }
+    if (typeof apiKey === 'string' && apiKey !== '' && !apiKey.trim()) {
+      return res.status(400).json({ error: 'The Gemini API key is empty. Paste the key, or use Remove to clear it.', errorCode: 'invalid_request' });
+    }
     if (apiKey === '') clearSessionApiKey();
     else if (typeof apiKey === 'string') setSessionApiKey(apiKey);
     if (typeof model === 'string') setSessionModel(model);

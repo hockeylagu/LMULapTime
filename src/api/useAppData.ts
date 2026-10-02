@@ -4,6 +4,12 @@ import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 
 const SERVER_RETRY_MS = 2000;
+/** An unreachable server is asked less and less often, down to once every 15 seconds. */
+const SERVER_RETRY_MAX_MS = 15000;
+
+export function serverRetryDelay(failures: number): number {
+  return Math.min(SERVER_RETRY_MS * 2 ** Math.max(0, failures - 1), SERVER_RETRY_MAX_MS);
+}
 
 // Completion timestamps catch scans that start and finish between polls. Revisions also catch
 // metadata and rain updates inside a replay, before the whole library finishes processing.
@@ -30,6 +36,7 @@ export function useAppData() {
   const scanAbort = useRef<AbortController | null>(null);
   const refreshAbort = useRef<AbortController | null>(null);
   const pollGeneration = useRef(0);
+  const pollFailures = useRef(0);
   const loaded = useRef(false);
   const loadedKey = useRef<string | null>(null);
   const referenceHandled = useRef<string | null>(null);
@@ -73,6 +80,7 @@ export function useAppData() {
       try {
         const scan = await fetchJson<ScanStatus>('/api/scan/status', { signal: controller.signal });
         if (!mounted.current || generation !== pollGeneration.current) return;
+        pollFailures.current = 0;
         setReplayScanStatus(scan);
         setStatusError(null);
         const reference = scan.referenceLaptimes;
@@ -93,8 +101,11 @@ export function useAppData() {
         if (active || retry) pollTimer.current = setTimeout(() => { void poll(); }, retry ? SERVER_RETRY_MS : 1000);
       } catch (err: unknown) {
         if (!mounted.current || generation !== pollGeneration.current || isAbortError(err)) return;
+        pollFailures.current += 1;
+        // The last progress we saw is out of date once the server stops answering (a restart ends every scan).
+        setReplayScanStatus(null);
         setStatusError(apiErrorMessage(err, 'Unable to check processing progress.'));
-        pollTimer.current = setTimeout(() => { void poll(); }, SERVER_RETRY_MS);
+        pollTimer.current = setTimeout(() => { void poll(); }, serverRetryDelay(pollFailures.current));
       }
     };
     void poll();

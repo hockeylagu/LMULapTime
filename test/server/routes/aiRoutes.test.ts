@@ -52,6 +52,10 @@ describe('AI routes', () => {
     expect(invalidKey.status).toBe(400);
     expect(invalidKey.body.errorCode).toBe('invalid_request');
 
+    const blankKey = await request(app).post('/api/ai/settings').send({ apiKey: '   ' });
+    expect(blankKey.status).toBe(400);
+    expect(blankKey.body.errorCode).toBe('invalid_request');
+
     const configured = await request(app).post('/api/ai/settings').send({ apiKey: 'session-key', model: 'gemini-3.8-flash' });
     expect(configured.status).toBe(200);
     expect(configured.body).toMatchObject({ configured: true, keySource: 'session', model: 'gemini-3.8-flash' });

@@ -110,7 +110,48 @@ describe('system routes', () => {
   });
 
   describe('POST /api/scan', () => {
-    const folders = { resultsDir: 'C:/lmu/results', replaysDir: 'C:/lmu/replays', telemetryDir: 'C:/lmu/telemetry', playerName: 'New Name' };
+    let folders: { resultsDir: string; replaysDir: string; telemetryDir: string; playerName: string };
+    beforeEach(() => {
+      fs.mkdirSync(path.join(dir, 'replays'));
+      folders = { resultsDir: path.join(dir, 'results'), replaysDir: path.join(dir, 'replays'), telemetryDir: path.join(dir, 'telemetry'), playerName: 'New Name' };
+    });
+
+    it('normalizes pasted folder paths and the driver name before applying them', async () => {
+      const pasted = {
+        resultsDir: `  "${folders.resultsDir.replace(/\\/g, '/')}\\"  `,
+        telemetryDir: folders.telemetryDir,
+        playerName: '  Zoë O\u2019Brien \u{1F3CE}\n',
+      };
+      const res = await request(app).post('/api/scan').send(pasted);
+
+      expect(res.status).toBe(200);
+      expect(context.configureDirectories).toHaveBeenCalledWith({
+        resultsDir: folders.resultsDir,
+        telemetryDir: folders.telemetryDir,
+        playerName: 'Zoë O\u2019Brien \u{1F3CE}',
+      });
+    });
+
+    it('accepts a well-formed folder that does not exist and saves it', async () => {
+      const missingDir = path.join(dir, 'nope');
+      const res = await request(app).post('/api/scan').send({ replaysDir: missingDir });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(context.configureDirectories).toHaveBeenCalledWith({ replaysDir: missingDir });
+    });
+
+    it('answers 400 with the field when a folder has forbidden characters or is not text', async () => {
+      const forbidden = await request(app).post('/api/scan').send({ resultsDir: 'C:\\lmu\\re*sults' });
+      expect(forbidden.status).toBe(400);
+      expect(forbidden.body).toMatchObject({ field: 'resultsDir' });
+
+      const notText = await request(app).post('/api/scan').send({ telemetryDir: 42 });
+      expect(notText.status).toBe(400);
+      expect(notText.body).toMatchObject({ field: 'telemetryDir' });
+
+      expect(context.configureDirectories).not.toHaveBeenCalled();
+      expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
+    });
 
     it('applies the folders and starts XML before associated telemetry scanning', async () => {
       const res = await request(app).post('/api/scan').send(folders);

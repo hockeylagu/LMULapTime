@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useAppData } from '../../src/api/useAppData.js';
+import { serverRetryDelay, useAppData } from '../../src/api/useAppData.js';
 import type { ScanStatus } from '../../shared/types/index.js';
 
 const idle = (revision = 'server:0'): ScanStatus => ({ running: false, processed: 0, total: 0, currentFile: null,
@@ -142,5 +142,29 @@ describe('app scan freshness', () => {
     const { unmount } = await mount();
     await poll(); expect(fetchMock.mock.calls.filter(([url]) => url === '/api/scan/status')).toHaveLength(2);
     unmount(); const calls = fetchMock.mock.calls.length; await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);
+  });
+
+  it('drops a stale running scan when the server stops answering, and backs off the retries', async () => {
+    scan.running = true; scan.total = 10; scan.processed = 4;
+    const { result } = await mount();
+    expect(result.current.replayScanStatus?.running).toBe(true);
+
+    fetchMock.mockImplementation((url: string) => url === '/api/scan/status' ? Promise.reject(new Error('fetch failed')) : reply([]));
+    await poll();
+    expect(result.current.replayScanStatus).toBeNull();
+    expect(result.current.error).toBe('fetch failed');
+
+    const statusCalls = () => fetchMock.mock.calls.filter(([url]) => url === '/api/scan/status').length;
+    const afterFirstFailure = statusCalls();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(statusCalls()).toBe(afterFirstFailure + 1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(statusCalls()).toBe(afterFirstFailure + 1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    expect(statusCalls()).toBe(afterFirstFailure + 2);
+  });
+
+  it('retries after 2 s, 4 s, 8 s and then every 15 s', () => {
+    expect([1, 2, 3, 4, 5, 9].map(serverRetryDelay)).toEqual([2000, 4000, 8000, 15000, 15000, 15000]);
   });
 });

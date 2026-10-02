@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
+import { REPLAY_CACHE_VERSION } from '../core/dbSchema.js';
 import { ServerContext } from '../core/serverContext.js';
 import { buildReplayListSummaries, composeReplayMetadata } from '../replay/replayMetadataService.js';
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
@@ -42,6 +43,8 @@ export function createReplayRouter(context: ServerContext): Router {
     const backlog = upgrade.getBacklog(context.replaysDir);
     res.json({
       status: upgrade.getStatus(),
+      // The version an on-disk replay must be at; below it the replay is outdated and waits for the upgrade.
+      currentVersion: REPLAY_CACHE_VERSION,
       pendingReplays: backlog.length,
       pendingDrivers: backlog.reduce((sum, replay) => sum + replay.driverSlots.length, 0),
       backlog: backlog.map(({ filename, metadataOutdated, driverSlots }) => ({ filename, metadataOutdated, driverSlots })),
