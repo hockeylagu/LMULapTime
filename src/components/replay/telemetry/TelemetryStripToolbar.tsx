@@ -5,6 +5,7 @@ import { TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution } from './telemetryResolution.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -122,7 +123,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               interactionMode === 'scrub'
                 ? 'bg-lmu-raised text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
-            }`}
+            } ${FOCUS_RING}`}
             aria-pressed={interactionMode === 'scrub'}
             title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans."
           >
@@ -139,7 +140,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               interactionMode === 'zoom'
                 ? 'bg-lmu-raised text-white font-bold'
                 : 'text-lmu-muted hover:text-white'
-            }`}
+            } ${FOCUS_RING}`}
             aria-pressed={interactionMode === 'zoom'}
             title="Drag across the chart to zoom into a range. Double-click to show the full lap."
           >
@@ -149,7 +150,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           <button type="button" disabled={!isZoomed}
             onClick={(event) => { event.stopPropagation(); onResetZoom(); }}
             title="Show the full lap. You can also double-click the chart."
-            className="ml-1 pl-2 pr-1 py-0.5 border-l border-lmu-border flex items-center gap-1 text-lmu-muted hover:text-white disabled:opacity-40 disabled:cursor-default">
+            className={`ml-1 pl-2 pr-1 py-0.5 border-l border-lmu-border flex items-center gap-1 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:cursor-not-allowed ${FOCUS_RING}`}>
             <Expand className="w-3 h-3" /> Full lap
           </button>
         </div>
@@ -163,7 +164,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 e.stopPropagation();
                 setIsResPopoverOpen(prev => !prev);
               }}
-              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] cursor-pointer text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''}`}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] cursor-pointer text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''} ${FOCUS_RING}`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
               <Activity className="w-2.5 h-2.5 text-lmu-muted" />
@@ -206,7 +207,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(-1);
             }}
             disabled={currentFrame !== undefined && currentFrame <= 1}
-            className="p-1 rounded hover:bg-white/5 text-lmu-muted hover:text-lmu-info-soft disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
+            className={`w-6 h-6 inline-flex items-center justify-center rounded hover:bg-white/5 text-lmu-muted hover:text-lmu-info-soft disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer ${FOCUS_RING}`}
             title="Move scrub line backward (Left Arrow, Shift for 10 frames)"
             aria-label="Step backward (Left Arrow)"
           >
@@ -223,7 +224,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               onStepIndex?.(1);
             }}
             disabled={currentFrame !== undefined && totalFrames !== undefined && currentFrame >= totalFrames}
-            className="p-1 rounded hover:bg-white/5 text-lmu-muted hover:text-white disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
+            className={`w-6 h-6 inline-flex items-center justify-center rounded hover:bg-white/5 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer ${FOCUS_RING}`}
             title="Move scrub line forward (Right Arrow, Shift for 10 frames)"
             aria-label="Step forward (Right Arrow)"
           >

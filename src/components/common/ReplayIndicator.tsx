@@ -1,6 +1,7 @@
 import React from 'react';
 import { Video, Zap, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
+import { FOCUS_RING } from './buttonStyles.js';
 
 export interface ReplayIndicatorProps {
   replay?: {
@@ -60,7 +61,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
 
   const indicatorClassName = isDuckDb
     ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 shrink-0 ${className}`
-    : `inline-flex p-1.5 rounded-lg bg-lmu-green/10 text-lmu-green border border-lmu-green/20 shrink-0 ${className}`;
+    : `inline-flex p-1.5 rounded-lg bg-lmu-gain/10 text-lmu-gain border border-lmu-gain/20 shrink-0 ${className}`;
 
   const title = isDuckDb
     ? `⚡ 100Hz DuckDB Telemetry & Replay: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}`
@@ -78,7 +79,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
           event.stopPropagation();
           onClick();
         }}
-        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
+        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-gain/20'} transition-colors cursor-pointer ${FOCUS_RING}`}
         title={`${indicatorTitle} - Open telemetry`}
         aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}
       >

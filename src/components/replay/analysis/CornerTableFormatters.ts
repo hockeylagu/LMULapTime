@@ -1,11 +1,11 @@
 export function speedDeltaClass(delta: number): string {
   if (Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
+  return delta > 0 ? 'text-lmu-gain font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function timeDeltaClass(delta: number): string {
   if (Math.abs(delta) < 0.02) return 'text-lmu-muted';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
+  return delta < 0 ? 'text-lmu-gain font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function formatSpeedDelta(delta: number): string {
@@ -26,12 +26,12 @@ export function formatBrakingDelta(delta: number | null): string {
 
 export function brakingDeltaClass(delta: number | null): string {
   if (delta === null || Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta > 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
+  return delta > 0 ? 'text-lmu-gain font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function throttleDeltaClass(delta: number | null): string {
   if (delta === null || Math.abs(delta) < 1) return 'text-lmu-muted';
-  return delta < 0 ? 'text-lmu-green font-bold' : 'text-lmu-loss font-medium';
+  return delta < 0 ? 'text-lmu-gain font-bold' : 'text-lmu-loss font-medium';
 }
 
 export function formatDistPoint(distM: number | null): string {

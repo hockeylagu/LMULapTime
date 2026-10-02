@@ -1,4 +1,5 @@
 import React from 'react';
+import { FOCUS_RING } from './buttonStyles.js';
 
 export type CarClassBadgeType = 'HY' | 'LMP2' | 'LMP3' | 'GT3' | 'GTE' | 'OTHER';
 
@@ -227,7 +228,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
         aria-label={effectiveAriaLabel}
         aria-pressed={selected}
         title={title || config.title}
-        className={sharedClasses}
+        className={`${sharedClasses} ${FOCUS_RING}`}
       >
         {badgeContent}
       </button>

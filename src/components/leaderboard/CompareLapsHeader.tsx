@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } from 'lucide-react';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface CompareLapsHeaderProps {
   selectedTrack: string;
@@ -57,7 +58,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           <button
             type="button"
             onClick={onSwapBaseline}
-            className={headerAction}
+            className={`${headerAction} ${FOCUS_RING}`}
             title="Measure the deltas against the other lap"
           >
             <ArrowLeftRight className="w-3 h-3" />
@@ -68,7 +69,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           <button
             type="button"
             onClick={onCompareTelemetry}
-            className={headerAction}
+            className={`${headerAction} ${FOCUS_RING}`}
             title="Speed, pedals, delta and line of the two laps, overlaid"
           >
             <Activity className="w-3 h-3" />
@@ -80,20 +81,20 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
 
     <div className="flex flex-wrap items-center gap-2">
       {rivalLap && onAddRival && (
-        <button type="button" onClick={onAddRival} className={preset} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
+        <button type="button" onClick={onAddRival} className={`${preset} ${FOCUS_RING}`} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
           <Crosshair className="w-3.5 h-3.5 text-lmu-warn-soft" />
           + Rival ({rivalLap.lapTimeString})
         </button>
       )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
-        <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
+        <button type="button" onClick={onAddPersonalBest} className={`${preset} ${FOCUS_RING}`} title="Add your Personal Best lap for this track & category">
           <Trophy className="w-3.5 h-3.5 text-lmu-personal-best" />
           + Personal Best ({formatTime(allTimePBObject.lapTime)})
         </button>
       )}
 
       {theoreticalBestSec && (
-        <button type="button" onClick={onAddTheoreticalBest} className={preset} title="Add your theoretical optimal lap for this track & category">
+        <button type="button" onClick={onAddTheoreticalBest} className={`${preset} ${FOCUS_RING}`} title="Add your theoretical optimal lap for this track & category">
           <Sparkles className="w-3.5 h-3.5 text-lmu-muted" />
           + Theoretical Best ({formatTime(theoreticalBestSec)})
         </button>
@@ -103,7 +104,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <button
           type="button"
           onClick={onAddOverallTrackBest}
-          className={preset}
+          className={`${preset} ${FOCUS_RING}`}
           title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
         >
           <Award className="w-3.5 h-3.5 text-lmu-muted" />
@@ -115,7 +116,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <button
           type="button"
           onClick={onClearAll}
-          className="px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-loss-deep/40 border border-lmu-border hover:border-lmu-loss-strong/40 text-xs text-lmu-muted hover:text-lmu-loss font-semibold transition-all flex items-center gap-1 cursor-pointer"
+          className={`px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-loss-deep/40 border border-lmu-border hover:border-lmu-loss-strong/40 text-xs text-lmu-muted hover:text-lmu-loss font-semibold transition-all flex items-center gap-1 cursor-pointer ${FOCUS_RING}`}
         >
           <Trash2 className="w-3.5 h-3.5" />
           Clear

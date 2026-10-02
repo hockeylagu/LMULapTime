@@ -84,7 +84,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
             ? 'Race start lap (standing or rolling start on cold tyres, left out of flying pace)'
             : 'Session start lap (out of the garage, left out of flying pace)'} />
       )}
-      {status === 'valid' && <StatusIcon icon={ShieldCheck} label="Valid" className="text-lmu-green" title="Valid lap" />}
+      {status === 'valid' && <StatusIcon icon={ShieldCheck} label="Valid" className="text-lmu-gain" title="Valid lap" />}
       {status === 'inferred' && <StatusIcon icon={Clock} label="Incomplete" className="text-lmu-warn" title={incompleteTooltip} />}
       {status === 'invalid' && <StatusIcon icon={CircleAlert} label="Incomplete" className="text-lmu-warn" title={incompleteTooltip} />}
 

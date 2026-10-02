@@ -44,7 +44,7 @@ describe('ReplayIndicator', () => {
     const indicator = screen.getByTitle('Replay VCR: Spa_Race_Replay.Vcr');
     expect(indicator).toBeInTheDocument();
     // Styling should remain standard green and not blue
-    expect(indicator.className).toContain('text-lmu-green');
+    expect(indicator.className).toContain('text-lmu-gain');
     expect(indicator.className).not.toContain('text-blue');
     expect(indicator.className).not.toContain('bg-blue');
 
@@ -88,7 +88,7 @@ describe('ReplayIndicator', () => {
 
     const button = screen.getByRole('button', { name: /Open replay telemetry/i });
     expect(button).toBeInTheDocument();
-    expect(button.className).toContain('hover:bg-lmu-green/20');
+    expect(button.className).toContain('hover:bg-lmu-gain/20');
     expect(button.className).not.toContain('hover:bg-blue');
 
     const svgs = container.querySelectorAll('svg');

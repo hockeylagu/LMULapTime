@@ -18,6 +18,7 @@ import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js
 import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
 import { SessionTelemetrySeries } from './SessionTelemetrySeries.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface SessionTelemetryChartProps {
   session: DetailedSession;
@@ -139,8 +140,8 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
                 className={`h-6 px-2.5 inline-flex items-center gap-1.5 rounded-[5px] transition-colors ${
                   selected
                     ? 'bg-lmu-raised text-white'
-                    : 'text-lmu-muted hover:text-white disabled:opacity-40 disabled:hover:text-lmu-muted disabled:cursor-not-allowed cursor-pointer'
-                }`}
+                    : 'text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:cursor-not-allowed cursor-pointer'
+                } ${FOCUS_RING}`}
               >
                 <Icon className={`w-3.5 h-3.5 ${selected ? 'text-lmu-text-soft' : ''}`} aria-hidden="true" />
                 {metric === 'fuelEnergy' && hasVirtualEnergyData ? 'Fuel & Energy' : label}

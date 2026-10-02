@@ -8,6 +8,7 @@ import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
 import { DetailedSession, SessionProgressionPoint } from '../../../shared/types/index.js';
 import { LoadingState } from '../common/index.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface SessionDetailProps {
   sessionId: string;
@@ -70,7 +71,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         {loadError && <p role="alert" className="text-sm text-lmu-loss mb-4">{loadError}</p>}
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider"
+          className={`px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider ${FOCUS_RING}`}
         >
           Return to Dashboard
         </button>

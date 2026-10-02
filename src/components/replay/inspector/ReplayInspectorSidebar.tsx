@@ -12,6 +12,7 @@ import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
 import { ConsistencyPanel, type LapConsistencyOption } from '../analysis/ConsistencyPanel.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
 import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/lapAlignment.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorSidebarProps {
   activeTab: 'map' | 'corners' | 'ai-report';
@@ -162,7 +163,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                     aria-pressed={cornerSubView === 'compare'}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 h-7 rounded text-xs font-medium transition-colors cursor-pointer ${
                       cornerSubView === 'compare' ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
-                    }`}
+                    } ${FOCUS_RING}`}
                   >
                     <Timer className="w-3.5 h-3.5 text-lmu-muted" /> {isSelfAnalysis ? 'Lap analysis' : 'vs Baseline'}
                   </button>
@@ -171,7 +172,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                     aria-pressed={cornerSubView === 'consistency'}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-3 h-7 rounded text-xs font-medium transition-colors cursor-pointer ${
                       cornerSubView === 'consistency' ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
-                    }`}
+                    } ${FOCUS_RING}`}
                   >
                     <Activity className="w-3.5 h-3.5 text-lmu-muted" /> Consistency
                   </button>

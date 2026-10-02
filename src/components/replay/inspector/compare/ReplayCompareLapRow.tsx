@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { CarClassBadge } from '../../../common/CarClassBadge.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface ReplayCompareLapRowProps {
   lap: ComparableLap;
@@ -22,7 +23,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
       onClick={() => onSelect(lap)}
       className={`w-full grid grid-cols-[minmax(180px,1.4fr)_minmax(140px,1.1fr)_50px_140px] items-center gap-3 rounded-lg px-3 py-2 text-left text-xs transition-colors ${
         isSelected ? 'bg-lmu-accent/10 border border-lmu-accent/40' : 'border border-transparent hover:bg-lmu-card'
-      }`}
+      } ${FOCUS_RING}`}
     >
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 truncate font-semibold text-white">

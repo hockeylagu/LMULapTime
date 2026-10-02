@@ -5,6 +5,7 @@ import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompar
 import { ReplayCompareButton } from './compare/ReplayCompareButton.js';
 import { ReplayInspectorTitle } from './ReplayInspectorTitle.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -66,7 +67,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 
       {/* Center: Driver Selector, Lap Selector & Live State */}
       <div className="flex items-center gap-2 justify-self-center min-w-0">
-          <label aria-busy={isPrimaryBusy} className="relative flex h-8 items-center gap-2 pl-2.5 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule-strong transition-colors w-[220px] shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text has-[select:disabled]:opacity-60">
+          <label aria-busy={isPrimaryBusy} className="relative flex h-8 items-center gap-2 pl-2.5 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule-strong transition-colors w-[220px] shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text has-[select:disabled]:text-lmu-faint">
             {isPrimaryBusy ? <LoaderCircle aria-hidden="true" className="w-3.5 h-3.5 text-lmu-muted animate-spin shrink-0" /> : <Users aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />}
             <select
               aria-label="Select Driver"
@@ -95,7 +96,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               onClick={() => onSelectLap(Math.max(1, (trajectory.currentLap ?? 1) - 1))}
               disabled={isPrimaryBusy || (trajectory.currentLap ?? 1) <= 1}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer"
+              className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
               title="Previous Lap"
             >
               ‹
@@ -116,7 +117,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               onClick={() => onSelectLap(Math.min(trajectory.laps!.length, (trajectory.currentLap ?? 1) + 1))}
               disabled={isPrimaryBusy || (trajectory.currentLap ?? 1) >= trajectory.laps.length}
-              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer"
+              className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
               title="Next Lap"
             >
               ›
@@ -140,7 +141,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             <button
               type="button"
               onClick={onToggleCompare}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs max-w-[330px] border transition-colors cursor-pointer ${baselineError ? 'bg-lmu-loss-strong/10 border-lmu-loss-strong/40 text-lmu-loss hover:bg-lmu-loss-strong/20' : 'bg-lmu-bg border-lmu-border hover:bg-lmu-card'}`}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs max-w-[330px] border transition-colors cursor-pointer ${baselineError ? 'bg-lmu-loss-strong/10 border-lmu-loss-strong/40 text-lmu-loss hover:bg-lmu-loss-strong/20' : 'bg-lmu-bg border-lmu-border hover:bg-lmu-card'} ${FOCUS_RING}`}
               style={baselineError ? undefined : { color: TELEMETRY_COLORS.baseline }}
               aria-busy={isBaselineLoading}
               title={baselineError ? `${baselineError}. Click to pick another comparison lap` : 'Click to change the comparison lap'}
@@ -151,11 +152,11 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               {baselineError ? <span className="font-sans font-semibold">(unavailable)</span> : null}
               {isBaselineLoading ? <span role="status" className="shrink-0 text-[11px]">Loading…</span> : baselineSummary?.lapTimeSec ? <span className="font-mono shrink-0">({formatLapTime(baselineSummary.lapTimeSec)})</span> : null}
             </button>
-            {baselineError && onRetryBaseline && <button type="button" onClick={onRetryBaseline} className="text-xs text-lmu-text-soft underline underline-offset-4" aria-label="Retry comparison lap">Retry</button>}
+            {baselineError && onRetryBaseline && <button type="button" onClick={onRetryBaseline} className={`text-xs text-lmu-text-soft underline underline-offset-4 ${FOCUS_RING}`} aria-label="Retry comparison lap">Retry</button>}
             <button
               type="button"
               onClick={onRemoveCompare}
-              className="p-1 rounded text-lmu-muted hover:text-lmu-loss-soft hover:bg-white/10"
+              className={`p-1 rounded text-lmu-muted hover:text-lmu-loss-soft hover:bg-white/10 ${FOCUS_RING}`}
               title="Remove comparison lap"
               aria-label="Remove comparison lap"
             >
@@ -165,7 +166,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               type="button"
               onClick={onSwapBaseline}
               disabled={isPrimaryBusy || isBaselineLoading || !baselineTrajectory || Boolean(baselineError)}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-transparent hover:bg-lmu-raised text-lmu-muted hover:text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className={`flex items-center gap-1 px-2 py-1 rounded bg-transparent hover:bg-lmu-raised text-lmu-muted hover:text-white text-xs font-semibold transition-colors cursor-pointer disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed ${FOCUS_RING}`}
               title="Swap the compared and baseline laps"
               aria-label="Swap comparison laps"
             >
@@ -205,7 +206,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           onClick={onRewind}
           disabled={isPrimaryBusy || !trajectory?.points.length}
           aria-label="Rewind to start"
-          className="p-1.5 rounded-xl bg-lmu-card hover:bg-white/10 text-lmu-muted hover:text-white border border-lmu-border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-lmu-card disabled:hover:text-lmu-muted"
+          className={`p-1.5 rounded-xl bg-lmu-card hover:bg-white/10 text-lmu-muted hover:text-white border border-lmu-border transition-colors cursor-pointer disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:cursor-not-allowed disabled:hover:bg-lmu-card ${FOCUS_RING}`}
           title="Rewind to start"
         >
           <RotateCcw className="w-4 h-4" />
@@ -215,7 +216,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           onClick={onTogglePlay}
           disabled={isPrimaryBusy || !trajectory?.points.length}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-lmu-raised hover:bg-lmu-raised/80 text-white font-semibold text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-lmu-raised"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded bg-lmu-raised hover:bg-lmu-raised/80 text-white font-semibold text-xs transition-all cursor-pointer disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:cursor-not-allowed disabled:hover:bg-lmu-raised ${FOCUS_RING}`}
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           <span className="hidden sm:inline">{isPlaying ? 'Pause' : 'Play'}</span>

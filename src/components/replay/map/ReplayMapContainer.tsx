@@ -7,6 +7,7 @@ import { MapColorMode } from './replayMapUtils.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData | null;
@@ -99,7 +100,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                   aria-pressed={colorBy === mode}
                   className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
                     colorBy === mode ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
-                  }`}
+                  } ${FOCUS_RING}`}
                 >
                   {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
                 </button>
@@ -116,7 +117,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 showPedalMarkers
                   ? 'bg-lmu-raised text-white'
                   : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
-              }`}
+              } ${FOCUS_RING}`}
             >
               <Disc className="w-3 h-3 text-lmu-loss" />
               <span>Pedal Points</span>
@@ -133,7 +134,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                   fadedLine === 'primary'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
                     : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
-                }`}
+                } ${FOCUS_RING}`}
               >
                 <span className="w-2.5 h-1 rounded-sm bg-lmu-info shrink-0" />
                 Mine
@@ -145,7 +146,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                   fadedLine === 'baseline'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
                     : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
-                }`}
+                } ${FOCUS_RING}`}
               >
                 <span className="w-2.5 h-0 border-b-2 border-dashed border-lmu-warn shrink-0" />
                 Baseline
@@ -162,7 +163,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
               showFrictionCircle
                 ? 'bg-lmu-raised text-white'
                 : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
-            }`}
+            } ${FOCUS_RING}`}
           >
             <CircleDot className="w-4 h-4" />
             <span>Friction</span>

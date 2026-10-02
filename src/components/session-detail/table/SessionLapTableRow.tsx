@@ -10,6 +10,7 @@ import { CompoundCell, FuelCell, TireWearCell } from './SessionLapResourceCells.
 import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapEventsTooltip, type LapDetailSection } from './lapDetailSections.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 /** A row that opens on Enter: the focus ring sits inside the row, so the table's edge does not clip it. */
 const FOCUS_ROW = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent';
@@ -133,7 +134,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       aria-label={`Lap ${l.lapNum}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: open its telemetry`}
       className={`transition-colors cursor-pointer group ${FOCUS_ROW} ${
         isLapAllTimePB ? 'bg-lmu-personal-best/8 hover:bg-lmu-personal-best/12' : isSessionBest ? 'bg-lmu-session-best-strong/10 hover:bg-lmu-session-best-strong/15' : 'hover:bg-lmu-cardHover'
-      }`}
+      } ${FOCUS_RING}`}
       title={`Click to open telemetry for Lap ${l.lapNum}`}
     >
       <td
@@ -145,7 +146,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
             <button
               type="button"
               onClick={(event) => { event.stopPropagation(); onToggleExpanded(l.lapNum); }}
-              className="w-5 h-5 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-lmu-accent"
+              className={`w-6 h-6 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/10 ${FOCUS_RING}`}
               aria-expanded={isExpanded}
               aria-label={`${isExpanded ? 'Hide' : 'Show'} what happened on lap ${l.lapNum}`}
               title={`${isExpanded ? 'Hide' : 'Show'} what happened on this lap`}

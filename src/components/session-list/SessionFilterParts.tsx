@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X, FilterX } from 'lucide-react';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 /** Free-text search over the session list, with a clear button once something is typed. */
 export const SessionSearchField: React.FC<{
@@ -20,7 +21,7 @@ export const SessionSearchField: React.FC<{
       <button
         type="button"
         onClick={() => onChange('')}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-lmu-muted hover:text-white p-0.5 rounded cursor-pointer"
+        className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-lmu-muted hover:text-white p-0.5 rounded cursor-pointer ${FOCUS_RING}`}
         title="Clear search"
         aria-label="Clear search"
       >
@@ -36,7 +37,7 @@ export const ClearFiltersButton: React.FC<{ onClear?: () => void }> = ({ onClear
     <button
       type="button"
       onClick={onClear}
-      className="h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-xs font-semibold text-lmu-text-soft hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0"
+      className={`h-9 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-xs font-semibold text-lmu-text-soft hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
     >
       <FilterX className="w-3.5 h-3.5" />
       <span>Clear filters</span>

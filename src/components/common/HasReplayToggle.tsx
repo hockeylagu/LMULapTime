@@ -1,5 +1,6 @@
 import React from 'react';
 import { Video } from 'lucide-react';
+import { FOCUS_RING } from './buttonStyles.js';
 
 export interface HasReplayToggleProps {
   hasReplayOnly: boolean;
@@ -32,7 +33,7 @@ export const HasReplayToggle: React.FC<HasReplayToggleProps> = ({
         hasReplayOnly
           ? 'bg-lmu-raised border-lmu-rule text-white'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-      } ${className}`}
+      } ${className} ${FOCUS_RING}`}
       title={hasReplayOnly ? titleActive : titleInactive}
     >
       <Video className="w-3.5 h-3.5 shrink-0" />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, Minus, RotateCcw, Crosshair, LocateFixed } from 'lucide-react';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface MapControlsOverlayProps {
   onZoomIn: () => void;
@@ -41,7 +42,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onZoomIn}
         aria-label="Zoom in"
-        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Zoom In"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -50,7 +51,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onZoomOut}
         aria-label="Zoom out"
-        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Zoom Out"
       >
         <Minus className="w-3.5 h-3.5" />
@@ -58,7 +59,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
 
       {onCenterCar && <button type="button" onClick={onCenterCar} aria-label="Center on car"
         title="Center on car · C (keeps zoom)"
-        className="h-7 min-w-7 px-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white text-xs cursor-pointer">
+        className={`h-7 min-w-7 px-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white text-xs cursor-pointer ${FOCUS_RING}`}>
         <LocateFixed className="w-3.5 h-3.5" />{isCarOffscreen && <span className="whitespace-nowrap">Center car · C</span>}
       </button>}
       {onToggleFollowCar && (
@@ -71,7 +72,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
             followCar
               ? 'bg-lmu-accent text-white'
               : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
-          }`}
+          } ${FOCUS_RING}`}
           title={followCar ? 'Follow car · F (active)' : 'Follow car · F'}
         >
           <Crosshair className="w-3.5 h-3.5" />
@@ -82,7 +83,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onReset}
         aria-label="Reset zoom and pan"
-        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0"
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Reset View"
       >
         <RotateCcw className="w-3.5 h-3.5" />

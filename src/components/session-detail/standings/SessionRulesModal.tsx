@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe, Gamepad2, Disc, Sun, CloudRain, CloudDrizzle, Thermometer } from 'lucide-react';
 import { DetailedSession, SessionSettings } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export type SessionConditionsInfo = Pick<NonNullable<DetailedSession['matchingReplayFile']>, 'weatherCondition' | 'maxRainIntensity' | 'ambientTemp' | 'trackTemp'>;
 
@@ -89,7 +90,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-raised transition-colors"
+            className={`p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-raised transition-colors ${FOCUS_RING}`}
             title="Close"
             aria-label="Close rules"
           >
@@ -243,7 +244,7 @@ export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
         <div className="flex justify-end pt-3 border-t border-lmu-border">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-xs font-semibold text-white transition-colors"
+            className={`px-4 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-xs font-semibold text-white transition-colors ${FOCUS_RING}`}
           >
             Close
           </button>

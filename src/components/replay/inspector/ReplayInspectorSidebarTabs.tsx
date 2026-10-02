@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrainCircuit, Timer, X } from 'lucide-react';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export type InspectorSidebarTab = 'map' | 'corners' | 'ai-report';
 
@@ -30,7 +31,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
         type="button"
         onClick={() => setActiveTab(activeTab === 'corners' ? 'map' : 'corners')}
         aria-pressed={activeTab === 'corners'}
-        className={tabClass(activeTab === 'corners')}
+        className={`${tabClass(activeTab === 'corners')} ${FOCUS_RING}`}
         title={activeTab === 'corners' ? 'Close Corners Panel' : 'Open Corners Panel'}
       >
         <Timer className="w-3.5 h-3.5" /> Corners ({cornerCount})
@@ -39,7 +40,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
         type="button"
         onClick={() => setActiveTab(activeTab === 'ai-report' ? 'map' : 'ai-report')}
         aria-pressed={activeTab === 'ai-report'}
-        className={tabClass(activeTab === 'ai-report')}
+        className={`${tabClass(activeTab === 'ai-report')} ${FOCUS_RING}`}
         title={activeTab === 'ai-report' ? 'Close AI Report Panel' : 'Open AI Report Panel'}
       >
         <BrainCircuit className="w-3.5 h-3.5" /> AI Report
@@ -50,7 +51,7 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
       <button
         type="button"
         onClick={onClosePanel}
-        className="inline-flex items-center justify-center w-7 h-7 text-lmu-muted hover:text-white rounded-lg hover:bg-lmu-raised transition-colors cursor-pointer shrink-0"
+        className={`inline-flex items-center justify-center w-7 h-7 text-lmu-muted hover:text-white rounded-lg hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         aria-label="Close side panel"
         title="Close side panel"
       >

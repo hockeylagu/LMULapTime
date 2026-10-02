@@ -12,6 +12,7 @@ import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 import { LapDebriefPanel } from './debrief/LapDebriefPanel.js';
 import { loadLapPairDebrief, LapDebriefUnavailableError } from './debrief/loadLapDebrief.js';
 import { SectorGapSummary } from './debrief/SectorGapSummary.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export type { CompareLapsSessionItem };
 
@@ -192,7 +193,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           <button
             type="button"
             onClick={() => setTelemetryError(null)}
-            className="p-1 hover:bg-lmu-loss-deep/60 rounded text-lmu-loss hover:text-white cursor-pointer"
+            className={`p-1 hover:bg-lmu-loss-deep/60 rounded text-lmu-loss hover:text-white cursor-pointer ${FOCUS_RING}`}
             title="Dismiss"
           >
             <X className="w-4 h-4" />

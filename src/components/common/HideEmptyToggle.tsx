@@ -1,5 +1,6 @@
 import React from 'react';
 import { FilterX } from 'lucide-react';
+import { FOCUS_RING } from './buttonStyles.js';
 
 export interface HideEmptyToggleProps {
   hideEmpty: boolean;
@@ -32,7 +33,7 @@ export const HideEmptyToggle: React.FC<HideEmptyToggleProps> = ({
         hideEmpty
           ? 'bg-lmu-raised border-lmu-rule text-white'
           : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-white'
-      } ${className}`}
+      } ${className} ${FOCUS_RING}`}
       title={hideEmpty ? titleHiding : titleShowing}
     >
       <FilterX className="w-3.5 h-3.5 shrink-0" />

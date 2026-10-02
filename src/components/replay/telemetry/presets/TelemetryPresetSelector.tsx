@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SlidersHorizontal, ChevronDown, Check, Settings2 } from 'lucide-react';
 import { TelemetryPreset } from './telemetryPresets.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface TelemetryPresetSelectorProps {
   presets: TelemetryPreset[];
@@ -40,7 +41,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
         <button
           type="button"
           onClick={() => setIsOpen(prev => !prev)}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-lmu-text hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-lmu-text hover:text-white hover:bg-white/5 transition-all cursor-pointer ${FOCUS_RING}`}
           aria-expanded={isOpen}
           title="Select telemetry channel preset"
           data-testid="telemetry-preset-dropdown-btn"
@@ -61,7 +62,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
             setIsOpen(false);
             onOpenManageModal();
           }}
-          className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+          className={`w-6 h-6 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-all cursor-pointer ${FOCUS_RING}`}
           title="Customize, rename, or add channel presets"
           data-testid="telemetry-preset-manage-btn"
         >
@@ -82,7 +83,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                 setIsOpen(false);
                 onOpenManageModal();
               }}
-              className="text-lmu-muted hover:text-white hover:underline cursor-pointer"
+              className={`text-lmu-muted hover:text-white hover:underline cursor-pointer ${FOCUS_RING}`}
             >
               Manage
             </button>
@@ -101,7 +102,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                   }}
                   className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
                     isSelected ? 'bg-lmu-raised/70 text-white font-semibold' : 'text-lmu-text-soft hover:bg-white/5 hover:text-white'
-                  }`}
+                  } ${FOCUS_RING}`}
                   aria-pressed={isSelected}
                   data-testid={`telemetry-preset-option-${p.id}`}
                 >
@@ -128,7 +129,7 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
                 setIsOpen(false);
                 onOpenManageModal();
               }}
-              className="w-full py-1 px-2.5 rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised/70 border border-lmu-border text-lmu-text-soft font-semibold flex items-center justify-center gap-1.5 transition-all text-[10px] cursor-pointer"
+              className={`w-full py-1 px-2.5 rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised/70 border border-lmu-border text-lmu-text-soft font-semibold flex items-center justify-center gap-1.5 transition-all text-[10px] cursor-pointer ${FOCUS_RING}`}
             >
               <Settings2 className="w-3 h-3" />
               Edit & Rename Presets

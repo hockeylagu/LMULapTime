@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface SessionListHeaderProps {
   headerTitle?: React.ReactNode;
@@ -26,7 +27,7 @@ export const SessionViewModeToggle: React.FC<SessionViewModeToggleProps> = ({
         viewMode === 'grid'
           ? 'bg-lmu-raised text-white'
           : 'text-lmu-muted hover:text-white'
-      }`}
+      } ${FOCUS_RING}`}
       title="Cards view"
       aria-label="Cards view"
       aria-pressed={viewMode === 'grid'}
@@ -40,7 +41,7 @@ export const SessionViewModeToggle: React.FC<SessionViewModeToggleProps> = ({
         viewMode === 'table'
           ? 'bg-lmu-raised text-white'
           : 'text-lmu-muted hover:text-white'
-      }`}
+      } ${FOCUS_RING}`}
       title="Table view"
       aria-label="Table view"
       aria-pressed={viewMode === 'table'}

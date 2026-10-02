@@ -1,5 +1,6 @@
 import React from 'react';
 import { getSessionTypeStyle } from './sessionTypeStyles.js';
+import { FOCUS_RING } from './buttonStyles.js';
 
 /** "All" is the resting state: selected, but narrowing nothing, so it stays neutral. */
 export const SEGMENT_RESTING = 'bg-lmu-raised text-white border-lmu-rule';
@@ -53,7 +54,7 @@ export const SessionTypePills: React.FC<SessionTypePillsProps> = ({
                 : style
                 ? style.chip
                 : SEGMENT_NARROWED
-            }`}
+            } ${FOCUS_RING}`}
           >
             {style && !isSelected && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} aria-hidden="true" />}
             {displayLabel}

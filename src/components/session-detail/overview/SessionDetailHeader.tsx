@@ -11,6 +11,7 @@ import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
 import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 /** The neutral jump buttons of the header: the icon carries the only color. */
 const JUMP_BUTTON =
@@ -81,7 +82,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors"
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors ${FOCUS_RING}`}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Sessions
@@ -114,7 +115,7 @@ Click to inspect trajectory and telemetry`}
                   ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
                   : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
               }
-              className={JUMP_BUTTON}
+              className={`${JUMP_BUTTON} ${FOCUS_RING}`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -159,7 +160,7 @@ Click to inspect trajectory and telemetry`}
                   className="inline-flex items-center gap-2 group max-w-full min-w-0 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
                   title={`View ${trackName} Track Details`}>
                   <span className="truncate">{trackName}</span>
-                  <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-lmu-muted group-hover:text-white transition-colors shrink-0" />
                 </Link>
               </h2>
               {subtitle && <p className="text-xs text-lmu-muted mt-0.5 truncate">{subtitle}</p>}
@@ -171,7 +172,7 @@ Click to inspect trajectory and telemetry`}
                 <button
                   type="button"
                   onClick={() => setShowRulesModal(true)}
-                  className={JUMP_BUTTON}
+                  className={`${JUMP_BUTTON} ${FOCUS_RING}`}
                   title="View Rules, Server Configuration & Conditions"
                 >
                   <Sliders className="w-3.5 h-3.5 text-lmu-muted shrink-0" aria-hidden="true" />

@@ -8,6 +8,7 @@ import {
 import { buildHandlingBands, computeCornerSpeedProfile } from './cornerSpeedProfile.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { computeLapComparisons } from '../../../utils/replayComparison.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface CornerSpeedGraphProps {
   corner: CornerSegmentComparison;
@@ -96,7 +97,7 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
                 aria-pressed={btn.pressed}
                 className={`px-1.5 h-6 min-w-6 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                   btn.active ? `bg-lmu-raised ${btn.color}` : 'text-lmu-muted hover:bg-lmu-raised/50 hover:text-white'
-                }`}
+                } ${FOCUS_RING}`}
                 title={`Toggle ${btn.name} overlay`}
               >
                 {btn.label}

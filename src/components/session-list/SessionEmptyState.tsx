@@ -1,5 +1,6 @@
 import React from 'react';
 import { FilterX } from 'lucide-react';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface SessionEmptyStateProps {
   emptyMessage?: string;
@@ -20,7 +21,7 @@ export const SessionEmptyState: React.FC<SessionEmptyStateProps> = ({
           <button
             type="button"
             onClick={onResetFilters}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-accent text-white border border-lmu-border text-xs font-semibold transition-all cursor-pointer"
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-accent text-white border border-lmu-border text-xs font-semibold transition-all cursor-pointer ${FOCUS_RING}`}
           >
             <FilterX className="w-3.5 h-3.5" />
             <span>Reset All Filters</span>

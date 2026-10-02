@@ -1,5 +1,6 @@
 import React from 'react';
 import { Copy, Trash2, Check, Edit2 } from 'lucide-react';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface TelemetryPresetToolbarProps {
   name: string;
@@ -47,7 +48,7 @@ export const TelemetryPresetToolbar: React.FC<TelemetryPresetToolbarProps> = ({
           <button
             type="button"
             onClick={onSaveRename}
-            className="px-2 py-1 rounded bg-lmu-raised text-white hover:bg-white/10 transition-colors font-bold text-[10px] cursor-pointer"
+            className={`px-2 py-1 rounded bg-lmu-raised text-white hover:bg-white/10 transition-colors font-bold text-[10px] cursor-pointer ${FOCUS_RING}`}
           >
             <Check className="w-3.5 h-3.5" />
           </button>
@@ -60,7 +61,7 @@ export const TelemetryPresetToolbar: React.FC<TelemetryPresetToolbarProps> = ({
           <button
             type="button"
             onClick={onStartRename}
-            className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            className={`p-1 rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-colors cursor-pointer ${FOCUS_RING}`}
             title="Rename preset"
           >
             <Edit2 className="w-3.5 h-3.5" />
@@ -76,7 +77,7 @@ export const TelemetryPresetToolbar: React.FC<TelemetryPresetToolbarProps> = ({
       <button
         type="button"
         onClick={onDuplicate}
-        className="px-2 py-1 rounded hover:bg-white/10 text-lmu-text-soft text-[10px] flex items-center gap-1 cursor-pointer transition-all"
+        className={`px-2 py-1 rounded hover:bg-white/10 text-lmu-text-soft text-[10px] flex items-center gap-1 cursor-pointer transition-all ${FOCUS_RING}`}
         title="Duplicate this preset"
       >
         <Copy className="w-3 h-3" /> Duplicate
@@ -85,7 +86,7 @@ export const TelemetryPresetToolbar: React.FC<TelemetryPresetToolbarProps> = ({
         <button
           type="button"
           onClick={onDelete}
-          className="px-2 py-1 rounded hover:bg-lmu-loss-strong/15 text-lmu-muted hover:text-lmu-loss-soft text-[10px] flex items-center gap-1 cursor-pointer transition-all"
+          className={`px-2 py-1 rounded hover:bg-lmu-loss-strong/15 text-lmu-muted hover:text-lmu-loss-soft text-[10px] flex items-center gap-1 cursor-pointer transition-all ${FOCUS_RING}`}
           title="Delete this preset"
         >
           <Trash2 className="w-3 h-3" /> Delete

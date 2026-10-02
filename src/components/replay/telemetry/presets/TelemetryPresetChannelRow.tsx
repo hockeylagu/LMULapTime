@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
 import { TelemetryChannelInfo, TelemetryChannelId } from './telemetryPresets.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface TelemetryPresetChannelRowProps {
   channel: TelemetryChannelInfo;
@@ -70,7 +71,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             type="button"
             disabled={isFirst}
             onClick={() => onMove(channel.id, 'up')}
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
+            className={`p-1 rounded hover:bg-white/10 text-lmu-text-soft disabled:text-lmu-faint disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`}
             title="Move channel up"
           >
             <ArrowUp className="w-3 h-3" />
@@ -79,7 +80,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             type="button"
             disabled={isLast}
             onClick={() => onMove(channel.id, 'down')}
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-20 text-lmu-text-soft cursor-pointer disabled:cursor-not-allowed"
+            className={`p-1 rounded hover:bg-white/10 text-lmu-text-soft disabled:text-lmu-faint disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`}
             title="Move channel down"
           >
             <ArrowDown className="w-3 h-3" />

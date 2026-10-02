@@ -6,6 +6,7 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import type { LeaderboardRow as Row } from './leaderboardRows.js';
 import { benchmarkPace, formatDrivenAgo, formatGap } from './leaderboardFormat.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export const LEADERBOARD_COLUMNS = 11;
 
@@ -27,8 +28,7 @@ export interface LeaderboardRowProps {
   onOpenSession?: (sessionId: string) => void;
 }
 
-const FOCUS = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
-const ICON_BUTTON = `p-1 rounded-lg cursor-pointer hover:bg-lmu-border ${FOCUS}`;
+const ICON_BUTTON = `w-6 h-6 inline-flex items-center justify-center rounded-lg cursor-pointer hover:bg-lmu-border ${FOCUS_RING}`;
 /** The row's secondary actions show on hover or keyboard focus, and always on touch screens. */
 const REVEAL = 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100';
 
@@ -69,7 +69,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
           <button
             type="button"
             onClick={onShowAll}
-            className={`text-[11px] text-lmu-faint hover:text-white hover:underline underline-offset-2 rounded cursor-pointer ${FOCUS}`}
+            className={`text-[11px] text-lmu-faint hover:text-white hover:underline underline-offset-2 rounded cursor-pointer ${FOCUS_RING}`}
           >
             {row.count} more driver{row.count === 1 ? '' : 's'}
           </button>
@@ -157,7 +157,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
                   : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
               }
               aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
-              className={`${ICON_BUTTON} text-lmu-muted enabled:hover:text-lmu-info-soft disabled:text-lmu-muted/40 disabled:cursor-default ${reveal}`}
+              className={`${ICON_BUTTON} text-lmu-muted enabled:hover:text-lmu-info-soft disabled:text-lmu-faint disabled:cursor-default ${reveal}`}
             >
               <Activity className="w-3.5 h-3.5" />
             </button>
@@ -168,7 +168,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
               onClick={() => onCompare(entry)}
               title={`Compare your best lap with ${entry.driverName}'s`}
               aria-label={`Compare with ${entry.driverName}`}
-              className={`ml-1 h-6 px-2 inline-flex items-center gap-1 rounded-md border border-lmu-border text-[11px] font-semibold text-lmu-text-soft hover:text-white hover:border-lmu-rule-strong cursor-pointer ${FOCUS}`}
+              className={`ml-1 h-6 px-2 inline-flex items-center gap-1 rounded-md border border-lmu-border text-[11px] font-semibold text-lmu-text-soft hover:text-white hover:border-lmu-rule-strong cursor-pointer ${FOCUS_RING}`}
             >
               <ArrowLeftRight className="w-3 h-3" aria-hidden="true" />
               Compare

@@ -49,7 +49,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
       <div className="bg-lmu-card border border-lmu-border p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Total Sessions</p>
-          <h4 className="text-xl font-semibold text-lmu-text font-mono mt-0.5">{trackDataCount}</h4>
+          <p className="text-xl font-semibold text-lmu-text font-mono mt-0.5">{trackDataCount}</p>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {selectedCarModel !== 'All' ? `${selectedCarModel}` : `${selectedCarClass === 'All' ? 'All Classes' : selectedCarClass}`}
           </p>
@@ -62,15 +62,15 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
           <div className="grid grid-cols-2 gap-3 mt-1">
             <div>
               <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Quali Avg Pos</p>
-              <h4 className="text-xl font-semibold text-lmu-text-soft font-mono">
+              <p className="text-xl font-semibold text-lmu-text-soft font-mono">
                 {formatAveragePosition(qualifyingAveragePosition)}
-              </h4>
+              </p>
             </div>
             <div>
               <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Finish Avg Pos</p>
-              <h4 className="text-xl font-semibold text-lmu-text-soft font-mono">
+              <p className="text-xl font-semibold text-lmu-text-soft font-mono">
                 {formatAveragePosition(finishAveragePosition)}
-              </h4>
+              </p>
             </div>
           </div>
         </div>
@@ -82,9 +82,9 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
             Your Best ({selectedCarModel !== 'All' ? selectedCarModel : selectedCarClass === 'All' ? 'Overall' : selectedCarClass})
           </p>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <h4 className="text-xl font-semibold text-lmu-personal-best font-mono">
+            <p className="text-xl font-semibold text-lmu-personal-best font-mono">
               {yourBest?.timeStr || (bestLapTimeInTrack ? formatTime(bestLapTimeInTrack) : '--:--.---')}
-            </h4>
+            </p>
           </div>
           {yourBest?.paceCat && (
             <div className="mt-1">
@@ -102,7 +102,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
       <div className="bg-lmu-card border border-lmu-border p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Overall Pace Improvement</p>
-          <h4
+          <p
             className={`text-xl font-semibold mt-0.5 font-mono ${
               totalImprovement !== null && totalImprovement > 0 ? 'text-lmu-gain' : 'text-white'
             }`}
@@ -112,7 +112,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
               : sessionsWithValidLapsCount === 1
               ? '0.000s'
               : 'N/A'}
-          </h4>
+          </p>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {sessionsWithValidLapsCount > 1 && totalImprovement !== null && totalImprovement > 0
               ? `Baseline ${formatTime(firstValidSessionBestLap)} → PB ${formatTime(bestLapTimeInTrack)}`
@@ -126,7 +126,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
       <div className="bg-lmu-card border border-lmu-border p-4 rounded-xl flex items-center justify-between">
         <div>
           <p className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">Top 3 Lap True Pace</p>
-          <h4
+          <p
             className={`text-xl font-semibold mt-0.5 font-mono ${
               top3Improvement !== null && top3Improvement > 0 ? 'text-lmu-gain' : 'text-white'
             }`}
@@ -136,7 +136,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
               : bestTop3
               ? formatTime(bestTop3)
               : 'N/A'}
-          </h4>
+          </p>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {bestTop3
               ? `Best 3-Lap: ${formatTime(bestTop3)}${

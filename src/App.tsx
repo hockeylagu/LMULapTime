@@ -229,7 +229,7 @@ export default function App() {
         </footer>
       )}
 
-      {referenceUpdateCount !== null && (
+      {referenceUpdateCount !== null && location.pathname !== '/settings' && (
         <ReferenceLaptimeUpdateToast
           updatedCount={referenceUpdateCount}
           onDismiss={() => setReferenceUpdateCount(null)}

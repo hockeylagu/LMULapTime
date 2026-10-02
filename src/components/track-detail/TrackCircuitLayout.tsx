@@ -6,6 +6,7 @@ import {
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
 
 export interface TrackCircuitLayoutProps {
@@ -82,7 +83,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     : 'h-[128px] w-[128px]';
 
   const interactiveClasses = onClick
-    ? 'cursor-pointer hover:opacity-80 transition-opacity'
+    ? `cursor-pointer rounded hover:bg-lmu-card-hover transition-colors ${FOCUS_RING}`
     : 'pointer-events-none';
 
   const pathD = useMemo(() => {
@@ -108,7 +109,8 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         onClick={onClick}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
-        onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+        onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+        aria-label={onClick ? `Open ${trackName}` : undefined}
         className={`${sizeClasses} shrink-0 flex items-center justify-center text-lmu-faint ${interactiveClasses} ${className}`}
         title={trackName}
       >
@@ -133,7 +135,8 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+        aria-label={onClick ? `Open ${trackName}` : undefined}
       className={`${sizeClasses} shrink-0 flex items-center justify-center relative ${interactiveClasses} ${className}`}
       title={`${trackName} Circuit Layout`}
     >

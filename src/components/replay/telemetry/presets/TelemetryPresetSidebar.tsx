@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, RotateCcw } from 'lucide-react';
 import { TelemetryPreset } from './telemetryPresets.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface TelemetryPresetSidebarProps {
   presets: TelemetryPreset[];
@@ -26,7 +27,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
         <button
           type="button"
           onClick={onCreateNew}
-          className="px-2 py-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/5 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer"
+          className={`px-2 py-0.5 rounded text-lmu-muted hover:text-white hover:bg-white/5 flex items-center gap-1 font-bold text-[10px] transition-all cursor-pointer ${FOCUS_RING}`}
           title="Create a new custom telemetry preset"
         >
           <Plus className="w-3 h-3" /> New
@@ -47,7 +48,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
                 isSelected
                   ? 'bg-lmu-raised/60 border border-transparent text-white font-semibold'
                   : 'text-lmu-muted hover:bg-white/5 hover:text-lmu-text border border-transparent'
-              }`}
+              } ${FOCUS_RING}`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 {isActive && <span className="w-1.5 h-1.5 rounded-full bg-lmu-gain shrink-0" />}
@@ -65,7 +66,7 @@ export const TelemetryPresetSidebar: React.FC<TelemetryPresetSidebarProps> = Rea
         <button
           type="button"
           onClick={onResetDefaults}
-          className="w-full py-1 px-2 rounded text-[10px] text-lmu-muted hover:text-lmu-warn-soft hover:bg-lmu-warn-strong/10 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          className={`w-full py-1 px-2 rounded text-[10px] text-lmu-muted hover:text-lmu-warn-soft hover:bg-lmu-warn-strong/10 flex items-center justify-center gap-1.5 transition-all cursor-pointer ${FOCUS_RING}`}
           title="Reset all presets to factory defaults"
         >
           <RotateCcw className="w-3 h-3" /> Reset to Defaults

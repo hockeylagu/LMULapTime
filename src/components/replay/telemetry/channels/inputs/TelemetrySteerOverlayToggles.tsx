@@ -1,4 +1,5 @@
 import React from 'react';
+import { FOCUS_RING } from '../../../../common/buttonStyles.js';
 
 export interface TelemetrySteerOverlayTogglesProps {
   scaleMode?: string;
@@ -38,7 +39,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
         showBalance
           ? 'bg-lmu-raised text-lmu-text border border-lmu-info-strong/40'
           : 'text-lmu-faint hover:text-lmu-text-soft hover:bg-lmu-raised/40'
-      }`}
+      } ${FOCUS_RING}`}
     >
       <span className="flex items-center gap-1">
         <span
@@ -64,7 +65,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
         showScrub
           ? 'bg-lmu-loss-deep/80 text-lmu-loss-soft border border-lmu-loss-strong/60'
           : 'text-lmu-faint hover:text-lmu-loss-soft hover:bg-lmu-raised/40'
-      }`}
+      } ${FOCUS_RING}`}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full transition-all ${showScrub ? 'bg-lmu-loss' : 'bg-lmu-rule-strong'}`}
