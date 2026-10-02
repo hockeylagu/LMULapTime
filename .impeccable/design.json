@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T15:45:59.051Z",
+  "generatedAt": "2026-10-02T13:16:24.680869Z",
   "title": "Design System: LMU Lap Time Analyzer",
   "extensions": {
     "colorMeta": {
@@ -596,6 +596,10 @@
       "readout-small": {
         "displayName": "Readout Small",
         "purpose": "Mono figures in dense tables and chips."
+      },
+      "field-label": {
+        "displayName": "Field Label",
+        "purpose": "Caption over a form field (11px semibold uppercase tracked, muted), one step above the Label."
       }
     },
     "shadows": [
@@ -620,6 +624,11 @@
         "name": "progress",
         "value": "300ms cubic-bezier(0.4, 0, 0.2, 1)",
         "purpose": "Progress bar width during scans."
+      },
+      {
+        "name": "progress-fill",
+        "value": "width 300ms ease",
+        "purpose": "A progress bar fill eases to each new value while work runs."
       }
     ],
     "breakpoints": [
@@ -658,17 +667,17 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Main action; uppercase tracked label on red.",
+      "description": "The one committing action in a panel. Disabled turns neutral (raised fill, faint text), never a faded red.",
       "html": "<button class=\"ds-btn-primary\">Build debrief</button>",
-      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;border-radius:12px;background:#DC3441;color:#fff;font:700 12px 'Segoe UI',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:opacity .15s}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-btn-primary:disabled{opacity:.5;cursor:not-allowed}"
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border:none;border-radius:12px;background:#DC3441;color:#fff;font:700 12px 'Segoe UI',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:background .15s}.ds-btn-primary:hover{background:color-mix(in oklab,#DC3441 90%,transparent)}.ds-btn-primary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-btn-primary:disabled{background:oklch(27.9% 0.041 260.031);color:#7F8BA1;cursor:not-allowed}"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Neutral 32px lmu-card button for header actions and jumps; the icon carries the only color when it has meaning.",
+      "description": "Default action button: 32px, rule border, soft-white sentence-case label, one tonal step up on hover.",
       "html": "<button class=\"ds-btn-secondary\"><span class=\"ds-dot\"></span>Rules &amp; Config</button>",
-      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:8px;border:1px solid #232A36;background:#151A23;color:#8D99AE;font:600 12px 'Segoe UI',system-ui,sans-serif;cursor:pointer;transition:color .15s,border-color .15s,background .15s}.ds-btn-secondary:hover{color:#fff;border-color:oklch(37.2% 0.044 257.287);background:#1A202C}.ds-btn-secondary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-dot{width:6px;height:6px;border-radius:9999px;background:oklch(82.8% 0.189 84.429)}"
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:8px;border:1px solid oklch(37.2% 0.044 257.287);background:#151A23;color:oklch(86.9% 0.022 252.894);font:600 12px 'Segoe UI',system-ui,sans-serif;cursor:pointer;transition:color .15s,border-color .15s,background .15s}.ds-btn-secondary:hover{color:#fff;background:#1A202C}.ds-btn-secondary:disabled{color:#7F8BA1;cursor:not-allowed}.ds-btn-secondary:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}.ds-dot{width:6px;height:6px;border-radius:9999px;background:oklch(82.8% 0.189 84.429)}"
     },
     {
       "name": "Icon Button",
@@ -716,6 +725,30 @@
       "description": "Session best in Sky blue; personal best in gold takes precedence. Explicit labels retain the meaning without color.",
       "html": "<table class=\"ds-best-table\"><tbody><tr class=\"ds-best-session\"><td>7</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open session-best lap telemetry\">1:35.894</button></td><td>Session best</td></tr><tr class=\"ds-best-personal\"><td>8</td><td><button class=\"ds-best-time\" type=\"button\" aria-label=\"Open personal-best lap telemetry\">1:35.620</button></td><td>Personal best</td></tr></tbody></table>",
       "css": ".ds-best-table{width:100%;border-collapse:collapse;background:#151A23;font:700 12px Consolas,monospace}.ds-best-table td{padding:10px 12px;border-bottom:1px solid #232A36;white-space:nowrap}.ds-best-table td:nth-child(2){text-align:right}.ds-best-session{color:#75B9F5;background:oklch(65% 0.11 246.489047 / .1)}.ds-best-personal{color:#FFB703;background:rgb(255 183 3 / .08)}.ds-best-time{border:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer;border-radius:4px}.ds-best-time:hover{text-decoration:underline;text-underline-offset:3px}.ds-best-time:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
+    },
+    {
+      "name": "Section Table of Contents",
+      "kind": "nav",
+      "refersTo": "toc-item-active",
+      "description": "Sticky TOC beside a long page of sections (Settings); the current section takes a card fill and a red left edge.",
+      "html": "<nav class=\"ds-toc\"><button class=\"ds-toc-item\" aria-current=\"location\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\"/></svg>Overview</button><button class=\"ds-toc-item\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 3\"/></svg>Reference benchmarks</button><button class=\"ds-toc-item\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 7h6l2 2h10v10H3z\"/></svg>Folder paths</button></nav>",
+      "css": ".ds-toc{display:flex;flex-direction:column;gap:2px;width:220px;padding-right:20px;border-right:1px solid color-mix(in oklab,#232A36 70%,transparent);font-family:'Segoe UI',system-ui,sans-serif}.ds-toc-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border:none;border-left:2px solid transparent;border-radius:6px;background:none;color:#8D99AE;font:500 12px 'Segoe UI',system-ui,sans-serif;text-align:left;cursor:pointer;transition:color .15s,background .15s}.ds-toc-item:hover{color:#F8F9FA;background:color-mix(in oklab,#151A23 60%,transparent)}.ds-toc-item[aria-current]{background:#151A23;color:#F8F9FA;border-left-color:#DC3441}.ds-toc-item[aria-current] svg{color:#FF4D55}.ds-toc-item:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
+    },
+    {
+      "name": "Inline Confirm",
+      "kind": "custom",
+      "refersTo": "button-secondary",
+      "description": "A destructive action asks in place of its button: a soft-white question, then confirm and Cancel (Cancel focused).",
+      "html": "<div class=\"ds-confirm\" role=\"group\" aria-label=\"Confirm clearing the session cache\"><span>Clear 42 parsed sessions?</span><button class=\"ds-confirm-btn\">Confirm</button><button class=\"ds-confirm-btn\">Cancel</button></div>",
+      "css": ".ds-confirm{display:flex;align-items:center;gap:8px;font:12px 'Segoe UI',system-ui,sans-serif;color:oklch(86.9% 0.022 252.894)}.ds-confirm-btn{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:8px;border:1px solid oklch(37.2% 0.044 257.287);background:#151A23;color:oklch(86.9% 0.022 252.894);font:600 12px 'Segoe UI',system-ui,sans-serif;cursor:pointer;transition:color .15s,background .15s}.ds-confirm-btn:hover{color:#fff;background:#1A202C}.ds-confirm-btn:focus-visible{outline:2px solid #FF4D55;outline-offset:2px}"
+    },
+    {
+      "name": "Progress Well",
+      "kind": "custom",
+      "refersTo": "progress-track",
+      "description": "Running background work: label and mono count, an 8px info bar, the current file and its percent. Shown only while work runs.",
+      "html": "<div class=\"ds-progress\"><div class=\"ds-progress-head\"><span class=\"ds-progress-label\">Upgrading Replay Telemetry</span><span class=\"ds-progress-count\">12 / 40 Drivers</span></div><div class=\"ds-progress-track\"><div class=\"ds-progress-fill\" style=\"width:30%\"></div></div><div class=\"ds-progress-file\"><span>24-09-28_LeMans_Race.Vcr</span><span class=\"ds-progress-pct\">62%</span></div></div>",
+      "css": ".ds-progress{width:420px;background:#0B0E14;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:8px;font-family:'Segoe UI',system-ui,sans-serif}.ds-progress-head{display:flex;justify-content:space-between;align-items:center}.ds-progress-label{font:700 10px 'Segoe UI',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:#8D99AE}.ds-progress-count{font:700 12px Consolas,monospace;color:#F8F9FA}.ds-progress-track{height:8px;border-radius:9999px;background:color-mix(in oklab,#232A36 50%,transparent);overflow:hidden}.ds-progress-fill{height:100%;background:oklch(74.6% 0.16 232.661);transition:width .3s}.ds-progress-file{display:flex;justify-content:space-between;font:11px Consolas,monospace;color:#8D99AE}.ds-progress-pct{color:oklch(74.6% 0.16 232.661);font-weight:600}"
     }
   ],
   "narrative": {
@@ -793,28 +826,30 @@
       }
     ],
     "dos": [
-      "Do set every comparable number in `font-mono` with its unit (The Readout Rule).",
-      "Do use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
-      "Do take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
-      "Do separate surfaces by tone and a `lmu-border` hairline.",
-      "Do put a 10px uppercase tracked label above a bold readout for key figures.",
-      "Do give every interactive control a visible `focus-visible` outline (2px, `lmu-accent-text`).",
-      "Do mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.",
-      "Do show the server's error message with a way to try again, in the place that failed.",
-      "Do reuse the canonical pieces (`LapStatusBadge`, `PaceBadge`, `BenchmarkLadder`, `ReplayLaunchButton`, the segmented pills) instead of re-deriving them."
+      "**Do** set every comparable number in `font-mono` with its unit (The Readout Rule).",
+      "**Do** use the semantic roles: `lmu-gain`, `lmu-loss`, `lmu-warn` (warning or uncertain), `lmu-info` (data), and gold/blue/teal for S1/S2/S3.",
+      "**Do** take channel, map, wheel and opponent colors from `src/utils/themeColors.ts` by name.",
+      "**Do** separate surfaces by tone and a `lmu-border` hairline.",
+      "**Do** put a 10px uppercase tracked label above a bold readout for key figures.",
+      "**Do** give every interactive control a visible `focus-visible` outline (2px, `lmu-accent-text`).",
+      "**Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.",
+      "**Do** show the server's error message with a way to try again, in the place that failed.",
+      "**Do** confirm a destructive action inline, in place of its button, with Cancel focused; never with a modal.",
+      "**Do** use `PRIMARY_BUTTON`, `SECONDARY_BUTTON` and `FOCUS_RING` from `common/buttonStyles.ts`; a disabled primary turns neutral, it never fades the red.",
+      "**Do** reuse the canonical pieces (`LapStatusBadge`, `PaceBadge`, `BenchmarkLadder`, `ReplayLaunchButton`, the segmented pills) instead of re-deriving them."
     ],
     "donts": [
-      "Don't render any text below 10px.",
-      "Don't add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
-      "Don't use Pit Lane Red as a panel fill or a decorative accent; it marks brand, identity and selection.",
-      "Don't mark your own row or name in gold or amber; gold is P1 and personal bests, amber is the rival.",
-      "Don't use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
-      "Don't dim text with `opacity-*`; step down a text tier or use the `faded` step.",
-      "Don't box every figure in its own tile, or add a second grid of benchmark targets beside the ladder.",
-      "Don't add a light theme.",
-      "Don't add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
-      "Don't use emoji in the UI; stored tags that carry them are stripped where shown.",
-      "Don't loop an animation that is not waiting on work, and don't scale, rotate or lift on hover (The Still Wall Rule)."
+      "**Don't** render any text below 10px.",
+      "**Don't** add glass (`backdrop-blur`) to content panels, glow halos, blurred color blobs or gradient panels; blur is for the navbar and overlays only.",
+      "**Don't** use Pit Lane Red as a panel fill or a decorative accent; it marks brand, identity and selection.",
+      "**Don't** mark your own row or name in gold or amber; gold is P1 and personal bests, amber is the rival.",
+      "**Don't** use raw Tailwind palette classes (`text-emerald-400`, `bg-slate-800`) or introduce a new hue for something that already has a role; add a role to `tailwind.config.js` first.",
+      "**Don't** dim text with `opacity-*`; step down a text tier or use the `faded` step.",
+      "**Don't** box every figure in its own tile, or add a second grid of benchmark targets beside the ladder.",
+      "**Don't** add a light theme.",
+      "**Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.",
+      "**Don't** use emoji in the UI; stored tags that carry them are stripped where shown.",
+      "**Don't** loop an animation that is not waiting on work, and don't scale, rotate or lift on hover (The Still Wall Rule)."
     ]
   }
 }

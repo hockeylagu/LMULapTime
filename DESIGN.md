@@ -69,6 +69,11 @@ typography:
     fontSize: "11px"
     fontWeight: 700
     letterSpacing: "0.05em"
+  field-label:
+    fontFamily: "Segoe UI, sans-serif"
+    fontSize: "11px"
+    fontWeight: 600
+    letterSpacing: "0.05em"
   readout-small:
     fontFamily: "Consolas, monospace"
     fontSize: "11px"
@@ -114,11 +119,17 @@ components:
     typography: "{typography.label}"
     rounded: "{rounded.xl}"
     padding: "10px 20px"
+  button-primary-disabled:
+    backgroundColor: "{colors.lmu-raised}"
+    textColor: "{colors.lmu-faint}"
+    rounded: "{rounded.xl}"
+    padding: "10px 20px"
   button-secondary:
     backgroundColor: "{colors.lmu-card}"
-    textColor: "{colors.lmu-muted}"
+    textColor: "{colors.lmu-text-soft}"
     rounded: "{rounded.lg}"
     height: "32px"
+    padding: "0 12px"
   button-icon:
     backgroundColor: "{colors.lmu-bg}"
     textColor: "{colors.lmu-muted}"
@@ -158,6 +169,19 @@ components:
     rounded: "{rounded.sm}"
     typography: "{typography.label}"
     padding: "2px 8px"
+  toc-item:
+    textColor: "{colors.lmu-muted}"
+    rounded: "{rounded.md}"
+    padding: "8px 12px"
+  toc-item-active:
+    backgroundColor: "{colors.lmu-card}"
+    textColor: "{colors.lmu-text}"
+    rounded: "{rounded.md}"
+    padding: "8px 12px"
+  progress-track:
+    backgroundColor: "{colors.lmu-border}"
+    rounded: "{rounded.full}"
+    height: "8px"
 ---
 
 # Design System: LMU Lap Time Analyzer
@@ -188,7 +212,7 @@ Motion reports state and keeps continuity. A driver scrubbing a lap is reading t
 - **Feedback (100–150 ms):** color, border and opacity transitions on hover, press and selection (`transition-colors`, `transition-opacity`). Hover never scales, rotates or lifts a surface. Two exceptions: a chevron may nudge 2–4px toward where it leads, and a tiny target (a map marker, a sparkline dot) may grow to confirm it is under the pointer.
 - **Enter (150 ms, ease-out):** overlays arrive with `animate-fade-in` (modals, scrims, full-screen views, inline banners). Anchored menus and popovers use `animate-pop-in`, a fade plus a 4px drop from their anchor. Keyframes live in `src/index.css` (`@theme`). Nothing animates out; a closing overlay unmounts.
 - **Loops:** only while work is running: `animate-spin` on a busy control, `animate-pulse` on skeletons, loading text and the scan in progress. A live state (ABS, TC, pit limiter, the selected corner, the car on the map) is shown by fill, rim and position. It does not flash.
-- **Content motion:** the playhead, the car on the map and chart updates move because the data moves. They are driven by playback (`requestAnimationFrame`), not by CSS.
+- **Content motion:** the playhead, the car on the map and chart updates move because the data moves. They are driven by playback (`requestAnimationFrame`), not by CSS. A progress bar's fill eases to each new value over 300ms.
 
 **The Still Wall Rule.** When the user is not acting and nothing is loading, nothing on screen moves except the data itself.
 
@@ -288,7 +312,8 @@ Two cases fail and must not be used:
 - **Panel Heading** (700, 14px, uppercase, tracked, with a 16px icon): the heading over a panel's hairline.
 - **Title** (600–700, 14–16px): card titles, track names, nav tabs.
 - **Body** (400–500, 12px, 1.5 line height): descriptions, helper text and debrief prose. It is the default text size across the app. Expanded event prose runs at 13px on a 20px line.
-- **Label** (700, 10px, uppercase, 0.05em tracking): captions above values, pills and badges.
+- **Label** (700, 10px, uppercase, 0.05em tracking): captions above values, pills and badges (`READOUT_LABEL` in `settings/labelStyles.ts`).
+- **Field Label** (600, 11px, uppercase, 0.05em tracking, muted): the caption over a form field, one step above the Label (`FIELD_LABEL`). Help text under a field is 11px muted sentence case.
 - **Table Header** (600–700, 11px, uppercase, 0.05em tracking, muted): every data table's column labels, including sort buttons.
 - **Readout** (monospace 700, 12px; **Readout Small** 11px in dense tables and chips): lap times, deltas, positions, counts and units. **Readout Large** (monospace 800, 18px and up) is for headline values: 20px on track summary cards, 24px for a finishing position, 28px for a ranked-list leader, 30px for a session's best lap.
 
@@ -306,6 +331,8 @@ Desktop only and dense. The design width is 1500px: content sits in a centered 1
 Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between inline items are 4–8px (`gap-1`, `gap-1.5`, `gap-2`, the three most used values). Groups are 12–16px apart and panel padding is 16–24px. Chips and badges use 2px vertical padding. Laptops, tablets and phones are not the audience: new work needs no `sm`/`md`/`lg` variants, and the existing ones are inert above the floor.
 
 Toolbars sit directly on the page surface, not in a panel. Wide tables scroll horizontally inside their panel rather than widening the column.
+
+A long page of independent sections (Settings) uses a two-column layout: a 240px sticky table of contents on the left (`sticky top-[84px]`, clearing the navbar, with a hairline right border) and a single stack of 16px-radius panels 24px apart on the right. Each section has an id, `scroll-mt-[84px]` and a heading that takes focus when jumped to, and the open section is kept in the URL (`?section=`). Sections are not tabs: everything stays on one scrolling page, and search filters the stack and the table of contents together.
 
 **The Timing Sheet Rule.** Density is a feature. Prefer rows, tables and label-over-value stacks to spacious cards. Reach for whitespace only to separate questions, not to decorate an answer.
 
@@ -336,8 +363,10 @@ Every interactive control shows a 2px outline on keyboard focus: `focus-visible:
 
 ### Buttons
 Compact and assertive.
-- **Primary:** Pit Lane Red fill, 12px radius, white 10–12px bold uppercase label with 0.05em tracking, 10px × 20px padding. Hover softens to 90% opacity. Disabled drops to 50% with a not-allowed cursor (`src/index.css` sets the cursor globally).
-- **Secondary:** a neutral 32px `lmu-card` button with a hairline and muted icon, 8px radius; the icon carries the only color when it has meaning (a session type dot). Used for header actions and jump buttons (related session, rules, Compare Laps).
+The shared class strings live in `common/buttonStyles.ts` (`PRIMARY_BUTTON`, `SECONDARY_BUTTON`, `FOCUS_RING`); use them rather than restating the utilities.
+- **Primary:** Pit Lane Red fill, 12px radius, white 12px bold uppercase label with 0.05em tracking, 10px × 20px padding. Hover softens the fill to 90%. Disabled turns neutral (`lmu-raised` fill, `lmu-faint` text, not-allowed cursor) rather than showing a faded red. One per panel at most: it is the action that commits (Save Key).
+- **Secondary:** a neutral 32px `lmu-card` button, 12px horizontal padding, 8px radius, an `lmu-rule` border, semibold 12px sentence-case `lmu-text-soft` label, lifting to `lmu-card-hover` and white on hover. Disabled drops the label to `lmu-faint`. It is the default action button: header actions, jump buttons (related session, rules, Compare Laps), Retry, Update, Clear and the confirm and cancel pair. An icon carries color only when it has meaning (a session type dot).
+- **External link:** the secondary shape with a `lmu-border` hairline, muted text and an external-link icon, brightening on hover ("Get a Gemini key"). An inline external link is `lmu-text-soft` text with a 12px icon that underlines on hover ("View sheet").
 - **Quiet outlined:** hairline border, muted semibold 12px text, white text and `lmu-rule` border on hover ("Where's the time?", the leaderboard "Compare").
 - **Icon:** a 6px-padded square on `lmu-bg` with a hairline border and muted icon. On hover it fills red (destructive or primary) or lifts one tonal step (neutral).
 - **Tinted:** a signal color at 10% background, 20% border and its text step (`bg-lmu-accent/10 border-lmu-accent/20 text-lmu-accent-text`), filling solid on hover. The replay launcher (`common/ReplayLaunchButton`) is the canonical one: amber "Launch 100Hz Replay" with DuckDB telemetry, green "Launch Replay" without.
@@ -396,6 +425,8 @@ Lap table, classification, standings, session list and leaderboard share one gra
 - **Style:** `lmu-bg` well, hairline border, 12px radius, 12–14px white text (mono for paths), an optional leading muted icon.
 - **Focus:** the border shifts to Pit Lane Red; the session search shifts to `lmu-muted`, since red there would read as a filter. Both add the 2px outline (see Focus).
 - **Selects:** transparent inline selects with semibold white text inside a pill or toolbar well (the driver picker is a single `lmu-bg` well with a transparent select).
+- **Field label and status** (`settings/PathField.tsx`): the 11px Field Label on the left, with one status on the right: "Detected" in gain with a check, "Not found" in warn with an alert, or, once the value is edited, muted "Changed, save to check" with a Reset link. A field the server rejects takes an `lmu-loss` border and the reason under it in loss with an icon, and the typed value is kept. 11px muted help text closes the field.
+- **Search in a side panel:** the settings search sits on `lmu-card` with an 8px radius and a leading icon, and a clear button appears once there is text. A polite line under it counts the matches ("2 of 6 sections match").
 - **Toolbar** (`SessionFilterParts.tsx`): two rows. Row one finds and orders (search, track select, sort, view mode); row two narrows (class, session type, toggles) and ends with a neutral "Clear filters" shown only while something narrows the list.
 
 ### Navigation
@@ -404,6 +435,18 @@ A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur
 - **Tabs:** a group in an inset `lmu-bg` well with a 12px radius; tabs are 32px, 14px medium with a 16px icon. Active is solid red with white text; inactive is muted, lifting to `lmu-raised/60` on hover.
 - **Status:** 32px chips and the refresh button in the same well, muted, lifting to white with an `lmu-rule` border on hover (never red). The sessions dot is gain when LMU results exist and warn when none do; while a scan runs the film icon pulses and the refresh icon spins in `lmu-info`.
 - **Links:** titles that navigate (the circuit title) are native React Router links with a visible focus outline and keep the car-class context.
+
+### Section Navigation
+The table of contents beside a long page (`settings/SettingsSidebar.tsx`). Items are 12px medium text with a 16px icon, 8px × 12px padding and a 6px radius. Muted at rest, they lift to white over `lmu-card/60` on hover. The current section takes an `lmu-card` fill, white text, a 2px Pit Lane Red left edge and a red icon (`aria-current="location"`), which counts as a selection under the One Red Rule. A scrollspy tracks the section in view, and a click pins it until the scroll settles.
+
+### Confirmations & Feedback
+- **Inline confirm** (`settings/controls/InlineConfirm.tsx`): a destructive or irreversible action asks in place of the button that started it. The button swaps for a soft-white question ("Clear 42 parsed sessions?") and a secondary confirm and Cancel pair. Focus lands on Cancel, Escape cancels, and focus returns to the trigger. Confirms do not open a modal.
+- **Feedback message** (`FeedbackMessage` in `settings/SettingsPanel.tsx`): the result of an action sits under its control as 12px semibold text with a 16px icon: gain with a check for success (`role="status"`), loss with an alert for failure (`role="alert"`). Long server messages wrap.
+- **Setup banner:** when required folders are missing, a 12px-radius `lmu-card` strip over the page names them, with a warn icon and an underlined white link that jumps to the field to fix. It is not a red alert.
+- **Change summaries:** counts of what an update did read as colored words: "+3 new" gain, "2 updated" warn, "1 removed" loss. In the list below, each row has a matching 10px colored label, the old value muted and struck through, an arrow, and the new value in white mono.
+
+### Progress
+Running work (`settings/replays/ReplayProgress.tsx`) sits in an `lmu-bg` well with an 8px radius and 16px padding: a 10px Label and a white mono count ("12 / 40"), then an 8px full-round track in `lmu-border/50` with an `lmu-info` fill, then the current file in 11px muted mono with its percent in info, and the stage in 10px muted sans. The bar shows only while work runs. At rest, one quiet muted line says what is left ("Replay upgrade: nothing to do.").
 
 ### Dialogs
 Modals (Rules & Config, circuit information) mount on the body with `animate-fade-in` over a blurred scrim, an 18px semibold title and flat specification columns separated by rules. In circuit information, restrained cyan marks specifications and data provenance, timing-gate labels take the sector gold and timing blue, and corner names are plain wrapping text. Opening focuses the close control, makes the background inert and locks scrolling; Tab stays inside; Escape and backdrop click close; closing restores focus, interaction and scrolling.
@@ -422,6 +465,17 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **Strips:** telemetry strip gridlines take the channel color dimmed, while scale labels stay `lmu-muted` at full strength (`TelemetryStaticTrace`).
 - **Map:** road surface and boundaries in `MAP_COLORS` line work, racing lines colored by speed, pedal or lateral G; monospace labels obey the 10px floor.
 
+### Telemetry Studio
+- Telemetry header: track/layout leads, with primary and baseline driver/lap controls grouped beside it. Event, split, replay filename, duration and file size live in the Info disclosure; weather and temperatures stay visible under the track name. Back is the single page exit; playback groups rewind, play/pause and a native speed selector. Telemetry is a wide workspace designed for a minimum 1920px viewport.
+- Telemetry charts, GPS map, HUD and corner phases share flat panes with compact toolbars and simple dividers, rather than nested cards. Trace and sector colors stay semantic. Toolbar sector times use sector 1 gold, sector 2 blue, and sector 3 teal only for session-best splits; other splits stay white. The toolbar lap time is gold only for the recorded personal-best replay/lap on the same layout and class, session-best blue otherwise, and white for ordinary laps; no Fastest Lap badge.
+- Telemetry channels reserve a compact 24px title row: plain colored names at the left, legends and controls at the right. Below it, traces and scale ticks share one plotting area, filling its height with a 6px bottom inset. SVG viewBoxes match each channel’s actual numeric scale; speed ticks use the path’s computed maximum. Live readings appear only on the scrub cursor; status and source indicators remain beside the channel name. Scrub readouts keep one vertical position below the upper scale label throughout the lap, switching sides only near the right edge.
+- The telemetry resolution popover uses flat fidelity statistics and explanatory text. Mode/source options use a shared neutral selected treatment; channel and source identity do not introduce saturated card fills.
+- The telemetry preset editor uses flat channel rows, neutral selected presets and controls, and sans-serif UI copy. Color stays on channel identifiers and traces; category labels stay neutral. The apply button does not use telemetry blue as a primary action color. Compare-to-your-best is a neutral action, with gain colors reserved for measured gains.
+- The telemetry preset dropdown follows the neutral editor selection treatment: white checkmarks, muted management links and a neutral edit action, with no telemetry-blue fills or borders.
+- Telemetry drag controls use “Move cursor” and “Zoom range” under a quiet “Drag:” label. “Full lap” stays beside them, disabled at full view; it restores the range without resetting playback. A zoomed view shows its duration, with frame bounds in a tooltip.
+- Resolution choices use semantic color sparingly: cyan Standard, green High, violet Full Raw; the selected source uses amber DuckDB or cyan VCR. Selected options retain aria-pressed, with softly tinted backgrounds and borders. Raw and active sample figures reflect those roles.
+- Corner analysis uses “Lap analysis” without a baseline and “vs Baseline” when comparing. Selected rows and phase headings use neutral emphasis, with a red selected flag and small aqua/violet/teal phase icons for orientation. Measured gains/losses, track usage warnings and handling bands retain semantic colors; active overlay labels match their event colors on neutral backgrounds. Phase metrics appear once in the three-column breakdown, without a duplicate summary strip. The speed profile's apex marker is neutral.
+
 ### Track Cards & Headers
 - **Track card:** one panel shell with a 128px circuit outline in a left column beside the title (16px semibold), session metadata and timing columns on a fixed 3:2 grid; the personal best in gold with its xs pace badge, the theoretical time in soft white; sector splits in three equal left-aligned columns below; one divider above the car inventory, a wrapping line of neutral 11px names. "Last driven" sits under the counts when known. No trophies, no bordered chips.
 - **Track header:** a 160px outline column (128px minimum height) spanning the full height beside the 30px title, the car-class selection top right, an optional car-model selection beneath, then the benchmark ladder. Summary cards below are 20px semibold mono values without icons.
@@ -438,6 +492,8 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **Do** give every interactive control a visible `focus-visible` outline (2px, `lmu-accent-text`).
 - **Do** mark inferred, estimated or partial values visibly (amber, an icon or wording). Never present them like measured values.
 - **Do** show the server's error message with a way to try again, in the place that failed.
+- **Do** confirm a destructive action inline, in place of its button, with Cancel focused; never with a modal.
+- **Do** use `PRIMARY_BUTTON`, `SECONDARY_BUTTON` and `FOCUS_RING` from `common/buttonStyles.ts`; a disabled primary turns neutral, it never fades the red.
 - **Do** reuse the canonical pieces (`LapStatusBadge`, `PaceBadge`, `BenchmarkLadder`, `ReplayLaunchButton`, the segmented pills) instead of re-deriving them.
 
 ### Don't:
@@ -452,21 +508,3 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **Don't** add web fonts; Segoe UI and Consolas are the rendered fonts, and the app loads nothing from a font CDN.
 - **Don't** use emoji in the UI; stored tags that carry them are stripped where shown.
 - **Don't** loop an animation that is not waiting on work, and don't scale, rotate or lift on hover (The Still Wall Rule).
-
-Telemetry header: track/layout leads, with primary and baseline driver/lap controls grouped beside it. Event, split, replay filename, duration and file size live in the Info disclosure; weather and temperatures stay visible under the track name. Back is the single page exit; playback groups rewind, play/pause and a native speed selector. Telemetry is a wide workspace designed for a minimum 1920px viewport.
-
-Telemetry charts, GPS map, HUD and corner phases share flat panes with compact toolbars and simple dividers, rather than nested cards. Trace and sector colors stay semantic. Toolbar sector times use sector 1 gold, sector 2 blue, and sector 3 teal only for session-best splits; other splits stay white. The toolbar lap time is gold only for the recorded personal-best replay/lap on the same layout and class, session-best blue otherwise, and white for ordinary laps; no Fastest Lap badge.
-
-Telemetry channels reserve a compact 24px title row: plain colored names at the left, legends and controls at the right. Below it, traces and scale ticks share one plotting area, filling its height with a 6px bottom inset. SVG viewBoxes match each channel’s actual numeric scale; speed ticks use the path’s computed maximum. Live readings appear only on the scrub cursor; status and source indicators remain beside the channel name. Scrub readouts keep one vertical position below the upper scale label throughout the lap, switching sides only near the right edge.
-
-The telemetry resolution popover uses flat fidelity statistics and explanatory text. Mode/source options use a shared neutral selected treatment; channel and source identity do not introduce saturated card fills.
-
-The telemetry preset editor uses flat channel rows, neutral selected presets and controls, and sans-serif UI copy. Color stays on channel identifiers and traces; category labels stay neutral. The apply button does not use telemetry blue as a primary action color. Compare-to-your-best is a neutral action, with gain colors reserved for measured gains.
-
-The telemetry preset dropdown follows the neutral editor selection treatment: white checkmarks, muted management links and a neutral edit action, with no telemetry-blue fills or borders.
-
-Telemetry drag controls use “Move cursor” and “Zoom range” under a quiet “Drag:” label. “Full lap” stays beside them, disabled at full view; it restores the range without resetting playback. A zoomed view shows its duration, with frame bounds in a tooltip.
-
-Resolution choices use semantic color sparingly: cyan Standard, green High, violet Full Raw; the selected source uses amber DuckDB or cyan VCR. Selected options retain aria-pressed, with softly tinted backgrounds and borders. Raw and active sample figures reflect those roles.
-
-Corner analysis uses “Lap analysis” without a baseline and “vs Baseline” when comparing. Selected rows and phase headings use neutral emphasis, with a red selected flag and small aqua/violet/teal phase icons for orientation. Measured gains/losses, track usage warnings and handling bands retain semantic colors; active overlay labels match their event colors on neutral backgrounds. Phase metrics appear once in the three-column breakdown, without a duplicate summary strip. The speed profile's apex marker is neutral.
