@@ -66,12 +66,18 @@ export function createSystemRouter(context: ServerContext): Router {
   });
 
   router.post('/scan', (req, res) => {
-    const { resultsDir, replaysDir, telemetryDir, playerName } = req.body;
-    if (!context.configureDirectories({ resultsDir, replaysDir, telemetryDir, playerName })) {
-      return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
+    const body = (req.body || {}) as { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown };
+    const hasConfig = Boolean(body.resultsDir || body.replaysDir || body.telemetryDir || body.playerName);
+    if (hasConfig) {
+      if (!context.configureDirectories(body)) {
+        return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
+      }
     }
-    context.telemetryCatalog.clear();
+    if (hasConfig) context.telemetryCatalog.clear();
     const sessionScanStarted = context.runSessionSyncInBackground();
+    if (!sessionScanStarted && !hasConfig) {
+      context.loadSessions(true);
+    }
     const sessions = context.loadSessions();
 
     res.json({
@@ -82,7 +88,7 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryExist: fs.existsSync(context.telemetryDir),
       playerName: context.currentParser.configuredPlayerName,
       sessionsCount: sessions.length,
-      sessionScanStarted,
+      sessionScanStarted: sessionScanStarted || !hasConfig,
       replayScanStarted: true,
       telemetryScanStarted: true,
       telemetryFilesScanned: null,

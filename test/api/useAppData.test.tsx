@@ -51,7 +51,7 @@ describe('app scan freshness', () => {
     const { result } = await mount();
     const answer = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((url: string) => {
-      if (url.includes('?refresh=true')) { count = 2; scan = idle('server:2'); scan.finishedAt = 'fast-done'; return reply([]); }
+      if (url === '/api/scan') { count = 2; scan = idle('server:2'); scan.finishedAt = 'fast-done'; return reply({ success: true }); }
       return answer(url);
     });
     await act(async () => { await result.current.fetchData(true); });
@@ -97,9 +97,9 @@ describe('app scan freshness', () => {
     const answer = fetchMock.getMockImplementation()!;
     let attempts = 0;
     fetchMock.mockImplementation((url: string) => {
-      if (url.includes('?refresh=true')) {
+      if (url === '/api/scan') {
         if (++attempts === 1) return Promise.reject(new Error('Server restarting'));
-        count = 2; scan = idle('restarted:2'); return reply([]);
+        count = 2; scan = idle('restarted:2'); return reply({ success: true });
       }
       return answer(url);
     });
@@ -115,7 +115,7 @@ describe('app scan freshness', () => {
     let failRefresh = false;
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/scan/status') return failStatus ? Promise.reject(new Error('transient status error')) : reply(idle());
-      if (url === '/api/sessions?refresh=true') return failRefresh ? Promise.reject(new Error('refresh data error')) : reply([]);
+      if (url === '/api/scan') return failRefresh ? Promise.reject(new Error('refresh data error')) : reply({ success: true });
       if (url === '/api/status') return reply({ sessionsCount: 1 });
       if (url === '/api/session-snapshot') return reply({ sessions: [{ id: 'A' }], progression: [] });
       return reply([]);

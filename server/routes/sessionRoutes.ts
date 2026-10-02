@@ -95,9 +95,8 @@ export function createSessionRouter(context: ServerContext): Router {
   });
 
   router.get('/sessions', (req, res) => {
-    const forceRefresh = req.query.refresh === 'true';
     const filters = parseSessionFilters(req.query as Record<string, unknown>);
-    const sessions = filterSessions(context.loadSessions(forceRefresh), filters);
+    const sessions = filterSessions(context.loadSessions(), filters);
 
     res.json(sessions.map(toSessionListEntry));
   });
