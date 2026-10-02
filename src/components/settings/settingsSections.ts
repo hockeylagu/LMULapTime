@@ -1,4 +1,4 @@
-import { LucideIcon, Zap, Film, BrainCircuit, History, Database, HardDrive } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -7,17 +7,16 @@ export interface SettingsSectionDef {
   icon: LucideIcon;
   description: string;
   keywords: string[];
-  getBadge?: (status: AppStatus | null) => string | undefined;
 }
 
+/** Page order when healthy: the overview first, then what changes (benchmarks, AI, replays), and the one-time folder setup last. */
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   {
-    id: 'cache-settings',
-    title: 'Session Cache',
-    icon: Zap,
-    description: 'Local SQLite database cache, session counts, storage size, and cache clearing',
-    keywords: ['sqlite', 'cache', 'database', 'sessions', 'size', 'clear', 'reset', 'storage', 'delta', 'sync', 'lmu_cache.db', 'memory', 'disk'],
-    getBadge: (status) => (status?.sqliteCache?.sessionsCount !== undefined ? `${status.sqliteCache.sessionsCount} Sessions` : undefined),
+    id: 'overview',
+    title: 'Overview',
+    icon: LayoutDashboard,
+    description: 'Folders, sessions, replays and AI at a glance, plus the local SQLite session cache and how to clear it',
+    keywords: ['overview', 'status', 'health', 'cache', 'session cache', 'sqlite', 'database', 'sessions', 'size', 'clear', 'clear cache', 'reset', 'storage', 'sync', 'last synced', 'lmu_cache.db', 'disk'],
   },
   {
     id: 'reference-benchmarks',
@@ -25,15 +24,6 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: Database,
     description: 'Alien and competitive target times synchronized from Google Sheets',
     keywords: ['reference', 'benchmarks', 'alien', 'targets', 'google sheets', 'laptimes', 'pace', 'csv', 'diff', 'refresh', 'spreadsheet', 'competitive'],
-    getBadge: (status) => (status?.referenceLaptimes?.entriesCount ? `${status.referenceLaptimes.entriesCount} Targets` : undefined),
-  },
-  {
-    id: 'replay-cache',
-    title: 'Cached Replays',
-    icon: Film,
-    description: 'Decoded binary VCR replays, 2D coordinates, driver telemetry, and replay files',
-    keywords: ['replay', 'replays', 'vcr', 'cache', 'trajectories', 'coordinates', 'telemetry', 'files', 'scan replays', 'playback', 'binary', 'upgrade', 'migration'],
-    getBadge: (status) => (status?.sqliteCache?.replaysCount !== undefined ? `${status.sqliteCache.replaysCount} Replays` : undefined),
   },
   {
     id: 'ai-settings',
@@ -50,12 +40,18 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     keywords: ['ai', 'history', 'reports', 'cached reports', 'debriefs', 'coaching', 'gemini', 'saved', 'logs'],
   },
   {
+    id: 'replay-cache',
+    title: 'Cached Replays',
+    icon: Film,
+    description: 'Decoded binary VCR replays, archived replays LMU has deleted, and the replay files list',
+    keywords: ['replay', 'replays', 'vcr', 'cache', 'trajectories', 'coordinates', 'telemetry', 'files', 'scan replays', 'playback', 'binary', 'archive', 'archived', 'deleted', 'outdated', 'version', 'upgrade'],
+  },
+  {
     id: 'folder-paths',
     title: 'Folder Paths & Driver',
     icon: HardDrive,
     description: 'UserData results, replays, telemetry directories, player name, and background scanner',
-    keywords: ['paths', 'folders', 'results', 'replays', 'telemetry', 'duckdb', 'xml', 'player', 'driver', 'scan', 'rescan', 'steam', 'userdata', 'log', 'directories'],
-    getBadge: (status) => status?.playerName || undefined,
+    keywords: ['paths', 'folders', 'results', 'replays', 'telemetry', 'duckdb', 'xml', 'player', 'driver', 'scan', 'rescan', 'save', 'sync', 'steam', 'userdata', 'log', 'directories'],
   },
 ];
 
@@ -92,4 +88,10 @@ export function orderSettingsSections(sections: SettingsSectionDef[], setupNeede
   if (!setupNeeded) return sections;
   const paths = sections.filter((section) => section.id === 'folder-paths');
   return [...paths, ...sections.filter((section) => section.id !== 'folder-paths')];
+}
+
+/** The section id a `?section=` value points at, or null when it names no section. */
+export function resolveSectionId(requested: string | null): string | null {
+  if (!requested) return null;
+  return SETTINGS_SECTIONS.some((section) => section.id === requested) ? requested : null;
 }

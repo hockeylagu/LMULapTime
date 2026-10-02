@@ -151,72 +151,79 @@ describe('ReferenceLaptimesCard component', () => {
     });
   });
 
-  it('renders benchmark stats, affected sessions badge, and expands category shifts', async () => {
+  const renderCard = (updateDiff: ReferenceBenchmarkDiff | null = mockDiffWithImpact) =>
     render(
       <ReferenceLaptimesCard
         status={mockStatus}
         isUpdatingLaptimes={false}
         onUpdateReferenceLaptimes={vi.fn()}
         laptimesMessage={null}
-        updateDiff={mockDiffWithImpact}
+        updateDiff={updateDiff}
       />
     );
 
-    // Wait for history load
-    await screen.findByRole('combobox', { name: /benchmark update history version/i });
+  const openHistory = async () => {
+    const toggle = await screen.findByRole('button', { name: /update history/i });
+    fireEvent.click(toggle);
+    return screen.findByRole('combobox', { name: /show update/i });
+  };
+
+  it('explains the purpose, the pace categories and the status in one line', async () => {
+    renderCard();
 
     expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
-    expect(screen.getByText('187 Benchmarks Cached')).toBeInTheDocument();
-    expect(screen.getByText('3 Sessions Driven')).toBeInTheDocument();
-    expect(screen.getByText('1 Category Shift')).toBeInTheDocument();
+    expect(screen.getByText(/community target lap times/i)).toBeInTheDocument();
+    for (const name of ['Alien', 'Competitive', 'Good', 'Midpack', 'Tail-ender', 'Offline']) {
+      expect(screen.getAllByText(name).length).toBeGreaterThanOrEqual(1);
+    }
+    expect(screen.getByText('187')).toBeInTheDocument();
+    expect(screen.getByText('+1 new')).toBeInTheDocument();
+    expect(screen.getByText('1 updated')).toBeInTheDocument();
+    expect(screen.queryByText(/no changes/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /update from the sheet/i })).toBeInTheDocument();
+    expect(screen.getByText(/downloads the sheet/i)).toBeInTheDocument();
+  });
 
-    // Check affected sessions badge on row
+  it('says "no changes" once when the latest update changed nothing', async () => {
+    renderCard({ ...mockDiffWithImpact, hasChanges: false, addedCount: 0, updatedCount: 0, added: [], updated: [], totalAffectedSessions: 0, totalCategoryShifts: 0 });
+    expect(screen.getAllByText(/no changes/i)).toHaveLength(1);
+    fireEvent.click(await screen.findByRole('button', { name: /update history/i }));
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'All 187 targets matched the sheet.')).toBeInTheDocument();
+  });
+
+  it('keeps history collapsed until asked, then shows sessions and lap category changes', async () => {
+    renderCard();
+    const toggle = await screen.findByRole('button', { name: /update history/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('benchmark-diff-section')).not.toBeInTheDocument();
+
+    await openHistory();
+    expect(screen.getByText('What changed')).toBeInTheDocument();
     expect(screen.getByText('3 sessions')).toBeInTheDocument();
 
-    // Check category shift button and click to expand
-    const shiftBtn = screen.getByRole('button', { name: /1 shift/i });
-    expect(shiftBtn).toBeInTheDocument();
-
+    const shiftBtn = screen.getByRole('button', { name: /1 lap changed category/i });
     fireEvent.click(shiftBtn);
-
-    expect(screen.getByText('Pace Category Shifts')).toBeInTheDocument();
+    expect(screen.getByText('Laps that changed category')).toBeInTheDocument();
     expect(screen.getByText('ProDriver')).toBeInTheDocument();
     expect(screen.getByText('Lap 4')).toBeInTheDocument();
     expect(screen.getByText('(1:59.200)')).toBeInTheDocument();
-    expect(screen.getAllByText('Alien').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Competitive').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('allows switching to older diff snapshots and returning to latest', async () => {
-    render(
-      <ReferenceLaptimesCard
-        status={mockStatus}
-        isUpdatingLaptimes={false}
-        onUpdateReferenceLaptimes={vi.fn()}
-        laptimesMessage={null}
-        updateDiff={mockDiffWithImpact}
-      />
-    );
+  it('allows switching to an older update and returning to the latest', async () => {
+    renderCard();
+    const select = await openHistory();
 
-    // Wait for history to load into select dropdown
-    const select = await screen.findByRole('combobox', { name: /benchmark update history version/i });
-    expect(select).toBeInTheDocument();
-
-    // Select older snapshot (id 9)
     fireEvent.change(select, { target: { value: '9' } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Viewing historical benchmark snapshot from/i)).toBeInTheDocument();
       expect(screen.getByText('Spa-Francorchamps')).toBeInTheDocument();
       expect(screen.getByText('1:57.000')).toBeInTheDocument();
     });
 
-    // Return to latest via banner button
-    const returnBtn = screen.getByRole('button', { name: /return to latest/i });
-    fireEvent.click(returnBtn);
+    fireEvent.click(screen.getByRole('button', { name: /back to latest update/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/Viewing historical benchmark snapshot/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /back to latest update/i })).not.toBeInTheDocument();
       expect(screen.getByText('Circuit of the Americas')).toBeInTheDocument();
       expect(screen.getByText('Bahrain')).toBeInTheDocument();
     });

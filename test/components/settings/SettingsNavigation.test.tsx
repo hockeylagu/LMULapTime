@@ -19,6 +19,10 @@ const okStatus: AppStatus = {
 const toc = () => screen.getByRole('navigation', { name: /settings table of contents/i });
 const sectionOrder = () => within(toc()).getAllByRole('button').map((b) => b.textContent);
 
+/** The replay list has loaded once the status strip shows its replay figure. */
+const settled = () =>
+  waitFor(() => expect(within(screen.getByRole('group', { name: 'Settings status' })).getByText('No replays cached yet')).toBeInTheDocument());
+
 describe('Settings navigation', () => {
   beforeEach(() => {
     window.location.hash = '#/settings';
@@ -44,28 +48,35 @@ describe('Settings navigation', () => {
     Reflect.deleteProperty(document.documentElement, 'scrollHeight');
   });
 
-  it('shows a failed scan as an error that names the missing folder', async () => {
+  it('shows a failed scan as an error', async () => {
     render(<Settings status={{ ...okStatus, replaysExist: false }} onUpdatePaths={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /rescan & load telemetry/i }));
+    fireEvent.change(screen.getByLabelText('Driver name'), { target: { value: 'Someone Else' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
-    const message = await screen.findByText(/replays folder could not be found/i);
-    expect(message.closest('[role="status"]')).toHaveClass('text-lmu-loss');
-    await screen.findByText(/no replays cached yet/i);
+    const message = await screen.findByText(/the server did not accept these folders/i);
+    expect(message.closest('[role="alert"]')).toHaveClass('text-lmu-loss');
+    await settled();
   });
 
   it('puts Folder Paths first and shows a setup notice while a folder is missing', async () => {
     render(<Settings status={{ ...okStatus, resultsExist: false, replaysExist: false }} onUpdatePaths={vi.fn()} />);
     expect(screen.getByText(/Setup needed: results folder, replays folder not found/)).toBeInTheDocument();
     expect(sectionOrder()[0]).toBe('Folder Paths & Driver');
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('keeps the default order and no notice when every folder is found', async () => {
     render(<Settings status={okStatus} onUpdatePaths={vi.fn()} />);
     expect(screen.queryByText(/Setup needed/)).not.toBeInTheDocument();
-    expect(sectionOrder()[0]).toBe(SETTINGS_SECTIONS[0].title);
-    expect(sectionOrder()[sectionOrder().length - 1]).toBe('Folder Paths & Driver');
-    await screen.findByText(/no replays cached yet/i);
+    expect(sectionOrder()).toEqual([
+      'Overview',
+      'Reference Benchmarks',
+      'AI Lap Reports',
+      'AI Report History',
+      'Cached Replays',
+      'Folder Paths & Driver',
+    ]);
+    await settled();
   });
 
   it('uses the same name in the TOC and the section heading', async () => {
@@ -73,7 +84,7 @@ describe('Settings navigation', () => {
     for (const section of SETTINGS_SECTIONS) {
       expect(screen.getByRole('heading', { name: section.title })).toBeInTheDocument();
     }
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('writes ?section= on TOC click, moves focus to the heading and marks the section current', async () => {
@@ -83,7 +94,7 @@ describe('Settings navigation', () => {
     expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toHaveFocus();
     expect(within(toc()).getByRole('button', { name: 'AI Lap Reports' })).toHaveAttribute('aria-current', 'location');
     await waitFor(() => expect(window.location.hash).toContain('section=ai-settings'));
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('scrolls to the section named by ?section= on load', async () => {
@@ -95,7 +106,17 @@ describe('Settings navigation', () => {
     await waitFor(() => expect(scrollMock).toHaveBeenCalled());
     expect(scrollMock.mock.contexts[0]).toBe(document.getElementById('reference-benchmarks'));
     expect(within(toc()).getByRole('button', { name: 'Reference Benchmarks' })).toHaveAttribute('aria-current', 'location');
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
+  });
+
+  it('ignores an unknown ?section= value', async () => {
+    window.location.hash = '#/settings?section=unknown-section';
+    const scrollMock = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollMock;
+    render(<Settings status={okStatus} onUpdatePaths={vi.fn()} />);
+
+    expect(scrollMock).not.toHaveBeenCalled();
+    await settled();
   });
 
   it('follows scrolling: the last section past the header line is current', async () => {
@@ -111,7 +132,7 @@ describe('Settings navigation', () => {
     await waitFor(() => {
       expect(within(toc()).getByRole('button', { name: SETTINGS_SECTIONS[2].title })).toHaveAttribute('aria-current', 'location');
     });
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('selects the last section at the bottom of the page', async () => {
@@ -127,6 +148,6 @@ describe('Settings navigation', () => {
     await waitFor(() => {
       expect(within(toc()).getByRole('button', { name: last })).toHaveAttribute('aria-current', 'location');
     });
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 });

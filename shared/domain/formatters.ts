@@ -2,8 +2,10 @@ export function formatTime(seconds: number | string | null | undefined): string 
   if (seconds === null || seconds === undefined || seconds === '') return '--:--.---';
   const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
   if (isNaN(num) || num <= 0) return '--:--.---';
-  const mins = Math.floor(num / 60);
-  const secs = (num % 60).toFixed(3);
+  if (!Number.isFinite(num)) return '--:--.---';
+  const ms = Math.round(num * 1000);
+  const mins = Math.floor(ms / 60000);
+  const secs = ((ms % 60000) / 1000).toFixed(3);
   return `${mins}:${secs.padStart(6, '0')}`;
 }
 
@@ -25,10 +27,12 @@ export function formatElapsedSeconds(seconds: number | string | null | undefined
   if (seconds === null || seconds === undefined || seconds === '') return '--:--';
   const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
   if (isNaN(num) || num < 0) return '--:--';
-  const hours = Math.floor(num / 3600);
-  const remainder = num % 3600;
-  const mins = Math.floor(remainder / 60);
-  const secs = (remainder % 60).toFixed(1);
+  if (!Number.isFinite(num)) return '--:--';
+  const tenths = Math.round(num * 10);
+  const hours = Math.floor(tenths / 36000);
+  const remainder = tenths % 36000;
+  const mins = Math.floor(remainder / 600);
+  const secs = ((remainder % 600) / 10).toFixed(1);
   const formattedSecs = secs.padStart(4, '0');
   if (hours > 0) {
     return `${hours}:${String(mins).padStart(2, '0')}:${formattedSecs}`;

@@ -406,3 +406,23 @@ describe('Replay routes', () => {
     expect((await request(app).get('/api/replays/Route_Test_P1.Vcr/traffic?driverName=Nobody')).status).toBe(404);
   });
 });
+
+describe('Replay upgrade route', () => {
+  it('reports the replay cache version an on-disk replay must be at', async () => {
+    const { REPLAY_CACHE_VERSION } = await import('../../../server/core/dbSchema.js');
+    const status = { enabled: true, running: false, processed: 0, total: 0 };
+    const context = {
+      replaysDir: 'unused',
+      sessionDb: {},
+      replayCache: {},
+      currentParser: { configuredPlayerName: 'Route Driver' },
+      replayUpgrade: { getStatus: () => status, getBacklog: () => [] },
+    } as unknown as ServerContext;
+    const app = express();
+    app.use('/api', createReplayRouter(context));
+
+    const response = await request(app).get('/api/replays/upgrade');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ currentVersion: REPLAY_CACHE_VERSION, pendingReplays: 0, status });
+  });
+});

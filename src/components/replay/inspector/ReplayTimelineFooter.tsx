@@ -12,8 +12,9 @@ export interface ReplayTimelineFooterProps {
 // formatLapTime a genuine 0 is shown as 0:00.000 rather than a '--:--.---' placeholder.
 function formatElapsed(sec?: number): string {
   const s = sec !== undefined && isFinite(sec) && sec >= 0 ? sec : 0;
-  const mins = Math.floor(s / 60);
-  const rem = (s % 60).toFixed(3).padStart(6, '0');
+  const ms = Math.round(s * 1000);
+  const mins = Math.floor(ms / 60000);
+  const rem = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
   return `${mins}:${rem}`;
 }
 

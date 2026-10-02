@@ -7,19 +7,22 @@ export interface SettingsFeedback {
   text: string;
 }
 
-/** Result of an action: failures are loss with an alert icon, successes gain with a check. */
+/**
+ * Result of an action: failures are loss with an alert icon (announced at once as an alert), successes gain
+ * with a check (announced politely as status). Long server messages and names wrap instead of widening the card.
+ */
 export const FeedbackMessage: React.FC<{ feedback: SettingsFeedback | null }> = ({ feedback }) => {
   if (!feedback) return null;
   const isError = feedback.tone === 'error';
   const Icon = isError ? AlertCircle : CheckCircle2;
   return (
     <div
-      role="status"
+      role={isError ? 'alert' : 'status'}
       data-tone={feedback.tone}
-      className={`text-xs font-semibold flex items-start gap-2 ${isError ? 'text-lmu-loss' : 'text-lmu-gain'}`}
+      className={`min-w-0 text-xs font-semibold flex items-start gap-2 ${isError ? 'text-lmu-loss' : 'text-lmu-gain'}`}
     >
       <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-      <span>{feedback.text}</span>
+      <span className="min-w-0 break-words">{feedback.text}</span>
     </div>
   );
 };

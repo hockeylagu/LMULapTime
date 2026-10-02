@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { Settings } from '../../../src/components/settings/index.js';
 import type { ScanStatus } from '../../../server/core/types.js';
 
+/** The replay list has loaded once the status strip shows its replay figure. */
+const settled = () =>
+  waitFor(() => expect(within(screen.getByRole('group', { name: 'Settings status' })).getByText('No replays cached yet')).toBeInTheDocument());
+
 describe('Settings component', () => {
   const mockStatus = {
     resultsDir: 'C:\\LMU\\Results',
@@ -53,7 +57,7 @@ describe('Settings component', () => {
   it('renders directory paths, status indicators, and scans directories on submit', async () => {
     const onUpdatePaths = vi.fn();
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cached Replays' })).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe('Settings component', () => {
     const playerNameInput = screen.getByDisplayValue('Player1');
     fireEvent.change(playerNameInput, { target: { value: 'NewDriver' } });
 
-    const scanBtn = screen.getByRole('button', { name: /rescan & load telemetry/i });
+    const scanBtn = screen.getByRole('button', { name: /save changes/i });
     fireEvent.click(scanBtn);
 
     await waitFor(() => {
@@ -119,15 +123,15 @@ describe('Settings component', () => {
   it('handles reference laptimes manual refresh button click', async () => {
     const onUpdatePaths = vi.fn();
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
 
-    const refreshBtn = screen.getByRole('button', { name: /update reference lap time benchmarks/i });
+    const refreshBtn = screen.getByRole('button', { name: /update from the sheet/i });
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Updated 190 benchmark entries from Google Sheets!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Updated 190 benchmark targets from the sheet./i)).toBeInTheDocument();
       expect(onUpdatePaths).toHaveBeenCalled();
     });
   });
@@ -141,11 +145,12 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
 
-    const scanBtn = screen.getByRole('button', { name: /rescan & load telemetry/i });
+    fireEvent.change(screen.getByDisplayValue('Player1'), { target: { value: 'NewDriver' } });
+    const scanBtn = screen.getByRole('button', { name: /save changes/i });
     fireEvent.click(scanBtn);
 
     await waitFor(() => {
@@ -178,15 +183,15 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={statusWithCache} onUpdatePaths={onUpdatePaths} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
-    expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
-    expect(screen.getByText('Cached Sessions').nextSibling).toHaveTextContent('42');
+    expect(screen.queryByRole('heading', { name: 'Session Cache' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByText('Total app database')).toBeInTheDocument();
+    expect(screen.queryByText('Cached Sessions')).not.toBeInTheDocument();
     expect(screen.getByText('512.0 KB')).toBeInTheDocument();
-    expect(screen.getByText('Cached Telemetry')).toBeInTheDocument();
-    expect(screen.getByText('7')).toBeInTheDocument();
 
-    const clearBtn = screen.getByRole('button', { name: /clear cache/i });
+    const clearBtn = screen.getByRole('button', { name: /clear parsed sessions/i });
     fireEvent.click(clearBtn);
 
     expect(screen.getByText('Clear 42 parsed sessions?')).toBeInTheDocument();
@@ -244,16 +249,17 @@ describe('Settings component', () => {
     };
 
     render(<Settings status={statusWithDiff} onUpdatePaths={onUpdatePaths} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
-    // Renders benchmark section title and badges
-    expect(screen.getByText('Benchmark Reference Updates')).toBeInTheDocument();
-    expect(screen.getByText('+1 New Reference')).toBeInTheDocument();
-    expect(screen.getByText('1 Updated Target')).toBeInTheDocument();
+    // Status line counts, history collapsed until asked
+    expect(screen.getByText('+1 new')).toBeInTheDocument();
+    expect(screen.getByText('1 updated')).toBeInTheDocument();
+    expect(screen.queryByText('Circuit of the Americas')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /update history/i }));
 
-    // Renders items
+    expect(screen.getByText('What changed')).toBeInTheDocument();
     expect(screen.getByText('Circuit of the Americas')).toBeInTheDocument();
-    expect(screen.getByText('Alien: 2:05.400')).toBeInTheDocument();
+    expect(screen.getByText('Alien target 2:05.400')).toBeInTheDocument();
     expect(screen.getByText('Bahrain')).toBeInTheDocument();
     expect(screen.getByText('2:00.000')).toBeInTheDocument();
     expect(screen.getByText('1:59.500')).toBeInTheDocument();
@@ -289,25 +295,33 @@ describe('Settings component', () => {
     });
 
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
-    const refreshBtn = screen.getByRole('button', { name: /update reference lap time benchmarks/i });
+    const refreshBtn = screen.getByRole('button', { name: /update from the sheet/i });
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/No Changes \(All 188 targets identical\)/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/All 188 benchmark targets are currently synchronized with Google Sheets/i)
-      ).toBeInTheDocument();
+      expect(screen.getAllByText(/no changes/i)).toHaveLength(1);
     });
+  });
+
+  it('finds Overview by cache, sqlite and clear', async () => {
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await settled();
+    const searchInput = screen.getByRole('textbox', { name: /search settings/i });
+    for (const term of ['cache', 'sqlite', 'clear']) {
+      fireEvent.change(searchInput, { target: { value: term } });
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument());
+    }
+    await settled();
   });
 
   it('filters settings cards and TOC items via search input and clears search', async () => {
     render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     const searchInput = screen.getByRole('textbox', { name: /search settings/i });
-    expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
 
     // Search for "gemini" -> should show AI sections and hide SQLite Cache
@@ -317,7 +331,7 @@ describe('Settings component', () => {
       expect(screen.getByText('2 of 6 sections match')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: 'Session Cache' })).not.toBeInTheDocument();
+      
     });
 
     // Clear search using the one clear button in the input
@@ -326,32 +340,32 @@ describe('Settings component', () => {
 
     await waitFor(() => {
       expect(searchInput).toHaveValue('');
-      expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     });
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('shows empty state when no settings match and clears via empty state button', async () => {
     render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     const searchInput = screen.getByRole('textbox', { name: /search settings/i });
     fireEvent.change(searchInput, { target: { value: 'nonexistenttermxyz' } });
 
     await waitFor(() => {
-      expect(screen.getByText('No Settings Found')).toBeInTheDocument();
+      expect(screen.getByText('No settings found')).toBeInTheDocument();
       expect(screen.getByText(/No settings match "nonexistenttermxyz"/i)).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: 'Session Cache' })).not.toBeInTheDocument();
+      
     });
 
     const [, clearBtn] = screen.getAllByRole('button', { name: 'Clear search' });
     fireEvent.click(clearBtn);
 
     await waitFor(() => {
-      expect(screen.queryByText('No Settings Found')).not.toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
+      expect(screen.queryByText('No settings found')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     });
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
   });
 
   it('navigates to section and scrolls element into view on TOC button click', async () => {
@@ -359,7 +373,7 @@ describe('Settings component', () => {
     window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
     render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
-    await screen.findByText(/no replays cached yet/i);
+    await settled();
 
     const tocNav = screen.getByRole('navigation', { name: /settings table of contents/i });
     expect(tocNav).toBeInTheDocument();

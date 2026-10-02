@@ -1,6 +1,5 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
-import { AppStatus } from '../../../shared/types/index.js';
 import { SettingsSectionDef } from './settingsSections.js';
 
 export interface SettingsSidebarProps {
@@ -9,7 +8,6 @@ export interface SettingsSidebarProps {
   onSelectSection: (sectionId: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  status: AppStatus | null;
   totalSectionsCount: number;
 }
 
@@ -19,7 +17,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSelectSection,
   searchQuery,
   onSearchChange,
-  status,
   totalSectionsCount,
 }) => {
   const isSearching = searchQuery.trim().length > 0;
@@ -36,14 +33,14 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search settings..."
             aria-label="Search settings"
-            className="w-full bg-lmu-card border border-lmu-border rounded-lg pl-9 pr-8 py-2 text-xs text-white placeholder-lmu-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+            className="w-full bg-lmu-card border border-lmu-border rounded-lg pl-9 pr-8 py-2 text-xs text-lmu-text placeholder-lmu-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => onSearchChange('')}
               aria-label="Clear search"
-              className="absolute right-2.5 p-1 rounded-md text-lmu-muted hover:text-white hover:bg-lmu-card-hover transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text"
+              className="absolute right-2.5 p-1 rounded-md text-lmu-muted hover:text-lmu-text hover:bg-lmu-card-hover transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -68,15 +65,15 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
                 type="button"
                 onClick={() => onSelectSection(section.id)}
                 aria-current={isActive ? 'location' : undefined}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors text-left group focus-visible:outline-2 focus-visible:outline-lmu-accent-text ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors text-left group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text ${
                   isActive
                     ? 'bg-lmu-card text-lmu-text border-l-2 border-lmu-accent'
-                    : 'text-lmu-muted hover:text-white hover:bg-lmu-card/60 border-l-2 border-transparent'
+                    : 'text-lmu-muted hover:text-lmu-text hover:bg-lmu-card/60 border-l-2 border-transparent'
                 }`}
               >
                 <Icon
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    isActive ? 'text-lmu-accent-text' : 'text-lmu-muted group-hover:text-white'
+                    isActive ? 'text-lmu-accent-text' : 'text-lmu-muted group-hover:text-lmu-text'
                   }`}
                 />
                 <span className="truncate flex-1">{section.title}</span>
@@ -84,33 +81,6 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
             );
           })}
         </nav>
-      </div>
-
-      {/* System Overview Footer */}
-      <div className="pt-4 border-t border-lmu-border/70 space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-lmu-muted px-1">System Overview</div>
-        <div className="space-y-2 text-xs px-1">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-lmu-muted">Driver</span>
-            <span className="font-mono text-white font-medium truncate max-w-[120px]">
-              {status?.playerName || '—'}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-lmu-muted">Sessions</span>
-            <span className="font-mono text-white font-semibold">
-              {status?.sqliteCache?.sessionsCount ?? status?.sessionsCount ?? 0}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-lmu-muted">Benchmarks</span>
-            <span className="font-mono text-white font-semibold">
-              {status?.referenceLaptimes?.entriesCount ?? 0}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

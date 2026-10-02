@@ -89,19 +89,41 @@ describe('FolderPathsCard component', () => {
     expect(setTelemetryDirInput).toHaveBeenCalledWith('D:\\Telemetry');
   });
 
-  it('handles scan button click and form submit', () => {
-    const onScanPaths = vi.fn((e: React.FormEvent) => e.preventDefault());
-    render(<FolderPathsCard {...defaultProps} onScanPaths={onScanPaths} />);
+  it('shows no save or discard button while nothing is edited', () => {
+    render(<FolderPathsCard {...defaultProps} />);
+    expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rescan/i })).not.toBeInTheDocument();
+  });
 
-    const scanBtn = screen.getByRole('button', { name: /Rescan & load telemetry/i });
-    fireEvent.click(scanBtn);
+  it('saves an edited path through the form submit', () => {
+    const onScanPaths = vi.fn((e: React.FormEvent) => e.preventDefault());
+    render(<FolderPathsCard {...defaultProps} replaysDirInput="D:\\Replays" onScanPaths={onScanPaths} />);
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
     expect(onScanPaths).toHaveBeenCalled();
   });
 
-  it('displays scanning state and path messages when active', () => {
-    render(<FolderPathsCard {...defaultProps} isScanning={true} pathMessage={{ tone: 'ok', text: 'Paths saved successfully.' }} />);
+  it('offers Save and Discard for an edited driver name, and Discard resets every field', () => {
+    const setters = { setResultsDirInput: vi.fn(), setReplaysDirInput: vi.fn(), setTelemetryDirInput: vi.fn(), setPlayerNameInput: vi.fn() };
+    render(<FolderPathsCard {...defaultProps} {...setters} playerNameInput="Someone Else" />);
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled();
 
-    const scanBtn = screen.getByRole('button', { name: /Scanning folders\.\.\./i });
+    fireEvent.click(screen.getByRole('button', { name: /discard/i }));
+    expect(setters.setPlayerNameInput).toHaveBeenCalledWith('Samuel Lague');
+    expect(setters.setResultsDirInput).toHaveBeenCalledWith('C:\\LMU\\UserData\\LOG\\Results');
+    expect(setters.setReplaysDirInput).toHaveBeenCalledWith('C:\\LMU\\UserData\\Replays');
+    expect(setters.setTelemetryDirInput).toHaveBeenCalledWith('C:\\LMU\\UserData\\Telemetry');
+  });
+
+  it('waits while a scan is already running elsewhere', () => {
+    render(<FolderPathsCard {...defaultProps} playerNameInput="Someone Else" isScanRunning={true} />);
+    expect(screen.getByRole('button', { name: /scan in progress/i })).toBeDisabled();
+  });
+
+  it('displays scanning state and path messages when active', () => {
+    render(<FolderPathsCard {...defaultProps} playerNameInput="Someone Else" isScanning={true} pathMessage={{ tone: 'ok', text: 'Paths saved successfully.' }} />);
+
+    const scanBtn = screen.getByRole('button', { name: /Saving/i });
     expect(scanBtn).toBeDisabled();
     expect(screen.getByRole('status')).toHaveTextContent('Paths saved successfully.');
     expect(screen.getByRole('status')).toHaveClass('text-lmu-gain');
@@ -109,7 +131,7 @@ describe('FolderPathsCard component', () => {
 
   it('renders a failed scan as an error, not a success', () => {
     render(<FolderPathsCard {...defaultProps} pathMessage={{ tone: 'error', text: 'Scan failed: the results folder could not be found.' }} />);
-    const status = screen.getByRole('status');
+    const status = screen.getByRole('alert');
     expect(status).toHaveTextContent('Scan failed');
     expect(status).toHaveClass('text-lmu-loss');
     expect(status).not.toHaveClass('text-lmu-gain');
@@ -128,7 +150,7 @@ describe('FolderPathsCard component', () => {
     const setResultsDirInput = vi.fn();
     render(<FolderPathsCard {...defaultProps} resultsDirInput="D:\\Elsewhere" setResultsDirInput={setResultsDirInput} />);
     expect(screen.getAllByText(/^Detected$/i)).toHaveLength(2);
-    expect(screen.getByText(/changed, rescan to check/i)).toBeInTheDocument();
+    expect(screen.getByText(/changed, save to check/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /reset/i }));
     expect(setResultsDirInput).toHaveBeenCalledWith('C:\\LMU\\UserData\\LOG\\Results');

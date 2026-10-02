@@ -15,7 +15,7 @@ describe('AiReportsHistoryCard', () => {
     await waitFor(() => {
       expect(screen.getByText(/no ai reports generated yet/i)).toBeInTheDocument();
     });
-    expect(screen.getByText('0 Cached')).toBeInTheDocument();
+    expect(screen.queryByText('0 cached')).not.toBeInTheDocument();
   });
 
   it('renders report history entries with summary, model and tokens used', async () => {
@@ -42,7 +42,7 @@ describe('AiReportsHistoryCard', () => {
     expect(screen.getByText('Brake later into Eau Rouge.')).toBeInTheDocument();
     expect(screen.getByText('gemini-3.7-flash')).toBeInTheDocument();
     expect(screen.getByText('150 tokens')).toBeInTheDocument();
-    expect(screen.getByText('1 Cached')).toBeInTheDocument();
+    expect(screen.getByText('1 cached')).toBeInTheDocument();
   });
 
   it('shows an error message when the fetch fails', async () => {
@@ -51,7 +51,7 @@ describe('AiReportsHistoryCard', () => {
     render(<AiReportsHistoryCard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/unable to load ai report history/i)).toBeInTheDocument();
+      expect(screen.getByText('network down')).toBeInTheDocument();
     });
   });
 
