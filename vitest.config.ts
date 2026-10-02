@@ -5,9 +5,31 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./test/setup.ts'],
-    include: ['test/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: [
+            'test/server/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'test/domain/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'test/utils/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'test/api/**/*.{test,spec}.ts',
+          ],
+        },
+      },
+      {
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: [
+            'test/components/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'test/**/*.test.tsx',
+          ],
+          setupFiles: ['./test/setup.ts'],
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
