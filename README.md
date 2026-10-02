@@ -6,13 +6,22 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/Tests-1700%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-2000%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decodes LMU's own replays to get the telemetry of every car on track, not just yours, and puts your laps next to theirs.
+
+![LMU Telemetry Studio Preview](assets/telemetry_studio.png)
 
 ---
 
 ## ✨ Highlights
+
+### 🗺️ Replay & Telemetry Studio
+![Replay & Telemetry Studio](assets/telemetry_studio.png)
+- **100 Hz columnar DuckDB telemetry**: Ingests native telemetry at microsecond precision, smoothly interpolated across the start/finish timing loop.
+- **2D track map with 1:1 boundaries**: Physical road edges and limit corridors for all 32 driven layouts in exact Cartesian coordinates ($x, z$), with color-coded speed, pedal zones, and live telemetry cursor.
+- **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
+- **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction).
 
 ### 🎬 Every Driver's Telemetry, from the Replays
 - **Reverse-engineered replay format**: LMU's binary `.Vcr` replays (`gMb1.002f`) are decoded to extract the trajectory and telemetry of every car in the session: position, speed, throttle and brake (with ABS/TC), steering, gear and brake temperatures.
@@ -20,23 +29,24 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 - **Compare against anyone**: any of your laps against any other driver's lap from the same layout, aligned on track position: speed and delta traces, pedals, racing lines on the map, sector and corner gaps.
 - **Built for big files**: replays of several hundred MB are decoded in worker threads and cached, so the next look is instant.
 
-### 🗺️ Replay & Telemetry Studio
-- **2D track map** with 1:1 track limits for all 32 layouts: racing lines colored by speed, pedals or lateral G, friction circle and playback scrubber.
-- **Synchronized telemetry**: speed and delta, pedals with ABS/TC, steering with understeer/oversteer, G-forces, yaw and slip, dampers, tire pressures/temps/wear, brake temps and Hypercar hybrid energy.
+### 🏆 Leaderboard & Rivals
+![Leaderboard & Rivals](assets/leaderboard_rivals.png)
+- **Leaderboard per layout and class**: Ranks the real drivers you met online on each layout on their representative dry laps, compared against official alien targets.
+- **A dynamic rival to chase**: Automatically picks a competitive rival about 0.3 s ahead (or a ghost target) until you beat them, showing exactly where the time is won or lost corner by corner.
+- **Community benchmark integration**: Synchronizes target lap times directly from community reference sheets with automated diff and patch-level tracking.
+
+### 🏎️ Dashboard & Sessions
+![Session Detail & Stint Analysis](assets/session_detail.png)
+- **True Pace & Consistency**: Calculates true pace (top 3 clean laps average), theoretical best, and lap consistency score exclusively from clean flying laps (out, in, and start laps filtered out).
+- **Multiclass race analysis**: Full classification standings, position deltas, sector splits vs best same car, tire wear degradation profiles, and stewards penalty logs.
+- **Multi-session progression**: Interactive pace trajectory tracking performance evolution across stints, cars, and layouts.
+
+![Dashboard Overview](assets/dashboard.png)
 
 ### 🎯 Coaching
 - **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring.
-- **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence.
+- **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence (`priority = timeLoss * repeatability * confidence`).
 - **AI Race Engineer** (optional, Google Gemini): explains the findings and suggests setup changes.
-
-### 🏆 Leaderboard & Rivals
-- **Leaderboard per layout and class**: ranks the real drivers you met on each layout on their dry representative laps.
-- **A rival to chase**: a driver about 0.3 s ahead (or a ghost time) until you beat them, with where the time is against them, corner by corner.
-
-### 🏎️ Dashboard & Sessions
-- **True Pace** (top 3 clean laps), consistency rating and theoretical best, from clean flying laps only (out, in, start and wet laps judged apart).
-- **Session detail**: multiclass standings, position deltas, sectors against the fastest same car, tire and fuel curves, stewards log (penalties, track limits, contacts), rules and conditions.
-- **Community benchmarks**: alien reference times synced from Google Sheets.
 
 ### 🔌 Plug & Play
 - Finds the LMU Steam install, results, replays and telemetry on its own; handles long multi-stint sessions and multi-file telemetry.

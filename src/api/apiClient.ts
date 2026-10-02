@@ -5,6 +5,8 @@
  * A non-2xx response is an ApiError carrying the server's `{ error }` message, so a failed request
  * is never mistaken for an empty result and the user sees why it failed.
  */
+import { isDemoMode, anonymizePayload, deanonymizeUrl } from './anonymizeData.js';
+
 export class ApiError extends Error {
   /** body: the parsed JSON error response (null when it was not JSON), for fields beyond the message. */
   public constructor(message: string, public readonly status: number, public readonly body: unknown = null) {
@@ -23,12 +25,14 @@ async function toApiError(response: Response, path: string): Promise<ApiError> {
 
 /** GETs (or sends `init`) and returns the parsed JSON body; throws ApiError on a non-2xx status. */
 export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const requestInit = path.startsWith('/api/')
+  const resolvedPath = isDemoMode() ? deanonymizeUrl(path) : path;
+  const requestInit = resolvedPath.startsWith('/api/')
     ? { cache: 'no-store' as RequestCache, ...init }
     : init;
-  const response = await (requestInit ? fetch(path, requestInit) : fetch(path));
-  if (!response.ok) throw await toApiError(response, path);
-  return response.json() as Promise<T>;
+  const response = await (requestInit ? fetch(resolvedPath, requestInit) : fetch(resolvedPath));
+  if (!response.ok) throw await toApiError(response, resolvedPath);
+  const data = (await response.json()) as T;
+  return isDemoMode() ? anonymizePayload(data) : data;
 }
 
 /** POSTs `body` as JSON and returns the parsed JSON response; throws ApiError on a non-2xx status. */
