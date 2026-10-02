@@ -4,7 +4,7 @@ import { ConsistencyMetricStat } from '../../../utils/cornerConsistency.js';
 import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 
 export function consistencyClass(pct: number): string {
-  if (pct <= 0.3) return 'text-lmu-green';
+  if (pct <= 0.3) return 'text-lmu-gain';
   if (pct <= 0.8) return 'text-lmu-warn';
   return 'text-lmu-loss';
 }
@@ -103,7 +103,7 @@ export function MetricRow({
         onClick={() => stat && onToggle()}
       >
         <td className="px-2 py-1.5 font-bold text-white">{label}</td>
-        <td className="px-2 py-1.5 text-right text-lmu-green">{stat ? `${stat.min.toFixed(decimals)}${unit}` : '--'}</td>
+        <td className="px-2 py-1.5 text-right text-lmu-gain">{stat ? `${stat.min.toFixed(decimals)}${unit}` : '--'}</td>
         <td className="px-2 py-1.5 text-right text-white">{stat ? `${stat.avg.toFixed(decimals)}${unit}` : '--'}</td>
         <td className="px-2 py-1.5 text-right text-lmu-loss">{stat ? `${stat.max.toFixed(decimals)}${unit}` : '--'}</td>
         <td className="px-2 py-1.5 text-right text-white">{stat ? `±${stat.stdDev.toFixed(decimals)}${unit}` : '--'}</td>

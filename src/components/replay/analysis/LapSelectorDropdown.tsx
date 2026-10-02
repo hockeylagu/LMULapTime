@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { NonRepresentativeReason } from '../../../../shared/types/index.js';
 import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface LapConsistencyOption {
   lapNumber: number;
@@ -42,7 +43,7 @@ export function LapSelectorDropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setIsOpen(v => !v)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-lmu-card/60 border border-lmu-border/60 text-[11px] font-mono font-semibold text-white hover:border-lmu-accent transition-colors cursor-pointer"
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg bg-lmu-card/60 border border-lmu-border/60 text-[11px] font-mono font-semibold text-white hover:border-lmu-accent transition-colors cursor-pointer ${FOCUS_RING}`}
       >
         <span>{includedCount}/{availableLaps.length} laps included</span>
         <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />

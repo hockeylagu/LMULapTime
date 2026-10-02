@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronRight, Users } from 'lucide-react';
 import type { CornerPhase, DebriefCorner } from '../../../utils/sessionDebrief.js';
 import { describeTrafficSpell } from '../../../utils/lapTrafficText.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 const PHASE_LABELS: Record<CornerPhase, string> = {
   entry: 'mostly on entry',
@@ -69,11 +70,11 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
         )}
       </div>
       <div className="flex flex-col items-end">
-        <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={linkClass} aria-label={`Open T${corner.cornerNumber} in telemetry`}>
+        <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} in telemetry`}>
           Open <ChevronRight className="w-3.5 h-3.5" />
         </button>
         {hasTechnique && (
-          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={linkClass} aria-label={`Open T${corner.cornerNumber} against the fastest lap`}>
+          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} against the fastest lap`}>
             Fastest <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}

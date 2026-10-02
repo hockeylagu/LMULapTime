@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface SessionPaginationProps {
   page: number;
@@ -36,7 +37,7 @@ export const SessionPagination: React.FC<SessionPaginationProps> = ({ page, page
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
           aria-label="Previous page"
-          className={`${STEP} text-lmu-text-soft hover:text-white hover:bg-lmu-raised disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-default cursor-pointer`}
+          className={`${STEP} text-lmu-text-soft hover:text-white hover:bg-lmu-raised disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-default cursor-pointer ${FOCUS_RING}`}
         >
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
@@ -52,7 +53,7 @@ export const SessionPagination: React.FC<SessionPaginationProps> = ({ page, page
               aria-current={p === page ? 'page' : undefined}
               className={`${STEP} cursor-pointer ${
                 p === page ? 'bg-lmu-raised text-white font-bold' : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/60'
-              }`}
+              } ${FOCUS_RING}`}
             >
               {p}
             </button>
@@ -63,7 +64,7 @@ export const SessionPagination: React.FC<SessionPaginationProps> = ({ page, page
           onClick={() => onPageChange(page + 1)}
           disabled={page === pageCount}
           aria-label="Next page"
-          className={`${STEP} text-lmu-text-soft hover:text-white hover:bg-lmu-raised disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-default cursor-pointer`}
+          className={`${STEP} text-lmu-text-soft hover:text-white hover:bg-lmu-raised disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-default cursor-pointer ${FOCUS_RING}`}
         >
           <ChevronRight className="w-3.5 h-3.5" />
         </button>

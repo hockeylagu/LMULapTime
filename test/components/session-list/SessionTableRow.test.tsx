@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SessionTableRow } from '../../../src/components/session-list/SessionTableRow';
 import { SessionListItem } from '../../../src/components/session-list/SessionList';
 
@@ -146,5 +147,23 @@ describe('SessionTableRow', () => {
     expect(screen.getByText('-4')).toHaveClass('text-lmu-loss');
     expect(screen.getByText('--:--.---')).toBeInTheDocument();
     expect(screen.getByText('-')).toBeInTheDocument();
+  });
+
+  it('opens the session from the keyboard without double-firing from the inner button', async () => {
+    const user = userEvent.setup();
+    const onSelectSession = vi.fn();
+    render(
+      <table><tbody><SessionTableRow session={baseSession} onSelectSession={onSelectSession} /></tbody></table>
+    );
+    const row = screen.getByRole('row', { name: 'Open session: Race, Autodromo Nazionale Monza, 2026-07-20 15:30' });
+    row.focus();
+    await user.keyboard('{Enter}');
+    expect(onSelectSession).toHaveBeenCalledTimes(1);
+    await user.keyboard(' ');
+    expect(onSelectSession).toHaveBeenCalledTimes(2);
+
+    screen.getByRole('button', { name: /Analyze/ }).focus();
+    await user.keyboard('{Enter}');
+    expect(onSelectSession).toHaveBeenCalledTimes(3);
   });
 });

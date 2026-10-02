@@ -5,6 +5,7 @@ import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js'
 import { CornerTechniqueDeck } from './CornerTechniqueDeck.js';
 import { CornerSpeedGraph } from './CornerSpeedGraph.js';
 import { TrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface CornerApexChartProps {
   corner: CornerSegmentComparison;
@@ -61,7 +62,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
               <button
                 type="button"
                 onClick={onOpenCornersTab}
-                className="inline-flex items-center h-5 px-2 rounded bg-lmu-info-strong/35 hover:bg-lmu-info-strong/50 border border-lmu-info-strong/40 text-lmu-info-soft text-[10px] font-medium transition-colors"
+                className={`inline-flex items-center h-5 px-2 rounded bg-lmu-info-strong/35 hover:bg-lmu-info-strong/50 border border-lmu-info-strong/40 text-lmu-info-soft text-[10px] font-medium transition-colors ${FOCUS_RING}`}
                 title="View in Corners Tab"
                 aria-label="View corner technique in Corners tab"
               >
@@ -69,7 +70,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
               </button>
             )}
             {onClose && (
-              <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-5 h-5 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised">
+              <button type="button" onClick={onClose} aria-label="Close corner detail" className={`inline-flex items-center justify-center w-5 h-5 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised ${FOCUS_RING}`}>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -116,7 +117,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
 
         <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           {onClose && (
-            <button type="button" onClick={onClose} aria-label="Close corner detail" className="inline-flex items-center justify-center w-6 h-6 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised/60 transition-colors shrink-0">
+            <button type="button" onClick={onClose} aria-label="Close corner detail" className={`inline-flex items-center justify-center w-6 h-6 text-lmu-muted hover:text-white rounded hover:bg-lmu-raised/60 transition-colors shrink-0 ${FOCUS_RING}`}>
               <X className="w-4 h-4" />
             </button>
           )}

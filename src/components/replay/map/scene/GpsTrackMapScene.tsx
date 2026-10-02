@@ -28,6 +28,7 @@ import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 
@@ -181,7 +182,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
-      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing ${className}`}
+      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing ${className} ${FOCUS_RING}`}
     >
       {showControls && (
         <MapControlsOverlay

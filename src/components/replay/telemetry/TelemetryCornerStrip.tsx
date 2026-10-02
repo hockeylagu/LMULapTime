@@ -2,6 +2,7 @@ import React from 'react';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface TelemetryCornerStripProps {
   corners: CornerSegmentComparison[];
@@ -114,7 +115,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
               onJumpToDistance?.(Math.round(initialStraight.entryDistM + initialStraight.lengthM / 2));
             }}
             title={stTooltip}
-            className={`flex-1 min-w-[58px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass}`}
+            className={`flex-1 min-w-[58px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass} ${FOCUS_RING}`}
           >
             <span className="text-[10px] font-mono font-bold tracking-wider text-lmu-warn">
               ST
@@ -195,7 +196,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
             aria-label={`Turn ${c.cornerNumber}`}
             onClick={() => handleCornerClick(c.cornerNumber, c.minDistM)}
             title={cornerTooltip}
-            className={`flex-1 min-w-[62px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass}`}
+            className={`flex-1 min-w-[62px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass} ${FOCUS_RING}`}
           >
             <span
               className={`text-[10px] font-mono font-bold tracking-wider ${

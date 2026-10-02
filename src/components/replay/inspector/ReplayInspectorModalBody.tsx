@@ -10,6 +10,7 @@ import { ReplayInspectorTelemetryColumn } from './ReplayInspectorTelemetryColumn
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayInspectorSidebar } from './ReplayInspectorSidebar.js';
 import { TelemetryResolution } from '../telemetry/telemetryResolution.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorModalBodyProps {
   onClose: () => void;
@@ -201,7 +202,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       {error && (
         <div role="alert" className="px-4 py-1.5 text-xs text-lmu-loss-soft bg-lmu-loss-deep/40 border-b border-lmu-loss-deep/60">
           {error}
-          {handleRetryLoad && <button type="button" onClick={handleRetryLoad} disabled={isLoading || isTrajLoading} className="ml-3 underline underline-offset-4 disabled:opacity-40">Try again</button>}
+          {handleRetryLoad && <button type="button" onClick={handleRetryLoad} disabled={isLoading || isTrajLoading} className={`ml-3 underline underline-offset-4 disabled:text-lmu-faint disabled:cursor-not-allowed ${FOCUS_RING}`}>Try again</button>}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Activity, Zap, Cpu, Sparkles, X, Info, Film } from 'lucide-react';
 import { TELEMETRY_POINT_SPACING_M, TelemetryResolution } from './telemetryResolution.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface TelemetryResolutionPopoverProps {
   isOpen: boolean;
@@ -87,7 +88,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors"
+          className={`p-1 rounded text-lmu-muted hover:text-white hover:bg-white/10 transition-colors ${FOCUS_RING}`}
           title="Close"
           aria-label="Close resolution selector"
         >
@@ -143,7 +144,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               telemetryResolution === 'standard' && !isFullResolution
                 ? 'bg-lmu-info-strong/10 border-lmu-info/45 text-lmu-info-soft'
                 : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
-            }`}
+            } ${FOCUS_RING}`}
           >
             <div className="flex items-center gap-1 font-semibold text-[11px]">
               <Cpu className="w-3 h-3 text-lmu-info" />
@@ -164,7 +165,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               telemetryResolution === 'high' && !isFullResolution
                 ? 'bg-lmu-gain-strong/10 border-lmu-gain/45 text-lmu-gain-soft'
                 : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
-            }`}
+            } ${FOCUS_RING}`}
           >
             <div className="flex items-center gap-1 font-semibold text-[11px]">
               <Zap className="w-3 h-3 text-lmu-gain" />
@@ -185,7 +186,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
               telemetryResolution === 'full' || isFullResolution
                 ? 'bg-lmu-violet-strong/10 border-lmu-violet/45 text-lmu-violet-soft'
                 : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
-            }`}
+            } ${FOCUS_RING}`}
           >
             <div className="flex items-center gap-1 font-semibold text-[11px]">
               <Sparkles className="w-3 h-3 text-lmu-violet-soft" />
@@ -215,7 +216,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                   : source === 'duckdb'
                   ? 'bg-lmu-warn-strong/10 border-lmu-warn/45 text-lmu-warn-soft'
                   : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
-              }`}
+              } ${FOCUS_RING}`}
             >
               <div className="flex items-center gap-1.5 font-semibold text-[11px]">
                 <Zap className="w-3 h-3 text-lmu-warn" />
@@ -237,7 +238,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
                 source === 'vcr'
                   ? 'bg-lmu-info-strong/10 border-lmu-info/45 text-lmu-info-soft'
                   : 'bg-transparent hover:bg-lmu-raised/40 border-transparent text-lmu-muted hover:text-white'
-              }`}
+              } ${FOCUS_RING}`}
             >
               <div className="flex items-center gap-1.5 font-semibold text-[11px]">
                 <Film className="w-3 h-3 text-lmu-info" />

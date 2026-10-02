@@ -67,7 +67,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
       >
         {selectedDriver.bestLapTimeString}
         <ChevronRight
-          className="w-5 h-5 text-lmu-muted group-hover:text-white group-hover:translate-x-0.5 transition-all"
+          className="w-5 h-5 text-lmu-muted group-hover:text-white transition-colors"
           aria-hidden="true"
         />
       </button>

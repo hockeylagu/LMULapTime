@@ -261,6 +261,7 @@ describe('App component', () => {
   });
 
   it('shows and dismisses the startup benchmark update toast', async () => {
+    localStorage.removeItem('lmu.referenceUpdateSeen');
     startupScanStatus = {
       running: false,
       sessionScan: { running: false },
@@ -277,11 +278,11 @@ describe('App component', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('3 existing benchmarks changed.');
+      expect(screen.getByRole('status')).toHaveTextContent('3 existing benchmarks changed.');
     });
 
-    expect(screen.getByRole('link', { name: /Review in Settings/i })).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: /Review in Settings/i })).toHaveAttribute('href', '/settings?section=reference-benchmarks');
     fireEvent.click(screen.getByRole('button', { name: /Dismiss reference lap time update notification/i }));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

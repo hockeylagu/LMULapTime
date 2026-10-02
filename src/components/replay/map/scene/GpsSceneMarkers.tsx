@@ -189,7 +189,6 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               fill={m.isSelected ? MAP_COLORS.apex : MAP_COLORS.markerUnselected}
               stroke={m.isSelected ? CHART_COLORS.white : m.isDimmed ? MAP_COLORS.markerDimmed : MAP_COLORS.markerMuted}
               strokeWidth={m.isSelected ? 2.2 : 1.6}
-              className={m.isSelected ? undefined : 'transition-transform group-hover:scale-110'}
             />
             <text
               x="0"

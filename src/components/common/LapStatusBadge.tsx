@@ -50,7 +50,7 @@ export const LapStatusBadge: React.FC<LapStatusBadgeProps> = ({
   }
   if (status === 'valid') {
     return (
-      <span className={`inline-flex items-center gap-1 font-medium text-lmu-green ${textSize} ${className}`}>
+      <span className={`inline-flex items-center gap-1 font-medium text-lmu-gain ${textSize} ${className}`}>
         <ShieldCheck className={iconSize} />
         Valid
       </span>

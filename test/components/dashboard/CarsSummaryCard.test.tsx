@@ -70,6 +70,15 @@ describe('CarsSummaryCard', () => {
     expect(onSelectCar).toHaveBeenCalledWith('BMW');
   });
 
+  it('renders the leader and the other ranked rows as buttons', () => {
+    render(
+      <CarsSummaryCard rankedCars={rankedCars} visibleCars={rankedCars} showMoreCars={false}
+        setShowMoreCars={vi.fn()} onSelectCar={vi.fn()} />
+    );
+    expect(screen.getByTestId('summary-leader').tagName).toBe('BUTTON');
+    expect(screen.getByText('Lexus RCF LMGT3').closest('button')).not.toBeNull();
+  });
+
   it('reorders rows by distance when the Km toggle is active', () => {
     render(
       <CarsSummaryCard

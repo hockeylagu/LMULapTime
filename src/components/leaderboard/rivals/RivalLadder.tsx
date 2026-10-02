@@ -27,7 +27,7 @@ export const RivalLadder: React.FC<RivalLadderProps> = ({ beaten, nextUp, onPin,
           disabled={pending}
           aria-label={`Make ${e.driverName} your rival`}
           title={`Make ${e.driverName} your rival`}
-          className="inline-flex items-center gap-1.5 max-w-64 px-2 py-0.5 rounded-lg border border-lmu-border bg-lmu-bg/60 text-lmu-text-soft enabled:hover:text-white enabled:hover:border-lmu-warn/40 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
+          className="inline-flex items-center gap-1.5 max-w-64 px-2 py-0.5 rounded-lg border border-lmu-border bg-lmu-bg/60 text-lmu-text-soft enabled:hover:text-white enabled:hover:border-lmu-warn/40 cursor-pointer transition-colors disabled:text-lmu-faint disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
         >
           <span className="font-mono text-lmu-muted shrink-0">P{e.rank}</span>
           <span className="truncate">{e.driverName}</span>

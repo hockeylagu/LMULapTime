@@ -9,7 +9,7 @@ describe('ReferenceLaptimeUpdateToast', () => {
       <ReferenceLaptimeUpdateToast updatedCount={1} onDismiss={onDismiss} />
     );
 
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText('Reference lap times updated')).toBeInTheDocument();
     expect(screen.getByText('1 existing benchmark changed.')).toBeInTheDocument();
 
@@ -26,6 +26,7 @@ describe('ReferenceLaptimeUpdateToast', () => {
 
     expect(screen.getByText('4 existing benchmarks changed.')).toBeInTheDocument();
 
+    expect(screen.getByRole('link', { name: 'Review in Settings' })).toHaveAttribute('href', '/settings?section=reference-benchmarks');
     const link = screen.getByText('Review in Settings');
     fireEvent.click(link);
     expect(onDismiss).toHaveBeenCalledTimes(1);

@@ -11,6 +11,7 @@ import {
   throttleDeltaClass,
   formatDistPoint,
 } from './CornerTableFormatters.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface CornerSpeedTableProps {
   segments: LapSegmentComparison[];
@@ -69,7 +70,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               aria-pressed={tableMode === 'speed'}
               className={`px-2 h-6 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                 tableMode === 'speed' ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-muted hover:text-white'
-              }`}
+              } ${FOCUS_RING}`}
             >
               Speed
             </button>
@@ -78,7 +79,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               aria-pressed={tableMode === 'technique'}
               className={`px-2 h-6 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                 tableMode === 'technique' ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-muted hover:text-white'
-              }`}
+              } ${FOCUS_RING}`}
             >
               Technique
             </button>
@@ -105,7 +106,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                 c.cornerNumber === selectedCornerNumber
                   ? 'bg-lmu-accent/20 border-lmu-accent text-white'
                   : 'bg-lmu-loss-strong/10 border-lmu-loss-strong/30 text-lmu-loss-soft hover:bg-lmu-loss-strong/20'
-              }`}
+              } ${FOCUS_RING}`}
             >
               <Flag className="w-2.5 h-2.5" />
               T{c.cornerNumber} +{c.timeDeltaSec.toFixed(3)}s

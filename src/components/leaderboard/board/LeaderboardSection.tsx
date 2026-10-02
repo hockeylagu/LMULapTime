@@ -9,6 +9,7 @@ import { carClassLabel } from './leaderboardFormat.js';
 import { boardLapId } from './leaderboardLaps.js';
 import { CompareBar } from './CompareBar.js';
 import { LoadError } from '../LoadError.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface LeaderboardSectionProps {
   board: Leaderboard | null;
@@ -44,7 +45,6 @@ const pill = (active: boolean) =>
 
 /** The board of the selected layout and class: the player's standing, then every driver met there. */
 /** The board's sectors are each driver's best, which may come from different laps than the best lap. */
-const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
 const BEST_SECTOR_HINT = 'Best sector from any clean lap, not always from the best lap';
 
 export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
@@ -88,7 +88,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Board scope" className="flex items-center gap-1 bg-lmu-bg p-1 rounded-xl border border-lmu-border">
-            <button type="button" aria-pressed={scope === 'class'} onClick={() => onScopeChange('class')} className={pill(scope === 'class')}>
+            <button type="button" aria-pressed={scope === 'class'} onClick={() => onScopeChange('class')} className={`${pill(scope === 'class')} ${FOCUS_RING}`}>
               Whole class
             </button>
             <button
@@ -96,7 +96,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
               aria-pressed={scope === 'car'}
               disabled={!playerCarType}
               onClick={() => onScopeChange('car')}
-              className={`${pill(scope === 'car')} disabled:opacity-40 disabled:cursor-default`}
+              className={`${pill(scope === 'car')} disabled:text-lmu-faint disabled:cursor-not-allowed ${FOCUS_RING}`}
               title={playerCarType ?? 'No lap of yours in this class yet to pick your car from'}
             >
               My car
@@ -155,7 +155,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
                 </tbody>
               </table>
               {showAll && board.entries.length > COMPACT_THRESHOLD && (
-                <button type="button" onClick={() => setShowAll(false)} className="mt-2 text-[11px] text-lmu-muted hover:text-white cursor-pointer">
+                <button type="button" onClick={() => setShowAll(false)} className={`mt-2 text-[11px] text-lmu-muted hover:text-white cursor-pointer ${FOCUS_RING}`}>
                   Show the top and the drivers around you only
                 </button>
               )}

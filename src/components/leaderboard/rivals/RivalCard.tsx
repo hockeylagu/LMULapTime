@@ -7,6 +7,7 @@ import { RivalInsights } from './RivalInsights.js';
 import { RivalLadder } from './RivalLadder.js';
 import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
 import { LoadError } from '../LoadError.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface RivalCardProps {
   rival: RivalState;
@@ -17,7 +18,7 @@ export interface RivalCardProps {
   onTelemetry?: (entry: LeaderboardEntry) => void;
 }
 
-const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bold text-lmu-muted hover:text-white hover:border-lmu-accent/50 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-default';
+const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bold text-lmu-muted hover:text-white hover:border-lmu-accent/50 transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:border-lmu-border disabled:cursor-not-allowed';
 
 /**
  * The next small step: a rival about 0.3 s ahead (or a ghost time), the time still to find, how
@@ -94,13 +95,13 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {rivalEntry && onCompare && (
-            <button type="button" className={action} onClick={() => onCompare(rivalEntry)}
+            <button type="button" className={`${action} ${FOCUS_RING}`} onClick={() => onCompare(rivalEntry)}
               title="Your best lap and your rival's side by side in Compare laps, with where the time is">
               <ArrowLeftRight className="w-3.5 h-3.5" /> Analyse in Compare laps
             </button>
           )}
           {rivalEntry && onTelemetry && (
-            <button type="button" className={action} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
+            <button type="button" className={`${action} ${FOCUS_RING}`} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
               title={telemetryReady ? 'Speed, pedals, delta and line of the two laps, overlaid' : 'Telemetry needs the replay of both laps'}>
               <Activity className="w-3.5 h-3.5" /> Compare Telemetry
             </button>

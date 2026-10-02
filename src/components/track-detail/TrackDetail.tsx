@@ -10,6 +10,7 @@ import { SessionMeta, getPaceCategoryForLap, getSessionBestLapPace, buildTrackPr
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { LoadingState } from '../common/index.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export type { TrackDetailSortOption };
 
@@ -189,7 +190,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       {error && (
         <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-lmu-warn-strong/40 bg-lmu-warn-strong/10 text-sm">
           <p className="text-lmu-warn-soft">Track data could not be refreshed: {error}</p>
-          <button type="button" onClick={retry} className="text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap">Try again</button>
+          <button type="button" onClick={retry} className={`text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap ${FOCUS_RING}`}>Try again</button>
         </div>
       )}
       <TrackDetailHeader

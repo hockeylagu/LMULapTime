@@ -6,6 +6,7 @@ import { formatTime } from '../../../shared/domain/formatters.js';
 import { matchesCarClass, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { PaceBadge, LapStatusBadge } from '../common';
 import { CarClassBadge } from '../common/CarClassBadge.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 /** A lap's tag without the emoji some stored tags still start with; the card's colour carries the meaning. */
 const plainTag = (tag?: string) => tag?.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '');
@@ -96,7 +97,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               <button
                 type="button"
                 onClick={() => onSetBaseline(lap.id)}
-                className="text-[10px] text-lmu-muted hover:text-lmu-warn-soft font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg cursor-pointer"
+                className={`text-[10px] text-lmu-muted hover:text-lmu-warn-soft font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg cursor-pointer ${FOCUS_RING}`}
                 title="Set as baseline for deltas"
               >
                 Set Baseline
@@ -105,7 +106,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
             <button
               type="button"
               onClick={() => onRemoveLap(lap)}
-              className="text-lmu-muted hover:text-lmu-loss p-0.5 rounded transition-colors cursor-pointer"
+              className={`text-lmu-muted hover:text-lmu-loss p-0.5 rounded transition-colors cursor-pointer ${FOCUS_RING}`}
               title="Remove from comparison"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -196,7 +197,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <button
             type="button"
             onClick={() => onSelectSession(lap.sessionId!)}
-            className="text-[11px] text-lmu-muted hover:text-white transition-colors font-medium cursor-pointer"
+            className={`text-[11px] text-lmu-muted hover:text-white transition-colors font-medium cursor-pointer ${FOCUS_RING}`}
           >
             View Full Session →
           </button>

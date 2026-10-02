@@ -41,7 +41,7 @@ describe('LapStatusBadge', () => {
   it('renders Valid with a distinct color from Incomplete', () => {
     render(<LapStatusBadge isValid />);
     const badge = screen.getByText('Valid');
-    expect(badge.className).toContain('text-lmu-green');
+    expect(badge.className).toContain('text-lmu-gain');
   });
 
   it('renders Incomplete in amber for an inferred lap', () => {

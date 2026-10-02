@@ -7,6 +7,16 @@ const SERVER_RETRY_MS = 2000;
 /** An unreachable server is asked less and less often, down to once every 15 seconds. */
 const SERVER_RETRY_MAX_MS = 15000;
 
+const REFERENCE_SEEN_KEY = 'lmu.referenceUpdateSeen';
+
+function readSeenReference(): string | null {
+  try { return localStorage.getItem(REFERENCE_SEEN_KEY); } catch { return null; }
+}
+
+function writeSeenReference(completedAt: string): void {
+  try { localStorage.setItem(REFERENCE_SEEN_KEY, completedAt); } catch { /* storage unavailable: the toast may show again */ }
+}
+
 export function serverRetryDelay(failures: number): number {
   return Math.min(SERVER_RETRY_MS * 2 ** Math.max(0, failures - 1), SERVER_RETRY_MAX_MS);
 }
@@ -87,7 +97,10 @@ export function useAppData() {
         if (reference?.checked && reference.completedAt && reference.completedAt !== referenceHandled.current) {
           referenceHandled.current = reference.completedAt;
           if (reference.refreshed) invalidateReferenceLaptimes();
-          if (reference.updatedCount > 0) setReferenceUpdateCount(reference.updatedCount);
+          if (reference.updatedCount > 0 && readSeenReference() !== reference.completedAt) {
+            writeSeenReference(reference.completedAt);
+            setReferenceUpdateCount(reference.updatedCount);
+          }
         }
         const key = snapshotKey(scan);
         if (!loaded.current || key !== loadedKey.current) {

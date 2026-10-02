@@ -9,8 +9,8 @@ import { SessionLapTableRow } from './SessionLapTableRow.js';
 import { lapDetailSections, type LapDetailSection } from './lapDetailSections.js';
 import { lapDetailContext } from './lapPlaces.js';
 import { SessionLapStewardsLine } from './SessionLapStewardsLine.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
-const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
 /** A neutral 32px header button: the icon carries no color either. */
 const HEADER_BUTTON = `h-8 px-3 rounded-lg bg-lmu-card hover:bg-lmu-raised border border-lmu-border hover:border-lmu-rule text-lmu-text-soft hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${FOCUS_RING}`;
 
@@ -141,7 +141,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             <button
               type="button"
               onClick={() => setExpandedLaps(allExpanded ? new Set() : new Set(lapsWithDetails))}
-              className={HEADER_BUTTON}
+              className={`${HEADER_BUTTON}`}
               aria-expanded={allExpanded}
               title="Show or hide traffic, incidents, track limits and penalties under every lap"
             >
@@ -161,7 +161,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
               )}&sessionId=${encodeURIComponent(session.id)}${lapNum ? `&lapNum=${lapNum}` : ''}`);
             }}
             type="button"
-            className={HEADER_BUTTON}
+            className={`${HEADER_BUTTON}`}
             title="Compare your best lap from this session"
           >
             <ArrowLeftRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />

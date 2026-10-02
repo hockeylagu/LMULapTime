@@ -4,6 +4,7 @@ import { VehicleClassPills, SessionTypePills, HideEmptyToggle, HasReplayToggle, 
 import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFilterParts.js';
 import { DASHBOARD_SORT_OPTIONS } from './dashboardSortOptions.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export type { DashboardSortOption };
 
@@ -95,7 +96,7 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
                   e.stopPropagation();
                   setSelectedTrack('All');
                 }}
-                className="text-lmu-muted hover:text-white p-0.5 rounded cursor-pointer shrink-0 transition-colors"
+                className={`text-lmu-muted hover:text-white p-0.5 rounded cursor-pointer shrink-0 transition-colors ${FOCUS_RING}`}
                 title="Reset to All Tracks"
                 aria-label="Reset track filter"
               >

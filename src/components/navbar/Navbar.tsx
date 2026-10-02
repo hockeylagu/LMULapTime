@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, Trophy, Film, LoaderCircle } from 'lucide-react';
 import { ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 /** Status chips on the right: an inset well like the tab group, lifting to white on hover. */
 const STATUS_CHIP =
@@ -28,7 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const location = useLocation();
   const tabSearch = location.pathname === '/telemetry' ? '' : location.search;
   const tabClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 h-8 px-3.5 rounded-lg text-sm font-medium transition-colors ${isActive
+    `flex items-center gap-2 h-8 px-3.5 rounded-lg text-sm font-medium transition-colors ${FOCUS_RING} ${isActive
       ? 'bg-lmu-accent text-white'
       : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/60'
     }`;
@@ -100,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand logo & title */}
         <Link
           to={{ pathname: '/dashboard', search: tabSearch }}
-          className="justify-self-start flex items-center gap-3 cursor-pointer group select-none rounded-xl"
+          className={`justify-self-start flex items-center gap-3 cursor-pointer group select-none rounded-xl ${FOCUS_RING}`}
           title="Return to Dashboard"
         >
           <span className="w-10 h-10 grid place-items-center rounded-xl bg-lmu-accent/10 border border-lmu-accent/30 text-lmu-accent-text transition-colors group-hover:bg-lmu-accent/20 group-hover:border-lmu-accent/50">
@@ -138,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="justify-self-end flex items-center gap-2 text-xs">
           <Link
             to={{ pathname: '/dashboard', search: tabSearch }}
-            className={STATUS_CHIP}
+            className={`${STATUS_CHIP} ${FOCUS_RING}`}
             title={status?.resultsExist === false ? 'No LMU results found yet' : 'Return to Dashboard'}
           >
             <span
@@ -150,7 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <Link
             to={{ pathname: '/settings', search: tabSearch }}
-            className={STATUS_CHIP}
+            className={`${STATUS_CHIP} ${FOCUS_RING}`}
             title={scanTooltip}
           >
             {isScanRunning
@@ -174,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="h-8 w-8 grid place-items-center rounded-lg bg-lmu-bg border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors cursor-pointer disabled:cursor-default disabled:hover:text-lmu-muted disabled:hover:border-lmu-border"
+            className={`h-8 w-8 grid place-items-center rounded-lg bg-lmu-bg border border-lmu-border text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors cursor-pointer disabled:cursor-default disabled:hover:text-lmu-muted disabled:hover:border-lmu-border ${FOCUS_RING}`}
             title="Refresh LMU Directory Scan"
             aria-label="Refresh LMU directory scan"
           >

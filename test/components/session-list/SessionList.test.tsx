@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { SessionList, SessionListItem } from '../../../src/components/session-list/index.js';
 
 describe('SessionList component', () => {
@@ -66,6 +67,18 @@ describe('SessionList component', () => {
       },
     },
   ];
+
+  it('opens a card from the keyboard through its labelled button', async () => {
+    const user = userEvent.setup();
+    const onSelectSession = vi.fn();
+    render(<SessionList sessions={mockSessions} onSelectSession={onSelectSession} showTrackColumn={true} />);
+    const open = screen.getAllByRole('button', { name: /^Open session: .*Spa-Francorchamps/ })[0];
+    open.focus();
+    await user.keyboard('{Enter}');
+    expect(onSelectSession).toHaveBeenCalledWith('sess-1');
+    await user.keyboard(' ');
+    expect(onSelectSession).toHaveBeenCalledTimes(2);
+  });
 
   it('renders in Cards (grid) mode by default and allows clicking cards', () => {
     const onSelectSession = vi.fn();

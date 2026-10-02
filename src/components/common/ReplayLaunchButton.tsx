@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { Zap, Video, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
+import { FOCUS_RING } from './buttonStyles.js';
 
 export interface ReplayLaunchButtonProps {
   /** Amber "Launch 100Hz Replay" with native DuckDB telemetry, green "Launch Replay" with the replay only. */
@@ -34,7 +35,7 @@ export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckD
       hasDuckDb
         ? 'border-lmu-warn-strong/40 bg-lmu-warn-strong/10 text-lmu-warn-soft hover:bg-lmu-warn-strong/20 hover:border-lmu-warn-strong/60'
         : 'border-lmu-gain-strong/30 bg-lmu-gain-strong/10 text-lmu-gain hover:bg-lmu-gain-strong/20 hover:border-lmu-gain-strong/50'
-    }`}
+    } ${FOCUS_RING}`}
     data-testid={testId}
     title={blocked ? `${label}${job?.error ? `: ${job.error}` : ''}` : failed ? `${partialStatus}${job?.error ? `: ${job.error}` : ''}` : title}
   >

@@ -3,6 +3,7 @@ import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js'
 import { getCarClassBadgeConfig } from '../../common/CarClassBadge.js';
 import { carClassLabel } from '../board/leaderboardFormat.js';
 
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 export interface LayoutClassPillsProps {
   layout: LeaderboardLayout;
   selectedCarClass: string;
@@ -27,7 +28,7 @@ export const LayoutClassPills: React.FC<LayoutClassPillsProps> = ({ layout, sele
           title={badge?.title}
           className={`h-7 px-3 rounded-[5px] border font-mono text-xs font-bold uppercase tracking-wider transition-[filter] cursor-pointer inline-flex items-center gap-2 ${
             badge ? `${badge.borderClass} ${badge.textClass} ${badge.bgClass}` : 'border-lmu-border text-lmu-muted'
-          } ${selected ? 'brightness-110' : 'grayscale hover:grayscale-0'}`}
+          } ${selected ? 'brightness-110' : 'grayscale hover:grayscale-0'} ${FOCUS_RING}`}
         >
           <span>{carClassLabel(c.carClass)}</span>
           {c.playerRank !== null && (

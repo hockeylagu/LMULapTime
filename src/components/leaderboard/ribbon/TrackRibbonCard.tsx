@@ -4,6 +4,7 @@ import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js'
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { carClassLabel, formatDrivenAgo } from '../board/leaderboardFormat.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface TrackRibbonCardProps {
   layout: LeaderboardLayout;
@@ -24,7 +25,7 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
         selected
           ? 'border-lmu-rule-strong bg-lmu-raised/50'
           : 'border-lmu-border bg-lmu-bg/60 hover:border-lmu-rule-strong hover:bg-lmu-card'
-      }`}
+      } ${FOCUS_RING}`}
     >
       <div className="flex items-start justify-between gap-2">
         {layout.outlinePath ? (

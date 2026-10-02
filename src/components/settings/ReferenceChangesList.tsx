@@ -53,7 +53,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
       </div>
 
       {updateDiff.hasChanges ? (
-        <div className="relative max-h-96 overflow-y-auto border-y border-lmu-border/70 divide-y divide-lmu-border/70">
+        <div className="relative max-h-96 overflow-y-auto overflow-x-hidden border-y border-lmu-border/70 divide-y divide-lmu-border/70">
           {/* Added items */}
           {updateDiff.added.map((item) => (
             <div

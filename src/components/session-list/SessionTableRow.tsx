@@ -4,6 +4,7 @@ import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/form
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionTableRowProps {
@@ -25,10 +26,22 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
   const empty = isSessionEmpty(s);
   const displayTrack = s.trackVenue ? getDisplayTrackName(s.trackVenue, s.trackCourse) : '';
 
+  const label = [s.sessionType, displayTrack, s.timeString].filter(Boolean).join(', ');
+
   return (
     <tr
       onClick={() => onSelectSession(s.id)}
-      className="hover:bg-lmu-cardHover transition-colors cursor-pointer group"
+      tabIndex={0}
+      aria-label={`Open session: ${label}`}
+      onKeyDown={(e) => {
+        // Only the row itself: Enter or Space on an inner button must not also open the session.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectSession(s.id);
+        }
+      }}
+      className={`hover:bg-lmu-cardHover transition-colors cursor-pointer group ${FOCUS_RING}`}
     >
       {/* Track */}
       {showTrackColumn && (
@@ -108,7 +121,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               e.stopPropagation();
               onSelectSession(s.id);
             }}
-            className="p-1.5 rounded-lg text-lmu-muted group-hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 flex items-center justify-center group/btn"
+            className={`p-1.5 rounded-lg ${FOCUS_RING} text-lmu-muted group-hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 flex items-center justify-center group/btn`}
             title={`Analyze ${displayTrack || 'Session'} Details`}
             aria-label={`Analyze ${displayTrack || 'Session'}`}
           >

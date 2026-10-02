@@ -8,6 +8,7 @@ import {
 import { TelemetryPresetChannelRow } from './TelemetryPresetChannelRow.js';
 import { TelemetryPresetToolbar } from './TelemetryPresetToolbar.js';
 import { TelemetryPresetSidebar } from './TelemetryPresetSidebar.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface TelemetryPresetModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close telemetry presets"
-            className="p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className={`p-1 rounded-lg text-lmu-muted hover:text-white hover:bg-white/10 transition-colors cursor-pointer ${FOCUS_RING}`}
           >
             <X className="w-4 h-4" />
           </button>
@@ -224,7 +225,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
                       onSelectActivePreset(currentPreset.id);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-lmu-raised hover:bg-lmu-card-hover border border-lmu-rule text-white font-semibold text-xs cursor-pointer transition-colors flex items-center gap-1.5"
+                    className={`px-3 py-1.5 rounded-lg bg-lmu-raised hover:bg-lmu-card-hover border border-lmu-rule text-white font-semibold text-xs cursor-pointer transition-colors flex items-center gap-1.5 ${FOCUS_RING}`}
                   >
                     <Check className="w-3.5 h-3.5" /> Apply & Use Preset
                   </button>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 export type RaceTypeFilter = 'all' | 'practice' | 'quali' | 'race';
@@ -156,7 +157,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-card transition-colors shrink-0"
+              className={`p-1.5 rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-card transition-colors shrink-0 ${FOCUS_RING}`}
               aria-label="Close comparison lap picker"
               title="Close lap picker"
             >
@@ -177,7 +178,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
                     aria-label={option.label}
                     className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${
                       filter === option.key ? 'bg-lmu-accent text-white' : 'text-lmu-muted hover:text-white'
-                    }`}
+                    } ${FOCUS_RING}`}
                   >
                     {option.label}
                   </button>
@@ -249,7 +250,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
           ) : error ? (
             <div role="alert" className="py-8 text-center text-xs space-y-2">
               <p className="text-lmu-loss-soft">{error}</p>
-              {onRetry && <button type="button" onClick={onRetry} className="text-lmu-text-soft underline underline-offset-4">Try again</button>}
+              {onRetry && <button type="button" onClick={onRetry} className={`text-lmu-text-soft underline underline-offset-4 ${FOCUS_RING}`}>Try again</button>}
             </div>
           ) : orderedLaps.length === 0 ? (
             <p className="py-8 text-center text-xs text-lmu-muted">

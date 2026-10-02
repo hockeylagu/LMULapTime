@@ -6,6 +6,7 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import { useSessionDebrief } from './useSessionDebrief.js';
 import { debriefCornerLink, SessionDebrief } from './loadSessionDebrief.js';
 import { DebriefCornerRow } from './DebriefCornerRow.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface SessionDebriefCardProps {
   session: DetailedSession;
@@ -86,7 +87,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           <button
             type="button"
             onClick={requestDebrief}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 hover:bg-lmu-warn-strong/25 whitespace-nowrap"
+            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 hover:bg-lmu-warn-strong/25 whitespace-nowrap ${FOCUS_RING}`}
           >
             <Crosshair className="w-3.5 h-3.5" /> Show where the time goes
           </button>
@@ -101,7 +102,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       {state.status === 'error' && (
         <div className="flex items-center justify-between gap-2 py-1">
           <p role="alert" className="text-xs text-lmu-loss">{state.message}</p>
-          <button type="button" onClick={requestDebrief} className="text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap">
+          <button type="button" onClick={requestDebrief} className={`text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap ${FOCUS_RING}`}>
             Try again
           </button>
         </div>

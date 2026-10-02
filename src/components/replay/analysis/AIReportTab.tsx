@@ -6,6 +6,7 @@ import { buildAiLapEvidence } from '../../../utils/aiReportPayload.js';
 import type { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { comparisonConfidence, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { ApiError, fetchJson, isAbortError, postJson } from '../../../api/apiClient.js';
+import { FOCUS_RING, PRIMARY_BUTTON } from '../../common/buttonStyles.js';
 
 interface AIReportTabProps {
   trajectory: ReplayTrajectoryData | null;
@@ -134,10 +135,10 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
         <p className="text-xs leading-relaxed text-lmu-muted">Lap analytics and driver names used in this comparison will be sent to Google Gemini.</p>
         {configured === false && <p className="text-xs text-lmu-gold">Configure a Gemini API key in Settings before generating a report.</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void generate(false)} disabled={configured !== true || isLoading} className="inline-flex items-center gap-1.5 rounded-lg bg-lmu-accent px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={() => void generate(false)} disabled={configured !== true || isLoading} data-busy={isLoading} className={PRIMARY_BUTTON}>
             <Sparkles className="h-3.5 w-3.5" /> {isLoading ? 'Generating...' : 'Generate AI Report'}
           </button>
-          {report && <button type="button" onClick={() => void generate(true)} disabled={isLoading} className="inline-flex items-center gap-1.5 rounded-lg border border-lmu-border px-3 py-2 text-xs font-semibold text-lmu-muted hover:text-white disabled:opacity-50">
+          {report && <button type="button" onClick={() => void generate(true)} disabled={isLoading} className={`inline-flex items-center gap-1.5 rounded-lg border border-lmu-border px-3 py-2 text-xs font-semibold text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:cursor-not-allowed ${FOCUS_RING}`}>
             <RefreshCw className="h-3.5 w-3.5" /> Regenerate
           </button>}
         </div>

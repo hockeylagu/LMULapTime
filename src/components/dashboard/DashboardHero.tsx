@@ -10,6 +10,7 @@ import { ReplayLaunchButton } from '../common/ReplayLaunchButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
+import { FOCUS_RING } from '../common/buttonStyles.js';
 
 export interface DashboardHeroProps {
   sessions: SessionSummary[];
@@ -184,7 +185,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             <button
               type="button"
               onClick={() => onSelectSession(latestOuting.id)}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-lmu-text border border-lmu-rule font-medium text-xs transition-colors cursor-pointer"
+              className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-lmu-text border border-lmu-rule font-medium text-xs transition-colors cursor-pointer ${FOCUS_RING}`}
               data-testid="hero-inspect-session-btn"
             >
               Session Details
