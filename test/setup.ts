@@ -34,6 +34,111 @@ vi.mock('@testing-library/react', async (importOriginal) => {
   return { ...actual, render };
 });
 
+const ChartSeriesContext = React.createContext<{
+  register: (entry: { dataKey?: string; value?: string; color?: string; type?: string }) => void;
+  entries: Array<{ dataKey?: string; value?: string; color?: string; type?: string }>;
+}>({ register: () => {}, entries: [] });
+
+vi.mock('recharts', () => {
+  const ChartContainer: React.FC<{
+    children?: React.ReactNode;
+    data?: unknown[];
+    onClick?: (state: { activeLabel?: number; activePayload?: unknown[] }) => void;
+  }> = ({ children, data, onClick }) => {
+    const [entries, setEntries] = React.useState<Array<{ dataKey?: string; value?: string; color?: string; type?: string }>>([]);
+    const register = React.useCallback((entry: { dataKey?: string; value?: string; color?: string; type?: string }) => {
+      setEntries((prev) => (prev.some((e) => e.dataKey === entry.dataKey) ? prev : [...prev, entry]));
+    }, []);
+
+    const firstItem = data && data.length > 0 ? data[0] : undefined;
+
+    return React.createElement(
+      ChartSeriesContext.Provider,
+      { value: { register, entries } },
+      React.createElement(
+        'div',
+        { 'data-testid': 'recharts-chart' },
+        React.createElement('button', {
+          type: 'button',
+          'aria-label': 'Select lap 2',
+          'data-testid': 'recharts-click-trigger',
+          onClick: () => onClick?.({ activeLabel: 2, activePayload: firstItem ? [{ payload: firstItem }] : undefined }),
+        }),
+        children,
+      ),
+    );
+  };
+
+  return {
+    ResponsiveContainer: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
+    LineChart: ChartContainer,
+    BarChart: ChartContainer,
+    AreaChart: ChartContainer,
+    Bar: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
+    Cell: (props: Record<string, unknown> & { children?: React.ReactNode }) => React.createElement('button', { type: 'button', ...props }, props.children),
+    Line: (props: { dataKey?: string; name?: string; stroke?: string }) => {
+      const ctx = React.useContext(ChartSeriesContext);
+      React.useEffect(() => {
+        if (props.dataKey && ctx) {
+          ctx.register({ dataKey: props.dataKey, value: props.name || props.dataKey, color: props.stroke, type: 'line' });
+        }
+      }, [props.dataKey, props.name, props.stroke, ctx]);
+      return null;
+    },
+    Area: () => null,
+    XAxis: () => null,
+    YAxis: () => null,
+    Tooltip: ({ content }: { content?: React.ReactNode | ((props: unknown) => React.ReactNode) }) => {
+      if (React.isValidElement(content)) return content;
+      if (typeof content === 'function') return (content as (props: unknown) => React.ReactNode)({});
+      return null;
+    },
+    CartesianGrid: () => null,
+    ReferenceLine: () => null,
+    Legend: ({
+      formatter,
+      content,
+      payload,
+    }: {
+      formatter?: (value: string, entry: unknown) => React.ReactNode;
+      content?: React.ReactNode | ((props: { payload?: unknown[] }) => React.ReactNode);
+      payload?: unknown[];
+    }) => {
+      const ctx = React.useContext(ChartSeriesContext);
+      const defaultPayload = [
+        { dataKey: 'bestLap', value: 'Best Lap Time', color: '#38bdf8' },
+        { dataKey: 'top3Avg', value: 'Top 3 Average', color: '#a855f7' },
+        { dataKey: 'medianPace', value: 'Median Pace', color: '#eab308' },
+        { dataKey: 's1', value: 'Sector 1', color: '#38bdf8' },
+        { dataKey: 's2', value: 'Sector 2', color: '#a855f7' },
+        { dataKey: 's3', value: 'Sector 3', color: '#eab308' },
+        { dataKey: 'consistency', value: 'Pace Consistency Rating (%)', color: '#10b981' },
+        { dataKey: 'Sim Driver', value: 'Sim Driver', color: '#fff', type: 'line' },
+      ];
+      const effectivePayload = payload && payload.length > 0
+        ? payload
+        : ctx.entries.length > 0
+          ? ctx.entries
+          : defaultPayload;
+
+      if (React.isValidElement(content)) {
+        return React.cloneElement(content as React.ReactElement<{ payload?: unknown[] }>, { payload: effectivePayload });
+      }
+      if (typeof content === 'function') {
+        return (content as (props: { payload?: unknown[] }) => React.ReactNode)({ payload: effectivePayload });
+      }
+      if (typeof formatter === 'function') {
+        return React.createElement(
+          'div',
+          null,
+          formatter('Sim Driver', { dataKey: 'Sim Driver', value: 'Sim Driver', color: '#fff', type: 'line' }),
+        );
+      }
+      return null;
+    },
+  };
+});
+
 import { cleanup } from '@testing-library/react';
 
 if (typeof window !== 'undefined') {

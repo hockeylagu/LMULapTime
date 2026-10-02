@@ -5,17 +5,13 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    css: false,
     projects: [
       {
         test: {
           name: 'unit',
           environment: 'node',
-          include: [
-            'test/server/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-            'test/domain/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-            'test/utils/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-            'test/api/**/*.{test,spec}.ts',
-          ],
+          include: ['test/**/*.test.ts'],
         },
       },
       {
@@ -23,10 +19,7 @@ export default defineConfig({
           name: 'dom',
           environment: 'jsdom',
           pool: 'vmThreads',
-          include: [
-            'test/components/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-            'test/**/*.test.tsx',
-          ],
+          include: ['test/**/*.test.tsx'],
           setupFiles: ['./test/setup.ts'],
         },
       },
