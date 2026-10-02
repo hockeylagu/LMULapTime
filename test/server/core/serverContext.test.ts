@@ -110,6 +110,50 @@ describe('ServerContext background session sync', () => {
     vi.useRealTimers();
   });
 
+  it('starts XML first and coalesces Refresh during replay and DuckDB work into one later XML pass', async () => {
+    let releaseXml: (() => void) | undefined;
+    let releaseReplay: (() => void) | undefined;
+    let releaseTelemetry: (() => void) | undefined;
+    let telemetryRunning = false;
+    const events: string[] = [];
+    let scans = 0;
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []), getAllSessions: vi.fn(() => []),
+      syncSessionsAsyncIterator: vi.fn(() => (async function* () {
+        events.push('xml');
+        if (++scans === 1) await new Promise<void>(resolve => { releaseXml = resolve; });
+        return { added: 0, updated: 0, total: 0, lastSyncedAt: 'now' };
+      })()),
+      syncReplaysAsyncIterator: vi.fn(() => (async function* () {
+        events.push('replay');
+        if (scans === 1) await new Promise<void>(resolve => { releaseReplay = resolve; });
+        return { added: 0, updated: 0, skipped: 0, total: 0, lastSyncedAt: 'now', interrupted: false };
+      })()),
+    } as unknown as SessionDatabase;
+    const telemetryCatalog = {
+      getScanStatus: () => ({ running: telemetryRunning }),
+      refresh: vi.fn(() => {
+        events.push('duckdb'); telemetryRunning = true;
+        if (scans > 1) { telemetryRunning = false; return Promise.resolve(0); }
+        return new Promise<number>(resolve => { releaseTelemetry = () => { telemetryRunning = false; resolve(0); }; });
+      }),
+    } as unknown as TelemetryCatalog;
+    const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(),
+      sessionDb, telemetryCatalog, replayCache: {} as ReplayCacheService });
+    vi.spyOn(context, 'enrichSessionsWithTelemetry').mockImplementation(() => undefined);
+    context.runInitialSessionSyncInBackground(); await vi.runOnlyPendingTimersAsync();
+    expect(events).toEqual(['xml']);
+    releaseXml?.(); await vi.runOnlyPendingTimersAsync();
+    expect(events).toContain('replay'); expect(events).toContain('duckdb');
+    context.loadSessions(true); context.loadSessions(true);
+    expect(context.getScanStatus().refreshQueued).toBe(true);
+    releaseReplay?.(); await vi.runOnlyPendingTimersAsync();
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    releaseTelemetry?.(); await vi.runAllTimersAsync();
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(2);
+    expect(context.getScanStatus()).toMatchObject({ refreshQueued: false, allComplete: true });
+  });
+
   it('records the completed session scan and starts replay indexing once', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
@@ -213,7 +257,7 @@ describe('ServerContext background session sync', () => {
     expect(context.loadSessions(true, true)).toEqual([]);
 
     expect(sessionDb.syncSessionsFromDir).not.toHaveBeenCalled();
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.any(LmuParser), true);
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
   });
 
   it('rescans the DuckDB folder on Refresh and matches the new files to the sessions', async () => {
@@ -239,8 +283,9 @@ describe('ServerContext background session sync', () => {
     expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
 
     context.loadSessions(true);
-    expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
+    expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
     await vi.runAllTimersAsync();
+    expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
     expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
   });
@@ -276,7 +321,7 @@ describe('ServerContext background session sync', () => {
     await vi.runAllTimersAsync();
 
     expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.any(LmuParser), true);
+    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
   });
 });
 

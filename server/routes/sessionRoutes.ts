@@ -86,6 +86,14 @@ export function createSessionRouter(context: ServerContext): Router {
     return session;
   };
 
+  // One request owns the session/progression snapshot, so a scan commit cannot split them.
+  router.get('/session-snapshot', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const sessions = context.loadSessions();
+    res.json({ sessions: sessions.map(toSessionListEntry), progression: computeProgression(sessions),
+      revision: context.getScanStatus().dataRevision });
+  });
+
   router.get('/sessions', (req, res) => {
     const forceRefresh = req.query.refresh === 'true';
     const filters = parseSessionFilters(req.query as Record<string, unknown>);
@@ -96,7 +104,7 @@ export function createSessionRouter(context: ServerContext): Router {
 
   router.get('/session/:id', (req, res) => {
     const { id } = req.params;
-    res.setHeader('Cache-Control', 'private, max-age=120');
+    res.setHeader('Cache-Control', 'no-store');
 
     const singleFilePath = path.join(context.resultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
     const session = context.sessionDb.getSessionById(id)

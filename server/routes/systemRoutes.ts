@@ -24,6 +24,7 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryExist,
       playerName: context.currentParser.configuredPlayerName,
       sessionsCount: sessions.length,
+      replaysCount: cacheStats.replaysCount,
       tracksCount: new Set(sessions.map((s) => getDisplayTrackName(s.trackVenue, s.trackCourse)).filter(Boolean)).size,
       referenceLaptimes: {
         lastUpdated: refCache?.lastUpdated || null,
@@ -70,7 +71,6 @@ export function createSystemRouter(context: ServerContext): Router {
       return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
     }
     context.telemetryCatalog.clear();
-    context.runTelemetryScanInBackground();
     const sessionScanStarted = context.runSessionSyncInBackground();
     const sessions = context.loadSessions();
 

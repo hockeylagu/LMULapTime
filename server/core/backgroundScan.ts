@@ -54,6 +54,7 @@ export function pumpScanInBackground<R>(
     else status.error = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
     status.running = false;
     status.finishedAt = new Date().toISOString();
+    status.currentFile = null;
     status.currentStage = null;
     status.filePercent = null;
     onSettled(outcome);

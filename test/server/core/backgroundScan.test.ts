@@ -29,7 +29,7 @@ describe('pumpScanInBackground', () => {
     expect(seen).toHaveLength(2);
     expect(outcome).toEqual({ result: { total: 2 } });
     expect(status).toMatchObject({
-      running: false, processed: 2, total: 2, currentFile: 'b.xml', currentStage: null, filePercent: null,
+      running: false, processed: 2, total: 2, currentFile: null, currentStage: null, filePercent: null,
       result: { total: 2 }, error: null,
     });
     expect(status.finishedAt).not.toBeNull();

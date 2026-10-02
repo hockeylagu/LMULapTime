@@ -61,7 +61,7 @@ describe('AIReportTab', () => {
     );
 
     expect(screen.getByText(/select a completed lap to generate an ai report/i)).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ai/settings'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/ai/settings', { cache: 'no-store' }));
   });
 
   it('shows the unconfigured state and keeps generation disabled', async () => {

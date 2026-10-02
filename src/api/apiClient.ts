@@ -23,7 +23,10 @@ async function toApiError(response: Response, path: string): Promise<ApiError> {
 
 /** GETs (or sends `init`) and returns the parsed JSON body; throws ApiError on a non-2xx status. */
 export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await (init ? fetch(path, init) : fetch(path));
+  const requestInit = path.startsWith('/api/')
+    ? { cache: 'no-store' as RequestCache, ...init }
+    : init;
+  const response = await (requestInit ? fetch(path, requestInit) : fetch(path));
   if (!response.ok) throw await toApiError(response, path);
   return response.json() as Promise<T>;
 }

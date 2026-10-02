@@ -175,6 +175,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             {latestOuting.hasReplay && onOpenReplay && (
               <ReplayLaunchButton
                 hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
+                replayName={latestOuting.replayName}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Suspense, startTransition } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Navbar } from './components/navbar/Navbar.js';
 import { ReferenceLaptimeUpdateToast } from './components/common/ReferenceLaptimeUpdateToast.js';
@@ -15,12 +15,9 @@ import {
   preloadRoutePage,
 } from './routePages.js';
 import { updateSearchParams } from './utils/urlParams';
-import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../shared/types/index.js';
-import { fetchJson, isAbortError } from './api/apiClient.js';
-import { invalidateReferenceLaptimes } from './api/referenceApi.js';
-
-// How long to wait before asking a server that did not answer again.
-const SERVER_RETRY_MS = 2000;
+import type { DetailedSession, SessionProgressionPoint } from '../shared/types/index.js';
+import { useAppData } from './api/useAppData.js';
+import { SessionDataContext } from './api/sessionDataContext.js';
 
 interface SessionRouteProps {
   onBack: () => void;
@@ -120,75 +117,9 @@ export default function App() {
   // Global Filter States
   const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
 
-  // Data States
-  const [status, setStatus] = useState<AppStatus | null>(null);
-  const [sessions, setSessions] = useState<DetailedSession[]>([]);
-  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [replayScanStatus, setReplayScanStatus] = useState<ScanStatus | null>(null);
-  const [referenceUpdateCount, setReferenceUpdateCount] = useState<number | null>(null);
-
-  // Poll replay scan progress only while a scan is actively running.
-  // Once the scan finishes (running === false), polling stops completely,
-  // making 0 requests when idle.
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const scanAbortRef = useRef<AbortController | null>(null);
-
-  const startScanPolling = useCallback(() => {
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-    if (scanAbortRef.current) scanAbortRef.current.abort();
-
-    const poll = () => {
-      scanAbortRef.current = new AbortController();
-      fetchJson<ScanStatus>('/api/scan/status', { signal: scanAbortRef.current.signal })
-        .then((data) => {
-          setReplayScanStatus(data);
-          const referenceCheckPending = !!data.referenceLaptimes && !data.referenceLaptimes.checked;
-          if (
-            data.running ||
-            data.sessionScan?.running ||
-            data.telemetryScan?.running ||
-            referenceCheckPending
-          ) {
-            pollTimerRef.current = setTimeout(poll, 1000);
-          }
-
-          const referenceRefresh = data.referenceLaptimes;
-          if (
-            referenceRefresh?.checked &&
-            referenceRefresh.completedAt &&
-            referenceRefresh.updatedCount > 0 &&
-            referenceRefresh.completedAt !== referenceRefreshHandledRef.current
-          ) {
-            referenceRefreshHandledRef.current = referenceRefresh.completedAt;
-            invalidateReferenceLaptimes();
-            setReferenceUpdateCount(referenceRefresh.updatedCount);
-          }
-        })
-        .catch((err: unknown) => {
-          if (isAbortError(err)) return;
-          // The server can be unreachable for a moment (starting, restarting): keep asking.
-          pollTimerRef.current = setTimeout(poll, SERVER_RETRY_MS);
-        });
-    };
-    poll();
-  }, []);
-
-  const referenceRefreshHandledRef = useRef<string | null>(null);
-
-  const refreshReplayScanStatus = useCallback(() => {
-    startScanPolling();
-  }, [startScanPolling]);
-
-  useEffect(() => {
-    // Check scan status once on startup; if a background scan is running, poll until complete
-    startScanPolling();
-    return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-      if (scanAbortRef.current) scanAbortRef.current.abort();
-    };
-  }, [startScanPolling]);
+  const { status, sessions, progression, loading, isRefreshing, replayScanStatus,
+    referenceUpdateCount, setReferenceUpdateCount, revision, error, fetchData,
+    refreshReplayScanStatus } = useAppData();
 
   // Keep view filters synchronized with the router URL.
   useEffect(() => {
@@ -200,38 +131,6 @@ export default function App() {
     updateSearchParams(searchParams, setSearchParams, { carClass });
   };
 
-  const hasLoadedRef = useRef(false);
-  const dataRetryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const fetchData = useCallback(async (forceRefresh = false): Promise<void> => {
-    setIsRefreshing(true);
-    try {
-      const [statusData, sessionsData, progData] = await Promise.all([
-        fetchJson<AppStatus>('/api/status'),
-        fetchJson<DetailedSession[]>(`/api/sessions${forceRefresh ? '?refresh=true' : ''}`),
-        fetchJson<SessionProgressionPoint[]>('/api/progression'),
-      ]);
-
-      setStatus(statusData);
-      setSessions(sessionsData);
-      setProgression(progData);
-      hasLoadedRef.current = true;
-      if (forceRefresh) startScanPolling();
-    } catch (err) {
-      console.error('Error fetching LMU telemetry data:', err);
-      // Before the first load the server may still be starting: keep the loading screen and retry.
-      if (!hasLoadedRef.current) {
-        dataRetryTimerRef.current = setTimeout(() => { void fetchData(forceRefresh); }, SERVER_RETRY_MS);
-      }
-    } finally {
-      // A transition keeps the loading screen up while the page chunk resolves, instead of flashing the Suspense
-      // fallback, which React then holds for its reveal throttle (~300 ms).
-      if (hasLoadedRef.current) startTransition(() => setLoading(false));
-      setIsRefreshing(false);
-    }
-  }, [startScanPolling]);
-
-  useEffect(() => () => clearTimeout(dataRetryTimerRef.current), []);
-
   useEffect(() => { preloadRoutePage(location.pathname); }, [location.pathname]);
 
   // Once the first page is up, fetch the other pages in the background so navigation never waits on a chunk.
@@ -242,26 +141,6 @@ export default function App() {
     const handle = idle(() => { void prefetchRoutePages(); });
     return () => cancel(handle);
   }, [loading]);
-
-  const scanStateRef = useRef({ replay: false, sessions: false, telemetry: false });
-  useEffect(() => {
-    const replayRunning = !!replayScanStatus?.running;
-    const sessionsRunning = !!replayScanStatus?.sessionScan?.running;
-    const telemetryRunning = !!replayScanStatus?.telemetryScan?.running;
-    const previous = scanStateRef.current;
-    if (
-      (previous.replay && !replayRunning) ||
-      (previous.sessions && !sessionsRunning) ||
-      (previous.telemetry && !telemetryRunning)
-    ) {
-      void fetchData();
-    }
-    scanStateRef.current = { replay: replayRunning, sessions: sessionsRunning, telemetry: telemetryRunning };
-  }, [fetchData, replayScanStatus?.running, replayScanStatus?.sessionScan?.running, replayScanStatus?.telemetryScan?.running]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const handleSelectSession = (id: string) => {
     navigate(`/session/${encodeURIComponent(id)}`);
@@ -277,6 +156,7 @@ export default function App() {
   };
 
   return (
+    <SessionDataContext.Provider value={{ revision, scan: replayScanStatus }}>
     <div className="min-h-screen min-w-[1480px] bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
       {!isTelemetryRoute && (
@@ -341,6 +221,8 @@ export default function App() {
         </Suspense>
       </main>
 
+      {error && <p role="alert" className="px-8 py-2 text-sm text-lmu-warn">{error}</p>}
+
       {!isTelemetryRoute && (
         <footer className="border-t border-lmu-border py-4 px-6 text-center text-xs text-lmu-muted">
           <p>LMU Lap Time & Sector Analyzer • Built for Le Mans Ultimate (Studio 397)</p>
@@ -354,5 +236,6 @@ export default function App() {
         />
       )}
     </div>
+    </SessionDataContext.Provider>
   );
 }

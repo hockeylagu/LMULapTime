@@ -52,9 +52,11 @@ export class LmuParser {
   private replayIndexRevision = 0;
   public configuredPlayerName: string = '';
 
-  constructor(replaysDir?: string, resultsDir?: string) {
-    this.detectPlayerName(resultsDir || replaysDir);
-    if (replaysDir && fs.existsSync(replaysDir)) {
+  constructor(replaysDir?: string, resultsDir?: string, private readonly options: {
+    indexReplays?: boolean; readReplayMetadata?: boolean; detectPlayer?: boolean;
+  } = {}) {
+    if (options.detectPlayer !== false) this.detectPlayerName(resultsDir || replaysDir);
+    if (options.indexReplays !== false && replaysDir && fs.existsSync(replaysDir)) {
       this.indexReplays(replaysDir);
     }
   }
@@ -418,7 +420,7 @@ export class LmuParser {
           let weatherCondition = matchingReplay.weatherCondition;
           let ambientTemp = matchingReplay.ambientTemp;
           let trackTemp = matchingReplay.trackTemp;
-          if (!matchingReplay.eventTitle && !matchingReplay.durationSec) {
+          if (this.options.readReplayMetadata !== false && !matchingReplay.eventTitle && !matchingReplay.durationSec) {
             try {
               if (fs.existsSync(matchingReplay.path)) {
                 const rMeta = parseReplayMetadata(matchingReplay.path);

@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
-import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
+import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
 export interface UseSessionDetailDataParams {
   sessionId: string;
@@ -13,50 +14,30 @@ export interface UseSessionDetailDataParams {
   initialSessions?: DetailedSession[];
 }
 
-// Module-level in-memory cache for instant sub-millisecond session switching. Capped so
-// browsing many sessions in one tab doesn't grow this forever.
-const clientSessionCache = new Map<string, DetailedSession>();
-const MAX_CACHED_SESSIONS = 5;
-
-function storeCachedSession(sessionId: string, session: DetailedSession): void {
-  if (clientSessionCache.size >= MAX_CACHED_SESSIONS && !clientSessionCache.has(sessionId)) {
-    const oldestKey = clientSessionCache.keys().next().value;
-    if (oldestKey !== undefined) clientSessionCache.delete(oldestKey);
-  }
-  clientSessionCache.set(sessionId, session);
-}
-
-export function clearSessionDetailCache() {
-  clientSessionCache.clear();
-  invalidateReferenceLaptimes();
-}
-
 export function useSessionDetailData({
   sessionId,
   onSelectSession,
   initialProgression,
   initialSessions,
 }: UseSessionDetailDataParams) {
-  const cachedInitial = clientSessionCache.get(sessionId) || null;
-  const [session, setSession] = useState<DetailedSession | null>(cachedInitial);
+  const { revision } = useSessionDataContext();
+  const [loadedSession, setLoadedSession] = useState<{ sessionId: string; data: DetailedSession } | null>(null);
+  const session = loadedSession?.sessionId === sessionId ? loadedSession.data : null;
   const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
   // Progression and the session list come from the parent when it has them, else are fetched here.
   // Read from props, never copied into state: a parent passing a new array on each render must not
   // restart loading (it re-rendered forever).
-  const hasInitialProgression = (initialProgression?.length ?? 0) > 0;
-  const hasInitialSessions = (initialSessions?.length ?? 0) > 0;
+  const hasInitialProgression = initialProgression !== undefined;
+  const hasInitialSessions = initialSessions !== undefined;
   const [fetchedProgression, setFetchedProgression] = useState<SessionProgressionPoint[]>([]);
   const [fetchedSessions, setFetchedSessions] = useState<DetailedSession[]>([]);
   const progression = hasInitialProgression && initialProgression ? initialProgression : fetchedProgression;
   const allSessions = hasInitialSessions && initialSessions ? initialSessions : fetchedSessions;
-  const [loading, setLoading] = useState<boolean>(!cachedInitial);
+  const [settledSessionId, setSettledSessionId] = useState<string | null>(null);
+  const loading = !session && settledSessionId !== sessionId;
   // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedDriverName, setSelectedDriverName] = useState<string>(() => {
-    if (cachedInitial?.playerDriver) return cachedInitial.playerDriver.name;
-    if (cachedInitial?.drivers?.[0]) return cachedInitial.drivers[0].name;
-    return '';
-  });
+  const [selectedDriverName, setSelectedDriverName] = useState<string>('');
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -74,40 +55,38 @@ export function useSessionDetailData({
     let isCurrent = true;
     const abortController = new AbortController();
     const { signal } = abortController;
-    const memCached = clientSessionCache.get(sessionId);
-    setLoadError(null);
-    if (memCached) {
-      setSession(memCached);
-      if (memCached.playerDriver) {
-        setSelectedDriverName(memCached.playerDriver.name);
-      } else if (memCached.drivers?.[0]) {
-        setSelectedDriverName(memCached.drivers[0].name);
-      }
-      setLoading(false);
-    } else {
-      setLoading(true);
+    const existingSession = loadedSession?.sessionId === sessionId ? loadedSession.data : null;
+    if (!existingSession) {
+      setLoadedSession(null);
+      setSettledSessionId(null);
+      setSelectedDriverName('');
     }
+    setLoadError(null);
 
     // 1. Fetch Session Telemetry Data (primary critical path)
     fetchJson<DetailedSession>(`/api/session/${encodeURIComponent(sessionId)}`, { signal })
       .then((sessionData) => {
         if (!isCurrent) return;
-        storeCachedSession(sessionId, sessionData);
-        setSession(sessionData);
-        if (sessionData.playerDriver) {
+        setLoadedSession({ sessionId, data: sessionData });
+        if (!existingSession && sessionData.playerDriver) {
           setSelectedDriverName(sessionData.playerDriver.name);
-        } else if (sessionData.drivers && sessionData.drivers.length > 0) {
+        } else if (!existingSession && sessionData.drivers && sessionData.drivers.length > 0) {
           setSelectedDriverName(sessionData.drivers[0].name);
         }
-        setLoading(false);
+        setLoadError(null);
+        setSettledSessionId(sessionId);
       })
       .catch((err) => {
         if (!isCurrent || isAbortError(err)) return;
         console.error('Failed to load session detail data:', err);
-        if (!(err instanceof ApiError && err.status === 404)) {
+        if (err instanceof ApiError && err.status === 404) {
+          setLoadedSession((current) => current?.sessionId === sessionId ? null : current);
+          setSelectedDriverName('');
+          setLoadError(null);
+        } else {
           setLoadError(apiErrorMessage(err, 'The session could not be loaded.'));
         }
-        setLoading(false);
+        setSettledSessionId(sessionId);
       });
 
     // 2. Fetch Reference Targets (shared across views until a benchmark refresh)
@@ -154,7 +133,7 @@ export function useSessionDetailData({
       isCurrent = false;
       abortController.abort();
     };
-  }, [sessionId, hasInitialProgression, hasInitialSessions]);
+  }, [sessionId, hasInitialProgression, hasInitialSessions, revision]);
 
   const selectedDriver = useMemo(() => {
     if (!session) return undefined;

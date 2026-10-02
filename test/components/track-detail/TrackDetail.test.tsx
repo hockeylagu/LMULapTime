@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { TrackDetail } from '../../../src/components/track-detail/index.js';
+import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
 
 describe('TrackDetail component', () => {
   const mockTrackDataWithMultipleClasses = {
@@ -162,6 +163,30 @@ describe('TrackDetail component', () => {
       fireEvent.click(sessionCard);
       expect(onSelectSession).toHaveBeenCalledWith('sess-hypercar-1');
     }
+  });
+
+  it('shows a retry warning with existing track data after a refresh fails', async () => {
+    let revision = 0;
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response)
+      .mockRejectedValueOnce(new Error('refresh offline'))
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response);
+    const content = () => (
+      <SessionDataContext.Provider value={{ revision, scan: null }}>
+        <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="LMH" setSelectedCarClass={vi.fn()} />
+      </SessionDataContext.Provider>
+    );
+    const view = render(content());
+    await screen.findByRole('heading', { level: 2, name: 'Spa' });
+
+    revision = 1;
+    view.rerender(content());
+    const warning = await screen.findByRole('alert');
+    expect(warning).toHaveTextContent('refresh offline');
+    expect(screen.getByText('2026/05/28 14:00')).toBeInTheDocument();
+    fireEvent.click(within(warning).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByText('2026/05/28 14:00')).toBeInTheDocument();
   });
 
   it('renders average qualifying and finish positions for the selected class', async () => {

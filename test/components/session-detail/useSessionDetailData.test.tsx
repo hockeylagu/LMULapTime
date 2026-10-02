@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { SessionDetail } from '../../../src/components/session-detail/index.js';
-import { clearSessionDetailCache, useSessionDetailData } from '../../../src/components/session-detail/useSessionDetailData.js';
+import { useSessionDetailData } from '../../../src/components/session-detail/useSessionDetailData.js';
+import { invalidateReferenceLaptimes } from '../../../src/api/referenceApi.js';
+import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 import type { DetailedSession, DriverData, SessionProgressionPoint } from '../../../shared/types/index.js';
 
@@ -19,7 +22,7 @@ function serve(replies: Record<string, Reply>) {
 }
 
 describe('SessionDetail loading', () => {
-  beforeEach(() => clearSessionDetailCache());
+  beforeEach(() => invalidateReferenceLaptimes());
   afterEach(() => vi.unstubAllGlobals());
 
   it('says why the session could not be loaded when the server fails', async () => {
@@ -47,7 +50,7 @@ describe('SessionDetail loading', () => {
     render(<SessionDetail sessionId="2026_05_28 P1#2" onBack={vi.fn()} />);
 
     expect(await screen.findAllByText(/Sim Driver/)).not.toHaveLength(0);
-    expect(fetchMock).toHaveBeenCalledWith('/api/session/2026_05_28%20P1%232', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/session/2026_05_28%20P1%232', expect.objectContaining({ cache: 'no-store' }));
   });
 });
 
@@ -66,7 +69,7 @@ describe('useSessionDetailData', () => {
     return hook;
   }
 
-  beforeEach(() => clearSessionDetailCache());
+  beforeEach(() => invalidateReferenceLaptimes());
   afterEach(() => vi.unstubAllGlobals());
 
   it('finds the stint limited by virtual energy and the fuel that is carried for nothing', async () => {
@@ -110,16 +113,149 @@ describe('useSessionDetailData', () => {
     expect(result.current.isCurrentSessionAllTimePB).toBe(false);
   });
 
-  it('shows a session opened before at once, then keeps it current', async () => {
-    await loaded(mockDetailedSession as unknown as DetailedSession, 'revisited');
-    serve({ '/api/session/': { status: 200, body: withSimDriver({ bestLapTime: 121 }) } });
+  it('fetches again after unmounting and remounting the same session', async () => {
+    const first = withSimDriver({ bestLapTime: 122 });
+    const second = withSimDriver({ bestLapTime: 121 });
+    let resolveRemount: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    let sessionRequests = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith('/api/session/') && sessionRequests++ > 0) {
+        return new Promise(resolve => { resolveRemount = resolve; });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(url.startsWith('/api/session/') ? first : []) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-    const initialSessions = [mockDetailedSession as unknown as DetailedSession];
-    const { result } = renderHook(() => useSessionDetailData({ sessionId: 'revisited', initialSessions }));
+    const firstMount = renderHook(() => useSessionDetailData({ sessionId: 'revisited', initialSessions: [] }));
+    await waitFor(() => expect(firstMount.result.current.selectedDriver?.bestLapTime).toBe(122));
+    firstMount.unmount();
+    const secondMount = renderHook(() => useSessionDetailData({ sessionId: 'revisited', initialSessions: [] }));
+    expect(secondMount.result.current.session).toBeNull();
+    expect(secondMount.result.current.loading).toBe(true);
+    await act(async () => resolveRemount?.({ ok: true, status: 200, json: () => Promise.resolve(second) }));
 
-    expect(result.current.loading).toBe(false);
-    expect(result.current.selectedDriverName).toBe('Sim Driver');
-    await waitFor(() => expect(result.current.selectedDriver?.bestLapTime).toBe(121));
+    await waitFor(() => expect(secondMount.result.current.selectedDriver?.bestLapTime).toBe(121));
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/'))).toHaveLength(2);
+  });
+
+  it('keeps the mounted session and selected driver during a revision refresh, then uses the updated response', async () => {
+    const updated: DetailedSession = {
+      ...mockDetailedSession,
+      drivers: mockDetailedSession.drivers.map((driver) => driver.name === 'AI Driver 2' ? { ...driver, bestLapTime: 120 } : driver),
+    } as unknown as DetailedSession;
+    let resolveRefresh: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    let revision = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (!url.startsWith('/api/session/')) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      if (fetchMock.mock.calls.length === 1) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(mockDetailedSession) });
+      return new Promise((resolve) => { resolveRefresh = resolve; });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <SessionDataContext.Provider value={{ revision, scan: null }}>{children}</SessionDataContext.Provider>
+    );
+    const hook = renderHook(() => useSessionDetailData({ sessionId: 'revision', initialSessions: [] }), { wrapper });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    revision = 1;
+    hook.rerender();
+
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.session?.id).toBe(mockDetailedSession.id);
+    expect(hook.result.current.selectedDriverName).toBe('AI Driver 2');
+    await act(async () => resolveRefresh?.({ ok: true, status: 200, json: () => Promise.resolve(updated) }));
+    await waitFor(() => expect(hook.result.current.selectedDriver?.bestLapTime).toBe(120));
+    expect(hook.result.current.selectedDriverName).toBe('AI Driver 2');
+  });
+
+  it('clears the mounted session when a revision refresh returns 404', async () => {
+    let revision = 0;
+    let sessionRequests = 0;
+    const fetchMock = vi.fn((url: string) => {
+      const requestNumber = url.startsWith('/api/session/') ? ++sessionRequests : 0;
+      const missing = requestNumber > 1;
+      return Promise.resolve({
+        ok: !missing,
+        status: missing ? 404 : 200,
+        json: () => Promise.resolve(missing ? { error: 'Session not found' } : mockDetailedSession),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <SessionDataContext.Provider value={{ revision, scan: null }}>{children}</SessionDataContext.Provider>
+    );
+    const hook = renderHook(() => useSessionDetailData({ sessionId: 'gone', initialSessions: [] }), { wrapper });
+    await waitFor(() => expect(hook.result.current.session).not.toBeNull());
+    revision = 1;
+    hook.rerender();
+    await waitFor(() => expect(hook.result.current.session).toBeNull());
+    expect(hook.result.current.loading).toBe(false);
+  });
+
+  it('ignores an obsolete session response after navigation', async () => {
+    let resolveOld: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    const current = { ...mockDetailedSession, id: 'current-session' } as unknown as DetailedSession;
+    const obsolete = { ...mockDetailedSession, id: 'obsolete-session' } as unknown as DetailedSession;
+    const fetchMock = vi.fn((url: string) => url.endsWith('/old')
+      ? new Promise((resolve) => { resolveOld = resolve; })
+      : Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(url.startsWith('/api/session/') ? current : []) }));
+    vi.stubGlobal('fetch', fetchMock);
+    const hook = renderHook(({ id }: { id: string }) => useSessionDetailData({ sessionId: id, initialSessions: [] }), { initialProps: { id: 'old' } });
+    hook.rerender({ id: 'current' });
+    await waitFor(() => expect(hook.result.current.session?.id).toBe('current-session'));
+    await act(async () => resolveOld?.({ ok: true, status: 200, json: () => Promise.resolve(obsolete) }));
+    expect(hook.result.current.session?.id).toBe('current-session');
+  });
+
+  it('discards session A when switching to B, even if B is still loading', async () => {
+    let resolveFirstA: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    let resolveSecondA: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    let sessionARequests = 0;
+    const responseA = { ...mockDetailedSession, id: 'session-a' } as unknown as DetailedSession;
+    const fetchMock = vi.fn((url: string) => {
+      if (!url.startsWith('/api/session/')) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      if (url.endsWith('/a')) {
+        sessionARequests++;
+        return new Promise((resolve) => {
+          if (sessionARequests === 1) resolveFirstA = resolve;
+          else resolveSecondA = resolve;
+        });
+      }
+      return new Promise(() => undefined);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const hook = renderHook(({ id }: { id: string }) => useSessionDetailData({ sessionId: id, initialSessions: [] }), { initialProps: { id: 'a' } });
+    await act(async () => resolveFirstA?.({ ok: true, status: 200, json: () => Promise.resolve(responseA) }));
+    await waitFor(() => expect(hook.result.current.session?.id).toBe('session-a'));
+    hook.rerender({ id: 'b' });
+    await waitFor(() => expect(sessionARequests).toBe(1));
+    hook.rerender({ id: 'a' });
+    await waitFor(() => expect(sessionARequests).toBe(2));
+    expect(hook.result.current.session).toBeNull();
+    expect(hook.result.current.loading).toBe(true);
+    await act(async () => resolveSecondA?.({ ok: true, status: 200, json: () => Promise.resolve(responseA) }));
+    await waitFor(() => expect(hook.result.current.session?.id).toBe('session-a'));
+  });
+
+  it('reports a failed revision refresh while retaining the current session data', async () => {
+    let revision = 0;
+    let sessionRequests = 0;
+    const fetchMock = vi.fn((url: string) => {
+      const failed = url.startsWith('/api/session/') && ++sessionRequests > 1;
+      return Promise.resolve({
+        ok: !failed,
+        status: failed ? 500 : 200,
+        json: () => Promise.resolve(failed ? { error: 'database is locked' } : mockDetailedSession),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const view = render(<SessionDataContext.Provider value={{ revision, scan: null }}><SessionDetail sessionId="retry" onBack={vi.fn()} /></SessionDataContext.Provider>);
+    await screen.findAllByText(/Sim Driver/);
+    revision = 1;
+    view.rerender(<SessionDataContext.Provider value={{ revision, scan: null }}><SessionDetail sessionId="retry" onBack={vi.fn()} /></SessionDataContext.Provider>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Session refresh failed: database is locked');
+    expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
   });
 
   it('hides and shows a chart series from its legend entry', async () => {
@@ -134,7 +270,7 @@ describe('useSessionDetailData', () => {
 });
 
 describe('useSessionDetailData props', () => {
-  beforeEach(() => clearSessionDetailCache());
+  beforeEach(() => invalidateReferenceLaptimes());
   afterEach(() => vi.unstubAllGlobals());
 
   it('settles when the parent passes new progression and session arrays on every render', async () => {

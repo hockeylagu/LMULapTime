@@ -60,6 +60,9 @@ describe('App component', () => {
       if (url.includes('/api/status')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockStatus) });
       }
+      if (url.includes('/api/session-snapshot')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: mockSessions, progression: [] }) });
+      }
       if (url.includes('/api/sessions')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockSessions) });
       }
@@ -111,7 +114,7 @@ describe('App component', () => {
     const defaultAnswer = answer.getMockImplementation() as ((url: string) => unknown) | undefined;
     let sessionAttempts = 0;
     answer.mockImplementation((url: string) => {
-      if (url.includes('/api/sessions') && ++sessionAttempts === 1) return Promise.reject(new TypeError('Failed to fetch'));
+      if (url.includes('/api/session-snapshot') && ++sessionAttempts === 1) return Promise.reject(new TypeError('Failed to fetch'));
       return defaultAnswer?.(url);
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -247,7 +250,7 @@ describe('App component', () => {
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true');
+      expect(global.fetch).toHaveBeenCalledWith('/api/sessions?refresh=true', expect.objectContaining({ signal: expect.any(AbortSignal) }));
       expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });

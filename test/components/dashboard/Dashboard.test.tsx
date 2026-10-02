@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Dashboard } from '../../../src/components/dashboard/index.js';
 
+vi.mock('../../../src/components/track-detail/TrackCircuitLayout.js', () => ({ TrackCircuitLayout: () => null }));
+
 describe('Dashboard component', () => {
   const mockSessions = [
     {

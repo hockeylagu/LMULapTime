@@ -159,5 +159,48 @@ describe('replay ingest', () => {
       expect(db.getStoredReplayTrajectory(name, 2, -1)).not.toBeNull();
       expect(db.getReplayDriverIngest(name, 2)?.status).toBe('stored');
     });
+
+    it('marks a replay playable when the primary trajectory is cached but a secondary driver fails', async () => {
+      const replace = db.replaceReplayDriverLaps.bind(db);
+      vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation((...args) => {
+        if (!args[6]) throw new Error('secondary driver write failed');
+        replace(...args);
+      });
+      const jobs: Array<{ status: string; playable?: boolean; error?: string }> = [];
+      const iterator = db.syncReplaysAsyncIterator(dir, {
+        playerName: 'Player Driver',
+        onReplayState: job => jobs.push(job),
+      });
+      let step = await iterator.next();
+      while (!step.done) step = await iterator.next();
+
+      expect(db.getStoredReplayTrajectory(name, -1, -1)).not.toBeNull();
+      expect(jobs[jobs.length - 1]).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
+
+      const secondRun: Array<{ status: string; playable?: boolean; error?: string }> = [];
+      const retryCheck = db.syncReplaysAsyncIterator(dir, {
+        playerName: 'Player Driver',
+        onReplayState: job => secondRun.push(job),
+      });
+      step = await retryCheck.next();
+      while (!step.done) step = await retryCheck.next();
+      expect(secondRun[secondRun.length - 1]).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
+    });
+
+    it('leaves a replay unplayable when its primary trajectory cannot be stored', async () => {
+      vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation(() => {
+        throw new Error('trajectory write failed');
+      });
+      const jobs: Array<{ status: string; playable?: boolean; error?: string }> = [];
+      const iterator = db.syncReplaysAsyncIterator(dir, {
+        playerName: 'Player Driver',
+        onReplayState: job => jobs.push(job),
+      });
+      let step = await iterator.next();
+      while (!step.done) step = await iterator.next();
+
+      expect(db.getStoredReplayTrajectory(name, -1, -1)).toBeNull();
+      expect(jobs[jobs.length - 1]).toMatchObject({ status: 'failed', playable: false, error: 'trajectory write failed' });
+    });
   });
 });

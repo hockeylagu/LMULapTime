@@ -135,6 +135,20 @@ describe('useTrackDetailState', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('shows loading during a retry when the requested track has no retained data', async () => {
+    let resolveRetry: (value: Response) => void = () => {};
+    vi.spyOn(global, 'fetch')
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { resolveRetry = resolve; }));
+    const { result } = renderHook(() => useTrackDetailState('UnknownTrack', 'All'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.error).toBe('offline'));
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.loading).toBe(true));
+    expect(result.current.data).toBeNull();
+    resolveRetry({ ok: true, json: async () => mockTrackData } as Response);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
   it('clears the previous track on failure and retries the current route without losing filters', async () => {
     vi.spyOn(global, 'fetch')
       .mockResolvedValueOnce({ ok: true, json: async () => mockTrackData } as Response)
@@ -166,6 +180,31 @@ describe('useTrackDetailState', () => {
     await waitFor(() => expect(result.current.data?.trackName).toBe('Spa'));
     await act(async () => resolveOld({ ok: true, json: async () => mockTrackData } as Response));
     expect(result.current.data?.trackName).toBe('Spa');
+  });
+
+  it('reloads a previously visited track when returning after another track fails', async () => {
+    let requests = 0;
+    let resolveReturn: (value: Response) => void = () => {};
+    vi.spyOn(global, 'fetch').mockImplementation(() => {
+      requests++;
+      if (requests === 1) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...mockTrackData, trackName: 'A' }) } as Response);
+      if (requests === 2) return Promise.reject(new Error('B offline'));
+      return new Promise<Response>(resolve => { resolveReturn = resolve; });
+    });
+    const { result, rerender } = renderHook(({ track }) => useTrackDetailState(track, 'All'), {
+      wrapper: Wrapper, initialProps: { track: 'A' },
+    });
+    await waitFor(() => expect(result.current.data?.trackName).toBe('A'));
+
+    rerender({ track: 'B' });
+    await waitFor(() => expect(result.current.error).toBe('B offline'));
+    expect(result.current.data).toBeNull();
+
+    rerender({ track: 'A' });
+    await waitFor(() => expect(requests).toBe(3));
+    expect(result.current.loading).toBe(true);
+    resolveReturn({ ok: true, json: () => Promise.resolve({ ...mockTrackData, trackName: 'A fresh' }) } as Response);
+    await waitFor(() => expect(result.current.data?.trackName).toBe('A fresh'));
   });
 
   it('falls back to date ordering for invalid route sort values', async () => {

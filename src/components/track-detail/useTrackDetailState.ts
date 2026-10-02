@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { fetchJson, isAbortError } from '../../api/apiClient.js';
@@ -20,6 +21,7 @@ export interface TrackDetailData {
 }
 
 export function useTrackDetailState(trackName: string, selectedCarClass: string) {
+  const { revision } = useSessionDataContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<boolean>(true);
@@ -31,10 +33,12 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   const [sortBy, setSortByState] = useState<TrackDetailSortOption>(
     readSort(searchParams.get('sort'))
   );
-  const [data, setData] = useState<TrackDetailData | null>(null);
+  const [loadedTrack, setLoadedTrack] = useState<{ trackName: string; data: TrackDetailData } | null>(null);
+  const data = loadedTrack?.trackName === trackName ? loadedTrack.data : null;
   const [error, setError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const prevCarClassRef = useRef(selectedCarClass);
+  const requestedTrackRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHideEmptyState(searchParams.get('hideEmpty') !== 'false');
@@ -105,13 +109,13 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   useEffect(() => {
     let isCurrent = true;
     const controller = new AbortController();
-    setLoading(true);
-    setData(null);
+    if (requestedTrackRef.current !== trackName || loadedTrack?.trackName !== trackName) setLoading(true);
+    requestedTrackRef.current = trackName;
     setError(null);
     fetchJson<TrackDetailData>(`/api/track/${encodeURIComponent(trackName)}`, { signal: controller.signal })
       .then((resData) => {
         if (!isCurrent) return;
-        setData(resData);
+        setLoadedTrack({ trackName, data: resData });
         setLoading(false);
       })
       .catch((err) => {
@@ -123,7 +127,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
       isCurrent = false;
       controller.abort();
     };
-  }, [trackName, loadAttempt]);
+  }, [trackName, loadAttempt, revision]);
 
   return {
     loading,

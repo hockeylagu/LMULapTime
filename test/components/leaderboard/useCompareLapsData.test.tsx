@@ -65,9 +65,11 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await waitFor(() => expect(result.current.allTimePBObject?.id).toBe('fast-player'));
 
-    result.current.handleAddPersonalBest();
-    result.current.handleAddTheoreticalBest();
-    result.current.handleAddOverallTrackBest();
+    act(() => {
+      result.current.handleAddPersonalBest();
+      result.current.handleAddTheoreticalBest();
+      result.current.handleAddOverallTrackBest();
+    });
 
     await waitFor(() => {
       expect(result.current.selectedLaps.some(lap => lap.isTheoreticalBest)).toBe(true);

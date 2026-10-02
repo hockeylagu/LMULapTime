@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `colorize-tokens` (2026-09-29): 376 source files, 213 test files, 1773 tests.
+Last checked against branch `main` (2026-10-01): 403 TypeScript source files in src/server/shared, 230 test files, 1940 tests (1930 passed, 10 skipped).
 
 ---
 
@@ -30,6 +30,7 @@ telemetry, upgrades or the startup benchmark check are active. `/scan/status` ex
 `dataRevision` from DB session/replay/telemetry revisions; completion timestamps catch fast scans.
 Changed snapshots reload counts and the atomic `/session-snapshot` session/progression payload together. `sessionDataContext.ts` refreshes
 open track/session details and lets `ReplayIndicator` show the current replay's processing spinner.
+Recovered scan-status polling errors clear independently of session snapshot or manual-refresh errors.
 API JSON requests use `no-store`; static track geometry keeps browser caching. Session detail retains
 only mounted same-session data during a revision refresh; switching IDs or remounting fetches fresh.
 Refreshes during a scan are coalesced into one follow-up
@@ -37,7 +38,8 @@ XML scan (preserving a requested force reparse), followed by replay and DuckDB s
 `server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker.
 XML publishes ten-session transactions before proceeding; cached sessions whose XML is gone survive.
 Replay discovery finishes and matches every session before decoding associated recordings; per-replay
-jobs expose queued/processing/ready/failed states. Manual refresh retries failed driver decodes.
+jobs expose queued/processing/ready/failed states and whether a failed decode still has a playable primary trajectory. Launch actions remain available for playable cached data or DuckDB telemetry and report partial failures.
+Manual refresh retries failed driver decodes.
 
 `server/index.ts` builds one `ServerContext` (`server/core/serverContext.ts`), which owns:
 - the scan jobs (`runInitialSessionSyncInBackground`, `runReplaySyncInBackground`, `runSessionSyncInBackground`), pumped one step per
@@ -74,7 +76,7 @@ jobs expose queued/processing/ready/failed states. Manual refresh retries failed
    - `table/`: the lap table memoizes class ranks and expanded-event sections per session/driver; `shared/domain/lapPlaces.ts` indexes rival lap positions once, and sorting/expansion reuse the prepared entries. The expanded row text comes from `lapDetailSections.ts` (sections), `lapPlaces.ts`
      (class places, the stop a lap belongs to), `SessionLapDetailsRow.tsx` (grouped event debrief, semantic colors and recorded lap/session clocks), `pitStopText.ts` (pit lines per lap), `src/utils/lapTrafficText.ts` (traffic and
      "left out of average" wording);
-   - `debrief/`: the auto debrief (`loadSessionDebrief.ts` → `/api/compare/laps` + replay trajectories/traffic; ranking in `src/utils/sessionDebrief.ts`);
+   - `debrief/`: the on-demand debrief (`loadSessionDebrief.ts` → `/api/compare/laps` + replay trajectories/traffic; ranking in `src/utils/sessionDebrief.ts`). `useSessionDebrief.ts` keeps results only in mounted hook state, clears them on session/driver changes, and refreshes requested results when the session data revision changes; an unavailable result can recover after ingestion settles. It aborts and ignores obsolete requests;
    - `chart/`: the session telemetry chart.
    - `standings/DriverSafetySummary.tsx`: independent contact, track-limit severity and penalty badges in classification, with the full event tooltip preserved.
 
@@ -101,7 +103,7 @@ jobs expose queued/processing/ready/failed states. Manual refresh retries failed
   Space toggles playback from a chart/map; manual cursor selection pauses it. Map C centers once at the existing zoom,
   F toggles following while preserving the current camera when stopped, and the center button labels itself when the car
   is off-screen. Zoomed scrubbing resumes following unless the driver explicitly pans or disables it.
-  `analysis/` (corner phase cards, consistency, AI tab). Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
+  `analysis/` (corner phase cards, consistency, AI tab). Corner consistency is lazy, recomputes from the mounted replay/driver/lap/trajectory/source inputs, and aborts obsolete comparison-lap requests; its result does not persist across view remounts. Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
   `replayComparison.ts`, `computedTelemetry.ts`, `handlingBalanceDetection.ts`, `telemetryPostProcessing.ts`).
   Steering handling warnings use `src/utils/handlingBalance/evidence.ts`: a sustained response deficit or rear slide is required,
   not just the fixed-ratio Ackermann residual. With aligned comparison samples, events also need at least 0.10 s of local
@@ -141,7 +143,8 @@ recharts out of the entry: chunk groups in `vite.config.ts`). All server calls g
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
 `server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
 
-Track detail load failures show the API message with retry and clear stale track data; route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
+Track detail keeps successful data keyed to its requested track, shows loading when switching back to a previously visited track, and offers an inline retry warning when a same-track refresh fails. Route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
+Leaderboard navigation resolves missing or `All` classes from the selected layout's last-driven class (or first available class), while preserving a valid specific class deep link.
 
 ## 5. Cache versions: what to bump
 

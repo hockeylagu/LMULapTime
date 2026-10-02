@@ -27,6 +27,7 @@ const layout = (layoutKey: string, trackName: string, lastDriven: number, classe
 const LAYOUTS = [
   layout('daytona_road_course', 'Daytona International Speedway (Road Course)', 3000, [['LMH', 7], ['LMGT3', 12]]),
   layout('monza_gp', 'Autodromo Nazionale Monza', 2000, [['LMGT3', 3]]),
+  layout('bahrain_gp', 'Bahrain International Circuit', 1000, [['LMP3', 2], ['LMH', 5]]),
 ];
 
 const EMPTY_LAPS = {
@@ -71,6 +72,30 @@ describe('LeaderboardPage', () => {
     expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH', expect.anything());
+  });
+
+  it.each(['', '&carClass=All'])('selects the chosen track default class when the class is missing or All (%s)', async classQuery => {
+    window.location.hash = `#/leaderboard?track=Bahrain%20International%20Circuit${classQuery}`;
+    render(<LeaderboardPage sessions={[]} />);
+
+    expect(await screen.findByRole('heading', { name: /LMP3 board/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /LMP3\s*P2\/20/ })).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(urlParams().get('carClass')).toBe('LMP3'));
+    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=bahrain_gp&carClass=LMP3', expect.anything());
+  });
+
+  it('defaults an explicit All track sentinel and preserves a valid track/class deep link', async () => {
+    window.location.hash = '#/leaderboard?track=All';
+    const { unmount } = render(<LeaderboardPage sessions={[]} />);
+    await waitFor(() => expect(urlParams().get('track')).toBe(LAYOUTS[0].trackName));
+    expect(urlParams().get('carClass')).toBe('LMH');
+    unmount();
+
+    window.location.hash = '#/leaderboard?track=Bahrain%20International%20Circuit&carClass=LMH&sessionId=s1';
+    render(<LeaderboardPage sessions={[]} />);
+    expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
+    expect(urlParams().get('carClass')).toBe('LMH');
+    expect(urlParams().get('sessionId')).toBe('s1');
   });
 
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
