@@ -207,7 +207,7 @@ export default function App() {
             <Route path="/settings" element={
               <Settings
                 status={status}
-                onUpdatePaths={() => fetchData(true)}
+                onUpdatePaths={(resultsDir) => fetchData(resultsDir === undefined)}
                 replayScanStatus={replayScanStatus}
                 onReplayScanTriggered={refreshReplayScanStatus}
               />

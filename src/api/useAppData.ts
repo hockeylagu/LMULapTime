@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../../shared/types/index.js';
-import { fetchJson, isAbortError, apiErrorMessage } from './apiClient.js';
+import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 
 const SERVER_RETRY_MS = 2000;
@@ -113,7 +113,7 @@ export function useAppData() {
     scanAbort.current?.abort();
     dataAbort.current?.abort();
     try {
-      if (forceRefresh) await fetchJson<DetailedSession[]>('/api/sessions?refresh=true', { signal: controller.signal });
+      if (forceRefresh) await postJson('/api/scan', {}, { signal: controller.signal });
       acknowledged = true;
       loadedKey.current = null;
     } catch (err: unknown) {

@@ -131,6 +131,28 @@ describe('system routes', () => {
       expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
       expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
     });
+
+    it('starts XML before its associated replay and telemetry scans without reconfiguring directories', async () => {
+      const res = await request(app).post('/api/scan').send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ success: true, sessionScanStarted: true });
+      expect(context.configureDirectories).not.toHaveBeenCalled();
+      expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
+      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();
+      expect(context.runSessionSyncInBackground).toHaveBeenCalled();
+    });
+
+    it('queues an empty-body refresh when a file scan is already active', async () => {
+      context.runSessionSyncInBackground.mockReturnValue(false);
+
+      const res = await request(app).post('/api/scan').send({});
+
+      expect(res.status).toBe(200);
+      expect(context.loadSessions).toHaveBeenCalledWith(true);
+      expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
+      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();
+    });
   });
 
   it('GET /api/scan/status returns the context scan status', async () => {

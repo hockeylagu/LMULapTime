@@ -98,20 +98,20 @@ describe('ReplayCacheCard', () => {
     });
   });
 
-  it('reloads the list when the refresh button is clicked', async () => {
+  it('retries loading cached replays after a request fails', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+    fetchMock.mockRejectedValueOnce(new Error('network down'));
     global.fetch = fetchMock;
 
     render(<ReplayCacheCard />);
     await waitFor(() => {
-      const cacheCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/api/replays/cache'));
-      expect(cacheCalls.length).toBe(1);
+      expect(screen.getByText(/unable to load cached replays/i)).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByLabelText(/refresh cached replays/i));
     await waitFor(() => {
-      const cacheCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes('/api/replays/cache'));
-      expect(cacheCalls.length).toBe(2);
+      expect(screen.queryByText(/unable to load cached replays/i)).not.toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/replays/cache'))).toHaveLength(2);
     });
   });
 
