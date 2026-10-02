@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { AppStatus, ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { apiErrorMessage, postJson } from '../../api/apiClient.js';
 import { invalidateReferenceLaptimes } from '../../api/referenceApi.js';
+import { SettingsFeedback } from './SettingsPanel.js';
+import { getMissingPaths } from './settingsSections.js';
 
 interface ReferenceRefreshResponse {
   success?: boolean;
@@ -31,9 +33,9 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isUpdatingLaptimes, setIsUpdatingLaptimes] = useState<boolean>(false);
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
-  const [pathMessage, setPathMessage] = useState<string | null>(null);
-  const [laptimesMessage, setLaptimesMessage] = useState<string | null>(null);
-  const [cacheMessage, setCacheMessage] = useState<string | null>(null);
+  const [pathMessage, setPathMessage] = useState<SettingsFeedback | null>(null);
+  const [laptimesMessage, setLaptimesMessage] = useState<SettingsFeedback | null>(null);
+  const [cacheMessage, setCacheMessage] = useState<SettingsFeedback | null>(null);
   const [updateDiff, setUpdateDiff] = useState<ReferenceBenchmarkDiff | null>(
     status?.referenceLaptimes?.lastUpdateDiff || null
   );
@@ -72,15 +74,24 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
         setIsScanning(false);
         if (data.success) {
           onUpdatePaths(resultsDirInput, replaysDirInput, telemetryDirInput);
-          setPathMessage(`Scanning session, replay, and telemetry data in the background. Driver profile: "${data.playerName}"`);
+          setPathMessage({
+            tone: 'ok',
+            text: `Scanning sessions, replays and telemetry in the background. Driver: "${data.playerName}".`,
+          });
           onReplayScanTriggered?.();
         } else {
-          setPathMessage('Failed to scan directories. Please check paths.');
+          const missing = getMissingPaths(status);
+          setPathMessage({
+            tone: 'error',
+            text: missing.length > 0
+              ? `Scan failed: the ${missing.join(' and ')} could not be found. Check the path${missing.length > 1 ? 's' : ''} above.`
+              : 'Scan failed: the server did not accept these folders.',
+          });
         }
       })
       .catch((err) => {
         setIsScanning(false);
-        setPathMessage(`Error scanning: ${apiErrorMessage(err, 'request failed')}`);
+        setPathMessage({ tone: 'error', text: `Scan failed: ${apiErrorMessage(err, 'request failed')}` });
       });
   };
 
@@ -100,21 +111,18 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
           const diffSummary = data.diff?.hasChanges
             ? ` (${data.diff.addedCount} new, ${data.diff.updatedCount} updated, ${data.diff.removedCount} removed)`
             : ' (no changes detected)';
-          setLaptimesMessage(`Updated ${data.entriesCount} benchmark entries from Google Sheets!${diffSummary}`);
+          setLaptimesMessage({ tone: 'ok', text: `Updated ${data.entriesCount} benchmark entries from Google Sheets!${diffSummary}` });
         } else {
-          setLaptimesMessage('Failed to update reference lap time benchmarks.');
+          setLaptimesMessage({ tone: 'error', text: 'The benchmark update did not complete. Your cached benchmarks are unchanged.' });
         }
       })
       .catch((err) => {
         setIsUpdatingLaptimes(false);
-        setLaptimesMessage(`Error updating: ${apiErrorMessage(err, 'request failed')}`);
+        setLaptimesMessage({ tone: 'error', text: `Benchmark update failed: ${apiErrorMessage(err, 'request failed')}` });
       });
   };
 
   const handleClearCache = () => {
-    if (!window.confirm('Are you sure you want to clear the SQLite session cache? Cached session data will be deleted and can be rescanned.')) {
-      return;
-    }
     setIsClearingCache(true);
     setCacheMessage(null);
 
@@ -124,14 +132,14 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
         if (data.success) {
           onUpdatePaths();
           invalidateReferenceLaptimes();
-          setCacheMessage('Session SQLite cache cleared successfully! You can rescan anytime.');
+          setCacheMessage({ tone: 'ok', text: 'Session cache cleared. Sessions are read again from your XML logs on the next scan.' });
         } else {
-          setCacheMessage('Failed to clear SQLite cache.');
+          setCacheMessage({ tone: 'error', text: 'The session cache was not cleared.' });
         }
       })
       .catch((err) => {
         setIsClearingCache(false);
-        setCacheMessage(`Error clearing cache: ${apiErrorMessage(err, 'request failed')}`);
+        setCacheMessage({ tone: 'error', text: `Clearing the cache failed: ${apiErrorMessage(err, 'request failed')}` });
       });
   };
 

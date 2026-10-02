@@ -165,7 +165,7 @@ describe('ReferenceLaptimesCard component', () => {
     // Wait for history load
     await screen.findByRole('combobox', { name: /benchmark update history version/i });
 
-    expect(screen.getByText('Reference Lap Time Benchmarks')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
     expect(screen.getByText('187 Benchmarks Cached')).toBeInTheDocument();
     expect(screen.getByText('3 Sessions Driven')).toBeInTheDocument();
     expect(screen.getByText('1 Category Shift')).toBeInTheDocument();

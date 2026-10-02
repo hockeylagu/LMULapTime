@@ -24,7 +24,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Ready (session)')).toBeInTheDocument();
+      expect(screen.getByText('Ready, key set this session')).toBeInTheDocument();
     });
 
     expect(screen.getByText(/AI Lap Reports/i)).toBeInTheDocument();
@@ -112,7 +112,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Ready (environment)')).toBeInTheDocument();
+      expect(screen.getByText('Ready, key from the environment')).toBeInTheDocument();
     });
 
     const removeBtn = screen.getByRole('button', { name: /Remove Session Key/i });
@@ -136,7 +136,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Ready (session)')).toBeInTheDocument();
+      expect(screen.getByText('Ready, key set this session')).toBeInTheDocument();
     });
 
     const removeBtn = screen.getByRole('button', { name: /Remove Session Key/i });
@@ -157,7 +157,7 @@ describe('AISettingsCard component', () => {
 
     render(<AISettingsCard />);
     await waitFor(() => {
-      expect(screen.getByText('Ready (session)')).toBeInTheDocument();
+      expect(screen.getByText('Ready, key set this session')).toBeInTheDocument();
     });
 
     const removeBtn = screen.getByRole('button', { name: /Remove Session Key/i });

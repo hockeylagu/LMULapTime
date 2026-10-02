@@ -35,8 +35,9 @@ describe('FolderPathsCard component', () => {
     render(<FolderPathsCard {...defaultProps} />);
     const detectedBadges = screen.getAllByText(/^Detected$/i);
     expect(detectedBadges).toHaveLength(3);
-    expect(screen.getByText('C:\\LMU\\UserData\\LOG\\Results')).toBeInTheDocument();
-    expect(screen.getByText('C:\\LMU\\UserData\\Replays')).toBeInTheDocument();
+    // Each path appears once, as the input value.
+    expect(screen.getAllByDisplayValue('C:\\LMU\\UserData\\LOG\\Results')).toHaveLength(1);
+    expect(screen.queryByText('C:\\LMU\\UserData\\LOG\\Results')).not.toBeInTheDocument();
   });
 
   it('renders Not Found badges and fallback telemetry label when directories do not exist', () => {
@@ -51,7 +52,6 @@ describe('FolderPathsCard component', () => {
     render(<FolderPathsCard {...defaultProps} status={missingStatus} />);
     const notFoundBadges = screen.getAllByText(/Not Found/i);
     expect(notFoundBadges).toHaveLength(3);
-    expect(screen.getByText('Not Configured')).toBeInTheDocument();
   });
 
   it('calls input change handlers when typing in fields', () => {
@@ -93,16 +93,44 @@ describe('FolderPathsCard component', () => {
     const onScanPaths = vi.fn((e: React.FormEvent) => e.preventDefault());
     render(<FolderPathsCard {...defaultProps} onScanPaths={onScanPaths} />);
 
-    const scanBtn = screen.getByRole('button', { name: /Rescan & Load Telemetry/i });
+    const scanBtn = screen.getByRole('button', { name: /Rescan & load telemetry/i });
     fireEvent.click(scanBtn);
     expect(onScanPaths).toHaveBeenCalled();
   });
 
   it('displays scanning state and path messages when active', () => {
-    render(<FolderPathsCard {...defaultProps} isScanning={true} pathMessage="Paths saved successfully." />);
+    render(<FolderPathsCard {...defaultProps} isScanning={true} pathMessage={{ tone: 'ok', text: 'Paths saved successfully.' }} />);
 
-    const scanBtn = screen.getByRole('button', { name: /Scanning Directory\.\.\./i });
+    const scanBtn = screen.getByRole('button', { name: /Scanning folders\.\.\./i });
     expect(scanBtn).toBeDisabled();
-    expect(screen.getByText('Paths saved successfully.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Paths saved successfully.');
+    expect(screen.getByRole('status')).toHaveClass('text-lmu-gain');
+  });
+
+  it('renders a failed scan as an error, not a success', () => {
+    render(<FolderPathsCard {...defaultProps} pathMessage={{ tone: 'error', text: 'Scan failed: the results folder could not be found.' }} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Scan failed');
+    expect(status).toHaveClass('text-lmu-loss');
+    expect(status).not.toHaveClass('text-lmu-gain');
+  });
+
+  it('gives every input an accessible name', () => {
+    render(<FolderPathsCard {...defaultProps} />);
+    expect(screen.getByLabelText('Driver name')).toHaveValue('Samuel Lague');
+    expect(screen.getByLabelText('Results logs')).toHaveValue('C:\\LMU\\UserData\\LOG\\Results');
+    expect(screen.getByLabelText('Replays')).toHaveValue('C:\\LMU\\UserData\\Replays');
+    expect(screen.getByLabelText('Telemetry')).toHaveValue('C:\\LMU\\UserData\\Telemetry');
+    expect(screen.getByLabelText('Driver name')).toHaveAttribute('placeholder', 'Your LMU driver name');
+  });
+
+  it('offers a reset to the saved path once a path is edited', () => {
+    const setResultsDirInput = vi.fn();
+    render(<FolderPathsCard {...defaultProps} resultsDirInput="D:\\Elsewhere" setResultsDirInput={setResultsDirInput} />);
+    expect(screen.getAllByText(/^Detected$/i)).toHaveLength(2);
+    expect(screen.getByText(/changed, rescan to check/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /reset/i }));
+    expect(setResultsDirInput).toHaveBeenCalledWith('C:\\LMU\\UserData\\LOG\\Results');
   });
 });

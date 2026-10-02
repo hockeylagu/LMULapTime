@@ -1,72 +1,120 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Film, RefreshCw, HardDrive, Archive } from 'lucide-react';
-import { ReplayCacheSummary, ReplayScanStatus } from '../../../shared/types/index.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import {
+  ReplayCacheSummary,
+  ReplayScanStatus,
+  ReplayUpgradeStatus,
+  ScanStatus,
+} from '../../../shared/types/index.js';
 import { fetchJson } from '../../api/apiClient.js';
+import { ReplayCacheTable } from './ReplayCacheTable.js';
+import { SettingsPanel } from './SettingsPanel.js';
+
+export interface ReplayUpgradeOverview {
+  status: ReplayUpgradeStatus;
+  pendingReplays: number;
+  pendingDrivers: number;
+}
+
+function isUpgradeOverview(value: unknown): value is ReplayUpgradeOverview {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<ReplayUpgradeOverview>;
+  return (
+    typeof candidate.pendingReplays === 'number' &&
+    typeof candidate.pendingDrivers === 'number' &&
+    !!candidate.status
+  );
+}
+
+const UPGRADE_POLL_MS = 3000;
 
 export interface ReplayCacheCardProps {
-  replayScanStatus?: ReplayScanStatus | null;
+  replayScanStatus?: ScanStatus | ReplayScanStatus | null;
 }
 
 export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStatus }) => {
   const [replays, setReplays] = useState<ReplayCacheSummary[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [upgradeOverview, setUpgradeOverview] = useState<ReplayUpgradeOverview | null>(null);
+  const upgradeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const loadReplays = () => {
+  const loadReplays = useCallback(() => {
     setIsLoading(true);
     setError(null);
     fetchJson<ReplayCacheSummary[]>('/api/replays/cache')
-      .then(data => setReplays(Array.isArray(data) ? data : []))
+      .then((data) => setReplays(Array.isArray(data) ? data : []))
       .catch(() => setError('Unable to load cached replays.'))
       .finally(() => setIsLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { loadReplays(); }, []);
+  const loadUpgrade = useCallback(() => {
+    if (upgradeTimer.current) clearTimeout(upgradeTimer.current);
+    fetchJson<unknown>('/api/replays/upgrade')
+      .then((data) => {
+        if (!isUpgradeOverview(data)) return;
+        setUpgradeOverview(data);
+        if (data.status.running) {
+          upgradeTimer.current = setTimeout(loadUpgrade, UPGRADE_POLL_MS);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  // Refresh the cached list right when a background scan finishes, so the count/table
-  // don't sit stale until the user manually clicks refresh.
-  const wasScanRunning = useRef(false);
   useEffect(() => {
-    const isRunning = !!replayScanStatus?.running;
-    if (wasScanRunning.current && !isRunning) {
+    loadReplays();
+    loadUpgrade();
+    return () => {
+      if (upgradeTimer.current) clearTimeout(upgradeTimer.current);
+    };
+  }, [loadReplays, loadUpgrade]);
+
+  // Refresh cached replays and check upgrade status when a background scan ends
+  const isScanRunning = !!replayScanStatus?.running;
+  const wasScanRunning = useRef(isScanRunning);
+  useEffect(() => {
+    if (wasScanRunning.current && !isScanRunning) {
+      loadReplays();
+      loadUpgrade();
+    }
+    wasScanRunning.current = isScanRunning;
+  }, [isScanRunning, loadReplays, loadUpgrade]);
+
+  // Active upgrade status from either props or polled endpoint
+  const scanUpgrade =
+    replayScanStatus && 'replayUpgrade' in replayScanStatus
+      ? (replayScanStatus as ScanStatus).replayUpgrade
+      : null;
+  const activeUpgrade =
+    (scanUpgrade?.running ? scanUpgrade : null) ??
+    (upgradeOverview?.status?.running ? upgradeOverview.status : null);
+  const isUpgradeRunning = !!activeUpgrade?.running;
+
+  // Refresh replays table once background upgrade completes
+  const wasUpgradeRunning = useRef(isUpgradeRunning);
+  useEffect(() => {
+    if (wasUpgradeRunning.current && !isUpgradeRunning) {
       loadReplays();
     }
-    wasScanRunning.current = isRunning;
-  }, [replayScanStatus?.running]);
+    wasUpgradeRunning.current = isUpgradeRunning;
+  }, [isUpgradeRunning, loadReplays]);
 
-  const isReplayScanRunning = !!replayScanStatus?.running;
-  const replayScanPercent = replayScanStatus && replayScanStatus.total > 0
-    ? Math.round((replayScanStatus.processed / replayScanStatus.total) * 100)
-    : 0;
+  const replayScanPercent =
+    replayScanStatus && replayScanStatus.total > 0
+      ? Math.round((replayScanStatus.processed / replayScanStatus.total) * 100)
+      : 0;
 
-  const formatBytes = (bytes?: number) => {
-    if (!bytes || bytes <= 0) return '0 KB';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  const formatDuration = (sec?: number) => {
-    if (!sec || sec <= 0) return '—';
-    const m = Math.floor(sec / 60);
-    const s = Math.round(sec % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const formatDate = (ms: number) => {
-    if (!ms) return '—';
-    return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  };
+  const upgradePercent =
+    activeUpgrade && activeUpgrade.driversTotal > 0
+      ? Math.round((activeUpgrade.driversDone / activeUpgrade.driversTotal) * 100)
+      : 0;
 
   return (
-    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
-      <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
+    <SettingsPanel
+      sectionId="replay-cache"
+      aside={
         <div className="flex items-center gap-2">
-          <Film className="w-5 h-5 text-lmu-accent-text" />
-          <h3 className="text-base font-bold text-white uppercase tracking-wider">Cached Replays (.VCR)</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-accent/20 text-lmu-accent-text border border-lmu-accent/30">
+          <span className="text-xs font-mono text-lmu-muted">
             {replays?.length ?? 0} Cached
           </span>
           <button
@@ -74,19 +122,22 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
             onClick={loadReplays}
             disabled={isLoading}
             aria-label="Refresh cached replays"
-            className="p-1.5 rounded-lg border border-lmu-border text-lmu-muted hover:text-white transition-all disabled:opacity-50 cursor-pointer"
+            className="p-1.5 rounded-md text-lmu-muted hover:text-white hover:bg-lmu-card-hover transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-lmu-accent-text"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      </div>
-
+      }
+    >
       <p className="text-xs text-lmu-muted leading-relaxed">
-        Replay metadata, drivers, laps and full-resolution telemetry are parsed once and cached in SQLite (brotli-compressed) during each session scan, so they stay available even after LMU deletes the original .VCR file.
+        Replay metadata, drivers, laps and full-resolution telemetry are parsed once and cached in
+        SQLite (brotli-compressed) during each session scan, so they stay available even after LMU
+        deletes the original .VCR file.
       </p>
 
-      {isReplayScanRunning && (
-        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
+      {/* Background Replay Scan Progress (when scanning disk) */}
+      {isScanRunning && (
+        <div className="bg-lmu-bg p-4 rounded-lg space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-lmu-muted uppercase tracking-wider">
               Parsing Replays in Background
@@ -97,7 +148,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
           </div>
           <div className="w-full h-2 rounded-full bg-lmu-border/50 overflow-hidden">
             <div
-              className="h-full bg-lmu-accent transition-all duration-300"
+              className="h-full bg-lmu-info transition-all duration-300"
               style={{ width: `${replayScanPercent}%` }}
             />
           </div>
@@ -105,12 +156,15 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
             <div className="flex flex-col gap-0.5 text-[11px] text-lmu-muted font-mono">
               <div className="flex items-center justify-between">
                 <span className="truncate">{replayScanStatus.currentFile}</span>
-                {replayScanStatus.filePercent !== undefined && replayScanStatus.filePercent !== null && (
-                  <span className="text-lmu-info font-semibold ml-2 shrink-0">{replayScanStatus.filePercent}%</span>
-                )}
+                {replayScanStatus.filePercent !== undefined &&
+                  replayScanStatus.filePercent !== null && (
+                    <span className="text-lmu-info font-semibold ml-2 shrink-0">
+                      {replayScanStatus.filePercent}%
+                    </span>
+                  )}
               </div>
               {replayScanStatus.currentStage && (
-                <span className="text-[10px] text-lmu-muted font-sans italic truncate">
+                <span className="text-[10px] text-lmu-faint font-sans truncate">
                   {replayScanStatus.currentStage}
                 </span>
               )}
@@ -119,70 +173,63 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replayScanStat
         </div>
       )}
 
-      {error && <p className="text-xs font-semibold text-lmu-accent-text">{error}</p>}
-
-      {replays && replays.length === 0 && !isLoading && (
-        <p className="text-xs text-lmu-muted italic">No replays cached yet. Rescan from the folder paths section below.</p>
-      )}
-
-      {replays && replays.length > 0 && (
-        <div className="max-h-72 overflow-y-auto overflow-x-auto rounded-xl border border-lmu-border">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-lmu-bg text-lmu-muted uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="text-left font-semibold px-3 py-2 max-w-[160px]">Replay</th>
-                <th className="text-center font-semibold px-2 py-2">Disk</th>
-                <th className="text-center font-semibold px-3 py-2">Version</th>
-                <th className="text-right font-semibold px-3 py-2">Drivers</th>
-                <th className="text-right font-semibold px-3 py-2">Duration</th>
-                <th className="text-right font-semibold px-3 py-2">Size</th>
-                <th className="text-right font-semibold px-3 py-2">Compressed</th>
-                <th className="text-right font-semibold px-3 py-2">Date</th>
-                <th className="text-right font-semibold px-3 py-2">Trajectories</th>
-              </tr>
-            </thead>
-            <tbody>
-              {replays.map(r => (
-                <tr key={r.filename} className="border-t border-lmu-border/50 hover:bg-lmu-card/50">
-                  <td className="px-3 py-2 text-white font-medium truncate max-w-[196px]" title={r.filename}>{r.filename}</td>
-                  <td className="px-2 py-2 text-center whitespace-nowrap">
-                    {r.isOnDisk ? (
-                      <span
-                        className="inline-flex items-center justify-center p-1 rounded bg-lmu-gain-strong/10 text-lmu-gain border border-lmu-gain-strong/30"
-                        title="On Disk"
-                        aria-label="On Disk"
-                        data-testid="replay-on-disk-badge"
-                      >
-                        <HardDrive className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center justify-center p-1 rounded bg-lmu-warn-strong/10 text-lmu-warn border border-lmu-warn-strong/25"
-                        title="Not on Disk"
-                        aria-label="Not on Disk"
-                        data-testid="replay-not-on-disk-badge"
-                      >
-                        <Archive className="w-3.5 h-3.5 text-lmu-warn/80" />
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-center font-mono">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-lmu-raised text-lmu-info border border-lmu-rule">
-                      {r.replayVersion || r.parserVersion || '—'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.driversCount}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{formatDuration(r.durationSec)}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.fileSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-gold">{formatBytes(r.compressedSizeBytes)}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-muted">{formatDate(r.replayDateMs)}</td>
-                  <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-white">{r.trajectoriesCached}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Background Replay Upgrade Progress (only shown when an upgrade is running) */}
+      {isUpgradeRunning && activeUpgrade && (
+        <div className="bg-lmu-bg p-4 rounded-lg space-y-2" data-testid="replay-upgrade-running">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-lmu-muted uppercase tracking-wider">
+              Upgrading Replay Telemetry
+            </span>
+            <span className="font-mono font-bold text-white">
+              {activeUpgrade.driversDone} / {activeUpgrade.driversTotal} Drivers
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-lmu-border/50 overflow-hidden">
+            <div
+              className="h-full bg-lmu-info transition-all duration-300"
+              style={{ width: `${upgradePercent}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-lmu-muted">
+            <span>
+              Replay {Math.min(activeUpgrade.processed + 1, activeUpgrade.total)} of{' '}
+              {activeUpgrade.total}
+            </span>
+            <span className="font-mono">{upgradePercent}%</span>
+          </div>
+          {activeUpgrade.currentFile && (
+            <div className="flex flex-col gap-0.5 text-[11px] text-lmu-muted font-mono">
+              <div className="flex items-center justify-between">
+                <span className="truncate">{activeUpgrade.currentFile}</span>
+                {activeUpgrade.filePercent !== null && activeUpgrade.filePercent !== undefined && (
+                  <span className="text-lmu-info font-semibold ml-2 shrink-0">
+                    {activeUpgrade.filePercent}%
+                  </span>
+                )}
+              </div>
+              {activeUpgrade.currentStage && (
+                <span className="text-[10px] text-lmu-faint font-sans truncate">
+                  {activeUpgrade.currentStage}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
-    </div>
+
+      {error && (
+        <p role="alert" className="text-xs font-semibold text-lmu-loss">
+          {error}
+        </p>
+      )}
+
+      {replays && replays.length === 0 && !isLoading && (
+        <p className="text-xs text-lmu-faint">
+          No replays cached yet. Rescan from Folder Paths &amp; Driver.
+        </p>
+      )}
+
+      {replays && replays.length > 0 && <ReplayCacheTable replays={replays} />}
+    </SettingsPanel>
   );
 };

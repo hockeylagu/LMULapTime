@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Globe, ExternalLink, RefreshCw, CheckCircle2, History } from 'lucide-react';
+import { Globe, ExternalLink, RefreshCw, History } from 'lucide-react';
 import {
   ReferenceBenchmarkDiff,
   BenchmarkDiffSummary,
@@ -7,12 +7,14 @@ import {
 } from '../../../shared/types/index.js';
 import { ReferenceChangesList } from './ReferenceChangesList.js';
 import { fetchBenchmarkDiffHistory, fetchBenchmarkDiffById } from '../../api/referenceApi.js';
+import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
+import { formatDateTime } from './settingsFormat.js';
 
 export interface ReferenceLaptimesCardProps {
   status: AppStatus | null;
   isUpdatingLaptimes: boolean;
   onUpdateReferenceLaptimes: () => void;
-  laptimesMessage: string | null;
+  laptimesMessage: SettingsFeedback | null;
   updateDiff: ReferenceBenchmarkDiff | null;
 }
 
@@ -29,7 +31,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   const lastUpdatedStr = status?.referenceLaptimes?.lastUpdated
-    ? new Date(status.referenceLaptimes.lastUpdated).toLocaleString()
+    ? formatDateTime(status.referenceLaptimes.lastUpdated)
     : 'Not cached yet';
 
   // Load history list on mount and when updateDiff changes
@@ -78,38 +80,35 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
   };
 
   return (
-    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
-      <div className="flex items-center justify-between border-b border-lmu-border/50 pb-3">
-        <div className="flex items-center gap-2">
-          <Database className="w-5 h-5 text-lmu-gold" />
-          <h3 className="text-base font-bold text-white uppercase tracking-wider">Reference Lap Time Benchmarks</h3>
-        </div>
-        <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-lmu-gold/20 text-lmu-gold border border-lmu-gold/30">
+    <SettingsPanel
+      sectionId="reference-benchmarks"
+      aside={
+        <span className="text-xs font-mono text-lmu-muted">
           {status?.referenceLaptimes?.entriesCount || 0} Benchmarks Cached
         </span>
-      </div>
-
+      }
+    >
       <p className="text-xs text-lmu-muted leading-relaxed">
         The reference lap times are used to classify each of your laps into pace categories (<strong>Alien</strong>, <strong>Competitive</strong>, <strong>Good</strong>, <strong>Midpack</strong>, <strong>Tail-ender</strong>, <strong>Offline</strong>). Benchmark data is fetched from the official published spreadsheet and cached locally.
       </p>
 
-      <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 border-y border-lmu-border py-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs text-lmu-muted">
-            <Globe className="w-4 h-4 text-lmu-cyan shrink-0" />
+            <Globe className="w-4 h-4 text-lmu-muted shrink-0" />
             <span>Source: Published Google Sheets CSV</span>
             <a
               href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-lmu-accent-text hover:underline ml-1"
+              className="inline-flex items-center gap-1 text-lmu-text-soft hover:underline ml-1"
             >
               <span>View Sheet</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
           <p className="text-xs text-white">
-            Last Cached/Updated: <span className="font-mono text-lmu-gold font-semibold">{lastUpdatedStr}</span>
+            Updated: <span className="font-mono text-lmu-text-soft font-semibold">{lastUpdatedStr}</span>
           </p>
         </div>
 
@@ -117,23 +116,18 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
           type="button"
           onClick={onUpdateReferenceLaptimes}
           disabled={isUpdatingLaptimes}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-gold text-lmu-bg font-extrabold text-xs uppercase tracking-wider hover:bg-lmu-warn transition-all shrink-0 disabled:opacity-50 cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-lmu-card border border-lmu-rule text-lmu-text-soft font-semibold text-xs hover:bg-lmu-card-hover transition-colors shrink-0 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
         >
           <RefreshCw className={`w-4 h-4 ${isUpdatingLaptimes ? 'animate-spin' : ''}`} />
-          {isUpdatingLaptimes ? 'Fetching Spreadsheet...' : 'Update Reference Lap Time Benchmarks'}
+          {isUpdatingLaptimes ? 'Fetching spreadsheet...' : 'Update Reference Lap Time Benchmarks'}
         </button>
       </div>
 
-      {laptimesMessage && (
-        <div className="p-3 rounded-xl bg-lmu-green/10 border border-lmu-green/20 text-xs font-semibold text-lmu-green flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>{laptimesMessage}</span>
-        </div>
-      )}
+      <FeedbackMessage feedback={laptimesMessage} />
 
       {/* Diff Version History Selector */}
       {history.length > 0 && (
-        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-lmu-border/40">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-white">
             <History className="w-4 h-4 text-lmu-muted" />
             <span>Benchmark Update History</span>
@@ -148,16 +142,11 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
               value={selectedDiffId}
               onChange={(e) => handleSelectDiffVersion(e.target.value)}
               aria-label="Benchmark Update History Version"
-              className="bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-lmu-accent font-mono transition-all cursor-pointer"
+              className="bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text font-mono transition-colors cursor-pointer"
             >
               <option value="latest">Latest Diff Snapshot</option>
               {history.map((h) => {
-                const dateStr = new Date(h.timestamp).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+                const dateStr = formatDateTime(h.timestamp);
                 const summaryText = h.hasChanges
                   ? `+${h.addedCount} / ~${h.updatedCount} / -${h.removedCount} (${h.totalCategoryShifts} shifts)`
                   : 'No changes';
@@ -174,17 +163,17 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
 
       {/* Viewing older diff notification banner */}
       {selectedDiffId !== 'latest' && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-purple-950/30 border border-purple-800/40 text-xs text-purple-200">
+        <div className="flex items-center justify-between gap-3 py-3 border-y border-lmu-border text-xs text-lmu-muted">
           <span>
             Viewing historical benchmark snapshot from{' '}
             <strong>
-              {displayedDiff?.timestamp ? new Date(displayedDiff.timestamp).toLocaleString() : `#${selectedDiffId}`}
+              {displayedDiff?.timestamp ? formatDateTime(displayedDiff.timestamp) : `#${selectedDiffId}`}
             </strong>
           </span>
           <button
             type="button"
             onClick={() => handleSelectDiffVersion('latest')}
-            className="text-xs text-purple-300 hover:text-white font-semibold underline cursor-pointer"
+            className="text-xs text-lmu-text-soft hover:text-white font-semibold underline underline-offset-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
           >
             Return to Latest
           </button>
@@ -194,12 +183,12 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
       {/* Reference Benchmark Changes / What Changed Section */}
       {isLoadingDiff ? (
         <div className="p-8 text-center text-xs text-lmu-muted">
-          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-lmu-accent-text" />
+          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-lmu-muted" />
           Loading historical benchmark diff...
         </div>
       ) : (
         displayedDiff && <ReferenceChangesList updateDiff={displayedDiff} />
       )}
-    </div>
+    </SettingsPanel>
   );
 };
