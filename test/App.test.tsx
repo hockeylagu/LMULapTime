@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from '../src/App.js';
 import { prefetchRoutePages } from '../src/routePages.js';
 
@@ -118,12 +118,17 @@ describe('App component', () => {
       return defaultAnswer?.(url);
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    render(<App />);
-
-    expect(await screen.findByTestId('app-loading-state')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Totals')).toBeInTheDocument(), { timeout: 4000 });
-    expect(sessionAttempts).toBe(2);
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      expect(screen.getByTestId('app-loading-state')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(sessionAttempts).toBe(2);
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+    await waitFor(() => expect(screen.getByText('Totals')).toBeInTheDocument());
   });
 
   it('navigates to Tracks and Settings via Navbar tabs', async () => {

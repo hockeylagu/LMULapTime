@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `main` (2026-10-01): 403 TypeScript source files in src/server/shared, 230 test files, 1940 tests (1930 passed, 10 skipped).
+Last checked against branch `main` (2026-10-02): 419 TypeScript source files in src/server/shared, 238 test files, 2053 tests (2043 passed, 10 skipped).
 
 ---
 
