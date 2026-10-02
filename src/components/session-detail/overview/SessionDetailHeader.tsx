@@ -91,6 +91,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
           {session.matchingReplayFile && (
             <ReplayLaunchButton
               hasDuckDb={hasDuckDb}
+              replayName={session.matchingReplayFile.name}
               onClick={() => handleOpenReplay()}
               title={`Matching Replay: ${session.matchingReplayFile.name}${
                 hasDuckDb ? `

@@ -80,6 +80,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
 
   return (
     <div className="space-y-6">
+      {loadError && <p role="alert" className="text-sm text-lmu-loss">Session refresh failed: {loadError}</p>}
       <SessionDetailHeader
         session={session}
         selectedDriver={selectedDriver}

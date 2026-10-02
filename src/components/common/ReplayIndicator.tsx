@@ -1,5 +1,6 @@
 import React from 'react';
-import { Video, Zap } from 'lucide-react';
+import { Video, Zap, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
+import { useSessionDataContext } from '../../api/sessionDataContext.js';
 
 export interface ReplayIndicatorProps {
   replay?: {
@@ -26,12 +27,35 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   className = '',
   onClick,
 }) => {
+  const { scan } = useSessionDataContext();
+  const job = scan?.replayJobs?.find(candidate => candidate.name === replay?.name);
+  const processing = job?.status === 'processing' || Boolean(replay && ((scan?.running && scan.currentFile === replay.name) ||
+    (scan?.replayUpgrade?.running && scan.replayUpgrade.currentFile === replay.name)));
+  const isDuckDb = Boolean(hasDuckDbTelemetry || replay?.hasDuckDbTelemetry);
+  const usableDespiteFailure = Boolean(job?.playable || isDuckDb);
+  const partialFailure = job?.status === 'failed' && usableDespiteFailure;
+
   if (!replay) {
     if (hideIfEmpty) return null;
     return <span className="text-lmu-muted text-xs">-</span>;
   }
 
-  const isDuckDb = Boolean(hasDuckDbTelemetry || replay.hasDuckDbTelemetry);
+  if (processing || job?.status === 'queued' || (job?.status === 'failed' && !usableDespiteFailure)) {
+    const state = processing ? 'processing' : job?.status === 'queued' ? 'queued' : 'failed';
+    const label = state === 'processing' ? 'Replay processing' : state === 'queued' ? 'Replay queued' : 'Replay processing failed. Refresh to retry.';
+    const stage = scan?.running ? scan.currentStage : scan?.replayUpgrade?.currentStage;
+    const percent = scan?.running ? scan.filePercent : scan?.replayUpgrade?.filePercent;
+    return (
+      <span role="status" aria-label={label} title={`${label}: ${replay.name}${processing && stage ? ` — ${stage}${percent != null ? ` (${Math.round(percent)}%)` : ''}` : ''}${job?.error ? ` — ${job.error}` : ''}`}
+        onClick={event => event.stopPropagation()}
+        className={`inline-flex p-1.5 rounded-lg bg-lmu-raised text-lmu-info border border-lmu-border shrink-0 ${className}`}>
+        {processing ? <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin motion-reduce:animate-none" />
+          : state === 'queued' ? <Clock3 aria-hidden="true" className="w-4 h-4" />
+          : <AlertCircle aria-hidden="true" className="w-4 h-4 text-lmu-warn" />}
+      </span>
+    );
+  }
+
   const activeDuckFilename = duckdbFilename || replay.duckdbFilename;
 
   const indicatorClassName = isDuckDb
@@ -41,6 +65,10 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   const title = isDuckDb
     ? `⚡ 100Hz DuckDB Telemetry & Replay: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}`
     : `Replay VCR: ${replay.name}`;
+  const partialWarning = partialFailure
+    ? `${job?.playable ? 'Some replay drivers are unavailable' : 'Replay cache unavailable; DuckDB telemetry is available'}${job?.error ? ` — ${job.error}` : ''}`
+    : '';
+  const indicatorTitle = partialWarning ? `${title} — ${partialWarning}` : title;
 
   if (onClick) {
     return (
@@ -51,8 +79,8 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
           onClick();
         }}
         className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-green/20'} transition-colors cursor-pointer`}
-        title={`${title} - Open telemetry`}
-        aria-label="Open replay telemetry"
+        title={`${indicatorTitle} - Open telemetry`}
+        aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}
       >
         {isDuckDb ? (
           <>
@@ -67,7 +95,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   }
 
   return (
-    <span className={indicatorClassName} title={title}>
+    <span className={indicatorClassName} title={indicatorTitle}>
       {isDuckDb ? (
         <>
           <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />

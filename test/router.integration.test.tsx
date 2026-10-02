@@ -10,6 +10,9 @@ function mockApi() {
     if (url.includes('/api/status')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ resultsExist: true, replaysExist: true, sessionsCount: 0 }) });
     }
+    if (url.includes('/api/session-snapshot')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [], progression: [] }) });
+    }
     if (url.includes('/api/sessions')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     }

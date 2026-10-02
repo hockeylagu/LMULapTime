@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
-import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, Trophy, Film } from 'lucide-react';
+import { Gauge, Flag, Settings as SettingsIcon, RefreshCw, Trophy, Film, LoaderCircle } from 'lucide-react';
 import { ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
 
 /** Status chips on the right: an inset well like the tab group, lifting to white on hover. */
@@ -36,11 +36,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isScanRunning = Boolean(
     replayScanStatus?.running ||
     ('sessionScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.sessionScan?.running) ||
-    ('telemetryScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.telemetryScan?.running)
+    ('telemetryScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.telemetryScan?.running) ||
+    ('replayUpgrade' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.replayUpgrade?.running)
   );
 
+  const fullScan = replayScanStatus && ('sessionScan' in replayScanStatus || 'telemetryScan' in replayScanStatus || 'replayUpgrade' in replayScanStatus) ? replayScanStatus as ScanStatus : null;
+
   const scanStatusText = (() => {
-    if (!replayScanStatus) return status ? `${status.replaysCount} Replays` : 'Replays';
+    if (!replayScanStatus) return status?.replaysCount != null ? `${status.replaysCount} Replays` : 'Replays';
     const fullStatus =
       'sessionScan' in replayScanStatus || 'telemetryScan' in replayScanStatus || 'allComplete' in replayScanStatus
         ? (replayScanStatus as ScanStatus)
@@ -62,6 +65,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       return t > 0 ? `Syncing Telemetry… ${p}/${t}` : 'Syncing Telemetry…';
     }
 
+    if (fullStatus?.replayUpgrade?.running) return `Updating Replays… ${fullStatus.replayUpgrade.processed}/${fullStatus.replayUpgrade.total}`;
+
     const totalReplays = replayScanStatus.result?.total ?? status?.replaysCount ?? 0;
     return `${totalReplays} Replays`;
   })();
@@ -81,6 +86,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       return `Syncing Session: ${fullStatus.sessionScan.currentFile}${stage}`;
     }
     if (fullStatus?.telemetryScan?.currentFile) return `Syncing Telemetry: ${fullStatus.telemetryScan.currentFile}`;
+    if (fullStatus?.replayUpgrade?.running) return `Updating Replay: ${fullStatus.replayUpgrade.currentFile || 'Preparing'}`;
+    if (replayScanStatus.error || fullStatus?.sessionScan?.error || fullStatus?.telemetryScan?.error || fullStatus?.replayJobs?.some(job => job.status === 'failed')) return 'Scan failed. See Settings for details.';
     if (fullStatus?.allComplete || fullStatus?.allCached) return 'All sessions, replays, and telemetry are synchronized';
     return 'View Replays in Settings';
   })();
@@ -146,8 +153,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={STATUS_CHIP}
             title={scanTooltip}
           >
-            <Film className={`w-3.5 h-3.5 ${isScanRunning ? 'animate-pulse text-lmu-info' : ''}`} />
-            <span className="tabular-nums">{scanStatusText}</span>
+            {isScanRunning
+              ? <LoaderCircle aria-hidden="true" className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none text-lmu-info" />
+              : <Film aria-hidden="true" className="w-3.5 h-3.5" />}
+            <span className="flex flex-col leading-tight tabular-nums" aria-live="polite">
+              <span className="flex items-center gap-1.5">
+                <span>{scanStatusText}</span>
+                {replayScanStatus?.running && replayScanStatus.filePercent != null && (
+                  <span className="text-[10px]">{Math.round(replayScanStatus.filePercent)}%</span>
+                )}
+              </span>
+              {replayScanStatus?.running && fullScan?.telemetryScan?.running && (
+                <span className="text-[10px]">Syncing Telemetry… {fullScan.telemetryScan.processed}/{fullScan.telemetryScan.total}</span>
+              )}
+              {fullScan?.refreshQueued && <span className="text-[10px]">Refresh queued</span>}
+            </span>
           </Link>
 
           <button

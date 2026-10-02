@@ -1,8 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
+import type { ScanStatus } from '../../../shared/types/index.js';
 import { ReplayIndicator } from '../../../src/components/common/ReplayIndicator.js';
+import { ReplayLaunchButton } from '../../../src/components/common/ReplayLaunchButton.js';
 
 describe('ReplayIndicator', () => {
+  it('shows queued, processing and failure states without launching an unfinished replay', () => {
+    const onClick = vi.fn();
+    const display = (status: 'queued' | 'processing' | 'ready' | 'failed') => (
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'x.Vcr', status }] } as ScanStatus }}>
+        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
+      </SessionDataContext.Provider>
+    );
+    const { rerender } = render(display('queued'));
+    expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
+    rerender(display('processing'));
+    const spinner = screen.getByRole('status', { name: 'Replay processing' });
+    expect(spinner.querySelector('svg')).toHaveClass('animate-spin', 'motion-reduce:animate-none');
+    fireEvent.click(spinner); expect(onClick).not.toHaveBeenCalled();
+    rerender(display('failed')); expect(screen.getByRole('status', { name: /Refresh to retry/ })).toBeInTheDocument();
+    rerender(display('ready')); fireEvent.click(screen.getByRole('button', { name: 'Open replay telemetry' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
   it('renders nothing or dash when replay is not provided', () => {
     const { container, rerender } = render(<ReplayIndicator replay={null} />);
     expect(screen.getByText('-')).toBeInTheDocument();
@@ -77,5 +97,51 @@ describe('ReplayIndicator', () => {
 
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a playable partial replay open and reports missing driver data', () => {
+    const onClick = vi.fn();
+    render(
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'partial.Vcr', status: 'failed', playable: true, error: 'secondary driver failed' }] } as ScanStatus }}>
+        <ReplayIndicator replay={{ name: 'partial.Vcr' }} onClick={onClick} />
+      </SessionDataContext.Provider>
+    );
+    const button = screen.getByRole('button', { name: /some replay drivers are unavailable/i });
+    expect(button).toHaveAttribute('title', expect.stringContaining('secondary driver failed'));
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('blocks an unusable failed replay but allows DuckDB fallback with a warning', () => {
+    const display = (hasDuckDb: boolean) => (
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'failed.Vcr', status: 'failed', playable: false, error: 'primary decode failed' }] } as ScanStatus }}>
+        <ReplayIndicator replay={{ name: 'failed.Vcr', hasDuckDbTelemetry: hasDuckDb }} onClick={vi.fn()} />
+      </SessionDataContext.Provider>
+    );
+    const { rerender } = render(display(false));
+    expect(screen.getByRole('status', { name: /Replay processing failed/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open replay/ })).not.toBeInTheDocument();
+    rerender(display(true));
+    expect(screen.getByRole('button', { name: /DuckDB telemetry is available/i })).toBeInTheDocument();
+  });
+
+  it('keeps launch enabled for cached player data or DuckDB after a secondary failure', () => {
+    const onClick = vi.fn();
+    const button = (playable: boolean, hasDuckDb: boolean) => (
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'partial.Vcr', status: 'failed', playable, error: 'secondary driver failed' }] } as ScanStatus }}>
+        <ReplayLaunchButton replayName="partial.Vcr" hasDuckDb={hasDuckDb} onClick={onClick} />
+      </SessionDataContext.Provider>
+    );
+    const { rerender } = render(button(true, false));
+    expect(screen.getByRole('button', { name: /Launch Replay/ })).toBeEnabled();
+    expect(screen.getByText('Some replay drivers are unavailable')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Launch Replay/ }));
+    expect(onClick).toHaveBeenCalledOnce();
+
+    rerender(button(false, true));
+    expect(screen.getByRole('button', { name: /Launch 100Hz Replay/ })).toBeEnabled();
+    expect(screen.getByText('Replay cache unavailable; using 100Hz telemetry')).toBeInTheDocument();
+    rerender(button(false, false));
+    expect(screen.getByRole('button', { name: /Replay failed/ })).toBeDisabled();
   });
 });

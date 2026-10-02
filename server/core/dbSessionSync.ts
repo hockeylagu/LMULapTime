@@ -13,6 +13,7 @@ export const DB_PARSER_VERSION = '2.18_wet_best_lap_unrated';
 export interface SessionXmlSyncParser {
   addReplayEntry(entry: ReplayFileEntry): void;
   parseSessionXml(filePath: string): DetailedSession | null;
+  parseSessionXmlAsync?(filePath: string): Promise<DetailedSession | null>;
 }
 
 export interface SessionSyncHost {
@@ -34,7 +35,7 @@ export function *syncSessionsIterator(
   resultsDir: string,
   parser: SessionXmlSyncParser,
   forceReparse = false
-): Generator<SessionSyncProgress, SyncResult, void> {
+): Generator<SessionSyncProgress, SyncResult, DetailedSession | null | undefined> {
   if (!fs.existsSync(resultsDir)) {
     return {
       added: 0,
@@ -65,36 +66,28 @@ export function *syncSessionsIterator(
   const storedReplays = host.getAllStoredReplayFiles();
   for (const r of storedReplays) parser.addReplayEntry(replayIndexEntryFromStored(r));
 
-  const files = fs.readdirSync(resultsDir).filter(f => f.endsWith('.xml'));
+  const files = fs.readdirSync(resultsDir).filter(f => f.toLowerCase().endsWith('.xml'));
   let added = 0;
   let updated = 0;
 
-  // A new parser version re-parses every XML on disk and replaces those rows in one transaction.
+  // Publish small transactions during the scan so sessions appear before it finishes.
+  // The parser version is committed only once the whole scan finishes.
   // Rows whose XML is gone are kept as they are: they are the only copy of that session left.
   const reparseAll = forceReparse || versionMismatch;
   const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
-    if (versionMismatch) {
-      host.setMetadata('parser_version', DB_PARSER_VERSION);
-      host.invalidateSessionCache();
-    }
     for (const item of sessionsToInsert) {
       // A session parsed with its replay already linked gets that replay's rain now; one linked
       // later gets it when the link is stored (SessionDatabase.updateSessionMatchingReplay).
       if (item.session.matchingReplayFile) host.classifySessionConditions(item.session);
       host.upsertSession(item.session, item.filePath, item.mtime, item.size);
     }
-    if (versionMismatch) {
-      // Rows whose XML is gone are not parsed again, but the lap rules still apply to them.
-      const parsedIds = new Set(sessionsToInsert.map(item => item.session.id));
-      host.reclassifyStoredSessions({ ids: existingRows.map(row => row.id).filter(id => !parsedIds.has(id)) });
-    }
   });
 
+  const parsedIds = new Set<string>();
   const pendingInserts: { session: DetailedSession; filePath: string; mtime: number; size: number }[] = [];
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
-    yield { processed: i, total: files.length, currentFile: f, stage: 'Reading XML session log', filePercent: 5 };
     const filePath = path.join(resultsDir, f);
     try {
       const stats = fs.statSync(filePath);
@@ -103,12 +96,15 @@ export function *syncSessionsIterator(
 
       // Check if file is already cached and unmodified
       if (!reparseAll && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+        yield { processed: i + 1, total: files.length, currentFile: f, stage: 'Checking XML session log' };
         continue;
       }
 
       // Parse new or modified XML file
-      const parsed = parser.parseSessionXml(filePath);
+      const asyncParsed = yield { processed: i, total: files.length, currentFile: f, stage: 'Reading XML session log', filePercent: 5 };
+      const parsed = asyncParsed === undefined ? parser.parseSessionXml(filePath) : asyncParsed;
       if (parsed) {
+        parsedIds.add(parsed.id);
         pendingInserts.push({
           session: parsed,
           filePath,
@@ -122,17 +118,34 @@ export function *syncSessionsIterator(
           added++;
         }
         host.clearIngestError('xml', filePath);
-      }
+      } else host.recordIngestError('xml', filePath, new Error('XML session could not be parsed'));
     } catch (err) {
       host.recordIngestError('xml', filePath, err);
       console.error(`Error processing session XML file ${filePath}:`, err);
+    }
+    if (pendingInserts.length >= 10) {
+      // Keep the batch until its transaction commits. This is outside the per-file parse catch:
+      // a storage failure must abort the scan so the parser version cannot advance past it.
+      persistTransaction(pendingInserts);
+      pendingInserts.length = 0;
+      yield { processed: i + 1, total: files.length, currentFile: f, stage: 'Published XML sessions', filePercent: 100 };
     }
   }
 
   if (pendingInserts.length > 0 || versionMismatch) {
     yield { processed: files.length, total: files.length, currentFile: '', stage: 'Persisting session cache', filePercent: 95 };
     persistTransaction(pendingInserts);
+    pendingInserts.length = 0;
   }
+  if (versionMismatch) {
+    db.transaction(() => {
+      // Rows whose XML is gone are kept and reclassified: they are the only remaining copy.
+      host.reclassifyStoredSessions({ ids: existingRows.map(row => row.id).filter(id => !parsedIds.has(id)) });
+      host.setMetadata('parser_version', DB_PARSER_VERSION);
+      host.invalidateSessionCache();
+    })();
+  }
+  yield { processed: files.length, total: files.length, currentFile: '' };
 
   const nowIso = new Date().toISOString();
   host.setMetadata('last_synced_at', nowIso);
@@ -172,7 +185,14 @@ export async function *syncSessionsAsyncIterator(
   let step = iterator.next();
   while (!step.done) {
     yield step.value;
-    step = iterator.next();
+    if (step.value.stage === 'Reading XML session log' && parser.parseSessionXmlAsync) {
+      try {
+        const parsed = await parser.parseSessionXmlAsync(path.join(resultsDir, step.value.currentFile));
+        step = iterator.next(parsed);
+      } catch (error: unknown) {
+        step = iterator.throw(error);
+      }
+    } else step = iterator.next();
   }
   return step.value;
 }

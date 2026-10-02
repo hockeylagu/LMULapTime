@@ -356,6 +356,7 @@ export async function enrichDuckDbDirectory(
   telemetryDir: string,
   options?: {
     cachedFiles?: Map<string, DuckDbFileInfo>;
+    onFile?: (file: DuckDbFileInfo) => void;
     onProgress?: (progress: { processed: number; total: number; currentFile: string; cached: boolean }) => void;
   }
 ): Promise<DuckDbFileInfo[]> {
@@ -375,10 +376,13 @@ export async function enrichDuckDbDirectory(
     ) {
       options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: true });
       results.push(cached);
+      options?.onFile?.(cached);
     } else {
-      options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: false });
+      options?.onProgress?.({ processed: i, total: files.length, currentFile: file.filename, cached: false });
       const enriched = await enrichDuckDbFileInfo(file);
       results.push(enriched);
+      options?.onFile?.(enriched);
+      options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: false });
     }
   }
 

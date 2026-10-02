@@ -3,6 +3,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Navbar } from '../../../src/components/navbar/index.js';
 
 describe('Navbar component', () => {
+  it('shows replay and DuckDB progress together while keeping the session count visible', () => {
+    render(<Navbar status={{ resultsExist: true, replaysExist: true, sessionsCount: 12 }} isRefreshing={false} onRefresh={vi.fn()}
+      replayScanStatus={{ running: true, processed: 1, total: 3, currentFile: 'x.Vcr', startedAt: null, finishedAt: null, result: null, error: null,
+        telemetryScan: { running: true, processed: 2, total: 8, currentFile: 'x.duckdb', startedAt: null, finishedAt: null, result: null, error: null } }} />);
+    expect(screen.getByText('12 Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Syncing Replays… 1/3')).toBeInTheDocument();
+    expect(screen.getByText('Syncing Telemetry… 2/8')).toBeInTheDocument();
+  });
   it('renders brand title and active tab correctly', () => {
     const onRefresh = vi.fn();
 

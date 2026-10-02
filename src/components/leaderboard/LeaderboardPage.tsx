@@ -41,9 +41,16 @@ export function findLayoutForTrack(layouts: LeaderboardLayout[], track: string |
 export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { layouts, loading, error, retry: retryLayouts } = useLeaderboardLayouts();
-  const track = searchParams.get('track') || props.initialTrack || null;
-  const carClass = searchParams.get('carClass') || props.initialCarClass || null;
+  const requestedTrack = searchParams.get('track') || props.initialTrack || null;
+  const track = requestedTrack === 'All' ? null : requestedTrack;
+  const requestedCarClass = searchParams.get('carClass') || props.initialCarClass || null;
   const selectedLayout = useMemo(() => findLayoutForTrack(layouts, track), [layouts, track]);
+  const layoutDefaultClass = selectedLayout?.lastCarClass || selectedLayout?.classes[0]?.carClass || null;
+  const requestedClassIsAvailable = Boolean(requestedCarClass && requestedCarClass !== 'All' &&
+    selectedLayout?.classes.some(item => item.carClass === requestedCarClass));
+  const carClass = selectedLayout
+    ? requestedClassIsAvailable ? requestedCarClass : layoutDefaultClass
+    : requestedCarClass === 'All' ? null : requestedCarClass;
   const layoutKey = selectedLayout?.layoutKey ?? (track ? getCircuitSpecification(track).layoutKey : null);
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
@@ -58,11 +65,22 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
     [rivalEntry, carClass]
   );
 
-  // Without a track in the URL, open the layout driven last, in the class driven last there.
+  // Pick a track if the URL has none, and resolve missing/All classes against that layout.
   useEffect(() => {
-    if (track || layouts.length === 0) return;
-    updateSearchParams(searchParams, setSearchParams, { track: layouts[0].trackName, carClass: layouts[0].lastCarClass });
-  }, [track, layouts, searchParams, setSearchParams]);
+    if (layouts.length === 0) return;
+    if (!track) {
+      const layout = layouts[0];
+      const keepRequested = requestedCarClass && requestedCarClass !== 'All' && layout.classes.some(item => item.carClass === requestedCarClass);
+      updateSearchParams(searchParams, setSearchParams, {
+        track: layout.trackName,
+        carClass: keepRequested ? requestedCarClass : layout.lastCarClass || layout.classes[0]?.carClass,
+      });
+      return;
+    }
+    if (selectedLayout && carClass && searchParams.get('carClass') !== carClass) {
+      updateSearchParams(searchParams, setSearchParams, { carClass });
+    }
+  }, [track, layouts, selectedLayout, requestedCarClass, carClass, searchParams, setSearchParams]);
 
   const selectLayout = (layout: LeaderboardLayout) => {
     if (layout.layoutKey === selectedLayout?.layoutKey) return;

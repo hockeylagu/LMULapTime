@@ -38,7 +38,7 @@ const serverContext = new ServerContext({
   resultsDir: defaultResultsDir,
   replaysDir: defaultReplaysDir,
   telemetryDir: defaultTelemetryDir,
-  parser: new LmuParser(defaultReplaysDir),
+  parser: new LmuParser(defaultReplaysDir, defaultResultsDir, { indexReplays: false, readReplayMetadata: false }),
   sessionDb,
   telemetryCatalog,
   replayCache,
@@ -63,7 +63,6 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 serverContext.runInitialSessionSyncInBackground();
-setImmediate(() => serverContext.runTelemetryScanInBackground());
 
 app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));

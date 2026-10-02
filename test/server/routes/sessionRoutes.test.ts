@@ -217,10 +217,18 @@ describe('sessionRoutes and filterSessions', () => {
       referenceCache.load.mockReturnValue(null);
       const context = {
         loadSessions: () => mockSessions,
+        getScanStatus: () => ({ dataRevision: 'test:1' }),
       } as unknown as ServerContext;
 
       app = express();
       app.use('/api', createSessionRouter(context));
+    });
+
+    it('serves sessions and progression from one snapshot without browser caching', async () => {
+      const res = await request(app).get('/api/session-snapshot');
+      expect(res.status).toBe(200); expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.body.sessions).toHaveLength(3); expect(res.body.progression).toBeInstanceOf(Array);
+      expect(res.body.revision).toBe('test:1'); expect(res.body.sessions[0]).not.toHaveProperty('drivers');
     });
 
     it('GET /api/sessions returns filtered sessions metadata without drivers payload', async () => {
@@ -299,7 +307,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.status).toBe(200);
       expect(res.body.id).toBe('sess_1');
       expect(res.body.drivers).toHaveLength(1);
-      expect(res.headers['cache-control']).toBe('private, max-age=120');
+      expect(res.headers['cache-control']).toBe('no-store');
       expect(enrichSessionsWithTelemetry).toHaveBeenCalledWith([expect.objectContaining({ id: 'sess_1' })]);
       expect(parseAndCacheFile).not.toHaveBeenCalled();
     });

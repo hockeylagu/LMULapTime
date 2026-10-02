@@ -23,9 +23,14 @@ function routePage<M, P extends object>(importPage: () => Promise<M>, pick: (mod
     );
     return pending;
   };
-  function Page(props: P) {
-    if (!Loaded) use(load());
+  function PendingPage(props: P) {
+    use(load());
     return Loaded ? createElement(Loaded, props) : null;
+  }
+  function Page(props: P) {
+    // A suspended component must still call use() when it resumes. Keep that boundary
+    // separate so an already preloaded page can render immediately without suspending.
+    return Loaded ? createElement(Loaded, props) : createElement(PendingPage, props);
   }
   return { Page, load };
 }

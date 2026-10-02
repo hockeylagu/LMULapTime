@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SessionDebriefCard } from '../../../../src/components/session-detail/debrief/SessionDebriefCard.js';
-import { clearSessionDebriefCache } from '../../../../src/components/session-detail/debrief/useSessionDebrief.js';
 import { me, mockDebriefServer, realisticLap, referenceLap, session } from './debriefFixtures.js';
 
 function renderAndAsk() {
@@ -12,7 +11,6 @@ function renderAndAsk() {
 
 describe('SessionDebriefCard', () => {
   beforeEach(() => {
-    clearSessionDebriefCache();
     window.location.hash = '#/session/R1';
   });
 
@@ -26,7 +24,7 @@ describe('SessionDebriefCard', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('shows a debrief already built without asking again', async () => {
+  it('requires a fresh on-demand request after the card remounts', async () => {
     mockDebriefServer();
     const first = renderAndAsk();
     await screen.findByTestId('debrief-corner-1');
@@ -34,8 +32,10 @@ describe('SessionDebriefCard', () => {
 
     render(<SessionDebriefCard session={session} selectedDriver={me} />);
 
-    expect(screen.getByTestId('debrief-corner-1')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Show where the time goes/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show where the time goes/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('debrief-corner-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Show where the time goes/ }));
+    expect(await screen.findByTestId('debrief-corner-1')).toBeInTheDocument();
   });
 
   it('lists the corner to work on and opens it in telemetry against the reference', async () => {

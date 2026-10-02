@@ -186,6 +186,12 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div role="alert" className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-lmu-warn-strong/40 bg-lmu-warn-strong/10 text-sm">
+          <p className="text-lmu-warn-soft">Track data could not be refreshed: {error}</p>
+          <button type="button" onClick={retry} className="text-xs font-bold text-lmu-info hover:text-lmu-info-soft whitespace-nowrap">Try again</button>
+        </div>
+      )}
       <TrackDetailHeader
         trackName={trackName}
         trackCourse={data.sessions[0]?.trackCourse}

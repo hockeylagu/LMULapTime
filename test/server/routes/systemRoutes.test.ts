@@ -112,14 +112,14 @@ describe('system routes', () => {
   describe('POST /api/scan', () => {
     const folders = { resultsDir: 'C:/lmu/results', replaysDir: 'C:/lmu/replays', telemetryDir: 'C:/lmu/telemetry', playerName: 'New Name' };
 
-    it('applies the folders, rescans telemetry and starts the session scan', async () => {
+    it('applies the folders and starts XML before associated telemetry scanning', async () => {
       const res = await request(app).post('/api/scan').send(folders);
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ success: true, sessionScanStarted: true, replayScanStarted: true, telemetryScanStarted: true, sessionsCount: 3 });
       expect(context.configureDirectories).toHaveBeenCalledWith(folders);
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
-      expect(context.runTelemetryScanInBackground).toHaveBeenCalled();
+      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();
       expect(context.runSessionSyncInBackground).toHaveBeenCalled();
     });
 

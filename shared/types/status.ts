@@ -93,7 +93,19 @@ export interface ReplayUpgradeStatus {
   error: string | null;
 }
 
+export interface ReplayIngestJob {
+  name: string;
+  status: 'queued' | 'processing' | 'ready' | 'failed';
+  error?: string;
+  /** A valid primary/default trajectory is cached for the current file and parser version. */
+  playable?: boolean;
+}
+
 export interface ScanStatus extends ReplayScanStatus {
+  replayJobs?: ReplayIngestJob[];
+  refreshQueued?: boolean;
+  /** Changes when session data, replay metadata or telemetry links change, including on restart. */
+  dataRevision?: string;
   sessionScan: SessionScanStatus;
   replayUpgrade?: ReplayUpgradeStatus;
   telemetryScan?: TelemetryScanStatus;

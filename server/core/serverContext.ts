@@ -1,4 +1,7 @@
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
+import { FileIngestWorker } from './ingest/fileIngestWorkerClient.js';
+import type { ReplayIngestJob } from './types.js';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
@@ -28,7 +31,10 @@ export class ServerContext {
   private currentReplaysDir: string;
   private currentTelemetryDir: string;
   private parser: LmuParser;
+  private readonly replayJobs = new Map<string, ReplayIngestJob>();
+  private pendingSessionRefresh = false;
   private pendingForcedSessionReparse = false;
+  private readonly instanceId = randomUUID();
   // What the cached session list was last enriched against (see loadSessions).
   private enrichedInputs: unknown[] | null = null;
   // The parser and replay_metadata revision the replay index was last loaded for.
@@ -94,7 +100,7 @@ export class ServerContext {
 
   // The upgrade is the lowest-priority work: it runs only once no scan is running.
   public startReplayUpgradeWhenIdle(): boolean {
-    if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    if (this.hasActiveFileScan() || this.pendingSessionRefresh) return false;
     return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
   }
 
@@ -116,7 +122,7 @@ export class ServerContext {
       this.sessionDb.setMetadata('telemetry_dir', this.currentTelemetryDir);
     }
 
-    this.parser = new LmuParser(this.currentReplaysDir, this.currentResultsDir);
+    this.parser = new LmuParser(this.currentReplaysDir, this.currentResultsDir, { indexReplays: false, readReplayMetadata: false });
     if (typeof values.playerName === 'string' && values.playerName.trim()) {
       this.parser.configuredPlayerName = values.playerName.trim();
     }
@@ -192,9 +198,11 @@ export class ServerContext {
   public loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
     if (forceRefresh) {
       const started = this.runSessionSyncInBackground(forceReparse);
-      if (!started && forceReparse) this.pendingForcedSessionReparse = true;
-      // DuckDB files of the sessions just driven are found by the same refresh as their results and replays.
-      this.runTelemetryScanInBackground();
+      if (!started) {
+        this.pendingSessionRefresh = true;
+        this.pendingForcedSessionReparse ||= forceReparse;
+      }
+      // Associated replay and DuckDB discovery starts only after XML has been published.
     }
     const sessions = this.sessionDb.getAllSessions();
     // getAllSessions returns the same cached objects until sessions change, and enrichment writes
@@ -212,6 +220,7 @@ export class ServerContext {
   private enrichmentInputs(sessions: DetailedSession[]): unknown[] {
     return [
       sessions,
+      this.sessionDb.getSessionRevision?.(),
       this.parser,
       typeof this.parser.getReplayIndexRevision === 'function' ? this.parser.getReplayIndexRevision() : NaN,
       typeof this.telemetryCatalog?.getFiles === 'function' ? this.telemetryCatalog.getFiles() : NaN,
@@ -237,7 +246,17 @@ export class ServerContext {
     this.replayUpgrade?.stop();
     this.replayScanStatus = startedScanStatus();
     const replaysDir = this.currentReplaysDir;
-    const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, { playerName: this.parser.configuredPlayerName });
+    this.replayJobs.clear();
+    const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, {
+      playerName: this.parser.configuredPlayerName,
+      retryFailed: true,
+      onMetadataReady: () => {
+        const sessions = this.loadSessions();
+        const associated = new Set(sessions.flatMap(session => session.matchingReplayFile ? [session.matchingReplayFile.name] : []));
+        return associated;
+      },
+      onReplayState: job => { this.replayJobs.set(job.name, job); },
+    });
     pumpScanInBackground(iterator, this.replayScanStatus, outcome => {
       if ('result' in outcome) {
         const { total, added, updated, skipped } = outcome.result;
@@ -252,36 +271,54 @@ export class ServerContext {
       } else {
         console.warn('[SQLite Cache] Replay sync warning:', outcome.error);
       }
-      this.runPendingForcedSessionReparse();
+      this.runPendingSessionRefresh();
       this.startReplayUpgradeWhenIdle();
     });
     return true;
   }
 
-  private runPendingForcedSessionReparse(): void {
-    if (!this.pendingForcedSessionReparse) return;
+  private runPendingSessionRefresh(): boolean {
+    if (!this.pendingSessionRefresh) return false;
+    const forceReparse = this.pendingForcedSessionReparse;
+    this.pendingSessionRefresh = false;
     this.pendingForcedSessionReparse = false;
-    if (!this.runSessionSyncInBackground(true)) this.pendingForcedSessionReparse = true;
+    if (this.hasActiveFileScan()) {
+      this.pendingSessionRefresh = true;
+      this.pendingForcedSessionReparse = forceReparse;
+      return false;
+    }
+    if (this.runSessionSyncInBackground(forceReparse)) return true;
+    this.pendingSessionRefresh = true;
+    this.pendingForcedSessionReparse = forceReparse;
+    return false;
   }
 
   public runSessionSyncInBackground(forceReparse = false): boolean {
-    if (this.sessionScanStatus.running || this.replayScanStatus.running) return false;
+    if (this.hasActiveFileScan()) return false;
     this.replayUpgrade?.stop();
     const status: SessionScanStatus = startedScanStatus();
     this.sessionScanStatus = status;
     const resultsDir = this.currentResultsDir;
-    const iterator = this.sessionDb.syncSessionsAsyncIterator(resultsDir, this.parser, forceReparse);
+    const parser = this.parser;
+    const worker = new FileIngestWorker();
+    const iterator = this.sessionDb.syncSessionsAsyncIterator(resultsDir, {
+      addReplayEntry: entry => parser.addReplayEntry(entry),
+      parseSessionXml: filePath => parser.parseSessionXml(filePath),
+      parseSessionXmlAsync: filePath => worker.parseXml(filePath, parser.configuredPlayerName, parser.getReplaysList(), this.sessionDb.getReferenceLaptimesCache?.() ?? null),
+    }, forceReparse);
     pumpScanInBackground(iterator, status, outcome => {
+      void worker.close();
       if ('result' in outcome) {
         const { total, added, updated } = outcome.result;
-        status.processed = total;
-        status.total = total;
         console.log(`[SQLite Cache] Loaded ${total} sessions (${added} new, ${updated} updated) from ${resultsDir}`);
       } else {
         console.warn('[SQLite Cache] Initial sync warning:', outcome.error);
       }
       // Replays are matched against the sessions: their sync always follows.
-      this.runReplaySyncInBackground();
+      if (!this.runPendingSessionRefresh()) {
+        this.runReplaySyncInBackground();
+        this.runTelemetryScanInBackground();
+      }
     });
     return true;
   }
@@ -299,6 +336,9 @@ export class ServerContext {
     }).catch((error: unknown) => {
       // The catalog records the failure as an ingest error.
       console.warn('[SQLite Cache] Telemetry scan warning:', error);
+    }).finally(() => {
+      this.runPendingSessionRefresh();
+      this.startReplayUpgradeWhenIdle();
     });
   }
 
@@ -356,15 +396,21 @@ export class ServerContext {
     const telemetryScan = typeof this.telemetryCatalog?.getScanStatus === 'function'
       ? this.telemetryCatalog.getScanStatus()
       : defaultTelemetryScan;
-    const allComplete = !this.replayScanStatus.running && !this.sessionScanStatus.running && !telemetryScan.running;
+    const allComplete = !this.pendingSessionRefresh && !this.replayScanStatus.running && !this.sessionScanStatus.running && !telemetryScan.running;
     const allCached = Boolean(
-      allComplete &&
+      allComplete && ![...this.replayJobs.values()].some(job => job.status === 'failed') && !this.replayScanStatus.error && !this.sessionScanStatus.error && !telemetryScan.error &&
       (this.replayScanStatus.result?.added === 0 && this.replayScanStatus.result?.updated === 0) &&
       (this.sessionScanStatus.result?.added === 0 && this.sessionScanStatus.result?.updated === 0)
     );
 
     return {
+      // Includes the process identity: a restarted server cannot reuse the previous revision.
+      dataRevision: [this.instanceId, this.sessionDb.getSessionRevision?.() ?? 0,
+        this.sessionDb.getReplayMetadataRevision?.() ?? 0,
+        this.sessionDb.getTelemetryMetadataRevision?.() ?? 0].join(':'),
       ...this.replayScanStatus,
+      replayJobs: [...this.replayJobs.values()],
+      refreshQueued: this.pendingSessionRefresh,
       sessionScan: this.sessionScanStatus,
       replayUpgrade: this.replayUpgrade?.getStatus(),
       telemetryScan,

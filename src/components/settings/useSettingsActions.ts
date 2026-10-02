@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { AppStatus, ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { apiErrorMessage, postJson } from '../../api/apiClient.js';
 import { invalidateReferenceLaptimes } from '../../api/referenceApi.js';
-import { clearSessionDetailCache } from '../session-detail/useSessionDetailData.js';
 
 interface ReferenceRefreshResponse {
   success?: boolean;
@@ -124,7 +123,7 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
         setIsClearingCache(false);
         if (data.success) {
           onUpdatePaths();
-          clearSessionDetailCache();
+          invalidateReferenceLaptimes();
           setCacheMessage('Session SQLite cache cleared successfully! You can rescan anytime.');
         } else {
           setCacheMessage('Failed to clear SQLite cache.');

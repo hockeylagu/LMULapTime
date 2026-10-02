@@ -19,8 +19,17 @@ describe('apiClient', () => {
   });
 
   it('returns the JSON body of a 2xx response', async () => {
-    stubFetch().mockResolvedValue(jsonResponse([{ id: 'a' }]));
+    const fetchMock = stubFetch().mockResolvedValue(jsonResponse([{ id: 'a' }]));
     await expect(fetchJson('/api/sessions')).resolves.toEqual([{ id: 'a' }]);
+    expect(fetchMock).toHaveBeenCalledWith('/api/sessions', { cache: 'no-store' });
+  });
+
+  it('keeps static asset caching and caller cache overrides', async () => {
+    const fetchMock = stubFetch().mockImplementation(async () => jsonResponse({ ok: true }));
+    await fetchJson('/tracks/spa.json');
+    await fetchJson('/api/sessions', { cache: 'force-cache' });
+    expect(fetchMock.mock.calls[0]).toEqual(['/tracks/spa.json']);
+    expect(fetchMock.mock.calls[1]).toEqual(['/api/sessions', { cache: 'force-cache' }]);
   });
 
   it('throws the server error message with the status and body of a failed response', async () => {
@@ -41,6 +50,7 @@ describe('apiClient', () => {
     const [path, init] = fetchMock.mock.calls[0];
     expect(path).toBe('/api/scan');
     expect(init).toMatchObject({ method: 'POST', body: '{"playerName":"Driver"}', headers: { 'Content-Type': 'application/json' } });
+    expect(init).toMatchObject({ cache: 'no-store' });
   });
 
   it('tells an aborted request from a failure', () => {

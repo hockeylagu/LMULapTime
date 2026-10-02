@@ -102,12 +102,23 @@ export class TelemetryCatalog {
       cachedMap.set(f.filePath, f);
     }
 
+    const published = new Set<string>();
+    const publish = (file: DuckDbFileInfo): void => {
+      if (generation !== this.refreshGeneration || published.has(file.filePath)) return;
+      published.add(file.filePath);
+      const previous = cachedMap.get(file.filePath);
+      if (!previous || previous.fileMtimeMs !== file.fileMtimeMs || previous.fileSizeBytes !== file.fileSizeBytes || previous.enrichmentError) {
+        this.sessionDb.upsertTelemetryMetadata?.(file);
+      }
+      this.files = [...this.files.filter(item => item.filePath !== file.filePath), file];
+    };
     let cachedCount = 0;
     let addedCount = 0;
     let updatedCount = 0;
 
     const refreshPromise = this.enrichDirectory(directory, {
       cachedFiles: cachedMap,
+      onFile: publish,
       onProgress: (p) => {
         if (generation !== this.refreshGeneration) return;
         this.scanStatus.processed = p.processed;
@@ -124,14 +135,10 @@ export class TelemetryCatalog {
           const prev = cachedMap.get(file.filePath);
           if (!prev) {
             addedCount++;
-            if (typeof this.sessionDb?.upsertTelemetryMetadata === 'function') {
-              this.sessionDb.upsertTelemetryMetadata(file);
-            }
+            publish(file);
           } else if (prev.fileMtimeMs !== file.fileMtimeMs || prev.fileSizeBytes !== file.fileSizeBytes) {
             updatedCount++;
-            if (typeof this.sessionDb?.upsertTelemetryMetadata === 'function') {
-              this.sessionDb.upsertTelemetryMetadata(file);
-            }
+            publish(file);
           } else {
             cachedCount++;
           }
@@ -172,6 +179,7 @@ export class TelemetryCatalog {
         if (generation !== this.refreshGeneration) return;
         this.scanStatus.running = false;
         this.scanStatus.finishedAt = new Date().toISOString();
+        this.scanStatus.currentFile = null;
         this.refreshPromise = null;
         this.refreshDirectory = null;
       });

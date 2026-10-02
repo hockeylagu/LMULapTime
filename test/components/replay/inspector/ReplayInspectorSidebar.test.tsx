@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ReplayInspectorSidebar } from '../../../../src/components/replay/inspector/ReplayInspectorSidebar.js';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
@@ -196,13 +196,14 @@ describe('ReplayInspectorSidebar', () => {
     expect(setCornerSubView).toHaveBeenCalledWith('compare');
   });
 
-  it('toggles AI Report tab back to map when AI Report button is clicked while active', () => {
+  it('toggles AI Report tab back to map when AI Report button is clicked while active', async () => {
     const setActiveTab = vi.fn();
     render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
 
     const aiBtn = screen.getByRole('button', { name: /AI Report/i });
     fireEvent.click(aiBtn);
     expect(setActiveTab).toHaveBeenCalledWith('map');
+    await act(async () => {});
   });
 
   it('gives the corner chart baseline distances in the primary lap frame (matched by track station)', () => {
