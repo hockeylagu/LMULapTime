@@ -7,8 +7,11 @@ import {
   getBenchmarkDiffHistory,
   getBenchmarkDiffById,
   clearReferenceLaptimes,
+  getBenchmarkDiffIdsWithImpactRuleOtherThan,
+  updateBenchmarkDiffImpact,
+  getReferenceLaptimesCache,
 } from '../../../server/core/dbReferenceLaptimeStore.js';
-import type { ReferenceBenchmarkDiff, ReferenceLaptimesCache } from '../../../server/core/types.js';
+import type { ReferenceBenchmarkDiff, ReferenceLaptimeEntry, ReferenceLaptimesCache } from '../../../server/core/types.js';
 
 describe('dbReferenceLaptimeStore', () => {
   let db: InstanceType<typeof Database>;
@@ -135,5 +138,35 @@ describe('dbReferenceLaptimeStore', () => {
 
     clearReferenceLaptimes(db);
     expect(getBenchmarkDiffHistory(db, 10)).toHaveLength(0);
+  });
+
+  it('rewrites a recounted update in the history and in the latest-update copy the status reads', () => {
+    const lastDiff = () => JSON.parse(
+      (db.prepare("SELECT value FROM cache_metadata WHERE key = 'reference_laptimes_last_diff'").get() as { value: string }).value,
+    ) as ReferenceBenchmarkDiff;
+    const diff: ReferenceBenchmarkDiff = {
+      timestamp: '2026-10-01T12:00:00Z', hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+      totalEntries: 1, totalAffectedSessions: 35, totalCategoryShifts: 70, added: [], updated: [], removed: [],
+    };
+    const entry: ReferenceLaptimeEntry = {
+      key: 'bahrain_gt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.4+', target100Sec: 120,
+      targets: { alienSec: 120, competitiveSec: 121, goodSec: 122, goodMidpackSec: 123, midpackSec: 124, midpackTailSec: 125, tailEnderSec: 126, offlineSec: 127 },
+    };
+    saveReferenceLaptimes(db, { lastUpdated: diff.timestamp, sourceUrl: '', entriesCount: 1, entries: { [entry.key]: entry }, lastUpdateDiff: diff }, (key, value) => {
+      db.prepare('INSERT OR REPLACE INTO cache_metadata (key, value) VALUES (?, ?)').run(key, value);
+    });
+    const id = lastDiff().id!;
+    expect(getBenchmarkDiffIdsWithImpactRuleOtherThan(db, 2)).toEqual([id]);
+
+    updateBenchmarkDiffImpact(db, id, { ...diff, totalAffectedSessions: 4, totalCategoryShifts: 6, impactRule: 2 });
+
+    expect(getBenchmarkDiffIdsWithImpactRuleOtherThan(db, 2)).toEqual([]);
+    expect(getBenchmarkDiffById(db, id)).toMatchObject({ totalAffectedSessions: 4, totalCategoryShifts: 6 });
+    expect(lastDiff()).toMatchObject({ id, totalAffectedSessions: 4, totalCategoryShifts: 6 });
+
+    // A copy left stale by an earlier recount is read from its history row instead.
+    db.prepare("UPDATE cache_metadata SET value = ? WHERE key = 'reference_laptimes_last_diff'").run(JSON.stringify({ ...diff, id }));
+    const getMeta = (key: string) => (db.prepare('SELECT value FROM cache_metadata WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null;
+    expect(getReferenceLaptimesCache(db, getMeta)?.lastUpdateDiff).toMatchObject({ id, totalAffectedSessions: 4 });
   });
 });

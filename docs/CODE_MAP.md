@@ -58,6 +58,7 @@ Manual refresh retries failed driver decodes.
      (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop` in `shared/domain/lapComparison.ts`), pit loss on the in-lap
      (`pitStopDuration`, spans in-lap + out-lap);
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): who was around the car on each lap;
+   - `rateDriversPace` (`server/sessions/sessionPaceRating.ts`): each valid lap and the best lap against the cached benchmark targets;
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): conditions (`shared/domain/lapConditions.ts`), non-representative
      laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average, best-lap benchmark rating (a wet best lap is
      `bestLapWet` and unrated: the targets are dry laps);
@@ -67,6 +68,9 @@ Manual refresh retries failed driver decodes.
 3. **Re-classify with rain**: `server/core/dbSessionConditions.ts` runs `classifySessionLaps` again with the replay's rain when a
    session gets its replay or the replay's conditions are stored, and sets the link's peak rain and weather from every stored
    condition (the header scan samples 30 windows and can miss the peak).
+   **Re-rate on new targets**: `server/core/dbSessionPace.ts` (`rerateStoredSessionPace`, via `context.rerateSessionPace`) runs
+   `rateDriversPace` again on every stored session when the benchmark `lastUpdated` differs from `cache_metadata`
+   `session_pace_reference`, after the startup background refresh and the manual refresh.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
    - telemetry links (`context.enrichSessionsWithTelemetry`);
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).
@@ -131,7 +135,7 @@ Manual refresh retries failed driver decodes.
 | Tracks | `/api/track/:trackName` | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` |
 | Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard`, `/rivals`, `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare) |
 | Lap comparison | `/api/compare/laps` (`sessionAnalytics.ts`) | `lapComparison.ts` | `src/utils/referenceLaps.ts`, `src/utils/telemetryCompareLink.ts` |
-| Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `server/benchmarks/benchmarkImpact.ts`, `dbReferenceLaptimeStore.ts` (`benchmark_diff_history`) | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards), `settings/ReferenceChangesList.tsx` |
+| Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `server/benchmarks/benchmarkImpact.ts` (player laps only; `BENCHMARK_IMPACT_RULE` stamped on each diff, stored diffs from an older rule are recounted by `context.refreshBenchmarkDiffImpacts` after the startup refresh and on read; the status reads the latest update from its history row), `dbReferenceLaptimeStore.ts` (`benchmark_diff_history`) | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards), `settings/ReferenceChangesList.tsx` |
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts` (`PROMPT_VERSION`), `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
 | Settings & scans | `systemRoutes.ts` (`/status`, `/scan`, `/scan/status`, `/cache/clear`), `/replays/cache`, `/replays/upgrade` | | `components/settings/` (`SettingsPanel` panel + `FeedbackMessage`, `settingsFormat` numbers/plurals/bytes/dates with fallbacks, `aiKey` (clean and redact the Gemini key), `labelStyles.ts` (`READOUT_LABEL` / `FIELD_LABEL` shared label classes), `shared/domain/folderPath.ts` (`normalizeFolderPath` / `folderPathProblem`, used by the form and by `POST /scan`, which answers 400 `{error, field}`), `useSettingsScrollspy` TOC highlight, `PathField`, `OverviewCard` (the one status card: folders, sessions, replays, AI state, database size, telemetry files count, last sync, plus the scoped Clear parsed sessions action; section order is Overview, Reference Benchmarks, AI reports, AI history, Cached Replays, Folder Paths; `resolveSectionId` validates `?section=`), `ReferenceLaptimesCard` + `ReferenceChangesList` (purpose, pace categories, one status line, collapsed update history), `controls/InlineConfirm` + `useInlineConfirm` (focus returns to the trigger or the section heading), `hooks/` (`useAiSettings`, `useDeepLinkAlign`), `replays/` (cached-replay list model, `useReplayCache`, filters, table, progress; the table draws 200 rows at a time with "Show N more"; `replayView` / `replayFilter` / `replaySort` params beside `?section=`); `/replays/upgrade` also reports `currentVersion`, the version an on-disk replay must be at) |
 

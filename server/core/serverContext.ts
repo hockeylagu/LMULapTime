@@ -15,6 +15,8 @@ import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayCacheService } from '../replay/replayCacheService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
+import { loadReferenceLaptimesFromCache, replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
+import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithImpact } from '../benchmarks/benchmarkImpact.js';
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -373,11 +375,48 @@ export class ServerContext {
           console.warn('[Reference Laptimes] Startup refresh warning:', error);
         })
         .finally(() => {
+          // Before completion is published, so the clients' refetch sees the new ratings.
+          this.rerateSessionPace();
+          this.refreshBenchmarkDiffImpacts();
           this.referenceLaptimeRefreshStatus.running = false;
           this.referenceLaptimeRefreshStatus.checked = true;
           this.referenceLaptimeRefreshStatus.completedAt = new Date().toISOString();
         });
     });
+  }
+
+  /** Rates stored sessions again against the current benchmark targets, if they changed since. */
+  public rerateSessionPace(): void {
+    const version = loadReferenceLaptimesFromCache()?.lastUpdated;
+    if (!version || typeof this.sessionDb.rerateSessionPace !== 'function') return;
+    try {
+      const changed = this.sessionDb.rerateSessionPace(version);
+      if (changed > 0) console.log(`[Reference Laptimes] Re-rated pace of ${changed} stored sessions`);
+    } catch (error: unknown) {
+      console.warn('[Reference Laptimes] Unable to re-rate stored sessions:', error);
+    }
+  }
+
+  /**
+   * Recomputes the effect on your laps of stored benchmark updates counted with an older rule
+   * (BENCHMARK_IMPACT_RULE), in the history row, its metadata copy and the in-memory latest update.
+   */
+  public refreshBenchmarkDiffImpacts(): void {
+    if (typeof this.sessionDb.getBenchmarkDiffIdsWithImpactRuleOtherThan !== 'function') return;
+    try {
+      const ids = this.sessionDb.getBenchmarkDiffIdsWithImpactRuleOtherThan(BENCHMARK_IMPACT_RULE);
+      if (ids.length === 0) return;
+      const sessions = this.loadSessions(false, false);
+      for (const id of ids) {
+        const diff = this.sessionDb.getBenchmarkDiffById(id);
+        if (!diff) continue;
+        const enriched = { ...enrichBenchmarkDiffWithImpact(diff, sessions), id };
+        this.sessionDb.updateBenchmarkDiffImpact(id, enriched);
+        replaceCachedLastUpdateDiff(enriched);
+      }
+    } catch (error: unknown) {
+      console.warn('[Benchmark Impact] Unable to recompute stored update impacts:', error);
+    }
   }
 
   public getReplayScanStatus(): ReplayScanStatus { return this.replayScanStatus; }
