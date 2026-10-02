@@ -30,13 +30,13 @@
     "screenshots": "tsx tools/captureScreenshots.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.22.0",
+    "@google/genai": "^2.26.0",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "duckdb": "^1.4.4",
     "express": "^5.2.1",
-    "fast-xml-parser": "^5.11.1",
-    "lucide-react": "^1.45.0",
+    "fast-xml-parser": "^5.11.2",
+    "lucide-react": "^1.50.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.3.1",
@@ -50,21 +50,21 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "^5.0.2",
+    "@vitest/coverage-v8": "^5.0.3",
     "concurrently": "^10.0.5",
     "jsdom": "^30.0.1",
     "postcss": "^8.5.28",
-    "supertest": "^7.2.2",
+    "supertest": "^7.3.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
-    "vite": "^8.3.0",
-    "vitest": "^5.0.2"
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "tar": "^7.5.22"
