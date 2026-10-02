@@ -26,6 +26,7 @@ export const REPLAY_PARAMS = { view: 'replayView', filter: 'replayFilter', sort:
 export interface ReplayCacheCardProps {
   replay: ReplayCacheState;
   replayScanStatus?: ScanStatus | ReplayScanStatus | null;
+  rowsPerPage?: number;
 }
 
 /** Rows drawn at first and per "Show more": a library of thousands of replays stays quick to open and sort. */
@@ -36,7 +37,7 @@ const Readout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 /** Every replay in the cache, on disk or archived after LMU deleted the file, with its filters, sort and progress. */
-export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache, replayScanStatus }) => {
+export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache, replayScanStatus, rowsPerPage = REPLAY_ROWS_PAGE }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { replays, counts, currentVersion } = cache;
 
@@ -63,8 +64,8 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache,
 
   // The row limit starts over whenever the filter, the segment or the sort changes.
   const listKey = `${text}|${show}|${formatSort(sort)}`;
-  const [limit, setLimit] = useState({ key: listKey, rows: REPLAY_ROWS_PAGE });
-  const rowLimit = limit.key === listKey ? limit.rows : REPLAY_ROWS_PAGE;
+  const [limit, setLimit] = useState({ key: listKey, rows: rowsPerPage });
+  const rowLimit = limit.key === listKey ? limit.rows : rowsPerPage;
   const shownRows = rows.length > rowLimit ? rows.slice(0, rowLimit) : rows;
 
   const isNarrowed = text.trim() !== '' || show !== 'all';
@@ -144,10 +145,10 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache,
                   <span className="font-mono">Showing {formatNumber(shownRows.length)} of {formatNumber(rows.length)}</span>
                   <button
                     type="button"
-                    onClick={() => setLimit({ key: listKey, rows: rowLimit + REPLAY_ROWS_PAGE })}
+                    onClick={() => setLimit({ key: listKey, rows: rowLimit + rowsPerPage })}
                     className={SECONDARY_BUTTON}
                   >
-                    Show {formatNumber(Math.min(REPLAY_ROWS_PAGE, rows.length - shownRows.length))} more
+                    Show {formatNumber(Math.min(rowsPerPage, rows.length - shownRows.length))} more
                   </button>
                 </div>
               )}

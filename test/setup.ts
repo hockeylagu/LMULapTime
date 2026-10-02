@@ -1,5 +1,4 @@
 import '@testing-library/jest-dom/vitest';
-import '@testing-library/jest-dom';
 import { afterEach, vi } from 'vitest';
 import React, { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router';

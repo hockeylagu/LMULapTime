@@ -22,6 +22,7 @@ export default defineConfig({
         test: {
           name: 'dom',
           environment: 'jsdom',
+          pool: 'vmThreads',
           include: [
             'test/components/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
             'test/**/*.test.tsx',
