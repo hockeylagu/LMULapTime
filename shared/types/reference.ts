@@ -71,6 +71,8 @@ export interface ReferenceBenchmarkDiff {
   totalEntries: number;
   totalAffectedSessions?: number;
   totalCategoryShifts?: number;
+  /** Version of the rule the impact was computed with (BENCHMARK_IMPACT_RULE); older diffs are recomputed. */
+  impactRule?: number;
   added: ReferenceBenchmarkDiffItem[];
   updated: ReferenceBenchmarkDiffItem[];
   removed: ReferenceBenchmarkDiffItem[];

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { fetchAndCacheReferenceLaptimes, loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
-import { enrichBenchmarkDiffWithImpact } from '../benchmarks/benchmarkImpact.js';
 import { ServerContext } from '../core/serverContext.js';
 
 export function createReferenceRouter(context: ServerContext): Router {
@@ -13,6 +12,7 @@ export function createReferenceRouter(context: ServerContext): Router {
 
   router.get('/reference-laptimes/diffs', (_req, res) => {
     try {
+      context.refreshBenchmarkDiffImpacts();
       const history = context.sessionDb.getBenchmarkDiffHistory(50);
       if (history.length === 0) {
         const currentCache = loadReferenceLaptimesFromCache();
@@ -50,18 +50,11 @@ export function createReferenceRouter(context: ServerContext): Router {
         return res.status(400).json({ error: 'Invalid diff ID' });
       }
 
+      context.refreshBenchmarkDiffImpacts();
       const diff = context.sessionDb.getBenchmarkDiffById(id);
       if (!diff) {
         return res.status(404).json({ error: 'Benchmark diff not found' });
       }
-
-      // If diff does not yet have impact computed or if impact details were omitted:
-      if (diff.totalAffectedSessions === undefined || diff.totalCategoryShifts === undefined) {
-        const sessions = context.loadSessions(false, false);
-        const enriched = enrichBenchmarkDiffWithImpact(diff, sessions);
-        return res.json(enriched);
-      }
-
       res.json(diff);
     } catch (error: unknown) {
       console.error('Failed to get benchmark diff by id:', error);
@@ -73,6 +66,7 @@ export function createReferenceRouter(context: ServerContext): Router {
   router.post('/reference-laptimes/refresh', async (_req, res) => {
     try {
       const updatedCache = await fetchAndCacheReferenceLaptimes();
+      context.rerateSessionPace();
       const sessions = context.loadSessions(true, true);
       res.json({
         success: true,

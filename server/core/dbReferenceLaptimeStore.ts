@@ -5,6 +5,10 @@ import {
   ReferenceBenchmarkDiff,
   BenchmarkDiffSummary,
 } from './types.js';
+import { getMetadata, setMetadata } from './dbMetadataStore.js';
+
+/** The latest update, copied out of `benchmark_diff_history` for the status route. */
+const LAST_DIFF_KEY = 'reference_laptimes_last_diff';
 
 export function recordBenchmarkDiff(
   db: DatabaseType,
@@ -81,6 +85,27 @@ export function getBenchmarkDiffById(
   return parsed;
 }
 
+/** Ids of the stored diffs whose impact was computed with another rule than `rule`. */
+export function getBenchmarkDiffIdsWithImpactRuleOtherThan(db: DatabaseType, rule: number): number[] {
+  const rows = db.prepare(
+    "SELECT id FROM benchmark_diff_history WHERE json_extract(diff_json, '$.impactRule') IS NOT ?"
+  ).all(rule) as { id: number }[];
+  return rows.map(r => r.id);
+}
+
+/** Rewrites a stored diff with its recomputed impact and totals. */
+export function updateBenchmarkDiffImpact(db: DatabaseType, id: number, diff: ReferenceBenchmarkDiff): void {
+  db.prepare(`
+    UPDATE benchmark_diff_history
+    SET total_affected_sessions = ?, total_category_shifts = ?, diff_json = ?
+    WHERE id = ?
+  `).run(diff.totalAffectedSessions || 0, diff.totalCategoryShifts || 0, JSON.stringify({ ...diff, id: undefined }), id);
+  const lastDiff = getMetadata(db, LAST_DIFF_KEY);
+  if (lastDiff && (JSON.parse(lastDiff) as ReferenceBenchmarkDiff).id === id) {
+    setMetadata(db, LAST_DIFF_KEY, JSON.stringify({ ...diff, id }));
+  }
+}
+
 export function saveReferenceLaptimes(
   db: DatabaseType,
   cache: ReferenceLaptimesCache,
@@ -121,7 +146,7 @@ export function saveReferenceLaptimes(
     if (cache.lastUpdateDiff) {
       const diffId = recordBenchmarkDiff(db, cache.lastUpdateDiff, cache.sourceUrl);
       cache.lastUpdateDiff.id = diffId;
-      setMetadata('reference_laptimes_last_diff', JSON.stringify(cache.lastUpdateDiff));
+      setMetadata(LAST_DIFF_KEY, JSON.stringify(cache.lastUpdateDiff));
     }
 
     for (const entry of entries) {
@@ -187,8 +212,10 @@ export function getReferenceLaptimesCache(
 
   const lastUpdated = getMetadata('reference_laptimes_last_updated') || new Date().toISOString();
   const sourceUrl = getMetadata('reference_laptimes_source_url') || '';
-  const diffJson = getMetadata('reference_laptimes_last_diff');
-  const lastUpdateDiff = diffJson ? (JSON.parse(diffJson) as ReferenceBenchmarkDiff) : null;
+  const diffJson = getMetadata(LAST_DIFF_KEY);
+  const copy = diffJson ? (JSON.parse(diffJson) as ReferenceBenchmarkDiff) : null;
+  // The history row is the record (a recount rewrites it); the copy only says which row is the latest.
+  const lastUpdateDiff = copy?.id !== undefined ? getBenchmarkDiffById(db, copy.id) ?? copy : copy;
 
   return {
     lastUpdated,

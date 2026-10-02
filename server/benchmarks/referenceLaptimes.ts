@@ -210,6 +210,11 @@ export function loadReferenceLaptimesFromCache(): ReferenceLaptimesCache | null 
   return null;
 }
 
+/** Swaps in a recomputed copy of the latest update, when `diff` is that update. */
+export function replaceCachedLastUpdateDiff(diff: ReferenceBenchmarkDiff): void {
+  if (cachedData?.lastUpdateDiff && cachedData.lastUpdateDiff.id === diff.id) cachedData.lastUpdateDiff = diff;
+}
+
 export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptimesCache> {
   console.log(`Fetching reference laptimes from Google Sheets: ${PUBLISHED_SPREADSHEET_CSV_URL}`);
   const res = await fetch(PUBLISHED_SPREADSHEET_CSV_URL);

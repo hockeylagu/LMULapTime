@@ -14,7 +14,8 @@ import type { ServerContext } from '../../../server/core/serverContext.js';
 
 describe('Reference laptime routes', () => {
   const loadSessions = vi.fn();
-  const context = { loadSessions } as unknown as ServerContext;
+  const rerateSessionPace = vi.fn();
+  const context = { loadSessions, rerateSessionPace } as unknown as ServerContext;
   const app = express();
 
   beforeEach(() => {
@@ -37,6 +38,7 @@ describe('Reference laptime routes', () => {
     expect(cached.body).toEqual({ lastUpdated: null, entriesCount: 0, entries: {} });
     expect(refreshed.body).toMatchObject({ success: true, entriesCount: 4, sessionsCount: 1, diff: { updatedCount: 1 } });
     expect(loadSessions).toHaveBeenCalledWith(true, true);
+    expect(rerateSessionPace).toHaveBeenCalledTimes(1);
   });
 
   it('returns the refresh error without attempting a session reparse', async () => {
@@ -70,7 +72,7 @@ describe('Reference laptime routes', () => {
       getBenchmarkDiffById: vi.fn(),
       recordBenchmarkDiff: vi.fn(),
     };
-    const ctx = { loadSessions, sessionDb: mockSessionDb } as unknown as ServerContext;
+    const ctx = { loadSessions, sessionDb: mockSessionDb, refreshBenchmarkDiffImpacts: vi.fn() } as unknown as ServerContext;
     const testApp = express();
     testApp.use('/api', createReferenceRouter(ctx));
 
@@ -101,7 +103,7 @@ describe('Reference laptime routes', () => {
       getBenchmarkDiffById: vi.fn().mockImplementation((id: number) => (id === 42 ? mockDiff : null)),
       recordBenchmarkDiff: vi.fn(),
     };
-    const ctx = { loadSessions, sessionDb: mockSessionDb } as unknown as ServerContext;
+    const ctx = { loadSessions, sessionDb: mockSessionDb, refreshBenchmarkDiffImpacts: vi.fn() } as unknown as ServerContext;
     const testApp = express();
     testApp.use('/api', createReferenceRouter(ctx));
 
@@ -112,5 +114,22 @@ describe('Reference laptime routes', () => {
     const missingRes = await request(testApp).get('/api/reference-laptimes/diffs/999');
     expect(missingRes.status).toBe(404);
     expect(missingRes.body).toEqual({ error: 'Benchmark diff not found' });
+  });
+
+  it('recounts stored updates before serving the history and a single update', async () => {
+    const refreshBenchmarkDiffImpacts = vi.fn();
+    const mockSessionDb = {
+      getBenchmarkDiffHistory: vi.fn().mockReturnValue([{ id: 1 }]),
+      getBenchmarkDiffById: vi.fn().mockReturnValue({ id: 1 }),
+      recordBenchmarkDiff: vi.fn(),
+    };
+    const ctx = { loadSessions, sessionDb: mockSessionDb, refreshBenchmarkDiffImpacts } as unknown as ServerContext;
+    const testApp = express();
+    testApp.use('/api', createReferenceRouter(ctx));
+
+    await request(testApp).get('/api/reference-laptimes/diffs');
+    await request(testApp).get('/api/reference-laptimes/diffs/1');
+
+    expect(refreshBenchmarkDiffImpacts).toHaveBeenCalledTimes(2);
   });
 });

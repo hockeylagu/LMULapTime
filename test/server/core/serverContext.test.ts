@@ -592,6 +592,24 @@ describe('ServerContext reference laptime refresh', () => {
     expect(context.getScanStatus().referenceLaptimes.completedAt).not.toBeNull();
   });
 
+  it('recounts stored benchmark updates counted with an older rule, on your laps only', () => {
+    const stale: ReferenceBenchmarkDiff = { ...benchmarkDiff, id: 7, totalAffectedSessions: 35, totalCategoryShifts: 70 };
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      getBenchmarkDiffIdsWithImpactRuleOtherThan: vi.fn(() => [7]),
+      getBenchmarkDiffById: vi.fn(() => stale),
+      updateBenchmarkDiffImpact: vi.fn(),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+    vi.spyOn(context, 'loadSessions').mockReturnValue([]);
+
+    context.refreshBenchmarkDiffImpacts();
+
+    expect(sessionDb.updateBenchmarkDiffImpact).toHaveBeenCalledWith(7, expect.objectContaining({
+      id: 7, totalAffectedSessions: 0, totalCategoryShifts: 0, impactRule: expect.any(Number),
+    }));
+  });
+
   it('records a refresh failure without leaving the scan running', async () => {
     const context = createContext();
     const refresh = vi.fn().mockRejectedValue(new Error('Google Sheets unavailable'));

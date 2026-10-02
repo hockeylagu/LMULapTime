@@ -112,6 +112,8 @@ import {
   recordBenchmarkDiff,
   getBenchmarkDiffHistory,
   getBenchmarkDiffById,
+  getBenchmarkDiffIdsWithImpactRuleOtherThan,
+  updateBenchmarkDiffImpact,
 } from './dbReferenceLaptimeStore.js';
 import {
   getAllSessions as fetchAllSessions,
@@ -126,6 +128,7 @@ import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbRepl
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
 import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
+import { rerateStoredSessionPace } from './dbSessionPace.js';
 import {
   listReplayUpgradeBacklog,
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
@@ -553,6 +556,20 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     }
   }
 
+  /**
+   * Rates the stored sessions' pace again when the benchmark targets changed (see dbSessionPace).
+   * Loaded sessions are updated in place, like reclassifyStoredSessions. Returns how many changed.
+   */
+  public rerateSessionPace(referenceVersion: string): number {
+    const updated = rerateStoredSessionPace(this.db, referenceVersion);
+    if (updated.length > 0) this.sessionRevision++;
+    for (const session of updated) {
+      const cached = this.allSessionsCache?.find(s => s.id === session.id);
+      if (cached) Object.assign(cached, session);
+    }
+    return updated.length;
+  }
+
   public getRejectedReplayLinks(): Map<string, RejectedReplayLink[]> {
     return getRejectedReplayLinks(this.db);
   }
@@ -615,6 +632,14 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public getBenchmarkDiffById(id: number): ReferenceBenchmarkDiff | null {
     return getBenchmarkDiffById(this.db, id);
+  }
+
+  public getBenchmarkDiffIdsWithImpactRuleOtherThan(rule: number): number[] {
+    return getBenchmarkDiffIdsWithImpactRuleOtherThan(this.db, rule);
+  }
+
+  public updateBenchmarkDiffImpact(id: number, diff: ReferenceBenchmarkDiff): void {
+    updateBenchmarkDiffImpact(this.db, id, diff);
   }
 
   public recordBenchmarkDiff(diff: ReferenceBenchmarkDiff, sourceUrl?: string): number {

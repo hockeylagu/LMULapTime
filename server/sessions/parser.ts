@@ -20,7 +20,7 @@ import {
   getSessionTypeWeight,
   minValidTime,
 } from '../../shared/domain/formatters.js';
-import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
+import { rateDriversPace } from './sessionPaceRating.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
@@ -192,27 +192,8 @@ export class LmuParser {
       const driversList = Array.isArray(rawDrivers) ? rawDrivers : [rawDrivers];
       const drivers: DriverData[] = driversList.map((d: RawDriverXmlNode) => this.parseDriver(d)).filter(Boolean);
 
-      // Compute Pace Categories for each lap and driver best lap
-      drivers.forEach(driver => {
-        driver.laps.forEach(lap => {
-          if (lap.isValid && lap.lapTime) {
-            const paceInfo = calculatePaceCategory(lap.lapTime, trackVenue, trackCourse, driver.carClass, driver.carType, trackLengthMeters);
-            if (paceInfo) {
-              lap.paceCategory = paceInfo.category;
-              lap.pacePercentage = paceInfo.percentage;
-              lap.target100Sec = paceInfo.target100Sec;
-            }
-          }
-        });
-
-        if (driver.bestLapTime) {
-          const bestPaceInfo = calculatePaceCategory(driver.bestLapTime, trackVenue, trackCourse, driver.carClass, driver.carType, trackLengthMeters);
-          if (bestPaceInfo) {
-            driver.bestLapPaceCategory = bestPaceInfo.category;
-            driver.bestLapPacePercentage = bestPaceInfo.percentage;
-          }
-        }
-      });
+      // Rate each lap and driver best lap against the benchmark targets
+      rateDriversPace(drivers, { venue: trackVenue, course: trackCourse, trackLengthMeters });
 
       // Compute Gap to Leader across drivers per lap
       const leaderLapEtMap = new Map<number, number>();

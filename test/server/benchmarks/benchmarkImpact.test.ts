@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   computeBenchmarkItemImpact,
   enrichBenchmarkDiffWithImpact,
+  BENCHMARK_IMPACT_RULE,
 } from '../../../server/benchmarks/benchmarkImpact.js';
 import type {
   DetailedSession,
@@ -19,7 +20,8 @@ describe('benchmarkImpact engine', () => {
       sessionName: 'FP1 Bahrain',
       drivers: [
         {
-          driverName: 'Driver GT3',
+          name: 'Driver GT3',
+          isPlayer: true,
           carClass: 'LMGT3',
           carType: 'Aston Martin Vantage LMGT3',
           laps: [
@@ -43,6 +45,13 @@ describe('benchmarkImpact engine', () => {
             },
           ],
         },
+        {
+          name: 'Rival GT3',
+          isPlayer: false,
+          carClass: 'LMGT3',
+          carType: 'Aston Martin Vantage LMGT3',
+          laps: [{ lapNum: 1, lapNumber: 1, lapTime: 120.6, isValid: true }],
+        },
       ],
     } as unknown as DetailedSession,
     {
@@ -52,7 +61,8 @@ describe('benchmarkImpact engine', () => {
       sessionType: 'Qualifying',
       drivers: [
         {
-          driverName: 'Driver Monza',
+          name: 'Driver Monza',
+          isPlayer: true,
           carClass: 'LMGT3',
           laps: [{ lapNumber: 1, lapTime: 110.0, isValid: true }],
         },
@@ -65,7 +75,8 @@ describe('benchmarkImpact engine', () => {
       sessionType: 'Race',
       drivers: [
         {
-          driverName: 'Driver Hyper',
+          name: 'Driver Hyper',
+          isPlayer: true,
           carClass: 'LMH',
           laps: [{ lapNumber: 1, lapTime: 98.0, isValid: true }],
         },
@@ -171,5 +182,23 @@ describe('benchmarkImpact engine', () => {
 
     expect(enriched.totalAffectedSessions).toBe(2); // Bahrain + Monza
     expect(enriched.totalCategoryShifts).toBe(2);
+  });
+
+  it('counts only the player laps, never the other drivers', () => {
+    const item: ReferenceBenchmarkDiffItem = {
+      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.4+', type: 'updated',
+      oldAlienSec: 120.0, newAlienSec: 118.0,
+    };
+    const impact = computeBenchmarkItemImpact(item, mockSessions);
+    expect(impact.categoryShifts.map(shift => shift.driverName)).not.toContain('Rival GT3');
+    expect(impact.affectedLapsCount).toBe(2);
+  });
+
+  it('marks an enriched diff with the current impact rule', () => {
+    const diff: ReferenceBenchmarkDiff = {
+      timestamp: '2026-10-01T12:00:00Z', hasChanges: false, addedCount: 0, updatedCount: 0, removedCount: 0,
+      totalEntries: 0, added: [], updated: [], removed: [],
+    };
+    expect(enrichBenchmarkDiffWithImpact(diff, mockSessions).impactRule).toBe(BENCHMARK_IMPACT_RULE);
   });
 });
