@@ -421,6 +421,13 @@ Lap table, classification, standings, session list and leaderboard share one gra
 - **Collapse:** drivers a compact board hides fold into a quiet left-aligned "N more drivers" link.
 - **Pagination** (`SessionPagination.tsx`): 25 per page under a hairline, "1–25 of 219 sessions" in muted text with mono numbers, then prev/next and a page window in 28px mono steps.
 
+### Stored Records (Settings)
+What the app keeps (cached replays, AI reports) reads as a log inside its panel. It follows the data table grammar, with no cards per item.
+- **Scroll box table** (`settings/replays/ReplayCacheTable.tsx`): a capped height (448px) that scrolls inside the panel, between top and bottom hairlines with no side border. The 11px Table Header sticks to the top on `lmu-card`. Every column sorts: the active column's label turns white with a direction arrow, and inactive columns show a faint double arrow. A column whose meaning is not obvious explains itself in a tooltip and to screen readers. The name column takes the free width and truncates in the middle of a long filename so its date and suffix stay readable, with the full name as a tooltip. Figures are right-aligned 12px mono, with a value ladder: counts and durations in white, sizes in soft white, dates in muted.
+- **State words, not badges:** the source column reads "Archived" in semibold gain (the cache holds the only copy, which counts as a kept asset) or "On disk" in muted. The version reads muted, "v behind" in semibold warn while a re-decode is due, or "v · kept" muted for an archived replay that can't be decoded again.
+- **Filter row:** an `lmu-bg` name filter with a 36px, 12px-radius well and a muted focus border (it narrows the list, it doesn't select). Next to it are segmented pills with a count in each (All, On disk, Archived, Outdated), and on the right a polite muted mono result line.
+- **Log list** (`settings/AiReportsHistoryCard.tsx`): rows between hairlines, 12px × 10px padding. Each row has a semibold white title that truncates, with the time in muted mono on the right. Below it come a 2-line clamped muted summary, then a muted mono metadata line (model, baseline, tokens). It shows the latest 5, with a secondary "Show all N" toggle. The panel heading carries the "N cached" count in muted mono and a small refresh icon button that spins while loading.
+
 ### Inputs / Fields
 - **Style:** `lmu-bg` well, hairline border, 12px radius, 12–14px white text (mono for paths), an optional leading muted icon.
 - **Focus:** the border shifts to Pit Lane Red; the session search shifts to `lmu-muted`, since red there would read as a filter. Both add the 2px outline (see Focus).
