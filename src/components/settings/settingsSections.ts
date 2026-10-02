@@ -20,6 +20,14 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     getBadge: (status) => (status?.sqliteCache?.sessionsCount !== undefined ? `${status.sqliteCache.sessionsCount} Sessions` : undefined),
   },
   {
+    id: 'reference-benchmarks',
+    title: 'Reference Benchmarks',
+    icon: Database,
+    description: 'Alien and competitive target times synchronized from Google Sheets',
+    keywords: ['reference', 'benchmarks', 'alien', 'targets', 'google sheets', 'laptimes', 'pace', 'csv', 'diff', 'refresh', 'spreadsheet', 'competitive'],
+    getBadge: (status) => (status?.referenceLaptimes?.entriesCount ? `${status.referenceLaptimes.entriesCount} Targets` : undefined),
+  },
+  {
     id: 'replay-cache',
     title: 'Cached Replays',
     icon: Film,
@@ -40,14 +48,6 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: History,
     description: 'Cached Gemini lap reports and coaching debrief history',
     keywords: ['ai', 'history', 'reports', 'cached reports', 'debriefs', 'coaching', 'gemini', 'saved', 'logs'],
-  },
-  {
-    id: 'reference-benchmarks',
-    title: 'Reference Benchmarks',
-    icon: Database,
-    description: 'Alien and competitive target times synchronized from Google Sheets',
-    keywords: ['reference', 'benchmarks', 'alien', 'targets', 'google sheets', 'laptimes', 'pace', 'csv', 'diff', 'refresh', 'spreadsheet', 'competitive'],
-    getBadge: (status) => (status?.referenceLaptimes?.entriesCount ? `${status.referenceLaptimes.entriesCount} Targets` : undefined),
   },
   {
     id: 'folder-paths',
