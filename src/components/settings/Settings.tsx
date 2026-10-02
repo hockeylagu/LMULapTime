@@ -1,16 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Settings as SettingsIcon, Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import { AlertCircle, Search } from 'lucide-react';
 import { AppStatus, ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
+import { updateSearchParams } from '../../utils/urlParams.js';
 import { CacheSettingsCard } from './CacheSettingsCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
-import { ReplayUpgradeCard } from './ReplayUpgradeCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
 import { SettingsSidebar } from './SettingsSidebar.js';
-import { SETTINGS_SECTIONS, matchesSettingsSection } from './settingsSections.js';
+import {
+  SETTINGS_SECTIONS,
+  getMissingPaths,
+  matchesSettingsSection,
+  orderSettingsSections,
+} from './settingsSections.js';
 import { useSettingsActions } from './useSettingsActions.js';
+import { useSettingsScrollspy } from './useSettingsScrollspy.js';
 
 export interface SettingsProps {
   status: AppStatus | null;
@@ -19,9 +26,14 @@ export interface SettingsProps {
   onReplayScanTriggered?: () => void;
 }
 
+function scrollBehavior(): ScrollBehavior {
+  const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return reduce ? 'auto' : 'smooth';
+}
+
 export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, replayScanStatus, onReplayScanTriggered }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeSectionId, setActiveSectionId] = useState<string>('cache-settings');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const actions = useSettingsActions({ status, onUpdatePaths, onReplayScanTriggered });
 
@@ -29,47 +41,31 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
     ? replayScanStatus.sessionScan
     : undefined;
 
+  const missingPaths = getMissingPaths(status);
+  const setupNeeded = missingPaths.length > 0;
+
   const matchingSections = useMemo(
-    () => SETTINGS_SECTIONS.filter((s) => matchesSettingsSection(s, searchQuery)),
-    [searchQuery]
+    () => orderSettingsSections(SETTINGS_SECTIONS, setupNeeded).filter((s) => matchesSettingsSection(s, searchQuery)),
+    [searchQuery, setupNeeded]
   );
 
-  // Update active section when visible matching sections change
-  useEffect(() => {
-    if (matchingSections.length > 0 && !matchingSections.some((s) => s.id === activeSectionId)) {
-      setActiveSectionId(matchingSections[0].id);
-    }
-  }, [matchingSections, activeSectionId]);
+  const { activeId: activeSectionId, pin } = useSettingsScrollspy(matchingSections.map((s) => s.id));
 
-  // Track active section on scroll
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.find((e) => e.isIntersecting);
-        if (visible) {
-          setActiveSectionId(visible.target.id);
-        }
-      },
-      { rootMargin: '-20px 0px -60% 0px', threshold: 0.1 }
-    );
-
-    for (const section of matchingSections) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, [matchingSections]);
-
-  const handleSelectSection = (sectionId: string) => {
-    setActiveSectionId(sectionId);
+  const goToSection = (sectionId: string, updateUrl: boolean) => {
     const el = document.getElementById(sectionId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (!el) return;
+    pin(sectionId);
+    el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    document.getElementById(`${sectionId}-heading`)?.focus({ preventScroll: true });
+    if (updateUrl) updateSearchParams(searchParams, setSearchParams, { section: sectionId });
   };
+
+  // Open on the section named by ?section=<id>.
+  useEffect(() => {
+    const requested = searchParams.get('section');
+    if (requested && SETTINGS_SECTIONS.some((s) => s.id === requested)) goToSection(requested, false);
+    // Only the first render honours the link; later changes come from the TOC itself.
+  }, []);
 
   const renderCard = (sectionId: string) => {
     switch (sectionId) {
@@ -84,8 +80,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         );
       case 'replay-cache':
         return <ReplayCacheCard replayScanStatus={replayScanStatus} />;
-      case 'replay-upgrade':
-        return <ReplayUpgradeCard replayScanStatus={replayScanStatus} />;
       case 'ai-settings':
         return <AISettingsCard />;
       case 'ai-history':
@@ -125,27 +119,33 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
 
   return (
     <div className="w-full max-w-[1500px] mx-auto space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-3 bg-lmu-card border border-lmu-border p-6 rounded-2xl">
-        <div className="p-3 rounded-xl bg-lmu-accent/10 text-lmu-accent-text border border-lmu-accent/20">
-          <SettingsIcon className="w-6 h-6" />
-        </div>
-        <div>
-          <h2 className="text-xl font-extrabold text-white">Application Settings</h2>
-          <p className="text-xs text-lmu-muted mt-0.5">
-            Manage LMU telemetry log paths, SQLite session database cache, and reference lap time benchmarks
-          </p>
-        </div>
+      <div>
+        <h2 className="text-xl font-bold text-lmu-text">Application Settings</h2>
+        <p className="text-xs text-lmu-muted mt-1">
+          Folder paths, session and replay caches, AI lap reports and reference benchmarks
+        </p>
       </div>
 
-      {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[300px_1fr] gap-6 items-start">
-        {/* Left Sidepanel / Table of Contents */}
-        <aside className="lg:sticky lg:top-6 space-y-4">
+      {setupNeeded && (
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-lmu-border bg-lmu-card px-4 py-3 text-xs text-lmu-text-soft">
+          <AlertCircle className="w-4 h-4 shrink-0 text-lmu-warn" aria-hidden="true" />
+          <span>Setup needed: {missingPaths.join(', ')} not found.</span>
+          <button
+            type="button"
+            onClick={() => goToSection('folder-paths', true)}
+            className="font-semibold text-lmu-text underline underline-offset-2 hover:text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+          >
+            Fix folder paths
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-[240px_minmax(0,1fr)] gap-8 items-start">
+        <aside className="sticky top-[84px]">
           <SettingsSidebar
             sections={matchingSections}
             activeSectionId={activeSectionId}
-            onSelectSection={handleSelectSection}
+            onSelectSection={(id) => goToSection(id, true)}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             status={status}
@@ -153,26 +153,10 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
           />
         </aside>
 
-        {/* Right Column / Cards List */}
-        <div className="space-y-6 min-w-0">
-          {searchQuery.trim() && matchingSections.length > 0 && (
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-sky-950/30 border border-sky-800/50 text-xs text-sky-200">
-              <span>
-                Filtering settings by <strong>&quot;{searchQuery}&quot;</strong> ({matchingSections.length} found)
-              </span>
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-xs text-sky-400 hover:text-sky-300 font-semibold underline cursor-pointer"
-              >
-                Reset Search
-              </button>
-            </div>
-          )}
-
+        <div className="min-w-0 space-y-6">
           {matchingSections.length === 0 ? (
-            <div className="bg-lmu-card border border-lmu-border p-12 rounded-2xl text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700 flex items-center justify-center mx-auto text-lmu-muted">
+            <div className="py-16 text-center space-y-3">
+              <div className="flex items-center justify-center mx-auto text-lmu-muted">
                 <Search className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-white">No Settings Found</h3>
@@ -182,14 +166,14 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="mt-2 px-4 py-2 rounded-xl bg-lmu-accent text-white text-xs font-bold hover:brightness-110 transition-all cursor-pointer"
+                className="mt-2 px-4 py-2 rounded-lg bg-lmu-card border border-lmu-rule text-lmu-text-soft text-xs font-semibold hover:bg-lmu-card-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
               >
-                Clear Search
+                Clear search
               </button>
             </div>
           ) : (
             matchingSections.map((section) => (
-              <section id={section.id} key={section.id} className="scroll-mt-6">
+              <section id={section.id} key={section.id} aria-labelledby={`${section.id}-heading`} className="scroll-mt-[84px]">
                 {renderCard(section.id)}
               </section>
             ))

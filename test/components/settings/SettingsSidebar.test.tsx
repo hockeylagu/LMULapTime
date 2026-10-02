@@ -46,8 +46,6 @@ describe('SettingsSidebar component', () => {
     );
 
     expect(screen.getByRole('textbox', { name: /search settings/i })).toBeInTheDocument();
-    expect(screen.getByText('Table of Contents')).toBeInTheDocument();
-    expect(screen.getByText('7 sections')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: /settings table of contents/i })).toBeInTheDocument();
 
     // Check system overview
@@ -88,7 +86,7 @@ describe('SettingsSidebar component', () => {
       />
     );
 
-    expect(screen.getByText(/2 of 7 sections match/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 of 6 sections match/i)).toBeInTheDocument();
 
     const clearBtn = screen.getByRole('button', { name: /clear search/i });
     fireEvent.click(clearBtn);

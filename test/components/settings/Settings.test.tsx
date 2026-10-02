@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Settings } from '../../../src/components/settings/index.js';
 import type { ScanStatus } from '../../../server/core/types.js';
 
@@ -56,8 +56,8 @@ describe('Settings component', () => {
     await screen.findByText(/no replays cached yet/i);
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
-    expect(screen.getByText('Cached Replays (.VCR)')).toBeInTheDocument();
-    expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cached Replays' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Telemetry')).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('Settings component', () => {
     render(<Settings status={mockStatus} onUpdatePaths={onUpdatePaths} />);
     await screen.findByText(/no replays cached yet/i);
 
-    expect(screen.getByText('Reference Lap Time Benchmarks')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
 
     const refreshBtn = screen.getByRole('button', { name: /update reference lap time benchmarks/i });
     fireEvent.click(refreshBtn);
@@ -167,9 +167,6 @@ describe('Settings component', () => {
       },
     };
 
-    // Mock confirm dialog
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/cache/clear')) {
         return Promise.resolve({
@@ -183,8 +180,8 @@ describe('Settings component', () => {
     render(<Settings status={statusWithCache} onUpdatePaths={onUpdatePaths} />);
     await screen.findByText(/no replays cached yet/i);
 
-    expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
-    expect(screen.getByText(/42 Sessions Cached/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
+    expect(screen.getByText('Cached Sessions').nextSibling).toHaveTextContent('42');
     expect(screen.getByText('512.0 KB')).toBeInTheDocument();
     expect(screen.getByText('Cached Telemetry')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
@@ -192,9 +189,10 @@ describe('Settings component', () => {
     const clearBtn = screen.getByRole('button', { name: /clear cache/i });
     fireEvent.click(clearBtn);
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByText('Clear 42 parsed sessions?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(() => {
-      expect(screen.getByText(/Session SQLite cache cleared successfully/i)).toBeInTheDocument();
+      expect(screen.getByText(/Session cache cleared/i)).toBeInTheDocument();
       expect(onUpdatePaths).toHaveBeenCalled();
     });
   });
@@ -309,26 +307,26 @@ describe('Settings component', () => {
     await screen.findByText(/no replays cached yet/i);
 
     const searchInput = screen.getByRole('textbox', { name: /search settings/i });
-    expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
-    expect(screen.getByText('Reference Lap Time Benchmarks')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
 
     // Search for "gemini" -> should show AI sections and hide SQLite Cache
     fireEvent.change(searchInput, { target: { value: 'gemini' } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Filtering settings by/i)).toBeInTheDocument();
-      expect(screen.getByText('AI Lap Reports')).toBeInTheDocument();
-      expect(screen.getByText('AI Lap Report History')).toBeInTheDocument();
-      expect(screen.queryByText('Session XML SQLite Cache')).not.toBeInTheDocument();
+      expect(screen.getByText('2 of 6 sections match')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Session Cache' })).not.toBeInTheDocument();
     });
 
-    // Clear search using the clear button in the input or reset button
+    // Clear search using the one clear button in the input
     const clearBtn = screen.getByRole('button', { name: /clear search/i });
     fireEvent.click(clearBtn);
 
     await waitFor(() => {
       expect(searchInput).toHaveValue('');
-      expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
     });
     await screen.findByText(/no replays cached yet/i);
   });
@@ -343,15 +341,15 @@ describe('Settings component', () => {
     await waitFor(() => {
       expect(screen.getByText('No Settings Found')).toBeInTheDocument();
       expect(screen.getByText(/No settings match "nonexistenttermxyz"/i)).toBeInTheDocument();
-      expect(screen.queryByText('Session XML SQLite Cache')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Session Cache' })).not.toBeInTheDocument();
     });
 
-    const clearBtn = screen.getByRole('button', { name: 'Clear Search' });
+    const [, clearBtn] = screen.getAllByRole('button', { name: 'Clear search' });
     fireEvent.click(clearBtn);
 
     await waitFor(() => {
       expect(screen.queryByText('No Settings Found')).not.toBeInTheDocument();
-      expect(screen.getByText('Session XML SQLite Cache')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Session Cache' })).toBeInTheDocument();
     });
     await screen.findByText(/no replays cached yet/i);
   });
@@ -366,7 +364,7 @@ describe('Settings component', () => {
     const tocNav = screen.getByRole('navigation', { name: /settings table of contents/i });
     expect(tocNav).toBeInTheDocument();
 
-    const aiButton = screen.getByRole('button', { name: /AI Race Engineer/i });
+    const aiButton = within(tocNav).getByRole('button', { name: /AI Lap Reports/i });
     fireEvent.click(aiButton);
 
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });

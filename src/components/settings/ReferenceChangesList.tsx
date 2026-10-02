@@ -3,6 +3,7 @@ import { FileText, CheckCircle2 } from 'lucide-react';
 import { ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { BenchmarkImpactBadge } from './BenchmarkImpactBadge.js';
+import { formatDateTime } from './settingsFormat.js';
 
 export interface ReferenceChangesListProps {
   updateDiff: ReferenceBenchmarkDiff;
@@ -13,12 +14,12 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
     <div className="mt-4 pt-4 border-t border-lmu-border/60 space-y-3" data-testid="benchmark-diff-section">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-lmu-gold" />
+          <FileText className="w-4 h-4 text-lmu-muted" />
           <h4 className="text-xs font-bold text-white uppercase tracking-wider">
             Benchmark Reference Updates
           </h4>
           <span className="text-[10px] text-lmu-muted font-mono">
-            {new Date(updateDiff.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {formatDateTime(updateDiff.timestamp)}
           </span>
         </div>
 
@@ -26,33 +27,33 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
           {updateDiff.hasChanges ? (
             <>
               {updateDiff.addedCount > 0 && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-gain-strong/15 text-lmu-gain border border-lmu-gain-strong/30">
+                <span className="text-[11px] font-semibold text-lmu-gain">
                   +{updateDiff.addedCount} New Reference{updateDiff.addedCount > 1 ? 's' : ''}
                 </span>
               )}
               {updateDiff.updatedCount > 0 && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-warn-strong/15 text-lmu-warn border border-lmu-warn-strong/30">
+                <span className="text-[11px] font-semibold text-lmu-warn">
                   {updateDiff.updatedCount} Updated Target{updateDiff.updatedCount > 1 ? 's' : ''}
                 </span>
               )}
               {updateDiff.removedCount > 0 && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-lmu-loss-strong/15 text-lmu-loss border border-lmu-loss-strong/30">
+                <span className="text-[11px] font-semibold text-lmu-loss">
                   -{updateDiff.removedCount} Removed
                 </span>
               )}
               {updateDiff.totalAffectedSessions !== undefined && updateDiff.totalAffectedSessions > 0 && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-sky-300 border border-slate-700">
+                <span className="text-[11px] text-lmu-muted">
                   {updateDiff.totalAffectedSessions} Session{updateDiff.totalAffectedSessions > 1 ? 's' : ''} Driven
                 </span>
               )}
               {updateDiff.totalCategoryShifts !== undefined && updateDiff.totalCategoryShifts > 0 && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                <span className="text-[11px] text-lmu-muted">
                   {updateDiff.totalCategoryShifts} Category Shift{updateDiff.totalCategoryShifts > 1 ? 's' : ''}
                 </span>
               )}
             </>
           ) : (
-            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-lmu-azure-strong/15 text-lmu-azure border border-lmu-azure-strong/30">
+            <span className="text-[11px] text-lmu-muted">
               No Changes (All {updateDiff.totalEntries} targets identical)
             </span>
           )}
@@ -60,16 +61,16 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
       </div>
 
       {updateDiff.hasChanges ? (
-        <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+        <div className="relative max-h-96 overflow-y-auto border-y border-lmu-border/70 divide-y divide-lmu-border/70">
           {/* Added items */}
           {updateDiff.added.map((item) => (
             <div
               key={`added-${item.key}`}
-              className="p-2.5 rounded-xl bg-lmu-gain-deep/20 border border-lmu-gain-strong/20 text-xs space-y-1.5"
+              className="py-3 text-xs space-y-1.5"
             >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-gain-strong/20 text-lmu-gain border border-lmu-gain-strong/40">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-lmu-gain">
                     NEW
                   </span>
                   <span className="font-semibold text-white">{item.trackName}</span>
@@ -78,7 +79,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                 <div className="flex items-center gap-3 font-mono">
                   <span className="text-lmu-gain-soft font-bold">Alien: {item.newAlienTimeString}</span>
                   {item.patch && (
-                    <span className="text-[10px] text-lmu-muted font-sans bg-lmu-card px-1.5 py-0.5 rounded border border-lmu-border/50">
+                    <span className="text-[10px] text-lmu-muted font-sans">
                       {item.patch}
                     </span>
                   )}
@@ -92,11 +93,11 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
           {updateDiff.updated.map((item) => (
             <div
               key={`updated-${item.key}`}
-              className="p-2.5 rounded-xl bg-lmu-warn-deep/20 border border-lmu-warn-strong/20 text-xs space-y-1.5"
+              className="py-3 text-xs space-y-1.5"
             >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-warn-strong/20 text-lmu-warn border border-lmu-warn-strong/40">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-lmu-warn">
                     UPDATED
                   </span>
                   <span className="font-semibold text-white">{item.trackName}</span>
@@ -119,7 +120,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                     )}
                   </div>
                   {item.newPatch && item.newPatch !== item.oldPatch && (
-                    <span className="text-[10px] text-lmu-warn-soft/90 font-sans bg-lmu-warn-strong/10 px-1.5 py-0.5 rounded border border-lmu-warn-strong/30">
+                    <span className="text-[10px] text-lmu-muted font-sans">
                       {item.oldPatch || '?'} &rarr; {item.newPatch}
                     </span>
                   )}
@@ -133,11 +134,11 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
           {updateDiff.removed.map((item) => (
             <div
               key={`removed-${item.key}`}
-              className="p-2.5 rounded-xl bg-lmu-loss-deep/20 border border-lmu-loss-strong/20 text-xs space-y-1.5"
+              className="py-3 text-xs space-y-1.5"
             >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-lmu-loss-strong/20 text-lmu-loss border border-lmu-loss-strong/40">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-lmu-loss">
                     REMOVED
                   </span>
                   <span className="font-semibold text-white">{item.trackName}</span>
@@ -152,8 +153,8 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
           ))}
         </div>
       ) : (
-        <div className="p-3 rounded-xl bg-lmu-bg/70 border border-lmu-border/60 text-xs text-lmu-muted flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-lmu-green shrink-0" />
+        <div className="py-3 text-xs text-lmu-muted flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-lmu-gain shrink-0" />
           <span>
             All {updateDiff.totalEntries} benchmark targets are currently synchronized with Google Sheets. No target lap times or tracks have changed.
           </span>

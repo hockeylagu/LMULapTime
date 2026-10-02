@@ -1,6 +1,8 @@
 import React from 'react';
-import { HardDrive, CheckCircle2, AlertCircle, User, RefreshCw } from 'lucide-react';
+import { HardDrive, User, RefreshCw } from 'lucide-react';
 import { AppStatus, SessionScanStatus } from '../../../shared/types/index.js';
+import { PathField } from './PathField.js';
+import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
 
 export interface FolderPathsCardProps {
   status: AppStatus | null;
@@ -14,7 +16,7 @@ export interface FolderPathsCardProps {
   setPlayerNameInput: (val: string) => void;
   isScanning: boolean;
   onScanPaths: (e: React.FormEvent) => void;
-  pathMessage: string | null;
+  pathMessage: SettingsFeedback | null;
   sessionScanStatus?: SessionScanStatus | null;
 }
 
@@ -36,90 +38,16 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   const sessionScanPercent = sessionScanStatus?.total && sessionScanStatus.total > 0
     ? Math.round(((sessionScanStatus.processed ?? 0) / sessionScanStatus.total) * 100)
     : 0;
+  const folderIcon = <HardDrive className="w-4 h-4" aria-hidden="true" />;
 
   return (
-    <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-6">
-      <div className="border-b border-lmu-border/50 pb-3">
-        <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <HardDrive className="w-5 h-5 text-lmu-accent-text" />
-          LMU UserData Directory Paths
-        </h3>
-        <p className="text-xs text-lmu-muted mt-0.5">
-          Configure local paths where Le Mans Ultimate writes XML results, VCR replays, and DuckDB telemetry files
-        </p>
-      </div>
-
-      {/* Current status indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Results Log Directory</span>
-            <span
-              className={`inline-flex items-center gap-1 text-xs font-bold ${
-                status?.resultsExist ? 'text-lmu-green' : 'text-lmu-accent-text'
-              }`}
-            >
-              {status?.resultsExist ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" /> Detected
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-4 h-4" /> Not Found
-                </>
-              )}
-            </span>
-          </div>
-          <p className="text-xs text-white font-mono truncate">{status?.resultsDir}</p>
-        </div>
-
-        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Replays (.VCR) Directory</span>
-            <span
-              className={`inline-flex items-center gap-1 text-xs font-bold ${
-                status?.replaysExist ? 'text-lmu-green' : 'text-lmu-accent-text'
-              }`}
-            >
-              {status?.replaysExist ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" /> Detected
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-4 h-4" /> Not Found
-                </>
-              )}
-            </span>
-          </div>
-          <p className="text-xs text-white font-mono truncate">{status?.replaysDir}</p>
-        </div>
-
-        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider">Telemetry (.duckdb)</span>
-            <span
-              className={`inline-flex items-center gap-1 text-xs font-bold ${
-                status?.telemetryExist ? 'text-lmu-green' : 'text-lmu-accent-text'
-              }`}
-            >
-              {status?.telemetryExist ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" /> Detected
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-4 h-4" /> Not Found
-                </>
-              )}
-            </span>
-          </div>
-          <p className="text-xs text-white font-mono truncate">{status?.telemetryDir || 'Not Configured'}</p>
-        </div>
-      </div>
+    <SettingsPanel sectionId="folder-paths">
+      <p className="text-xs text-lmu-muted">
+        Where Le Mans Ultimate writes XML results, VCR replays and DuckDB telemetry.
+      </p>
 
       {sessionScanStatus?.running && (
-        <div className="bg-lmu-bg p-4 rounded-xl border border-lmu-border space-y-2">
+        <div className="bg-lmu-bg p-4 rounded-lg space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-lmu-muted uppercase tracking-wider">Parsing XML Session Logs</span>
             <span className="font-bold text-white">
@@ -127,7 +55,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
             </span>
           </div>
           <div className="w-full h-2 rounded-full bg-lmu-border/50 overflow-hidden">
-            <div className="h-full bg-lmu-accent transition-all duration-300" style={{ width: `${sessionScanPercent}%` }} />
+            <div className="h-full bg-lmu-info transition-all duration-300" style={{ width: `${sessionScanPercent}%` }} />
           </div>
           {sessionScanStatus.currentFile && (
             <div className="flex flex-col gap-0.5 text-[11px] text-lmu-muted font-mono">
@@ -138,103 +66,68 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
                 )}
               </div>
               {sessionScanStatus.currentStage && (
-                <span className="text-[10px] text-lmu-muted font-sans italic truncate">{sessionScanStatus.currentStage}</span>
+                <span className="text-[10px] text-lmu-faint font-sans truncate">{sessionScanStatus.currentStage}</span>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* Path Form */}
       <form onSubmit={onScanPaths} className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5 flex items-center justify-between">
-            <span>Player Driver Profile Name</span>
-            <span className="text-lmu-accent-text text-[11px] font-normal normal-case">
-              (Auto-detected from LMU settings.json or user editable)
-            </span>
-          </label>
-          <div className="relative">
-            <User className="w-4 h-4 text-lmu-muted absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={playerNameInput}
-              onChange={(e) => setPlayerNameInput(e.target.value)}
-              placeholder="e.g. Bob"
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-sans focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-            />
-          </div>
-          <p className="text-[11px] text-lmu-muted mt-1">
-            Personal track records, sector splits, and star icons (⭐) are attributed to this driver profile name.
-          </p>
-        </div>
+        <PathField
+          id="player-name"
+          label="Driver name"
+          help="Personal records and sector bests are credited to this name. It is read from LMU's settings when available."
+          value={playerNameInput}
+          onChange={setPlayerNameInput}
+          icon={<User className="w-4 h-4" aria-hidden="true" />}
+          placeholder="Your LMU driver name"
+          plain
+        />
+        <PathField
+          id="results-dir"
+          label="Results logs"
+          help="XML session logs, usually UserData\LOG\Results."
+          value={resultsDirInput}
+          onChange={setResultsDirInput}
+          icon={folderIcon}
+          savedValue={status?.resultsDir}
+          exists={status?.resultsExist}
+        />
+        <PathField
+          id="replays-dir"
+          label="Replays"
+          help="VCR replay files, usually UserData\Replays."
+          value={replaysDirInput}
+          onChange={setReplaysDirInput}
+          icon={folderIcon}
+          savedValue={status?.replaysDir}
+          exists={status?.replaysExist}
+        />
+        <PathField
+          id="telemetry-dir"
+          label="Telemetry"
+          help="DuckDB telemetry files, the primary source for your own laps."
+          value={telemetryDirInput}
+          onChange={setTelemetryDirInput}
+          icon={folderIcon}
+          savedValue={status?.telemetryDir}
+          exists={status?.telemetryExist}
+          placeholder="C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry"
+        />
 
-        <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5">
-            UserData Results XML Folder Path
-          </label>
-          <div className="relative">
-            <HardDrive className="w-4 h-4 text-lmu-muted absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={resultsDirInput}
-              onChange={(e) => setResultsDirInput(e.target.value)}
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5">
-            UserData Replays (.VCR) Folder Path
-          </label>
-          <div className="relative">
-            <HardDrive className="w-4 h-4 text-lmu-muted absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={replaysDirInput}
-              onChange={(e) => setReplaysDirInput(e.target.value)}
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-lmu-muted uppercase tracking-wider mb-1.5 flex items-center justify-between">
-            <span>UserData Telemetry (.duckdb) Folder Path</span>
-            <span className="text-lmu-accent-text text-[11px] font-normal normal-case">
-              (Primary telemetry source for main driver)
-            </span>
-          </label>
-          <div className="relative">
-            <HardDrive className="w-4 h-4 text-lmu-muted absolute left-3.5 top-3" />
-            <input
-              type="text"
-              value={telemetryDirInput}
-              onChange={(e) => setTelemetryDirInput(e.target.value)}
-              placeholder="C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry"
-              className="w-full bg-lmu-bg border border-lmu-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white font-mono focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-wrap items-center gap-4 pt-2">
           <button
             type="submit"
             disabled={isScanning}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lmu-accent text-white font-bold text-xs uppercase tracking-wider hover:bg-lmu-accent/90 transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-lmu-accent text-white font-semibold text-xs hover:bg-lmu-accent/90 transition-colors disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
           >
             <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-            {isScanning ? 'Scanning Directory...' : 'Rescan & Load Telemetry'}
+            {isScanning ? 'Scanning folders...' : 'Rescan & load telemetry'}
           </button>
-
-          {pathMessage && (
-            <span className="text-xs font-semibold text-lmu-green">
-              {pathMessage}
-            </span>
-          )}
+          <FeedbackMessage feedback={pathMessage} />
         </div>
       </form>
-    </div>
+    </SettingsPanel>
   );
 };
