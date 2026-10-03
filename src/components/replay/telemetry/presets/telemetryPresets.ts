@@ -317,7 +317,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     id: 'default',
     name: 'Standard Telemetry',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
+    channels: ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'],
   },
   {
     id: 'powertrain',
@@ -382,10 +382,10 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v8';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v8';
-const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v7';
-const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v7';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v9';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v9';
+const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v8';
+const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v8';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {
@@ -411,7 +411,7 @@ export function loadTelemetryPresets(): TelemetryPreset[] {
     const validated: TelemetryPreset[] = (baseList as Record<string, unknown>[])
       .filter((p) => p.id !== 'driver-inputs')
       .map((p, idx) => {
-      const defaultChannels: TelemetryChannelId[] = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'];
+      const defaultChannels: TelemetryChannelId[] = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'];
       const fallbackSingle: TelemetryChannelId[] = ['speed'];
       const validChannels: TelemetryChannelId[] = Array.isArray(p.channels)
         ? (p.channels.filter((c: unknown): c is TelemetryChannelId =>

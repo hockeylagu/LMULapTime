@@ -187,4 +187,46 @@ describe('TelemetryPresetModal', () => {
     );
     expect(screen.queryByTestId('telemetry-preset-modal')).not.toBeInTheDocument();
   });
+
+  it('allows reordering active channels with up and down buttons', () => {
+    const handleSave = vi.fn();
+    const { rerender } = render(
+      <TelemetryPresetModal
+        isOpen={true}
+        onClose={vi.fn()}
+        presets={DEFAULT_TELEMETRY_PRESETS}
+        activePresetId="default"
+        onSavePresets={handleSave}
+        onSelectActivePreset={vi.fn()}
+        onResetDefaults={vi.fn()}
+      />
+    );
+
+    // Default preset channels are ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear']
+    const downButtons = screen.getAllByTitle('Move channel down');
+    // Steer is at index 4 (5th active channel)
+    fireEvent.click(downButtons[4]);
+
+    expect(handleSave).toHaveBeenCalled();
+    const savedPresets = handleSave.mock.calls[0][0] as TelemetryPreset[];
+    expect(savedPresets[0].channels).toEqual(['speed', 'delta', 'throttle', 'brake', 'gear', 'steer']);
+
+    rerender(
+      <TelemetryPresetModal
+        isOpen={true}
+        onClose={vi.fn()}
+        presets={savedPresets}
+        activePresetId="default"
+        onSavePresets={handleSave}
+        onSelectActivePreset={vi.fn()}
+        onResetDefaults={vi.fn()}
+      />
+    );
+
+    const upButtons = screen.getAllByTitle('Move channel up');
+    fireEvent.click(upButtons[4]);
+    expect(handleSave).toHaveBeenCalledTimes(2);
+    const updatedAgain = handleSave.mock.calls[1][0] as TelemetryPreset[];
+    expect(updatedAgain[0].channels).toEqual(['speed', 'delta', 'throttle', 'gear', 'brake', 'steer']);
+  });
 });

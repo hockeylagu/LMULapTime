@@ -78,7 +78,7 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(presets.length).toBe(DEFAULT_TELEMETRY_PRESETS.length);
     expect(presets[0].id).toBe('default');
     expect(presets[0].name).toBe('Standard Telemetry');
-    expect(presets[0].channels).toEqual(['speed', 'delta', 'throttle', 'brake', 'gear', 'steer']);
+    expect(presets[0].channels).toEqual(['speed', 'delta', 'throttle', 'brake', 'steer', 'gear']);
   });
 
   it('persists and reloads modified and renamed presets', () => {
@@ -111,5 +111,19 @@ describe('telemetryPresets - Management and Storage', () => {
     const defs = resetTelemetryPresetsToDefault();
     expect(defs.length).toBe(DEFAULT_TELEMETRY_PRESETS.length);
     expect(defs.find(p => p.id === 'powertrain')?.channels).toContain('rpm');
+  });
+
+  it('migrates v8 presets updating defaults while preserving custom presets', () => {
+    store['lmu_telemetry_presets_v8'] = JSON.stringify([
+      { id: 'default', name: 'Standard Telemetry', isBuiltIn: true, channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'] },
+      { id: 'custom-old', name: 'My Old Setup', isBuiltIn: false, channels: ['speed', 'rpm'] },
+    ]);
+    const loaded = loadTelemetryPresets();
+    const defaultPreset = loaded.find(p => p.id === 'default');
+    const customPreset = loaded.find(p => p.id === 'custom-old');
+
+    expect(defaultPreset?.channels).toEqual(['speed', 'delta', 'throttle', 'brake', 'steer', 'gear']);
+    expect(customPreset?.channels).toEqual(['speed', 'rpm']);
+    expect(store['lmu_telemetry_presets_v9']).toBeDefined();
   });
 });

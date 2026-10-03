@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Check, SlidersHorizontal } from 'lucide-react';
 import {
   TelemetryPreset,
   TelemetryChannelId,
+  TelemetryChannelInfo,
   AVAILABLE_TELEMETRY_CHANNELS,
 } from './telemetryPresets.js';
 import { TelemetryPresetChannelRow } from './TelemetryPresetChannelRow.js';
@@ -33,9 +34,28 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
   const [editingName, setEditingName] = useState<string>('');
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
 
-  if (!isOpen) return null;
-
   const currentPreset = presets.find(p => p.id === selectedId) || presets[0];
+
+  const channelMap = useMemo(
+    () => new Map(AVAILABLE_TELEMETRY_CHANNELS.map(c => [c.id, c])),
+    []
+  );
+
+  const activeChannels = useMemo(
+    () => (currentPreset?.channels ?? [])
+      .map(id => channelMap.get(id))
+      .filter((c): c is TelemetryChannelInfo => c !== undefined),
+    [currentPreset?.channels, channelMap]
+  );
+
+  const inactiveChannels = useMemo(
+    () => AVAILABLE_TELEMETRY_CHANNELS.filter(
+      c => !currentPreset?.channels.includes(c.id)
+    ),
+    [currentPreset?.channels]
+  );
+
+  if (!isOpen) return null;
 
   const handleStartRename = () => {
     if (!currentPreset) return;
@@ -94,7 +114,7 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
       id: newId,
       name: `Custom Preset ${presets.length + 1}`,
       isBuiltIn: false,
-      channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
+      channels: ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'],
     };
     onSavePresets([...presets, newPreset]);
     setSelectedId(newId);
@@ -190,27 +210,40 @@ export const TelemetryPresetModal: React.FC<TelemetryPresetModalProps> = ({
 
               {/* Channels List */}
               <div className="flex-1 min-h-0 overflow-y-auto space-y-0 pr-1">
-                <div className="text-[10px] font-bold text-lmu-muted uppercase tracking-wider mb-2">
-                  Telemetry Channels
+                <div className="text-[10px] font-bold text-lmu-muted uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Active Channels ({activeChannels.length})</span>
+                  <span className="text-[10px] text-lmu-faint font-normal">Use arrows to reorder</span>
                 </div>
-                {AVAILABLE_TELEMETRY_CHANNELS.map(channel => {
-                  const isActive = currentPreset.channels.includes(channel.id);
-                  const activeIdx = currentPreset.channels.indexOf(channel.id);
-                  const isFirst = activeIdx === 0;
-                  const isLast = activeIdx === currentPreset.channels.length - 1;
+                {activeChannels.map((channel, activeIdx) => (
+                  <TelemetryPresetChannelRow
+                    key={channel.id}
+                    channel={channel}
+                    isActive={true}
+                    isFirst={activeIdx === 0}
+                    isLast={activeIdx === activeChannels.length - 1}
+                    onToggle={handleToggleChannel}
+                    onMove={handleMoveChannel}
+                  />
+                ))}
 
-                  return (
-                    <TelemetryPresetChannelRow
-                      key={channel.id}
-                      channel={channel}
-                      isActive={isActive}
-                      isFirst={isFirst}
-                      isLast={isLast}
-                      onToggle={handleToggleChannel}
-                      onMove={handleMoveChannel}
-                    />
-                  );
-                })}
+                {inactiveChannels.length > 0 && (
+                  <>
+                    <div className="text-[10px] font-bold text-lmu-muted uppercase tracking-wider mt-4 mb-2">
+                      Available Channels ({inactiveChannels.length})
+                    </div>
+                    {inactiveChannels.map(channel => (
+                      <TelemetryPresetChannelRow
+                        key={channel.id}
+                        channel={channel}
+                        isActive={false}
+                        isFirst={false}
+                        isLast={false}
+                        onToggle={handleToggleChannel}
+                        onMove={handleMoveChannel}
+                      />
+                    ))}
+                  </>
+                )}
               </div>
 
               {/* Bottom Apply Bar */}

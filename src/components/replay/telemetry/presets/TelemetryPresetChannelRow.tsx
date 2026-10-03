@@ -73,6 +73,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             onClick={() => onMove(channel.id, 'up')}
             className={`p-1 rounded hover:bg-white/10 text-lmu-text-soft disabled:text-lmu-faint disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`}
             title="Move channel up"
+            aria-label="Move channel up"
           >
             <ArrowUp className="w-3 h-3" />
           </button>
@@ -82,6 +83,7 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
             onClick={() => onMove(channel.id, 'down')}
             className={`p-1 rounded hover:bg-white/10 text-lmu-text-soft disabled:text-lmu-faint disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`}
             title="Move channel down"
+            aria-label="Move channel down"
           >
             <ArrowDown className="w-3 h-3" />
           </button>

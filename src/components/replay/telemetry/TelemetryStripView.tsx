@@ -76,7 +76,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
   isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
-  activeChannels = ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'],
+  activeChannels = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'],
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
   hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {
