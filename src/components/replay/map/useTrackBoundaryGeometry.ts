@@ -1,56 +1,13 @@
 import { useState, useEffect } from 'react';
 import { loadTrackBoundaryGeometry } from '../../../api/trackGeometryApi.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
-
-export interface TimingGateGeometry {
-  name: string;
-  center: [number, number];
-  left: [number, number];
-  right: [number, number];
-  stationM: number;
-}
-
-export interface TrackBoundaryGeometry {
-  layoutKey: string;
-  circuitId: string;
-  layoutId: string;
-  trackVenue: string;
-  trackCourse: string;
-  lengthM: number;
-  bounds: {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-    spanX: number;
-    spanZ: number;
-  };
-  leftBoundary: Array<[number, number]>;
-  rightBoundary: Array<[number, number]>;
-  centerline: Array<[number, number]>;
-  nominalWidthM?: number;
-  startFinish?: [number, number];
-  timingGates?: {
-    startFinish: TimingGateGeometry;
-    sector1?: TimingGateGeometry;
-    sector2?: TimingGateGeometry;
-  };
-  elevationProfile?: number[];
-  pitLane?: {
-    centerline: Array<[number, number]>;
-    elevation?: number[];
-  };
-  pitStalls?: Array<{
-    id: number;
-    center: [number, number];
-    widthM: number;
-    angleDeg?: number;
-  }>;
-  gridSlots?: Array<{
-    slot: number;
-    center: [number, number];
-  }>;
-}
+import type { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
+export type {
+  TimingGateGeometry,
+  TrackSurfacePolygon,
+  TrackMapSurfaces,
+  TrackBoundaryGeometry,
+} from '../../../../shared/types/trackGeometry.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
 // Capped with LRU eviction to keep memory low across 21 track geometries.
@@ -112,7 +69,7 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
 
     let fetchPromise = inFlightRequests.get(resolvedKey);
     if (!fetchPromise) {
-      fetchPromise = loadTrackBoundaryGeometry<TrackBoundaryGeometry>(resolvedKey)
+      fetchPromise = loadTrackBoundaryGeometry(resolvedKey)
         .then((data) => {
           setGeometryCache(resolvedKey, data);
           inFlightRequests.delete(resolvedKey);

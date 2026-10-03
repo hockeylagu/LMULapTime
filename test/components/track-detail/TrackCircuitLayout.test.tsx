@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { TrackCircuitLayout } from '../../../src/components/track-detail/TrackCircuitLayout.js';
 import { TrackDetailHeader } from '../../../src/components/track-detail/TrackDetailHeader.js';
 import { TrackBoundaryGeometry } from '../../../src/components/replay/map/index.js';
@@ -73,6 +73,30 @@ describe('TrackCircuitLayout', () => {
     // Check no extra circles/dots exist
     const circle = svg?.querySelector('circle');
     expect(circle).toBeNull();
+  });
+
+  it('renders native road, runoff and kerb polygons while preserving the clickable map shell', () => {
+    const onClick = vi.fn();
+    const geometryWithSurfaces: TrackBoundaryGeometry = {
+      ...mockGeometry,
+      mapSurfaces: {
+        road: [[[[100, 100], [400, 100], [400, 400], [100, 100]]]],
+        runoff: [[[[80, 80], [420, 80], [420, 420], [80, 80]]]],
+        kerb: [[[[120, 120], [180, 120], [180, 180], [120, 120]]]],
+      },
+    };
+
+    render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" trackGeometry={geometryWithSurfaces} onClick={onClick} />);
+
+    const layout = screen.getByRole('button', { name: 'Open Circuit de Spa-Francorchamps' });
+    expect(layout).toHaveAttribute('title', 'Circuit de Spa-Francorchamps Circuit Layout');
+    expect(layout.querySelectorAll('[data-surface]')).toHaveLength(3);
+    expect(layout.querySelector('[data-surface="road"]')).toBeInTheDocument();
+    expect(layout.querySelector('[data-surface="kerb"]')).toBeInTheDocument();
+    expect(layout.querySelector('[data-surface="runoff"]')).toBeInTheDocument();
+    expect(layout.querySelector('path[stroke="#FFFFFF"]')).toBeNull();
+    fireEvent.click(layout);
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it('renders fallback icon when geometry is null and not loading', () => {

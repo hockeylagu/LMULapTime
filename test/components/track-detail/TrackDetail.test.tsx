@@ -129,9 +129,26 @@ describe('TrackDetail component', () => {
   };
 
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockTrackDataWithMultipleClasses),
+    global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/tracks/')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            layoutKey: 'spa_gp',
+            circuitId: 'spa',
+            layoutId: 'gp',
+            bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+            centerline: [[0, 0], [100, 100]],
+            leftBoundary: [[-5, 0], [-5, 100]],
+            rightBoundary: [[5, 0], [5, 100]],
+          }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockTrackDataWithMultipleClasses),
+      } as Response);
     });
   });
 
@@ -173,7 +190,7 @@ describe('TrackDetail component', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response);
     const content = () => (
       <SessionDataContext.Provider value={{ revision, scan: null }}>
-        <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="LMH" setSelectedCarClass={vi.fn()} />
+        <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="LMH" setSelectedCarClass={vi.fn()} trackGeometry={null} />
       </SessionDataContext.Provider>
     );
     const view = render(content());

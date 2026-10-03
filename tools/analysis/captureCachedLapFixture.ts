@@ -13,7 +13,7 @@
  * Pass the real driver slot, not the -1 player alias: since the dedup migration the alias is only
  * a pointer (replay_trajectory_defaults.resolved_driver_slot). Only the channels corner analysis
  * reads are kept, rounded to 3 decimals; stationM/lateralOffsetM are left out because the test
- * derives them from the track geometry in server/data/tracks/.
+ * derives them from the track geometry in public/tracks/.
  */
 import fs from 'fs';
 import path from 'path';

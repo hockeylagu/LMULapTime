@@ -93,13 +93,15 @@ describe('serverTrackSync', () => {
       bounds: { minX: 0, maxX: 20, minZ: -10, maxZ: 20, spanX: 20, spanZ: 30 },
     };
 
-    enrichTrajectoryWithTrackGeometry(trajectory, 'Autodromo Nazionale Monza');
+    const enriched = enrichTrajectoryWithTrackGeometry(trajectory, 'Autodromo Nazionale Monza');
 
-    expect(trajectory.layoutKey).toBe('monza_gp');
-    expect(childLap1.layoutKey).toBe('monza_gp');
-    expect(childLap2.layoutKey).toBe('monza_gp');
-    expect(childLap1.points[0].stationM).toBeDefined();
-    expect(childLap2.points[0].stationM).toBeDefined();
+    expect(enriched.layoutKey).toBe('monza_gp');
+    expect(enriched.allLapsData?.[0].layoutKey).toBe('monza_gp');
+    expect(enriched.allLapsData?.[1].layoutKey).toBe('monza_gp');
+    expect(enriched.allLapsData?.[0].points[0].stationM).toBeDefined();
+    expect(enriched.allLapsData?.[1].points[0].stationM).toBeDefined();
+    expect(childLap1.points[0].stationM).toBeUndefined();
+    expect(childLap2.layoutKey).toBeUndefined();
   });
 
   it('falls back gracefully to cumulative odometer distance for unknown track', () => {

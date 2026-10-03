@@ -23,6 +23,7 @@ import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
+import { GpsTrackSurfaceLayers } from './GpsTrackSurfaceLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
@@ -212,7 +213,10 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       <div className="relative w-full h-full">
         {/* Static scene on its own layer: the minimap and car markers above it move every frame. */}
         <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md will-change-transform">
-          {leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
+          {effectiveGeometry?.mapSurfaces?.road.length ? (
+            <GpsTrackSurfaceLayers surfaces={effectiveGeometry.mapSurfaces} bounds={effectiveBounds}
+              viewBoxSize={VIEWBOX_SIZE} padding={PADDING} />
+          ) : leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
             <GpsTrackRoadRibbon
               leftSvgPoints={leftSvgPoints}
               rightSvgPoints={rightSvgPoints}

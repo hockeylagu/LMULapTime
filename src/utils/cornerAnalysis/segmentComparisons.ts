@@ -19,6 +19,71 @@ import {
   getHeadingAtDistance, maxSpeedInRangeKmh, throttleOnsetLookbackM, type SpeedTurningPoint,
 } from './helpers.js';
 
+type RoadEdge = 'leftRoadDistanceM' | 'rightRoadDistanceM';
+
+/** Returns undefined for legacy trajectories with no geometry fields, and null for an
+ * explicitly unavailable measurement. The caller may use the legacy nominal fallback only
+ * for the former. */
+function measuredEdgeDistanceAt(
+  points: ReplayTrajectoryPoint[],
+  distances: number[],
+  targetM: number,
+  edge: RoadEdge
+): number | null | undefined {
+  if (!points.some(point => point[edge] !== undefined)) return undefined;
+  if (!points.length || points.length !== distances.length) return null;
+
+  let upper = 0;
+  while (upper < distances.length && distances[upper] < targetM) upper++;
+  if (upper === 0) {
+    const value = points[0][edge];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+  if (upper >= distances.length) {
+    const value = points[points.length - 1][edge];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  }
+
+  const lower = upper - 1;
+  const first = points[lower][edge];
+  const second = points[upper][edge];
+  if (typeof first !== 'number' || typeof second !== 'number' || !Number.isFinite(first) || !Number.isFinite(second)) return null;
+  const span = distances[upper] - distances[lower];
+  if (span <= 0) return first;
+  const fraction = Math.max(0, Math.min(1, (targetM - distances[lower]) / span));
+  return first + fraction * (second - first);
+}
+
+function measuredEdgeSpaceOrLegacy(
+  points: ReplayTrajectoryPoint[],
+  distances: number[],
+  targetM: number,
+  edge: RoadEdge,
+  legacySpace: number | undefined
+): number | undefined {
+  const measured = measuredEdgeDistanceAt(points, distances, targetM, edge);
+  return measured === undefined ? legacySpace : measured ?? undefined;
+}
+
+function minimumMeasuredEdgeSpace(
+  points: ReplayTrajectoryPoint[],
+  distances: number[],
+  startM: number,
+  endM: number,
+  edge: RoadEdge
+): number | null | undefined {
+  if (!points.some(point => point[edge] !== undefined)) return undefined;
+  let minimum = Infinity;
+  for (let d = startM; d <= endM; d += SEGMENT_SCAN_STEP_M) {
+    const value = measuredEdgeDistanceAt(points, distances, d, edge);
+    if (value === null || value === undefined) return null;
+    minimum = Math.min(minimum, value);
+  }
+  const endValue = measuredEdgeDistanceAt(points, distances, endM, edge);
+  if (endValue === null || endValue === undefined) return null;
+  return Math.min(minimum, endValue);
+}
+
 /**
  * Detects corners (braking -> apex -> acceleration) from the PRIMARY lap's speed trace and
  * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
@@ -362,52 +427,64 @@ export function computeLapSegmentComparisons(
       baselineTrackOutOffsetM = Number(bExtremeOffset.toFixed(2));
     }
 
-    // Physical corner half-widths decoupled per phase:
-    // Uses circuit nominal width (or 12.0m fallback). Each phase adapts to clean track limits / curbing
-    // locally rather than allowing an entry apron or straightaway excursion to distort the apex or exit road width.
+    // Legacy rows did not retain measured edge distances. Keep their nominal-width estimate only
+    // when the geometry annotations are absent; explicit null means this location is unknown.
     const nominalHalfWidthM = (nominalWidthM ?? 12.0) / 2;
-
-    // 1) Entry Space Left: distance to outside entry track edge
-    const entryHalfWidthM = Math.max(
+    const legacyEntryHalfWidthM = Math.max(
       nominalHalfWidthM,
       primaryAtEntry.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtEntry.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
-    const primaryEntrySpaceLeftM = primaryAtEntry.lateralOffsetM !== undefined
-      ? Number((entryHalfWidthM - Math.abs(primaryAtEntry.lateralOffsetM)).toFixed(1))
-      : undefined;
-    const baselineEntrySpaceLeftM = baselineAtEntry.lateralOffsetM !== undefined
-      ? Number((entryHalfWidthM - Math.abs(baselineAtEntry.lateralOffsetM)).toFixed(1))
-      : undefined;
+    const legacyEntrySpace = (point: InterpolatedPoint) => point.lateralOffsetM === undefined
+      ? undefined
+      : Number((legacyEntryHalfWidthM - Math.abs(point.lateralOffsetM)).toFixed(1));
+    const outsideEdge: RoadEdge = turnDirection === 'right' ? 'leftRoadDistanceM' : 'rightRoadDistanceM';
+    const insideEdge: RoadEdge = turnDirection === 'right' ? 'rightRoadDistanceM' : 'leftRoadDistanceM';
+    const primaryEntrySpaceLeftM = measuredEdgeSpaceOrLegacy(
+      primaryPoints, primaryDists, entry.distM, outsideEdge, legacyEntrySpace(primaryAtEntry)
+    );
+    const baselineEntrySpaceLeftM = measuredEdgeSpaceOrLegacy(
+      baselinePoints, baselineDists, entry.distM, outsideEdge, legacyEntrySpace(baselineAtEntry)
+    );
     const entrySpaceDeltaM = primaryEntrySpaceLeftM !== undefined && baselineEntrySpaceLeftM !== undefined
       ? Number((primaryEntrySpaceLeftM - baselineEntrySpaceLeftM).toFixed(1))
       : null;
 
-    // 2) Apex Space Left: distance to inside apex curb
-    const apexHalfWidthM = Math.max(
+    const legacyApexHalfWidthM = Math.max(
       nominalHalfWidthM,
       primaryAtMin.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtMin.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
-    const primaryApexSpaceLeftM = primaryAtMin.lateralOffsetM !== undefined
-      ? Number((apexHalfWidthM - Math.abs(primaryAtMin.lateralOffsetM)).toFixed(1))
-      : undefined;
-    const baselineApexSpaceLeftM = baselineAtMin.lateralOffsetM !== undefined
-      ? Number((apexHalfWidthM - Math.abs(baselineAtMin.lateralOffsetM)).toFixed(1))
-      : undefined;
+    const legacyApexSpace = (point: InterpolatedPoint) => point.lateralOffsetM === undefined
+      ? undefined
+      : Number((legacyApexHalfWidthM - Math.abs(point.lateralOffsetM)).toFixed(1));
+    const primaryApexSpaceLeftM = measuredEdgeSpaceOrLegacy(
+      primaryPoints, primaryDists, min.distM, insideEdge, legacyApexSpace(primaryAtMin)
+    );
+    const baselineApexSpaceLeftM = measuredEdgeSpaceOrLegacy(
+      baselinePoints, baselineDists, min.distM, insideEdge, legacyApexSpace(baselineAtMin)
+    );
     const apexSpaceDeltaM = primaryApexSpaceLeftM !== undefined && baselineApexSpaceLeftM !== undefined
       ? Number((primaryApexSpaceLeftM - baselineApexSpaceLeftM).toFixed(1))
       : null;
 
-    // 3) Exit Space Left: distance to outside exit track edge at track-out
-    const exitHalfWidthM = Math.max(
+    const legacyExitHalfWidthM = Math.max(
       nominalHalfWidthM,
       primaryAtExit.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryTrackOutOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
-    const primaryExitSpaceLeftM = primaryTrackOutOffsetM !== undefined
-      ? Number((exitHalfWidthM - Math.abs(primaryTrackOutOffsetM)).toFixed(1))
-      : undefined;
-    const baselineExitSpaceLeftM = baselineTrackOutOffsetM !== undefined
-      ? Number((exitHalfWidthM - Math.abs(baselineTrackOutOffsetM)).toFixed(1))
-      : undefined;
+    const legacyExitSpace = (offset: number | undefined) => offset === undefined
+      ? undefined
+      : Number((legacyExitHalfWidthM - Math.abs(offset)).toFixed(1));
+    const primaryMeasuredExit = minimumMeasuredEdgeSpace(
+      primaryPoints, primaryDists, min.distM, exitScanEndM, outsideEdge
+    );
+    const baselineMeasuredExit = minimumMeasuredEdgeSpace(
+      baselinePoints, baselineDists, min.distM, exitScanEndM, outsideEdge
+    );
+    const primaryExitSpaceLeftM = primaryMeasuredExit === undefined
+      ? legacyExitSpace(primaryTrackOutOffsetM)
+      : primaryMeasuredExit ?? undefined;
+    const baselineExitSpaceLeftM = baselineMeasuredExit === undefined
+      ? legacyExitSpace(baselineTrackOutOffsetM)
+      : baselineMeasuredExit ?? undefined;
     const exitSpaceDeltaM = primaryExitSpaceLeftM !== undefined && baselineExitSpaceLeftM !== undefined
       ? Number((primaryExitSpaceLeftM - baselineExitSpaceLeftM).toFixed(1))
       : null;

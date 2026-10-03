@@ -8,6 +8,7 @@ import {
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
+import { GpsTrackSurfaceLayers } from '../replay/map/scene/GpsTrackSurfaceLayers.js';
 
 export interface TrackCircuitLayoutProps {
   trackName: string;
@@ -66,8 +67,10 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     (resolvedKey ? pathDCache.get(resolvedKey) : undefined) ||
     (propGeometry ? getOrComputePathD(propGeometry, resolvedKey || undefined) : undefined);
 
-  // If path is already cached in pathDCache or supplied by propGeometry, we do not need to fetch or retain raw geometry
-  const shouldFetch = propGeometry === undefined && !cachedD;
+  // Detail and header views render native road, kerb and runoff surfaces (mapSurfaces).
+  // Compact cards and session headers only need the outline path, so they skip fetching once cached.
+  const wantsSurfaces = size === 'detail' || size === 'header';
+  const shouldFetch = propGeometry === undefined && (!cachedD || wantsSurfaces);
   const { trackGeometry: fetchedGeometry, isLoading } = useTrackBoundaryGeometry(
     shouldFetch
       ? { trackVenue: trackName, trackCourse, layoutKey: resolvedKey }
@@ -91,7 +94,9 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     return getOrComputePathD(effectiveGeometry, resolvedKey || undefined);
   }, [cachedD, effectiveGeometry, resolvedKey]);
 
-  if (isLoading && shouldFetch) {
+  const hasNativeSurfaces = Boolean(effectiveGeometry?.mapSurfaces?.road?.length);
+
+  if (isLoading && shouldFetch && !cachedD) {
     return (
       <div
         data-testid="track-circuit-layout-loading"
@@ -145,15 +150,24 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
         className="w-full h-full drop-shadow-sm pointer-events-none"
         preserveAspectRatio="xMidYMid meet"
       >
-        {/* Crisp white circuit outline */}
-        <path
-          d={pathD}
-          stroke={CHART_COLORS.white}
-          strokeWidth="24"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
+        {hasNativeSurfaces && effectiveGeometry?.bounds ? (
+          <GpsTrackSurfaceLayers
+            surfaces={effectiveGeometry.mapSurfaces!}
+            bounds={effectiveGeometry.bounds}
+            viewBoxSize={VIEWBOX_SIZE}
+            padding={PADDING}
+          />
+        ) : (
+          /* Crisp white circuit outline remains the fallback for legacy geometry. */
+          <path
+            d={pathD}
+            stroke={CHART_COLORS.white}
+            strokeWidth="24"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        )}
       </svg>
     </div>
   );

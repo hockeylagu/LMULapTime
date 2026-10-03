@@ -19,7 +19,7 @@ describe('ReplayCacheService', () => {
 
   afterEach(() => {
     db.close();
-    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
   it('serves cached metadata when the source replay is deleted', () => {

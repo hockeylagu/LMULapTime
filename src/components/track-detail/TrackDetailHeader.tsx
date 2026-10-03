@@ -21,6 +21,7 @@ export interface TrackDetailHeaderProps {
   bestLapTimeString?: string | null;
   bestLapCar?: string | null;
   xmlTrackLengthMeters?: number | null;
+  trackGeometry?: import('../replay/map/index.js').TrackBoundaryGeometry | null;
 }
 
 export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
@@ -37,6 +38,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
   bestLapTimeString: _bestLapTimeString,
   bestLapCar: _bestLapCar,
   xmlTrackLengthMeters,
+  trackGeometry,
 }) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -73,6 +75,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
               <TrackCircuitLayout
                 trackName={trackName}
                 trackCourse={trackCourse}
+                trackGeometry={trackGeometry}
                 size="header"
               />
           <div className="min-w-0 space-y-4">

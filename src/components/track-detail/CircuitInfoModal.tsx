@@ -4,15 +4,14 @@ import {
   X,
   Ruler,
   Compass,
-  FileCode,
   Layers,
   Flag,
-  Info,
   Award,
   Mountain,
 } from 'lucide-react';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
+import { TrackSurfaceProfiles } from './TrackSurfaceProfiles.js';
 import { useModalFocus } from '../common/useModalFocus.js';
 import { useTrackBoundaryGeometry, TrackBoundaryGeometry } from '../replay/map/index.js';
 
@@ -160,6 +159,10 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
             </div>
           </div>
 
+          {trackGeometry?.surfaceProfile && (
+            <TrackSurfaceProfiles profile={trackGeometry.surfaceProfile} lengthM={trackGeometry.lengthM} />
+          )}
+
           {/* Famous Corners Breakdown */}
           {specs.famousCorners.length > 0 && (
             <div className="pt-4 border-t border-lmu-border space-y-2">
@@ -204,41 +207,26 @@ export const CircuitInfoModal: React.FC<CircuitInfoModalProps> = ({
             </div>
           )}
 
-          {/* Track information */}
-          <div className="pt-4 border-t border-lmu-border space-y-2.5">
-            <div className="flex items-center gap-2 text-lmu-text font-semibold text-xs">
-              <FileCode className="w-3.5 h-3.5 text-lmu-cyan" />
-              <span>Track information</span>
-            </div>
-
-            <div className="space-y-2 text-[11px] text-lmu-text-soft">
-              <div className="flex items-start gap-2">
-                <Layers className="w-3.5 h-3.5 text-lmu-muted shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-white">Physical Road Boundaries: </span>
-                  <span className="text-lmu-text-soft">{specs.geometryDescription}</span>
-                </div>
+          {/* Geometry Quality Details */}
+          {trackGeometry?.quality && (
+            <div className="pt-4 border-t border-lmu-border space-y-2.5">
+              <div className="flex items-center gap-2 text-lmu-text font-semibold text-xs">
+                <Layers className="w-3.5 h-3.5 text-lmu-cyan" />
+                <span>Geometry Quality</span>
               </div>
 
-              <div className="flex items-start gap-2">
-                <FileCode className="w-3.5 h-3.5 text-lmu-muted shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-white">Parsed From: </span>
-                  <span className="text-lmu-text-soft">{specs.parsedFrom}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <Info className="w-3.5 h-3.5 text-lmu-muted shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-white">Coordinate System: </span>
-                  <span className="text-lmu-text-soft">
-                    Pre-aligned 1:1 Metric LMU World Space (scale factor 0.99 &lt; s &lt; 1.01).
-                  </span>
+              <div className="space-y-2 text-[11px] text-lmu-text-soft">
+                <div className="flex items-start gap-2">
+                  <Layers className="w-3.5 h-3.5 text-lmu-muted shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-lmu-muted">
+                      Loaded quality: surfaces {trackGeometry.quality.surfaces}, boundaries {trackGeometry.quality.boundaries}, elevation {trackGeometry.quality.elevation}, banking {trackGeometry.quality.banking}, legal limits {trackGeometry.quality.legalLimits}.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}

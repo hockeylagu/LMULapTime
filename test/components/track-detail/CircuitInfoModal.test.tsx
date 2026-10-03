@@ -21,7 +21,7 @@ describe('CircuitInfoModal', () => {
     },
   };
 
-  it('renders circuit information including length, turn count, and parsed source without sessions, target, or start/finish 0 gate', () => {
+  it('renders circuit information including length, turn count, and boundary source without sessions, target, or start/finish 0 gate', () => {
     const onClose = vi.fn();
     render(
       <CircuitInfoModal
@@ -54,10 +54,6 @@ describe('CircuitInfoModal', () => {
     // Sessions and Target should NOT be in the modal
     expect(screen.queryByText('Sessions')).not.toBeInTheDocument();
     expect(screen.queryByText('Alien Target')).not.toBeInTheDocument();
-
-    // Parsed from & Source
-    expect(screen.getByText(/LMU Results XML/i)).toBeInTheDocument();
-    expect(screen.getByText(/Road geometry for this layout/i)).toBeInTheDocument();
 
     // Famous corners
     expect(screen.getByText(/Eau Rouge & Raidillon/i)).toBeInTheDocument();
@@ -93,7 +89,7 @@ describe('CircuitInfoModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('renders Monza details accurately with 11 turns and layout geometry', () => {
+  it('renders Monza circuit identity and notable corners', () => {
     render(
       <CircuitInfoModal
         isOpen={true}
@@ -107,6 +103,38 @@ describe('CircuitInfoModal', () => {
     expect(screen.getByText(/Italy/i)).toBeInTheDocument();
     expect(screen.getByText(/Variante del Rettifilo/i)).toBeInTheDocument();
     expect(screen.getByText(/Curva Parabolica/i)).toBeInTheDocument();
+  });
+
+  it('shows loaded geometry quality and native elevation, grade and bank profiles when available', () => {
+    const profileGeometry = {
+      ...mockGeometry,
+      quality: {
+        surfaces: 'native' as const,
+        boundaries: 'native' as const,
+        elevation: 'partial' as const,
+        banking: 'partial' as const,
+        legalLimits: 'unavailable' as const,
+      },
+      surfaceProfile: {
+        stationM: [0, 1000],
+        leftWidthM: [6, 6],
+        rightWidthM: [6, 6],
+        elevationM: [12, 18],
+        gradePct: [0.2, -0.3],
+        bankDeg: [1, -1],
+        leftElevationM: [12, 18],
+        rightElevationM: [12, 18],
+        leftKerbWidthM: [null, null],
+        rightKerbWidthM: [null, null],
+        leftKerbHeightM: [null, null],
+        rightKerbHeightM: [null, null],
+      },
+    };
+    render(<CircuitInfoModal isOpen onClose={vi.fn()} trackName="Monza" trackGeometry={profileGeometry} />);
+
+    expect(screen.getByRole('region', { name: 'Native road elevation and slope profiles' })).toBeInTheDocument();
+    expect(screen.getByText(/Loaded quality: surfaces native, boundaries native, elevation partial, banking partial, legal limits unavailable\./)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Elevation · local Y profile, m' })).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {

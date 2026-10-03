@@ -1,5 +1,27 @@
 import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
 
+const POINT_GEOMETRY_FIELDS = [
+  'stationM', 'lateralOffsetM', 'leftRoadDistanceM', 'rightRoadDistanceM',
+  'roadElevationM', 'roadGradePct', 'roadBankDeg', 'leftKerbWidthM', 'rightKerbWidthM',
+  'leftKerbHeightM', 'rightKerbHeightM',
+] as const satisfies readonly (keyof ReplayTrajectoryPoint)[];
+
+/** New fused samples need their own projection; source annotations describe different points. */
+function withoutPointGeometry(point: ReplayTrajectoryPoint): ReplayTrajectoryPoint {
+  const copy = { ...point };
+  for (const key of POINT_GEOMETRY_FIELDS) delete copy[key];
+  return copy;
+}
+
+function withoutTrajectoryGeometry(trajectory: ReplayTrajectoryData): ReplayTrajectoryData {
+  const copy = { ...trajectory };
+  for (const key of [
+    'geometryRevision', 'projectionRevision', 'lineCut', 'lineCutProjectionRevision',
+    'stationSource', 'trackLengthM', 'timingGates', 'lapDistMeters',
+  ] as const) delete copy[key];
+  return copy;
+}
+
 /**
  * Normalizes an angle difference in radians to the range [-pi, pi].
  */
@@ -38,14 +60,17 @@ export function fuseDuckDbWithVcrTrajectory(
   vcrTrajectory: ReplayTrajectoryData,
   duckdbFilename?: string
 ): ReplayTrajectoryData {
+  const source = withoutTrajectoryGeometry(vcrTrajectory);
   const vcrPoints = vcrTrajectory.points;
   if (!vcrPoints || vcrPoints.length === 0) {
     return {
-      ...vcrTrajectory,
+      ...source,
       source: 'duckdb',
       duckdbFilename,
-      points: duckLap.points,
+      points: duckLap.points.map(withoutPointGeometry),
       pointsCount: duckLap.points.length,
+      leadInPoints: undefined,
+      leadOutPoints: undefined,
     };
   }
 
@@ -100,7 +125,7 @@ export function fuseDuckDbWithVcrTrajectory(
     const rotZ = p0.rotZ !== undefined && p1.rotZ !== undefined ? interpolateAngle(p0.rotZ, p1.rotZ, alpha) : p0.rotZ;
 
     fusedPoints.push({
-      ...dp,
+      ...withoutPointGeometry(dp),
       brakeTemps: dp.brakeTemps ?? p0.brakeTemps,
       rideHeight: dp.rideHeight,
       fuel: dp.fuel ?? p0.fuel,
@@ -140,13 +165,13 @@ export function fuseDuckDbWithVcrTrajectory(
   const lastDuckTime = fusedPoints[fusedPoints.length - 1]?.timeSec ?? 0;
   const onDuckClock = (edge: ReplayTrajectoryPoint[] | undefined, keep: (t: number) => boolean) => {
     const retimed = (edge ?? [])
-      .map(p => ({ ...p, timeSec: Number(((p.timeSec ?? 0) - vcrBaseTime).toFixed(3)) }))
+      .map(p => ({ ...withoutPointGeometry(p), timeSec: Number(((p.timeSec ?? 0) - vcrBaseTime).toFixed(3)) }))
       .filter(p => keep(p.timeSec));
     return retimed.length > 0 ? retimed : undefined;
   };
 
   return {
-    ...vcrTrajectory,
+    ...source,
     source: 'duckdb',
     duckdbFilename,
     points: fusedPoints,

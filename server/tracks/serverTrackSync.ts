@@ -1,69 +1,35 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ReplayTrajectoryData, TrackTimingGates } from '../core/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
-import { buildCenterlineSpatialIndex, projectTrajectoryToCenterline, CenterlineSpatialIndex } from './trackProjection.js';
+import { sampleTrackSurfaceProfile } from '../../shared/domain/trackGeometry.js';
+import { projectTrajectoryToCenterline } from './trackProjection.js';
 import { cutLapAtLine } from './lapLineCut.js';
-
-interface CachedTrackDefinition {
-  layoutKey: string;
-  timingGates?: TrackTimingGates;
-  centerline: Array<[number, number]>;
-  spatialIndex: CenterlineSpatialIndex;
-}
-
-const trackCache = new Map<string, CachedTrackDefinition | null>();
+import { TrackGeometryStore, type CachedTrackDefinition } from './trackGeometryStore.js';
 
 function getTracksDir(): string {
   try {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const candidate = path.join(currentDir, 'data', 'tracks');
+    const candidate = path.resolve(currentDir, '..', '..', 'public', 'tracks');
     if (fs.existsSync(candidate)) return candidate;
   } catch {
     // Fallback if import.meta.url is not available
   }
-  return path.join(process.cwd(), 'server', 'data', 'tracks');
+  const cwdPublic = path.join(process.cwd(), 'public', 'tracks');
+  if (fs.existsSync(cwdPublic)) return cwdPublic;
+  const cwdDist = path.join(process.cwd(), 'dist', 'tracks');
+  if (fs.existsSync(cwdDist)) return cwdDist;
+  return cwdPublic;
 }
+
+const trackStore = new TrackGeometryStore(getTracksDir());
 
 /**
  * Loads and caches a track definition and its pre-computed spatial index by layoutKey.
  */
 export function getTrackDefinition(layoutKey: string): CachedTrackDefinition | null {
-  if (trackCache.has(layoutKey)) {
-    return trackCache.get(layoutKey) || null;
-  }
-
-  try {
-    const tracksDir = getTracksDir();
-    const filePath = path.join(tracksDir, `${layoutKey}.json`);
-    if (!fs.existsSync(filePath)) {
-      trackCache.set(layoutKey, null);
-      return null;
-    }
-
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (!parsed.centerline || !Array.isArray(parsed.centerline) || parsed.centerline.length < 2) {
-      trackCache.set(layoutKey, null);
-      return null;
-    }
-
-    const spatialIndex = buildCenterlineSpatialIndex(parsed.centerline);
-    const def: CachedTrackDefinition = {
-      layoutKey,
-      timingGates: parsed.timingGates,
-      centerline: parsed.centerline,
-      spatialIndex,
-    };
-
-    trackCache.set(layoutKey, def);
-    return def;
-  } catch (err) {
-    console.warn(`[serverTrackSync] Failed to load track geometry for ${layoutKey}:`, err);
-    trackCache.set(layoutKey, null);
-    return null;
-  }
+  return trackStore.get(layoutKey);
 }
 
 /**
@@ -84,6 +50,9 @@ export function enrichTrajectoryWithTrackGeometry(
   if (!trajectory || !trajectory.points || trajectory.points.length === 0) {
     return trajectory;
   }
+
+  // Serving must never rewrite retained samples, child laps, or four-corner channel arrays.
+  trajectory = structuredClone(trajectory);
 
   const spec = getCircuitSpecification(venue, course, sceneDesc, replayName, null, trackLengthMeters);
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
@@ -117,29 +86,43 @@ export function enrichTrajectoryWithTrackGeometry(
   return trajectory;
 }
 
-function applyCanonicalProjection(
+export function applyCanonicalProjection(
   trajectory: ReplayTrajectoryData,
   trackDef: CachedTrackDefinition
 ): void {
-  // Project the lap with the recording either side of it, then cut it at the line: the
-  // timing-loop slice starts and ends wherever the (possibly late) timing event landed.
+  // A recorded cut is authoritative: after a route update its seam context may be gone.
+  // Reprojection changes annotations only, never its XYZ, clocks, channels or sector frames.
   const leadIn = trajectory.leadInPoints ?? [];
   const samples = [...leadIn, ...trajectory.points, ...(trajectory.leadOutPoints ?? [])];
-  const { stations, lateralOffsets } = projectTrajectoryToCenterline(samples, trackDef.spatialIndex, { clampSeam: false });
-  const cut = cutLapAtLine(
-    samples,
-    stations,
-    lateralOffsets,
-    trackDef.spatialIndex.totalLengthM,
-    leadIn.length,
-    leadIn.length + trajectory.points.length - 1
-  );
-  stripLapEdgeSamples(trajectory);
-  trajectory.points = cut.points;
-  if (trajectory.sectors) {
-    const shifted = (frame: number) => Math.max(0, Math.min(cut.points.length - 1, frame + cut.indexShift));
-    trajectory.sectors = { s1Frame: shifted(trajectory.sectors.s1Frame), s2Frame: shifted(trajectory.sectors.s2Frame) };
+  const hasContext = leadIn.length > 0 || (trajectory.leadOutPoints?.length ?? 0) > 0;
+  const alreadyAnnotated = trajectory.stationSource === 'track' || trajectory.projectionRevision !== undefined;
+  const canCut = !trajectory.lineCut && !alreadyAnnotated && hasContext;
+  // Wrapped stations locate a first cut; retained laps keep the existing seam continuity rule.
+  const { stations, lateralOffsets } = projectTrajectoryToCenterline(samples, trackDef.spatialIndex, { clampSeam: !canCut });
+  if (canCut) {
+    const cut = cutLapAtLine(
+      samples, stations, lateralOffsets, trackDef.spatialIndex.totalLengthM,
+      leadIn.length, leadIn.length + trajectory.points.length - 1,
+    );
+    trajectory.points = cut.points;
+    trajectory.lineCut = { start: cut.start, end: cut.end };
+    trajectory.lineCutProjectionRevision = trackDef.projectionRevision;
+    if (trajectory.sectors) {
+      const shifted = (frame: number) => Math.max(0, Math.min(cut.points.length - 1, frame + cut.indexShift));
+      trajectory.sectors = { s1Frame: shifted(trajectory.sectors.s1Frame), s2Frame: shifted(trajectory.sectors.s2Frame) };
+    }
+  } else {
+    for (let i = 0; i < trajectory.points.length; i++) {
+      trajectory.points[i].stationM = Number(stations[leadIn.length + i].toFixed(2));
+      trajectory.points[i].lateralOffsetM = Number(lateralOffsets[leadIn.length + i].toFixed(2));
+    }
+    trajectory.lineCut ??= { start: 'none', end: 'none' };
+    // Station zero remains anchored to the recorded timing line during the initial migration.
+    if (trajectory.lineCut.start !== 'none') trajectory.points[0].stationM = 0;
+    if (trajectory.lineCut.end !== 'none') trajectory.points[trajectory.points.length - 1].stationM =
+      Number(trackDef.spatialIndex.totalLengthM.toFixed(2));
   }
+  stripLapEdgeSamples(trajectory);
 
   const n = trajectory.points.length;
   let runningDist = 0;
@@ -153,17 +136,45 @@ function applyCanonicalProjection(
       runningDist += (d < 1000 ? d : 0);
     }
     pt.distM = Number(runningDist.toFixed(2));
+    annotateRoadProfile(pt, trackDef);
   }
 
   trajectory.layoutKey = trackDef.layoutKey;
-  // The centreline's own length, where stations wrap and where the cut lap ends: the layout's
-  // published lengthM is the same length rounded to 0.1 m, which leaves every lap a few
-  // centimetres short of (or past) the track length.
+  trajectory.geometryRevision = trackDef.geometryRevision;
+  trajectory.projectionRevision = trackDef.projectionRevision;
+  trajectory.pointsCount = trajectory.points.length;
+  // Use the centerline's measured closure length for station wrapping and cut endpoints;
+  // published lengthM may use a different rounding precision.
   trajectory.trackLengthM = Number(trackDef.spatialIndex.totalLengthM.toFixed(2));
   trajectory.lapDistMeters = Number(runningDist.toFixed(2));
   trajectory.timingGates = trackDef.timingGates;
   trajectory.stationSource = 'track';
-  trajectory.lineCut = { start: cut.start, end: cut.end };
+}
+
+function annotateRoadProfile(point: ReplayTrajectoryPoint, definition: CachedTrackDefinition | null): void {
+  if (!definition?.surfaceProfile) {
+    delete point.leftRoadDistanceM;
+    delete point.rightRoadDistanceM;
+    delete point.roadElevationM;
+    delete point.roadGradePct;
+    delete point.roadBankDeg;
+    delete point.leftKerbWidthM;
+    delete point.rightKerbWidthM;
+    delete point.leftKerbHeightM;
+    delete point.rightKerbHeightM;
+    return;
+  }
+  const profile = definition ? sampleTrackSurfaceProfile(definition, point.stationM ?? NaN) : null;
+  const offset = point.lateralOffsetM;
+  point.leftRoadDistanceM = profile?.leftWidthM != null && offset !== undefined ? profile.leftWidthM + offset : null;
+  point.rightRoadDistanceM = profile?.rightWidthM != null && offset !== undefined ? profile.rightWidthM - offset : null;
+  point.roadElevationM = profile?.elevationM ?? null;
+  point.roadGradePct = profile?.gradePct ?? null;
+  point.roadBankDeg = profile?.bankDeg ?? null;
+  point.leftKerbWidthM = profile?.leftKerbWidthM ?? null;
+  point.rightKerbWidthM = profile?.rightKerbWidthM ?? null;
+  point.leftKerbHeightM = profile?.leftKerbHeightM ?? null;
+  point.rightKerbHeightM = profile?.rightKerbHeightM ?? null;
 }
 
 /** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */
@@ -191,14 +202,17 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
     points[i].distM = dist;
     points[i].stationM = dist;
     points[i].lateralOffsetM = 0;
+    annotateRoadProfile(points[i], null);
   }
 
   const totalLength = Number(runningDist.toFixed(2));
   trajectory.trackLengthM = totalLength;
   trajectory.lapDistMeters = totalLength;
   trajectory.layoutKey = undefined;
+  trajectory.geometryRevision = undefined;
+  trajectory.projectionRevision = undefined;
   trajectory.stationSource = 'odometer';
-  trajectory.lineCut = { start: 'none', end: 'none' };
+  trajectory.lineCut ??= { start: 'none', end: 'none' };
 
   // Build synthetic timingGates from sector frame markers or third-splits
   const s1Idx = trajectory.sectors?.s1Frame !== undefined && trajectory.sectors.s1Frame >= 0 && trajectory.sectors.s1Frame < n
@@ -242,5 +256,5 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
 
 /** Clear cache (useful for testing or hot reloads) */
 export function clearTrackDefinitionCache(): void {
-  trackCache.clear();
+  trackStore.clear();
 }

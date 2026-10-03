@@ -150,6 +150,7 @@ describe('Settings save concurrency', () => {
       sessionScan: { running: false },
     } as unknown as ScanStatus;
     render(<Settings status={status} onUpdatePaths={vi.fn()} replayScanStatus={running} />);
+    await settled();
     renameDriver();
 
     expect(rescan()).toBeDisabled();

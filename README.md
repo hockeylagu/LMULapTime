@@ -1,6 +1,6 @@
 # 🏎️ Le Mans Ultimate Lap Time Analyzer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
@@ -144,7 +144,7 @@ To adjust your paths or driver profile:
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more details.
+Distributed under the **Mozilla Public License 2.0** (`MPL-2.0`). See [`LICENSE`](LICENSE) for the full license text and third-party software usage and trademark notices.
 
 ---
 

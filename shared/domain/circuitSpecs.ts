@@ -32,9 +32,6 @@ function createUnknownCircuitSpec(venueOrKey?: string | null, course?: string | 
     turnCount: 0,
     direction: 'Clockwise',
     famousCorners: [],
-    geometryKind: 'Geometry',
-    geometryDescription: 'Road geometry for this layout.',
-    parsedFrom: 'LMU Results XML & Binary .Vcr Replays',
   };
 }
 

@@ -50,6 +50,7 @@ Success means the driver leaves a session review knowing a few specific, correct
 ## Evidence on Hand
 
 - Real session, telemetry and replay data from the author's local LMU install (not committed). Test fixtures are in `test/fixtures/`.
+- Format documentation is in `docs/` (`VCR_FORMAT`, `TELEMETRY_FORMAT`, `XML_FORMAT`, `LMU_REST_API`).
 - Community benchmark targets are synced from a public Google Sheet.
 - There are no testimonials, user counts, press or published accuracy claims. Do not fabricate any.
 

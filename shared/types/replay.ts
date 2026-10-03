@@ -107,6 +107,18 @@ export interface ReplayTrajectoryPoint {
   distM?: number;
   stationM?: number;
   lateralOffsetM?: number;
+  /** Signed car-center distance to the physical road edge; negative means outside. */
+  leftRoadDistanceM?: number | null;
+  rightRoadDistanceM?: number | null;
+  /** Ground elevation at the reference route in the native local datum, not car-body Y. */
+  roadElevationM?: number | null;
+  roadGradePct?: number | null;
+  /** Positive banking means the left road edge is higher than the right. */
+  roadBankDeg?: number | null;
+  leftKerbWidthM?: number | null;
+  rightKerbWidthM?: number | null;
+  leftKerbHeightM?: number | null;
+  rightKerbHeightM?: number | null;
   accelLonG?: number;
   accelLatG?: number;
   accelTotalG?: number;
@@ -272,6 +284,11 @@ export interface ReplayTrajectoryData {
   wheelTelemetryAvailable?: boolean;
   energyTelemetryAvailable?: boolean;
   layoutKey?: string;
+  geometryRevision?: string;
+  /** Reference route/station origin revision, independent of display and profile updates. */
+  projectionRevision?: string;
+  /** Station frame used for a recorded line cut; retained during subsequent reprojection. */
+  lineCutProjectionRevision?: string;
   trackLengthM?: number;
   lapDistMeters?: number;
   timingGates?: TrackTimingGates;

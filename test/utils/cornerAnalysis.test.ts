@@ -514,7 +514,62 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.exitSpaceDeltaM).toBe(-1.5); // 0.5 - 2.0 = -1.5m (wide lap used 1.5m more track)
   });
 
-  it('accurately computes apex margin on realistic real-world corner (Algarve Turn 9)', () => {
+  it('uses measured left and right road-edge distances according to corner phase and direction', () => {
+    const speeds = [200, 160, 100, 70, 70, 100, 140, 180, 200];
+    const measuredLap = (leftRoadDistanceM: number, rightRoadDistanceM: number): ReplayTrajectoryPoint[] =>
+      speeds.map((speedKmh, i) => ({
+        x: i * 10,
+        y: 0,
+        z: i * 5,
+        speedKmh,
+        throttle: i >= 4 ? 95 : 0,
+        brake: i < 4 ? 60 : 0,
+        steerYaw: i >= 2 && i <= 6 ? 25 : 0,
+        lateralOffsetM: i <= 2 ? 3 : i >= 5 && i <= 6 ? -2 : 1,
+        leftRoadDistanceM,
+        rightRoadDistanceM,
+        timeSec: i * 0.4,
+      }));
+
+    const segments = computeLapSegmentComparisons(measuredLap(12, 5), measuredLap(8, 7), 10, 150, 12);
+    const corner = segments.find(segment => segment.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+
+    expect(corner.turnDirection).toBe('right');
+    expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBe(12); // outside edge on a right turn is the left edge
+    expect(corner.baselineTrackUsage?.entrySpaceLeftM).toBe(8);
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(5); // inside edge is the right edge
+    expect(corner.baselineTrackUsage?.apexSpaceLeftM).toBe(7);
+    expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(12);
+    expect(corner.entrySpaceDeltaM).toBe(4);
+    expect(corner.apexSpaceDeltaM).toBe(-2);
+  });
+
+  it('does not substitute nominal widths when measured edge distances are explicitly unknown', () => {
+    const speeds = [200, 160, 100, 70, 70, 100, 140, 180, 200];
+    const unknownLap: ReplayTrajectoryPoint[] = speeds.map((speedKmh, i) => ({
+      x: i * 10,
+      y: 0,
+      z: i * 5,
+      speedKmh,
+      throttle: i >= 4 ? 95 : 0,
+      brake: i < 4 ? 60 : 0,
+      steerYaw: i >= 2 && i <= 6 ? 25 : 0,
+      lateralOffsetM: i <= 2 ? 3 : -2,
+      leftRoadDistanceM: null,
+      rightRoadDistanceM: null,
+      timeSec: i * 0.4,
+    }));
+
+    const segments = computeLapSegmentComparisons(unknownLap, unknownLap, 10, 150, 12);
+    const corner = segments.find(segment => segment.type === 'corner');
+    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
+    expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBeUndefined();
+    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBeUndefined();
+    expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBeUndefined();
+  });
+
+  it('does not substitute nominal width for an explicitly unknown profile sample (Algarve Turn 9)', () => {
     const traj = loadCachedLapFixture('algarve-r1-19-player-lap5');
     expect(traj.driverName).toBe('Samuel Lague');
     enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', traj.replayName);
@@ -524,9 +579,8 @@ describe('computeLapSegmentComparisons', () => {
     const c9 = corners.find(c => c.cornerNumber === 9);
     expect(c9).toBeDefined();
     expect(c9?.turnDirection).toBe('right');
-    // Car is in realistic proximity to inside curb (1.5m at min speed on the v5 decode, 2.3m on v3; down from corrupted 8.8m)
-    expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeLessThanOrEqual(3.0);
-    expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeGreaterThanOrEqual(0.0);
+    // This profile is present but lacks a measured width at this corner; the value stays unknown.
+    expect(c9?.primaryTrackUsage?.apexSpaceLeftM).toBeUndefined();
   });
 
   it('prevents wide entry straightaway excursion from corrupting apex and exit space left (decoupled per-phase half-widths)', () => {

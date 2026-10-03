@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Comprehensive telemetry analytics, lap comparison, and benchmark progression analyzer for Le Mans Ultimate (LMU)",
   "author": "Samuel Lague",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "keywords": [
     "le-mans-ultimate",
     "sim-racing",

@@ -159,8 +159,7 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
       options: { playerName?: string; driverSlot?: number; lapNumber: number }
     ): ReplayTrajectoryData {
       const traj = extractReplayTrajectory(filePath, options);
-      enrichTrajectoryWithTrackGeometry(traj, null, null, path.basename(filePath));
-      return traj;
+      return enrichTrajectoryWithTrackGeometry(traj, null, null, path.basename(filePath));
     }
 
     it('Scenario 1 (Binary VCR): Same session, same driver (Samuel Lague Lap 2 vs Lap 3 from raw Daytona R1 4 .Vcr)', () => {

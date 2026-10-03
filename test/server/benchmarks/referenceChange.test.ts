@@ -167,11 +167,11 @@ describe('Baseline Comparison & Reference Change Invariance', () => {
       bounds: { minX: -500, maxX: 500, minZ: -1000, maxZ: 500, spanX: 1000, spanZ: 1500 },
     };
 
-    enrichTrajectoryWithTrackGeometry(trajA, 'Autodromo Nazionale Monza');
-    enrichTrajectoryWithTrackGeometry(trajB, 'Autodromo Nazionale Monza');
+    const enrichedA = enrichTrajectoryWithTrackGeometry(trajA, 'Autodromo Nazionale Monza');
+    const enrichedB = enrichTrajectoryWithTrackGeometry(trajB, 'Autodromo Nazionale Monza');
 
     // Call computeLapSegmentComparisons without manual distance options
-    const segments = computeLapSegmentComparisons(trajA.points, trajB.points);
+    const segments = computeLapSegmentComparisons(enrichedA.points, enrichedB.points);
     expect(segments.length).toBeGreaterThan(0);
 
     const corners = segments.filter(s => s.type === 'corner');
@@ -208,13 +208,13 @@ describe('Baseline Comparison & Reference Change Invariance', () => {
       bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 50, spanX: 100, spanZ: 50 },
     };
 
-    enrichTrajectoryWithTrackGeometry(trajA, 'Unknown');
-    enrichTrajectoryWithTrackGeometry(trajB, 'Unknown');
+    const enrichedA = enrichTrajectoryWithTrackGeometry(trajA, 'Unknown');
+    const enrichedB = enrichTrajectoryWithTrackGeometry(trajB, 'Unknown');
 
-    expect(trajA.points[0].stationM).toBe(0);
-    expect(trajB.points[0].stationM).toBe(0);
+    expect(enrichedA.points[0].stationM).toBe(0);
+    expect(enrichedB.points[0].stationM).toBe(0);
 
-    const comparisons = computeLapComparisons(trajA.points, trajB.points);
+    const comparisons = computeLapComparisons(enrichedA.points, enrichedB.points);
     expect(comparisons.length).toBe(3);
     expect(comparisons[0].deltaTimeSec).toBe(0);
     expect(comparisons[2].deltaTimeSec).toBeGreaterThan(0); // Lap A is slower than Lap B

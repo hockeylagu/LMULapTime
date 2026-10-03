@@ -72,6 +72,43 @@ describe('RaceTrafficService', () => {
     expect(build).toHaveBeenCalledTimes(2);
   });
 
+  it('rebuilds archived replay traffic only when its projection frame changes', async () => {
+    let geometry = { centerline: circleCenterline(), projectionRevision: 'projection-one', geometryRevision: 'geometry-one' };
+    const traffic = new RaceTrafficService(db, build, () => geometry);
+    expect(await traffic.getDriverTraffic(request)).toMatchObject({ available: true, projectionRevision: 'projection-one' });
+    geometry = { ...geometry, geometryRevision: 'geometry-two' };
+    await traffic.getDriverTraffic(request);
+    expect(build).toHaveBeenCalledTimes(1);
+    geometry = { ...geometry, projectionRevision: 'projection-two' };
+    expect(await traffic.getDriverTraffic(request)).toMatchObject({ available: true, projectionRevision: 'projection-two' });
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(db.listReplayLapRows(REPLAY)).toHaveLength(4);
+  });
+
+  it('invalidates legacy centerline-only caches when route coordinates change', async () => {
+    let centerline = circleCenterline();
+    const traffic = new RaceTrafficService(db, build, () => centerline);
+    await traffic.getDriverTraffic(request);
+    centerline = centerline.map(([x, z]) => [x + 1, z]);
+    await traffic.getDriverTraffic(request);
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves the previous index and reports unavailable when retained samples cannot rebuild it', async () => {
+    let projectionRevision = 'projection-one';
+    const saved = vi.spyOn(db, 'saveRacePositions');
+    const traffic = new RaceTrafficService(db, build, () => ({ centerline: circleCenterline(), projectionRevision }));
+    await traffic.getDriverTraffic(request);
+    const previousSignature = saved.mock.calls[0][1];
+    const old = db.getRacePositions(REPLAY, previousSignature);
+    projectionRevision = 'projection-two';
+    vi.spyOn(db, 'listReplayLapRows').mockReturnValue([]);
+    expect(await traffic.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('retained replay samples') });
+    expect(saved).toHaveBeenCalledTimes(1);
+    expect(db.getRacePositions(REPLAY, previousSignature)).toEqual(old);
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
   it('says why there is no traffic to show', async () => {
     const noCentreline = new RaceTrafficService(db, build, () => null);
     expect(await noCentreline.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('centreline') });

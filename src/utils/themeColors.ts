@@ -82,6 +82,9 @@ export const WHEEL_CORNER_COLORS = {
 export const MAP_COLORS = {
   roadSurface: '#0C121E',
   roadBorder: '#1A2234',
+  physicalRoadSurface: '#253448',
+  kerbSurface: '#64748B',
+  runoffSurface: '#25364A',
   centerline: '#334155',
   trackBoundary: '#475569',
   minimapBorder: '#1E293B',

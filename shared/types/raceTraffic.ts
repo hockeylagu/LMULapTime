@@ -49,6 +49,8 @@ export interface ReplayLapTraffic {
 /** GET /api/replays/:name/traffic: unavailable when the replay or the layout's centreline is missing. */
 export interface ReplayTrafficResponse {
   available: boolean;
+  /** Station frame of every traffic spell; matches the served replay projection revision. */
+  projectionRevision?: string;
   reason?: string;
   laps: ReplayLapTraffic[];
 }

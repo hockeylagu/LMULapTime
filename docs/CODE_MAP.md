@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `main` (2026-10-02): 419 TypeScript source files in src/server/shared, 238 test files, 2053 tests (2043 passed, 10 skipped).
+Last checked against branch `main` (2026-10-02): 423 TypeScript source files in src/server/shared, 249 test files, 2174 tests (2164 passed, 10 skipped).
 
 ---
 
@@ -94,12 +94,15 @@ Manual refresh retries failed driver decodes.
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
 - Serving: `GET /api/replays/:name/trajectory` (`replayRoutes.ts`) → `ReplayTrajectoryService` → `ReplayTelemetryService`
   (fuses DuckDB channels, `server/telemetry/telemetryFusion.ts`) → `server/tracks/` (line cut `lapLineCut.ts`, projection
-  `trackProjection.ts`, glitches `stationGlitches.ts`, geometry `serverTrackSync.ts`).
+  `trackProjection.ts`, glitches `stationGlitches.ts`, geometry `serverTrackSync.ts`, store `trackGeometryStore.ts`).
 - Traffic: `GET /api/replays/:name/traffic` → `server/traffic/raceTrafficService.ts` → race positions index
   (`racePositions.ts`, built on a worker by `racePositionsWorkerClient.ts`, stored by `dbRacePositionStore.ts`) → `trafficSpells.ts`.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
   `inspector/` (data hook `useReplayInspectorData.ts`, `replayPlaybackCursor.ts` publishes frame-by-frame visual interpolation to the charts and map without rerendering the whole inspector between recorded samples; telemetry readouts remain on real samples, `useReplayPersonalBest.ts` (canonical same-layout/class leaderboard identity for the gold lap time), sidebar, timeline, `compare/` (Compare button, comparison lap picker and its rows); HUD assist labels reserve height so TC/ABS toggles do not resize the map), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, racing lines share one non-scaling 28px hit stroke (44px on touch) per continuous section for nearest-sample selection; selected-corner ranges stay stable during playback to avoid rebuilding static paths, boundaries via
-  `useTrackBoundaryGeometry.ts` from `public/tracks/`), `telemetry/` (strip charts; `TelemetryScrubCursor.tsx` snaps the shared scrub line to physical pixels for stable thickness; channels by subsystem; `presets/`),
+  `useTrackBoundaryGeometry.ts` from `public/tracks/`; optional `mapSurfaces` road/kerb/runoff polygons are drawn by
+  `scene/GpsTrackSurfaceLayers.tsx` as compound paths preserving holes. Coordinates are local x/z meters; these
+  display layers leave centerline projection and timing gates unchanged. Maps without surfaces retain the road ribbon),
+  `telemetry/` (strip charts; `TelemetryScrubCursor.tsx` snaps the shared scrub line to physical pixels for stable thickness; channels by subsystem; `presets/`),
   `ReplayShortcutHelp.tsx` lists chart/map shortcuts. `src/utils/replayShortcuts.ts` excludes native controls, typing,
   browser modifiers and modal dialogs. Chart interaction supports Shift-wheel pointer-anchored zoom, Shift-drag range
   selection, Alt-drag pan, sample arrows / 0.5 s Shift-arrows, Home/End, +/− and 0 reset; distance windows and wheel
@@ -132,7 +135,7 @@ Manual refresh retries failed driver decodes.
 |---|---|---|---|
 | Dashboard | `/api/sessions`, `/api/progression` | `trackSummaryUtils.ts`, `paceCategory.ts` | `components/dashboard/` (`useDashboardMetrics.ts`, `useDashboardTrends.ts`) |
 | Session list (dashboard + track detail) | `/api/sessions` (list entries: no drivers, and the player's laps without traffic or steward records, `toSessionListEntry` in `sessionRoutes.ts`) | | `components/session-list/` (`SessionList.tsx`; 25 per page via `useSessionPage.ts` + `SessionPagination.tsx`, `?page=` reset by `updateSearchParams` on any other filter change; `SessionFilterParts.tsx` two-row toolbar with Clear filters, used by `dashboard/DashboardFilterBar.tsx` and `track-detail/TrackSessionsToolbar.tsx`; row chips in `SessionRowParts.tsx`) |
-| Tracks | `/api/track/:trackName` | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` |
+| Tracks | `/api/track/:trackName` | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` (`TrackSurfaceProfiles.tsx` local road elevation/grade/bank traces) |
 | Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard`, `/rivals`, `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare) |
 | Lap comparison | `/api/compare/laps` (`sessionAnalytics.ts`) | `lapComparison.ts` | `src/utils/referenceLaps.ts`, `src/utils/telemetryCompareLink.ts` |
 | Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `server/benchmarks/benchmarkImpact.ts` (player laps only; `BENCHMARK_IMPACT_RULE` stamped on each diff, stored diffs from an older rule are recounted by `context.refreshBenchmarkDiffImpacts` after the startup refresh and on read; the status reads the latest update from its history row), `dbReferenceLaptimeStore.ts` (`benchmark_diff_history`) | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards), `settings/ReferenceChangesList.tsx` |
@@ -146,6 +149,12 @@ recharts out of the entry: chunk groups in `vite.config.ts`). All server calls g
 
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
 `server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
+
+Track geometry: `shared/types/trackGeometry.ts` defines local-meter map polygons, station-indexed nullable physical
+profiles, quality flags and independent geometry/projection revisions. `shared/domain/trackGeometry.ts` validates
+bounded payloads, samples profiles cyclically, and computes asymmetric road-edge distances (+lateral offset is right).
+`server/tracks/trackGeometryStore.ts` caches validated definitions, indexes centerline projection, and tracks geometry/projection revisions across file replacements.
+Unavailable measurements remain null; road and kerb geometry do not determine penalty validity.
 
 Track detail keeps successful data keyed to its requested track, shows loading when switching back to a previously visited track, and offers an inline retry warning when a same-track refresh fails. Route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
 Leaderboard navigation resolves missing or `All` classes from the selected layout's last-driven class (or first available class), while preserving a valid specific class deep link.
@@ -177,6 +186,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
   supertest in `test/server/routes/` → client loader in `src/api/`.
 - **New table/store**: DDL in `dbSchema.ts` → functions taking the `better-sqlite3` `Database` in `server/core/db<Name>Store.ts`
   (pattern: `dbRivalStore.ts`) → callers pass `sessionDb.getDb()`; add a `SessionDatabase` method in `db.ts` only when many callers need it.
+- **New circuit/layout**: `shared/domain/circuitDefinitions.ts` + geometry in `public/tracks/`.
 - **New car**: `shared/domain/vehicleMapping.ts`; `vehicleCatalog.ts` is generated by `tools/analysis/buildVehicleCatalog.ts`.
 - **New session list filter**: add the control to the `narrow` slot of both toolbars (`DashboardFilterBar.tsx`, `TrackSessionsToolbar.tsx`), clear it in the one-write resets (`resetFilters` in `Dashboard.tsx`, `resetSessionFilters` in `useTrackDetailState.ts`; separate `updateSearchParams` calls overwrite each other) and count it in their "is filtered" checks.
 - **Color in the UI**: use the semantic `lmu-*` roles in `tailwind.config.js` (`text-lmu-gain`, `bg-lmu-warn-strong/20`,
@@ -193,6 +203,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 ## 8. Other docs
 
 `docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md` (incl. pit event codes), `docs/VCR_ANALYSIS.md`, `docs/TELEMETRY_FORMAT.md`,
+`docs/LMU_REST_API.md` (+ `swagger-schema.json`; probe gently, ≤1 Hz), `docs/plans/`.
 
 ---
 
@@ -203,7 +214,7 @@ Session-detail accessibility hardening: `SessionRulesModal` portals into the bod
 Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
 
 **Size limits close to the edge**
-- Files near the 1,000-line limit, both left as they are: `shared/domain/circuitDefinitions.ts` (873, a data file: one entry per layout)
+- Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (775, a data file: one entry per layout).
 - Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`;
   `src/components/replay/inspector/` is at 17 (comparison picker split into `compare/`) and `test/components/replay/telemetry/` at 17.
 - Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).

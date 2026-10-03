@@ -22,6 +22,7 @@ export interface TrackDetailProps {
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
   progression?: SessionProgressionPoint[];
+  trackGeometry?: import('../replay/map/index.js').TrackBoundaryGeometry | null;
 }
 
 export const TrackDetail: React.FC<TrackDetailProps> = ({
@@ -32,6 +33,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   selectedCarClass,
   setSelectedCarClass,
   progression = [],
+  trackGeometry,
 }) => {
   const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
   const {
@@ -207,6 +209,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         bestLapTimeString={bestLapSession?.playerDriver?.bestLapTimeString}
         bestLapCar={bestLapSession?.playerDriver?.carType}
         xmlTrackLengthMeters={data.sessions[0]?.trackLengthMeters}
+        trackGeometry={trackGeometry}
       />
 
       <ImprovementChart

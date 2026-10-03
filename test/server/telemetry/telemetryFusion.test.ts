@@ -3,6 +3,41 @@ import { fuseDuckDbWithVcrTrajectory } from '../../../server/telemetry/telemetry
 import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../../server/core/types.js';
 
 describe('telemetryFusion', () => {
+  it('clears source geometry and cut annotations when producing a new fused sample series', () => {
+    const vcr: ReplayTrajectoryData = {
+      replayName: 'Geometry_Test.Vcr', pointsCount: 2,
+      bounds: { minX: 0, maxX: 10, minZ: 0, maxZ: 10, spanX: 10, spanZ: 10 },
+      geometryRevision: 'old-geometry', projectionRevision: 'old-projection',
+      stationSource: 'track', lineCut: { start: 'line', end: 'line' },
+      lineCutProjectionRevision: 'old-projection', trackLengthM: 100,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 500 }, { x: 10, y: 0, z: 10, timeSec: 501 }],
+      leadInPoints: [{ x: -1, y: 0, z: -1, timeSec: 499.9, stationM: 99 }],
+    };
+    const duck: DuckDbLapTelemetry = {
+      lapNumber: 1, lapTimeSec: 1, pointsCount: 3, sampleRateHz: 100,
+      points: [0, 0.5, 1].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, speedKmh: 100,
+        stationM: 999, lateralOffsetM: 20, leftRoadDistanceM: -10, rightRoadDistanceM: 30,
+        roadElevationM: 777, roadGradePct: 30, roadBankDeg: 20,
+        leftKerbWidthM: 3, rightKerbWidthM: 3, leftKerbHeightM: 1, rightKerbHeightM: 1,
+        tireTemps: [71, 72, 73, 74], brakeTemps: [301, 302, 303, 304] })),
+    };
+    const snapshot = structuredClone({ vcr, duck });
+    for (const source of [vcr, { ...vcr, points: [] }]) {
+      const fused = fuseDuckDbWithVcrTrajectory(duck, source);
+      for (const key of ['geometryRevision', 'projectionRevision', 'lineCut', 'lineCutProjectionRevision', 'stationSource'] as const) {
+        expect(fused[key]).toBeUndefined();
+      }
+      expect(fused.points[1]).toMatchObject({ timeSec: 0.5, tireTemps: [71, 72, 73, 74], brakeTemps: [301, 302, 303, 304] });
+      for (const key of ['stationM', 'lateralOffsetM', 'leftRoadDistanceM', 'rightRoadDistanceM',
+        'roadElevationM', 'roadGradePct', 'roadBankDeg', 'leftKerbWidthM', 'rightKerbWidthM',
+        'leftKerbHeightM', 'rightKerbHeightM'] as const) {
+        expect(fused.points[1][key]).toBeUndefined();
+      }
+      expect(fused.leadInPoints?.[0].stationM).toBeUndefined();
+    }
+    expect({ vcr, duck }).toEqual(snapshot);
+  });
+
   it('fuses DuckDB 100Hz telemetry channels with VCR 2D spatial coordinates accurately', () => {
     const mockVcrTrajectory: ReplayTrajectoryData = {
       replayName: 'Bahrain_R1.Vcr',

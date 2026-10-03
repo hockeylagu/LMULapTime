@@ -44,7 +44,6 @@ tmp/
 # Telemetry recorder build output
 tools/telemetry-recorder/bin/
 tools/telemetry-recorder/obj/
-tools/analysis/cache/*
 
 # Raw shared-memory captures (large; keep only derived track models)
 test/fixtures/telemetry/*.jsonl
@@ -60,7 +59,6 @@ test/fixtures/*_temp/
 test/fixtures/replays_temp/
 test/fixtures/replays_db_temp/
 test/fixtures/replays_api_temp/
-
 
 # impeccable-ignore-start
 # Ephemeral output, runtime state, and per-dev overrides.
@@ -88,3 +86,8 @@ test/fixtures/replays_api_temp/
 
 # Impeccable live mode wiring for this machine (kept out of git on purpose, outside the managed block above).
 .impeccable/live/config.json
+
+# Local workspace files.
+/tools/analysis/local/
+/test/tools/analysis/local/
+/docs/local/

@@ -55,6 +55,7 @@ This document provides architectural standards, domain rules, coding conventions
 
 ### Tooling & Native Utilities
 - **C# .NET 8 Telemetry Recorder**: `tools/telemetry-recorder/` (probes and records live memory-mapped telemetry).
+- **TSX Scripts & Offline Correlation**: `tools/analysis/` (offline correlation and reverse engineering).
 
 ---
 
@@ -67,6 +68,7 @@ This document provides architectural standards, domain rules, coding conventions
 
 | Folder | Holds |
 |---|---|
+| `docs/` | Reverse-engineered formats (`XML_FORMAT`, `VCR_FORMAT`, `VCR_ANALYSIS`, `TELEMETRY_FORMAT`), `LMU_REST_API`, `CODE_MAP`, `plans/` |
 | `server/core/` | SQLite coordinator (`db.ts`), DDL (`dbSchema.ts`), one store module per table group, `ServerContext` (scans, enrichment) |
 | `server/core/replay/` | Replay cache stores: metadata, trajectories, normalized facts, links, identity, upgrade, race positions |
 | `server/sessions/` | XML parsing (`parser.ts`), lap classification, replay matching and links, pit stops, session analytics |
@@ -76,7 +78,7 @@ This document provides architectural standards, domain rules, coding conventions
 | `server/tracks/` | Track geometry, centerline projection, timing line cut, station glitch repair, outlines |
 | `server/routes/` | One Express router per domain (`ai`, `leaderboard`, `reference`, `replay`, `session`, `system`) |
 | `server/ai/`, `server/benchmarks/` | Gemini race engineer; Google Sheets benchmark scraper and diff |
-| `server/data/tracks/`, `public/tracks/` | 1:1 track boundary JSON per layout (exempt from the 20-file limit) |
+| `public/tracks/` | 1:1 track boundary JSON per layout (exempt from the 20-file limit) |
 | `shared/domain/` | Pure deterministic engines: circuits, vehicles, lap comparison, conditions, pace, pit stops, traffic, leaderboard, rivals |
 | `shared/types/` | Canonical data contracts (`index.ts` for sessions and laps, plus leaderboard, pit stops, traffic, AI) |
 | `src/api/` | The only place the client calls the server |
@@ -118,8 +120,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Cache processed trajectories and columnar channel data in SQLite (`server/core/db.ts`) with appropriate hash/timestamp invalidation.
 
 ### E. Physical Track Boundaries & Metric Integrity
-- All track boundaries (`leftBoundary`, `rightBoundary`, `centerline`) stored in `server/data/tracks/` and `public/tracks/` **must be strictly expressed in LMU local Cartesian coordinates** (`x, z` in meters).
-- Alignment scale factors ($s$) relative to real LMU replay telemetry must adhere to $0.99 < s < 1.01$ (exact 1:1 metric modeling).
+- All track boundaries (`leftBoundary`, `rightBoundary`, `centerline`) stored in `public/tracks/` **must be strictly expressed in LMU local Cartesian coordinates** (`x, z` in meters).
 - Never cross-pollinate track geometries across distinct layout variants of the same facility.
 
 ### F. Telemetry & Replay Ingestion Integrity
@@ -154,8 +155,8 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - **Strict Component Size Limit**: Frontend components (`.tsx` files under `src/components/`) **must not exceed 300 lines**. If a component approaches or exceeds this limit, decompose it into focused sub-components, custom hooks, or utility functions in a feature subfolder.
 - **Strict Folder File Limit (Max 20 Files per Directory)**:
   - Every directory in the codebase (`src/`, `server/`, `shared/`, `test/`) **must contain a maximum of 20 files**.
-  - **Explicit Exception for Track Geometry Folders (`tracks/`)**:
-    - `server/data/tracks/` and `public/tracks/` are **explicitly exempt** from the 20-file limit. These directories store the complete set of 1:1 local Cartesian boundary geometries across all 32 supported LMU layouts (`*.json` and `index.json`) and must remain flat for direct runtime spatial lookups.
+  - **Explicit Exception for Track Geometry Folder (`public/tracks/`)**:
+    - `public/tracks/` is **explicitly exempt** from the 20-file limit. This directory stores the complete set of 1:1 local Cartesian boundary geometries across all 32 supported LMU layouts (`*.json` and `index.json`) and must remain flat for direct runtime spatial lookups.
   - When any non-exempt folder approaches or reaches 20 files, decompose it into focused subdirectories organized by **strict semantic boundaries** rather than arbitrary splits or flat catch-alls.
   - **Enforce Semantic Boundaries**:
     - **Frontend Components (`src/components/`)**: Group by feature domain (e.g., `dashboard/`, `session-detail/`, `track-detail/`, `replay/`). In complex subdomains (such as `replay/telemetry/`), group channel renderers by physical car subsystem semantics (e.g., chassis & dynamics, powertrain & hybrid energy, tires & brakes, driver inputs).
@@ -204,6 +205,7 @@ The repository keeps an extensive automated test suite (counts in `docs/CODE_MAP
 
 ## 7. Recommended Development Workflow
 
+1. **Understand Requirements**: Before making modifications, check whether changes touch session parsing (`server/sessions/`), replay decoding (`server/replay/`), telemetry ingestion (`server/telemetry/`), track geometry & timing loops (`server/tracks/`), database cache (`server/core/`), track boundaries, or UI views (`src/components/`).
 2. **Preserve Documentation**: Retain all existing JSDoc comments, formulas, and format specifications in `docs/`.
 3. **Execute & Verify**:
    - Run `npm test` to verify no regressions across the full suite.

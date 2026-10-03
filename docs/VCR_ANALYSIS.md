@@ -482,11 +482,12 @@ Distinct `sessionInfo.raining` values seen during playback, compared with the VC
 
 #### C. `trackmap` reference line matches our geometry frame
 
-The `type 0` polyline was measured against `server/data/tracks/sebring_full.json`
+The `type 0` polyline was measured against `public/tracks/sebring_full.json`
 (`centerline`, 2348 pts). Nearest-point distance: **p50 2.47 m, p90 6.05 m, p99 13.46 m,
 max 17.27 m**. Polyline length is 5798 m against our `lengthM` 5861.3 m. The two share the LMU
 local (x, z) frame with no rotation or offset. The typical 2–6 m lateral offset (largest in
 corners) fits a racing / AI line rather than a centreline. This is not replay data, but it is a
+free, game-authoritative reference: frame and scale
 checks for new layouts before any laps have been driven, plus a pit-lane polyline.
 
 #### D. Per-car fields worth hunting in the binary (leads, not findings)

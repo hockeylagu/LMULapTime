@@ -96,6 +96,22 @@ describe('App component', () => {
             }),
         });
       }
+      if (url.includes('/tracks/')) {
+        const layoutKey = url.split('/tracks/')[1]?.replace('.json', '') || 'spa_gp';
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              layoutKey,
+              circuitId: layoutKey.split('_')[0] || 'spa',
+              layoutId: layoutKey.split('_')[1] || 'gp',
+              bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
+              centerline: [[0, 0], [100, 100]],
+              leftBoundary: [[-5, 0], [-5, 100]],
+              rightBoundary: [[5, 0], [5, 100]],
+            }),
+        });
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
   });
@@ -206,6 +222,7 @@ describe('App component', () => {
       expect(screen.getByText(/Back to Tracks/i)).toBeInTheDocument();
     });
 
+    await screen.findByTestId(/track-circuit-layout/);
     const backBtn = screen.getByRole('button', { name: /Back to Tracks/i });
     fireEvent.click(backBtn);
 
@@ -284,5 +301,6 @@ describe('App component', () => {
     expect(screen.getByRole('link', { name: /Review in Settings/i })).toHaveAttribute('href', '/settings?section=reference-benchmarks');
     fireEvent.click(screen.getByRole('button', { name: /Dismiss reference lap time update notification/i }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await screen.findByTestId(/track-circuit-layout/);
   });
 });
