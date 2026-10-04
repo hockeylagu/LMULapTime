@@ -92,7 +92,8 @@ describe('ReplayTrajectoryService', () => {
 
     const canonical = getTrackDefinition('daytona_road_course');
     expect(canonical).not.toBeNull();
-    expect(traj.trackLengthM).toBe(canonical?.lengthM);
+    // The response rounds measured polyline length to centimetres; catalog length uses millimetres.
+    expect(traj.trackLengthM).toBeCloseTo(canonical?.spatialIndex.totalLengthM ?? 0, 2);
     expect(traj.points).toHaveLength(3);
     expect(traj.maxPoints).toBe(3);
   });
