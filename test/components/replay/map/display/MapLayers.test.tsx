@@ -27,6 +27,14 @@ function mapDisplay(overrides: Partial<TrackMapDisplay['surfaces']> = {}): Track
   };
 }
 
+const displayWithBrakeMarkers: TrackMapDisplay = {
+  ...mapDisplay(),
+  brakeMarkers: [
+    { id: 'brake-150', center: [120, 205], distanceM: 150, stationM: 325, side: 'left' },
+    { id: 'brake-unknown', center: [180, 230], distanceM: null, stationM: 710, side: 'right' },
+  ],
+};
+
 function renderMap(display = mapDisplay()) {
   return render(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={display} />);
 }
@@ -43,6 +51,27 @@ describe('GPS map display layers', () => {
     localStorage.removeItem(MAP_LAYERS_STORAGE_KEY);
   });
 
+  it('uses one outer-surface toggle when only other roads are available', () => {
+    const { container } = renderMap(mapDisplay({ runoff: [] }));
+    openLayers();
+    const toggle = screen.getByRole('checkbox', { name: 'Runoff and other roads' });
+    expect(toggle).toBeEnabled();
+    expect(screen.queryByRole('checkbox', { name: 'Other circuit roads' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(container.querySelector('[data-surface="otherRoad"]')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(container.querySelector('[data-surface="otherRoad"]')).not.toBeInTheDocument();
+  });
+
+  it('preserves an enabled legacy other-road preference in the combined toggle', () => {
+    localStorage.setItem(MAP_LAYERS_STORAGE_KEY, JSON.stringify({ runoff: false, otherRoad: true }));
+    const { container } = renderMap();
+    openLayers();
+    expect(screen.getByRole('checkbox', { name: 'Runoff and other roads' })).toBeChecked();
+    expect(container.querySelector('[data-surface="runoff"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-surface="otherRoad"]')).toBeInTheDocument();
+  });
+
   it('shows only the active road and kerbs by default', () => {
     const { container } = renderMap();
     const surfacePaths = [...container.querySelectorAll('[data-surface]')].map(path => path.getAttribute('data-surface'));
@@ -56,8 +85,9 @@ describe('GPS map display layers', () => {
     expect(initialViewBox).toBeTruthy();
 
     openLayers();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
     expect(container.querySelector('[data-surface="runoff"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-surface="otherRoad"]')).toBeInTheDocument();
     expect(container.querySelector('[data-surface="pit"]')).toBeNull();
     expect(mapSvg?.getAttribute('viewBox')).toBe(initialViewBox);
 
@@ -67,15 +97,32 @@ describe('GPS map display layers', () => {
     expect(mapSvg?.getAttribute('viewBox')).toBe(initialViewBox);
   });
 
+  it('keeps braking markers off by default and draws measured and unknown boards when enabled', () => {
+    const { container, rerender } = renderMap(displayWithBrakeMarkers);
+    expect(container.querySelector('[data-testid="gps-brake-markers"]')).toBeNull();
+
+    openLayers();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Braking markers' }));
+    expect(container.querySelector('[data-marker-id="brake-150"] text')).toHaveTextContent('150 m');
+    expect(container.querySelector('[data-marker-id="brake-unknown"] text')).toHaveTextContent('Brake');
+    expect(screen.getByRole('img', { name: 'Brake board, printed 150 metres' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Brake board, printed distance unknown' })).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-testid="gps-brake-markers"] circle')).toHaveLength(2);
+
+    rerender(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={mapDisplay()} />);
+    expect(screen.getByRole('checkbox', { name: 'Braking markers' })).toBeDisabled();
+    expect(container.querySelector('[data-testid="gps-brake-markers"]')).toBeNull();
+  });
+
   it('toggles a layer when clicking its label text without closing the panel', async () => {
     const user = userEvent.setup();
     renderMap();
     openLayers();
 
-    const checkbox = screen.getByRole('checkbox', { name: 'Runoff' });
+    const checkbox = screen.getByRole('checkbox', { name: 'Runoff and other roads' });
     expect(checkbox).not.toBeChecked();
 
-    const labelText = screen.getByText('Runoff');
+    const labelText = screen.getByText('Runoff and other roads');
     await user.click(labelText);
 
     expect(checkbox).toBeChecked();
@@ -93,7 +140,7 @@ describe('GPS map display layers', () => {
     const panel = openLayers();
     fireEvent.wheel(panel, { deltaY: -120 });
     expect(mapSvg?.getAttribute('viewBox')).toBe(original);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
     expect(mapSvg?.getAttribute('viewBox')).toBe(original);
     fireEvent.click(screen.getByRole('button', { name: 'Fit visible layers' }));
     expect(mapSvg?.getAttribute('viewBox')).not.toBe(original);
@@ -104,22 +151,22 @@ describe('GPS map display layers', () => {
   it('persists layer choices, restores defaults, and keeps the UI working when storage fails', () => {
     const first = renderMap();
     openLayers();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
     const stored = JSON.parse(localStorage.getItem(MAP_LAYERS_STORAGE_KEY) ?? '{}') as { runoff?: boolean };
     expect(stored.runoff).toBe(true);
     first.unmount();
 
     renderMap();
     openLayers();
-    expect(screen.getByRole('checkbox', { name: 'Runoff' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Runoff and other roads' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
-    expect(screen.getByRole('checkbox', { name: 'Runoff' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Runoff and other roads' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Active track' })).toBeChecked();
     expect(JSON.parse(localStorage.getItem(MAP_LAYERS_STORAGE_KEY) ?? '{}')).toMatchObject({ road: true, kerb: true, runoff: false, pit: false });
 
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage unavailable'); });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff' }));
-    expect(screen.getByRole('checkbox', { name: 'Runoff' })).toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
+    expect(screen.getByRole('checkbox', { name: 'Runoff and other roads' })).toBeChecked();
   });
 
   it('closes with Escape, restores focus to Layers, and disables unavailable pit geometry', () => {
@@ -127,7 +174,7 @@ describe('GPS map display layers', () => {
     const trigger = screen.getByRole('button', { name: 'Layers' });
     const panel = openLayers();
     expect(screen.getByRole('checkbox', { name: 'Pit lane and apron' })).toBeDisabled();
-    expect(screen.getByText(/Some optional surface layers are unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/Some optional map layers are unavailable/)).toBeInTheDocument();
     expect(panel.querySelector('input:not(:disabled)')).toHaveFocus();
 
     fireEvent.keyDown(panel, { key: 'Escape' });

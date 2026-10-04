@@ -4,6 +4,21 @@ import { GpsSceneMarkers } from '../../../../../src/components/replay/map/scene/
 import type { CornerMarkerPoint, PedalMarkerPoint } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
 
 describe('GpsSceneMarkers', () => {
+  it('keeps the selected corner when overview labels overlap and reveals neighbors at closer scale', () => {
+    const corners: CornerMarkerPoint[] = [
+      { cornerNumber: 1, sx: 100, sy: 100, idx: 0, actualSx: 100, actualSy: 100 },
+      { cornerNumber: 2, sx: 120, sy: 100, idx: 1, actualSx: 120, actualSy: 100 },
+    ];
+    const { rerender } = render(<svg><GpsSceneMarkers cornerMarkers={corners} selectedCornerNumber={2}
+      pedalMarkers={[]} markerScale={1} /></svg>);
+    expect(screen.queryByTestId('corner-flag-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('corner-flag-2')).toBeInTheDocument();
+    rerender(<svg><GpsSceneMarkers cornerMarkers={corners} selectedCornerNumber={2}
+      pedalMarkers={[]} markerScale={.25} /></svg>);
+    expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
+    expect(screen.getByTestId('corner-flag-2')).toBeInTheDocument();
+  });
+
   const mockCorner: CornerMarkerPoint = {
     cornerNumber: 1,
     sx: 140,

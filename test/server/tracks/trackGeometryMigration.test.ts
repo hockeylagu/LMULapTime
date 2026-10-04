@@ -31,6 +31,7 @@ function fixture(): TrackBoundaryGeometry {
       leftElevationM: [20.3, 20.3, 20.3, 20.3], rightElevationM: [19.7, 19.7, 19.7, 19.7],
       leftKerbWidthM: [1, 1, 1, 1], rightKerbWidthM: [0, 0, 0, 0],
       leftKerbHeightM: [0.05, 0.05, 0.05, 0.05], rightKerbHeightM: [null, null, null, null],
+      leftKerbType: ['flat', 'flat', 'sawtooth', 'sawtooth'], rightKerbType: [null, null, null, null],
     },
   };
 }
@@ -115,7 +116,7 @@ describe('geometry revision migration', () => {
         ({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight })));
     expect(lap.points[1]).toMatchObject({ stationM: 50, lateralOffsetM: 2,
       leftRoadDistanceM: 7, rightRoadDistanceM: 6, roadElevationM: 20, roadGradePct: 2,
-      roadBankDeg: 3, leftKerbHeightM: 0.05, rightKerbHeightM: null });
+      roadBankDeg: 3, leftKerbHeightM: 0.05, rightKerbHeightM: null, leftKerbType: 'flat', rightKerbType: null });
     expect(lap.points[2].stationM).toBe(lap.trackLengthM);
   });
 
@@ -192,10 +193,11 @@ describe('geometry revision migration', () => {
     const lap = archivedLap();
     Object.assign(lap.points[1], { leftRoadDistanceM: 9, rightRoadDistanceM: 9,
       roadElevationM: 30, roadGradePct: 10, roadBankDeg: 10, leftKerbHeightM: 0.2,
-      rightKerbHeightM: 0.2, leftKerbWidthM: 1, rightKerbWidthM: 1 });
+      rightKerbHeightM: 0.2, leftKerbWidthM: 1, rightKerbWidthM: 1, leftKerbType: 'flat', rightKerbType: 'other' });
     applyCanonicalProjection(lap, store.get('monza_gp')!);
     for (const key of ['leftRoadDistanceM', 'rightRoadDistanceM', 'roadElevationM', 'roadGradePct',
-      'roadBankDeg', 'leftKerbHeightM', 'rightKerbHeightM', 'leftKerbWidthM', 'rightKerbWidthM'] as const) {
+      'roadBankDeg', 'leftKerbHeightM', 'rightKerbHeightM', 'leftKerbWidthM', 'rightKerbWidthM',
+      'leftKerbType', 'rightKerbType'] as const) {
       expect(lap.points[1][key]).toBeUndefined();
     }
   });

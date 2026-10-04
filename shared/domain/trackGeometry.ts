@@ -1,5 +1,7 @@
 import type {
   TrackBoundaryGeometry,
+  TrackKerbType,
+  TrackMapDisplay,
   TrackRoadEdgeDistances,
   TrackSurfaceProfileColumns,
   TrackSurfaceProfileSample,
@@ -13,6 +15,8 @@ const PROFILE_COLUMNS = [
   'leftElevationM', 'rightElevationM', 'leftKerbWidthM', 'rightKerbWidthM',
   'leftKerbHeightM', 'rightKerbHeightM',
 ] as const satisfies readonly (keyof TrackSurfaceProfileColumns)[];
+const KERB_TYPE_COLUMNS = ['leftKerbType', 'rightKerbType'] as const;
+const KERB_TYPES: readonly TrackKerbType[] = ['flat', 'sawtooth', 'other'];
 
 function invalid(path: string): never {
   throw new Error(`Invalid track geometry: ${path}`);
@@ -79,7 +83,8 @@ export function parseTrackBoundaryGeometry(value: unknown, expectedLayoutKey?: s
 
   if (geometry.mapSurfaces !== undefined) {
     const surfaces = object(geometry.mapSurfaces, 'mapSurfaces');
-    for (const key of ['road', 'kerb', 'runoff']) {
+    for (const key of ['road', 'kerb', 'runoff', 'pit', 'otherRoad']) {
+      if ((key === 'pit' || key === 'otherRoad') && surfaces[key] === undefined) continue;
       array(surfaces[key], `mapSurfaces.${key}`).forEach((polygon, index) => {
         const path = `mapSurfaces.${key}[${index}]`;
         array(polygon, path, 1).forEach((ring, ringIndex) => pairs(ring, `${path}[${ringIndex}]`, 3));
@@ -156,8 +161,59 @@ export function parseTrackBoundaryGeometry(value: unknown, expectedLayoutKey?: s
         else finite(measurement, path);
       });
     }
+    for (const key of KERB_TYPE_COLUMNS) {
+      if (profile[key] === undefined) continue;
+      const column = array(profile[key], `surfaceProfile.${key}`);
+      if (column.length !== stations.length) invalid(`surfaceProfile.${key} length`);
+      column.forEach((kind, index) => {
+        if (kind !== null && !KERB_TYPES.includes(kind as TrackKerbType)) invalid(`surfaceProfile.${key}[${index}]`);
+      });
+    }
   }
   return value as TrackBoundaryGeometry;
+}
+
+/** Validates optional display assets without allowing a different layout or stale source revision. */
+export function parseTrackMapDisplay(value: unknown, layoutKey: string, sourceRevision: string): TrackMapDisplay {
+  const display = object(value, 'display');
+  if (display.layoutKey !== layoutKey) invalid('display layoutKey mismatch');
+  if (display.sourceRevision !== sourceRevision) invalid('display sourceRevision mismatch');
+  text(display.sourceRevision, 'display.sourceRevision');
+  const surfaces = object(display.surfaces, 'display.surfaces');
+  let total = 0;
+  const array = (candidate: unknown, path: string, minimum = 0): unknown[] => {
+    if (!Array.isArray(candidate) || candidate.length < minimum || candidate.length > MAX_ARRAY_ITEMS) invalid(path);
+    total += candidate.length;
+    if (total > MAX_TOTAL_ITEMS) invalid('display total array size');
+    return candidate;
+  };
+  for (const key of ['road', 'kerb', 'runoff', 'pit', 'otherRoad']) {
+    const path = `display.surfaces.${key}`;
+    for (const polygon of array(surfaces[key], path)) {
+      for (const ring of array(polygon, path, 1)) {
+        for (const point of array(ring, path, 3)) {
+          const pair = array(point, path, 2);
+          if (pair.length !== 2) invalid(path);
+          finite(pair[0], path); finite(pair[1], path);
+        }
+      }
+    }
+  }
+  if (display.brakeMarkers !== undefined) {
+    const markers = array(display.brakeMarkers, 'display.brakeMarkers');
+    for (let index = 0; index < markers.length; index++) {
+      const path = `display.brakeMarkers[${index}]`;
+      const marker = object(markers[index], path);
+      text(marker.id, `${path}.id`);
+      const center = array(marker.center, `${path}.center`, 2);
+      if (center.length !== 2) invalid(`${path}.center`);
+      finite(center[0], `${path}.center[0]`); finite(center[1], `${path}.center[1]`);
+      if (marker.distanceM !== null) finite(marker.distanceM, `${path}.distanceM`, 0);
+      finite(marker.stationM, `${path}.stationM`, 0);
+      if (marker.side !== 'left' && marker.side !== 'right') invalid(`${path}.side`);
+    }
+  }
+  return value as TrackMapDisplay;
 }
 
 /** Samples actual physical station intervals, including the closing interval to station zero. */
@@ -185,6 +241,9 @@ export function sampleTrackSurfaceProfile(geometry: TrackBoundaryGeometry, stati
     const right = profile[key][rightIndex];
     return left === null || right === null ? null : left + (right - left) * fraction;
   };
+  // A type is a category, not a measurement: take the nearer station's.
+  const nearest = fraction < 0.5 ? leftIndex : rightIndex;
+  const kerbType = (key: typeof KERB_TYPE_COLUMNS[number]): TrackKerbType | null => profile[key]?.[nearest] ?? null;
   return {
     stationM: station,
     leftWidthM: interpolate('leftWidthM'), rightWidthM: interpolate('rightWidthM'),
@@ -192,6 +251,7 @@ export function sampleTrackSurfaceProfile(geometry: TrackBoundaryGeometry, stati
     leftElevationM: interpolate('leftElevationM'), rightElevationM: interpolate('rightElevationM'),
     leftKerbWidthM: interpolate('leftKerbWidthM'), rightKerbWidthM: interpolate('rightKerbWidthM'),
     leftKerbHeightM: interpolate('leftKerbHeightM'), rightKerbHeightM: interpolate('rightKerbHeightM'),
+    leftKerbType: kerbType('leftKerbType'), rightKerbType: kerbType('rightKerbType'),
   };
 }
 

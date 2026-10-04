@@ -11,6 +11,10 @@ const MAX_ZOOM = 100;
 function getNextZoom(current: number, direction: 1 | -1, steps = 1): number {
   let result = current;
   for (let i = 0; i < steps; i++) {
+    if (result < 1 || (result === 1 && direction < 0)) {
+      result = Math.max(.1, Math.min(1, Number((result + direction * .1).toFixed(1))));
+      continue;
+    }
     if (direction > 0) {
       const step = result >= 30 ? 10 : result >= 15 ? 5 : result >= 7.5 ? 2.5 : result >= 3 ? 1.5 : 1;
       result = Math.min(MAX_ZOOM, Number((result + step).toFixed(1)));
@@ -179,6 +183,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
+      if (e.target instanceof Element && e.target.closest('[data-map-control]')) return;
       if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
       e.stopPropagation();
@@ -258,6 +263,16 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     autoFollowOnScrubRef.current = true;
   };
 
+  const fitBounds = (bounds: { minX: number; minY: number; maxX: number; maxY: number }) => {
+    const extent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 1);
+    const zoom = Math.max(.1, Math.min(MAX_ZOOM, viewBoxSize / (extent * BASE_ZOOM * 1.12)));
+    const offset = { x: (bounds.minX + bounds.maxX) / 2 - viewBoxSize / 2,
+      y: (bounds.minY + bounds.maxY) / 2 - viewBoxSize / 2 };
+    zoomLevelRef.current = zoom; panOffsetRef.current = offset;
+    setZoomLevel(zoom); setPanOffset(offset);
+    followCarRef.current = false; setFollowCar(false); autoFollowOnScrubRef.current = false;
+  };
+
   const focusOnPoint = (targetX: number, targetY: number, targetZoom = 4.5) => {
     const newPanX = Math.max(-1000, Math.min(1000, Number((targetX - viewBoxSize / 2).toFixed(1))));
     const newPanY = Math.max(-1000, Math.min(1000, Number((targetY - viewBoxSize / 2).toFixed(1))));
@@ -325,5 +340,6 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     zoomIn,
     zoomOut,
     markerScale,
+    fitBounds,
   };
 }

@@ -101,7 +101,13 @@ Manual refresh retries failed driver decodes.
   `inspector/` (data hook `useReplayInspectorData.ts`, `replayPlaybackCursor.ts` publishes frame-by-frame visual interpolation to the charts and map without rerendering the whole inspector between recorded samples; telemetry readouts remain on real samples, `useReplayPersonalBest.ts` (canonical same-layout/class leaderboard identity for the gold lap time), sidebar, timeline, `compare/` (Compare button, comparison lap picker and its rows); HUD assist labels reserve height so TC/ABS toggles do not resize the map), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, racing lines share one non-scaling 28px hit stroke (44px on touch) per continuous section for nearest-sample selection; selected-corner ranges stay stable during playback to avoid rebuilding static paths, boundaries via
   `useTrackBoundaryGeometry.ts` from `public/tracks/`; optional `mapSurfaces` road/kerb/runoff polygons are drawn by
   `scene/GpsTrackSurfaceLayers.tsx` as compound paths preserving holes. Coordinates are local x/z meters; these
-  display layers leave centerline projection and timing gates unchanged. Maps without surfaces retain the road ribbon),
+  display layers leave centerline projection and timing gates unchanged. `map/display/` owns persistent Layers
+  preferences, optional revision-matched `/tracks-display/<layoutKey>.json` assets, quiet active-route backgrounds,
+  fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards. Their
+  labels report printed board distances; unknown distances use a generic brake label. Active road and kerbs are the defaults; runoff, pits, other circuit roads,
+  road edges and the centerline guide are opt-ins. Legacy files use a seam-free measured ribbon and measured kerb
+  clipping; unavailable pit/outer-road controls are disabled. Layer toggles preserve camera and playback. Maps without
+  surfaces retain the road ribbon),
   `telemetry/` (strip charts; `TelemetryScrubCursor.tsx` snaps the shared scrub line to physical pixels for stable thickness; channels by subsystem; `presets/`),
   `ReplayShortcutHelp.tsx` lists chart/map shortcuts. `src/utils/replayShortcuts.ts` excludes native controls, typing,
   browser modifiers and modal dialogs. Chart interaction supports Shift-wheel pointer-anchored zoom, Shift-drag range
@@ -155,8 +161,19 @@ profiles, quality flags and independent geometry/projection revisions. `shared/d
 bounded payloads, samples profiles cyclically, and computes asymmetric road-edge distances (+lateral offset is right).
 `server/tracks/trackGeometryStore.ts` caches validated definitions, indexes centerline projection, and tracks geometry/projection revisions across file replacements.
 Unavailable measurements remain null; road and kerb geometry do not determine penalty validity.
+Optional `leftKerbType`/`rightKerbType` profile columns carry the kerb surface category (`flat`, `sawtooth`, `other`, null
+without a kerb); samples take the nearer station's type, and `server/tracks/serverTrackSync.ts` copies kerb width, height
+and type onto each projected lap point.
 
 Track detail keeps successful data keyed to its requested track, shows loading when switching back to a previously visited track, and offers an inline retry warning when a same-track refresh fails. Route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
+
+`TrackCircuitLayout.tsx` uses lightweight white `/track-outlines/<layoutKey>.svg` outlines at every size,
+falling back to an inline SVG fitted to the active centerline if an asset is unavailable. It never renders
+detailed map surfaces; the information modal still loads physical profiles independently. Static geometry,
+display assets and outlines are served from their public directories (or dist equivalents) by `server/index.ts`.
+`src/api/trackGeometryApi.ts` loads/validates display assets against layout identity and `geometryRevision`;
+stale assets are ignored while generation replaces files. The optional display contract is `TrackMapDisplay`
+in `shared/types/trackGeometry.ts`, validated by `parseTrackMapDisplay` in `shared/domain/trackGeometry.ts`.
 Leaderboard navigation resolves missing or `All` classes from the selected layout's last-driven class (or first available class), while preserving a valid specific class deep link.
 
 ## 5. Cache versions: what to bump
@@ -186,7 +203,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
   supertest in `test/server/routes/` → client loader in `src/api/`.
 - **New table/store**: DDL in `dbSchema.ts` → functions taking the `better-sqlite3` `Database` in `server/core/db<Name>Store.ts`
   (pattern: `dbRivalStore.ts`) → callers pass `sessionDb.getDb()`; add a `SessionDatabase` method in `db.ts` only when many callers need it.
-- **New circuit/layout**: `shared/domain/circuitDefinitions.ts` + geometry in `public/tracks/`.
+- **New circuit/layout**: `shared/domain/circuitDefinitions.ts` + geometry in `public/tracks/`. Track geometry and map display files are generated outside this repository and only copied in.
 - **New car**: `shared/domain/vehicleMapping.ts`; `vehicleCatalog.ts` is generated by `tools/analysis/buildVehicleCatalog.ts`.
 - **New session list filter**: add the control to the `narrow` slot of both toolbars (`DashboardFilterBar.tsx`, `TrackSessionsToolbar.tsx`), clear it in the one-write resets (`resetFilters` in `Dashboard.tsx`, `resetSessionFilters` in `useTrackDetailState.ts`; separate `updateSearchParams` calls overwrite each other) and count it in their "is filtered" checks.
 - **Color in the UI**: use the semantic `lmu-*` roles in `tailwind.config.js` (`text-lmu-gain`, `bg-lmu-warn-strong/20`,

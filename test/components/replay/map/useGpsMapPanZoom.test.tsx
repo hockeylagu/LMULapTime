@@ -68,6 +68,19 @@ describe('useGpsMapPanZoom', () => {
     expect(result.current.zoomLevel).toBe(1);
   });
 
+  it('crosses the overview zoom threshold in both directions', () => {
+    const { result } = renderHook(() => useGpsMapPanZoom({ viewBoxSize: 800 }));
+    act(() => result.current.zoomOut());
+    expect(result.current.zoomLevel).toBe(0.9);
+    act(() => result.current.zoomIn());
+    expect(result.current.zoomLevel).toBe(1);
+    act(() => result.current.zoomIn());
+    expect(result.current.zoomLevel).toBe(2);
+    act(() => result.current.zoomOut());
+    act(() => result.current.zoomOut());
+    expect(result.current.zoomLevel).toBe(0.9);
+  });
+
   it('resets zoom and pan when calling resetPanZoom', () => {
     const { result } = renderHook(() =>
       useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })

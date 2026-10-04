@@ -10,9 +10,9 @@ export interface MapControlsOverlayProps {
   followCar?: boolean;
   onToggleFollowCar?: () => void;
   onCenterCar?: () => void;
-  isCarOffscreen?: boolean;
   orientation?: 'vertical' | 'horizontal';
   className?: string;
+  children?: React.ReactNode;
 }
 
 export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
@@ -23,20 +23,21 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
   followCar,
   onToggleFollowCar,
   onCenterCar,
-  isCarOffscreen,
   orientation = 'horizontal',
   className = '',
+  children,
 }) => {
   const isVert = orientation === 'vertical';
 
   return (
-    <div
+    <div data-map-control="navigation"
       data-testid="map-controls-overlay"
       className={`absolute bottom-3 right-3 z-30 flex ${
         isVert ? 'flex-col items-center gap-1 p-1' : 'items-center gap-1.5 p-1.5'
       } bg-lmu-strip/90 backdrop-blur-md rounded-xl border border-white/10 shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
+      onDoubleClick={e => e.stopPropagation()}
     >
       <button
         type="button"
@@ -57,11 +58,17 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         <Minus className="w-3.5 h-3.5" />
       </button>
 
-      {onCenterCar && <button type="button" onClick={onCenterCar} aria-label="Center on car"
-        title="Center on car · C (keeps zoom)"
-        className={`h-7 min-w-7 px-1.5 flex items-center justify-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white text-xs cursor-pointer ${FOCUS_RING}`}>
-        <LocateFixed className="w-3.5 h-3.5" />{isCarOffscreen && <span className="whitespace-nowrap">Center car · C</span>}
-      </button>}
+      {onCenterCar && (
+        <button
+          type="button"
+          onClick={onCenterCar}
+          aria-label="Center car"
+          title="Center car · C"
+          className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
+        >
+          <LocateFixed className="w-3.5 h-3.5" />
+        </button>
+      )}
       {onToggleFollowCar && (
         <button
           type="button"
@@ -89,6 +96,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         <RotateCcw className="w-3.5 h-3.5" />
       </button>
 
+      {children}
       {zoomDisplay && (
         <span
           className={`${

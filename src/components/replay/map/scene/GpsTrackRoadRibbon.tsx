@@ -7,6 +7,9 @@ export interface GpsTrackRoadRibbonProps {
   rightSvgPoints: Array<{ sx: number; sy: number }>;
   centerlineSvgPoints?: Array<{ sx: number; sy: number }>;
   className?: string;
+  showRoad?: boolean;
+  showEdges?: boolean;
+  showCenterline?: boolean;
 }
 
 export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(({
@@ -14,6 +17,9 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
   rightSvgPoints,
   centerlineSvgPoints,
   className = '',
+  showRoad = true,
+  showEdges = false,
+  showCenterline = false,
 }) => {
   const ribbonD = useMemo(
     () => buildRoadRibbonSvgPath(leftSvgPoints, rightSvgPoints),
@@ -40,17 +46,16 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
   return (
     <g data-testid="gps-track-road-ribbon" className={`pointer-events-none select-none ${className}`}>
       {/* Dark motorsport asphalt road surface */}
-      <path
+      {showRoad && <path
         d={ribbonD}
         fill={MAP_COLORS.roadSurface}
         fillOpacity="0.88"
-        stroke={MAP_COLORS.roadBorder}
-        strokeWidth="1"
-        vectorEffect="non-scaling-stroke"
-      />
+        fillRule="evenodd"
+        stroke="none"
+      />}
 
       {/* Subtle dashed centerline guide */}
-      {centerlineD && (
+      {showCenterline && centerlineD && (
         <path
           d={centerlineD}
           fill="none"
@@ -63,7 +68,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
       )}
 
       {/* Left physical track boundary limit / kerb edge */}
-      <path
+      {showEdges && <path
         d={leftEdgeD}
         fill="none"
         stroke={MAP_COLORS.trackBoundary}
@@ -72,10 +77,10 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
         opacity="0.85"
-      />
+      />}
 
       {/* Right physical track boundary limit / kerb edge */}
-      <path
+      {showEdges && <path
         d={rightEdgeD}
         fill="none"
         stroke={MAP_COLORS.trackBoundary}
@@ -84,7 +89,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
         opacity="0.85"
-      />
+      />}
     </g>
   );
 });

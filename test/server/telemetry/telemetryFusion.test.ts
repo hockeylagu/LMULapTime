@@ -19,6 +19,7 @@ describe('telemetryFusion', () => {
         stationM: 999, lateralOffsetM: 20, leftRoadDistanceM: -10, rightRoadDistanceM: 30,
         roadElevationM: 777, roadGradePct: 30, roadBankDeg: 20,
         leftKerbWidthM: 3, rightKerbWidthM: 3, leftKerbHeightM: 1, rightKerbHeightM: 1,
+        leftKerbType: 'flat' as const, rightKerbType: 'sawtooth' as const,
         tireTemps: [71, 72, 73, 74], brakeTemps: [301, 302, 303, 304] })),
     };
     const snapshot = structuredClone({ vcr, duck });
@@ -30,7 +31,7 @@ describe('telemetryFusion', () => {
       expect(fused.points[1]).toMatchObject({ timeSec: 0.5, tireTemps: [71, 72, 73, 74], brakeTemps: [301, 302, 303, 304] });
       for (const key of ['stationM', 'lateralOffsetM', 'leftRoadDistanceM', 'rightRoadDistanceM',
         'roadElevationM', 'roadGradePct', 'roadBankDeg', 'leftKerbWidthM', 'rightKerbWidthM',
-        'leftKerbHeightM', 'rightKerbHeightM'] as const) {
+        'leftKerbHeightM', 'rightKerbHeightM', 'leftKerbType', 'rightKerbType'] as const) {
         expect(fused.points[1][key]).toBeUndefined();
       }
       expect(fused.leadInPoints?.[0].stationM).toBeUndefined();

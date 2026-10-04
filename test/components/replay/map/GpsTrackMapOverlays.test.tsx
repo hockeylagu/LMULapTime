@@ -390,8 +390,10 @@ describe('GpsTrackMap overlays and geometry', () => {
     expect(roadRibbon).toBeInTheDocument();
 
     const paths = roadRibbon.querySelectorAll('path');
-    expect(paths.length).toBeGreaterThanOrEqual(3); // Asphalt surface + 2 boundary limits
+    expect(paths).toHaveLength(3); // Fill and both track edges (always drawn); the centerline is optional.
     expect(paths[0].getAttribute('fill')).toBe('#0C121E');
+    expect(paths[0].getAttribute('stroke')).toBe('none');
+    expect(paths[0].getAttribute('fill-rule')).toBe('evenodd');
   });
 
   it('renders circuit minimap using track layout geometry when available', () => {

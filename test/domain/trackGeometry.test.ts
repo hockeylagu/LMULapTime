@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   getTrackRoadEdgeDistances,
   parseTrackBoundaryGeometry,
+  parseTrackMapDisplay,
   sampleTrackSurfaceProfile,
 } from '../../shared/domain/trackGeometry.js';
-import type { TrackBoundaryGeometry, TrackSurfaceProfile } from '../../shared/types/trackGeometry.js';
+import type { TrackBoundaryGeometry, TrackMapDisplay, TrackSurfaceProfile } from '../../shared/types/trackGeometry.js';
 
 function legacy(): TrackBoundaryGeometry {
   return {
@@ -33,6 +34,15 @@ function native(): TrackBoundaryGeometry {
     coordinates: { frame: 'lmu-local', unit: 'm', axes: 'xyz' },
     quality: { surfaces: 'native', boundaries: 'partial', elevation: 'native', banking: 'partial', legalLimits: 'unavailable' },
     surfaceProfile: surfaceProfile(),
+  };
+}
+
+function mapDisplay(): TrackMapDisplay {
+  const ring: Array<[number, number]> = [[0, 0], [10, 0], [10, 10], [0, 0]];
+  const polygon = [[ring]];
+  return {
+    layoutKey: 'test_gp', sourceRevision: 'mesh-v2',
+    surfaces: { road: polygon, kerb: [], runoff: [], pit: [], otherRoad: [] },
   };
 }
 
@@ -74,6 +84,15 @@ describe('native surface sampling', () => {
     const geometry = native();
     geometry.surfaceProfile!.leftWidthM[1] = null;
     expect(getTrackRoadEdgeDistances(geometry, 10, 2)).toEqual({ leftDistanceM: null, rightDistanceM: 3 });
+  });
+
+  it('takes the nearer station kerb type and reports none for files without the column', () => {
+    const geometry = native();
+    geometry.surfaceProfile = { ...geometry.surfaceProfile!, leftKerbType: ['flat', 'sawtooth', null], rightKerbType: [null, null, 'other'] };
+    expect(sampleTrackSurfaceProfile(geometry, 5)).toMatchObject({ leftKerbType: 'flat', rightKerbType: null });
+    expect(sampleTrackSurfaceProfile(geometry, 15)).toMatchObject({ leftKerbType: 'sawtooth', rightKerbType: null });
+    expect(sampleTrackSurfaceProfile(geometry, 85)).toMatchObject({ leftKerbType: null, rightKerbType: 'other' });
+    expect(sampleTrackSurfaceProfile(native(), 15)).toMatchObject({ leftKerbType: null, rightKerbType: null });
   });
 
   it('does not fabricate a native profile for legacy geometry or invalid query inputs', () => {
@@ -149,6 +168,16 @@ describe('track geometry runtime validation', () => {
     expect(() => parseTrackBoundaryGeometry({ ...native(), surfaceProfile: surfaceProfileValue })).toThrow('Invalid track geometry');
   });
 
+  it('accepts known kerb types and rejects unknown ones or a column of the wrong length', () => {
+    const geometry = native();
+    geometry.surfaceProfile = { ...geometry.surfaceProfile!, leftKerbType: ['flat', 'sawtooth', 'other'], rightKerbType: [null, null, null] };
+    expect(parseTrackBoundaryGeometry(geometry)).toBe(geometry);
+    const unknown = { ...native(), surfaceProfile: { ...surfaceProfile(), leftKerbType: ['flat', 'concrete', null] } };
+    expect(() => parseTrackBoundaryGeometry(unknown)).toThrow('surfaceProfile.leftKerbType[1]');
+    const short = { ...native(), surfaceProfile: { ...surfaceProfile(), rightKerbType: ['flat'] } };
+    expect(() => parseTrackBoundaryGeometry(short)).toThrow('surfaceProfile.rightKerbType length');
+  });
+
   it('rejects sparse arrays instead of treating missing measurements as unavailable nulls', () => {
     const geometry = native();
     delete geometry.surfaceProfile!.leftWidthM[1];
@@ -156,5 +185,34 @@ describe('track geometry runtime validation', () => {
     const sparsePoints = legacy();
     delete sparsePoints.centerline[1];
     expect(() => parseTrackBoundaryGeometry(sparsePoints)).toThrow('missing');
+  });
+});
+
+describe('track map display validation', () => {
+  it('accepts a matching layout and geometry revision without rewriting its polygons', () => {
+    const display = mapDisplay();
+    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2')).toBe(display);
+    expect(display.surfaces.road[0][0]).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
+  });
+
+  it('accepts optional braking markers and preserves legacy displays without them', () => {
+    const display = mapDisplay() as TrackMapDisplay;
+    display.brakeMarkers = [
+      { id: 'brake-150', center: [12, 34], distanceM: 150, stationM: 900, side: 'left' },
+      { id: 'brake-unknown', center: [56, 78], distanceM: null, stationM: 1200, side: 'right' },
+    ];
+    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2').brakeMarkers).toEqual(display.brakeMarkers);
+    expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2')).not.toHaveProperty('brakeMarkers');
+  });
+
+  it.each([
+    ['wrong layout', { ...mapDisplay(), layoutKey: 'test_short' }, 'test_gp', 'mesh-v2'],
+    ['wrong revision', { ...mapDisplay(), sourceRevision: 'old-mesh' }, 'test_gp', 'mesh-v2'],
+    ['malformed polygon ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
+    ['nonfinite coordinate', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [10, 0], [Infinity, 10]]]] } }, 'test_gp', 'mesh-v2'],
+    ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], distanceM: -1, stationM: 5, side: 'left' }] }, 'test_gp', 'mesh-v2'],
+    ['unknown marker side', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], distanceM: null, stationM: 5, side: 'center' }] }, 'test_gp', 'mesh-v2'],
+  ])('rejects sidecar data with %s', (_label, value, layoutKey, revision) => {
+    expect(() => parseTrackMapDisplay(value, layoutKey, revision)).toThrow('Invalid track geometry');
   });
 });

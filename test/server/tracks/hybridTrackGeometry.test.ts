@@ -7,6 +7,7 @@ interface TrackGeometry {
   leftBoundary: Array<[number, number]>;
   rightBoundary: Array<[number, number]>;
   nominalWidthM: number;
+  surfaceProfile: { leftWidthM: Array<number | null>; rightWidthM: Array<number | null> };
 }
 
 const layouts = [
@@ -54,6 +55,11 @@ describe('generated hybrid road corridors', () => {
     const maxWidth = Math.max(parentMaxWidth, geometry.nominalWidthM) + 0.5;
     const maxEdgeStep = Math.max(6, Math.max(...edgeSteps(parent)) * 1.5);
     const widths = geometry.leftBoundary.map((left, i) => distance(left, geometry.rightBoundary[i]));
+    // Where an edge is unmeasured (Sebring's airfield) each layout follows its own AI route, so only
+    // the measured road is bounded by the parent's widest point.
+    const measured = (i: number): boolean =>
+      geometry.surfaceProfile.leftWidthM[i] !== null && geometry.surfaceProfile.rightWidthM[i] !== null;
+    const measuredWidths = widths.filter((_, i) => measured(i));
     const perpendicularWidths = geometry.centerline.map((_, i) => {
       const previous = geometry.centerline[(i - 1 + geometry.centerline.length) % geometry.centerline.length];
       const next = geometry.centerline[(i + 1) % geometry.centerline.length];
@@ -64,7 +70,7 @@ describe('generated hybrid road corridors', () => {
 
     expect(Math.min(...widths)).toBeGreaterThan(5);
     expect(Math.min(...perpendicularWidths)).toBeGreaterThan(5);
-    expect(Math.max(...widths)).toBeLessThan(maxWidth);
+    expect(Math.max(...measuredWidths)).toBeLessThan(maxWidth);
     expect(Math.max(...edgeSteps(geometry))).toBeLessThan(maxEdgeStep);
     expect(Math.max(...turnAngles(geometry))).toBeLessThan(35);
   });

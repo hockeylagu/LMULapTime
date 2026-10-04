@@ -13,6 +13,24 @@ export interface TrackMapSurfaces {
   road: TrackSurfacePolygon[];
   kerb: TrackSurfacePolygon[];
   runoff: TrackSurfacePolygon[];
+  pit?: TrackSurfacePolygon[];
+  otherRoad?: TrackSurfacePolygon[];
+}
+
+/** Optional display-only layers bound to the source geometry revision; road/kerb are active-layout only. */
+export interface TrackBrakeMarker {
+  id: string;
+  center: [number, number];
+  distanceM: number | null;
+  stationM: number;
+  side: 'left' | 'right';
+}
+
+export interface TrackMapDisplay {
+  layoutKey: string;
+  sourceRevision: string;
+  surfaces: TrackMapSurfaces & { pit: TrackSurfacePolygon[]; otherRoad: TrackSurfacePolygon[] };
+  brakeMarkers?: TrackBrakeMarker[];
 }
 
 export interface TrackGeometryQuality {
@@ -39,13 +57,24 @@ export interface TrackSurfaceProfileColumns {
   rightKerbHeightM: Array<number | null>;
 }
 
-export interface TrackSurfaceProfile extends TrackSurfaceProfileColumns {
+/** Kerb surface category: flat rumble strip, raised sawtooth (razor) kerb, or another kerb surface. */
+export type TrackKerbType = 'flat' | 'sawtooth' | 'other';
+
+/** Kerb type at each station (null where that side has no kerb); absent in files built before it existed. */
+export interface TrackKerbTypeColumns {
+  leftKerbType?: Array<TrackKerbType | null>;
+  rightKerbType?: Array<TrackKerbType | null>;
+}
+
+export interface TrackSurfaceProfile extends TrackSurfaceProfileColumns, TrackKerbTypeColumns {
   /** Ascending centerline stations: first is zero and last is strictly below lengthM. */
   stationM: number[];
 }
 
 export type TrackSurfaceProfileSample = {
   stationM: number;
+  leftKerbType: TrackKerbType | null;
+  rightKerbType: TrackKerbType | null;
 } & { [Key in keyof TrackSurfaceProfileColumns]: number | null };
 
 export interface TrackRoadEdgeDistances {

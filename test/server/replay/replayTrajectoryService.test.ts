@@ -90,7 +90,9 @@ describe('ReplayTrajectoryService', () => {
     // maxPoints says (0 = full resolution).
     const traj = await trajectoryService.getTrajectory({ replayName: 'Daytona.Vcr', driverSlot: 0, maxPoints: 0, pointSpacingM: 2000, allowDuckDb: false });
 
-    expect(traj.trackLengthM).toBe(5747.76);
+    const canonical = getTrackDefinition('daytona_road_course');
+    expect(canonical).not.toBeNull();
+    expect(traj.trackLengthM).toBe(canonical?.lengthM);
     expect(traj.points).toHaveLength(3);
     expect(traj.maxPoints).toBe(3);
   });

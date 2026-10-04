@@ -13,7 +13,6 @@ import {
   computeBaselineDeltaByIdx,
   projectStartFinishGate,
 } from '../replayMapUtils.js';
-import { MapControlsOverlay } from '../MapControlsOverlay.js';
 import { HeatmapLegendBar } from '../HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
@@ -22,10 +21,14 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
-import { GpsTrackRoadRibbon } from './GpsTrackRoadRibbon.js';
-import { GpsTrackSurfaceLayers } from './GpsTrackSurfaceLayers.js';
+import { GpsMapBackground } from '../display/GpsMapBackground.js';
+import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
+import { GpsMapControls } from '../display/GpsMapControls.js';
+import { MapScaleBar } from '../display/MapScaleBar.js';
+import { useMapDisplay } from '../display/useMapDisplay.js';
+import { activeTrackBounds } from '../display/mapLayers.js';
+import { useMapLayers, projectedPointBounds } from '../display/useMapLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
-import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
@@ -40,24 +43,27 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
-    trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM,
+    trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM, mapDisplay,
   } = props;
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
 
   const { trackGeometry: fetchedGeometry } = useTrackBoundaryGeometry({
-    layoutKey,
-    trackVenue,
-    trackCourse,
-    replayName,
+    layoutKey: trackGeometry === undefined ? layoutKey : null,
+    trackVenue: trackGeometry === undefined ? trackVenue : null,
+    trackCourse: trackGeometry === undefined ? trackCourse : null,
+    replayName: trackGeometry === undefined ? replayName : null,
   });
-  const effectiveGeometry = trackGeometry ?? fetchedGeometry;
+  const effectiveGeometry = trackGeometry !== undefined ? trackGeometry : fetchedGeometry;
+  const { display, error: displayError } = useMapDisplay(effectiveGeometry, mapDisplay);
+  const { layers, changeLayers } = useMapLayers();
+  const activeBounds = useMemo(() => activeTrackBounds(effectiveGeometry), [effectiveGeometry]);
 
   const effectiveBaselinePoints = useMemo(() => baselinePoints ?? [], [baselinePoints]);
 
   const effectiveBounds = useMemo(
-    () => computeEffectiveBounds(bounds, effectiveGeometry?.bounds, effectiveBaselinePoints),
-    [bounds, effectiveGeometry, effectiveBaselinePoints]
+    () => computeEffectiveBounds(bounds, activeBounds, effectiveBaselinePoints),
+    [bounds, activeBounds, effectiveBaselinePoints]
   );
 
   const svgPoints = useMemo(() => projectTrajectoryPoints(points, effectiveBounds, VIEWBOX_SIZE, PADDING), [points, effectiveBounds]);
@@ -89,10 +95,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     [effectiveGeometry, effectiveBounds]
   );
 
+  const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
   const {
     zoomLevel,
-    followCar,
-    setFollowCar,
     containerRef,
     currentViewBox,
     handlePointerDown,
@@ -101,14 +106,17 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     handleDoubleClick,
     resetPanZoom,
     focusOnPoint,
-    centerOnCar,
-    zoomIn,
-    zoomOut,
     markerScale,
-  } = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
-  const [viewX, viewY, viewWidth, viewHeight] = currentViewBox.split(' ').map(Number);
-  const isCarOffscreen = Boolean(currentPos && (currentPos.sx < viewX || currentPos.sx > viewX + viewWidth
-    || currentPos.sy < viewY || currentPos.sy > viewY + viewHeight));
+  } = camera;
+  const fittedLayout = useRef<string | null>(null);
+  useEffect(() => {
+    const key = effectiveGeometry?.layoutKey ?? null;
+    if (!key || fittedLayout.current === key) return;
+    fittedLayout.current = key;
+    const points = leftSvgPoints.length && rightSvgPoints.length ? [...leftSvgPoints, ...rightSvgPoints] : svgPoints;
+    const rectangle = projectedPointBounds(points);
+    if (rectangle) camera.fitBounds(rectangle);
+  }, [effectiveGeometry?.layoutKey, leftSvgPoints, rightSvgPoints, svgPoints, camera]);
 
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);
@@ -183,21 +191,13 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onDoubleClick={handleDoubleClick}
-      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing ${className} ${FOCUS_RING}`}
+      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen [&[data-map-expanded]]:bg-lmu-bg ${className} ${FOCUS_RING}`}
     >
       {showControls && (
-        <MapControlsOverlay
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
-          onReset={resetPanZoom}
-          zoomDisplay={`${zoomLevel}x`}
-          followCar={followCar}
-          onToggleFollowCar={() => setFollowCar(f => !f)}
-          onCenterCar={centerOnCar}
-          isCarOffscreen={isCarOffscreen}
-          orientation={controlsOrientation ?? (dimNonSelectedTrack ? 'vertical' : 'horizontal')}
-          className="top-2 right-2 bottom-auto"
-        />
+        <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={effectiveGeometry}
+          display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
+          center={centerlineSvgPoints} trajectory={svgPoints}
+          orientation={controlsOrientation ?? (dimNonSelectedTrack ? 'vertical' : 'horizontal')} />
       )}
 
       {showMinimap && (
@@ -213,21 +213,11 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       <div className="relative w-full h-full">
         {/* Static scene on its own layer: the minimap and car markers above it move every frame. */}
         <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md will-change-transform">
-          {effectiveGeometry?.mapSurfaces?.road.length ? (
-            <GpsTrackSurfaceLayers surfaces={effectiveGeometry.mapSurfaces} bounds={effectiveBounds}
-              viewBoxSize={VIEWBOX_SIZE} padding={PADDING} />
-          ) : leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? (
-            <GpsTrackRoadRibbon
-              leftSvgPoints={leftSvgPoints}
-              rightSvgPoints={rightSvgPoints}
-              centerlineSvgPoints={centerlineSvgPoints}
-            />
-          ) : (
-            <>
-              <path d={pathD} fill="none" stroke={MAP_COLORS.minimapBorder} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-              <path d={pathD} fill="none" stroke={MAP_COLORS.centerline} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-            </>
-          )}
+          <GpsMapBackground geometry={effectiveGeometry} display={display} bounds={effectiveBounds} layers={layers}
+            left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
+
+          {layers.brakeMarkers && display?.brakeMarkers?.length ? <GpsBrakeMarkers markers={display.brakeMarkers}
+            bounds={effectiveBounds} viewBoxSize={VIEWBOX_SIZE} padding={PADDING} /> : null}
 
           <GpsTrackSegments
             svgPoints={svgPoints}
@@ -279,6 +269,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       </div>
 
       <GpsSceneHudOverlay isStationary={isStationary} />
+      <MapScaleBar markerScale={markerScale} spanM={Math.max(effectiveBounds.spanX, effectiveBounds.spanZ)} />
 
       {showLegend && <HeatmapLegendBar colorBy={colorBy} />}
     </div>

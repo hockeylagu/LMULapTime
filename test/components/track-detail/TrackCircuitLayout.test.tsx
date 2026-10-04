@@ -1,10 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TrackCircuitLayout } from '../../../src/components/track-detail/TrackCircuitLayout.js';
 import { TrackDetailHeader } from '../../../src/components/track-detail/TrackDetailHeader.js';
 import { TrackBoundaryGeometry } from '../../../src/components/replay/map/index.js';
+import * as trackGeometryApi from '../../../src/api/trackGeometryApi.js';
 
 describe('TrackCircuitLayout', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   const mockGeometry: TrackBoundaryGeometry = {
     layoutKey: 'spa_gp',
     circuitId: 'spa',
@@ -75,7 +78,7 @@ describe('TrackCircuitLayout', () => {
     expect(circle).toBeNull();
   });
 
-  it('renders native road, runoff and kerb polygons while preserving the clickable map shell', () => {
+  it('keeps the simple outline when native road, runoff and kerb surfaces are available', () => {
     const onClick = vi.fn();
     const geometryWithSurfaces: TrackBoundaryGeometry = {
       ...mockGeometry,
@@ -90,13 +93,55 @@ describe('TrackCircuitLayout', () => {
 
     const layout = screen.getByRole('button', { name: 'Open Circuit de Spa-Francorchamps' });
     expect(layout).toHaveAttribute('title', 'Circuit de Spa-Francorchamps Circuit Layout');
-    expect(layout.querySelectorAll('[data-surface]')).toHaveLength(3);
-    expect(layout.querySelector('[data-surface="road"]')).toBeInTheDocument();
-    expect(layout.querySelector('[data-surface="kerb"]')).toBeInTheDocument();
-    expect(layout.querySelector('[data-surface="runoff"]')).toBeInTheDocument();
-    expect(layout.querySelector('path[stroke="#FFFFFF"]')).toBeNull();
+    expect(layout.querySelectorAll('[data-surface]')).toHaveLength(0);
+    expect(layout.querySelectorAll('path')).toHaveLength(1);
+    expect(layout.querySelector('path[stroke="#FFFFFF"]')).toBeInTheDocument();
     fireEvent.click(layout);
     expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('fits the outline to centerline bounds instead of broad geometry bounds', () => {
+    const geometryWithBroadBounds: TrackBoundaryGeometry = {
+      ...mockGeometry,
+      bounds: {
+        minX: -5000,
+        maxX: 5000,
+        minZ: -5000,
+        maxZ: 5000,
+        spanX: 10000,
+        spanZ: 10000,
+      },
+    };
+
+    render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" trackGeometry={geometryWithBroadBounds} />);
+
+    const path = screen.getByTestId('track-circuit-layout').querySelector('path');
+    expect(path?.getAttribute('d')).toMatch(/^M 45\.0 755\.0/);
+  });
+
+  it('loads a lightweight static outline without requesting full geometry', () => {
+    const loadGeometry = vi.spyOn(trackGeometryApi, 'loadTrackBoundaryGeometry');
+
+    const { container } = render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" layoutKey="spa_gp" />);
+
+    const outline = container.querySelector('img');
+    expect(outline).toBeInTheDocument();
+    expect(outline).toHaveAttribute('src', trackGeometryApi.getTrackOutlineUrl('spa_gp'));
+    expect(loadGeometry).not.toHaveBeenCalled();
+  });
+
+  it('fetches full geometry after the static outline fails and then uses the inline outline', async () => {
+    const loadGeometry = vi.spyOn(trackGeometryApi, 'loadTrackBoundaryGeometry').mockResolvedValue(mockGeometry);
+
+    const { container } = render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" layoutKey="spa_gp" />);
+
+    const outline = container.querySelector('img');
+    expect(outline).toBeInTheDocument();
+    fireEvent.error(outline!);
+
+    const layout = await screen.findByTestId('track-circuit-layout');
+    expect(loadGeometry).toHaveBeenCalledOnce();
+    await waitFor(() => expect(layout.querySelector('path[stroke="#FFFFFF"]')).toBeInTheDocument());
   });
 
   it('renders fallback icon when geometry is null and not loading', () => {

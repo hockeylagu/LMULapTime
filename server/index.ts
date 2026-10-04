@@ -22,12 +22,14 @@ const allowedOrigin = process.env.LMU_UI_ORIGIN || 'http://localhost:5173';
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || origin === allowedOrigin) }));
 app.use(express.json());
 
-const publicTracksDir = path.join(process.cwd(), 'public', 'tracks');
-const distTracksDir = path.join(process.cwd(), 'dist', 'tracks');
-if (fs.existsSync(publicTracksDir)) {
-  app.use('/tracks', express.static(publicTracksDir));
-} else if (fs.existsSync(distTracksDir)) {
-  app.use('/tracks', express.static(distTracksDir));
+for (const directory of ['tracks', 'tracks-display', 'track-outlines']) {
+  const publicDirectory = path.join(process.cwd(), 'public', directory);
+  const distDirectory = path.join(process.cwd(), 'dist', directory);
+  if (fs.existsSync(publicDirectory)) {
+    app.use(`/${directory}`, express.static(publicDirectory));
+  } else if (fs.existsSync(distDirectory)) {
+    app.use(`/${directory}`, express.static(distDirectory));
+  }
 }
 
 const defaultResultsDir = process.env.NODE_ENV === 'test'

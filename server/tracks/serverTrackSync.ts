@@ -162,6 +162,8 @@ function annotateRoadProfile(point: ReplayTrajectoryPoint, definition: CachedTra
     delete point.rightKerbWidthM;
     delete point.leftKerbHeightM;
     delete point.rightKerbHeightM;
+    delete point.leftKerbType;
+    delete point.rightKerbType;
     return;
   }
   const profile = definition ? sampleTrackSurfaceProfile(definition, point.stationM ?? NaN) : null;
@@ -175,6 +177,8 @@ function annotateRoadProfile(point: ReplayTrajectoryPoint, definition: CachedTra
   point.rightKerbWidthM = profile?.rightKerbWidthM ?? null;
   point.leftKerbHeightM = profile?.leftKerbHeightM ?? null;
   point.rightKerbHeightM = profile?.rightKerbHeightM ?? null;
+  point.leftKerbType = profile?.leftKerbType ?? null;
+  point.rightKerbType = profile?.rightKerbType ?? null;
 }
 
 /** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */

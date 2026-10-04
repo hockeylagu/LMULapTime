@@ -101,6 +101,18 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
     return pedalMarkers.filter(p => p.cornerNumber === selectedCornerNumber);
   }, [pedalMarkers, dimNonSelectedTrack, selectedCornerNumber]);
 
+  const visibleCornerFlags = useMemo(() => {
+    // Selected corners win collisions. The screen-space margin reveals more labels as zoom increases.
+    const ordered = [...cornerPositions].sort((a, b) => Number(b.isSelected) - Number(a.isSelected));
+    const kept: typeof cornerPositions = [];
+    for (const marker of ordered) {
+      if (marker.isSelected || kept.every(other => Math.hypot(marker.posX - other.posX, marker.posY - other.posY) > 34 * markerScale)) {
+        kept.push(marker);
+      }
+    }
+    return kept;
+  }, [cornerPositions, markerScale]);
+
   return (
     <>
       {!showCornerFlags && cornerPositions.map(m => {
@@ -140,7 +152,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
         );
       })}
 
-      {showCornerFlags && cornerPositions.map(m => (
+      {showCornerFlags && visibleCornerFlags.map(m => (
         <g
           key={`corner-${m.cornerNumber}`}
           data-testid={`corner-flag-${m.cornerNumber}`}

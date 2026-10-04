@@ -3,7 +3,7 @@ import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from 
 const POINT_GEOMETRY_FIELDS = [
   'stationM', 'lateralOffsetM', 'leftRoadDistanceM', 'rightRoadDistanceM',
   'roadElevationM', 'roadGradePct', 'roadBankDeg', 'leftKerbWidthM', 'rightKerbWidthM',
-  'leftKerbHeightM', 'rightKerbHeightM',
+  'leftKerbHeightM', 'rightKerbHeightM', 'leftKerbType', 'rightKerbType',
 ] as const satisfies readonly (keyof ReplayTrajectoryPoint)[];
 
 /** New fused samples need their own projection; source annotations describe different points. */

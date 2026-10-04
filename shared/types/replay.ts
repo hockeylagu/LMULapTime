@@ -1,4 +1,5 @@
 import type { NonRepresentativeReason } from './session.js';
+import type { TrackKerbType } from './trackGeometry.js';
 
 export interface ReplayEventInfo {
   eventId?: string;
@@ -119,6 +120,9 @@ export interface ReplayTrajectoryPoint {
   rightKerbWidthM?: number | null;
   leftKerbHeightM?: number | null;
   rightKerbHeightM?: number | null;
+  /** Kerb type beside the car's station on each side (flat / sawtooth / other), null without a kerb. */
+  leftKerbType?: TrackKerbType | null;
+  rightKerbType?: TrackKerbType | null;
   accelLonG?: number;
   accelLatG?: number;
   accelTotalG?: number;

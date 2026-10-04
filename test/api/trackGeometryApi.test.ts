@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../src/api/apiClient.js';
-import { loadTrackBoundaryGeometry } from '../../src/api/trackGeometryApi.js';
+import { loadTrackBoundaryGeometry, loadTrackMapDisplay } from '../../src/api/trackGeometryApi.js';
 
 describe('trackGeometryApi', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -25,5 +25,34 @@ describe('trackGeometryApi', () => {
   it('rejects with ApiError when the file is missing', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response('nope', { status: 404 })));
     await expect(loadTrackBoundaryGeometry('a')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('treats a missing optional display sidecar as unavailable', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('missing', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(loadTrackMapDisplay('a', 'revision-1')).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith('/tracks-display/a.json', { cache: 'no-cache', signal: undefined });
+  });
+
+  it('ignores a sidecar generated from an older geometry revision', async () => {
+    const display = {
+      layoutKey: 'a', sourceRevision: 'revision-0',
+      surfaces: { road: [], kerb: [], runoff: [], pit: [], otherRoad: [] },
+    };
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(display))));
+    await expect(loadTrackMapDisplay('a', 'revision-1')).resolves.toBeNull();
+  });
+
+  it('propagates non-404 API failures and aborted requests', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: 'offline' }), { status: 503 })));
+    await expect(loadTrackMapDisplay('a', 'revision-1')).rejects.toMatchObject({ name: 'ApiError', status: 503, message: 'offline' });
+
+    const controller = new AbortController();
+    controller.abort();
+    const abortError = new DOMException('Request aborted', 'AbortError');
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(abortError);
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(loadTrackMapDisplay('a', 'revision-1', controller.signal)).rejects.toBe(abortError);
+    expect(fetchMock).toHaveBeenCalledWith('/tracks-display/a.json', { cache: 'no-cache', signal: controller.signal });
   });
 });

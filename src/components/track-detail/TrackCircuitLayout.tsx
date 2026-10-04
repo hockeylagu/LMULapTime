@@ -8,7 +8,7 @@ import {
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
-import { GpsTrackSurfaceLayers } from '../replay/map/scene/GpsTrackSurfaceLayers.js';
+import { getTrackOutlineUrl } from '../../api/trackGeometryApi.js';
 
 export interface TrackCircuitLayoutProps {
   trackName: string;
@@ -22,34 +22,42 @@ export interface TrackCircuitLayoutProps {
 
 const VIEWBOX_SIZE = 800;
 const PADDING = 45;
-const pathDCache = new Map<string, string>();
 
-function getOrComputePathD(
-  geometry: TrackBoundaryGeometry | null | undefined,
-  fallbackKey?: string
-): string {
-  if (!geometry?.bounds) return '';
-  const cacheKey = geometry.layoutKey || fallbackKey || `${geometry.trackVenue}|${geometry.trackCourse}`;
-  if (cacheKey && pathDCache.has(cacheKey)) {
-    return pathDCache.get(cacheKey)!;
+function getActiveBounds(geometry: TrackBoundaryGeometry): TrackBoundaryGeometry['bounds'] {
+  const points = geometry.centerline.length > 0
+    ? geometry.centerline
+    : geometry.leftBoundary.length > 0
+      ? geometry.leftBoundary
+      : geometry.rightBoundary;
+  if (points.length === 0) return geometry.bounds;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const [x, z] of points) {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minZ = Math.min(minZ, z);
+    maxZ = Math.max(maxZ, z);
   }
-  const centerlineSvg = geometry.centerline
-    ? projectBoundaryPoints(geometry.centerline, geometry.bounds, VIEWBOX_SIZE, PADDING)
-    : [];
-  const leftSvg = geometry.leftBoundary
-    ? projectBoundaryPoints(geometry.leftBoundary, geometry.bounds, VIEWBOX_SIZE, PADDING)
-    : [];
-  const rightSvg = geometry.rightBoundary
-    ? projectBoundaryPoints(geometry.rightBoundary, geometry.bounds, VIEWBOX_SIZE, PADDING)
-    : [];
-  const d = computeTrackBoundaryPathD(centerlineSvg, leftSvg, rightSvg);
-  if (cacheKey && d) {
-    pathDCache.set(cacheKey, d);
-  }
-  if (fallbackKey && d && fallbackKey !== cacheKey) {
-    pathDCache.set(fallbackKey, d);
-  }
-  return d || '';
+  return {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    spanX: Math.max(maxX - minX, 1),
+    spanZ: Math.max(maxZ - minZ, 1),
+  };
+}
+
+function computePathD(geometry: TrackBoundaryGeometry | null | undefined): string {
+  if (!geometry) return '';
+  const bounds = getActiveBounds(geometry);
+  const centerlineSvg = projectBoundaryPoints(geometry.centerline, bounds, VIEWBOX_SIZE, PADDING);
+  const leftSvg = projectBoundaryPoints(geometry.leftBoundary, bounds, VIEWBOX_SIZE, PADDING);
+  const rightSvg = projectBoundaryPoints(geometry.rightBoundary, bounds, VIEWBOX_SIZE, PADDING);
+  return computeTrackBoundaryPathD(centerlineSvg, leftSvg, rightSvg) || '';
 }
 
 export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
@@ -63,14 +71,9 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
 }) => {
   const spec = getCircuitSpecification(trackName, trackCourse, null, null, layoutKey);
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
-  const cachedD =
-    (resolvedKey ? pathDCache.get(resolvedKey) : undefined) ||
-    (propGeometry ? getOrComputePathD(propGeometry, resolvedKey || undefined) : undefined);
-
-  // Detail and header views render native road, kerb and runoff surfaces (mapSurfaces).
-  // Compact cards and session headers only need the outline path, so they skip fetching once cached.
-  const wantsSurfaces = size === 'detail' || size === 'header';
-  const shouldFetch = propGeometry === undefined && (!cachedD || wantsSurfaces);
+  const [outlineFailedLayoutKey, setOutlineFailedLayoutKey] = React.useState<string | null>(null);
+  const useStaticOutline = propGeometry === undefined && Boolean(resolvedKey) && outlineFailedLayoutKey !== resolvedKey;
+  const shouldFetch = propGeometry === undefined && !useStaticOutline;
   const { trackGeometry: fetchedGeometry, isLoading } = useTrackBoundaryGeometry(
     shouldFetch
       ? { trackVenue: trackName, trackCourse, layoutKey: resolvedKey }
@@ -78,9 +81,10 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   );
 
   const effectiveGeometry = propGeometry !== undefined ? propGeometry : fetchedGeometry;
+  const staticOutlineUrl = useStaticOutline && resolvedKey ? getTrackOutlineUrl(resolvedKey) : null;
 
   const sizeClasses =
-    size === 'header' ? 'relative min-h-[128px] w-[160px] self-stretch [&>svg]:absolute [&>svg]:inset-0'
+    size === 'header' ? 'relative min-h-[128px] w-[160px] self-stretch [&>svg]:absolute [&>svg]:inset-0 [&>img]:absolute [&>img]:inset-0'
     : size === 'card' ? 'h-[128px] w-[128px]'
     : size === 'session' ? 'h-[76px] w-[100px]'
     : 'h-[128px] w-[128px]';
@@ -89,14 +93,9 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     ? `cursor-pointer rounded hover:bg-lmu-card-hover transition-colors ${FOCUS_RING}`
     : 'pointer-events-none';
 
-  const pathD = useMemo(() => {
-    if (cachedD) return cachedD;
-    return getOrComputePathD(effectiveGeometry, resolvedKey || undefined);
-  }, [cachedD, effectiveGeometry, resolvedKey]);
+  const pathD = useMemo(() => computePathD(effectiveGeometry), [effectiveGeometry]);
 
-  const hasNativeSurfaces = Boolean(effectiveGeometry?.mapSurfaces?.road?.length);
-
-  if (isLoading && shouldFetch && !cachedD) {
+  if (isLoading && shouldFetch && !pathD && !staticOutlineUrl) {
     return (
       <div
         data-testid="track-circuit-layout-loading"
@@ -107,7 +106,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
     );
   }
 
-  if (!pathD) {
+  if (!pathD && !staticOutlineUrl) {
     return (
       <div
         data-testid="track-circuit-layout-fallback"
@@ -145,20 +144,20 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
       className={`${sizeClasses} shrink-0 flex items-center justify-center relative ${interactiveClasses} ${className}`}
       title={`${trackName} Circuit Layout`}
     >
-      <svg
-        viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}
-        className="w-full h-full drop-shadow-sm pointer-events-none"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {hasNativeSurfaces && effectiveGeometry?.bounds ? (
-          <GpsTrackSurfaceLayers
-            surfaces={effectiveGeometry.mapSurfaces!}
-            bounds={effectiveGeometry.bounds}
-            viewBoxSize={VIEWBOX_SIZE}
-            padding={PADDING}
-          />
-        ) : (
-          /* Crisp white circuit outline remains the fallback for legacy geometry. */
+      {staticOutlineUrl ? (
+        <img
+          src={staticOutlineUrl}
+          alt=""
+          className="w-full h-full object-contain drop-shadow-sm pointer-events-none"
+          onError={() => setOutlineFailedLayoutKey(resolvedKey)}
+        />
+      ) : (
+        <svg
+          viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}
+          className="w-full h-full drop-shadow-sm pointer-events-none"
+          preserveAspectRatio="xMidYMid meet"
+          aria-hidden="true"
+        >
           <path
             d={pathD}
             stroke={CHART_COLORS.white}
@@ -167,8 +166,8 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
             strokeLinejoin="round"
             fill="none"
           />
-        )}
-      </svg>
+        </svg>
+      )}
     </div>
   );
 };

@@ -222,15 +222,8 @@ export function buildRoadRibbonSvgPath(
   rightSvg: Array<{ sx: number; sy: number }>
 ): string {
   if (leftSvg.length === 0 || rightSvg.length === 0) return '';
-  let d = `M ${leftSvg[0].sx.toFixed(1)} ${leftSvg[0].sy.toFixed(1)}`;
-  for (let i = 1; i < leftSvg.length; i++) {
-    d += ` L ${leftSvg[i].sx.toFixed(1)} ${leftSvg[i].sy.toFixed(1)}`;
-  }
-  for (let i = rightSvg.length - 1; i >= 0; i--) {
-    d += ` L ${rightSvg[i].sx.toFixed(1)} ${rightSvg[i].sy.toFixed(1)}`;
-  }
-  d += ' Z';
-  return d;
+  // Separate closed rings form an annulus with evenodd fill: no cross-track start/finish seam.
+  return `${buildClosedSvgPath(leftSvg)} ${buildClosedSvgPath(rightSvg)}`;
 }
 
 export function buildClosedSvgPath(pts: Array<{ sx: number; sy: number }>): string {
