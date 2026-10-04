@@ -27,7 +27,7 @@ const sampleIndices = (n: number) => {
   return out;
 };
 
-describe.each(PAIRS)('lap comparison golden output: %s', name => {
+if (process.env.LMU_PERSONAL_FIXTURES) describe.each(PAIRS)('lap comparison golden output: %s', name => {
   const pair = loadLapPair(name);
   const P = pair.primary.points;
   const B = pair.baseline.points;
@@ -81,3 +81,5 @@ describe.each(PAIRS)('lap comparison golden output: %s', name => {
     expect(roundDeep(computePairConsistency(pair))).toMatchSnapshot();
   });
 });
+
+else describe.skip('Private recording regressions',()=>{it('requires LMU_PERSONAL_FIXTURES',()=>{});});

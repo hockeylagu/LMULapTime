@@ -11,10 +11,10 @@ describe('trackGeometryApi', () => {
       bounds: { minX: 0, maxX: 10, minZ: 0, maxZ: 10, spanX: 10, spanZ: 10 },
       centerline: [[0, 0], [10, 10]], leftBoundary: [[0, 0], [10, 10]], rightBoundary: [[1, 0], [11, 10]],
     };
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(geometry)));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({packageRevision:'test',geometry,display:null})));
     vi.stubGlobal('fetch', fetchMock);
     await expect(loadTrackBoundaryGeometry('a')).resolves.toEqual(geometry);
-    expect(fetchMock).toHaveBeenCalledWith('/tracks/a.json', { cache: 'no-cache' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/data-plugin/tracks/a', { cache: 'no-cache' });
   });
 
   it('rejects malformed geometry rather than letting it reach map rendering', async () => {
@@ -31,7 +31,7 @@ describe('trackGeometryApi', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('missing', { status: 404 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(loadTrackMapDisplay('a', 'revision-1')).resolves.toBeNull();
-    expect(fetchMock).toHaveBeenCalledWith('/tracks-display/a.json', { cache: 'no-cache', signal: undefined });
+    expect(fetchMock).toHaveBeenCalledWith('/api/data-plugin/tracks/a', { cache: 'no-cache', signal: undefined });
   });
 
   it('ignores a sidecar generated from an older geometry revision', async () => {
@@ -39,7 +39,7 @@ describe('trackGeometryApi', () => {
       layoutKey: 'a', sourceRevision: 'revision-0',
       surfaces: { road: [], kerb: [], runoff: [], pit: [], otherRoad: [] },
     };
-    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(display))));
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({packageRevision:'test',geometry:null,display}))));
     await expect(loadTrackMapDisplay('a', 'revision-1')).resolves.toBeNull();
   });
 
@@ -53,6 +53,6 @@ describe('trackGeometryApi', () => {
     const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(abortError);
     vi.stubGlobal('fetch', fetchMock);
     await expect(loadTrackMapDisplay('a', 'revision-1', controller.signal)).rejects.toBe(abortError);
-    expect(fetchMock).toHaveBeenCalledWith('/tracks-display/a.json', { cache: 'no-cache', signal: controller.signal });
+    expect(fetchMock).toHaveBeenCalledWith('/api/data-plugin/tracks/a', { cache: 'no-cache', signal: controller.signal });
   });
 });

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { dataPlugin } from '../plugins/dataPlugin.js';
 import path from 'path';
 import {
   DetailedSession,
@@ -93,6 +94,10 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     metadata.duckdbFilename = options.duckdbFilename;
   }
 
+  for (const entry of metadata.drivers) {
+    const vehicle=dataPlugin.vehicle(entry);
+    if(vehicle){entry.carModel=vehicle.model;entry.carClass=vehicle.carClass;}
+  }
   return metadata;
 }
 

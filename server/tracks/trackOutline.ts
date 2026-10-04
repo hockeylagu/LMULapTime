@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitSpecs.js';
 import { getTrackDefinition } from './serverTrackSync.js';
 
 /**
@@ -50,7 +53,18 @@ const outlineCache = new Map<string, string | null>();
 export function getTrackOutlinePath(layoutKey: string): string | null {
   if (!outlineCache.has(layoutKey)) {
     const centerline = getTrackDefinition(layoutKey)?.centerline;
-    outlineCache.set(layoutKey, centerline ? buildTrackOutlinePath(centerline) : null);
+    let outline = centerline ? buildTrackOutlinePath(centerline) : null;
+    if (!outline && CIRCUIT_SPECIFICATIONS[layoutKey]) {
+      // Illustrations are dimensionless; never use their coordinates for projection or analysis.
+      const file = ['dist', 'public'].map(dir => path.resolve(dir, 'track-outlines', layoutKey + '.svg')).find(file => fs.existsSync(file));
+      if (file) {
+        const svg = fs.readFileSync(file, 'utf8');
+        const d = svg.match(/<path\s[^>]*d="([MLZ0-9.,\s-]+)"/)?.[1];
+        const size = Number(svg.match(/viewBox="0 0 ([0-9.]+) [0-9.]+"/)?.[1]);
+        if (d && size > 0) outline = d.replace(/-?\d+(?:\.\d+)?/g, n => (Number(n) * 100 / size).toFixed(1));
+      }
+    }
+    outlineCache.set(layoutKey, outline);
   }
   return outlineCache.get(layoutKey) ?? null;
 }

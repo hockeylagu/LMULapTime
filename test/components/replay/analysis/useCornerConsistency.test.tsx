@@ -26,6 +26,12 @@ function trajectory(currentLap: number, laps: ReplayTrajectoryData['laps'] = [])
 }
 
 describe('useCornerConsistency', () => {
+  it('leaves canonical corner consistency unavailable without local track geometry',()=>{
+    const fetchMock=vi.fn();global.fetch=fetchMock;
+    const data:ReplayTrajectoryData={...trajectory(1),stationSource:'odometer'};
+    const {result}=renderHook(()=>useCornerConsistency(true,'Test.Vcr',null,null,data));
+    expect(result.current.cornerStats).toEqual([]);expect(result.current.lapsSampled).toBe(0);expect(fetchMock).not.toHaveBeenCalled();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });

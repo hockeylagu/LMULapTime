@@ -81,3 +81,16 @@ describe('class-sized GPS bodies', () => {
     expect(screen.getByText(/Approximate LMH size/)).toBeInTheDocument();
   });
 });
+
+
+describe('local model footprints',()=>{
+ const model={id:'test',model:'Synthetic car',carClass:'LMH',vehicleIds:['TEST'],dimensions:{lengthM:5,widthM:2},outlineXZ:[[-1,-2.5],[1,-2.5],[1,2.5],[-1,2.5]] as Array<[number,number]>,replayOriginOffsetXZ:[.25,.5] as [number,number]};
+ it('preserves the model origin and resolves the ghost independently',()=>{
+  render(<GpsSceneCarMarkers viewBox="0 0 800 800" currentPos={{sx:100,sy:100}} baselineGhostPos={{sx:150,sy:150}} markerScale={1} unitsPerMeter={10} primaryOpacity={1} baselineOpacity={1} primaryHeadingDeg={90} baselineHeadingDeg={0} primaryVehicleData={model} baselineCarClass="LMP2"/>);
+  const car=screen.getByTestId('gps-car-footprint');expect(car.tagName.toLowerCase()).toBe('polygon');expect(car.getAttribute('points')).toBe('7.5,-20 -12.5,-20 -12.5,30 7.5,30');expect(car.parentElement?.getAttribute('transform')).toBe('rotate(90)');expect(screen.getByTestId('gps-ghost-footprint').tagName.toLowerCase()).toBe('rect');
+ });
+ it('keeps class estimates until replay-origin alignment is established',()=>{
+  render(<GpsSceneCarMarkers viewBox="0 0 800 800" currentPos={{sx:100,sy:100}} markerScale={1} unitsPerMeter={10} primaryOpacity={1} baselineOpacity={1} primaryHeadingDeg={0} primaryCarClass="LMH" primaryVehicleData={{...model,replayOriginOffsetXZ:undefined}}/>);
+  expect(screen.getByTestId('gps-car-footprint').tagName.toLowerCase()).toBe('rect');expect(screen.getByText(/Approximate LMH/)).toBeInTheDocument();
+ });
+});

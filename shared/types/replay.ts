@@ -1,4 +1,5 @@
 import type { NonRepresentativeReason } from './session.js';
+import type { VehicleDataRecord } from './dataPlugin.js';
 import type { TrackKerbType } from './trackGeometry.js';
 
 export interface ReplayEventInfo {
@@ -245,6 +246,9 @@ export interface ReplayTrajectoryValidation {
 export type LapEndCut = 'line' | 'extrapolated' | 'none';
 
 export interface ReplayTrajectoryData {
+  vehicleIdentity?: { vehicleId?:string; carModel?:string; carClass?:string };
+  vehicleData?: VehicleDataRecord;
+  dataPluginRevision?: string;
   replayName: string;
   driverSlot?: number;
   driverName?: string;

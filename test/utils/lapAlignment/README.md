@@ -9,7 +9,7 @@ map ghost / pedal markers / corner flags, corner consistency), run on real laps.
 | `lapAlignmentGolden.test.ts` | Characterization snapshot: **every** change in output shows up as a diff |
 | `lapAlignmentInvariants.test.ts` | Properties that must hold whatever the implementation; known violations are listed with the phase that fixes them |
 
-Fixtures (`test/fixtures/replays/*.json`) are captured with
+Private fixtures (`<LMU_PERSONAL_FIXTURES>/replays/*.json`) are captured with
 `tools/analysis/captureLapPairFixture.ts` (usage in its header):
 
 | Fixture | Class | Primary | Baseline | Why it is here |
@@ -70,3 +70,7 @@ when toggling the comparison lap.
 - Le Mans, cross-session baseline (the original selector bug): `http://localhost:5173/#/telemetry?replayName=Circuit+de+la+Sarthe+R1+41.Vcr&lap=4&baselineReplay=Circuit+de+la+Sarthe+R1+27.Vcr&compareSessionId=2026_09_03_14_41_14-69R1&compareDriver=Andrzej+Nycz&compareLapNum=4`
 - Also switch the telemetry resolution between Standard (4 m), High (2 m) and Full Raw on one of them,
   and scrub and pan the map at Full Raw on Le Mans: it should stay smooth.
+
+Captured recordings and golden snapshots stay outside hosted Git. Set `LMU_PERSONAL_FIXTURES`
+to a private root with `replays/` and `__snapshots__/` to run these suites; the default app
+suite exercises synthetic projection, timing, alignment and corner cases without a package.

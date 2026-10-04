@@ -25,6 +25,8 @@ export interface GpsTrackMapProps {
   colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];
+  primaryVehicleData?: import('../../../../shared/types/dataPlugin.js').VehicleDataRecord;
+  baselineVehicleData?: import('../../../../shared/types/dataPlugin.js').VehicleDataRecord;
   primaryCarClass?: string;
   baselineCarClass?: string;
   corners?: GpsTrackMapCorner[];
@@ -44,6 +46,7 @@ export interface GpsTrackMapProps {
   trackVenue?: string;
   trackCourse?: string;
   layoutKey?: string;
+  dataPluginRevision?: string;
   replayName?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   mapDisplay?: TrackMapDisplay | null;

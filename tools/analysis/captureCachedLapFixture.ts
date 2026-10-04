@@ -1,19 +1,19 @@
 /**
  * Captures one full-resolution lap stored in the replay cache (server/lmu_cache.db, opened
- * read-only) into a compact columnar fixture under test/fixtures/replays/, so tests run on a real
+ * read-only) into a compact columnar fixture under ignored .tmp/personal-regressions/replays/, so tests run on a real
  * lap without opening the live database (which the background replay upgrade rewrites).
  *
  * Usage:
  *   npx tsx tools/analysis/captureCachedLapFixture.ts <fixture-name> "<replay>" <driver slot> <lap>
  *
- * Example (the fixture currently checked in, the player's lap 5 at Algarve, parser v5):
+ * Example (a private regression fixture, the player's lap 5 at Algarve, parser v5):
  *   npx tsx tools/analysis/captureCachedLapFixture.ts algarve-r1-19-player-lap5 \
  *     "Algarve International Circuit R1 19.Vcr" 18 5
  *
  * Pass the real driver slot, not the -1 player alias: since the dedup migration the alias is only
  * a pointer (replay_trajectory_defaults.resolved_driver_slot). Only the channels corner analysis
  * reads are kept, rounded to 3 decimals; stationM/lateralOffsetM are left out because the test
- * derives them from the track geometry in public/tracks/.
+ * derives them from the configured local track package.
  */
 import fs from 'fs';
 import path from 'path';
@@ -60,6 +60,7 @@ const fixture = {
   parserVersion: row.parser_version,
   columns,
 };
-const out = path.join(root, 'test', 'fixtures', 'replays', `${name}.json`);
+if (!/^[a-z0-9_-]+$/.test(name)) throw new Error('Invalid fixture name');
+const out = path.join(root, '.tmp', 'personal-regressions', 'replays', `${name}.json`);
 fs.writeFileSync(out, JSON.stringify(fixture));
 console.log(`${out}: ${trajectory.points.length} points, ${(fs.statSync(out).size / 1024).toFixed(0)} KB`);

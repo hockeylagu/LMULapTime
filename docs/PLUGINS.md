@@ -1,65 +1,80 @@
-# Optional data plugins
+# Optional local data packages
 
-Status: proposed design. Plugin loading is not available in the current app.
-The configuration and package format below describe the planned interface.
+Basic track layouts are always bundled with the app as SVG illustrations. They provide
+orientation and thumbnails; they are never used as calibrated geometry for analysis.
+Detailed tracks and vehicle records come from an optional local JSON package.
+Session-log, replay and DuckDB ingestion work without a package.
 
-LMULapTime is planned to support optional local data plugins. A plugin supplies
-additional layout metadata through a versioned contract. The app discovers its
-capabilities and enables compatible features when the data is available.
+## Setup
 
-Session-log, VCR replay and DuckDB telemetry parsing remain part of the app and
-do not require a plugin. Basic track outlines provide orientation; they are
-illustrations and are not used as calibrated geometry for analysis.
+Set the backend-only setting in your ignored `.env.local`:
 
-## Configuration
+```dotenv
+LMU_PLUGIN_ROOT=C:/LocalData/package-v1
+```
 
-The proposed `LMU_PLUGIN_ROOT` setting identifies a local package directory for
-the backend. Configuration is local to your installation and is not embedded in
-the frontend build. No plugin is selected when the setting is absent.
+Run `npm start`. The backend reads and validates one immutable snapshot at startup.
+To change packages, select a new folder, restart the backend and reload the app. A
+missing or invalid package disables detailed features; it does not reuse a previous
+package's measurements. Local paths never enter frontend configuration or status responses.
+The backend listens on loopback. Plugin endpoints also check Host and Origin.
 
-The initial design accepts data packages, not executable extensions. It does
-not run plugin scripts or download packages automatically. Install only packages
-you trust and have permission to use. Plugins are distributed separately from
-the application and are not included in application releases.
+## Contract version 1
 
-## Package compatibility
+```json
+{
+  "schemaVersion": 1,
+  "id": "personal-data",
+  "version": "1",
+  "tracks": { "catalog": "tracks/index.json" },
+  "vehicles": { "catalog": "vehicles/index.json" }
+}
+```
 
-A package includes a JSON manifest declaring its contract version, identity,
-version, available capabilities and layout resources. Resource paths are
-relative to the package; absolute paths and paths outside it are rejected.
-Examples and automated tests use synthetic data.
+Tracks and vehicles are independently optional; at least one must be declared. Catalog
+paths are package-relative JSON files. Absolute paths, traversal and symlink/junction
+escapes are rejected. The whole package is validated before activation.
 
-The app validates the manifest and resources before activating a package.
-Layouts must match their canonical identities. Related resources must agree on
-their revisions, so incompatible versions cannot be combined. Updates activate
-as a complete generation; a failed update retains the previous valid generation.
+Track catalogs use the existing canonical layout identities. Geometry files sit beside
+the catalog as `<layoutKey>.json`; optional display files are
+`tracks-display/<layoutKey>.json`. Geometry and projection revisions must match their
+contents; a display's `sourceRevision` must match its geometry revision. The same
+provider supplies backend projection, profiles and frontend geometry. Null samples
+remain unavailable, including measured widths, kerb profiles and banking.
 
-## Optional features and fallback
+Vehicle catalogs contain `schemaVersion: 1`,
+`coordinates: "local-xz-metres-forward-minus-z"`, and a `vehicles` array.
+Each record has `id`, `model`, `carClass`, `vehicleIds`; optional
+`dimensions` hold `lengthM`, `widthM`, `heightM`. Optional convex
+`outlineXZ` coordinates are metres with forward -Z. A validated
+`replayOriginOffsetXZ` is required before model footprints are placed on replay poses.
+Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
+vehicles resolve independently. Body direction continues to use replay yaw.
 
-Features request capabilities from the local backend rather than importing
-package files into the frontend build. The backend returns only the validated
-resources needed by the app, without exposing local filesystem paths.
+## Behavior without detailed data
 
-If no compatible plugin is configured, session browsing, recording ingestion
-and analytics that use recorded channels remain available. Features that need
-additional metadata show an unavailable state. Missing values are not guessed,
-and the app never substitutes a different layout from the same venue.
+Bundled layouts, recorded trajectories and channel-based analysis remain available.
+Geometry-dependent corner results, road/kerb distances and road banking are unavailable.
+The GPS map uses labeled approximate class-size bodies until suitable local vehicle
+footprints are available. Missing data never selects another layout or invents flat roads.
 
-## Local access
+The local API exposes `/api/data-plugin/status`, `/vehicles` and
+`/tracks/:layoutKey` (geometry and optional display together). It serves validated
+responses, not arbitrary package files. Status contains availability and a content revision.
+The browser can inspect the local data it displays. Cloud AI reports are disabled while
+any local package is configured, including an invalid package.
 
-Plugin resources are served to the local application for use in your browser.
-They are excluded from the static application build and release archives.
-This does not make resources invisible to the local browser that displays them.
-Cloud features must state what they send outside the machine; plugin loading
-does not itself grant permission for uploads or redistribution.
+No scripts, downloads, registry, logos, settings manager or automatic extraction are part
+of this version. Packages are supplied separately and excluded from static builds.
+`npm run build` checks inputs and output for forbidden detailed assets; basic SVGs are allowed.
 
-## Troubleshooting
+## Regression tests
 
-For an unavailable plugin, check that the configured directory exists and is
-readable, the manifest version is supported, and the package contains matching
-layout resources. Validation errors should identify the affected capability
-without revealing machine paths. Restart or explicitly reload after selecting
-a new package. Removing the setting returns the app to its standard fallback.
+The default suite uses synthetic geometry and vehicle records. Optional personal
+regressions use `LMU_PERSONAL_REGRESSION_ROOT` for a package and
+`LMU_PERSONAL_FIXTURES` for a private folder containing `replays/` and
+`__snapshots__/`. These folders must stay outside committed release inputs.
+Use `LMU_PLUGIN_ROOT` too when testing recording enrichment with that package.
 
-Final installation commands and the manifest schema will be documented when
-the implementation is available.
+Removing datasets from the current tree prevents future bundling; it does not remove
+copies from earlier Git history, tags, deployments or releases.

@@ -1,4 +1,5 @@
 import path from 'path';
+import { dataPlugin } from '../plugins/dataPlugin.js';
 import { DetailedSession, DriverData, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 import { ReplayCacheService } from './replayCacheService.js';
 import { ReplayTelemetryService } from './replayTelemetryService.js';
@@ -150,6 +151,12 @@ export class ReplayTrajectoryService {
       }
     }
 
+    const selectedSlot=trajectory.driverSlot ?? driverSlot;
+    const selectedDriver=selectedSlot !== undefined ? metadata?.drivers.find(d=>d.slot===selectedSlot)
+      : metadata?.drivers.find(d=>d.name===trajectory.driverName);
+    trajectory.vehicleIdentity=selectedDriver ? {vehicleId:selectedDriver.vehicleId,carModel:selectedDriver.carModel,carClass:selectedDriver.carClass}:undefined;
+    trajectory.vehicleData=selectedDriver ? dataPlugin.vehicle(selectedDriver) ?? undefined : undefined;
+    trajectory.dataPluginRevision=dataPlugin.status.revision;
     return trajectory;
   }
 }

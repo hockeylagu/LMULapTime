@@ -144,6 +144,10 @@ describe('TrackCircuitLayout', () => {
     await waitFor(() => expect(layout.querySelector('path[stroke="#FFFFFF"]')).toBeInTheDocument());
   });
 
+  it('keeps bundled basic layouts when detailed geometry is explicitly unavailable',()=>{
+    const {container}=render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" layoutKey="spa_gp" trackGeometry={null}/>);
+    expect(container.querySelector('img')).toHaveAttribute('src','/track-outlines/spa_gp.svg');
+  });
   it('renders fallback icon when geometry is null and not loading', () => {
     render(
       <TrackCircuitLayout

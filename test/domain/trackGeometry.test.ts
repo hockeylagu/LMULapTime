@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasCompatibleTrackStations,
   getTrackRoadEdgeDistances,
   parseTrackBoundaryGeometry,
   parseTrackMapDisplay,
@@ -215,4 +216,14 @@ describe('track map display validation', () => {
   ])('rejects sidecar data with %s', (_label, value, layoutKey, revision) => {
     expect(() => parseTrackMapDisplay(value, layoutKey, revision)).toThrow('Invalid track geometry');
   });
+});
+
+
+describe('canonical station availability',()=>{
+ it('rejects odometer and mixed geometry frames while accepting a shared track revision',()=>{
+  expect(hasCompatibleTrackStations({stationSource:'odometer'})).toBe(false);
+  expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'odometer'})).toBe(false);
+  expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'track',geometryRevision:'two'})).toBe(false);
+  expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'track',geometryRevision:'one'})).toBe(true);
+ });
 });

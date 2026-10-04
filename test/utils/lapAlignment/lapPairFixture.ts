@@ -104,7 +104,7 @@ const cache = new Map<LapPairName, LoadedLapPair>();
 export function loadLapPair(name: LapPairName): LoadedLapPair {
   const cached = cache.get(name);
   if (cached) return cached;
-  const file = path.resolve(process.cwd(), 'test/fixtures/replays', `${name}.json`);
+  const file = path.resolve(process.env.LMU_PERSONAL_FIXTURES!, 'replays', `${name}.json`);
   const data = JSON.parse(fs.readFileSync(file, 'utf8')) as { primary: FixtureLap; baseline: FixtureLap };
   const primary = decodeLap(data.primary);
   const baseline = decodeLap(data.baseline);

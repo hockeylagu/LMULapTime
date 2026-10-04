@@ -93,7 +93,7 @@ const dropPreLineSamples = (points: ReplayTrajectoryPoint[], L: number) => {
   return points.slice(Math.max(0, first));
 };
 
-describe.each(PAIRS)('lap comparison invariants: %s', name => {
+if (process.env.LMU_PERSONAL_FIXTURES) describe.each(PAIRS)('lap comparison invariants: %s', name => {
   const pair = loadLapPair(name);
   const P = pair.primary.points;
   const B = pair.baseline.points;
@@ -194,3 +194,5 @@ describe.each(PAIRS)('lap comparison invariants: %s', name => {
     }
   });
 });
+
+else describe.skip('Private recording regressions',()=>{it('requires LMU_PERSONAL_FIXTURES',()=>{});});

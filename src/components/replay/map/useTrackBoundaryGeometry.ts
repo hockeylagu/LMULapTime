@@ -25,6 +25,7 @@ function setGeometryCache(key: string, data: TrackBoundaryGeometry): void {
 
 export interface UseTrackBoundaryGeometryOptions {
   layoutKey?: string | null;
+  packageRevision?: string;
   trackVenue?: string | null;
   trackCourse?: string | null;
   replayName?: string | null;
@@ -39,12 +40,13 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
     options.layoutKey
   );
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
+  const cacheKey = resolvedKey ? `${resolvedKey}:${options.packageRevision || 'startup'}` : null;
 
   const [trackGeometry, setTrackGeometry] = useState<TrackBoundaryGeometry | null>(
-    resolvedKey ? geometryCache.get(resolvedKey) || null : null
+    resolvedKey ? geometryCache.get(cacheKey!) || null : null
   );
   const [isLoading, setIsLoading] = useState<boolean>(
-    Boolean(resolvedKey && !geometryCache.has(resolvedKey))
+    Boolean(resolvedKey && !geometryCache.has(cacheKey!))
   );
 
   useEffect(() => {
@@ -54,11 +56,11 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
       return;
     }
 
-    if (geometryCache.has(resolvedKey)) {
-      const existing = geometryCache.get(resolvedKey)!;
+    if (geometryCache.has(cacheKey!)) {
+      const existing = geometryCache.get(cacheKey!)!;
       // Refresh LRU order
-      geometryCache.delete(resolvedKey);
-      geometryCache.set(resolvedKey, existing);
+      geometryCache.delete(cacheKey!);
+      geometryCache.set(cacheKey!, existing);
       setTrackGeometry(existing);
       setIsLoading(false);
       return;
@@ -67,22 +69,22 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
     let isMounted = true;
     setIsLoading(true);
 
-    let fetchPromise = inFlightRequests.get(resolvedKey);
+    let fetchPromise = inFlightRequests.get(cacheKey!);
     if (!fetchPromise) {
       fetchPromise = loadTrackBoundaryGeometry(resolvedKey)
         .then((data) => {
-          setGeometryCache(resolvedKey, data);
-          inFlightRequests.delete(resolvedKey);
+          setGeometryCache(cacheKey!, data);
+          inFlightRequests.delete(cacheKey!);
           return data;
         })
         .catch(err => {
-          inFlightRequests.delete(resolvedKey);
+          inFlightRequests.delete(cacheKey!);
           if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'test') {
             console.warn(`[useTrackBoundaryGeometry] Could not fetch geometry for ${resolvedKey}:`, err);
           }
           return null;
         });
-      inFlightRequests.set(resolvedKey, fetchPromise);
+      inFlightRequests.set(cacheKey!, fetchPromise);
     }
 
     fetchPromise.then(data => {
@@ -95,7 +97,7 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
     return () => {
       isMounted = false;
     };
-  }, [resolvedKey]);
+  }, [resolvedKey, cacheKey]);
 
   return { trackGeometry, layoutKey: resolvedKey, isLoading };
 }

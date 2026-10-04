@@ -11,6 +11,8 @@ export interface GpsSceneCarMarkersProps {
   primaryOpacity: number;
   baselineOpacity: number;
   unitsPerMeter?: number;
+  primaryVehicleData?: import('../../../../../shared/types/dataPlugin.js').VehicleDataRecord;
+  baselineVehicleData?: import('../../../../../shared/types/dataPlugin.js').VehicleDataRecord;
   primaryCarClass?: string;
   baselineCarClass?: string;
   primaryHeadingDeg?: number;
@@ -41,10 +43,15 @@ export function replayBodyHeading(
  */
 export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
   viewBox, currentPos, baselineGhostPos, markerScale, primaryOpacity, baselineOpacity,
-  unitsPerMeter = 0, primaryHeadingDeg, baselineHeadingDeg, primaryCarClass, baselineCarClass,
+  unitsPerMeter = 0, primaryHeadingDeg, baselineHeadingDeg, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData,
 }) => {
   const car = (position: Position, heading: number | undefined, color: string, opacity: number, ghost: boolean, carClass?: string) => {
-    const size = defaultVehicleSize(carClass);
+    const vehicle=ghost?baselineVehicleData:primaryVehicleData;
+    // An outline is placed only when its replay origin has been established.
+    const modelReady=!!vehicle?.dimensions && !!vehicle.replayOriginOffsetXZ;
+    const size = modelReady ? vehicle!.dimensions! : defaultVehicleSize(carClass);
+    const offset=modelReady?vehicle!.replayOriginOffsetXZ!:[0,0];
+    const outline=modelReady?vehicle?.outlineXZ:undefined;
     const width = size.widthM * unitsPerMeter;
     const length = size.lengthM * unitsPerMeter;
     // Class-sized footprint grows with camera zoom; overview keeps a readable position dot.
@@ -53,10 +60,10 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
     <g data-car-role={ghost ? 'baseline' : 'primary'}
       transform={`translate(${position.sx}, ${position.sy})`} opacity={opacity}>
       {showFootprint && heading !== undefined && Number.isFinite(heading) ? <g transform={`rotate(${heading})`}>
-        <title>{`Approximate ${carClass || 'unknown class'} size: ${size.lengthM} × ${size.widthM} m; body orientation from replay`}</title>
-        <rect data-testid={ghost ? 'gps-ghost-footprint' : 'gps-car-footprint'}
-          x={-width / 2} y={-length / 2} width={width} height={length} rx={width * 0.18}
-          fill={color} fillOpacity={ghost ? 0.3 : 0.8} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        <title>{modelReady ? `${vehicle!.model}: ${size.lengthM} × ${size.widthM} m; body orientation from replay` : `Approximate ${carClass || 'unknown class'} size: ${size.lengthM} × ${size.widthM} m; body orientation from replay`}</title>
+        {outline ? <polygon data-testid={ghost ? 'gps-ghost-footprint' : 'gps-car-footprint'} points={outline.map(([x,z])=>`${-(x+offset[0])*unitsPerMeter},${(z+offset[1])*unitsPerMeter}`).join(' ')} fill={color} fillOpacity={ghost?.3:.8} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" /> : <rect data-testid={ghost ? 'gps-ghost-footprint' : 'gps-car-footprint'}
+          x={-width / 2-offset[0]*unitsPerMeter} y={-length / 2+offset[1]*unitsPerMeter} width={width} height={length} rx={width * 0.18}
+          fill={color} fillOpacity={ghost ? 0.3 : 0.8} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
         <path d={`M ${-width * 0.28} ${-length * 0.2} H ${width * 0.28} L ${width * 0.22} ${-length * 0.05} H ${-width * 0.22} Z`}
           fill={CHART_COLORS.white} fillOpacity={ghost ? 0.35 : 0.7} />
         <circle r={Math.min(width * 0.08, 1.5 * markerScale)} fill={CHART_COLORS.white} />

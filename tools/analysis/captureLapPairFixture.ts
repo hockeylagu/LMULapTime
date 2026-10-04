@@ -11,7 +11,7 @@
  * The resolution is what the replay inspector asks for: a point spacing ("2m", its default) or a
  * point count ("2400"; "0" for every sample).
  *
- * Example (the fixtures currently checked in):
+ * Example (private regression fixtures):
  *   npx tsx tools/analysis/captureLapPairFixture.ts daytona-r1-10-lap-pair \
  *     "Daytona International Speedway Road Course R1 10.Vcr" 2 - duckdb \
  *     "Daytona International Speedway Road Course R1 10.Vcr" 9 "Mack Pearmain" vcr
@@ -21,7 +21,7 @@
  *
  * A driver of "-" means the configured player. Both laps must be the same car class (a
  * comparison is only meaningful within a class); the capture is refused otherwise. Re-capturing changes the golden snapshot:
- * review the diff, then run `npx vitest run -u test/utils/lapAlignment`.
+ * review the private diff, then run the suite with LMU_PERSONAL_FIXTURES configured.
  */
 import fs from 'fs';
 import path from 'path';
@@ -101,7 +101,8 @@ async function main() {
   }
 
   const toolsDir = path.dirname(fileURLToPath(import.meta.url));
-  const out = path.resolve(toolsDir, '../../test/fixtures/replays', `${name}.json`);
+  if (!/^[a-z0-9_-]+$/.test(name)) throw new Error('Invalid fixture name');
+  const out = path.resolve(toolsDir, '../../.tmp/personal-regressions/replays', `${name}.json`);
   fs.writeFileSync(out, JSON.stringify({ primary, baseline }));
   console.log(`${out} [${primary.carClass}]: ${primary.driverName} lap ${primary.currentLap} (${primary.lapTimeSec}s) vs ${baseline.driverName} lap ${baseline.currentLap} (${baseline.lapTimeSec}s), ${(fs.statSync(out).size / 1024).toFixed(0)} KB`);
 }

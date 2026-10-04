@@ -1,9 +1,13 @@
 import { matchesCarClass } from './paceCategory.js';
-import { VEHICLE_FILE_GROUPS } from './vehicleCatalog.js';
 
-const VEHICLE_FILES = new Map<string, { model: string; carClass: string }>(
-  VEHICLE_FILE_GROUPS.flatMap(group => group.vehicleIds.map(id => [id, { model: group.model, carClass: group.carClass }] as const)),
-);
+
+const VEHICLE_FILES = new Map<string, { model: string; carClass: string }>();
+
+/** Local provider identity aliases; generic app builds contain no generated livery catalog. */
+export function setVehicleCatalog(records: readonly {model:string;carClass:string;vehicleIds:readonly string[]}[]): void {
+  VEHICLE_FILES.clear();
+  for (const record of records) for (const id of record.vehicleIds) VEHICLE_FILES.set(id.trim().replace(/\.veh$/i,'').toUpperCase(), {model:record.model,carClass:record.carClass});
+}
 
 // LMU results-log <CarType> names that differ from the model names the app shows.
 const LMU_CAR_TYPE_MODELS: Readonly<Record<string, string>> = {
@@ -38,7 +42,7 @@ export function normalizeLmuCarClass(carClass: string): string {
   return LMU_CAR_CLASS_IDS[carClass.trim()] ?? carClass.trim();
 }
 
-/** The car a vehicle file is, as LMU's results logs record it (vehicleCatalog.ts). */
+/** The car a vehicle file is, from the configured local alias catalog. */
 function lookupVehicleFile(vehicleId?: string): { model: string; carClass: string } | undefined {
   return vehicleId ? VEHICLE_FILES.get(vehicleId.trim().replace(/\.veh$/i, '').toUpperCase()) : undefined;
 }

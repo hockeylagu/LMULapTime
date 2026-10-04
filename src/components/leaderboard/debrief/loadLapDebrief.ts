@@ -1,3 +1,4 @@
+import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { fetchReplayTrajectory } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/index.js';
@@ -34,6 +35,9 @@ export async function loadLapPairDebrief(yours: TelemetryLapRef, theirs: Telemet
     throw new LapDebriefUnavailableError('The replay has no telemetry for one of the two laps.');
   }
 
+  if (!hasCompatibleTrackStations(target, reference)) {
+    throw new LapDebriefUnavailableError('Detailed local track data is required for corner analysis.');
+  }
   const spec = target.layoutKey ? getCircuitSpecification(target.layoutKey) : undefined;
   const segments = computeLapSegmentComparisons(target.points, reference.points, 6, target.trackLengthM, spec?.nominalWidthM);
   const confidence = comparisonConfidence(target, reference);

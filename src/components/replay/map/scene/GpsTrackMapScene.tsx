@@ -40,11 +40,11 @@ export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const {
     points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',
-    baselinePoints, primaryCarClass, baselineCarClass, corners, selectedCornerNumber, onSelectCornerNumber,
+    baselinePoints, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData, corners, selectedCornerNumber, onSelectCornerNumber,
     primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
-    trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM, mapDisplay,
+    trackVenue, trackCourse, layoutKey, replayName, dataPluginRevision, trackGeometry, trackLengthM, mapDisplay,
     isPlaying, onTogglePlay,
   } = props;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -52,6 +52,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const PADDING = 60;
 
   const { trackGeometry: fetchedGeometry } = useTrackBoundaryGeometry({
+    packageRevision: dataPluginRevision,
     layoutKey: trackGeometry === undefined ? layoutKey : null,
     trackVenue: trackGeometry === undefined ? trackVenue : null,
     trackCourse: trackGeometry === undefined ? trackCourse : null,
@@ -277,6 +278,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         <GpsSceneCarMarkers
           viewBox={currentViewBox}
           primaryCarClass={primaryCarClass}
+          primaryVehicleData={primaryVehicleData}
+          baselineVehicleData={baselineVehicleData}
           baselineCarClass={baselineCarClass}
           unitsPerMeter={(VIEWBOX_SIZE - 2 * PADDING) / Math.max(effectiveBounds.spanX, effectiveBounds.spanZ, 1)}
           primaryHeadingDeg={replayBodyHeading(points, currentIndex, fraction)}

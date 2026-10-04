@@ -1,3 +1,11 @@
+vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
+  const actual=await importOriginal<typeof import('../../../server/plugins/dataPlugin.js')>();
+  const {syntheticTrack}=await import('../../helpers/syntheticTrack.js');
+  return {...actual,dataPlugin:{status:actual.dataPlugin.status,
+    track:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?{geometry:syntheticTrack(key),display:null}:null,
+    vehicle:()=>null,vehicles:()=>[]}};
+});
+import { vi } from 'vitest';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { enrichTrajectoryWithTrackGeometry, clearTrackDefinitionCache, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
@@ -7,7 +15,7 @@ describe('serverTrackSync', () => {
     clearTrackDefinitionCache();
   });
 
-  it('loads real circuit definition from disk and caches it in memory', () => {
+  it('loads a synthetic provider definition and caches it in memory', () => {
     const def = getTrackDefinition('monza_gp');
     expect(def).not.toBeNull();
     expect(def?.layoutKey).toBe('monza_gp');
@@ -23,7 +31,7 @@ describe('serverTrackSync', () => {
   });
 
   it('enriches trajectory with canonical projection for recognized circuit', () => {
-    // Generate sample points around Monza start/finish straight
+    // Generate recorded samples independently of the synthetic reference route
     const rawPoints: ReplayTrajectoryPoint[] = [
       { x: 14.5, y: 0, z: 14.8, speedKmh: 220, timeSec: 0 },
       { x: 14.0, y: 0, z: 9.8, speedKmh: 225, timeSec: 0.1 },

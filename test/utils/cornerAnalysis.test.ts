@@ -14,7 +14,7 @@ import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTra
 
 /** Loads a lap captured from the replay cache by tools/analysis/captureCachedLapFixture.ts. */
 function loadCachedLapFixture(name: string): ReplayTrajectoryData {
-  const file = path.resolve(process.cwd(), 'test', 'fixtures', 'replays', `${name}.json`);
+  const file = path.resolve(process.env.LMU_PERSONAL_FIXTURES!, 'replays', `${name}.json`);
   const fixture = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
     replayName: string;
     driverName: string;
@@ -569,7 +569,7 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBeUndefined();
   });
 
-  it('does not substitute nominal width for an explicitly unknown profile sample (Algarve Turn 9)', () => {
+  it.skipIf(!process.env.LMU_PERSONAL_FIXTURES || !process.env.LMU_PLUGIN_ROOT)('does not substitute nominal width for an explicitly unknown profile sample (Algarve Turn 9)', () => {
     const traj = loadCachedLapFixture('algarve-r1-19-player-lap5');
     expect(traj.driverName).toBe('Samuel Lague');
     enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', traj.replayName);

@@ -1,3 +1,4 @@
+// Optional personal-data regressions. Public tests use synthetic provider fixtures.
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -44,10 +45,10 @@ function turnAngles(geometry: TrackGeometry): number[] {
   });
 }
 
-describe('generated hybrid road corridors', () => {
+describe.skipIf(!process.env.LMU_PERSONAL_REGRESSION_ROOT)('generated hybrid road corridors', () => {
   it.each(layouts)('%s keeps matched, continuous boundaries', (layout, parentLayout) => {
-    const geometry = read('public/tracks', layout);
-    const parent = read('public/tracks', parentLayout);
+    const geometry = read(path.join(process.env.LMU_PERSONAL_REGRESSION_ROOT || '.missing-private-fixture', 'tracks'), layout);
+    const parent = read(path.join(process.env.LMU_PERSONAL_REGRESSION_ROOT || '.missing-private-fixture', 'tracks'), parentLayout);
     expect(geometry.leftBoundary).toHaveLength(geometry.centerline.length);
     expect(geometry.rightBoundary).toHaveLength(geometry.centerline.length);
 

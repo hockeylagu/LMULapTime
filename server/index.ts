@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import fs from 'fs';
+import fs from 'node:fs';
 import { LmuParser } from './sessions/parser.js';
 import { fetchAndCacheReferenceLaptimes, isReferenceLaptimesCacheFresh, loadReferenceLaptimesFromCache } from './benchmarks/referenceLaptimes.js';
 import { getSessionDatabase } from './core/db.js';
@@ -15,22 +15,20 @@ import { createReplayRouter } from './routes/replayRoutes.js';
 import { createSessionRouter } from './routes/sessionRoutes.js';
 import { createSystemRouter } from './routes/systemRoutes.js';
 
+import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
+import { dataPlugin } from './plugins/dataPlugin.js';
+
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 const allowedOrigin = process.env.LMU_UI_ORIGIN || 'http://localhost:5173';
 
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || origin === allowedOrigin) }));
 app.use(express.json());
 
-for (const directory of ['tracks', 'tracks-display', 'track-outlines']) {
-  const publicDirectory = path.join(process.cwd(), 'public', directory);
-  const distDirectory = path.join(process.cwd(), 'dist', directory);
-  if (fs.existsSync(publicDirectory)) {
-    app.use(`/${directory}`, express.static(publicDirectory));
-  } else if (fs.existsSync(distDirectory)) {
-    app.use(`/${directory}`, express.static(distDirectory));
-  }
-}
+// Basic layout illustrations are bundled independently of optional metric data.
+const outlineDir = fs.existsSync(path.resolve('dist/track-outlines')) ? path.resolve('dist/track-outlines') : path.resolve('public/track-outlines');
+app.use('/track-outlines', express.static(outlineDir));
+app.use('/api/data-plugin', createDataPluginRouter());
 
 const defaultResultsDir = process.env.NODE_ENV === 'test'
   ? path.join(process.cwd(), 'test', 'fixtures', 'results')
@@ -75,7 +73,10 @@ const startReferenceLaptimeRefresh = (): void => {
 
 serverContext.runInitialSessionSyncInBackground();
 
-app.use('/api/ai', createAiRouter(sessionDb));
+app.use('/api/ai', (_req, res, next) => {
+  if (dataPlugin.status.state !== 'absent') { res.status(403).json({error:'Cloud reports are disabled while local data is active'}); return; }
+  next();
+}, createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
 app.use('/api', createReferenceRouter(serverContext));
 app.use('/api', createSessionRouter(serverContext));
@@ -83,7 +84,7 @@ app.use('/api', createLeaderboardRouter(serverContext));
 app.use('/api', createReplayRouter(serverContext));
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
     startReferenceLaptimeRefresh();
   });

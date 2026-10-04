@@ -1,3 +1,4 @@
+// Optional personal-data regressions. Public tests use synthetic provider fixtures.
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -39,11 +40,11 @@ const PROMOTED_LAYOUTS = [
   'road_atlanta',
 ] as const;
 
-describe('Promoted native surface geometry across all 32 canonical layouts', () => {
-  const store = new TrackGeometryStore(path.resolve('public/tracks'));
+describe.skipIf(!process.env.LMU_PERSONAL_REGRESSION_ROOT)('Promoted native surface geometry across all 32 canonical layouts', () => {
+  const store = new TrackGeometryStore(path.resolve(path.join(process.env.LMU_PERSONAL_REGRESSION_ROOT || '.missing-private-fixture', 'tracks')));
 
   it.each(PROMOTED_LAYOUTS)('%s satisfies runtime contracts', (layoutKey) => {
-    const publicPath = path.resolve('public/tracks', `${layoutKey}.json`);
+    const publicPath = path.resolve(path.join(process.env.LMU_PERSONAL_REGRESSION_ROOT || '.missing-private-fixture', 'tracks'), `${layoutKey}.json`);
     const publicRaw = fs.readFileSync(publicPath, 'utf8');
 
     const data = JSON.parse(publicRaw) as TrackBoundaryGeometry;
@@ -88,7 +89,7 @@ describe('Promoted native surface geometry across all 32 canonical layouts', () 
   });
 
   it('verifies index.json catalogs all promoted layouts with elevation enabled', () => {
-    const publicIndex = JSON.parse(fs.readFileSync('public/tracks/index.json', 'utf8')) as Array<{
+    const publicIndex = JSON.parse(fs.readFileSync(path.join(process.env.LMU_PERSONAL_REGRESSION_ROOT || '.missing-private-fixture', 'tracks/index.json'), 'utf8')) as Array<{
       layoutKey: string;
       hasElevation?: boolean;
       bounds?: { spanX: number; spanZ: number };

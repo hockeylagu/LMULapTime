@@ -28,10 +28,18 @@ export function centerlineProjectionRevision(
 export class TrackGeometryStore {
   private readonly cache = new Map<string, CacheEntry>();
 
-  public constructor(private readonly directory: string) {}
+  public constructor(private readonly directory: string | ((key:string)=>TrackBoundaryGeometry|null)) {}
 
   public get(layoutKey: string): CachedTrackDefinition | null {
     if (!/^[a-z0-9_]+$/.test(layoutKey)) return null;
+    if (typeof this.directory === 'function') {
+      const cached=this.cache.get(layoutKey); if(cached)return cached.definition;
+      const geometry=this.directory(layoutKey); if(!geometry)return null;
+      const spatialIndex=buildCenterlineSpatialIndex(geometry.centerline);
+      if (!(spatialIndex.totalLengthM>0))return null;
+      const definition={...geometry,geometryRevision:geometry.geometryRevision!,projectionRevision:geometry.projectionRevision!,spatialIndex};
+      this.cache.set(layoutKey,{fileStamp:geometry.geometryRevision!,definition});return definition;
+    }
     const filename = path.join(this.directory, `${layoutKey}.json`);
     let fileStamp = 'missing';
     try {

@@ -16,9 +16,9 @@
   "scripts": {
     "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "node --env-file-if-exists=.env.local --import tsx --watch server/index.ts",
     "dev:client": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run check:local-data && tsc && vite build && node tools/release/checkLocalData.mjs --built",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,8 +26,8 @@
     "telemetry:probe": "dotnet run -c Release --project tools/telemetry-recorder -- probe",
     "telemetry:record": "dotnet run -c Release --project tools/telemetry-recorder -- record",
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts",
-    "vehicles:catalog": "tsx tools/analysis/buildVehicleCatalog.ts",
-    "screenshots": "tsx tools/captureScreenshots.ts"
+    "screenshots": "tsx tools/captureScreenshots.ts",
+    "check:local-data": "node tools/release/checkLocalData.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.26.0",

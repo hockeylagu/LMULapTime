@@ -132,7 +132,7 @@ describe('Cross-Driver Telemetry & Canonical Reference Matching', () => {
 
   // Real laps as the server serves them (cut at the line), captured into test/fixtures/replays/
   // so the suite never opens the live cache. Each pair is two drivers of one class in one session.
-  describe('Real Replay Lap Pairs Cross-Tests (test/fixtures/replays)', () => {
+  describe.skipIf(!process.env.LMU_PERSONAL_FIXTURES)('Private replay lap pairs cross-tests', () => {
     for (const name of LAP_PAIRS) {
       it(`Same session, different driver: ${name} starts both laps on the line with no delta jump`, () => {
         const { primary, baseline, trackLengthM } = loadLapPair(name);

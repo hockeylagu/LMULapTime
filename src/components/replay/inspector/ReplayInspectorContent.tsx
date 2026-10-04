@@ -1,3 +1,4 @@
+import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { ReplayPlaybackCursorContext } from './replayPlaybackCursor.js';
@@ -116,7 +117,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   }, [colorBy, isCompareMode, baselineTrajectory]);
 
   const lapSegments = useMemo(() => {
-    if (!trajectory) return [];
+    if (!trajectory || !hasCompatibleTrackStations(trajectory, isCompareMode && baselineTrajectory ? baselineTrajectory : trajectory)) return [];
     const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
     const spec = trajectory.layoutKey ? getCircuitSpecification(trajectory.layoutKey) : undefined;
     return computeLapSegmentComparisons(trajectory.points, baseline, 6, trajectory.trackLengthM, spec?.nominalWidthM);

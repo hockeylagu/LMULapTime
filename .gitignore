@@ -91,3 +91,12 @@ test/fixtures/replays_api_temp/
 /tools/analysis/local/
 /test/tools/analysis/local/
 /docs/local/
+
+# Detailed data is supplied by an external local package. Basic SVG layouts stay bundled.
+/public/tracks/
+/public/tracks-display/
+/shared/domain/vehicleCatalog.ts
+
+# Captured personal regressions and their golden outputs stay private.
+/test/fixtures/replays/*.json
+/test/utils/lapAlignment/__snapshots__/

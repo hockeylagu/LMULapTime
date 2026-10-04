@@ -1,3 +1,4 @@
+import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { useEffect, useState } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
@@ -35,9 +36,11 @@ export function useCornerConsistency(
   const points = trajectory?.points;
   const trackLengthM = trajectory?.trackLengthM;
   const source = trajectory?.source;
+  const stationSource = trajectory?.stationSource;
+  const geometryRevision = trajectory?.geometryRevision;
 
   useEffect(() => {
-    if (!enabled || !activeReplayName || !points?.length) {
+    if (!enabled || !activeReplayName || !points?.length || stationSource === 'odometer') {
       setCornerStats([]);
       setLapsSampled(0);
       setIsLoading(false);
@@ -73,7 +76,7 @@ export function useCornerConsistency(
     Promise.all(
       otherLaps.map(l =>
         fetchReplayTrajectory(activeReplayName, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lap: l.lapNumber, driverSlot: selectedDriverSlot, source }, { signal: controller.signal })
-          .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: applyTelemetryPostProcessing(data?.points || []) }))
+          .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: data && hasCompatibleTrackStations({stationSource,geometryRevision}, data) ? applyTelemetryPostProcessing(data.points || []) : [] }))
           .catch((): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: [] }))
       )
     ).then(results => {
@@ -92,7 +95,7 @@ export function useCornerConsistency(
       isCurrent = false;
       controller.abort();
     };
-  }, [enabled, activeReplayName, selectedDriverSlot, currentLap, points, trackLengthM, lapSummaries, source]);
+  }, [enabled, activeReplayName, selectedDriverSlot, currentLap, points, trackLengthM, lapSummaries, source, stationSource, geometryRevision]);
 
 
   return { cornerStats, isLoading, lapsSampled };

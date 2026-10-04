@@ -399,7 +399,7 @@ describe('Replay routes', () => {
 
     const response = await request(app).get('/api/replays/Route_Test_P1.Vcr/traffic?driverName=Route%20Driver');
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ available: false, reason: 'The replay has no stored laps yet.', laps: [] });
+    expect(response.body).toEqual({ available: false, reason: 'This layout has no track centreline to place the cars on.', laps: [] });
 
     expect((await request(app).get('/api/replays/..%2Fsecret.Vcr/traffic')).status).toBe(400);
     expect((await request(app).get('/api/replays/Missing_P1.Vcr/traffic')).status).toBe(404);

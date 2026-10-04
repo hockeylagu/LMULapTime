@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { sampleTrackSurfaceProfile } from '../../shared/domain/trackGeometry.js';
@@ -8,22 +5,9 @@ import { projectTrajectoryToCenterline } from './trackProjection.js';
 import { cutLapAtLine } from './lapLineCut.js';
 import { TrackGeometryStore, type CachedTrackDefinition } from './trackGeometryStore.js';
 
-function getTracksDir(): string {
-  try {
-    const currentDir = path.dirname(fileURLToPath(import.meta.url));
-    const candidate = path.resolve(currentDir, '..', '..', 'public', 'tracks');
-    if (fs.existsSync(candidate)) return candidate;
-  } catch {
-    // Fallback if import.meta.url is not available
-  }
-  const cwdPublic = path.join(process.cwd(), 'public', 'tracks');
-  if (fs.existsSync(cwdPublic)) return cwdPublic;
-  const cwdDist = path.join(process.cwd(), 'dist', 'tracks');
-  if (fs.existsSync(cwdDist)) return cwdDist;
-  return cwdPublic;
-}
+import { dataPlugin } from '../plugins/dataPlugin.js';
 
-const trackStore = new TrackGeometryStore(getTracksDir());
+const trackStore = new TrackGeometryStore(key=>dataPlugin.track(key)?.geometry??null);
 
 /**
  * Loads and caches a track definition and its pre-computed spatial index by layoutKey.

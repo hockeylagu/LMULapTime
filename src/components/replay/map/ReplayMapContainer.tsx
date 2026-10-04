@@ -7,6 +7,7 @@ import { MapColorMode } from './replayMapUtils.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
+import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayMapContainerProps {
@@ -179,6 +180,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         </div>
       </div>
 
+      {trajectory.stationSource === 'odometer' && <div className="flex items-center gap-2 px-2 text-xs text-lmu-muted"><TrackCircuitLayout trackName={trackVenue || ''} trackCourse={trackCourse} layoutKey={layoutKey} size="session" /><p>Basic layout and recorded trajectory. Detailed road, kerb, banking and corner analysis need local track data.</p></div>}
       {/* SINGLE UNIFIED MAP PANE */}
       <div className="flex flex-col gap-0 flex-1 min-h-0 h-full">
         <div className="flex-1 min-h-0 bg-lmu-deep p-0 flex items-center justify-center relative overflow-hidden">
@@ -192,8 +194,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             colorBy={colorBy}
             className="w-full h-full"
             baselinePoints={baselinePoints}
-            primaryCarClass={primaryCarClass}
-            baselineCarClass={baselineCarClass}
+            primaryCarClass={trajectory.vehicleIdentity?.carClass ?? primaryCarClass}
+            primaryVehicleData={trajectory.vehicleData}
+            baselineVehicleData={baselineTrajectory?.vehicleData}
+            baselineCarClass={baselineTrajectory?.vehicleIdentity?.carClass ?? baselineCarClass}
             corners={corners}
             selectedCornerNumber={selectedCornerNumber}
             onSelectCornerNumber={onSelectCornerNumber}
@@ -206,6 +210,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             trackVenue={trackVenue}
             trackCourse={trackCourse}
             layoutKey={layoutKey}
+            dataPluginRevision={trajectory.dataPluginRevision}
             replayName={trajectory.replayName}
             trackGeometry={trackGeometry}
             trackLengthM={trajectory.trackLengthM}

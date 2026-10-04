@@ -1,3 +1,10 @@
+vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
+  const actual=await importOriginal<typeof import('../../../server/plugins/dataPlugin.js')>();
+  const {syntheticTrack}=await import('../../helpers/syntheticTrack.js');
+  return {...actual,dataPlugin:{status:actual.dataPlugin.status,
+    track:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?{geometry:syntheticTrack(key),display:null}:null,
+    vehicle:()=>null,vehicles:()=>[]}};
+});
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
@@ -94,8 +101,8 @@ describe('ReplayTrajectoryService', () => {
     expect(canonical).not.toBeNull();
     // The response rounds measured polyline length to centimetres; catalog length uses millimetres.
     expect(traj.trackLengthM).toBeCloseTo(canonical?.spatialIndex.totalLengthM ?? 0, 2);
-    expect(traj.points).toHaveLength(3);
-    expect(traj.maxPoints).toBe(3);
+    expect(traj.points).toHaveLength(4);
+    expect(traj.maxPoints).toBeUndefined();
   });
 
   it('projects and cuts the lap at the line at full resolution, then downsamples', async () => {

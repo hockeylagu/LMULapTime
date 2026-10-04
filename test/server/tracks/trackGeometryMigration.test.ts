@@ -1,3 +1,10 @@
+vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
+  const actual=await importOriginal<typeof import('../../../server/plugins/dataPlugin.js')>();
+  const {syntheticTrack}=await import('../../helpers/syntheticTrack.js');
+  return {...actual,dataPlugin:{status:actual.dataPlugin.status,
+    track:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?{geometry:syntheticTrack(key),display:null}:null,
+    vehicle:()=>null,vehicles:()=>[]}};
+});
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

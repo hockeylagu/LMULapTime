@@ -1,9 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import path from 'node:path';
 
 export default defineConfig({
   plugins: [react()],
   test: {
+    resolveSnapshotPath: (testPath, extension) => testPath.endsWith('lapAlignmentGolden.test.ts')
+      ? path.resolve(process.env.LMU_PERSONAL_FIXTURES || '.tmp/personal-regressions', '__snapshots__', path.basename(testPath) + extension)
+      : path.join(path.dirname(testPath), '__snapshots__', path.basename(testPath) + extension),
     globals: true,
     css: false,
     projects: [

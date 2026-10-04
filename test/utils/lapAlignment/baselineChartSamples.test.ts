@@ -17,7 +17,7 @@ function brakeOnsets(stations: number[], brake: number[]): number[] {
   return onsets;
 }
 
-describe.each(LAP_PAIRS)('%s: baseline traces in compare mode', name => {
+if (process.env.LMU_PERSONAL_FIXTURES) describe.each(LAP_PAIRS)('%s: baseline traces in compare mode', name => {
   const { primary, baseline, trackLengthM } = loadLapPair(name);
   const axis = getMonotonicStations(primary.points, trackLengthM);
   const baselineStations = getMonotonicStations(baseline.points, trackLengthM);
@@ -42,3 +42,5 @@ describe.each(LAP_PAIRS)('%s: baseline traces in compare mode', name => {
     expect(worst).toBeGreaterThan(0.01);
   });
 });
+
+else describe.skip('Private recording regressions',()=>{it('requires LMU_PERSONAL_FIXTURES',()=>{});});

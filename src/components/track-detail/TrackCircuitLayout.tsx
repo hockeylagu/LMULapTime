@@ -5,7 +5,7 @@ import {
   computeTrackBoundaryPathD,
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
-import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
 import { getTrackOutlineUrl } from '../../api/trackGeometryApi.js';
@@ -72,7 +72,7 @@ export const TrackCircuitLayout: React.FC<TrackCircuitLayoutProps> = ({
   const spec = getCircuitSpecification(trackName, trackCourse, null, null, layoutKey);
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
   const [outlineFailedLayoutKey, setOutlineFailedLayoutKey] = React.useState<string | null>(null);
-  const useStaticOutline = propGeometry === undefined && Boolean(resolvedKey) && outlineFailedLayoutKey !== resolvedKey;
+  const useStaticOutline = !propGeometry && Boolean(resolvedKey && CIRCUIT_SPECIFICATIONS[resolvedKey]) && outlineFailedLayoutKey !== resolvedKey;
   const shouldFetch = propGeometry === undefined && !useStaticOutline;
   const { trackGeometry: fetchedGeometry, isLoading } = useTrackBoundaryGeometry(
     shouldFetch

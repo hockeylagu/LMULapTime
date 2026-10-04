@@ -273,3 +273,13 @@ export function getTrackRoadEdgeDistances(
     rightDistanceM: sample.rightWidthM === null ? null : sample.rightWidthM - lateralOffsetM,
   };
 }
+
+
+/** Recorded odometer stations cannot supply canonical corner windows or a mixed revision comparison. */
+export function hasCompatibleTrackStations(
+  primary: {stationSource?: string; geometryRevision?: string},
+  baseline: {stationSource?: string; geometryRevision?: string} = primary,
+): boolean {
+  return primary.stationSource !== 'odometer' && baseline.stationSource !== 'odometer'
+    && primary.geometryRevision === baseline.geometryRevision;
+}

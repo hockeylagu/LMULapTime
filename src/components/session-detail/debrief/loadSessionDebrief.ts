@@ -1,3 +1,4 @@
+import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import type { ComparableLap, DetailedSession, DriverData, LapData, LapTraffic, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { getBestLapNumber, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
@@ -117,18 +118,21 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     throw new DebriefUnavailableError('The replay has no telemetry for one of the two laps.');
   }
 
+  if (!hasCompatibleTrackStations(target, referenceTrajectory)) {
+    throw new DebriefUnavailableError('Detailed local track data is required for corner analysis.');
+  }
   const spec = target.layoutKey ? getCircuitSpecification(target.layoutKey) : undefined;
   const compare = (other: ReplayTrajectoryData) =>
     computeLapSegmentComparisons(target.points, other.points, 6, target.trackLengthM, spec?.nominalWidthM);
   const segments = compare(referenceTrajectory);
-  const techniqueSegments = techniqueTrajectory?.points?.length ? compare(techniqueTrajectory) : undefined;
+  const techniqueSegments = techniqueTrajectory?.points?.length && hasCompatibleTrackStations(target, techniqueTrajectory) ? compare(techniqueTrajectory) : undefined;
 
   const otherLapNumbers = repeatabilityLaps(driver.laps || [], traffic !== null)
     .map(l => l.lapNum)
     .filter(n => n !== lapNumber);
   const otherLaps = await Promise.all(otherLapNumbers.map(n =>
     fetchReplayTrajectory(replayName, { resolutionQuery: `maxPoints=${REPEATABILITY_LAP_MAX_POINTS}`, lap: n, driverName: driver.name }, { signal })
-      .then((data): CornerConsistencyLapInput => ({ lapNumber: n, points: applyTelemetryPostProcessing(data?.points || []) }))
+      .then((data): CornerConsistencyLapInput => ({ lapNumber: n, points: hasCompatibleTrackStations(target, data) ? applyTelemetryPostProcessing(data?.points || []) : [] }))
       .catch((err: unknown): CornerConsistencyLapInput => {
         if (signal?.aborted) throw err;
         return { lapNumber: n, points: [] };
