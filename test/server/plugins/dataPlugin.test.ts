@@ -45,12 +45,12 @@ describe('local data plugin snapshot',()=>{
     applyCanonicalProjection(trajectory,definition);expect(trajectory.stationSource).toBe('track');expect(trajectory.points[0].roadBankDeg).toBe(3);expect(trajectory.points[0].leftKerbWidthM).toBe(1);expect(trajectory.points[0].rightKerbWidthM).toBeNull();
     const without=enrichTrajectoryWithTrackGeometry(trajectory,'Unknown','Unknown');expect(without.stationSource).toBe('odometer');expect(without.points[0].roadBankDeg).toBeUndefined();expect(without.points[0].leftRoadDistanceM).toBeUndefined();
   });
-  it('serves validated payloads only to local callers and does not expose package files',async()=>{
+  it('serves validated payloads without a local caller restriction and does not expose package files',async()=>{
     const {dir}=fixture();const app=express();app.use('/api/data-plugin',createDataPluginRouter(new DataPlugin(dir)));
     expect((await request(app).get('/api/data-plugin/status')).body.state).toBe('ready');
     expect((await request(app).get('/api/data-plugin/tracks/monza_gp')).body.geometry.layoutKey).toBe('monza_gp');
-    expect((await request(app).get('/api/data-plugin/status').set('Host','evil.example')).status).toBe(403);
-    expect((await request(app).get('/api/data-plugin/status').set('Origin','https://evil.example')).status).toBe(403);
+    expect((await request(app).get('/api/data-plugin/status').set('Host','app.example')).status).toBe(200);
+    expect((await request(app).get('/api/data-plugin/status').set('Origin','https://app.example')).status).toBe(200);
     expect((await request(app).get('/api/data-plugin/manifest.json')).status).toBe(404);
     expect((await request(app).get('/api/data-plugin/tracks/unknown')).status).toBe(404);
   });

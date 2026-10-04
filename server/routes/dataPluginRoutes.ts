@@ -3,12 +3,7 @@ import { DataPlugin, dataPlugin } from '../plugins/dataPlugin.js';
 
 export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
   const router=Router();
-  router.use((req,res,next)=>{
-    const ip=req.socket.remoteAddress;
-    const local=(host:string)=>['localhost','127.0.0.1','[::1]','::1'].includes(host);
-    let allowedOrigin=true;
-    try {if(req.headers.origin) {const url=new URL(req.headers.origin); allowedOrigin=local(url.hostname)&&[process.env.LMU_UI_ORIGIN||'http://localhost:5173','http://127.0.0.1:5173',`${req.protocol}://${req.headers.host}`].includes(url.origin);}} catch {allowedOrigin=false;}
-    if (!ip || !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(ip) || !local(req.hostname) || !allowedOrigin) {res.status(403).json({error:'Local application access required'});return;}
+  router.use((_req,res,next)=>{
     res.setHeader('Cache-Control','no-store'); next();
   });
   router.get('/status',(_req,res)=>res.json(provider.status));

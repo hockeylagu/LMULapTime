@@ -275,7 +275,7 @@ still require an established replay-origin offset.
 `server/plugins/dataPlugin.ts` loads one validated startup snapshot from backend-only
 `LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist.
 `server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair) and
-vehicles, restricted to local callers. There is no static package mount.
+vehicles, with the same server access behavior as the rest of the API. There is no static package mount.
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and
 surface enrichment. Missing geometry clears old road annotations and marks odometer stations;
 `shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to reject odometer stations and require matching station sources and geometry revisions. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches

@@ -17,7 +17,7 @@ Run `npm start`. The backend reads and validates one immutable snapshot at start
 To change packages, select a new folder, restart the backend and reload the app. A
 missing or invalid package disables detailed features; it does not reuse a previous
 package's measurements. Local paths never enter frontend configuration or status responses.
-The backend listens on loopback. Plugin endpoints also check Host and Origin.
+The backend listens on loopback. Plugin endpoints use the same server access behavior as the rest of the API.
 
 ## Contract version 1
 
