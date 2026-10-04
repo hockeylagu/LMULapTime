@@ -77,6 +77,3 @@ regressions use `LMU_PERSONAL_REGRESSION_ROOT` for a package and
 `LMU_PERSONAL_FIXTURES` for a private folder containing `replays/` and
 `__snapshots__/`. These folders must stay outside committed release inputs.
 Use `LMU_PLUGIN_ROOT` too when testing recording enrichment with that package.
-
-Removing datasets from the current tree prevents future bundling; it does not remove
-copies from earlier Git history, tags, deployments or releases.
