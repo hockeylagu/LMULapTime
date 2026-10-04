@@ -133,6 +133,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
           <h3 className="text-sm font-bold text-white">AI Lap Report</h3>
         </div>
         <p className="text-xs leading-relaxed text-lmu-muted">Lap analytics and driver names used in this comparison will be sent to Google Gemini.</p>
+        {trajectory.stationSource === 'odometer' && <p className="text-xs text-lmu-muted">Detailed track data is unavailable. The report will use the available lap and sector evidence.</p>}
         {configured === false && <p className="text-xs text-lmu-gold">Configure a Gemini API key in Settings before generating a report.</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void generate(false)} disabled={configured !== true || isLoading} data-busy={isLoading} className={PRIMARY_BUTTON}>

@@ -61,8 +61,10 @@ footprints are available. Missing data never selects another layout or invents f
 The local API exposes `/api/data-plugin/status`, `/vehicles` and
 `/tracks/:layoutKey` (geometry and optional display together). It serves validated
 responses, not arbitrary package files. Status contains availability and a content revision.
-The browser can inspect the local data it displays. Cloud AI reports are disabled while
-any local package is configured, including an invalid package.
+The browser can inspect the local data it displays. Cloud AI remains available regardless
+of package availability. Reports use the normal analysis evidence, including available derived
+measurements; missing details reduce the report's specificity rather than disabling it.
+Raw package files and geometry arrays are not uploaded by the report evidence builder.
 
 No scripts, downloads, registry, logos, settings manager or automatic extraction are part
 of this version. Packages are supplied separately and excluded from static builds.

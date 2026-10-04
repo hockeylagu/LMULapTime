@@ -85,6 +85,20 @@ describe('AIReportTab', () => {
     expect(screen.getByRole('button', { name: /generate ai report/i })).toBeDisabled();
   });
 
+  it('generates a reduced-evidence report without detailed track geometry',async()=>{
+    fetchMock.mockResolvedValueOnce({ok:true,json:()=>Promise.resolve({configured:true})})
+      .mockResolvedValueOnce({ok:true,json:()=>Promise.resolve({...reportResponse,report:{overallSummary:'Only lap and sector evidence is available.',improvements:[]}})});
+    render(<AIReportTab trajectory={{...trajectory,stationSource:'odometer'}} baselineTrajectory={null} baselineLapNumber={null} segments={[]}/>);
+    const button=screen.getByRole('button',{name:/generate ai report/i});
+    await waitFor(()=>expect(button).toBeEnabled());
+    expect(screen.getByText(/report will use the available lap and sector evidence/i)).toBeInTheDocument();
+    fireEvent.click(button);
+    await screen.findByText('Only lap and sector evidence is available.');
+    const body=JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body.evidence.lap.lapTimeSec).toBe(95.25);expect(body.evidence.segments).toEqual([]);
+    expect(body.evidence).not.toHaveProperty('geometry');expect(body.evidence).not.toHaveProperty('points');
+  });
+
   it('generates and regenerates a report when configured', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ configured: true }) })

@@ -284,7 +284,7 @@ without loading any metric data.
 
 Replay metadata and trajectory services resolve each selected driver's own vehicle record.
 `GpsSceneCarMarkers` uses model footprints only with established replay-origin alignment,
-otherwise labeled class-size defaults. Cloud AI routes are gated when a package is configured.
+otherwise labeled class-size defaults. Cloud AI remains available with or without a package and uses the existing summarized evidence contract; missing geometry reduces available detail.
 `tools/release/checkLocalData.mjs` runs before and after builds to reject detailed static
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).

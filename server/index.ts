@@ -16,7 +16,6 @@ import { createSessionRouter } from './routes/sessionRoutes.js';
 import { createSystemRouter } from './routes/systemRoutes.js';
 
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
-import { dataPlugin } from './plugins/dataPlugin.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -73,10 +72,7 @@ const startReferenceLaptimeRefresh = (): void => {
 
 serverContext.runInitialSessionSyncInBackground();
 
-app.use('/api/ai', (_req, res, next) => {
-  if (dataPlugin.status.state !== 'absent') { res.status(403).json({error:'Cloud reports are disabled while local data is active'}); return; }
-  next();
-}, createAiRouter(sessionDb));
+app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
 app.use('/api', createReferenceRouter(serverContext));
 app.use('/api', createSessionRouter(serverContext));
