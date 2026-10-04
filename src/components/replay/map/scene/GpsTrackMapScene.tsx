@@ -217,7 +217,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
             left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
 
           {layers.brakeMarkers && display?.brakeMarkers?.length ? <GpsBrakeMarkers markers={display.brakeMarkers}
-            bounds={effectiveBounds} viewBoxSize={VIEWBOX_SIZE} padding={PADDING} /> : null}
+            bounds={effectiveBounds} viewBoxSize={VIEWBOX_SIZE} padding={PADDING} markerScale={markerScale} /> : null}
 
           <GpsTrackSegments
             svgPoints={svgPoints}

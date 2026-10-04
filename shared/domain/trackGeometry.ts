@@ -205,12 +205,16 @@ export function parseTrackMapDisplay(value: unknown, layoutKey: string, sourceRe
       const path = `display.brakeMarkers[${index}]`;
       const marker = object(markers[index], path);
       text(marker.id, `${path}.id`);
+      if (marker.label !== undefined) text(marker.label, `${path}.label`);
       const center = array(marker.center, `${path}.center`, 2);
       if (center.length !== 2) invalid(`${path}.center`);
       finite(center[0], `${path}.center[0]`); finite(center[1], `${path}.center[1]`);
-      if (marker.distanceM !== null) finite(marker.distanceM, `${path}.distanceM`, 0);
       finite(marker.stationM, `${path}.stationM`, 0);
       if (marker.side !== 'left' && marker.side !== 'right') invalid(`${path}.side`);
+      if (marker.normal !== undefined) {
+        const normal = array(marker.normal, `${path}.normal`, 2);
+        finite(normal[0], `${path}.normal[0]`); finite(normal[1], `${path}.normal[1]`);
+      }
     }
   }
   return value as TrackMapDisplay;

@@ -30,8 +30,8 @@ function mapDisplay(overrides: Partial<TrackMapDisplay['surfaces']> = {}): Track
 const displayWithBrakeMarkers: TrackMapDisplay = {
   ...mapDisplay(),
   brakeMarkers: [
-    { id: 'brake-150', center: [120, 205], distanceM: 150, stationM: 325, side: 'left' },
-    { id: 'brake-unknown', center: [180, 230], distanceM: null, stationM: 710, side: 'right' },
+    { id: 'brake-150', center: [120, 205], label: '150', stationM: 325, side: 'left' },
+    { id: 'brake-unknown', center: [180, 230], label: '50', stationM: 710, side: 'right' },
   ],
 };
 
@@ -103,11 +103,12 @@ describe('GPS map display layers', () => {
 
     openLayers();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Braking markers' }));
-    expect(container.querySelector('[data-marker-id="brake-150"] text')).toHaveTextContent('150 m');
-    expect(container.querySelector('[data-marker-id="brake-unknown"] text')).toHaveTextContent('Brake');
-    expect(screen.getByRole('img', { name: 'Brake board, printed 150 metres' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Brake board, printed distance unknown' })).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-testid="gps-brake-markers"] circle')).toHaveLength(2);
+    expect(container.querySelector('[data-marker-id="brake-150"] text')).toHaveTextContent('150');
+    expect(container.querySelector('[data-marker-id="brake-unknown"] text')).toHaveTextContent('50');
+    expect(screen.getByRole('img', { name: 'Brake board, 150' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Brake board, 50' })).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-testid="gps-brake-markers"] rect')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-testid="gps-brake-markers"] circle')).toHaveLength(0);
 
     rerender(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={mapDisplay()} />);
     expect(screen.getByRole('checkbox', { name: 'Braking markers' })).toBeDisabled();

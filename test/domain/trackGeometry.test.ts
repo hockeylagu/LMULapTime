@@ -198,8 +198,8 @@ describe('track map display validation', () => {
   it('accepts optional braking markers and preserves legacy displays without them', () => {
     const display = mapDisplay() as TrackMapDisplay;
     display.brakeMarkers = [
-      { id: 'brake-150', center: [12, 34], distanceM: 150, stationM: 900, side: 'left' },
-      { id: 'brake-unknown', center: [56, 78], distanceM: null, stationM: 1200, side: 'right' },
+      { id: 'brake-150', center: [12, 34], label: '150', stationM: 900, side: 'left' },
+      { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right' },
     ];
     expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2').brakeMarkers).toEqual(display.brakeMarkers);
     expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2')).not.toHaveProperty('brakeMarkers');
@@ -210,8 +210,8 @@ describe('track map display validation', () => {
     ['wrong revision', { ...mapDisplay(), sourceRevision: 'old-mesh' }, 'test_gp', 'mesh-v2'],
     ['malformed polygon ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
     ['nonfinite coordinate', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [10, 0], [Infinity, 10]]]] } }, 'test_gp', 'mesh-v2'],
-    ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], distanceM: -1, stationM: 5, side: 'left' }] }, 'test_gp', 'mesh-v2'],
-    ['unknown marker side', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], distanceM: null, stationM: 5, side: 'center' }] }, 'test_gp', 'mesh-v2'],
+    ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: -5, side: 'left' }] }, 'test_gp', 'mesh-v2'],
+    ['unknown marker side', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: 5, side: 'center' }] }, 'test_gp', 'mesh-v2'],
   ])('rejects sidecar data with %s', (_label, value, layoutKey, revision) => {
     expect(() => parseTrackMapDisplay(value, layoutKey, revision)).toThrow('Invalid track geometry');
   });

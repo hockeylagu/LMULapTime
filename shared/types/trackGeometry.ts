@@ -21,9 +21,10 @@ export interface TrackMapSurfaces {
 export interface TrackBrakeMarker {
   id: string;
   center: [number, number];
-  distanceM: number | null;
+  label?: string;
   stationM: number;
   side: 'left' | 'right';
+  normal?: [number, number];
 }
 
 export interface TrackMapDisplay {
