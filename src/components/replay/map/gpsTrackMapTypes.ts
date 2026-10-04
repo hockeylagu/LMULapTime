@@ -20,6 +20,8 @@ export interface GpsTrackMapProps {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
   currentIndex: number;
   onSelectIndex?: (index: number) => void;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
   colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];

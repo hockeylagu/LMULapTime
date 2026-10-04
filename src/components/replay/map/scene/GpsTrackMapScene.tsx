@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { computeLapComparisons } from '../../../../utils/replayComparison.js';
-import { getTrajectoryDistances, getDistancesInReferenceFrame } from '../../../../utils/lapAlignment.js';
+import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 import {
   projectTrajectoryPoints,
   projectBoundaryPoints,
@@ -16,7 +16,7 @@ import {
 import { HeatmapLegendBar } from '../HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
-import { GpsSceneCarMarkers } from './GpsSceneCarMarkers.js';
+import { GpsSceneCarMarkers, replayBodyHeading } from './GpsSceneCarMarkers.js';
 import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
@@ -30,6 +30,7 @@ import { activeTrackBounds } from '../display/mapLayers.js';
 import { useMapLayers, projectedPointBounds } from '../display/useMapLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
+import { useGpsMapShortcuts } from '../useGpsMapShortcuts.js';
 
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
@@ -44,7 +45,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
     trackVenue, trackCourse, layoutKey, replayName, trackGeometry, trackLengthM, mapDisplay,
+    isPlaying, onTogglePlay,
   } = props;
+  const [isExpanded, setIsExpanded] = useState(false);
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
 
@@ -96,18 +99,19 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   );
 
   const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
-  const {
-    zoomLevel,
+  const { zoomLevel, containerRef, currentViewBox, handlePointerDown, handlePointerMove,
+    handlePointerUp, handleDoubleClick, resetPanZoom, focusOnPoint, markerScale } = camera;
+  useGpsMapShortcuts({
+    isExpanded,
     containerRef,
-    currentViewBox,
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
-    handleDoubleClick,
-    resetPanZoom,
-    focusOnPoint,
-    markerScale,
-  } = camera;
+    points,
+    currentIndex,
+    onSelectIndex,
+    onZoomIn: camera.zoomIn,
+    onZoomOut: camera.zoomOut,
+    onResetZoom: camera.resetPanZoom,
+    onTogglePlay,
+  });
   const fittedLayout = useRef<string | null>(null);
   useEffect(() => {
     const key = effectiveGeometry?.layoutKey ?? null;
@@ -150,6 +154,16 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     );
   }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, fraction, effectiveBounds]);
 
+  // Use the same distance station as ghost position, with shortest-arc body yaw interpolation.
+  const primaryDistance = (primaryDists[currentIndex] ?? 0)
+    + ((primaryDists[currentIndex + 1] ?? primaryDists[currentIndex] ?? 0) - (primaryDists[currentIndex] ?? 0)) * fraction;
+  let baselineHeadingIndex = findIndexAtDistance(baselineDists, primaryDistance);
+  if (baselineHeadingIndex > 0 && baselineDists[baselineHeadingIndex] > primaryDistance) baselineHeadingIndex--;
+  const baselineHeadingSpan = (baselineDists[baselineHeadingIndex + 1] ?? baselineDists[baselineHeadingIndex]) - baselineDists[baselineHeadingIndex];
+  const baselineHeadingFraction = baselineHeadingSpan > 0
+    ? (primaryDistance - baselineDists[baselineHeadingIndex]) / baselineHeadingSpan : 0;
+  const baselineBodyHeading = replayBodyHeading(effectiveBaselinePoints, baselineHeadingIndex, baselineHeadingFraction);
+
   const pedalMarkerPoints = useMemo(
     () => computePedalMarkerPoints(showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints),
     [showPedalMarkers, pedalMarkers, primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaselinePoints]
@@ -186,6 +200,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       ref={containerRef}
       tabIndex={0}
       data-replay-surface="map"
+      data-map-expanded={isExpanded ? '' : undefined}
       aria-label="Track map"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -197,7 +212,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={effectiveGeometry}
           display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
           center={centerlineSvgPoints} trajectory={svgPoints}
-          orientation={controlsOrientation ?? (dimNonSelectedTrack ? 'vertical' : 'horizontal')} />
+          orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : (dimNonSelectedTrack ? 'vertical' : 'horizontal'))}
+          isPlaying={isPlaying} onTogglePlay={onTogglePlay} isExpanded={isExpanded} onToggleExpanded={setIsExpanded} />
       )}
 
       {showMinimap && (
@@ -260,6 +276,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         </svg>
         <GpsSceneCarMarkers
           viewBox={currentViewBox}
+          unitsPerMeter={(VIEWBOX_SIZE - 2 * PADDING) / Math.max(effectiveBounds.spanX, effectiveBounds.spanZ, 1)}
+          primaryHeadingDeg={replayBodyHeading(points, currentIndex, fraction)}
+          baselineHeadingDeg={baselineBodyHeading}
           currentPos={currentPos}
           baselineGhostPos={baselineGhostPos}
           markerScale={markerScale}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { GpsSceneCarMarkers, replayBodyHeading } from '../../../../../src/components/replay/map/scene/GpsSceneCarMarkers.js';
 import { GpsTrackMap } from '../../../../../src/components/replay/index.js';
 import { ReplayTrajectoryPoint } from '../../../../../server/core/types.js';
 
@@ -18,8 +19,8 @@ describe('GpsSceneCarMarkers', () => {
 
     expect(overlay).toHaveClass('will-change-transform', 'pointer-events-none', 'absolute', 'inset-0');
     expect(overlay.getAttribute('viewBox')).toBe(scene?.getAttribute('viewBox'));
-    expect(overlay.querySelector('[filter="url(#carGlow)"]')).toBeInTheDocument();
-    expect(overlay.querySelector('[filter="url(#ghostGlow)"]')).toBeInTheDocument();
+    expect(overlay.querySelector('[data-car-role="primary"]')).toBeInTheDocument();
+    expect(overlay.querySelector('[data-car-role="baseline"]')).toBeInTheDocument();
     expect(overlay.querySelector('[data-track-line]')).toBeNull();
     expect(scene?.querySelector('[filter="url(#carGlow)"]')).toBeNull();
   });
@@ -32,3 +33,40 @@ describe('GpsSceneCarMarkers', () => {
     expect(carTransform()).not.toBe(before);
   });
 });
+
+describe('temporary car size preview', () => {
+  it('preserves world dimensions across camera zoom and keeps dots at overview scale', () => {
+    const props = { currentPos: {sx:100,sy:200}, unitsPerMeter:10, primaryHeadingDeg:0, primaryOpacity:1, baselineOpacity:1 };
+    const {rerender} = render(<GpsSceneCarMarkers {...props} viewBox="0 0 800 800" markerScale={1} />);
+    const footprint = () => screen.getByTestId('gps-car-footprint');
+    const width = footprint().getAttribute('width'), height = footprint().getAttribute('height');
+    expect(Number(width)/10).toBeCloseTo(2.005);
+    expect(Number(height)/10).toBeCloseTo(5.023);
+    rerender(<GpsSceneCarMarkers {...props} viewBox="60 160 80 80" markerScale={0.1} />);
+    expect(footprint().getAttribute('width')).toBe(width);
+    expect(footprint().getAttribute('height')).toBe(height);
+    rerender(<GpsSceneCarMarkers {...props} unitsPerMeter={0.1} viewBox="0 0 800 800" markerScale={1} />);
+    expect(screen.queryByTestId('gps-car-footprint')).toBeNull();
+    expect(screen.getByTestId('gps-car-markers').querySelector('circle')).toBeInTheDocument();
+  });
+
+  it('uses body yaw even while stopped or travelling sideways, and wraps smoothly', () => {
+    expect(replayBodyHeading([{rotY:Math.PI}],0)).toBeCloseTo(0);
+    expect(replayBodyHeading([{rotY:0}],0)).toBeCloseTo(180);
+    expect(replayBodyHeading([{rotY:Math.PI/2}],0)).toBeCloseTo(-90);
+    expect(replayBodyHeading([{rotY:Math.PI-0.1},{rotY:-Math.PI+0.1}],0,0.5)).toBeCloseTo(0);
+    expect(replayBodyHeading([{rotY:Math.PI},{rotY:0,isTeleport:true}],0,0.5)).toBeCloseTo(0);
+    expect(replayBodyHeading([{}],0)).toBeUndefined();
+    expect(replayBodyHeading([{rotY:NaN}],0)).toBeUndefined();
+  });
+
+  it('draws replay body orientation independently of the path and uses a dot without it', () => {
+    const sliding = points.map(p => ({...p, rotY:Math.PI/2}));
+    const {rerender} = render(<GpsTrackMap points={sliding} bounds={bounds} currentIndex={1} baselinePoints={points.map(p=>({...p,rotY:Math.PI}))} />);
+    expect(Number(screen.getByTestId('gps-car-footprint').parentElement?.getAttribute('transform')?.slice(7,-1))).toBeCloseTo(-90);
+    expect(Number(screen.getByTestId('gps-ghost-footprint').parentElement?.getAttribute('transform')?.match(/rotate\((.*)\)/)?.[1])).toBeCloseTo(0);
+    rerender(<GpsTrackMap points={points.map(({rotY,...p})=>p)} bounds={bounds} currentIndex={1} />);
+    expect(screen.queryByTestId('gps-car-footprint')).toBeNull();
+  });
+});
+

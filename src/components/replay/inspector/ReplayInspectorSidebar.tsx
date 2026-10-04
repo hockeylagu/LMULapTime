@@ -48,6 +48,8 @@ export interface ReplayInspectorSidebarProps {
   trackVenue?: string;
   trackCourse?: string;
   layoutKey?: string;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
@@ -63,6 +65,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   trajectory,
   currentIndex,
   setCurrentIndex,
+  isPlaying,
+  onTogglePlay,
   currentPoint,
   cornerSegments,
   selectedCornerNumber,
@@ -113,6 +117,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       trajectory={trajectory}
       currentIndex={currentIndex}
       onSelectIndex={setCurrentIndex}
+      isPlaying={isPlaying}
+      onTogglePlay={onTogglePlay}
       colorBy={colorBy}
       onChangeColorBy={setColorBy}
       isCompareMode={isCompareMode}

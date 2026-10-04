@@ -82,4 +82,29 @@ describe('MapControlsOverlay', () => {
     const overlay = container.querySelector('[data-testid="map-controls-overlay"]');
     expect(overlay).toHaveClass('flex-col');
   });
+
+  it('renders and toggles play/pause button when onTogglePlay is provided', () => {
+    const onTogglePlay = vi.fn();
+    const { rerender } = render(
+      <MapControlsOverlay {...defaultProps} isPlaying={false} onTogglePlay={onTogglePlay} />
+    );
+
+    const playButton = screen.getByRole('button', { name: 'Play' });
+    expect(playButton).toBeInTheDocument();
+    expect(playButton).toHaveAttribute('title', 'Play · Space');
+
+    fireEvent.click(playButton);
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MapControlsOverlay {...defaultProps} isPlaying={true} onTogglePlay={onTogglePlay} />
+    );
+
+    const pauseButton = screen.getByRole('button', { name: 'Pause' });
+    expect(pauseButton).toBeInTheDocument();
+    expect(pauseButton).toHaveAttribute('title', 'Pause · Space');
+
+    fireEvent.click(pauseButton);
+    expect(onTogglePlay).toHaveBeenCalledTimes(2);
+  });
 });

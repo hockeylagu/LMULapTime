@@ -5,6 +5,7 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { projectBoundaryPoints } from '../replayMapUtils.js';
 import { MapLayersControl } from './MapLayersControl.js';
 import { MapFullscreenButton } from './MapFullscreenButton.js';
+import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { visibleSurfacePoints, type MapLayers } from './mapLayers.js';
 import { projectedPointBounds } from './useMapLayers.js';
 
@@ -19,15 +20,22 @@ interface Props {
   bounds: TrackBoundaryGeometry['bounds'];
   left: Point[]; right: Point[]; center: Point[]; trajectory: Point[];
   orientation: 'vertical' | 'horizontal';
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
+  showPlayPause?: boolean;
 }
 
 export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geometry, display, error,
-  bounds, left, right, center, trajectory, orientation }) => {
+  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause }) => {
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
+  const shouldShowPlayPause = showPlayPause ?? Boolean(isExpanded);
   return <MapControlsOverlay onZoomIn={camera.zoomIn} onZoomOut={camera.zoomOut} onReset={() => fit(active)}
     zoomDisplay={`${Number(camera.zoomLevel.toFixed(1))}x`} followCar={camera.followCar}
     onToggleFollowCar={() => camera.setFollowCar(value => !value)} onCenterCar={camera.centerOnCar}
+    isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}
     orientation={orientation} className="top-2 right-2 bottom-auto">
     <MapLayersControl layers={layers} onChange={onChange} error={error}
       available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
@@ -38,6 +46,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(display?.surfaces ?? geometry?.mapSurfaces,
           { ...layers, road: Boolean(display) && layers.road, kerb: Boolean(display) && layers.kerb }), bounds, 800, 60)])} />
-    <MapFullscreenButton />
+    <ReplayShortcutHelp />
+    <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />
   </MapControlsOverlay>;
 };

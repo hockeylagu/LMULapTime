@@ -8,5 +8,6 @@ export function replayShortcutBlocked(event: KeyboardEvent): boolean {
 }
 
 export function isReplaySurfaceTarget(event: KeyboardEvent): boolean {
+  if (Boolean(document.querySelector('[data-map-expanded]'))) return true;
   return event.target instanceof Element && Boolean(event.target.closest('[data-replay-surface]'));
 }

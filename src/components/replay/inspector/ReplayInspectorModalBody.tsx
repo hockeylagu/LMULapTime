@@ -246,6 +246,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           trajectory={trajectory}
           currentIndex={currentIndex}
           setCurrentIndex={setCurrentIndex}
+          isPlaying={isPlaying}
+          onTogglePlay={() => setIsPlaying(!isPlaying)}
           currentPoint={currentPoint}
           cornerSegments={cornerSegments}
           selectedCornerNumber={selectedCornerNumber}

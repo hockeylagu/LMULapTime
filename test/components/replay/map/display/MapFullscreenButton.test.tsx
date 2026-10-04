@@ -25,4 +25,28 @@ describe('MapFullscreenButton', () => {
     expect(map).not.toHaveAttribute('data-map-expanded');
     expect(screen.getByRole('button', { name: 'Full screen map' })).toHaveAttribute('aria-pressed', 'false');
   });
+
+  it('supports controlled mode with isExpanded and onToggleExpanded', () => {
+    let expanded = false;
+    const onToggle = (next: boolean) => { expanded = next; };
+    const { rerender } = render(
+      <div data-replay-surface="map" data-testid="map">
+        <MapFullscreenButton isExpanded={expanded} onToggleExpanded={onToggle} />
+      </div>
+    );
+    const map = screen.getByTestId('map');
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    expect(expanded).toBe(true);
+
+    rerender(
+      <div data-replay-surface="map" data-testid="map">
+        <MapFullscreenButton isExpanded={true} onToggleExpanded={onToggle} />
+      </div>
+    );
+    expect(map).toHaveAttribute('data-map-expanded');
+    expect(screen.getByRole('button', { name: 'Exit full screen (Esc)' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(expanded).toBe(false);
+  });
 });

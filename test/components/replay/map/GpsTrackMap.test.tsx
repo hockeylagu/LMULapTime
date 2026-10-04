@@ -378,4 +378,87 @@ describe('GpsTrackMap', () => {
     fireEvent.click(screen.getByText('T1'));
     expect(onSelectIndex).toHaveBeenCalledWith(1);
   });
+
+  it('shows play/pause button in full screen map and handles toggling playback', () => {
+    const onTogglePlay = vi.fn();
+    const { container, rerender } = render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        isPlaying={false}
+        onTogglePlay={onTogglePlay}
+      />
+    );
+
+    // In normal view, play/pause is hidden so it doesn't crowd sidebar controls
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+
+    // Expand map to full screen
+    const fullscreenButton = screen.getByRole('button', { name: 'Full screen map' });
+    fireEvent.click(fullscreenButton);
+
+    const map = container.querySelector('[data-replay-surface="map"]');
+    expect(map).toHaveAttribute('data-map-expanded');
+
+    // In full screen view, play button is visible
+    const playButton = screen.getByRole('button', { name: 'Play' });
+    expect(playButton).toBeInTheDocument();
+
+    fireEvent.click(playButton);
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+
+    // When playing in full screen, pause button is visible
+    rerender(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={0}
+        isPlaying={true}
+        onTogglePlay={onTogglePlay}
+      />
+    );
+
+    const pauseButton = screen.getByRole('button', { name: 'Pause' });
+    expect(pauseButton).toBeInTheDocument();
+    fireEvent.click(pauseButton);
+    expect(onTogglePlay).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles keyboard shortcuts in full screen mode', () => {
+    const onSelectIndex = vi.fn();
+    const onTogglePlay = vi.fn();
+    render(
+      <GpsTrackMap
+        points={mockPoints}
+        bounds={mockBounds}
+        currentIndex={1}
+        isPlaying={false}
+        onTogglePlay={onTogglePlay}
+        onSelectIndex={onSelectIndex}
+      />
+    );
+
+    // Expand map to full screen
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+
+    // Arrow keys step replay index
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(onSelectIndex).toHaveBeenCalledWith(2);
+
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(onSelectIndex).toHaveBeenCalledWith(0);
+
+    // Home jumps to start
+    fireEvent.keyDown(window, { key: 'Home' });
+    expect(onSelectIndex).toHaveBeenCalledWith(0);
+
+    // End jumps to end
+    fireEvent.keyDown(window, { key: 'End' });
+    expect(onSelectIndex).toHaveBeenCalledWith(mockPoints.length - 1);
+
+    // Space toggles play/pause in full screen
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  });
 });

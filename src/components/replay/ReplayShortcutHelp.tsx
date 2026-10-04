@@ -33,7 +33,7 @@ export function ReplayShortcutHelp() {
   return <>
     <button type="button" onClick={() => setOpen(true)} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"
       className="h-6 w-6 shrink-0 text-xs font-mono text-lmu-muted hover:text-white rounded hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-lmu-info">?</button>
-    {open && createPortal(<div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center" onClick={() => setOpen(false)}>
+    {open && createPortal(<div className="fixed inset-0 z-[1100] bg-black/60 flex items-center justify-center" onClick={() => setOpen(false)}>
       <section role="dialog" aria-modal="true" aria-labelledby="replay-shortcut-title"
         className="w-[440px] max-w-[90vw] rounded-xl border border-lmu-border bg-lmu-strip p-5 shadow-xl"
         onClick={event => event.stopPropagation()} onKeyDown={event => {

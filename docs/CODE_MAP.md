@@ -259,3 +259,9 @@ Update this file in the same commit when you:
 - fix or find a smell (section 9).
 
 Refresh the "Last checked" line when you re-verify the numbers.
+
+GPS car-size visual POC: `src/components/replay/map/scene/GpsSceneCarMarkers.tsx` uses a hardcoded
+5.023 × 2.005 m envelope for both primary and comparison cars. `GpsTrackMapScene.tsx` supplies the
+map projection scale and replay body yaw (`rotY`, native forward -Z), interpolated on the shortest
+arc for playback and distance-aligned ghosts. Overview dots become true-scale footprints on close
+views; missing body yaw retains a dot. Model matching and replay-origin alignment remain pending.

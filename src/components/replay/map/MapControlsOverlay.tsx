@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, RotateCcw, Crosshair, LocateFixed } from 'lucide-react';
+import { Plus, Minus, RotateCcw, Crosshair, LocateFixed, Play, Pause } from 'lucide-react';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface MapControlsOverlayProps {
@@ -13,6 +13,8 @@ export interface MapControlsOverlayProps {
   orientation?: 'vertical' | 'horizontal';
   className?: string;
   children?: React.ReactNode;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
@@ -26,6 +28,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
   orientation = 'horizontal',
   className = '',
   children,
+  isPlaying,
+  onTogglePlay,
 }) => {
   const isVert = orientation === 'vertical';
 
@@ -39,6 +43,21 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
     >
+      {onTogglePlay && (
+        <button
+          type="button"
+          onClick={onTogglePlay}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? 'Pause · Space' : 'Play · Space'}
+          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
+            isPlaying
+              ? 'bg-lmu-accent text-white hover:bg-lmu-accent/80'
+              : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
+          } ${FOCUS_RING}`}
+        >
+          {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 translate-x-0.5" />}
+        </button>
+      )}
       <button
         type="button"
         onClick={onZoomIn}

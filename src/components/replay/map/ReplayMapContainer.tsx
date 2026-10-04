@@ -26,6 +26,8 @@ export interface ReplayMapContainerProps {
   layoutKey?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   onOpenCornersTab?: () => void;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -44,6 +46,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   trackCourse,
   layoutKey,
   trackGeometry,
+  isPlaying,
+  onTogglePlay,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
@@ -179,6 +183,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             bounds={trajectory.bounds}
             currentIndex={currentIndex}
             onSelectIndex={onSelectIndex}
+            isPlaying={isPlaying}
+            onTogglePlay={onTogglePlay}
             colorBy={colorBy}
             className="w-full h-full"
             baselinePoints={baselinePoints}
