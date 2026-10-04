@@ -55,6 +55,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ## 🛠️ Documentation
 
+- [`docs/PLUGINS.md`](docs/PLUGINS.md): planned optional local data plugins, compatibility and fallback.
 - [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): LMU 100 Hz DuckDB telemetry tables and channels.
 - [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md) / [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): the reverse-engineered binary replay format (`gMb1.002f`) and its accuracy.
 - [`docs/XML_FORMAT.md`](docs/XML_FORMAT.md): LMU results XML schema.
