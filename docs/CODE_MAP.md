@@ -37,6 +37,8 @@ Refreshes during a scan are coalesced into one follow-up
 XML scan (preserving a requested force reparse), followed by replay and DuckDB scans.
 `server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker.
 XML publishes ten-session transactions before proceeding; cached sessions whose XML is gone survive.
+Each batch rates pace against the current main-thread benchmarks immediately before persistence,
+then reapplies lap conditions, so delayed worker results cannot restore obsolete or wet-best ratings.
 Replay discovery finishes and matches every session before decoding associated recordings; per-replay
 jobs expose queued/processing/ready/failed states and whether a failed decode still has a playable primary trajectory. Launch actions remain available for playable cached data or DuckDB telemetry and report partial failures.
 Manual refresh retries failed driver decodes.
@@ -70,7 +72,8 @@ Manual refresh retries failed driver decodes.
    condition (the header scan samples 30 windows and can miss the peak).
    **Re-rate on new targets**: `server/core/dbSessionPace.ts` (`rerateStoredSessionPace`, via `context.rerateSessionPace`) runs
    `rateDriversPace` again on every stored session when the benchmark `lastUpdated` differs from `cache_metadata`
-   `session_pace_reference`, after the startup background refresh and the manual refresh.
+   `session_pace_reference_v2`, after the startup background refresh and the manual refresh.
+   The v2 marker repairs ratings saved by the former late-worker race even when targets are unchanged.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
    - telemetry links (`context.enrichSessionsWithTelemetry`);
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).
@@ -89,6 +92,13 @@ Manual refresh retries failed driver decodes.
 - Decode (all in `server/replay/decode/`): `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
   (`extractReplayTrajectory`) → laps sliced by `replayLapBuilder.ts` / `replayLapPoints.ts` → garage/pit state `garageState.ts`.
 - Always on a worker: `worker/replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayCacheService` (`replayCacheService.ts`).
+- Driver selection prefers exact normalized names and rejects ambiguous partial matches.
+  Native replay trajectories retain their session clock and timing-loop lap start; DuckDB fusion explicitly
+  converts that clock to lap time, including early race laps. Older retained rows use their first sample.
+  `decode/replayLapClassification.ts` recovers pit flags from retained lap spans, pit events and samples on read;
+  matched XML classification takes precedence in `replayTransforms.ts`. Replay consistency uses
+  `isCleanReplayLap` (`shared/domain/lapComparison.ts`) to exclude pit, out, invalid and non-representative laps.
+  These read-time corrections preserve deleted recordings and require no cache version bump.
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
@@ -273,7 +283,8 @@ still require an established replay-origin offset.
 ## Local data packages
 
 `server/plugins/dataPlugin.ts` loads one validated startup snapshot from backend-only
-`LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist.
+`LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist,
+rejects degenerate closed routes, and checks declared length against the measured route within 0.01 m.
 `server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair) and
 vehicles, with the same server access behavior as the rest of the API. There is no static package mount.
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and

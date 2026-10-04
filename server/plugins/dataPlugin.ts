@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitSpecs.js';
-import { parseTrackBoundaryGeometry, parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
+import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
@@ -106,8 +106,7 @@ export class DataPlugin {
           const row=object(entry), key=text(row.layoutKey);
           if (!/^[a-z0-9_]+$/.test(key) || !CIRCUIT_SPECIFICATIONS[key] || this.tracks.has(key)) throw Error('Invalid layout identity');
           const raw=object(read(path.posix.join(path.posix.dirname(catalogPath), key+'.json')));
-          validateTrackPackage(raw);
-          const geometry=parseTrackBoundaryGeometry(raw,key), spec=CIRCUIT_SPECIFICATIONS[key];
+          const geometry=validateTrackPackage(raw,key), spec=CIRCUIT_SPECIFICATIONS[key];
           if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId!) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || row.lengthM!==geometry.lengthM || row.pointsCount!==geometry.centerline.length || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
           let display: TrackMapDisplay|null=null;
           const displayPath=`tracks-display/${key}.json`;

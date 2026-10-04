@@ -41,11 +41,14 @@ export class ReplayCacheService {
     if (!driverName) return undefined;
     try {
       const metadata = this.getMetadata(filePath, replayName, playerName);
-      const target = driverName.toLowerCase();
-      const match = metadata.drivers.find(driver => {
-        const name = driver.name.toLowerCase();
-        return name === target || name.includes(target) || target.includes(name);
+      const target = driverName.trim().toLowerCase();
+      if (!target) return undefined;
+      const exact = metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target);
+      const candidates = exact.length ? exact : metadata.drivers.filter(driver => {
+        const name = driver.name.trim().toLowerCase();
+        return name.length > 0 && (name.includes(target) || target.includes(name));
       });
+      const match = candidates.length === 1 ? candidates[0] : undefined;
       return typeof match?.slot === 'number' ? match.slot : undefined;
     } catch {
       return undefined;

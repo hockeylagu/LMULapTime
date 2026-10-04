@@ -10,6 +10,7 @@ import {syntheticTrack} from '../../helpers/syntheticTrack.js';
 import {TrackGeometryStore} from '../../../server/tracks/trackGeometryStore.js';
 import {applyCanonicalProjection,enrichTrajectoryWithTrackGeometry} from '../../../server/tracks/serverTrackSync.js';
 import type {ReplayTrajectoryData} from '../../../shared/types/replay.js';
+import {trackRevisions} from '../../../server/plugins/trackPackage.js';
 
 const directories:string[]=[];
 afterEach(()=>{for(const dir of directories.splice(0))fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:50});});
@@ -38,6 +39,19 @@ describe('local data plugin snapshot',()=>{
   it('rejects changed content under old revisions and unsupported track fields',()=>{
     const a=fixture('tracks');a.write('tracks/monza_gp.json',{...a.geometry,lengthM:a.geometry.lengthM+1});expect(new DataPlugin(a.dir).status.state).toBe('invalid');
     const b=fixture('tracks');b.write('tracks/monza_gp.json',{...b.geometry,source:'private'});expect(new DataPlugin(b.dir).status.state).toBe('invalid');
+  });
+  it.each(['collapsed','duplicate','length'] as const)('rejects a correctly hashed but unusable route (%s)',kind=>{
+    const {dir,write,geometry}=fixture('tracks');
+    if(kind==='collapsed') geometry.centerline=geometry.centerline.map(()=>[0,0]);
+    if(kind==='duplicate') geometry.centerline[1]=[...geometry.centerline[0]];
+    if(kind==='length') geometry.lengthM+=100;
+    Object.assign(geometry,trackRevisions(geometry as unknown as Record<string,unknown>));
+    write('tracks/monza_gp.json',geometry);
+    write('tracks/index.json',[{layoutKey:geometry.layoutKey,circuitId:geometry.circuitId,layoutId:geometry.layoutId,lengthM:geometry.lengthM,pointsCount:geometry.centerline.length}]);
+    write('tracks-display/monza_gp.json',{layoutKey:geometry.layoutKey,sourceRevision:geometry.geometryRevision,surfaces:{road:[],kerb:[],runoff:[],pit:[],otherRoad:[]}});
+    const plugin=new DataPlugin(dir);
+    expect(plugin.status.state).toBe('invalid');
+    expect(plugin.track(geometry.layoutKey)).toBeNull();
   });
   it('feeds the same metric geometry into banking and kerb enrichment while missing profiles remain null',()=>{
     const {dir}=fixture();const p=new DataPlugin(dir),store=new TrackGeometryStore(key=>p.track(key)?.geometry??null),definition=store.get('monza_gp')!;

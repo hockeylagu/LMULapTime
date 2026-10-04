@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
 import type { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 // The benchmark target the ratings are computed against; each test sets it.
 const target = vi.hoisted(() => ({ sec: 120 as number | null }));
@@ -75,5 +78,40 @@ describe('re-rating stored sessions when the benchmark targets change', () => {
     const stored = db.getAllSessions()[0];
     expect(stored.playerDriver?.bestLapPacePercentage).toBeUndefined();
     expect(stored.drivers[0].laps[1].paceCategory).toBeUndefined();
+  });
+
+  it('repairs a stored rating from the old completion marker even when targets have not changed', () => {
+    db.getDb().prepare('DELETE FROM cache_metadata WHERE key = ?').run('session_pace_reference_v2');
+    db.setMetadata('session_pace_reference', 'v1');
+    target.sec = 120.5;
+    expect(db.rerateSessionPace('v1')).toBe(1);
+    expect(db.getSessionById(session.id)?.drivers[0].laps[1].pacePercentage).toBe(100.58);
+  });
+
+  it.each([false, true])('rates a late worker result at persistence and preserves wet-best rules (wet=%s)', async wet => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-pace-race-'));
+    try {
+      fs.writeFileSync(path.join(directory, 'late.xml'), '<session/>');
+      const oldWorkerResult = structuredClone(db.getSessionById(session.id)!);
+      if (wet) {
+        oldWorkerResult.drivers[0].laps[1].fCompound = 'Wet';
+        oldWorkerResult.drivers[0].laps[1].rCompound = 'Wet';
+      }
+      const iterator = db.syncSessionsAsyncIterator(directory, {
+        addReplayEntry: () => {},
+        parseSessionXml: () => { throw new Error('Expected asynchronous parsing'); },
+        parseSessionXmlAsync: async () => {
+          target.sec = 120.5;
+          db.rerateSessionPace('v2');
+          return oldWorkerResult;
+        },
+      });
+      for await (const progress of iterator) void progress;
+      expect(db.rerateSessionPace('v2')).toBe(0);
+      const stored = db.getSessionById(session.id)!;
+      expect(stored.drivers[0].laps[1].pacePercentage).toBe(100.58);
+      expect(stored.playerDriver?.bestLapPacePercentage).toBe(wet ? undefined : 100.58);
+      expect(stored.playerDriver?.bestLapWet).toBe(wet ? true : undefined);
+    } finally { fs.rmSync(directory, {recursive: true, force: true}); }
   });
 });

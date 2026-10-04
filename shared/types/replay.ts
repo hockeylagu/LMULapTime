@@ -206,6 +206,8 @@ export interface ReplayLapSummary {
   s2Sec: number;
   s3Sec: number;
   isOutlap?: boolean;
+  /** Completed lap containing pit-lane entry; excluded from flying-lap consistency. */
+  isPitStop?: boolean;
   isBest?: boolean;
   isValid?: boolean;
   startFrame?: number;
@@ -233,6 +235,8 @@ export interface ReplayTrajectoryValidation {
     s2Sec?: number | null;
     s3Sec?: number | null;
     isValid?: boolean;
+    isPitStop?: boolean;
+    isOutLap?: boolean;
     nonRepresentativeReason?: NonRepresentativeReason;
   }>;
 }
@@ -258,6 +262,10 @@ export interface ReplayTrajectoryData {
   maxPoints?: number;
   isFullResolution?: boolean;
   currentLap?: number;
+  /** Recorded sample clock; native replay samples use session time. */
+  timeReference?: 'session' | 'lap';
+  /** Session timestamp of the selected lap's timing-loop start. */
+  lapStartTimeSec?: number;
   laps?: ReplayLapSummary[];
   sectors?: {
     s1Frame: number;

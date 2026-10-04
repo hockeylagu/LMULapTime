@@ -14,6 +14,7 @@ import {
   ReplayMetadata,
   ReplayTrajectoryData,
 } from '../../../server/core/types.js';
+import { computeLapConsistencyStats } from '../../../src/utils/lapConsistency.js';
 
 describe('Replay domain services and transforms', () => {
   describe('cloneReplayMetadata & composeReplayMetadata', () => {
@@ -263,6 +264,25 @@ describe('Replay domain services and transforms', () => {
       // Verify original lap was not mutated
       expect(originalLap).not.toHaveProperty('validatedTimeSec');
       expect(originalLap).not.toHaveProperty('timeDiffSec');
+    });
+
+    it('uses parser classification for pit, out and invalid laps even when replay flags disagree', () => {
+      const original: ReplayTrajectoryData = { replayName: 'Validation.Vcr', pointsCount: 1,
+        bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1 },
+        points: [{ x: 0, y: 0, z: 0 }],
+        laps: [1, 2, 3, 4].map(lapNumber => ({ lapNumber, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30, isValid: true, isBest: lapNumber === 1 })) };
+      const driver = { name: 'Official', laps: [
+        { lapNum: 1, lapTime: 90, isValid: true, isPitStop: true },
+        { lapNum: 2, lapTime: 90, isValid: true, isOutLap: true },
+        { lapNum: 3, lapTime: null, isValid: false },
+        { lapNum: 4, lapTime: 90, isValid: true },
+      ] } as unknown as DriverData;
+      const result = applyPureOfficialLapValidation(original, { id: 'official', trackVenue: 'Monza', trackCourse: 'GP' } as DetailedSession, driver);
+      expect(result.laps?.[0]).toMatchObject({ isPitStop: true, isBest: false });
+      expect(result.laps?.[1].isOutlap).toBe(true);
+      expect(result.laps?.[2].isValid).toBe(false);
+      expect(computeLapConsistencyStats(result.laps).lapCount).toBe(1);
+      expect(original.laps?.[0].isPitStop).toBeUndefined();
     });
   });
 });

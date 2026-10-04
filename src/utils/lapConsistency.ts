@@ -1,4 +1,5 @@
 import { ReplayLapSummary } from '../../shared/types/index.js';
+import { isCleanReplayLap } from '../../shared/domain/lapComparison.js';
 
 export interface SectorConsistencyStat {
   key: 'lapTimeSec' | 's1Sec' | 's2Sec' | 's3Sec';
@@ -33,7 +34,7 @@ const SECTOR_DEFS: Array<{ key: SectorConsistencyStat['key']; label: string }> =
  * than outright pace.
  */
 export function computeLapConsistencyStats(laps: ReplayLapSummary[] | null | undefined): LapConsistencyStats {
-  const validLaps = (laps || []).filter(l => l.isValid !== false && !l.isOutlap && l.lapTimeSec > 0);
+  const validLaps = (laps || []).filter(isCleanReplayLap);
 
   const stats: SectorConsistencyStat[] = SECTOR_DEFS.map(({ key, label }) => {
     const values = validLaps.map(l => l[key]).filter((v): v is number => typeof v === 'number' && v > 0);

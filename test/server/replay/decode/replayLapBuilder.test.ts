@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { detectLapsFromTelemetry, RawTrajectoryPoint, VcrTimingEvent } from '../../../../server/replay/decode/replayLapBuilder.js';
+import { computeLapConsistencyStats } from '../../../../src/utils/lapConsistency.js';
 
 const SLOT = 1;
 const SPEED_MPS = 50;
@@ -24,6 +25,21 @@ function detect(points: RawTrajectoryPoint[], timings: VcrTimingEvent[]) {
 }
 
 describe('detectLapsFromTelemetry: the lap still running when the replay ends', () => {
+  it('excludes a completed pit in-lap from best flying lap and consistency', () => {
+    const result = detectLapsFromTelemetry(drive(190), twoLaps, SLOT,
+      [{ driverSlot: SLOT, timeSec: 150, code: 34, action: 'Pit entry' }], 2000);
+    expect(result.lapsSummary[1]).toMatchObject({ isValid: true, isOutlap: false, isPitStop: true, isBest: false });
+    expect(computeLapConsistencyStats(result.lapsSummary).lapCount).toBe(0);
+  });
+
+  it('uses recorded pit state without events and identifies an out-lap with the limiter off', () => {
+    const result = detectLapsFromTelemetry(drive(290, sTime => ({ inPit: sTime >= 150 && sTime <= 205 })),
+      [...twoLaps, finish(2, 290, 100)], SLOT, [], 2000);
+    expect(result.lapsSummary[1].isPitStop).toBe(true);
+    expect(result.lapsSummary[2].isOutlap).toBe(true);
+    expect(computeLapConsistencyStats(result.lapsSummary).lapCount).toBe(0);
+  });
+
   it('is kept as an invalid, partial lap and never becomes the best lap', () => {
     const laps = detect(drive(230), [...twoLaps, sector(2, 1, 215, 25)]);
 

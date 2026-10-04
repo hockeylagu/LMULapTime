@@ -3,6 +3,36 @@ import { fuseDuckDbWithVcrTrajectory } from '../../../server/telemetry/telemetry
 import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../../server/core/types.js';
 
 describe('telemetryFusion', () => {
+  it.each([40, 100])('aligns an early race lap starting at session time %s, including retained rows', start => {
+    const vcr: ReplayTrajectoryData = {
+      replayName: 'Race.Vcr', currentLap: 2, pointsCount: 3,
+      bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 0, spanX: 100, spanZ: 0 },
+      points: [0, 50, 100].map((x, i) => ({ x, y: 0, z: 0, timeSec: start + i * 50 })),
+      sectors: { s1Frame: 1, s2Frame: 2 },
+      leadInPoints: [{ x: -1, y: 0, z: 0, timeSec: start - 0.1 }],
+    };
+    const duck: DuckDbLapTelemetry = { lapNumber: 2, lapTimeSec: 100, pointsCount: 3, sampleRateHz: 100,
+      points: [0, 50, 100].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, tireTemps: [70, 71, 72, 73] })) };
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
+    expect(fused.points.map(point => point.x)).toEqual([0, 50, 100]);
+    expect(fused.sectors).toEqual({ s1Frame: 1, s2Frame: 2 });
+    expect(fused.leadInPoints?.[0].timeSec).toBe(-0.1);
+    expect(fused.points[1].tireTemps).toEqual([70, 71, 72, 73]);
+    expect(fused.timeReference).toBe('lap');
+  });
+
+  it('uses an explicit timing-loop start and preserves an explicitly lap-relative clock', () => {
+    const vcr: ReplayTrajectoryData = { replayName: 'Clock.Vcr', pointsCount: 2,
+      timeReference: 'session', lapStartTimeSec: 100,
+      bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 0, spanX: 100, spanZ: 0 },
+      points: [{ x: 10, y: 0, z: 0, timeSec: 100.2 }, { x: 100, y: 0, z: 0, timeSec: 102 }] };
+    const duck: DuckDbLapTelemetry = { lapNumber: 2, lapTimeSec: 2, pointsCount: 1, sampleRateHz: 100,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 1 }] };
+    expect(fuseDuckDbWithVcrTrajectory(duck, vcr).points[0].x).toBe(50);
+    const relative = { ...vcr, timeReference: 'lap' as const, points: vcr.points.map(point => ({ ...point, timeSec: point.timeSec! - 100 })) };
+    expect(fuseDuckDbWithVcrTrajectory(duck, relative).points[0].x).toBe(50);
+  });
+
   it('clears source geometry and cut annotations when producing a new fused sample series', () => {
     const vcr: ReplayTrajectoryData = {
       replayName: 'Geometry_Test.Vcr', pointsCount: 2,

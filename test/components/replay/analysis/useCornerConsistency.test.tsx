@@ -5,7 +5,7 @@ import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/co
 
 const bounds = { minX: 0, maxX: 10, minZ: 0, maxZ: 0, spanX: 10, spanZ: 0 };
 
-function lapSummary(lapNumber: number, lapTimeSec: number, options: { isValid?: boolean; isOutlap?: boolean } = {}) {
+function lapSummary(lapNumber: number, lapTimeSec: number, options: { isValid?: boolean; isOutlap?: boolean; isPitStop?: boolean } = {}) {
   return { lapNumber, lapTimeSec, s1Sec: 0, s2Sec: 0, s3Sec: 0, ...options };
 }
 
@@ -26,6 +26,14 @@ function trajectory(currentLap: number, laps: ReplayTrajectoryData['laps'] = [])
 }
 
 describe('useCornerConsistency', () => {
+  it('does not time the current pit in-lap or fetch other pit laps', () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const current = trajectory(2, [lapSummary(2, 110, { isPitStop: true }), lapSummary(3, 120, { isPitStop: true })]);
+    const { result } = renderHook(() => useCornerConsistency(true, 'pit.vcr', null, 1, current));
+    expect(result.current.lapsSampled).toBe(0);
+    expect(result.current.isLoading).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('leaves canonical corner consistency unavailable without local track geometry',()=>{
     const fetchMock=vi.fn();global.fetch=fetchMock;
     const data:ReplayTrajectoryData={...trajectory(1),stationSource:'odometer'};

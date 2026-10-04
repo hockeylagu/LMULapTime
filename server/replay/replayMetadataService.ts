@@ -66,6 +66,10 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
           s2Sec: lap.s2 || 0,
           s3Sec: lap.s3 || 0,
           isBest: Boolean(driver.bestLapTime && lap.lapTime === driver.bestLapTime),
+          isValid: lap.isValid,
+          isPitStop: lap.isPitStop,
+          isOutlap: lap.isOutLap,
+          nonRepresentativeReason: lap.nonRepresentativeReason,
         }));
     }
   } else {

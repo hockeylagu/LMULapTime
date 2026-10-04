@@ -4,6 +4,7 @@ import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchem
 import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
 import { getReplayLaps } from './dbReplayLapStore.js';
 import { lapSummariesFrom } from '../../replay/decode/replayFacts.js';
+import { classifyRetainedReplayLaps } from '../../replay/decode/replayLapClassification.js';
 
 /**
  * Trajectories are keyed by (filename, driver_slot, lap_key) where -1 means "caller did not
@@ -30,8 +31,20 @@ function readTrajectoryRow(db: DatabaseType, row: TrajectoryRow): ReplayTrajecto
   const trajectory = withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
   const slot = row.driver_slot >= 0 ? row.driver_slot : trajectory.driverSlot;
   if (typeof slot !== 'number' || slot < 0) return trajectory;
-  const laps = lapSummariesFrom(getReplayLaps(db, row.filename, slot));
-  if (laps.length > 0) trajectory.laps = laps;
+  const facts = getReplayLaps(db, row.filename, slot);
+  const laps = lapSummariesFrom(facts);
+  if (laps.length > 0) {
+    const stored = new Map(trajectory.laps?.map(lap => [lap.lapNumber, lap]));
+    trajectory.laps = laps.map(lap => ({ ...lap, isPitStop: stored.get(lap.lapNumber)?.isPitStop }));
+  }
+  const spans = new Map(facts.flatMap(fact => fact.startSec !== null && fact.endSec !== null
+    ? [[fact.lapNumber, { startSec: fact.startSec, endSec: fact.endSec }] as const] : []));
+  if (trajectory.currentLap !== undefined && trajectory.points.length > 0) {
+    const first = trajectory.points[0].timeSec;
+    const last = trajectory.points[trajectory.points.length - 1].timeSec;
+    if (first !== undefined && last !== undefined) spans.set(trajectory.currentLap, { startSec: first, endSec: last });
+  }
+  trajectory.laps = classifyRetainedReplayLaps(trajectory, spans, slot);
   return trajectory;
 }
 

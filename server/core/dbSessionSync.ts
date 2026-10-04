@@ -6,6 +6,7 @@ import { SyncResult, SessionSyncProgress } from './dbSchema.js';
 import { StoredReplayFileInfo } from './replay/dbReplayMetadataStore.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
+import { rateDriversPace } from '../sessions/sessionPaceRating.js';
 
 /** Bumping this re-parses every stored session from its XML. */
 export const DB_PARSER_VERSION = '2.18_wet_best_lap_unrated';
@@ -76,9 +77,15 @@ export function *syncSessionsIterator(
   const reparseAll = forceReparse || versionMismatch;
   const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
     for (const item of sessionsToInsert) {
+      // A worker's benchmark snapshot may predate a refresh, including while this batch waited.
+      // Rate at the synchronous write boundary so a late result cannot restore obsolete ratings.
+      rateDriversPace(item.session.drivers ?? [], {
+        venue: item.session.trackVenue, course: item.session.trackCourse,
+        trackLengthMeters: item.session.trackLengthMeters,
+      });
       // A session parsed with its replay already linked gets that replay's rain now; one linked
       // later gets it when the link is stored (SessionDatabase.updateSessionMatchingReplay).
-      if (item.session.matchingReplayFile) host.classifySessionConditions(item.session);
+      host.classifySessionConditions(item.session);
       host.upsertSession(item.session, item.filePath, item.mtime, item.size);
     }
   });

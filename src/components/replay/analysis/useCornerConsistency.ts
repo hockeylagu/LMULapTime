@@ -1,4 +1,5 @@
 import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
+import { isCleanReplayLap } from '../../../../shared/domain/lapComparison.js';
 import { useEffect, useState } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
@@ -51,10 +52,10 @@ export function useCornerConsistency(
     // notion of "valid" always agrees with the sector-level consistency stats.
     const isLapValid = (lapNumber: number) => {
       const summary = lapSummaries.find(l => l.lapNumber === lapNumber);
-      return summary ? summary.isValid !== false && !summary.isOutlap : true;
+      return summary ? isCleanReplayLap(summary) : true;
     };
     const otherLaps = lapSummaries.filter(l =>
-      l.isValid !== false && !l.isOutlap && l.lapTimeSec > 0 && l.lapNumber !== currentLap
+      isCleanReplayLap(l) && l.lapNumber !== currentLap
     );
     // The currently displayed lap is only usable as a data point if it's itself valid - an
     // invalid/outlap current lap still supplies the corner-boundary geometry (referencePoints

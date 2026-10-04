@@ -47,7 +47,7 @@ export class ReplayTrajectoryService {
       if (matchedSession) {
         matchedDriver = driverName
           ? matchedSession.drivers.find(driver =>
-              (driver.driverName || driver.name || '').toLowerCase().includes(driverName.toLowerCase())
+              (driver.driverName || driver.name || '').trim().toLowerCase() === driverName.trim().toLowerCase()
             )
           : undefined;
 
@@ -102,8 +102,9 @@ export class ReplayTrajectoryService {
 
     const isPlayer =
       (driverSlot === undefined && !driverName) ||
-      Boolean(driverName && driverName.toLowerCase().includes(configuredPlayer.toLowerCase())) ||
-      (typeof driverSlot === 'number' && metadata?.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer);
+      (typeof driverSlot === 'number'
+        ? metadata?.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer
+        : Boolean(driverName && configuredPlayer && driverName.trim().toLowerCase() === configuredPlayer.trim().toLowerCase()));
 
     const telemetryResult = await this.telemetryService.enrichWithTelemetry({
       replayName: request.replayName,

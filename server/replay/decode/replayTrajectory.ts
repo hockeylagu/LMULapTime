@@ -580,7 +580,7 @@ export function extractReplayTrajectory(
     const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
 
     if (!options.silent) {
-      const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap);
+      const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap && !l.isPitStop);
       const outLaps = detectedLaps.filter(l => l.isOutlap);
       const best = detectedLaps.find(l => l.isBest);
       const bestStr = best
@@ -637,6 +637,8 @@ export function extractReplayTrajectory(
         maxPoints: options.maxPoints,
         isFullResolution: finalPoints.length >= rawPointsCount,
         currentLap: chosenLap.lapNumber,
+        timeReference: 'session',
+        lapStartTimeSec: chosenLap.startTimeSec ?? lapRawPts[0]?.sTime,
         laps: lapsSummary,
         sectors: { s1Frame, s2Frame },
         bounds: {

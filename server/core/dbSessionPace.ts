@@ -5,7 +5,8 @@ import { classifySessionConditions } from './dbSessionConditions.js';
 import { rateDriversPace } from '../sessions/sessionPaceRating.js';
 
 /** The benchmark version (its `lastUpdated`) the stored sessions' pace ratings were computed against. */
-const SESSION_PACE_REFERENCE_KEY = 'session_pace_reference';
+// Repair ratings retained by the former late-worker race, even with unchanged targets.
+const SESSION_PACE_REFERENCE_KEY = 'session_pace_reference_v2';
 
 /**
  * Rates the stored sessions' laps again when the benchmark targets changed since they were last

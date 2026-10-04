@@ -2,6 +2,12 @@ import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeRe
 import { formatTime, computeTheoreticalBest } from './formatters.js';
 import { matchesCarClass } from './paceCategory.js';
 import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
+import type { ReplayLapSummary } from '../types/index.js';
+
+/** Replay consistency follows the same completed flying-lap exclusions as session analytics. */
+export function isCleanReplayLap(lap: ReplayLapSummary): boolean {
+  return lap.isValid !== false && !lap.isPitStop && !lap.isOutlap && !lap.nonRepresentativeReason && lap.lapTimeSec > 0;
+}
 
 export interface LapSelectionInput {
   lapTime: number | null;

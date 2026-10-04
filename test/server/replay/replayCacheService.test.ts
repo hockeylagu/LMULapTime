@@ -50,6 +50,20 @@ describe('ReplayCacheService', () => {
     expect(service.resolveDriverSlot(filePath, replayName)).toBeUndefined();
   });
 
+  it('prefers an exact normalized name and rejects ambiguous partial or duplicate names', () => {
+    const filePath = path.join(tempDir, 'Names_P1.Vcr');
+    fs.writeFileSync(filePath, createSliceVcrBuffer({ drivers: [
+      { name: 'Ann Smithson', vehicleId: 'A', team: 'Test', carNumber: '1' },
+      { name: 'Ann Smith', vehicleId: 'B', team: 'Test', carNumber: '2' },
+    ] }));
+    expect(service.resolveDriverSlot(filePath, 'Names_P1.Vcr', ' ann SMITH ')).toBe(2);
+    expect(service.resolveDriverSlot(filePath, 'Names_P1.Vcr', 'Ann')).toBeUndefined();
+    expect(service.resolveDriverSlot(filePath, 'Names_P1.Vcr', '   ')).toBeUndefined();
+    const metadata = service.getMetadata(filePath, 'Names_P1.Vcr');
+    vi.spyOn(service, 'getMetadata').mockReturnValue({ ...metadata, drivers: metadata.drivers.map(driver => ({ ...driver, name: 'Ann' })) });
+    expect(service.resolveDriverSlot(filePath, 'Names_P1.Vcr', 'Ann')).toBeUndefined();
+  });
+
   it('serves cached trajectory data when the source replay is deleted', async () => {
     const replayName = 'Trajectory_Cache_P1.Vcr';
     const filePath = path.join(tempDir, replayName);

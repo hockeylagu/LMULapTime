@@ -50,21 +50,29 @@ export function applyPureOfficialLapValidation(
     s2Sec: lap.s2,
     s3Sec: lap.s3,
     isValid: lap.isValid,
+    isPitStop: lap.isPitStop,
+    isOutLap: lap.isOutLap,
     nonRepresentativeReason: lap.nonRepresentativeReason,
   }));
 
   const clonedLaps = trajectory.laps
     ? trajectory.laps.map((lap): ReplayLapSummary => {
         const match = officialLaps.find(official => official.lapNumber === lap.lapNumber);
-        if (match && typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0) {
+        if (match) {
           return {
             ...lap,
-            validatedTimeSec: Number(match.lapTimeSec.toFixed(3)),
-            validatedS1Sec: typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null,
-            validatedS2Sec: typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null,
-            validatedS3Sec: typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null,
-            timeDiffSec: Number((lap.lapTimeSec - match.lapTimeSec).toFixed(3)),
-            ...(match.nonRepresentativeReason ? { nonRepresentativeReason: match.nonRepresentativeReason } : {}),
+            isValid: match.isValid,
+            isPitStop: Boolean(match.isPitStop),
+            isOutlap: Boolean(match.isOutLap),
+            isBest: match.isPitStop || match.isOutLap || !match.isValid ? false : lap.isBest,
+            nonRepresentativeReason: match.nonRepresentativeReason,
+            ...(typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0 ? {
+              validatedTimeSec: Number(match.lapTimeSec.toFixed(3)),
+              validatedS1Sec: typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null,
+              validatedS2Sec: typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null,
+              validatedS3Sec: typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null,
+              timeDiffSec: Number((lap.lapTimeSec - match.lapTimeSec).toFixed(3)),
+            } : {}),
           };
         }
         return { ...lap };

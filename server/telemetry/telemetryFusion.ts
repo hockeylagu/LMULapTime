@@ -43,11 +43,11 @@ export function interpolateAngle(a0: number, a1: number, alpha: number): number 
 
 /**
  * VCR time at which the DuckDB lap clock starts: VCR samples carry session time, DuckDB samples
- * lap time. A VCR lap already on lap time (it starts within the lap) is left as it is.
+ * lap time. Explicit lap-relative recordings keep their clock. Retained native replay rows
+ * without clock metadata use their first recorded sample, independent of the lap's duration.
  */
-export function vcrLapBaseTime(duckLap: DuckDbLapTelemetry, vcrPoints: ReplayTrajectoryPoint[]): number {
-  const first = vcrPoints[0]?.timeSec;
-  return first !== undefined && first > duckLap.lapTimeSec + 5 ? first : 0;
+export function vcrLapBaseTime(trajectory: ReplayTrajectoryData): number {
+  return trajectory.timeReference === 'lap' ? 0 : trajectory.lapStartTimeSec ?? trajectory.points[0]?.timeSec ?? 0;
 }
 
 /**
@@ -60,7 +60,7 @@ export function fuseDuckDbWithVcrTrajectory(
   vcrTrajectory: ReplayTrajectoryData,
   duckdbFilename?: string
 ): ReplayTrajectoryData {
-  const source = withoutTrajectoryGeometry(vcrTrajectory);
+  const source = { ...withoutTrajectoryGeometry(vcrTrajectory), timeReference: 'lap' as const, lapStartTimeSec: undefined };
   const vcrPoints = vcrTrajectory.points;
   if (!vcrPoints || vcrPoints.length === 0) {
     return {
@@ -74,7 +74,7 @@ export function fuseDuckDbWithVcrTrajectory(
     };
   }
 
-  const vcrBaseTime = vcrLapBaseTime(duckLap, vcrPoints);
+  const vcrBaseTime = vcrLapBaseTime(vcrTrajectory);
   const vcrMaxTime =
     ((vcrPoints[vcrPoints.length - 1].timeSec ?? duckLap.lapTimeSec) - vcrBaseTime) || duckLap.lapTimeSec;
   const duckPoints = duckLap.points;

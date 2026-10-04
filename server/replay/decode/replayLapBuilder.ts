@@ -41,6 +41,7 @@ export interface DetectedLapInternal {
   startIdx: number;
   endIdx: number;
   lapTimeSec: number;
+  startTimeSec?: number;
   lapDistMeters: number;
   s1Sec: number;
   s2Sec: number;
@@ -48,6 +49,7 @@ export interface DetectedLapInternal {
   s1Idx: number;
   s2Idx: number;
   isOutlap: boolean;
+  isPitStop?: boolean;
   isBest: boolean;
   isValid?: boolean;
 }
@@ -114,6 +116,8 @@ export function detectLapsFromTelemetry(
 ): LapDetectionResult {
   const cumDist = calculateCumulativeDistance(rawPts);
   let detectedLaps: DetectedLapInternal[] = [];
+  const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
+  const pitIntervals = buildPitIntervals(targetPitEvents);
 
   const targetTimings = targetSlot !== undefined ? vcrTimingEvents.filter(e => e.drv === targetSlot) : [];
   const finishTimings = targetTimings.filter(e => e.sector === 0).sort((a, b) => a.lapIdx - b.lapIdx);
@@ -199,13 +203,17 @@ export function detectLapsFromTelemetry(
       }
 
       const isValid = ft.splitSec > 0;
-      const isOutlap = i === 0 || (startIdx >= 0 && Boolean(rawPts[startIdx]?.pitLimiter));
+      const isOutlap = i === 0 || Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit)
+        || isTimeInIntervals(startTime, pitIntervals);
+      const isPitStop = targetPitEvents.some(event => event.code === 34 && event.timeSec >= startTime && event.timeSec < finishTime)
+        || rawPts.slice(startIdx, endIdx + 1).some(point => point.inPit || point.pitLimiter);
 
       detectedLaps.push({
         lapNumber: lapNum,
         startIdx,
         endIdx,
         lapTimeSec,
+        startTimeSec: startTime,
         lapDistMeters: Math.round(lapDist),
         s1Sec,
         s2Sec,
@@ -213,6 +221,7 @@ export function detectLapsFromTelemetry(
         s1Idx,
         s2Idx,
         isOutlap,
+        isPitStop,
         isBest: false,
         isValid,
       });
@@ -267,6 +276,7 @@ export function detectLapsFromTelemetry(
           startIdx: lastStartIdx,
           endIdx: finalIdx,
           lapTimeSec: Number(inProgressTime.toFixed(3)),
+          startTimeSec: lastFt.sTime,
           lapDistMeters: Math.round(inProgressDist),
           s1Sec,
           s2Sec,
@@ -280,7 +290,7 @@ export function detectLapsFromTelemetry(
       }
     }
 
-    const validLaps = detectedLaps.filter(l => l.isValid && l.lapTimeSec > 30);
+    const validLaps = detectedLaps.filter(l => l.isValid && !l.isPitStop && l.lapTimeSec > 30);
     const validFlying = validLaps.filter(l => !l.isOutlap);
     const pool = validFlying.length > 0 ? validFlying : validLaps;
     let minTime = Infinity;
@@ -323,9 +333,6 @@ export function detectLapsFromTelemetry(
     }];
   }
 
-  const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
-  const pitIntervals = buildPitIntervals(targetPitEvents);
-
   const lapsSummary: ReplayLapSummary[] = detectedLaps.map(l => {
     const rawCount = Math.max(0, l.endIdx - l.startIdx + 1);
     const frameCount = maxPoints > 0 ? Math.min(rawCount, maxPoints) : rawCount;
@@ -337,6 +344,7 @@ export function detectLapsFromTelemetry(
       s2Sec: l.s2Sec,
       s3Sec: l.s3Sec,
       isOutlap: l.isOutlap,
+      isPitStop: l.isPitStop,
       isBest: l.isBest,
       isValid: l.isValid ?? !l.isOutlap,
       startFrame: 0,
