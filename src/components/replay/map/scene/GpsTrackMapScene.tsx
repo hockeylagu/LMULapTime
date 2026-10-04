@@ -40,7 +40,7 @@ export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const {
     points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',
-    baselinePoints, corners, selectedCornerNumber, onSelectCornerNumber,
+    baselinePoints, primaryCarClass, baselineCarClass, corners, selectedCornerNumber, onSelectCornerNumber,
     primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
     showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
@@ -276,6 +276,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
         </svg>
         <GpsSceneCarMarkers
           viewBox={currentViewBox}
+          primaryCarClass={primaryCarClass}
+          baselineCarClass={baselineCarClass}
           unitsPerMeter={(VIEWBOX_SIZE - 2 * PADDING) / Math.max(effectiveBounds.spanX, effectiveBounds.spanZ, 1)}
           primaryHeadingDeg={replayBodyHeading(points, currentIndex, fraction)}
           baselineHeadingDeg={baselineBodyHeading}

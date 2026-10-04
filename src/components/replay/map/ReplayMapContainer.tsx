@@ -17,6 +17,8 @@ export interface ReplayMapContainerProps {
   onChangeColorBy?: (mode: MapColorMode) => void;
   isCompareMode: boolean;
   baselineTrajectory?: ReplayTrajectoryData | null;
+  primaryCarClass?: string;
+  baselineCarClass?: string;
   currentPoint?: ReplayTelemetryPoint | null;
   corners?: CornerSegmentComparison[];
   selectedCornerNumber?: number | null;
@@ -38,6 +40,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   onChangeColorBy,
   isCompareMode,
   baselineTrajectory,
+  primaryCarClass,
+  baselineCarClass,
   currentPoint,
   corners,
   selectedCornerNumber,
@@ -188,6 +192,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             colorBy={colorBy}
             className="w-full h-full"
             baselinePoints={baselinePoints}
+            primaryCarClass={primaryCarClass}
+            baselineCarClass={baselineCarClass}
             corners={corners}
             selectedCornerNumber={selectedCornerNumber}
             onSelectCornerNumber={onSelectCornerNumber}

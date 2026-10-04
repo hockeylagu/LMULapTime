@@ -1,8 +1,7 @@
 import React from 'react';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
-// Temporary visual POC: one Ferrari-sized envelope for every car, without model matching.
-const CAR_PREVIEW = { lengthM: 5.023, widthM: 2.005 };
+import { defaultVehicleSize } from '../../../../../shared/domain/vehicleDimensions.js';
 type Position = { sx: number; sy: number };
 export interface GpsSceneCarMarkersProps {
   viewBox: string;
@@ -12,6 +11,8 @@ export interface GpsSceneCarMarkersProps {
   primaryOpacity: number;
   baselineOpacity: number;
   unitsPerMeter?: number;
+  primaryCarClass?: string;
+  baselineCarClass?: string;
   primaryHeadingDeg?: number;
   baselineHeadingDeg?: number;
 }
@@ -40,17 +41,19 @@ export function replayBodyHeading(
  */
 export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
   viewBox, currentPos, baselineGhostPos, markerScale, primaryOpacity, baselineOpacity,
-  unitsPerMeter = 0, primaryHeadingDeg, baselineHeadingDeg,
+  unitsPerMeter = 0, primaryHeadingDeg, baselineHeadingDeg, primaryCarClass, baselineCarClass,
 }) => {
-  const width = CAR_PREVIEW.widthM * unitsPerMeter;
-  const length = CAR_PREVIEW.lengthM * unitsPerMeter;
-  // True-size footprint grows with camera zoom; the overview keeps a readable position dot.
-  const showFootprint = Number.isFinite(length) && width > 0 && length >= 14 * markerScale;
-  const car = (position: Position, heading: number | undefined, color: string, opacity: number, ghost: boolean) => (
+  const car = (position: Position, heading: number | undefined, color: string, opacity: number, ghost: boolean, carClass?: string) => {
+    const size = defaultVehicleSize(carClass);
+    const width = size.widthM * unitsPerMeter;
+    const length = size.lengthM * unitsPerMeter;
+    // Class-sized footprint grows with camera zoom; overview keeps a readable position dot.
+    const showFootprint = Number.isFinite(length) && width > 0 && length >= 14 * markerScale;
+    return (
     <g data-car-role={ghost ? 'baseline' : 'primary'}
       transform={`translate(${position.sx}, ${position.sy})`} opacity={opacity}>
       {showFootprint && heading !== undefined && Number.isFinite(heading) ? <g transform={`rotate(${heading})`}>
-        <title>Car size preview: 5.023 × 2.005 m; body orientation from replay</title>
+        <title>{`Approximate ${carClass || 'unknown class'} size: ${size.lengthM} × ${size.widthM} m; body orientation from replay`}</title>
         <rect data-testid={ghost ? 'gps-ghost-footprint' : 'gps-car-footprint'}
           x={-width / 2} y={-length / 2} width={width} height={length} rx={width * 0.18}
           fill={color} fillOpacity={ghost ? 0.3 : 0.8} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
@@ -63,7 +66,8 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
           filter={ghost ? 'url(#ghostGlow)' : 'url(#carGlow)'} />
       </g>}
     </g>
-  );
+    );
+  };
   return <svg viewBox={viewBox} className="absolute inset-0 w-full h-full pointer-events-none will-change-transform drop-shadow-md" data-testid="gps-car-markers">
     <defs>
       <filter id="carGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -75,7 +79,7 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
     </defs>
     {currentPos && baselineGhostPos && <line x1={currentPos.sx} y1={currentPos.sy} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy}
       stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" strokeDasharray="4 4" opacity={0.75 * baselineOpacity} vectorEffect="non-scaling-stroke" />}
-    {baselineGhostPos && car(baselineGhostPos, baselineHeadingDeg, TELEMETRY_COLORS.baseline, baselineOpacity, true)}
-    {currentPos && car(currentPos, primaryHeadingDeg, TELEMETRY_COLORS.primary, primaryOpacity, false)}
+    {baselineGhostPos && car(baselineGhostPos, baselineHeadingDeg, TELEMETRY_COLORS.baseline, baselineOpacity, true, baselineCarClass)}
+    {currentPos && car(currentPos, primaryHeadingDeg, TELEMETRY_COLORS.primary, primaryOpacity, false, primaryCarClass)}
   </svg>;
 };

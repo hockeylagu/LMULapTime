@@ -25,6 +25,8 @@ export interface GpsTrackMapProps {
   colorBy?: MapColorMode;
   className?: string;
   baselinePoints?: ReplayTrajectoryPoint[];
+  primaryCarClass?: string;
+  baselineCarClass?: string;
   corners?: GpsTrackMapCorner[];
   selectedCornerNumber?: number | null;
   onSelectCornerNumber?: (cornerNumber: number) => void;

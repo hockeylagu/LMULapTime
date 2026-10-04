@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { Activity, BrainCircuit, Timer } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
@@ -123,6 +124,9 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       onChangeColorBy={setColorBy}
       isCompareMode={isCompareMode}
       baselineTrajectory={baselineTrajectory}
+      primaryCarClass={resolveDriverCarClass(drivers.find(driver => driver.slot === selectedDriverSlot))}
+      baselineCarClass={baselineTrajectory?.replayName === trajectory?.replayName
+        ? resolveDriverCarClass(drivers.find(driver => driver.slot === baselineTrajectory?.driverSlot)) : undefined}
       currentPoint={currentPoint}
       corners={cornerSegments}
       selectedCornerNumber={selectedCornerNumber}

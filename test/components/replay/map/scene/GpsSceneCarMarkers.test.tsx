@@ -34,14 +34,14 @@ describe('GpsSceneCarMarkers', () => {
   });
 });
 
-describe('temporary car size preview', () => {
+describe('class size preview', () => {
   it('preserves world dimensions across camera zoom and keeps dots at overview scale', () => {
     const props = { currentPos: {sx:100,sy:200}, unitsPerMeter:10, primaryHeadingDeg:0, primaryOpacity:1, baselineOpacity:1 };
     const {rerender} = render(<GpsSceneCarMarkers {...props} viewBox="0 0 800 800" markerScale={1} />);
     const footprint = () => screen.getByTestId('gps-car-footprint');
     const width = footprint().getAttribute('width'), height = footprint().getAttribute('height');
-    expect(Number(width)/10).toBeCloseTo(2.005);
-    expect(Number(height)/10).toBeCloseTo(5.023);
+    expect(Number(width)/10).toBeCloseTo(2);
+    expect(Number(height)/10).toBeCloseTo(4.8);
     rerender(<GpsSceneCarMarkers {...props} viewBox="60 160 80 80" markerScale={0.1} />);
     expect(footprint().getAttribute('width')).toBe(width);
     expect(footprint().getAttribute('height')).toBe(height);
@@ -70,3 +70,14 @@ describe('temporary car size preview', () => {
   });
 });
 
+
+describe('class-sized GPS bodies', () => {
+  it('sizes primary and ghost independently and labels estimates', () => {
+    render(<GpsSceneCarMarkers viewBox="0 0 800 800" currentPos={{sx:100,sy:100}} baselineGhostPos={{sx:150,sy:100}}
+      markerScale={1} unitsPerMeter={10} primaryHeadingDeg={0} baselineHeadingDeg={0}
+      primaryOpacity={1} baselineOpacity={1} primaryCarClass="LMH" baselineCarClass="LMP2_ELMS" />);
+    expect(Number(screen.getByTestId('gps-car-footprint').getAttribute('height'))).toBe(50);
+    expect(Number(screen.getByTestId('gps-ghost-footprint').getAttribute('height'))).toBe(47);
+    expect(screen.getByText(/Approximate LMH size/)).toBeInTheDocument();
+  });
+});
