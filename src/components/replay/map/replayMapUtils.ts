@@ -178,6 +178,26 @@ export function parseViewBox(viewBox?: string | null, marginRatio = 1.2): ViewBo
   };
 }
 
+/**
+ * The view box to cull against, kept stable while the camera drifts. `parseViewBox` adds 1.2 view widths of margin on
+ * every side, so the previous cull box still covers the live view as long as the view's origin moved by at most one
+ * view width and the view did not grow by more than 10%. Inside that safe area the previous string is returned
+ * (memoised layers see an equal prop and skip re-rendering); outside it the live view box becomes the new cull box.
+ */
+export function nextCullViewBox(previous: string | null, live: string): string {
+  if (!previous) return live;
+  const prev = previous.trim().split(/\s+/).map(Number);
+  const cur = live.trim().split(/\s+/).map(Number);
+  if (prev.length !== 4 || cur.length !== 4 || [...prev, ...cur].some(n => !Number.isFinite(n))) return live;
+  const [px, py, pw, ph] = prev;
+  const [cx, cy, cw, ch] = cur;
+  const grewTooMuch = cw > pw * 1.1 || ch > ph * 1.1;
+  // Zoomed in far enough that the old box is wasteful: re-tighten.
+  const shrankTooMuch = cw < pw * 0.5 || ch < ph * 0.5;
+  const movedTooFar = Math.abs(cx - px) > pw || Math.abs(cy - py) > ph;
+  return grewTooMuch || shrankTooMuch || movedTooFar ? live : previous;
+}
+
 export function isRunInViewBox(run: TrackLineRun, box: ViewBoxRect | null): boolean {
   if (!box || run.minSx === undefined || run.maxSx === undefined || run.minSy === undefined || run.maxSy === undefined) return true;
   return !(run.maxSx < box.minX || run.minSx > box.maxX || run.maxSy < box.minY || run.minSy > box.maxY);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   buildTrackLineRuns,
   getHeatmapColor,
@@ -92,70 +92,37 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
     [hitRuns, viewBoxRect]
   );
 
-  const selectNearest = (run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => {
-    const at = toSvgCoords(e);
-    if (!at || !onSelectIndex) return;
-    onSelectIndex(svgPoints[nearestRunVertex(svgPoints, run.from, run.to, at.sx, at.sy)].idx);
-  };
+  const svgPointsRef = useRef(svgPoints);
+  svgPointsRef.current = svgPoints;
+  const onSelectIndexRef = useRef(onSelectIndex);
+  onSelectIndexRef.current = onSelectIndex;
 
-  const handlePointerHover = (run: TrackLineRun, e: React.PointerEvent<SVGPathElement>) => {
+  // Stable callbacks: the path layer below is memoised, so hovering (which re-renders only this
+  // component for the tooltip) never re-renders the run paths.
+  const selectNearest = useCallback((run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => {
+    const at = toSvgCoords(e);
+    const pts = svgPointsRef.current;
+    if (!at || !onSelectIndexRef.current) return;
+    onSelectIndexRef.current(pts[nearestRunVertex(pts, run.from, run.to, at.sx, at.sy)].idx);
+  }, []);
+
+  // setState with the same point object bails out, so a move within one vertex's reach costs nothing.
+  const handlePointerHover = useCallback((run: TrackLineRun, e: React.PointerEvent<SVGPathElement>) => {
     const at = toSvgCoords(e as unknown as React.MouseEvent<SVGPathElement>);
     if (!at) return;
-    setHoveredPoint(svgPoints[nearestRunVertex(svgPoints, run.from, run.to, at.sx, at.sy)]);
-  };
+    const pts = svgPointsRef.current;
+    setHoveredPoint(pts[nearestRunVertex(pts, run.from, run.to, at.sx, at.sy)]);
+  }, []);
+  const handlePointerLeave = useCallback(() => setHoveredPoint(null), []);
 
   return (
     <>
-      {visiblePrimaryRuns.map(run => (
-        <path
-          key={`primary-${run.from}`}
-          d={run.d}
-          fill="none"
-          stroke={run.color}
-          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '3.2' : '2.5') : '1.8'}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity={run.isHighlighted ? primaryOpacity : 0.45 * primaryOpacity}
-          vectorEffect="non-scaling-stroke"
-          className="cursor-pointer"
-          onClick={e => selectNearest(run, e)}
-          data-track-line="primary"
-        />
-      ))}
-      {visibleBaselineRuns.map(run => (
-        <path
-          key={`baseline-${run.from}`}
-          d={run.d}
-          fill="none"
-          stroke={run.color}
-          strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '2.5' : '1.8') : '1.3'}
-          strokeDasharray={run.isHighlighted ? '8 6' : '6 4'}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity={run.isHighlighted ? 0.9 * baselineOpacity : 0.4 * baselineOpacity}
-          vectorEffect="non-scaling-stroke"
-          data-track-line="baseline"
-          pointerEvents="none"
-        />
-      ))}
-      {onSelectIndex && visibleHitRuns.map(run => (
-        <path
-          key={`hit-${run.from}`}
-          d={run.d}
-          fill="none"
-          stroke="transparent"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-          pointerEvents="stroke"
-          className="cursor-pointer stroke-[28px] pointer-coarse:stroke-[44px]"
-          onClick={e => selectNearest(run, e)}
-          onPointerMove={e => handlePointerHover(run, e)}
-          onPointerLeave={() => setHoveredPoint(null)}
-          data-track-line="hit-target"
-          aria-hidden="true"
-        />
-      ))}
+      <TrackPathLayers
+        primaryRuns={visiblePrimaryRuns} baselineRuns={visibleBaselineRuns} hitRuns={visibleHitRuns}
+        interactive={Boolean(onSelectIndex)} primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity}
+        dimNonSelectedTrack={dimNonSelectedTrack} onSelect={selectNearest} onHover={handlePointerHover}
+        onLeave={handlePointerLeave}
+      />
       {hoveredPoint && (
         <GpsTrackHoverTooltip
           point={hoveredPoint}
@@ -167,3 +134,74 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
     </>
   );
 });
+
+interface TrackPathLayersProps {
+  primaryRuns: TrackLineRun[];
+  baselineRuns: TrackLineRun[];
+  hitRuns: TrackLineRun[];
+  interactive: boolean;
+  primaryOpacity: number;
+  baselineOpacity: number;
+  dimNonSelectedTrack: boolean;
+  onSelect: (run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => void;
+  onHover: (run: TrackLineRun, e: React.PointerEvent<SVGPathElement>) => void;
+  onLeave: () => void;
+}
+
+const TrackPathLayers = React.memo(({
+  primaryRuns, baselineRuns, hitRuns, interactive, primaryOpacity, baselineOpacity, dimNonSelectedTrack,
+  onSelect, onHover, onLeave,
+}: TrackPathLayersProps) => (
+  <>
+    {primaryRuns.map(run => (
+      <path
+        key={`primary-${run.from}`}
+        d={run.d}
+        fill="none"
+        stroke={run.color}
+        strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '3.2' : '2.5') : '1.8'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={run.isHighlighted ? primaryOpacity : 0.45 * primaryOpacity}
+        vectorEffect="non-scaling-stroke"
+        className="cursor-pointer"
+        onClick={e => onSelect(run, e)}
+        data-track-line="primary"
+      />
+    ))}
+    {baselineRuns.map(run => (
+      <path
+        key={`baseline-${run.from}`}
+        d={run.d}
+        fill="none"
+        stroke={run.color}
+        strokeWidth={run.isHighlighted ? (dimNonSelectedTrack ? '2.5' : '1.8') : '1.3'}
+        strokeDasharray={run.isHighlighted ? '8 6' : '6 4'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity={run.isHighlighted ? 0.9 * baselineOpacity : 0.4 * baselineOpacity}
+        vectorEffect="non-scaling-stroke"
+        data-track-line="baseline"
+        pointerEvents="none"
+      />
+    ))}
+    {interactive && hitRuns.map(run => (
+      <path
+        key={`hit-${run.from}`}
+        d={run.d}
+        fill="none"
+        stroke="transparent"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+        pointerEvents="stroke"
+        className="cursor-pointer stroke-[28px] pointer-coarse:stroke-[44px]"
+        onClick={e => onSelect(run, e)}
+        onPointerMove={e => onHover(run, e)}
+        onPointerLeave={onLeave}
+        data-track-line="hit-target"
+        aria-hidden="true"
+      />
+    ))}
+  </>
+));

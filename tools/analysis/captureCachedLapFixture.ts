@@ -58,6 +58,7 @@ const fixture = {
   currentLap: Number(lapArg),
   lapTimeSec: trajectory.laps?.find(l => l.lapNumber === Number(lapArg))?.lapTimeSec ?? null,
   parserVersion: row.parser_version,
+  signConvention: trajectory.signConvention,
   columns,
 };
 if (!/^[a-z0-9_-]+$/.test(name)) throw new Error('Invalid fixture name');

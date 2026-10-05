@@ -4,6 +4,7 @@ import { ChevronRight, Users } from 'lucide-react';
 import type { CornerPhase, DebriefCorner } from '../../../utils/sessionDebrief.js';
 import { describeTrafficSpell } from '../../../utils/lapTrafficText.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 const PHASE_LABELS: Record<CornerPhase, string> = {
   entry: 'mostly on entry',
@@ -79,12 +80,7 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
         {refUrl ? (
           <Link
             to={refUrl}
-            onClick={(e) => {
-              if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                e.preventDefault();
-                onOpen(corner.cornerNumber, 'reference');
-              }
-            }}
+            onClick={linkClickHandler(() => onOpen(corner.cornerNumber, 'reference'))}
             className={`${linkClass} ${FOCUS_RING}`}
             aria-label={`Open T${corner.cornerNumber} in telemetry`}
           >
@@ -99,12 +95,7 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
           techUrl ? (
             <Link
               to={techUrl}
-              onClick={(e) => {
-                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                  e.preventDefault();
-                  onOpen(corner.cornerNumber, 'technique');
-                }
-              }}
+              onClick={linkClickHandler(() => onOpen(corner.cornerNumber, 'technique'))}
               className={`${linkClass} ${FOCUS_RING}`}
               aria-label={`Open T${corner.cornerNumber} against the fastest lap`}
             >

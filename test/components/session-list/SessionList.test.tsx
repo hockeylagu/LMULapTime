@@ -68,7 +68,7 @@ describe('SessionList component', () => {
     },
   ];
 
-  it('opens a card from the keyboard through its labelled button', async () => {
+  it('opens a card once from the keyboard through its labelled link', async () => {
     const user = userEvent.setup();
     const onSelectSession = vi.fn();
     render(<SessionList sessions={mockSessions} onSelectSession={onSelectSession} showTrackColumn={true} />);
@@ -76,8 +76,7 @@ describe('SessionList component', () => {
     open.focus();
     await user.keyboard('{Enter}');
     expect(onSelectSession).toHaveBeenCalledWith('sess-1');
-    await user.keyboard(' ');
-    expect(onSelectSession).toHaveBeenCalledTimes(2);
+    expect(onSelectSession).toHaveBeenCalledTimes(1);
   });
 
   it('renders in Cards (grid) mode by default and allows clicking cards', () => {

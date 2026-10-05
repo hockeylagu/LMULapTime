@@ -73,21 +73,19 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   });
 }
 
+/**
+ * Logos are cosmetic: a malformed file yields no logos and an invalid entry is skipped, never thrown.
+ * Only brand keys and SVG content are judged here; the file itself is read through the package's path checks.
+ */
 export function parseVehicleLogos(value: unknown): Record<string, string> {
-  const catalog = object(value);
-  keys(catalog, ['schemaVersion', 'logos']);
-  if (catalog.schemaVersion !== 1 || !catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) {
-    throw Error('Invalid vehicle logos');
-  }
   const result: Record<string, string> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+  const catalog = value as Record<string, unknown>;
+  if (catalog.schemaVersion !== 1 || !catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) return result;
   for (const [key, svg] of Object.entries(catalog.logos as Record<string, unknown>)) {
-    if (typeof key !== 'string' || !/^[a-zA-Z0-9_ -]+$/.test(key) || typeof svg !== 'string') {
-      throw Error('Invalid logo brand identity');
-    }
+    if (!/^[a-zA-Z0-9_ -]+$/.test(key) || typeof svg !== 'string') continue;
     const trimmed = svg.trim();
-    if (!trimmed.startsWith('<svg') || !trimmed.endsWith('</svg>') || !trimmed.includes('viewBox') || trimmed.length > 2_000_000) {
-      throw Error('Invalid logo SVG content');
-    }
+    if (!trimmed.startsWith('<svg') || !trimmed.endsWith('</svg>') || !trimmed.includes('viewBox') || trimmed.length > 2_000_000) continue;
     result[key] = trimmed;
   }
   return result;
@@ -139,8 +137,10 @@ export class DataPlugin {
         const resource=object(manifest.vehicles); keys(resource,['catalog','logos']);
         this.records.push(...parseVehicleCatalog(read(text(resource.catalog))));
         if (resource.logos !== undefined) {
-          const logos = parseVehicleLogos(read(text(resource.logos)));
-          for (const [k, v] of Object.entries(logos)) this.logoRecords.set(k, v);
+          // A bad logos file never invalidates tracks or vehicles; a path escaping the package still does.
+          let logoFile: unknown = null;
+          try { logoFile = read(text(resource.logos)); } catch (error) { if (error instanceof Error && /resource path|Escaping/.test(error.message)) throw error; }
+          for (const [k, v] of Object.entries(parseVehicleLogos(logoFile))) this.logoRecords.set(k, v);
         }
       }
       this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {})};

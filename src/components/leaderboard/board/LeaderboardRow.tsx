@@ -11,6 +11,7 @@ import { benchmarkPace, formatDrivenAgo, formatGap } from './leaderboardFormat.j
 import { boardLapTelemetryRef } from './leaderboardLaps.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 export const LEADERBOARD_COLUMNS = 11;
 
@@ -159,12 +160,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
           {entry.isPlayer && (
             <Link
               to={`/session/${encodeURIComponent(entry.bestLap.sessionId)}`}
-              onClick={(e) => {
-                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && onOpenSession) {
-                  e.preventDefault();
-                  onOpenSession(entry.bestLap.sessionId);
-                }
-              }}
+              onClick={linkClickHandler(onOpenSession ? () => onOpenSession(entry.bestLap.sessionId) : undefined)}
               title={`Open the session of your best lap (${entry.bestLap.sessionName})`}
               aria-label="Open the session of your best lap"
               className={`${ICON_BUTTON} text-lmu-muted hover:text-white`}
@@ -176,12 +172,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
             telemetryPath ? (
               <Link
                 to={telemetryPath}
-                onClick={(e) => {
-                  if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                    e.preventDefault();
-                    onTelemetry(entry);
-                  }
-                }}
+                onClick={linkClickHandler(() => onTelemetry(entry))}
                 title={entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`}
                 aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
                 className={`${ICON_BUTTON} text-lmu-muted hover:text-lmu-info-soft ${reveal}`}

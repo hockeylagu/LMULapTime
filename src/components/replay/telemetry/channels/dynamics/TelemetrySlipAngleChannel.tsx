@@ -71,9 +71,9 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
-        { label: '+12° Slip Right', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
+        { label: '+12° Nose Right', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
         { label: '0° In-Line', borderClassName: 'border-b border-lmu-violet/50', labelClassName: 'text-[10px] text-lmu-violet-soft font-mono' },
-        { label: '-12° Slip Left', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
+        { label: '-12° Nose Left', borderClassName: 'border-b border-lmu-violet/30', labelClassName: 'text-[10px] text-lmu-violet font-mono' },
       ]} />
 
       {isCursorInView && hasSlipAngle && (

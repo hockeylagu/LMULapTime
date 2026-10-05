@@ -61,7 +61,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
     const gear = Math.min(7, Math.max(1, p?.gear ?? 1));
     const steerDeg = p?.steerYaw ?? 0;
     const steerPct = Math.abs(getSteerPercent(steerDeg));
-    const steerDir = steerDeg < -5 ? 'L' : steerDeg > 5 ? 'R' : 'C';
+    const steerDir = steerDeg > 5 ? 'L' : steerDeg < -5 ? 'R' : 'C';
     const latG = p?.accelLatG ?? 0;
     const lonG = p?.accelLonG ?? 0;
     const totalG = Math.hypot(latG, lonG);
@@ -168,7 +168,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             {p ? `${totalG.toFixed(2)}G` : '--'}
           </span>
           <span className="text-[9px] sm:text-[10px] text-lmu-muted tabular-nums leading-tight">
-            {p ? `${Math.abs(latG).toFixed(1)}L · ${Math.abs(lonG).toFixed(1)}${lonG < -0.05 ? 'B' : 'A'}` : 'total'}
+            {p ? `${Math.abs(latG).toFixed(1)}${latG > 0.05 ? 'L' : latG < -0.05 ? 'R' : ''} · ${Math.abs(lonG).toFixed(1)}${lonG < -0.05 ? 'B' : 'A'}` : 'total'}
           </span>
         </div>
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import zlib from 'node:zlib';
+import Database from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import {
   compressTrajectory,
@@ -7,6 +8,8 @@ import {
   toColumnarTrajectory,
   isColumnar,
 } from '../../../../server/core/replay/replayTrajectoryCodec.js';
+import { compressJson, initDbSchema } from '../../../../server/core/dbSchema.js';
+import { getTelemetryLapCache, upsertTelemetryLapCache } from '../../../../server/core/dbTelemetryStore.js';
 
 function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajectoryData {
   return {
@@ -99,5 +102,40 @@ describe('replay trajectory columnar codec', () => {
     }).length;
 
     expect(columnar).toBeLessThan(legacy);
+  });
+
+  it('flips the right-positive steering of blobs written before the ISO 8855 conversion, laps included', () => {
+    const legacy = buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.25 }, { x: 1, y: 0, z: 1, steerYaw: 0 }]);
+    legacy.leadInPoints = [{ x: -1, y: 0, z: -1, steerYaw: -0.5 }];
+    legacy.allLapsData = [buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.1 }])];
+    const restored = decompressTrajectory(compressJson(toColumnarTrajectory(legacy)));
+
+    expect(restored.points.map(p => p.steerYaw)).toEqual([-0.25, 0]);
+    expect(restored.leadInPoints?.[0].steerYaw).toBe(0.5);
+    expect(restored.allLapsData?.[0].points?.[0].steerYaw).toBe(-0.1);
+    expect(restored.signConvention).toBe('iso8855');
+  });
+
+  it('marks new blobs as ISO 8855 and never flips them again', () => {
+    const trajectory = buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.25 }]);
+    const once = decompressTrajectory(compressTrajectory(trajectory));
+    const twice = decompressTrajectory(compressTrajectory(once));
+
+    expect(once.points[0].steerYaw).toBe(0.25);
+    expect(twice.points[0].steerYaw).toBe(0.25);
+    expect(trajectory.signConvention).toBeUndefined();
+  });
+
+  it('converts DuckDB laps cached before the ISO 8855 conversion, including old-version rows', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    const lap = { lapNumber: 1, lapTimeSec: 90, pointsCount: 1, sampleRateHz: 100, points: [{ x: 0, y: 0, z: 0, steerYaw: 0.3 }] };
+    db.prepare('INSERT INTO telemetry_lap_cache (filename, lap_number, points_count, telemetry_br, cache_version, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('Old.duckdb', 1, 1, compressJson(lap), 'v1', 0);
+    upsertTelemetryLapCache(db, 'New.duckdb', 1, lap);
+
+    expect(getTelemetryLapCache(db, 'Old.duckdb', 1, true)?.points[0].steerYaw).toBe(-0.3);
+    expect(getTelemetryLapCache(db, 'New.duckdb', 1)?.points[0].steerYaw).toBe(0.3);
+    db.close();
   });
 });

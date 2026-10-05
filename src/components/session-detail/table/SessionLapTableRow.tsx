@@ -11,6 +11,7 @@ import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapEventsTooltip, type LapDetailSection } from './lapDetailSections.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 /** A row that opens on Enter: the focus ring sits inside the row, so the table's edge does not clip it. */
 const FOCUS_ROW = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent';
@@ -162,12 +163,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           )}
           <Link
             to={telemetryUrl}
-            onClick={(e) => {
-              if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                e.preventDefault();
-                handleOpenTelemetry();
-              }
-            }}
+            onClick={linkClickHandler(handleOpenTelemetry, { stop: true })}
             className="hover:underline hover:text-white"
           >
             {l.lapNum}

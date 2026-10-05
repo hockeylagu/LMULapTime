@@ -63,8 +63,9 @@ export function buildCenterlineSpatialIndex(centerline: Array<[number, number]>)
     const tx = dx / len;
     const tz = dz / len;
     tangents.push({ x: tx, z: tz });
-    // Normal pointing to the right (+d = right, -d = left)
-    normals.push({ x: tz, z: -tx });
+    // Left-hand normal: LMU headings grow clockwise, so left of travel is (-tz, tx). Lateral offsets
+    // are positive to the left (ASAM OpenDRIVE t, ISO 8855 Y).
+    normals.push({ x: -tz, z: tx });
   }
 
   return {
@@ -83,7 +84,8 @@ export function buildCenterlineSpatialIndex(centerline: Array<[number, number]>)
  *
  * Coordinates:
  * - station (s): Curvilinear distance along centerline in meters [0, L_track].
- * - lateralOffset (d_perp): Signed distance in meters (+ = right of center, - = left of center).
+ * - lateralOffset (d_perp): Signed distance in meters (+ = left of center, - = right of center),
+ *   as ASAM OpenDRIVE's t and ISO 8855's Y.
  *
  * By default a station that wraps back to the start in the second half of the points is pinned
  * at the track length. Pass clampSeam: false to get the true wrapped stations, e.g. to locate

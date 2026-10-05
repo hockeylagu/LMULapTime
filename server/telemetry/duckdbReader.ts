@@ -20,6 +20,9 @@ export interface DuckDbSessionMetadata {
  * Maps LMU's exported G-force channels to canonical ISO 8855 vehicle coordinate axes:
  * - Longitudinal (a_x): positive power / acceleration, negative braking.
  * - Lateral (a_y): positive left turn (+Y), negative right turn (-Y).
+ * LMU's labels are swapped: its "G Force Long" table holds lateral G (already positive in a
+ * left turn) and "G Force Lat" holds longitudinal G (positive under braking). Verified against
+ * the GPS track's turn direction; see docs/TELEMETRY_FORMAT.md "Sign conventions (ISO 8855)".
  */
 export function normalizeDuckDbGForces(
   exportedLatG: number | undefined,
@@ -654,7 +657,8 @@ export class DuckDbReader {
       } else if (absSteer > 1.01 && steerUnit.includes('rad')) {
         steerYaw = rawSteer / Math.PI;
       }
-      steerYaw = parseFloat(Math.max(-1, Math.min(1, steerYaw)).toFixed(4));
+      // LMU's "Steering Pos" reads positive to the right; ISO 8855 steering is positive to the left.
+      steerYaw = parseFloat(Math.max(-1, Math.min(1, -steerYaw)).toFixed(4)) || 0;
 
       const rpmRow = getChannelRow(rpmData, i);
       const engineRpm = rpmRow?.value ?? 0;
@@ -763,6 +767,7 @@ export class DuckDbReader {
       pointsCount: points.length,
       sampleRateHz: declaredHz,
       points,
+      signConvention: 'iso8855',
     };
   }
 }

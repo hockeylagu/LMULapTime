@@ -12,6 +12,7 @@ import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 /** The neutral jump buttons of the header: the icon carries the only color. */
 const JUMP_BUTTON =
@@ -82,12 +83,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
       <div className="flex items-center justify-between">
         <Link
           to="/dashboard"
-          onClick={(e) => {
-            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              onBack();
-            }
-          }}
+          onClick={linkClickHandler(() => onBack())}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors ${FOCUS_RING}`}
         >
           <ArrowLeft className="w-4 h-4" />
@@ -116,12 +112,7 @@ Click to inspect trajectory and telemetry`}
               return (
                 <Link
                   to={`/session/${encodeURIComponent(targetId)}`}
-                  onClick={(e) => {
-                    if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                      e.preventDefault();
-                      handleNavigateToSession(targetId);
-                    }
-                  }}
+                  onClick={linkClickHandler(() => handleNavigateToSession(targetId))}
                   title={
                     relatedSession.type === 'qualifying'
                       ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`

@@ -242,7 +242,7 @@ export function computeLapSegmentComparisons(
 
     const meanSteer = steerCount > 0 ? steerSum / steerCount : 0;
     const turnDirection: 'left' | 'right' = meanSteer !== 0
-      ? (meanSteer > 0 ? 'right' : 'left')
+      ? (meanSteer > 0 ? 'left' : 'right')
       : (dHeadingRad >= 0 ? 'right' : 'left');
 
     const lengthM = Math.max(1, Math.round(exit.distM - entry.distM));
@@ -365,7 +365,8 @@ export function computeLapSegmentComparisons(
       ? Number((Math.abs(bdzChord * baselineAtMin.x - bdxChord * baselineAtMin.z + baselineAtExit.x * baselineAtEntry.z - baselineAtExit.z * baselineAtEntry.x) / bchordLen).toFixed(1))
       : undefined;
 
-    // Corner Exit Track-Out & Space Left
+    // Corner Exit Track-Out & Space Left. Lateral offset is positive to the left, so the track-out
+    // of a right-hander is the largest offset and that of a left-hander the smallest.
     // Scan from apex (min.distM) up to the end of corner exit (min.distM + 120m or exit.distM)
     const exitScanEndM = Math.min(exit.distM, min.distM + 120);
     let primaryTrackOutOffsetM: number | undefined;
@@ -376,7 +377,7 @@ export function computeLapSegmentComparisons(
       for (let d = min.distM; d <= exitScanEndM; d += SEGMENT_SCAN_STEP_M) {
         const pt = interpolatePointAtDistance(primaryPoints, primaryDists, d);
         if (pt.lateralOffsetM !== undefined) {
-          if (turnDirection === 'right') {
+          if (turnDirection === 'left') {
             if (pt.lateralOffsetM < extremeOffset) extremeOffset = pt.lateralOffsetM;
           } else {
             if (pt.lateralOffsetM > extremeOffset) extremeOffset = pt.lateralOffsetM;
@@ -388,7 +389,7 @@ export function computeLapSegmentComparisons(
         if (d >= min.distM && d <= exitScanEndM) {
           const off = primaryPoints[i].lateralOffsetM;
           if (off !== undefined) {
-            if (turnDirection === 'right') {
+            if (turnDirection === 'left') {
               if (off < extremeOffset) extremeOffset = off;
             } else {
               if (off > extremeOffset) extremeOffset = off;
@@ -404,7 +405,7 @@ export function computeLapSegmentComparisons(
       for (let d = min.distM; d <= exitScanEndM; d += SEGMENT_SCAN_STEP_M) {
         const bpt = interpolatePointAtDistance(baselinePoints, baselineDists, d);
         if (bpt.lateralOffsetM !== undefined) {
-          if (turnDirection === 'right') {
+          if (turnDirection === 'left') {
             if (bpt.lateralOffsetM < bExtremeOffset) bExtremeOffset = bpt.lateralOffsetM;
           } else {
             if (bpt.lateralOffsetM > bExtremeOffset) bExtremeOffset = bpt.lateralOffsetM;
@@ -416,7 +417,7 @@ export function computeLapSegmentComparisons(
         if (d >= min.distM && d <= exitScanEndM) {
           const off = baselinePoints[i].lateralOffsetM;
           if (off !== undefined) {
-            if (turnDirection === 'right') {
+            if (turnDirection === 'left') {
               if (off < bExtremeOffset) bExtremeOffset = off;
             } else {
               if (off > bExtremeOffset) bExtremeOffset = off;

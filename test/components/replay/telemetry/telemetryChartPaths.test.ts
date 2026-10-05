@@ -256,10 +256,10 @@ describe('telemetryChartPaths - Dynamic Delta Gradient & Fading', () => {
     expect(result.maxBrakeTemp).toBeGreaterThanOrEqual(500);
   });
 
-  it('inverts steering graph so Left is UP (lower SVG Y) and Right is BOTTOM (higher SVG Y)', () => {
-    const leftPoint: ReplayTrajectoryPoint = { timeSec: 0, x: 0, y: 0, z: 0, speedKmh: 100, steerYaw: -270 };
+  it('draws ISO 8855 steering with Left (positive) UP (lower SVG Y) and Right (negative) at the BOTTOM', () => {
+    const leftPoint: ReplayTrajectoryPoint = { timeSec: 0, x: 0, y: 0, z: 0, speedKmh: 100, steerYaw: 270 };
     const centerPoint: ReplayTrajectoryPoint = { timeSec: 1, x: 50, y: 0, z: 0, speedKmh: 100, steerYaw: 0 };
-    const rightPoint: ReplayTrajectoryPoint = { timeSec: 2, x: 100, y: 0, z: 0, speedKmh: 100, steerYaw: 270 };
+    const rightPoint: ReplayTrajectoryPoint = { timeSec: 2, x: 100, y: 0, z: 0, speedKmh: 100, steerYaw: -270 };
 
     const comparisons: PointComparison[] = [
       createMockComparison(leftPoint, 0),

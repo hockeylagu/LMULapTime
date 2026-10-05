@@ -41,6 +41,18 @@ describe('resolveCarAcceleration', () => {
     expect(Number.isFinite(accel!.latG)).toBe(true);
   });
 
+  it('derives negative lateral G in a right turn (ISO 8855), matching computeLateralG', () => {
+    // Heading atan2(dx, dz) grows clockwise in LMU coordinates: rotY increasing is a right turn.
+    const points = [
+      { x: 0, z: 0, speedKmh: 144, timeSec: 0.0, rotY: 0.0 },
+      { x: 3.9, z: 1.0, speedKmh: 144, timeSec: 0.1, rotY: 0.05 },
+      { x: 7.6, z: 2.2, speedKmh: 144, timeSec: 0.2, rotY: 0.10 },
+    ];
+    expect(resolveCarAcceleration(points, 1)!.latG).toBeLessThan(-1.5);
+    const mirrored = points.map(p => ({ ...p, x: -p.x, rotY: -p.rotY }));
+    expect(resolveCarAcceleration(mirrored, 1)!.latG).toBeGreaterThan(1.5);
+  });
+
   it('handles stationary or constant speed vehicle without NaN or Inf', () => {
     const points = [
       { x: 0, z: 0, speedKmh: 0, timeSec: 0.0, rotY: 0 },
@@ -49,6 +61,26 @@ describe('resolveCarAcceleration', () => {
 
     const accel = resolveCarAcceleration(points, 0);
     expect(accel).toEqual({ latG: 0, lonG: 0 });
+  });
+
+  it('resolves the full turn rate from path tangents without body orientation', () => {
+    // Radius 80 m, speed 40 m/s: right turn r = 0.5 rad/s, a_y = -20 m/s².
+    const points = Array.from({ length: 9 }, (_, i) => ({
+      x: 80 * (1 - Math.cos(i * 0.05)), z: 80 * Math.sin(i * 0.05),
+      timeSec: i * 0.1, speedKmh: 144,
+    }));
+    expect(resolveCarAcceleration(points, 4)).toEqual({ latG: -2.04, lonG: 0 });
+    expect(resolveCarAcceleration(points.map(p => ({ ...p, x: -p.x })), 4))
+      .toEqual({ latG: 2.04, lonG: 0 });
+  });
+
+  it('does not invent lateral G at either endpoint of a diagonal straight', () => {
+    const points = Array.from({ length: 5 }, (_, i) => ({
+      x: i * 3, z: i * 4, timeSec: i * 0.1, speedKmh: 180,
+    }));
+    for (const index of [0, 2, 4]) {
+      expect(resolveCarAcceleration(points, index)).toEqual({ latG: 0, lonG: 0 });
+    }
   });
 });
 

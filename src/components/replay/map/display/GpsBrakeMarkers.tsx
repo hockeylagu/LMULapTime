@@ -23,6 +23,8 @@ interface PlacedMarker {
   posY: number;
   lineEndX: number;
   lineEndY: number;
+  ux: number;
+  uy: number;
   width: number;
   height: number;
   strokeColor: string;
@@ -147,11 +149,12 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
       let chosenX = baseX;
       let chosenY = baseY;
 
-      for (const [kn, kt] of offsets) {
+      for (let i = 0; i < offsets.length; i++) {
+        const [kn, kt] = offsets[i];
         const candX = baseX + (item.ux * kn * stepN + item.tx * kt * stepT);
         const candY = baseY + (item.uy * kn * stepN + item.ty * kt * stepT);
         const collides = placedBoxes.some(b => checkOverlap(candX, candY, hw, hh, b.x, b.y, b.hw, b.hh, 2 * markerScale));
-        if (!collides || kn === offsets[offsets.length - 1][0]) {
+        if (!collides || i === offsets.length - 1) {
           chosenX = candX;
           chosenY = candY;
           if (!collides) break;
@@ -181,6 +184,8 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
         posY: chosenY,
         lineEndX,
         lineEndY,
+        ux: item.ux,
+        uy: item.uy,
         width: item.width,
         height: item.height,
         strokeColor: item.strokeColor,
@@ -192,6 +197,10 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
     // Sort back by circuit station so foreground order along track is natural
     return results.sort((a, b) => a.marker.stationM - b.marker.stationM);
   }, [markers, projected, markerScale, showDistance, showAds, showDigi]);
+
+  // Zoom-dependent level of detail: badges fade in as the camera zooms into a corner or sector, while the
+  // roadside ticks always show the precise brake stations.
+  const badgeOpacity = Math.max(0, Math.min(1, (0.48 - markerScale) / 0.12));
 
   return (
     <g data-testid="gps-brake-markers" aria-label="Braking markers" pointerEvents="none">
@@ -206,20 +215,24 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
             aria-label={accessibleLabel}
           >
             <title>{accessibleLabel}</title>
-            {/* Roadside connection line */}
+            {/* Roadside tick: a short stub at full-track zoom, a connection line to the badge once it shows */}
             <line
               x1={item.point.sx}
               y1={item.point.sy}
-              x2={item.lineEndX}
-              y2={item.lineEndY}
+              x2={badgeOpacity > 0 ? item.lineEndX : item.point.sx + item.ux * 7 * markerScale}
+              y2={badgeOpacity > 0 ? item.lineEndY : item.point.sy + item.uy * 7 * markerScale}
               stroke={item.tickStroke}
-              strokeWidth="1.2"
-              strokeOpacity={0.7}
+              strokeWidth={badgeOpacity > 0 ? '1.2' : '1.6'}
+              strokeOpacity={badgeOpacity > 0 ? 0.7 : 0.85}
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
-            {/* Badge box (always fully visible, no zoom fade-in) */}
-            <g transform={`translate(${item.posX}, ${item.posY}) scale(${markerScale})`}>
+            {/* Badge box, fading in with zoom */}
+            <g
+              opacity={badgeOpacity}
+              transform={`translate(${item.posX}, ${item.posY}) scale(${markerScale})`}
+              className="transition-opacity duration-150"
+            >
               <rect
                 x={-item.width / 2}
                 y={-item.height / 2}

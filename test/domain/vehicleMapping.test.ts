@@ -174,6 +174,37 @@ describe('vehicleMapping utility', () => {
       expect(resolveCarManufacturer('Glickenhaus 007')).toBe('Glickenhaus');
     });
 
+    it.each([
+      // results-log <CarType> names
+      ['Aston Martin Vantage AMR LMGT3', 'Aston Martin'], ['BMW M4 LMGT3', 'BMW'],
+      ['Chevrolet Corvette Z06 LMGT3.R', 'Corvette'], ['Ferrari 296 LMGT3', 'Ferrari'],
+      ['Ferrari 296 LMGT3 Evo', 'Ferrari'], ['Ford Mustang LMGT3', 'Ford'], ['Genesis GMR001', 'Genesis'],
+      ['Genesis GMR-001', 'Genesis'], ['Lamborghini Huracan LMGT3 Evo2', 'Lamborghini'], ['Lexus RCF LMGT3', 'Lexus'],
+      ['McLaren 720S LMGT3 Evo', 'McLaren'], ['Mercedes-AMG LMGT3', 'Mercedes-AMG'], ['Oreca 07', 'Oreca'],
+      ['Peugeot 9x8', 'Peugeot'], ['Porsche 911 GT3 R LMGT3', 'Porsche'], ['Toyota TR010', 'Toyota'],
+      // app model names
+      ['Aston Martin Vantage AMR', 'Aston Martin'], ['Porsche 911 RSR-19', 'Porsche'], ['Ferrari 488 GTE EVO', 'Ferrari'],
+      ['Cadillac V-Series.R', 'Cadillac'], ['Porsche 992 (Safety Car)', 'Porsche'], ['Ginetta G61-LT-P325 Evo', 'Ginetta'],
+      ['Isotta Fraschini Tipo 6', 'Isotta Fraschini'], ['Alpine A424', 'Alpine'],
+      // vehicle-id style tokens
+      ['WRT_M4', 'BMW'], ['911_RSR', 'Porsche'], ['Duqueine_D08', 'Duqueine'], ['Ligier_JSP325', 'Ligier'],
+      ['ligier js p325', 'Ligier'], ['Lamborghini Huracán', 'Lamborghini'], ['rc-f gt3', 'Lexus'], ['SCG 007', 'Glickenhaus'],
+    ])('resolves %s to %s', (name, brand) => {
+      expect(resolveCarManufacturer(name)).toBe(brand);
+    });
+
+    it.each([
+      'Team 1963 Racing', 'Car 9630', 'Gamma Racing', 'Cm4x', 'M44 Motorsport', 'Pc8 Team', 'Racing JSPlus',
+      'Tr0100', 'D080', 'Team a4245', 'Z061', 'Numbers 2960',
+    ])('does not match a brand inside %s', (name) => {
+      expect(resolveCarManufacturer(name)).toBe('');
+    });
+
+    it('prefers a brand name over a model token of another brand', () => {
+      expect(resolveCarManufacturer('Ferrari 911 tribute')).toBe('Ferrari');
+      expect(resolveCarManufacturer('Porsche 296')).toBe('Porsche');
+    });
+
     it('returns empty string for null, undefined, or unknown names', () => {
       expect(resolveCarManufacturer(null)).toBe('');
       expect(resolveCarManufacturer(undefined)).toBe('');

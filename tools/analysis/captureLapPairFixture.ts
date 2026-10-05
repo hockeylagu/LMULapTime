@@ -83,6 +83,7 @@ async function fetchLap(req: LapRequest, resolution: string) {
     trackLengthM: data.trackLengthM,
     resolution,
     maxPoints: data.maxPoints ?? 0,
+    signConvention: data.signConvention,
     columns,
   };
 }

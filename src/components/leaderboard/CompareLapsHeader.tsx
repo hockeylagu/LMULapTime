@@ -4,6 +4,7 @@ import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } 
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface CompareLapsHeaderProps {
   selectedTrack: string;
@@ -74,12 +75,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
             <Link
               to={compareTelemetryUrl}
               className={`${headerAction} ${FOCUS_RING}`}
-              onClick={(e) => {
-                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && onCompareTelemetry) {
-                  e.preventDefault();
-                  onCompareTelemetry();
-                }
-              }}
+              onClick={linkClickHandler(onCompareTelemetry ? () => onCompareTelemetry() : undefined)}
               title="Speed, pedals, delta and line of the two laps, overlaid"
             >
               <Activity className="w-3 h-3" />

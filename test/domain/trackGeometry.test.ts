@@ -78,13 +78,13 @@ describe('native surface sampling', () => {
     expect(sampleTrackSurfaceProfile(geometry, 0.1)?.leftKerbWidthM).toBe(0.8);
   });
 
-  it('reports signed road edge distances with positive lateral offsets to the right', () => {
-    expect(getTrackRoadEdgeDistances(native(), 10, 2)).toEqual({ leftDistanceM: 9, rightDistanceM: 3 });
-    expect(getTrackRoadEdgeDistances(native(), 10, 6)).toEqual({ leftDistanceM: 13, rightDistanceM: -1 });
-    expect(getTrackRoadEdgeDistances(native(), 10, -8)).toEqual({ leftDistanceM: -1, rightDistanceM: 13 });
+  it('reports signed road edge distances with positive lateral offsets to the left (OpenDRIVE t)', () => {
+    expect(getTrackRoadEdgeDistances(native(), 10, 2)).toEqual({ leftDistanceM: 5, rightDistanceM: 7 });
+    expect(getTrackRoadEdgeDistances(native(), 10, 6)).toEqual({ leftDistanceM: 1, rightDistanceM: 11 });
+    expect(getTrackRoadEdgeDistances(native(), 10, -8)).toEqual({ leftDistanceM: 15, rightDistanceM: -3 });
     const geometry = native();
     geometry.surfaceProfile!.leftWidthM[1] = null;
-    expect(getTrackRoadEdgeDistances(geometry, 10, 2)).toEqual({ leftDistanceM: null, rightDistanceM: 3 });
+    expect(getTrackRoadEdgeDistances(geometry, 10, 2)).toEqual({ leftDistanceM: null, rightDistanceM: 7 });
   });
 
   it('takes the nearer station kerb type and reports none for files without the column', () => {

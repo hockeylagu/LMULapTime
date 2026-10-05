@@ -191,6 +191,11 @@ describe('GpsMapTelemetryHud', () => {
     expect(steerEl.textContent).toMatch(/^\d+\.\d% [LRC]$/);
   });
 
+  it('labels negative lateral G as a right turn (ISO 8855)', () => {
+    render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, accelLatG: -1.42, accelLonG: 0.31 }} />);
+    expect(screen.getByText('1.4R · 0.3A')).toBeInTheDocument();
+  });
+
   it('renders dedicated G-FORCE column and keeps status clean', () => {
     const gPoint: ReplayTelemetryPoint = {
       ...mockPrimary,
@@ -204,7 +209,7 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('G-FORCE')).toBeInTheDocument();
     // Hypotenuse = sqrt(1.82^2 + (-0.65)^2) = sqrt(3.3124 + 0.4225) = sqrt(3.7349) ≈ 1.93G
     expect(screen.getByText('1.93G')).toBeInTheDocument();
-    // Lateral and longitudinal breakdown: 1.8L · 0.7B
+    // Lateral and longitudinal breakdown, ISO 8855: positive lateral G is a left turn
     expect(screen.getByText('1.8L · 0.7B')).toBeInTheDocument();
 
     // STATUS remains clean (not polluted with G-force)

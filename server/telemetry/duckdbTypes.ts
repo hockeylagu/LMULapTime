@@ -27,6 +27,8 @@ export interface DuckDbLapTelemetry {
   pointsCount: number;
   sampleRateHz: number;
   points: ReplayTrajectoryPoint[];
+  /** Sign convention of steering; laps cached before ISO 8855 carry none (see dbTelemetryStore.ts). */
+  signConvention?: 'iso8855';
   sectors?: {
     s1PointIndex?: number;
     s2PointIndex?: number;

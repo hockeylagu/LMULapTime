@@ -58,7 +58,7 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
   const formatYawRate = (yr: number | undefined): string => {
     if (yr === undefined) return '0.0°/s';
     const sign = yr > 0 ? '+' : '';
-    const dir = Math.abs(yr) < 0.5 ? '' : yr > 0 ? ' R' : ' L';
+    const dir = Math.abs(yr) < 0.5 ? '' : yr > 0 ? ' L' : ' R';
     return `${sign}${yr.toFixed(1)}°/s${dir}`;
   };
 
@@ -78,9 +78,9 @@ export const TelemetryYawRateChannel: React.FC<TelemetryYawRateChannelProps> = R
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
-        { label: '+90°/s Rotation Right', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: '+90°/s Rotation Left', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
         { label: '0°/s In-Line', borderClassName: 'border-b border-lmu-aqua/50', labelClassName: 'text-[10px] text-lmu-aqua-soft font-mono' },
-        { label: '-90°/s Rotation Left', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
+        { label: '-90°/s Rotation Right', borderClassName: 'border-b border-lmu-aqua/30', labelClassName: 'text-[10px] text-lmu-aqua font-mono' },
       ]} />
 
       {isCursorInView && hasYawRate && (

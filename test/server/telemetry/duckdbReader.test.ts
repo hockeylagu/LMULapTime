@@ -6,7 +6,8 @@ import os from 'os';
 import { DuckDbReader, normalizeDuckDbGForces } from '../../../server/telemetry/duckdbReader.js';
 
 describe('DuckDbReader', () => {
-  it('normalizes exported G-force labels to canonical lateral and longitudinal axes', () => {
+  it('normalizes exported G-force labels to ISO 8855 lateral and longitudinal axes', () => {
+    // LMU's "G Force Long" holds lateral G (+ left turn); "G Force Lat" holds longitudinal G (+ braking).
     expect(normalizeDuckDbGForces(1.25, -0.75)).toEqual({
       accelLatG: -0.75,
       accelLonG: -1.25,
@@ -268,7 +269,9 @@ describe('DuckDbReader', () => {
     expect(lapTelemetry).not.toBeNull();
     expect(lapTelemetry!.points.length).toBeGreaterThan(0);
     expect(lapTelemetry!.points[0].throttle).toBe(100);
-    expect(lapTelemetry!.points[0].steerYaw).toBe(-0.025);
+    // LMU's Steering Pos -2.5% is to the left, positive under ISO 8855.
+    expect(lapTelemetry!.points[0].steerYaw).toBe(0.025);
+    expect(lapTelemetry!.signConvention).toBe('iso8855');
     expect(lapTelemetry!.points[0].tirePressures).toBeDefined();
     expect(lapTelemetry!.points[0].tirePressures![0]).toBe(175);
     expect(typeof lapTelemetry!.points[0].tcActive).toBe('boolean');

@@ -6,6 +6,7 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { carClassLabel, formatDrivenAgo } from '../board/leaderboardFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 export interface TrackRibbonCardProps {
   layout: LeaderboardLayout;
@@ -22,13 +23,8 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
   return (
     <Link
       to={targetUrl}
-      onClick={(e) => {
-        if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-          e.preventDefault();
-          onSelect(layout);
-        }
-      }}
-      aria-pressed={selected}
+      onClick={linkClickHandler(() => onSelect(layout))}
+      aria-current={selected ? 'true' : undefined}
       title={`${layout.trackName} — ${layout.layoutName}`}
       className={`snap-start shrink-0 w-56 rounded-xl border p-3 text-left transition-all cursor-pointer ${
         selected

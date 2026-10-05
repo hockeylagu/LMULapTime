@@ -152,8 +152,9 @@ function annotateRoadProfile(point: ReplayTrajectoryPoint, definition: CachedTra
   }
   const profile = definition ? sampleTrackSurfaceProfile(definition, point.stationM ?? NaN) : null;
   const offset = point.lateralOffsetM;
-  point.leftRoadDistanceM = profile?.leftWidthM != null && offset !== undefined ? profile.leftWidthM + offset : null;
-  point.rightRoadDistanceM = profile?.rightWidthM != null && offset !== undefined ? profile.rightWidthM - offset : null;
+  // Lateral offset is positive to the left: moving left shrinks the distance to the left edge.
+  point.leftRoadDistanceM = profile?.leftWidthM != null && offset !== undefined ? profile.leftWidthM - offset : null;
+  point.rightRoadDistanceM = profile?.rightWidthM != null && offset !== undefined ? profile.rightWidthM + offset : null;
   point.roadElevationM = profile?.elevationM ?? null;
   point.roadGradePct = profile?.gradePct ?? null;
   point.roadBankDeg = profile?.bankDeg ?? null;

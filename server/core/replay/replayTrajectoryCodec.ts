@@ -85,12 +85,31 @@ export function isColumnar(stored: StoredTrajectory): stored is Omit<ReplayTraje
   return (stored as ColumnarPoints).pointsFormat === 'columnar';
 }
 
+/**
+ * Steering was stored positive to the right until the ISO 8855 conversion (positive to the left).
+ * Every row written now is marked; an unmarked row is flipped on read and never rewritten, so
+ * deleted replays keep their only copy. Lateral offsets are not stored: they are reprojected on read.
+ */
+export function toIso8855Steering<T extends { points?: ReplayTrajectoryPoint[]; signConvention?: 'iso8855' }>(stored: T): T {
+  if (stored.signConvention === 'iso8855') return stored;
+  const record = stored as T & Partial<Pick<ReplayTrajectoryData, 'leadInPoints' | 'leadOutPoints' | 'allLapsData'>>;
+  for (const points of [record.points, record.leadInPoints, record.leadOutPoints]) {
+    for (const point of points ?? []) {
+      if (typeof point.steerYaw === 'number' && point.steerYaw !== 0) point.steerYaw = -point.steerYaw;
+    }
+  }
+  for (const lap of record.allLapsData ?? []) toIso8855Steering(lap);
+  stored.signConvention = 'iso8855';
+  return stored;
+}
+
+/** Callers pass ISO 8855 data (everything decoded or read now is), so the row is marked as such. */
 export function compressTrajectory(trajectory: ReplayTrajectoryData): Buffer {
-  return compressJson(toColumnarTrajectory(trajectory));
+  return compressJson(toColumnarTrajectory({ ...trajectory, signConvention: 'iso8855' }));
 }
 
 export function decompressTrajectory(buffer: Buffer): ReplayTrajectoryData {
-  return fromColumnarTrajectory(decompressJson<StoredTrajectory>(buffer));
+  return toIso8855Steering(fromColumnarTrajectory(decompressJson<StoredTrajectory>(buffer)));
 }
 
 /** Ambient °C written by builds before v6 (`25 - (146 - raw) * 0.176`), recomputed as `raw / 8 + 5.9`. */

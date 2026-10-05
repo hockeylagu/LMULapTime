@@ -24,6 +24,7 @@ export interface SessionListItem {
     name?: string;
     carType: string;
     carClass?: string;
+    bestLapNum?: number | null;
     bestLapTime: number | null;
     bestLapTimeString: string;
     bestLapPaceCategory?: PaceCategory | null;

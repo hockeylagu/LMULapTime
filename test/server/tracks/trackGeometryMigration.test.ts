@@ -121,7 +121,7 @@ describe('geometry revision migration', () => {
       ({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight })))
       .toEqual(retained.points.map(({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight }) =>
         ({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight })));
-    expect(lap.points[1]).toMatchObject({ stationM: 50, lateralOffsetM: 2,
+    expect(lap.points[1]).toMatchObject({ stationM: 50, lateralOffsetM: -2,
       leftRoadDistanceM: 7, rightRoadDistanceM: 6, roadElevationM: 20, roadGradePct: 2,
       roadBankDeg: 3, leftKerbHeightM: 0.05, rightKerbHeightM: null, leftKerbType: 'flat', rightKerbType: null });
     expect(lap.points[2].stationM).toBe(lap.trackLengthM);

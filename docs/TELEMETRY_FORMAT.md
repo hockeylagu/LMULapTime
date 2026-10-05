@@ -78,6 +78,81 @@ If telemetry is normalized into the application's cache, the recommended logical
 
 Use a stable `session_id` plus `(channel_name, sample_index)` for continuous rows and `(channel_name, ts)` for timestamped rows. Keep raw source columns and the original DuckDB path alongside derived metrics so parsing changes can be replayed without data loss.
 
+## Sign conventions (ISO 8855)
+
+Normalized vehicle dynamics follow ISO 8855:2011 vehicle axes (x forward, y left, z up), and ASAM OpenDRIVE's
+`t` (positive left of the reference line, the same sense as ISO 8855 y) for the offset from the track
+centerline. Views put the positive side up on charts and label it left.
+
+Reference: [ISO 8855:2011](https://www.iso.org/standard/51180.html), clauses 2.3, 2.8 and 2.10
+(right-handed axes, earth-fixed axes and vehicle axes).
+
+### Map and native coordinates
+
+Positions `x`, `y`, `z` and orientations `rotX`, `rotY`, `rotZ` retain the **native LMU frame**:
+`x/z` are horizontal metres and `y` is elevation. They are not ISO vehicle-axis components.
+An ISO earth-fixed representation can be chosen as `(X_E, Y_E, Z_E) = (z, -x, y)`;
+the horizontal bearing and origin are arbitrary. Detailed track packages remain in native LMU
+coordinates so replays, timing gates, boundaries and surface polygons share the same frame.
+
+The SVG map draws native `x` right and `z` up (screen y is inverted); native
+`atan2(dx, dz)` therefore increases clockwise. ISO yaw rate negates its derivative. A native
+forward tangent `(tx, tz)` has left normal `(-tz, tx)`, used for positive centerline offset.
+`rotY = 0` is a valid body orientation, not a missing-data sentinel.
+
+The car's map arrow shows **inertial load transfer**, opposite the acceleration vector: left-turn
+acceleration moves load right, and braking moves load forward. Its numeric tooltip uses ISO
+acceleration signs. Screen coordinates are display coordinates, not vehicle axes.
+
+### Channel signs
+
+| Field | Positive | Source and conversion |
+| --- | --- | --- |
+| `accelLonG` | Accelerating (braking is negative) | DuckDB `G Force Lat` negated; replays: computed from speed |
+| `accelLatG` | Left turn (a_y toward the car's left) | DuckDB `G Force Long` as is; replays: `v · r / g` |
+| `yawRateDeg` | Turning left (counter-clockwise seen from above) | Computed: minus the rate of LMU's heading |
+| `slipAngleDeg` | Velocity left of the nose (nose right of travel, a right-hander at speed) | Computed: nose heading minus velocity heading |
+| `steerYaw` | Steering left | VCR wheel position and DuckDB `Steering Pos` negated at decode |
+| `lateralOffsetM` | Left of the centerline | Track projection onto the left-hand normal |
+| `understeerDeg` | Understeer (oversteer negative) | Not an axis; independent of turn direction |
+
+Replay acceleration derived from speed and yaw assumes approximately planar motion and small
+sideslip. When orientation is absent, the sideslip fallback (`-0.85 degrees/G`) is a heuristic,
+not a measured ISO beta; beta's sign cannot generally be inferred from turn direction alone.
+These conventions establish coordinate and sign consistency, not full ISO certification of
+every estimated vehicle-dynamics quantity.
+
+LMU's own data is right-positive for steering and heading, and its DuckDB G-force channel names do
+not match their content:
+
+| LMU source | Holds | Mapping |
+| --- | --- | --- |
+| DuckDB `G Force Long` | Lateral G, positive in a left turn | `accelLatG = value` (`normalizeDuckDbGForces`) |
+| DuckDB `G Force Lat` | Longitudinal G, positive under braking | `accelLonG = -value` |
+| DuckDB `Steering Pos` (%) | Steering, positive to the right | `steerYaw = -value / 100` |
+| VCR `steer10` | Steering wheel, positive to the right | `steerYaw = (512 - steer10) / 512` |
+| Heading `atan2(dx, dz)`, `rotY` | Grows clockwise seen from above (turning right) | Yaw rate negated |
+
+Evidence (2026-10-05):
+
+- **GPS ground truth.** The 10 Hz `GPS Latitude`/`GPS Longitude` track is synthetic but not mirrored:
+  its heading winds +360° per lap on clockwise Bahrain and Monza. Its right-turn rate correlates with
+  `G Force Long` at r = −0.76 (Bahrain Q), −0.76 (Monza Q) and −0.80 (Algarve Q), and with
+  `Steering Pos` at r = +0.59 (Bahrain) and +0.65 (Monza). `G Force Lat` does not correlate with it
+  (|r| < 0.07).
+- **LMU heading.** In LMU local x/z, `atan2(dx, dz)` grows through right turns: the plugin centerlines
+  wind +360° on clockwise circuits (Bahrain, Monza, Spa) and −360° on counter-clockwise ones (COTA,
+  Interlagos, Imola). `rotY` turns the same way (r = +0.93 against the path's right-turn rate,
+  Bahrain Q1 13).
+- **VCR steering.** Replay `steer10` is right-positive: r = +0.95 against the path's right-turn rate for
+  three AI cars of the same Bahrain replay.
+
+Stored data: replay trajectory blobs and DuckDB lap-cache rows written since the conversion carry
+`signConvention: 'iso8855'`. Rows without it hold right-positive steering and are flipped on read
+(`toIso8855Steering`, `replayTrajectoryCodec.ts`), never rewritten, so deleted replays keep their only
+copy and no replay needs decoding again. Lateral offsets are not stored: they are reprojected whenever
+a trajectory is served.
+
 ## Versioning and provenance
 
 The database schema is tied to the LMU telemetry exporter and may change with a game update. Record the LMU build, database filename, DuckDB version, `metadata` rows, catalog tables, and `config.json` beside imported data. Re-run the catalog queries after an update rather than assuming every channel has the same columns or timestamp behavior.

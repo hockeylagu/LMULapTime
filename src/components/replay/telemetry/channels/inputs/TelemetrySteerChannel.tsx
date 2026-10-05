@@ -13,9 +13,9 @@ import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTr
 import { TelemetrySteerOverlayToggles } from './TelemetrySteerOverlayToggles.js';
 
 const steerGridLines = (range: number): readonly TelemetryGridLine[] => [
-  { label: `-${range}% L`, yPercent: 0, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
+  { label: `+${range}% L`, yPercent: 0, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
   { label: '0% Center', yPercent: 50, borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[10px] text-lmu-indigo-soft font-mono' },
-  { label: `+${range}% R`, yPercent: 100, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
+  { label: `-${range}% R`, yPercent: 100, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
 ];
 
 export interface TelemetrySteerChannelProps {

@@ -165,7 +165,7 @@ describe('Computed Telemetry UI Channels', () => {
 
     expect(screen.getByText('YAW RATE')).toBeInTheDocument();
     expect(screen.getByText('COMPUTED')).toBeInTheDocument();
-    expect(screen.getByText('+32.5°/s R')).toBeInTheDocument();
+    expect(screen.getByText('+32.5°/s L')).toBeInTheDocument();
   });
 
   it('renders TelemetryPresetChannelRow showing COMPUTED for calculated channels and DIRECT for native', () => {

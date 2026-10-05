@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { toIso8855Steering } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
 import {
   computeLapComparisons,
@@ -48,6 +49,8 @@ interface FixtureLap {
   resolution?: string;
   /** Points the server reduced the lap to. */
   maxPoints: number;
+  /** Absent on laps captured before the ISO 8855 conversion (right-positive steering). */
+  signConvention?: 'iso8855';
   columns: Record<string, Array<number | null>>;
 }
 
@@ -86,6 +89,13 @@ function decodeLap(lap: FixtureLap): LoadedLap {
       point[field] = BOOLEAN_FIELDS.has(field) ? value === 1 : value;
     }
     rawPoints.push(point as unknown as ReplayTrajectoryPoint);
+  }
+  if (lap.signConvention !== 'iso8855') {
+    // Captured before the ISO 8855 conversion: steering and the served lateral offset were right-positive.
+    toIso8855Steering({ points: rawPoints });
+    for (const point of rawPoints) {
+      if (typeof point.lateralOffsetM === 'number' && point.lateralOffsetM !== 0) point.lateralOffsetM = -point.lateralOffsetM;
+    }
   }
   return {
     driverName: lap.driverName,

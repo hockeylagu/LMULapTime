@@ -22,8 +22,8 @@ export const GpsCarDynamicsVector: React.FC<GpsCarDynamicsVectorProps> = ({
 
   // 1G maps to ~1.6 meters in world space
   const pixelsPerG = unitsPerMeter * 1.6;
-  // In car body frame, -Y is forward (windshield), +Y is rearward (tail),
-  // -X is left (driver-side), and +X is right (passenger-side).
+  // In the car's SVG display frame, -screenY is forward, +screenY is rearward,
+  // -screenX is left and +screenX is right. These are not ISO vehicle axes.
   // Inertial load transfer (where the weight goes):
   // In telemetry, turning right has accelLatG < 0, transferring load to outside left tires (-X).
   // Turning left has accelLatG > 0, transferring load to outside right tires (+X).
@@ -52,7 +52,7 @@ export const GpsCarDynamicsVector: React.FC<GpsCarDynamicsVectorProps> = ({
   const shaftEndX = uX * shaftEndDist;
   const shaftEndY = uY * shaftEndDist;
 
-  const tooltip = `${totalG.toFixed(2)}G (${accelLatG >= 0 ? '+' : ''}${accelLatG.toFixed(2)}G Lat, ${accelLonG >= 0 ? '+' : ''}${accelLonG.toFixed(2)}G Lon)`;
+  const tooltip = `Load transfer (opposite acceleration): ${totalG.toFixed(2)}G (${accelLatG >= 0 ? '+' : ''}${accelLatG.toFixed(2)}G Lat, ${accelLonG >= 0 ? '+' : ''}${accelLonG.toFixed(2)}G Lon)`;
 
   return (
     <g

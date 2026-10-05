@@ -212,3 +212,46 @@ describe('useGpsMapShortcuts', () => {
     document.body.removeChild(input);
   });
 });
+
+describe('useGpsMapShortcuts target scoping', () => {
+  const pts: ReplayTrajectoryPoint[] = [0, 1, 2].map(i => ({ x: i, y: 0, z: 0, speedKmh: 100, throttle: 0, brake: 0, timeSec: i * 0.1 }));
+
+  function setup(isExpanded: boolean) {
+    const map = document.createElement('div'); map.dataset.replaySurface = 'map';
+    const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
+    document.body.append(map, chart);
+    const handlers = { onSelectIndex: vi.fn(), onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleGForce: vi.fn() };
+    renderHook(() => useGpsMapShortcuts({ isExpanded, containerRef: { current: map }, points: pts, currentIndex: 1, ...handlers }));
+    return { map, chart, handlers, cleanup: () => { map.remove(); chart.remove(); } };
+  }
+  const press = (el: Element, key: string) => el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+
+  it('ignores map keys pressed on the telemetry chart when the map is not expanded', () => {
+    const { chart, handlers, cleanup } = setup(false);
+    for (const key of ['+', '=', '-', '0', 'r', 'g', 'ArrowRight', 'Home', 'End']) press(chart, key);
+    expect(handlers.onZoomIn).not.toHaveBeenCalled();
+    expect(handlers.onZoomOut).not.toHaveBeenCalled();
+    expect(handlers.onResetZoom).not.toHaveBeenCalled();
+    expect(handlers.onToggleGForce).not.toHaveBeenCalled();
+    expect(handlers.onSelectIndex).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it('acts on keys pressed inside the map', () => {
+    const { map, handlers, cleanup } = setup(false);
+    press(map, '+'); press(map, 'ArrowRight');
+    expect(handlers.onZoomIn).toHaveBeenCalledTimes(1);
+    expect(handlers.onSelectIndex).toHaveBeenCalledWith(2);
+    cleanup();
+  });
+
+  it('does not double-handle chart keys even when a map is expanded', () => {
+    const { chart, handlers, cleanup } = setup(true);
+    press(chart, 'ArrowLeft'); press(chart, '+');
+    expect(handlers.onSelectIndex).not.toHaveBeenCalled();
+    expect(handlers.onZoomIn).not.toHaveBeenCalled();
+    press(document.body, '+');
+    expect(handlers.onZoomIn).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+});

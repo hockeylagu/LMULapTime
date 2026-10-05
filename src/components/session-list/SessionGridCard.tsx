@@ -5,9 +5,11 @@ import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/form
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { CarLogo } from '../vehicle/index.js';
 import { SessionListItem } from './sessionListTypes.js';
+import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface SessionGridCardProps {
   session: SessionListItem;
@@ -29,9 +31,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   const displayTrack = s.trackVenue ? getDisplayTrackName(s.trackVenue, s.trackCourse) : '';
 
   const label = [s.sessionType, displayTrack, s.timeString].filter(Boolean).join(', ');
-  const replayUrl = s.matchingReplayFile
-    ? `/telemetry?replayName=${encodeURIComponent(s.matchingReplayFile.name)}&session=${encodeURIComponent(s.id)}`
-    : undefined;
+  const replayUrl = sessionReplayUrl(s);
 
   return (
     <div
@@ -42,12 +42,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
       <Link
         to={`/session/${encodeURIComponent(s.id)}`}
         aria-label={`Open session: ${label}`}
-        onClick={(e) => {
-          if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-            e.preventDefault();
-            onSelectSession(s.id);
-          }
-        }}
+        onClick={linkClickHandler(() => onSelectSession(s.id), { stop: true })}
         className={`absolute inset-0 rounded-xl cursor-pointer ${FOCUS_RING}`}
       />
       <div className="flex items-start justify-between gap-3">

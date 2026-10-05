@@ -94,10 +94,45 @@ describe('local data plugin snapshot',()=>{
     const res = await request(app).get('/api/data-plugin/vehicles/logos');
     expect(res.status).toBe(200);
     expect(res.body.logos.Ferrari).toBe(svgContent);
+    // The vehicle list does not carry the logos.
+    const list = await request(app).get('/api/data-plugin/vehicles');
+    expect(list.status).toBe(200);
+    expect(list.body).not.toHaveProperty('logos');
+    expect(list.body.vehicles).toBeDefined();
 
-    // Rejection of invalid logos
-    expect(() => parseVehicleLogos({ schemaVersion: 1, logos: { Ferrari: 'not an svg' } })).toThrow();
-    expect(() => parseVehicleLogos({ schemaVersion: 2, logos: {} })).toThrow();
-    expect(() => parseVehicleLogos({ schemaVersion: 1, logos: { 'invalid/key': svgContent } })).toThrow();
+    // Invalid entries are skipped, never thrown
+    expect(parseVehicleLogos({ schemaVersion: 1, logos: { Ferrari: 'not an svg', Audi: svgContent } })).toEqual({ Audi: svgContent });
+    expect(parseVehicleLogos({ schemaVersion: 2, logos: {} })).toEqual({});
+    expect(parseVehicleLogos({ schemaVersion: 1, logos: { 'invalid/key': svgContent } })).toEqual({});
+    expect(parseVehicleLogos('garbage')).toEqual({});
+  });
+  it('keeps tracks and vehicles ready when a logo is invalid', () => {
+    const { dir, write, manifest } = fixture('both');
+    const svgContent = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>';
+    write('vehicles/logos.json', { schemaVersion: 1, logos: { Ferrari: svgContent, 'bad/key': svgContent, Porsche: 'not an svg' } });
+    write('manifest.json', { ...manifest, vehicles: { ...manifest.vehicles, logos: 'vehicles/logos.json' } });
+    const plugin = new DataPlugin(dir);
+    expect(plugin.status.state).toBe('ready');
+    expect(plugin.status.tracks).toBe(true);
+    expect(plugin.vehicles()).toHaveLength(1);
+    expect(plugin.logos()).toEqual({ Ferrari: svgContent });
+  });
+  it('keeps tracks and vehicles ready when the logos file is malformed or missing', () => {
+    const { dir, manifest } = fixture('both');
+    fs.mkdirSync(path.join(dir, 'vehicles'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'vehicles/logos.json'), '{not json');
+    const withLogos = { ...manifest, vehicles: { ...manifest.vehicles, logos: 'vehicles/logos.json' } };
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(withLogos));
+    const broken = new DataPlugin(dir);
+    expect(broken.status.state).toBe('ready');
+    expect(broken.status.logos).toBeUndefined();
+    expect(broken.logos()).toEqual({});
+    fs.rmSync(path.join(dir, 'vehicles/logos.json'));
+    expect(new DataPlugin(dir).status.state).toBe('ready');
+  });
+  it('still rejects a logos path escaping the package', () => {
+    const { dir, manifest } = fixture('both');
+    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ ...manifest, vehicles: { ...manifest.vehicles, logos: '../logos.json' } }));
+    expect(new DataPlugin(dir).status.state).toBe('invalid');
   });
 });

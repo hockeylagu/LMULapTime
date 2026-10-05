@@ -5,8 +5,10 @@ import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/form
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
 import { CarLogo } from '../vehicle/index.js';
 import { SessionListItem } from './sessionListTypes.js';
+import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionTableRowProps {
@@ -30,9 +32,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
 
   const label = [s.sessionType, displayTrack, s.timeString].filter(Boolean).join(', ');
   const sessionUrl = `/session/${encodeURIComponent(s.id)}`;
-  const replayUrl = s.matchingReplayFile
-    ? `/telemetry?replayName=${encodeURIComponent(s.matchingReplayFile.name)}&session=${encodeURIComponent(s.id)}`
-    : undefined;
+  const replayUrl = sessionReplayUrl(s);
 
   return (
     <tr
@@ -52,7 +52,11 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
       {/* Track */}
       {showTrackColumn && (
         <td className="px-3.5 py-3 font-semibold text-white">
-          <Link to={sessionUrl} className="hover:text-lmu-accent-text transition-colors">
+          <Link
+            to={sessionUrl}
+            onClick={linkClickHandler(() => onSelectSession(s.id), { stop: true })}
+            className="hover:text-lmu-accent-text transition-colors"
+          >
             {displayTrack || 'Circuit'}
           </Link>
         </td>
@@ -129,10 +133,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
           )}
           <Link
             to={sessionUrl}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectSession(s.id);
-            }}
+            onClick={linkClickHandler(() => onSelectSession(s.id), { stop: true })}
             className={`p-1.5 rounded-lg ${FOCUS_RING} text-lmu-muted group-hover:text-white hover:bg-lmu-raised transition-colors cursor-pointer shrink-0 flex items-center justify-center group/btn`}
             title={`Analyze ${displayTrack || 'Session'} Details`}
             aria-label={`Analyze ${displayTrack || 'Session'}`}

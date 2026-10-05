@@ -92,8 +92,9 @@ describe('computedTelemetry physics engine', () => {
       expect(latG[1]).toBe(0);
     });
 
-    it('computes canonical lateral G sign for a positive yaw turn', () => {
-      // Speed 144 km/h (40 m/s), rotating right by 0.05 rad (~2.86 deg) per 0.1s -> yawRate = 28.6 deg/s (0.5 rad/s)
+    it('gives negative yaw rate and lateral G in a right turn (ISO 8855: + is left)', () => {
+      // Heading atan2(dx, dz) grows clockwise in LMU coordinates: this path turns right.
+      // Speed 144 km/h (40 m/s), rotating right by 0.05 rad (~2.86 deg) per 0.1s -> yawRate = -28.6 deg/s (ISO 8855: +yaw is left)
       // aLat = v * omega = 40 * 0.5 = 20 m/s^2 (~ 2.04G)
       const points = [
         makePoint({ x: 0, z: 0, timeSec: 0.0, speedKmh: 144, rotY: 0.0 }),
@@ -104,7 +105,7 @@ describe('computedTelemetry physics engine', () => {
       const yawRates = computeYawRate(points);
       const latG = computeLateralG(points, yawRates);
 
-      expect(yawRates[1]).toBeGreaterThan(20);
+      expect(yawRates[1]).toBeLessThan(-20);
       expect(latG[1]).toBeLessThan(-1.5);
       expect(latG[1]).toBeGreaterThan(-2.5);
     });
@@ -116,6 +117,7 @@ describe('computedTelemetry physics engine', () => {
         makePoint({ x: 3, z: 9, timeSec: 0.2, speedKmh: 100 }),
         makePoint({ x: 6, z: 12, timeSec: 0.3, speedKmh: 100 }),
       ];
+      for (const point of points) delete point.rotY;
       const yawRates = computeYawRate(points);
       expect(yawRates.length).toBe(4);
       expect(yawRates.some(r => r !== 0)).toBe(true);
@@ -123,6 +125,15 @@ describe('computedTelemetry physics engine', () => {
   });
 
   describe('computeSlipAngle', () => {
+    it('keeps a valid zero body heading when the velocity slides left or right', () => {
+      const points = Array.from({ length: 7 }, (_, i) => makePoint({
+        x: i * -0.5, z: i * 5, timeSec: i * 0.1, rotY: 0,
+      }));
+      expect(computeYawRate(points)).toEqual(points.map(() => 0));
+      expect(computeSlipAngle(points)[3]).toBeCloseTo(5.71, 2);
+      expect(computeSlipAngle(points.map(p => ({ ...p, x: -p.x })))[3]).toBeCloseTo(-5.71, 2);
+    });
+
     it('suppresses slip angle at near-stationary speeds', () => {
       const points = [
         makePoint({ x: 0, z: 0, timeSec: 0.0, speedKmh: 5, rotY: 0.5 }),
@@ -165,8 +176,10 @@ describe('computedTelemetry physics engine', () => {
         makePoint({ x: 1, z: 5, timeSec: 0.1, speedKmh: 120, accelLatG: 2.0 }),
         makePoint({ x: 3, z: 10, timeSec: 0.2, speedKmh: 120, accelLatG: 2.0 }),
       ];
+      for (const point of points) delete point.rotY;
       const slip = computeSlipAngle(points);
-      expect(slip[1]).toBeCloseTo(1.7, 1);
+      // ISO 8855 sideslip: in a left turn (+a_y) the velocity points right of the nose, so beta is negative.
+      expect(slip[1]).toBeCloseTo(-1.7, 1);
     });
   });
 

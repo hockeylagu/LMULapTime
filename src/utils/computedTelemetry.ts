@@ -63,18 +63,20 @@ export function computeLongitudinalG(points: ReplayTrajectoryPoint[]): number[] 
 }
 
 /**
- * Computes yaw rotation rate (deg/s) from vehicle orientation yaw (rotY) or path tangent.
+ * Computes yaw rate (deg/s) from vehicle orientation yaw (rotY) or path tangent, in ISO 8855
+ * axes: positive counter-clockwise seen from above (turning left), negative turning right.
+ * LMU's heading (rotY, and the path heading atan2(dx, dz)) grows clockwise, hence the negation.
  */
 export function computeYawRate(points: ReplayTrajectoryPoint[]): number[] {
   const n = points.length;
   if (n === 0) return [];
   if (n === 1) return [0];
 
-  const hasRotY = points.some(p => p.rotY !== undefined && p.rotY !== 0);
+  const hasRotY = points.some(p => Number.isFinite(p.rotY));
   const yawAngles: number[] = new Array<number>(n);
 
   for (let i = 0; i < n; i++) {
-    if (hasRotY && points[i].rotY !== undefined) {
+    if (hasRotY && Number.isFinite(points[i].rotY)) {
       yawAngles[i] = points[i].rotY!;
     } else {
       // Fallback: derive heading angle from velocity / position trajectory
@@ -93,19 +95,19 @@ export function computeYawRate(points: ReplayTrajectoryPoint[]): number[] {
     const dt = (points[nextIdx].timeSec ?? 0) - (points[prevIdx].timeSec ?? 0);
     if (dt > 0.005) {
       const dYawRad = unwrapAngle(yawAngles[nextIdx] - yawAngles[prevIdx]);
-      rawRateDeg[i] = (dYawRad / dt) * (180 / Math.PI);
+      rawRateDeg[i] = -(dYawRad / dt) * (180 / Math.PI);
     } else {
       rawRateDeg[i] = 0;
     }
   }
 
   const smoothed = movingAverage(rawRateDeg, 2);
-  return smoothed.map(r => Number(Math.max(-150, Math.min(150, r)).toFixed(1)));
+  return smoothed.map(r => Number(Math.max(-150, Math.min(150, r)).toFixed(1)) || 0);
 }
 
 /**
- * Computes lateral acceleration (G) from yaw rate following ISO 8855 vehicle coordinates:
- * Canonical convention: +G left turn (+Y), -G right turn (-Y), 0G straight.
+ * Computes lateral acceleration (G) from the ISO 8855 yaw rate: a_y = v * r, so +G in a left
+ * turn (+Y), -G in a right turn, 0G straight. See docs/TELEMETRY_FORMAT.md "Sign conventions (ISO 8855)".
  */
 export function computeLateralG(points: ReplayTrajectoryPoint[], yawRatesDeg: number[]): number[] {
   const n = points.length;
@@ -115,13 +117,12 @@ export function computeLateralG(points: ReplayTrajectoryPoint[], yawRatesDeg: nu
   for (let i = 0; i < n; i++) {
     const vMs = (points[i].speedKmh ?? 0) / 3.6;
     const yawRateRad = (yawRatesDeg[i] * Math.PI) / 180;
-    // a_lat = v * omega
-    const aLat = vMs * yawRateRad;
-    latG[i] = -aLat / G_CONST;
+    // a_y = v * r
+    latG[i] = (vMs * yawRateRad) / G_CONST;
   }
 
   const smoothed = movingAverage(latG, 2);
-  return smoothed.map(g => Number(Math.max(-4.5, Math.min(4.5, g)).toFixed(2)));
+  return smoothed.map(g => Number(Math.max(-4.5, Math.min(4.5, g)).toFixed(2)) || 0);
 }
 
 /**
@@ -136,7 +137,7 @@ function detectRotYOffset(points: ReplayTrajectoryPoint[]): number {
   for (let i = 1; i < maxScan; i++) {
     const dx = points[i].x - points[i - 1].x;
     const dz = points[i].z - points[i - 1].z;
-    if (Math.hypot(dx, dz) > 0.1 && points[i].rotY !== undefined) {
+    if (Math.hypot(dx, dz) > 0.1 && Number.isFinite(points[i].rotY)) {
       const velH = Math.atan2(dx, dz);
       const d = Math.abs(unwrapAngle(velH - points[i].rotY!));
       sumDiff += d;
@@ -151,8 +152,9 @@ function detectRotYOffset(points: ReplayTrajectoryPoint[]): number {
 }
 
 /**
- * Computes vehicle body slip angle beta (degrees): angle between vehicle heading
- * and actual velocity vector.
+ * Computes the ISO 8855 sideslip angle beta (degrees): the angle from the vehicle's x axis
+ * (its nose) to its velocity, positive counter-clockwise. Positive when the car travels to the
+ * left of where its nose points (nose right of travel, as in a right-hand corner at speed).
  * In LMU/rFactor 2 coordinates, vehicle forward is -Z in local space, so yaw rotation
  * rotY is offset by PI relative to world atan2(dx, dz).
  * Suppressed at low speeds (< 10 km/h) to prevent singularity.
@@ -165,7 +167,7 @@ export function computeSlipAngle(
   if (n === 0) return [];
   if (n === 1) return [0];
 
-  const hasRotY = points.some(p => p.rotY !== undefined && p.rotY !== 0);
+  const hasRotY = points.some(p => Number.isFinite(p.rotY));
   const rotOffset = hasRotY ? detectRotYOffset(points) : 0;
   const slipAngles = new Array<number>(n);
 
@@ -176,7 +178,7 @@ export function computeSlipAngle(
       continue;
     }
 
-    if (hasRotY && points[i].rotY !== undefined) {
+    if (hasRotY && Number.isFinite(points[i].rotY)) {
       const prevIdx = Math.max(0, i - 2);
       const nextIdx = Math.min(n - 1, i + 2);
       const dx = points[nextIdx].x - points[prevIdx].x;
@@ -187,29 +189,31 @@ export function computeSlipAngle(
         continue;
       }
 
-      // Velocity heading in LMU world plane (X = lateral/east, Z = forward/north)
+      // Velocity heading in the native LMU horizontal x/z plane (no geographic bearing).
       const velHeadingRad = Math.atan2(dx, dz);
       const carHeadingRad = unwrapAngle(points[i].rotY! + rotOffset);
 
-      // Body slip angle: positive indicates slip to the right (+G / right turn),
-      // negative indicates slip to the left (-G / left turn)
+      // Both headings grow clockwise, so nose minus velocity is the counter-clockwise angle
+      // from the nose to the velocity: ISO 8855 beta.
       const betaRad = unwrapAngle(carHeadingRad - velHeadingRad);
       const betaDeg = betaRad * (180 / Math.PI);
       slipAngles[i] = betaDeg;
     } else {
-      // Fallback if orientation rotY is not available:
-      // Approximate chassis body slip angle from lateral acceleration (~0.85 deg/G)
+      // Fallback if orientation rotY is not available: approximate the sideslip from lateral
+      // acceleration (~0.85 deg/G). At racing speed beta opposes a_y: negative in a left turn.
       const g = latG ? latG[i] ?? 0 : (points[i].accelLatG ?? 0);
-      slipAngles[i] = g * 0.85;
+      slipAngles[i] = -g * 0.85;
     }
   }
 
   const smoothed = movingAverage(slipAngles, 2);
-  return smoothed.map(b => Number(Math.max(-25, Math.min(25, b)).toFixed(2)));
+  return smoothed.map(b => Number(Math.max(-25, Math.min(25, b)).toFixed(2)) || 0);
 }
 
 /**
- * Computes dynamic understeer (+) vs oversteer (-) handling balance angle in degrees:
+ * Computes dynamic understeer (+) vs oversteer (-) handling balance angle in degrees. Steering
+ * and yaw rate are both ISO 8855 (positive left), so the sign of the balance does not depend
+ * on the turn direction:
  * Difference between actual front road-wheel angle (steerYaw / ratio) and
  * kinematic Ackermann angle required for the path radius.
  * Gated to 0 when driving straight or at low speeds.

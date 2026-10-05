@@ -7,6 +7,7 @@ import { BenchmarkLadder } from '../common/BenchmarkLadder.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
 import { CarLogo } from '../vehicle/index.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface TrackDetailHeaderProps {
   trackName: string;
@@ -53,12 +54,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
       <div className="flex items-center justify-between">
         <Link
           to={backUrl}
-          onClick={(e) => {
-            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              onBack();
-            }
-          }}
+          onClick={linkClickHandler(() => onBack())}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-accent transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           <ArrowLeft className="w-4 h-4" />

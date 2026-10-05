@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
+import { toIso8855Steering } from '../../server/core/replay/replayTrajectoryCodec.js';
 
 /** Loads a lap captured from the replay cache by tools/analysis/captureCachedLapFixture.ts. */
 function loadCachedLapFixture(name: string): ReplayTrajectoryData {
@@ -19,6 +20,7 @@ function loadCachedLapFixture(name: string): ReplayTrajectoryData {
     replayName: string;
     driverName: string;
     currentLap: number;
+    signConvention?: 'iso8855';
     columns: Record<string, Array<number | null>>;
   };
   const fields = Object.keys(fixture.columns);
@@ -30,13 +32,15 @@ function loadCachedLapFixture(name: string): ReplayTrajectoryData {
     }
     return point as unknown as ReplayTrajectoryPoint;
   });
-  return {
+  // Fixtures captured before the ISO 8855 conversion carry right-positive steering.
+  return toIso8855Steering({
     replayName: fixture.replayName,
     driverName: fixture.driverName,
     currentLap: fixture.currentLap,
     pointsCount: points.length,
     points,
-  } as ReplayTrajectoryData;
+    signConvention: fixture.signConvention,
+  } as ReplayTrajectoryData);
 }
 
 describe('computeLapSegmentComparisons', () => {
@@ -364,7 +368,7 @@ describe('computeLapSegmentComparisons', () => {
         const angle = progress * (Math.PI / 2);
         x = 50 * (1 - Math.cos(angle));
         z = 30 + 50 * Math.sin(angle);
-        steerYaw = 30; // right turn
+        steerYaw = -30; // right turn
         if (distM >= 40 && distM < 70) brake = 80;
         if (distM >= 80) throttle = 90;
       } else if (distM > 110) {
@@ -383,7 +387,7 @@ describe('computeLapSegmentComparisons', () => {
         brake,
         steerYaw,
         timeSec: t,
-        lateralOffsetM: i === 3 ? 3.5 : (i === 6 || i === 7) ? 0.2 : (i === 10 || i === 11) ? 3.8 : 0,
+        lateralOffsetM: i === 3 ? -3.5 : (i === 6 || i === 7) ? -0.2 : (i === 10 || i === 11) ? -3.8 : 0,
       };
     });
 
@@ -397,9 +401,9 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.effectiveRadiusM).toBeGreaterThan(0);
     expect(corner.primaryTurnInDistM).toBeDefined();
     expect(corner.primaryTurnInDistM).toBeGreaterThanOrEqual(30);
-    expect(corner.primaryTrackUsage?.entryOffsetM).toBe(3.5);
-    expect(corner.primaryTrackUsage?.apexMarginM).toBe(0.2);
-    expect(corner.primaryTrackUsage?.exitWidthM).toBe(3.8);
+    expect(corner.primaryTrackUsage?.entryOffsetM).toBe(-3.5);
+    expect(corner.primaryTrackUsage?.apexMarginM).toBe(-0.2);
+    expect(corner.primaryTrackUsage?.exitWidthM).toBe(-3.8);
     expect(corner.trailBrakeDistM).toBeGreaterThan(0);
     expect(corner.trailBrakeDurationSec).toBeCloseTo(0.92, 2);
     expect(corner.phaseTiming?.rotation).toBeDefined();
@@ -429,7 +433,7 @@ describe('computeLapSegmentComparisons', () => {
         speedKmh,
         throttle: distM >= throttleDistM ? 85 : 0,
         brake: distM >= 30 && distM < 70 ? 70 : 0,
-        steerYaw: distM >= 30 && distM <= 110 ? 35 : 0,
+        steerYaw: distM >= 30 && distM <= 110 ? -35 : 0,
         timeSec: i * 0.25,
       };
     });
@@ -452,7 +456,7 @@ describe('computeLapSegmentComparisons', () => {
     // Arc of points with significant curvature in X/Z plane
     const points: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, speedKmh: 150, throttle: 0, brake: 0, steerYaw: 0, timeSec: 0 },
-      { x: 50, y: 0, z: 30, speedKmh: 80, throttle: 0, brake: 0, steerYaw: 30, timeSec: 1 },
+      { x: 50, y: 0, z: 30, speedKmh: 80, throttle: 0, brake: 0, steerYaw: -30, timeSec: 1 },
       { x: 100, y: 0, z: 0, speedKmh: 140, throttle: 0, brake: 0, steerYaw: 0, timeSec: 2 },
     ];
 
@@ -467,8 +471,8 @@ describe('computeLapSegmentComparisons', () => {
   it('detects understeer scrub and exit traction slip', () => {
     const points: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, speedKmh: 160, throttle: 100, brake: 0, steerYaw: 0, timeSec: 0 },
-      { x: 40, y: 0, z: 10, speedKmh: 140, throttle: 80, brake: 0, steerYaw: 15, understeerDeg: 4.5, timeSec: 0.8 },
-      { x: 80, y: 0, z: 0, speedKmh: 155, throttle: 100, brake: 0, steerYaw: 5, tcActive: true, timeSec: 1.6 },
+      { x: 40, y: 0, z: 10, speedKmh: 140, throttle: 80, brake: 0, steerYaw: -15, understeerDeg: 4.5, timeSec: 0.8 },
+      { x: 80, y: 0, z: 0, speedKmh: 155, throttle: 100, brake: 0, steerYaw: -5, tcActive: true, timeSec: 1.6 },
     ];
 
     const segments = computeLapSegmentComparisons(points, points, 10);
@@ -481,8 +485,8 @@ describe('computeLapSegmentComparisons', () => {
   });
 
   it('accurately computes exit track-out offset and remaining space left on track', () => {
-    // Lap A (wide clean track-out): car drifts to -5.5m (nominal width 12m, half-width 6m -> 0.5m left)
-    // Lap B (pinched exit): car only drifts to -4.0m (2.0m left)
+    // Lap A (wide clean track-out): car drifts to +5.5m (left, the outside of a right-hander) (nominal width 12m, half-width 6m -> 0.5m left)
+    // Lap B (pinched exit): car only drifts to +4.0m (2.0m left)
     const speeds = [200, 160, 100, 70, 70, 100, 140, 180, 200];
     const buildLapWithOffsets = (exitOffset: number): ReplayTrajectoryPoint[] =>
       speeds.map((speedKmh, i) => ({
@@ -492,13 +496,13 @@ describe('computeLapSegmentComparisons', () => {
           speedKmh,
           throttle: i >= 4 ? 95 : 0,
           brake: i < 4 ? 60 : 0,
-          steerYaw: i >= 2 && i <= 6 ? 25 : 0, // right turn
-          lateralOffsetM: i <= 2 ? 3.0 : i === 3 || i === 4 ? 2.5 : i === 6 ? exitOffset : 0,
+          steerYaw: i >= 2 && i <= 6 ? -25 : 0, // right turn
+          lateralOffsetM: i <= 2 ? -3.0 : i === 3 || i === 4 ? -2.5 : i === 6 ? exitOffset : 0,
           timeSec: i * 0.4,
         }));
 
-    const wideLap = buildLapWithOffsets(-5.5);
-    const pinchedLap = buildLapWithOffsets(-4.0);
+    const wideLap = buildLapWithOffsets(5.5);
+    const pinchedLap = buildLapWithOffsets(4.0);
 
     const segments = computeLapSegmentComparisons(wideLap, pinchedLap, 10, 150, 12.0);
     const corner = segments.find(s => s.type === 'corner');
@@ -507,9 +511,9 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.turnDirection).toBe('right');
     expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBe(3.0);
     expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(3.5);
-    expect(corner.primaryTrackUsage?.exitTrackOutOffsetM).toBe(-5.5);
+    expect(corner.primaryTrackUsage?.exitTrackOutOffsetM).toBe(5.5);
     expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(0.5); // 6.0 - 5.5 = 0.5m space left
-    expect(corner.baselineTrackUsage?.exitTrackOutOffsetM).toBe(-4.0);
+    expect(corner.baselineTrackUsage?.exitTrackOutOffsetM).toBe(4.0);
     expect(corner.baselineTrackUsage?.exitSpaceLeftM).toBe(2.0); // 6.0 - 4.0 = 2.0m space left
     expect(corner.exitSpaceDeltaM).toBe(-1.5); // 0.5 - 2.0 = -1.5m (wide lap used 1.5m more track)
   });
@@ -524,8 +528,8 @@ describe('computeLapSegmentComparisons', () => {
         speedKmh,
         throttle: i >= 4 ? 95 : 0,
         brake: i < 4 ? 60 : 0,
-        steerYaw: i >= 2 && i <= 6 ? 25 : 0,
-        lateralOffsetM: i <= 2 ? 3 : i >= 5 && i <= 6 ? -2 : 1,
+        steerYaw: i >= 2 && i <= 6 ? -25 : 0,
+        lateralOffsetM: i <= 2 ? -3 : i >= 5 && i <= 6 ? 2 : -1,
         leftRoadDistanceM,
         rightRoadDistanceM,
         timeSec: i * 0.4,
@@ -554,8 +558,8 @@ describe('computeLapSegmentComparisons', () => {
       speedKmh,
       throttle: i >= 4 ? 95 : 0,
       brake: i < 4 ? 60 : 0,
-      steerYaw: i >= 2 && i <= 6 ? 25 : 0,
-      lateralOffsetM: i <= 2 ? 3 : -2,
+      steerYaw: i >= 2 && i <= 6 ? -25 : 0,
+      lateralOffsetM: i <= 2 ? -3 : 2,
       leftRoadDistanceM: null,
       rightRoadDistanceM: null,
       timeSec: i * 0.4,
@@ -596,8 +600,8 @@ describe('computeLapSegmentComparisons', () => {
       speedKmh,
       throttle: i >= 4 ? 100 : 0,
       brake: i < 3 ? 80 : 0,
-      steerYaw: i >= 2 && i <= 5 ? 20 : 0, // right turn
-      lateralOffsetM: i === 0 ? 13.2 : i === 1 ? 10.0 : i === 3 || i === 4 ? 6.8 : i === 6 ? -5.8 : 0,
+      steerYaw: i >= 2 && i <= 5 ? -20 : 0, // right turn
+      lateralOffsetM: i === 0 ? -13.2 : i === 1 ? -10.0 : i === 3 || i === 4 ? -6.8 : i === 6 ? 5.8 : 0,
       timeSec: i * 0.5,
     }));
 
@@ -627,14 +631,14 @@ describe('computeLapSegmentComparisons', () => {
         speedKmh,
         throttle: i >= 4 ? 90 : 0,
         brake: i < 3 ? 70 : 0,
-        steerYaw: i >= 2 && i <= 5 ? 18 : 0,
-        lateralOffsetM: i <= 1 ? -4.5 : i === 3 || i === 4 ? apexOffset : i === 6 ? -5.0 : 0,
+        steerYaw: i >= 2 && i <= 5 ? -18 : 0,
+        lateralOffsetM: i <= 1 ? 4.5 : i === 3 || i === 4 ? apexOffset : i === 6 ? 5.0 : 0,
         isOffTrack: (i === 3 || i === 4) && isOffTrack,
         timeSec: i * 0.45,
       }));
 
-    const cleanLap = buildLap(5.8, false);
-    const cutLap = buildLap(7.2, true);
+    const cleanLap = buildLap(-5.8, false);
+    const cutLap = buildLap(-7.2, true);
 
     const segments = computeLapSegmentComparisons(cutLap, cleanLap, 10, 180, 12.0);
     const corner = segments.find(s => s.type === 'corner');
@@ -667,8 +671,8 @@ describe('computeLapSegmentComparisons', () => {
       speedKmh,
       throttle: i >= 4 ? 90 : 0,
       brake: i < 3 ? 75 : 0,
-      steerYaw: i >= 2 && i <= 5 ? 22 : 0,
-      lateralOffsetM: i <= 1 ? -6.8 : i === 3 || i === 4 ? 6.9 : i === 6 ? -6.7 : 0,
+      steerYaw: i >= 2 && i <= 5 ? -22 : 0,
+      lateralOffsetM: i <= 1 ? 6.8 : i === 3 || i === 4 ? -6.9 : i === 6 ? 6.7 : 0,
       timeSec: i * 0.4,
     }));
 
@@ -679,8 +683,8 @@ describe('computeLapSegmentComparisons', () => {
       speedKmh,
       throttle: i >= 4 ? 90 : 0,
       brake: i < 3 ? 75 : 0,
-      steerYaw: i >= 2 && i <= 5 ? 22 : 0,
-      lateralOffsetM: i <= 1 ? -5.0 : i === 3 || i === 4 ? 5.2 : i === 6 ? -4.5 : 0,
+      steerYaw: i >= 2 && i <= 5 ? -22 : 0,
+      lateralOffsetM: i <= 1 ? 5.0 : i === 3 || i === 4 ? -5.2 : i === 6 ? 4.5 : 0,
       timeSec: i * 0.42,
     }));
 

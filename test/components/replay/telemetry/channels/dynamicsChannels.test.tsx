@@ -106,7 +106,7 @@ describe('TelemetryUndersteerChannel', () => {
 });
 
 describe('TelemetryYawRateChannel', () => {
-  it('shows a positive yaw rate as rotating right, with its baseline', () => {
+  it('shows a positive yaw rate as rotating left (ISO 8855), with its baseline', () => {
     render(
       <TelemetryYawRateChannel
         yawRatePath="M 0 50 L 1000 40"
@@ -117,14 +117,14 @@ describe('TelemetryYawRateChannel', () => {
         cursorPct={10}
       />
     );
-    expect(screen.getAllByText('+35.6°/s R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('+35.6°/s L').length).toBeGreaterThanOrEqual(1);
 
-    expect(screen.getByText('B: +15.2°/s R')).toBeInTheDocument();
+    expect(screen.getByText('B: +15.2°/s L')).toBeInTheDocument();
   });
 
-  it('shows a negative yaw rate as rotating left', () => {
+  it('shows a negative yaw rate as rotating right', () => {
     render(<TelemetryYawRateChannel yawRatePath="M 0 50 L 1000 60" currentPoint={point({ yawRateDeg: -22.4 })} isCursorInView={true} cursorPct={90} />);
-    expect(screen.getAllByText('-22.4°/s L').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('-22.4°/s R').length).toBeGreaterThanOrEqual(1);
   });
 
   it('gives no direction to a rate close to zero', () => {

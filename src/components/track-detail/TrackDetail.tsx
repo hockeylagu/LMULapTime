@@ -12,6 +12,7 @@ import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { LoadingState } from '../common/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export type { TrackDetailSortOption };
 
@@ -79,12 +80,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         {error && <button type="button" onClick={retry} className="px-4 py-2 mr-3 bg-lmu-raised text-lmu-text rounded-xl text-xs focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2">Try again</button>}
         <Link
           to="/tracks"
-          onClick={(e) => {
-            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              onBack();
-            }
-          }}
+          onClick={linkClickHandler(() => onBack())}
           className="inline-block px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           Return to Tracks

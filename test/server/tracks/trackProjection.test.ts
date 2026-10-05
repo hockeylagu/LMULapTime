@@ -29,13 +29,13 @@ describe('trackProjection utility', () => {
       expect(index.cumulativeStations).toEqual([0, 100, 150, 250]);
     });
 
-    it('computes unit tangent and right-hand normal vectors', () => {
+    it('computes unit tangent and left-hand normal (ISO 8855 Y, OpenDRIVE t) vectors', () => {
       const index = buildCenterlineSpatialIndex(simpleCenterline);
-      // Segment 0: (0,0) -> (100,0) => dx=100, dz=0 => tangent=(1, 0), normal=(0, -1)
+      // Segment 0: (0,0) -> (100,0) => dx=100, dz=0 => tangent=(1, 0), normal=(0, 1) (left: LMU heading grows clockwise)
       expect(index.tangents[0].x).toBeCloseTo(1);
       expect(index.tangents[0].z).toBeCloseTo(0);
       expect(index.normals[0].x).toBeCloseTo(0);
-      expect(index.normals[0].z).toBeCloseTo(-1);
+      expect(index.normals[0].z).toBeCloseTo(1);
     });
 
     it('handles empty and single-point inputs safely', () => {
@@ -70,7 +70,7 @@ describe('trackProjection utility', () => {
 
     it('accurately computes lateral offset for wide/tight racing lines', () => {
       // Segment 0 goes along +X axis (z=0).
-      // Normal points towards -Z (+d = right).
+      // The normal points towards +Z, the left of the car (+d = left, OpenDRIVE t).
       // Car driving parallel at z = -3 (right of center)
       const ptsRight: ReplayTrajectoryPoint[] = [
         { x: 10, y: 0, z: -3, speedKmh: 100 },
@@ -79,8 +79,8 @@ describe('trackProjection utility', () => {
       const resRight = projectTrajectoryToCenterline(ptsRight, simpleCenterline);
       expect(resRight.stations[0]).toBe(10);
       expect(resRight.stations[1]).toBe(20);
-      expect(resRight.lateralOffsets[0]).toBeCloseTo(3, 1);
-      expect(resRight.lateralOffsets[1]).toBeCloseTo(3, 1);
+      expect(resRight.lateralOffsets[0]).toBeCloseTo(-3, 1);
+      expect(resRight.lateralOffsets[1]).toBeCloseTo(-3, 1);
 
       // Car driving parallel at z = +2.5 (left of center)
       const ptsLeft: ReplayTrajectoryPoint[] = [
@@ -88,8 +88,8 @@ describe('trackProjection utility', () => {
         { x: 20, y: 0, z: 2.5, speedKmh: 100 },
       ];
       const resLeft = projectTrajectoryToCenterline(ptsLeft, simpleCenterline);
-      expect(resLeft.lateralOffsets[0]).toBeCloseTo(-2.5, 1);
-      expect(resLeft.lateralOffsets[1]).toBeCloseTo(-2.5, 1);
+      expect(resLeft.lateralOffsets[0]).toBeCloseTo(2.5, 1);
+      expect(resLeft.lateralOffsets[1]).toBeCloseTo(2.5, 1);
     });
 
     it('disambiguates hairpins using vehicle heading to avoid snapping to opposing straights', () => {

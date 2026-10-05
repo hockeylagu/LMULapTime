@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Video, Zap, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { FOCUS_RING } from './buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface ReplayIndicatorProps {
   replay?: {
@@ -78,10 +79,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
     return (
       <Link
         to={to}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (onClick) onClick();
-        }}
+        onClick={linkClickHandler(onClick, { stop: true })}
         className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-gain/20'} transition-colors cursor-pointer ${FOCUS_RING}`}
         title={`${indicatorTitle} - Open telemetry`}
         aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}

@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `main` (2026-10-05): 426 TypeScript source files in src/server/shared, 254 test files, 2268 tests (2212 passed, 56 skipped).
+Last checked against branch `main` (2026-10-05): 454 TypeScript source files in src/server/shared, 266 test files, 2354 tests (2298 passed, 56 skipped).
 
 ---
 
@@ -113,8 +113,12 @@ Manual refresh retries failed driver decodes.
   `scene/GpsTrackSurfaceLayers.tsx` as compound paths preserving holes. Coordinates are local x/z meters; these
   display layers leave centerline projection and timing gates unchanged. `map/display/` owns persistent Layers
   preferences, optional revision-matched `/tracks-display/<layoutKey>.json` assets, quiet active-route backgrounds,
-  fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards. Their
-  labels report printed board distances; unknown distances use a generic brake label. Active road and kerbs are the defaults; runoff, pits, other circuit roads,
+  fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards (faded by
+  zoom level; boards without a station fall back to their order along the lap). Their
+  labels report printed board distances; unknown distances use a generic brake label.
+  `useStableCullViewBox.ts` (rule `nextCullViewBox` in `replayMapUtils.ts`) keeps the culling view box unchanged while
+  the live view stays inside its margin, so the memoised `TrackPathLayers` in `scene/GpsTrackSegments.tsx` skip
+  re-rendering during pans; `useGpsMapShortcuts.ts` acts only on the focused or expanded map, never on chart keys. Active road and kerbs are the defaults; runoff, pits, other circuit roads,
   road edges and the centerline guide are opt-ins. Legacy files use a seam-free measured ribbon and measured kerb
   clipping; unavailable pit/outer-road controls are disabled. Layer toggles preserve camera and playback. Maps without
   surfaces retain the road ribbon),
@@ -168,7 +172,7 @@ Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps
 
 Track geometry: `shared/types/trackGeometry.ts` defines local-meter map polygons, station-indexed nullable physical
 profiles, quality flags and independent geometry/projection revisions. `shared/domain/trackGeometry.ts` validates
-bounded payloads, samples profiles cyclically, and computes asymmetric road-edge distances (+lateral offset is right).
+bounded payloads, samples profiles cyclically, and computes asymmetric road-edge distances (+lateral offset is left, as OpenDRIVE t).
 `server/tracks/trackGeometryStore.ts` caches validated definitions, indexes centerline projection, and tracks geometry/projection revisions across file replacements.
 Unavailable measurements remain null; road and kerb geometry do not determine penalty validity.
 Optional `leftKerbType`/`rightKerbType` profile columns carry the kerb surface category (`flat`, `sawtooth`, `other`, null
@@ -216,6 +220,15 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 - **New circuit/layout**: `shared/domain/circuitDefinitions.ts` + basic SVG in `public/track-outlines/`; detailed geometry and display files belong in an external local package.
 - **New car**: `shared/domain/vehicleMapping.ts`; exact aliases and footprints belong in the local vehicle catalog; class defaults stay in `vehicleDimensions.ts`.
 - **New session list filter**: add the control to the `narrow` slot of both toolbars (`DashboardFilterBar.tsx`, `TrackSessionsToolbar.tsx`), clear it in the one-write resets (`resetFilters` in `Dashboard.tsx`, `resetSessionFilters` in `useTrackDetailState.ts`; separate `updateSearchParams` calls overwrite each other) and count it in their "is filtered" checks.
+- **Navigation control**: a React Router `Link` with a real `to` (middle/modifier clicks open a new tab); when a plain
+  click needs an in-app handler, pass `linkClickHandler` from `src/utils/linkClick.ts` (session replay URLs:
+  `session-list/sessionReplayUrl.ts`).
+- **New signed vehicle channel**: ISO 8855 (positive left, as steering, yaw rate, lateral G, sideslip and lateral offset);
+  native positions and rotations retain LMU's x/z horizontal, y-up frame. The map uses ISO signed
+  dynamics with a documented screen projection; its arrow depicts inertial load transfer.
+  Zero heading is valid; path-only map acceleration evaluates tangents over the same time interval
+  as the yaw derivative. Coordinate details and estimation limits are in `TELEMETRY_FORMAT.md`.
+  convert LMU's sign at ingestion (`replayTrajectory.ts`, `duckdbReader.ts`), see `docs/TELEMETRY_FORMAT.md`.
 - **Color in the UI**: use the semantic `lmu-*` roles in `tailwind.config.js` (`text-lmu-gain`, `bg-lmu-warn-strong/20`,
   `text-lmu-faint`), never raw Tailwind hues; charts and SVG take `src/utils/themeColors.ts`. Roles, steps and contrast rules
   (no `opacity-*` on text) are in `DESIGN.md`, Colors; a new role goes in the config and `DESIGN.md` together.
@@ -229,7 +242,9 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 
 ## 8. Other docs
 
-`docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md` (incl. pit event codes), `docs/VCR_ANALYSIS.md`, `docs/TELEMETRY_FORMAT.md`,
+`docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md` (incl. pit event codes), `docs/VCR_ANALYSIS.md`, `docs/TELEMETRY_FORMAT.md`
+(incl. the sign conventions: ISO 8855 vehicle axes, so steering, yaw rate, lateral G and lateral offset are positive left;
+LMU's swapped `G Force Lat`/`Long` labels; unmarked cached rows flipped on read),
 `docs/LMU_REST_API.md` (+ `swagger-schema.json`; probe gently, ≤1 Hz), `docs/plans/`.
 
 ---
@@ -286,8 +301,11 @@ use model shapes when available, with approximate placement until a replay-origi
 `LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist,
 rejects degenerate closed routes, and checks declared length against the measured route within 0.01 m.
 `server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair),
-vehicles, and optional manufacturer logos (`GET /api/data-plugin/vehicles/logos`), with the same server access behavior as the rest of the API. There is no static package mount.
-The client loads logos via `src/api/vehicleLogosApi.ts` and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals).
+vehicles (without logos), and optional manufacturer logos (`GET /api/data-plugin/vehicles/logos`; a malformed logo
+entry is skipped, not fatal), with the same server access behavior as the rest of the API. There is no static package mount.
+`resolveCarManufacturer` (`shared/domain/vehicleMapping.ts`) matches car names against a word-bounded rule table.
+The client loads logos via `src/api/vehicleLogosApi.ts` (one shared request; a failure is cached for
+`LOGO_RETRY_COOLDOWN_MS` before retrying) and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals).
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and
 surface enrichment. Missing geometry clears old road annotations and marks odometer stations;
 `shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to reject odometer stations and require matching station sources and geometry revisions. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches

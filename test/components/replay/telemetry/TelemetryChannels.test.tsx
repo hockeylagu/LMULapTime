@@ -92,10 +92,10 @@ describe('Authentic VCR Telemetry Channels', () => {
   it('fits the steering trace to the lap and supports a full-range override', () => {
     const { container } = render(<TelemetrySteerChannel steerPath="M 0 50 L 1000 54" points={[{ ...mockPoint, steerYaw: 27 }]} currentPoint={mockPoint} isCursorInView={true} cursorPct={50} />);
     expect(screen.getByRole('combobox', { name: 'Steering scale' })).toHaveValue('fit');
-    expect(screen.getByText('-25% L')).toBeInTheDocument();
+    expect(screen.getByText('+25% L')).toBeInTheDocument();
     expect(container.querySelector('g[transform]')).toHaveAttribute('transform', 'translate(0 50) scale(1 4) translate(0 -50)');
     fireEvent.change(screen.getByRole('combobox', { name: 'Steering scale' }), { target: { value: '100' } });
-    expect(screen.getByText('-100% L')).toBeInTheDocument();
+    expect(screen.getByText('+100% L')).toBeInTheDocument();
     expect(container.querySelector('g[transform]')).toHaveAttribute('transform', 'translate(0 50) scale(1 1) translate(0 -50)');
   });
 

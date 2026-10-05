@@ -10,13 +10,14 @@ const corners = (base: number, i: number, step: number): Corners =>
   [base + i * step, base + 1 + i * step, base + 2 + i * step, base + 3 + i * step];
 
 // A whole synthetic lap with every channel the strip draws: a braking zone, a corner and a straight.
+// Steering is ISO 8855 (positive left); the lap was first written right-positive, hence the minus.
 function lapPoint(i: number, offset: number): InterpolatedPoint {
   const phase = i / 80;
   const speedKmh = 140 + 120 * Math.abs(Math.sin(Math.PI * phase)) + offset;
   return {
     timeSec: i * 0.5 + offset * 0.01, x: i * 12, y: 0, z: Math.sin(phase * 6) * 40,
     speedKmh, throttle: i % 20 < 12 ? 100 : 0, brake: i % 20 >= 14 ? 80 - (i % 20) * 2 : 0,
-    steerYaw: Math.sin(phase * 12) * 0.4, gear: 1 + (i % 9) - (i % 9 === 8 ? 9 : 0),
+    steerYaw: -Math.sin(phase * 12) * 0.4, gear: 1 + (i % 9) - (i % 9 === 8 ? 9 : 0),
     engineRpm: 6000 + (i % 10) * 350, lateralOffsetM: Math.cos(phase * 5) * 3,
     accelLatG: Math.sin(phase * 9) * 2.5, accelLonG: Math.cos(phase * 7) * 1.8, accelTotalG: 1 + (i % 5) * 0.4,
     slipAngleDeg: Math.sin(phase * 11) * 4, understeerDeg: Math.cos(phase * 3) * 2, tireSlipPct: (i % 7) * 1.5,

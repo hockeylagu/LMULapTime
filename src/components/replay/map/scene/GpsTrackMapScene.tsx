@@ -28,7 +28,7 @@ import { useMapLayers, projectedPointBounds } from '../display/useMapLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 import { useGpsMapShortcuts } from '../useGpsMapShortcuts.js';
-
+import { useStableCullViewBox } from '../useStableCullViewBox.js';
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
@@ -48,8 +48,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const [localShowFriction, setLocalShowFriction] = useState(false);
   const effectiveShowFriction = showFrictionCircle ?? localShowFriction;
   const handleToggleFriction = onToggleFrictionCircle ?? (() => setLocalShowFriction(v => !v));
-  const VIEWBOX_SIZE = 800;
-  const PADDING = 60;
+  const VIEWBOX_SIZE = 800, PADDING = 60;
 
   const { trackGeometry: fetchedGeometry } = useTrackBoundaryGeometry({
     packageRevision: dataPluginRevision,
@@ -121,6 +120,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     onTogglePlay,
     onToggleGForce: handleToggleGForce,
   });
+  const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
   const fittedLayout = useRef<string | null>(null);
   useEffect(() => {
     const key = effectiveGeometry?.layoutKey ?? null;
@@ -243,7 +243,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
             primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity} onSelectIndex={onSelectIndex}
             highlightDistRange={highlightDistRange} primaryDists={primaryDists} baselineDists={baselineDists}
             dimNonSelectedTrack={dimNonSelectedTrack} markerScale={markerScale}
-            viewBox={zoomLevel >= 2.5 ? currentViewBox : undefined}
+            viewBox={cullViewBox}
           />
 
           <GpsStartFinishLine
@@ -258,7 +258,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
             onSelectIndex={onSelectIndex} markerScale={markerScale} zoomLevel={zoomLevel}
             primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity}
             dimNonSelectedTrack={dimNonSelectedTrack} showCornerFlags={showCornerFlags}
-            viewBox={zoomLevel >= 2.5 ? currentViewBox : undefined}
+            viewBox={cullViewBox}
           />
         </svg>
         <GpsSceneCarMarkers

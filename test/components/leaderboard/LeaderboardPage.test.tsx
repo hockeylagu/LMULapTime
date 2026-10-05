@@ -65,7 +65,7 @@ describe('LeaderboardPage', () => {
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
     expect(urlParams().get('carClass')).toBe('LMH');
     const ribbonCard = screen.getByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
-    expect(ribbonCard).toHaveAttribute('aria-pressed', 'true');
+    expect(ribbonCard).toHaveAttribute('aria-current', 'true');
     // The circuit, then the layout: never the layout twice, nor a flag.
     expect(ribbonCard).toHaveTextContent('Daytona International SpeedwayDaytona International Speedway (Road Course) layout');
     expect(ribbonCard).not.toHaveTextContent('🇮🇹');
@@ -104,7 +104,9 @@ describe('LeaderboardPage', () => {
     render(<LeaderboardPage sessions={[]} />);
 
     const daytona = await screen.findByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
-    expect(screen.getByRole('link', { name: /Monza layout/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('link', { name: /Monza layout/ })).toHaveAttribute('aria-current', 'true');
+    expect(daytona).not.toHaveAttribute('aria-current');
+    expect(daytona).not.toHaveAttribute('aria-pressed');
 
     fireEvent.click(daytona);
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));

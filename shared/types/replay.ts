@@ -79,15 +79,18 @@ export interface TrackTimingGates {
 }
 
 export interface ReplayTrajectoryPoint {
+  /** Native LMU world coordinates in metres: x/z horizontal, y up; not vehicle ISO axes. */
   x: number;
   y: number;
   z: number;
   rotX?: number;
+  /** Native clockwise heading in radians, with local vehicle forward -Z. */
   rotY?: number;
   rotZ?: number;
   speedKmh?: number;
   throttle?: number;
   brake?: number;
+  /** ISO positive-left steering: normalized [-1, 1] at ingestion, wheel degrees after client processing. */
   steerYaw?: number;
   gear?: number;
   inPit?: boolean;
@@ -108,6 +111,7 @@ export interface ReplayTrajectoryPoint {
   engineRpm?: number;
   distM?: number;
   stationM?: number;
+  /** Metres left of the reference centerline (positive left, OpenDRIVE t). */
   lateralOffsetM?: number;
   /** Signed car-center distance to the physical road edge; negative means outside. */
   leftRoadDistanceM?: number | null;
@@ -124,10 +128,14 @@ export interface ReplayTrajectoryPoint {
   /** Kerb type beside the car's station on each side (flat / sawtooth / other), null without a kerb. */
   leftKerbType?: TrackKerbType | null;
   rightKerbType?: TrackKerbType | null;
+  /** ISO vehicle X acceleration in g: positive forward, braking negative. */
   accelLonG?: number;
+  /** ISO vehicle Y acceleration in g: positive toward the vehicle's left. */
   accelLatG?: number;
   accelTotalG?: number;
+  /** ISO yaw rate in degrees/s: positive left about the upward axis. */
   yawRateDeg?: number;
+  /** ISO sideslip beta in degrees: positive velocity left of the nose. */
   slipAngleDeg?: number;
   understeerDeg?: number;
   tireSlipPct?: number;
@@ -280,6 +288,11 @@ export interface ReplayTrajectoryData {
     spanZ: number;
   };
   points: ReplayTrajectoryPoint[];
+  /**
+   * Sign convention of the stored signed channels (steering). Rows cached before ISO 8855 carry
+   * none and are converted on read (replayTrajectoryCodec.ts); see docs/TELEMETRY_FORMAT.md.
+   */
+  signConvention?: 'iso8855';
   // Server-internal: raw samples just before / after the lap as sliced by the timing loop, so it
   // can be cut exactly at the start/finish line once projected on the track. Never sent to clients.
   leadInPoints?: ReplayTrajectoryPoint[];

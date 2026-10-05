@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 
 export interface UseGpsMapShortcutsOptions {
   isExpanded: boolean;
@@ -16,7 +16,8 @@ export interface UseGpsMapShortcutsOptions {
 }
 
 /**
- * Handles keyboard shortcuts on the GPS track map, matching the telemetry strip interactions:
+ * Handles keyboard shortcuts on the GPS track map (only when it is focused or expanded, never for keys
+ * pressed on the telemetry chart), matching the telemetry strip interactions:
  * - ArrowLeft / ArrowRight: Step by 1 sample (or Shift + Arrow: jump by 0.5s)
  * - Home / End: Lap start / end
  * - + / = / -: Zoom in / zoom out
@@ -79,7 +80,12 @@ export function useGpsMapShortcuts({
 
       const container = contRef.current;
       const isTargetOnMap = Boolean(container && event.target instanceof Node && container.contains(event.target));
-      if (!expanded && !isTargetOnMap && !isReplaySurfaceTarget(event)) return;
+      // Map keys act only on the map: focused on it, or expanded over everything. The telemetry
+      // chart handles its own arrows, Home/End, zoom and reset, so a key pressed on it must not
+      // also move the map (each press acts once).
+      if (!expanded && !isTargetOnMap) return;
+      const otherSurface = event.target instanceof Element ? event.target.closest('[data-replay-surface]') : null;
+      if (otherSurface && otherSurface !== container) return;
 
       const total = pts.length;
       if (total === 0) return;

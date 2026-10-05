@@ -272,41 +272,55 @@ export function areComparableCarClasses(a?: string, b?: string): boolean {
   return matchesCarClass(a, '', b) && matchesCarClass(b, '', a);
 }
 
+interface ManufacturerRule {
+  brand: string;
+  /** The brand's own name (and spellings of it); checked for every brand before any model token. */
+  name?: RegExp;
+  /** Model tokens, matched as whole words only. */
+  models?: RegExp;
+}
+
+// Patterns run on the normalized text (lower case, accents dropped, every run of non-alphanumerics a single
+// space), so `-`, `_`, `.` and spaces are interchangeable and `\b` is a real word boundary: `amg` does not
+// match "Gamma", `963` does not match "1963" or "9630", `m4` does not match "Cm4x". Order matters within a pass
+// (Corvette before Chevrolet: "Chevrolet Corvette Z06" is a Corvette).
+const MANUFACTURER_RULES: readonly ManufacturerRule[] = [
+  { brand: 'Aston Martin', name: /\baston martin\b/, models: /\b(valkyrie|vantage)\b/ },
+  { brand: 'Isotta Fraschini', name: /\bisotta( fraschini)?\b/, models: /\btipo ?6\b/ },
+  { brand: 'Mercedes-AMG', name: /\bmercedes\b/, models: /\bamg\b/ },
+  { brand: 'Corvette', name: /\bcorvette\b/, models: /\b(c8|z06)\b/ },
+  { brand: 'Chevrolet', name: /\bchevrolet\b/ },
+  { brand: 'Ferrari', name: /\bferrari\b/, models: /\b(296|488|499p)\b/ },
+  { brand: 'Porsche', name: /\bporsche\b/, models: /\b(911|963|992s?)\b/ },
+  { brand: 'BMW', name: /\bbmw\b/, models: /\bm4\b/ },
+  { brand: 'Cadillac', name: /\bcadillac\b/, models: /\b(v series|vlmdh)\b/ },
+  { brand: 'Alpine', name: /\balpine\b/, models: /\ba424\b/ },
+  { brand: 'Ford', name: /\bford\b/, models: /\bmustang\b/ },
+  { brand: 'Lamborghini', name: /\blamborghini\b/, models: /\b(huracan|sc63)\b/ },
+  { brand: 'Lexus', name: /\blexus\b/, models: /\brc ?f\b/ },
+  { brand: 'McLaren', name: /\bmclaren\b/, models: /\b720s\b/ },
+  { brand: 'Peugeot', name: /\bpeugeot\b/, models: /\b9x8\b/ },
+  { brand: 'Toyota', name: /\btoyota\b/, models: /\b(gr010|tr010)\b/ },
+  { brand: 'Genesis', name: /\bgenesis\b/, models: /\bgmr ?001\b/ },
+  { brand: 'Glickenhaus', name: /\bglickenhaus\b/, models: /\bscg ?007\b/ },
+  { brand: 'Vanwall', name: /\b(vanwall|vandervell)\b/ },
+  { brand: 'Oreca', name: /\boreca\b/, models: /\b07 lmp2\b/ },
+  { brand: 'Ligier', name: /\bligier\b/, models: /\bjs ?p\d*\b/ },
+  { brand: 'Duqueine', name: /\bduqueine\b/, models: /\bd0[89]\b/ },
+  { brand: 'Ginetta', name: /\bginetta\b/, models: /\bg61\b/ },
+  { brand: 'ADESS', name: /\badess\b/, models: /\bad25\b/ },
+];
+
 /**
  * Resolves the vehicle manufacturer / brand key for logo lookup from a car type, model name or vehicle ID.
+ * Brand names are matched first, then model tokens as whole words (see MANUFACTURER_RULES).
  */
 export function resolveCarManufacturer(carTypeOrModel?: string | null): string {
   if (!carTypeOrModel) return '';
-  const s = carTypeOrModel.trim();
-  const lower = s.toLowerCase();
-
-  // Multi-word or specific brands first
-  if (lower.includes('aston martin') || lower.includes('valkyrie') || lower.includes('vantage')) return 'Aston Martin';
-  if (lower.includes('isotta fraschini') || lower.includes('isotta') || lower.includes('tipo6') || lower.includes('tipo 6')) return 'Isotta Fraschini';
-  if (lower.includes('mercedes') || lower.includes('amg')) return 'Mercedes-AMG';
-  if (lower.includes('corvette') || lower.includes('c8') || lower.includes('z06')) return 'Corvette';
-  if (lower.includes('chevrolet')) return 'Chevrolet';
-
-  // Specific single-word brands
-  if (lower.includes('ferrari') || lower.includes('296') || lower.includes('488') || lower.includes('499p')) return 'Ferrari';
-  if (lower.includes('porsche') || lower.includes('911') || lower.includes('963') || lower.includes('992')) return 'Porsche';
-  if (lower.includes('bmw') || lower.includes('m4')) return 'BMW';
-  if (lower.includes('cadillac') || lower.includes('v-series') || lower.includes('vlmdh')) return 'Cadillac';
-  if (lower.includes('alpine') || lower.includes('a424')) return 'Alpine';
-  if (lower.includes('ford') || lower.includes('mustang')) return 'Ford';
-  if (lower.includes('lamborghini') || lower.includes('huracan') || lower.includes('sc63')) return 'Lamborghini';
-  if (lower.includes('lexus') || lower.includes('rc f') || lower.includes('rcf')) return 'Lexus';
-  if (lower.includes('mclaren') || lower.includes('720s')) return 'McLaren';
-  if (lower.includes('peugeot') || lower.includes('9x8')) return 'Peugeot';
-  if (lower.includes('toyota') || lower.includes('gr010') || lower.includes('tr010')) return 'Toyota';
-  if (lower.includes('genesis') || lower.includes('gmr001') || lower.includes('gmr-001')) return 'Genesis';
-  if (lower.includes('glickenhaus') || lower.includes('scg007') || lower.includes('scg 007')) return 'Glickenhaus';
-  if (lower.includes('vanwall') || lower.includes('vandervell')) return 'Vanwall';
-  if (lower.includes('oreca') || lower.includes('07 lmp2') || lower.includes('07_lmp2')) return 'Oreca';
-  if (lower.includes('ligier') || lower.includes('jsp') || lower.includes('js p')) return 'Ligier';
-  if (lower.includes('duqueine') || lower.includes('d09') || lower.includes('d08')) return 'Duqueine';
-  if (lower.includes('ginetta') || lower.includes('g61')) return 'Ginetta';
-  if (lower.includes('adess') || lower.includes('ad25')) return 'ADESS';
-
+  const text = carTypeOrModel.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!text) return '';
+  for (const rule of MANUFACTURER_RULES) if (rule.name?.test(text)) return rule.brand;
+  for (const rule of MANUFACTURER_RULES) if (rule.models?.test(text)) return rule.brand;
   return '';
 }

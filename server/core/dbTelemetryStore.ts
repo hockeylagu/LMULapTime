@@ -6,6 +6,7 @@ import {
   compressJson,
   decompressJson,
 } from './dbSchema.js';
+import { toIso8855Steering } from './replay/replayTrajectoryCodec.js';
 
 export interface TelemetryMetadataRecord {
   filename: string;
@@ -107,7 +108,7 @@ export function getTelemetryLapCache(db: DatabaseType, filename: string, lapNumb
     'SELECT telemetry_br, cache_version FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
   ).get(filename, lapNumber) as { telemetry_br: Buffer; cache_version: string } | undefined;
   if (!row || (!anyVersion && row.cache_version !== DUCKDB_TELEMETRY_CACHE_VERSION)) return null;
-  return decompressJson<DuckDbLapTelemetry>(row.telemetry_br);
+  return toIso8855Steering(decompressJson<DuckDbLapTelemetry>(row.telemetry_br));
 }
 
 export function upsertTelemetryLapCache(db: DatabaseType, filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {
@@ -119,7 +120,7 @@ export function upsertTelemetryLapCache(db: DatabaseType, filename: string, lapN
       telemetry_br = excluded.telemetry_br,
       cache_version = excluded.cache_version,
       updated_at = excluded.updated_at
-  `).run(filename, lapNumber, lapData.pointsCount, compressJson(lapData), DUCKDB_TELEMETRY_CACHE_VERSION, Date.now());
+  `).run(filename, lapNumber, lapData.pointsCount, compressJson({ ...lapData, signConvention: 'iso8855' }), DUCKDB_TELEMETRY_CACHE_VERSION, Date.now());
 }
 
 /** A match decided for one telemetry file (see telemetry/telemetryLinks). */

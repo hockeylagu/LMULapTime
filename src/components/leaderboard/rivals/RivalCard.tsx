@@ -12,6 +12,7 @@ import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
 import { LoadError } from '../LoadError.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { CarLogo } from '../../vehicle/index.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 export interface RivalCardProps {
   rival: RivalState;
@@ -121,12 +122,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
               <Link
                 to={telemetryPath}
                 className={`${action} ${FOCUS_RING}`}
-                onClick={(e) => {
-                  if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                    e.preventDefault();
-                    onTelemetry(rivalEntry);
-                  }
-                }}
+                onClick={linkClickHandler(() => onTelemetry(rivalEntry))}
                 title="Speed, pedals, delta and line of the two laps, overlaid"
               >
                 <Activity className="w-3.5 h-3.5" /> Compare Telemetry

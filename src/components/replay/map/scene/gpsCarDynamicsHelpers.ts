@@ -53,15 +53,27 @@ export function resolveCarAcceleration(
       if (latG === undefined) {
         const v = (pt.speedKmh ?? 0) / 3.6;
         let dYaw = 0;
-        if (next.rotY !== undefined && prev.rotY !== undefined) {
-          dYaw = Math.atan2(Math.sin(next.rotY - prev.rotY), Math.cos(next.rotY - prev.rotY));
-        } else if (Math.hypot(next.x - prev.x, next.z - prev.z) > 0.1) {
-          const hNext = Math.atan2(next.x - pt.x, next.z - pt.z);
-          const hPrev = Math.atan2(pt.x - prev.x, pt.z - prev.z);
-          dYaw = Math.atan2(Math.sin(hNext - hPrev), Math.cos(hNext - hPrev));
+        if (Number.isFinite(next.rotY) && Number.isFinite(prev.rotY)) {
+          dYaw = Math.atan2(Math.sin(next.rotY! - prev.rotY!), Math.cos(next.rotY! - prev.rotY!));
+        } else {
+          // Evaluate tangents at the same samples as dt. Adjacent segment headings are only
+          // one sample apart and would halve the central turn rate; endpoint zero vectors
+          // would invent a turn even on a straight.
+          const pathHeading = (at: number): number | undefined => {
+            const a = points[Math.max(0, at - 1)];
+            const b = points[Math.min(points.length - 1, at + 1)];
+            return Math.hypot(b.x - a.x, b.z - a.z) > 0.05
+              ? Math.atan2(b.x - a.x, b.z - a.z) : undefined;
+          };
+          const hNext = pathHeading(Math.min(points.length - 1, idx + 1));
+          const hPrev = pathHeading(Math.max(0, idx - 1));
+          if (hNext !== undefined && hPrev !== undefined) {
+            dYaw = Math.atan2(Math.sin(hNext - hPrev), Math.cos(hNext - hPrev));
+          }
         }
-        const omega = dYaw / effectiveDt;
-        latG = -(v * omega) / 9.80665;
+        // LMU headings grow clockwise: the ISO 8855 yaw rate is -dYaw/dt, and a_y = v * r.
+        const yawRateIso = -dYaw / effectiveDt;
+        latG = (v * yawRateIso) / 9.80665;
       }
     }
 

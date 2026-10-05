@@ -13,6 +13,7 @@ import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface DashboardHeroProps {
   sessions: SessionSummary[];
@@ -97,12 +98,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                   <div className="flex items-center gap-2">
                     <Link
                       to={`/session/${encodeURIComponent(latestOuting.id)}`}
-                      onClick={(e) => {
-                        if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                          e.preventDefault();
-                          onSelectSession(latestOuting.id);
-                        }
-                      }}
+                      onClick={linkClickHandler(() => onSelectSession(latestOuting.id))}
                       className="text-xl font-bold text-white tracking-tight truncate hover:text-lmu-accent-text transition-colors"
                       title={`View ${latestOuting.trackName} session`}
                     >
@@ -200,12 +196,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
             )}
             <Link
               to={`/session/${encodeURIComponent(latestOuting.id)}`}
-              onClick={(e) => {
-                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-                  e.preventDefault();
-                  onSelectSession(latestOuting.id);
-                }
-              }}
+              onClick={linkClickHandler(() => onSelectSession(latestOuting.id))}
               className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-lmu-text border border-lmu-rule font-medium text-xs transition-colors cursor-pointer ${FOCUS_RING}`}
               data-testid="hero-inspect-session-btn"
             >

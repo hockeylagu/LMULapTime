@@ -200,7 +200,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
-    const closeBtn = screen.getByRole('link', { name: 'Back' });
+    const closeBtn = screen.getByRole('button', { name: 'Back' });
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalled();
   });

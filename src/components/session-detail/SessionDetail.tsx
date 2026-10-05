@@ -10,6 +10,7 @@ import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
 import { DetailedSession, SessionProgressionPoint } from '../../../shared/types/index.js';
 import { LoadingState } from '../common/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface SessionDetailProps {
   sessionId: string;
@@ -72,12 +73,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         {loadError && <p role="alert" className="text-sm text-lmu-loss mb-4">{loadError}</p>}
         <Link
           to="/dashboard"
-          onClick={(e) => {
-            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              onBack();
-            }
-          }}
+          onClick={linkClickHandler(() => onBack())}
           className={`inline-block px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider ${FOCUS_RING}`}
         >
           Return to Dashboard

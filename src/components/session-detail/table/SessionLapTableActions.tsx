@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ArrowLeftRight, Activity } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
 
 const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
 
@@ -42,12 +43,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
       {telemetryUrl ? (
         <Link
           to={telemetryUrl}
-          onClick={(e) => {
-            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-              e.preventDefault();
-              onOpenTelemetry();
-            }
-          }}
+          onClick={linkClickHandler(() => onOpenTelemetry())}
           aria-label={`Telemetry for lap ${lapNum}`}
           className={telemetryClassName}
           title={telemetryTitle}

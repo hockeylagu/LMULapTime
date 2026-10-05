@@ -259,7 +259,7 @@ export function sampleTrackSurfaceProfile(geometry: TrackBoundaryGeometry, stati
   };
 }
 
-/** Positive lateral offset is RIGHT in the centerline projection; these are road edges, not legal limits. */
+/** Positive lateral offset is LEFT of the centerline (OpenDRIVE t); these are road edges, not legal limits. */
 export function getTrackRoadEdgeDistances(
   geometry: TrackBoundaryGeometry,
   stationM: number,
@@ -269,8 +269,8 @@ export function getTrackRoadEdgeDistances(
   const sample = sampleTrackSurfaceProfile(geometry, stationM);
   if (!sample) return null;
   return {
-    leftDistanceM: sample.leftWidthM === null ? null : sample.leftWidthM + lateralOffsetM,
-    rightDistanceM: sample.rightWidthM === null ? null : sample.rightWidthM - lateralOffsetM,
+    leftDistanceM: sample.leftWidthM === null ? null : sample.leftWidthM - lateralOffsetM,
+    rightDistanceM: sample.rightWidthM === null ? null : sample.rightWidthM + lateralOffsetM,
   };
 }
 

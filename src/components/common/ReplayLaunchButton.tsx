@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { Zap, Video, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
 import { FOCUS_RING } from './buttonStyles.js';
+import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface ReplayLaunchButtonProps {
   /** Amber "Launch 100Hz Replay" with native DuckDB telemetry, green "Launch Replay" with the replay only. */
@@ -64,7 +65,7 @@ export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckD
     return (
       <Link
         to={to}
-        onClick={onClick}
+        onClick={linkClickHandler(onClick)}
         className={className}
         data-testid={testId}
         title={resolvedTitle}

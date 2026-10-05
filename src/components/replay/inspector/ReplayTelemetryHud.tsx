@@ -60,7 +60,7 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       <div className="px-2 py-1.5 flex flex-col items-center">
         <span className="text-[10px] text-lmu-indigo font-bold">STEER</span>
         <span className="text-xs font-black text-lmu-indigo-soft font-mono">
-          {Math.abs(getSteerPercent(currentPoint?.steerYaw))}% {(currentPoint?.steerYaw ?? 0) < -5 ? 'L' : (currentPoint?.steerYaw ?? 0) > 5 ? 'R' : 'C'}
+          {Math.abs(getSteerPercent(currentPoint?.steerYaw))}% {(currentPoint?.steerYaw ?? 0) > 5 ? 'L' : (currentPoint?.steerYaw ?? 0) < -5 ? 'R' : 'C'}
         </span>
         <span className="text-[10px] text-lmu-muted">input</span>
       </div>

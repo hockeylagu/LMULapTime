@@ -73,10 +73,10 @@ const SCALAR_CHANNELS: ScalarChannel[] = [
   { key: 'spd', read: (p) => p.speedKmh || 0, y: (v, b) => upFromBottom(v, b.maxSpd) },
   { key: 'thr', read: (p) => p.throttle || 0, y: (v) => upFromBottom(v, 100) },
   { key: 'brk', read: (p) => p.brake || 0, y: (v) => upFromBottom(v, 100) },
-  // Steering: left is up (-100% -> 10), right is down (+100% -> 90), centre at 50
-  { key: 'str', read: (p) => p.steerYaw || 0, y: (v) => 50 + (Math.min(100, Math.max(-100, (v / 270) * 100)) / 100) * 40 },
+  // Steering (ISO 8855, positive left): left is up (+100% -> 10), right is down (-100% -> 90)
+  { key: 'str', read: (p) => p.steerYaw || 0, y: (v) => aroundCentre((v / 270) * 100, 100, 40) },
   { key: 'rpm', read: (p) => p.engineRpm, y: (v, b) => upFromBottom(v, b.maxRpm) },
-  // Lateral offset: -10 m to +10 m -> 90 to 10
+  // Lateral offset (positive left of the centerline): -10 m to +10 m -> 90 to 10
   { key: 'lat', read: (p) => p.lateralOffsetM, y: (v) => aroundCentre(v, 10, 40) },
   // Accelerations: -3 G to +3 G -> 92 to 8; combined 0 G to 4 G -> 95 to 10
   { key: 'accLat', read: (p) => p.accelLatG, y: (v) => aroundCentre(v, 3.0, 42) },

@@ -166,4 +166,49 @@ describe('SessionTableRow', () => {
     await user.keyboard('{Enter}');
     expect(onSelectSession).toHaveBeenCalledTimes(3);
   });
+
+  describe('link clicks', () => {
+    const withReplay: SessionListItem = {
+      ...baseSession,
+      matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
+      playerDriver: { ...baseSession.playerDriver!, bestLapNum: 4 } as SessionListItem['playerDriver'],
+    };
+    const setup = () => {
+      const onSelectSession = vi.fn();
+      const onOpenReplay = vi.fn();
+      render(<table><tbody><SessionTableRow session={withReplay} onSelectSession={onSelectSession} onOpenReplay={onOpenReplay} /></tbody></table>);
+      return { onSelectSession, onOpenReplay };
+    };
+
+    it('opens the session once on a plain click of the track link or chevron', () => {
+      const { onSelectSession } = setup();
+      fireEvent.click(screen.getByText('Autodromo Nazionale Monza'));
+      expect(onSelectSession).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('link', { name: /Analyze/ }));
+      expect(onSelectSession).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves ctrl-clicks to the browser: no in-app handler, no row handler', () => {
+      const { onSelectSession, onOpenReplay } = setup();
+      const modifierClick = (el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }) => {
+        // jsdom cannot open a new tab; swallow the browser default after React has seen the click.
+        el.addEventListener('click', (e) => e.preventDefault(), { once: true });
+        fireEvent.click(el, init);
+      };
+      modifierClick(screen.getByText('Autodromo Nazionale Monza'), { ctrlKey: true });
+      modifierClick(screen.getByRole('link', { name: /Analyze/ }), { metaKey: true });
+      modifierClick(screen.getByRole('link', { name: /Open replay telemetry/ }), { ctrlKey: true });
+      expect(onSelectSession).not.toHaveBeenCalled();
+      expect(onOpenReplay).not.toHaveBeenCalled();
+    });
+
+    it('opens the replay once on a plain click, and the link carries the best lap', () => {
+      const { onSelectSession, onOpenReplay } = setup();
+      const link = screen.getByRole('link', { name: /Open replay telemetry/ });
+      expect(link).toHaveAttribute('href', expect.stringContaining('lap=4'));
+      fireEvent.click(link);
+      expect(onOpenReplay).toHaveBeenCalledTimes(1);
+      expect(onSelectSession).not.toHaveBeenCalled();
+    });
+  });
 });
