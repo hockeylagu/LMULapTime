@@ -26,12 +26,6 @@ function getStatusSubtext(p?: ReplayTelemetryPoint | null): string {
   return p?.inPit ? 'in pits' : p?.ambientTemp ? `${p.ambientTemp.toFixed(1)}°C` : 'green';
 }
 
-function getStatusColor(p?: ReplayTelemetryPoint | null): string {
-  if (p?.pitLimiter) return 'text-purple-400';
-  if (p?.isOffTrack) return 'text-amber-400';
-  return ((p?.rainIntensity ?? 0) > 0 || p?.inPit) ? 'text-sky-400' : 'text-emerald-400';
-}
-
 export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(({
   primaryPoint,
   baselinePoint,
@@ -86,7 +80,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
               </>
             ) : (
               <>
-                <span className="text-xs sm:text-sm font-bold text-amber-400/90">REF</span>
+                <span className="text-xs sm:text-sm font-bold text-white">REF</span>
                 <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">baseline</span>
               </>
             )}
@@ -99,7 +93,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             {!isGhost ? (
               <>
                 <div className="flex items-baseline gap-0.5">
-                  <span className="text-xs sm:text-sm font-bold text-sky-300">
+                  <span className="text-xs sm:text-sm font-bold text-white">
                     {effectiveLineDist !== null ? effectiveLineDist.toFixed(1) : '--'}
                   </span>
                   <span className="text-[9px] sm:text-[10px] text-lmu-muted font-medium">m</span>
@@ -108,7 +102,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
               </>
             ) : (
               <>
-                <span className="text-xs sm:text-sm font-bold text-amber-400/90">--</span>
+                <span className="text-xs sm:text-sm font-bold text-white">--</span>
                 <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">line</span>
               </>
             )}
@@ -129,7 +123,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
         {/* Throttle */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 whitespace-nowrap overflow-hidden">
           <div className="flex items-center gap-1 font-mono">
-            <span className="text-xs sm:text-sm font-bold text-emerald-400">
+            <span className="text-xs sm:text-sm font-bold text-white">
               {(p?.throttle ?? 0).toFixed(0)}%
             </span>
             {p?.tcActive && (
@@ -146,7 +140,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
         {/* Brake */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 whitespace-nowrap overflow-hidden">
           <div className="flex items-center gap-1 font-mono">
-            <span className="text-xs sm:text-sm font-bold text-rose-400">
+            <span className="text-xs sm:text-sm font-bold text-white">
               {(p?.brake ?? 0).toFixed(0)}%
             </span>
             {p?.absActive && (
@@ -162,7 +156,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
 
         {/* Steering */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className="text-xs sm:text-sm font-bold text-indigo-300 tabular-nums">
+          <span className="text-xs sm:text-sm font-bold text-white tabular-nums">
             {steerPct.toFixed(1)}% {steerDir}
           </span>
           <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">input</span>
@@ -170,7 +164,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
 
         {/* G-Force */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className="text-xs sm:text-sm font-bold text-amber-300 tabular-nums">
+          <span className="text-xs sm:text-sm font-bold text-white tabular-nums">
             {p ? `${totalG.toFixed(2)}G` : '--'}
           </span>
           <span className="text-[9px] sm:text-[10px] text-lmu-muted tabular-nums leading-tight">
@@ -180,7 +174,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
 
         {/* Status */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className={`text-[10px] sm:text-[11px] font-bold tracking-tight ${getStatusColor(p)}`}>
+          <span className="text-[10px] sm:text-[11px] font-bold tracking-tight text-white">
             {getStatusLabel(p)}
           </span>
           <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">
@@ -220,17 +214,17 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             )}
             {isComparing && effectiveLineDist != null && (
               <>
-                <span className="text-sky-300 font-bold">{effectiveLineDist.toFixed(1)}m line</span>
+                <span className="text-white font-bold">{effectiveLineDist.toFixed(1)}m line</span>
                 <span>·</span>
               </>
             )}
-            <span className="text-sky-400 font-bold">{primaryPoint.speedKmh ?? 0} km/h</span>
+            <span className="text-white font-bold">{primaryPoint.speedKmh ?? 0} km/h</span>
             <span>·</span>
-            <span className="text-emerald-400 font-bold">THR {(primaryPoint.throttle ?? 0).toFixed(0)}%</span>
+            <span className="text-white font-bold">THR {(primaryPoint.throttle ?? 0).toFixed(0)}%</span>
             <span>·</span>
-            <span className="text-rose-400 font-bold">BRK {(primaryPoint.brake ?? 0).toFixed(0)}%</span>
+            <span className="text-white font-bold">BRK {(primaryPoint.brake ?? 0).toFixed(0)}%</span>
             <span>·</span>
-            <span className="text-amber-300 font-bold">{Math.hypot(primaryPoint.accelLatG ?? 0, primaryPoint.accelLonG ?? 0).toFixed(1)}G</span>
+            <span className="text-white font-bold">{Math.hypot(primaryPoint.accelLatG ?? 0, primaryPoint.accelLonG ?? 0).toFixed(1)}G</span>
           </div>
         ) : (
           <div className="flex flex-col divide-y divide-white/10">
@@ -254,7 +248,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             >
               {isComparing && (
                 <div className="flex items-center justify-center px-1">
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-sky-500/20 text-white border border-sky-500/30">
                     ME
                   </span>
                 </div>
@@ -269,7 +263,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
                 className={`grid ${gridColsClass} divide-x divide-white/10 items-center py-0.5 sm:py-1 bg-amber-500/[0.04]`}
               >
                 <div className="flex items-center justify-center px-1">
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-amber-500/20 text-white border border-amber-500/30">
                     RIVAL
                   </span>
                 </div>
