@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Clock } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { computeTheoreticalGap, formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
@@ -54,7 +54,6 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
   hasVirtualEnergyData,
   isCurrentSessionAllTimePB,
 }) => {
-  const navigate = useNavigate();
   const [sortColumn, setSortColumn] = React.useState<SortableLapColumn>('lap');
   const [sortDescending, setSortDescending] = React.useState(false);
   const bestLap = selectedDriver?.bestLapTime ?? null;
@@ -151,22 +150,24 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
               <span>{allExpanded ? 'Hide lap details' : 'Show lap details'}</span>
             </button>
           )}
-          <button
-            onClick={() => {
-              const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-              const carClass = selectedDriver?.carClass || 'LMGT3';
-              const lapNum = selectedDriver?.bestLapNum;
-              navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-                carClass
-              )}&sessionId=${encodeURIComponent(session.id)}${lapNum ? `&lapNum=${lapNum}` : ''}`);
-            }}
-            type="button"
-            className={`${HEADER_BUTTON}`}
-            title="Compare your best lap from this session"
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
-            <span>Compare Laps</span>
-          </button>
+          {(() => {
+            const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+            const carClass = selectedDriver?.carClass || 'LMGT3';
+            const lapNum = selectedDriver?.bestLapNum;
+            const compareUrl = `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+              carClass
+            )}&sessionId=${encodeURIComponent(session.id)}${lapNum ? `&lapNum=${lapNum}` : ''}`;
+            return (
+              <Link
+                to={compareUrl}
+                className={`${HEADER_BUTTON}`}
+                title="Compare your best lap from this session"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
+                <span>Compare Laps</span>
+              </Link>
+            );
+          })()}
         </div>
         <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <p className="text-xs text-lmu-muted">Select a lap for telemetry; expand it for events.</p>

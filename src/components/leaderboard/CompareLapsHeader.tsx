@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } from 'lucide-react';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
@@ -17,6 +18,8 @@ export interface CompareLapsHeaderProps {
   onAddRival?: () => void;
   /** Measures the deltas against the other lap. */
   onSwapBaseline?: () => void;
+  /** URL to compare telemetry directly. */
+  compareTelemetryUrl?: string;
   /** Opens the telemetry of the two laps compared. */
   onCompareTelemetry?: () => void;
   onAddPersonalBest: () => void;
@@ -40,6 +43,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
   rivalLap,
   onAddRival,
   onSwapBaseline,
+  compareTelemetryUrl,
   onCompareTelemetry,
   onAddPersonalBest,
   onAddTheoreticalBest,
@@ -65,16 +69,33 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
             Swap baseline
           </button>
         )}
-        {onCompareTelemetry && (
-          <button
-            type="button"
-            onClick={onCompareTelemetry}
-            className={`${headerAction} ${FOCUS_RING}`}
-            title="Speed, pedals, delta and line of the two laps, overlaid"
-          >
-            <Activity className="w-3 h-3" />
-            Compare Telemetry
-          </button>
+        {(compareTelemetryUrl || onCompareTelemetry) && (
+          compareTelemetryUrl ? (
+            <Link
+              to={compareTelemetryUrl}
+              className={`${headerAction} ${FOCUS_RING}`}
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && onCompareTelemetry) {
+                  e.preventDefault();
+                  onCompareTelemetry();
+                }
+              }}
+              title="Speed, pedals, delta and line of the two laps, overlaid"
+            >
+              <Activity className="w-3 h-3" />
+              Compare Telemetry
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={onCompareTelemetry}
+              className={`${headerAction} ${FOCUS_RING}`}
+              title="Speed, pedals, delta and line of the two laps, overlaid"
+            >
+              <Activity className="w-3 h-3" />
+              Compare Telemetry
+            </button>
+          )
         )}
       </div>
     </div>

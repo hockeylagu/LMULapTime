@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { ArrowLeftRight, Activity, Crosshair, FileText, SquareCheck, SquarePlus } from 'lucide-react';
 import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
@@ -6,6 +7,8 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import type { LeaderboardRow as Row } from './leaderboardRows.js';
 import { benchmarkPace, formatDrivenAgo, formatGap } from './leaderboardFormat.js';
+import { boardLapTelemetryRef } from './leaderboardLaps.js';
+import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export const LEADERBOARD_COLUMNS = 11;
@@ -83,6 +86,18 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   const hasTelemetry = Boolean(entry.bestLap.replayName && player?.bestLap.replayName);
   const canPin = Boolean(onPin && !isRival && vsYou !== null && vsYou < 0);
   const pace = benchmarkPace(entry.bestLap.lapTime, benchmark);
+  const [searchParams] = useSearchParams();
+  const telemetryPath = React.useMemo(() => {
+    if (!hasTelemetry || !player) return null;
+    const yours = boardLapTelemetryRef(player);
+    if (!yours) return null;
+    if (entry.isPlayer) {
+      return buildTelemetryComparePath(searchParams, yours, null);
+    }
+    const theirs = boardLapTelemetryRef(entry);
+    return theirs ? buildTelemetryComparePath(searchParams, yours, theirs) : null;
+  }, [hasTelemetry, player, entry, searchParams]);
+
   // Your row is the one to find at a glance: the identity red; the rival is told by its tag alone.
   const rowClass = entry.isPlayer ? 'bg-lmu-accent/10 text-white' : 'hover:bg-white/[0.03] text-lmu-text';
   // Your own row has no Compare, so its few actions stay in view.
@@ -135,32 +150,54 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
               <Crosshair className="w-3.5 h-3.5" />
             </button>
           )}
-          {entry.isPlayer && onOpenSession && (
-            <button
-              type="button"
-              onClick={() => onOpenSession(entry.bestLap.sessionId)}
+          {entry.isPlayer && (
+            <Link
+              to={`/session/${encodeURIComponent(entry.bestLap.sessionId)}`}
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && onOpenSession) {
+                  e.preventDefault();
+                  onOpenSession(entry.bestLap.sessionId);
+                }
+              }}
               title={`Open the session of your best lap (${entry.bestLap.sessionName})`}
               aria-label="Open the session of your best lap"
               className={`${ICON_BUTTON} text-lmu-muted hover:text-white`}
             >
               <FileText className="w-3.5 h-3.5" />
-            </button>
+            </Link>
           )}
           {onTelemetry && (
-            <button
-              type="button"
-              onClick={() => onTelemetry(entry)}
-              disabled={!hasTelemetry}
-              title={
-                !hasTelemetry
-                  ? entry.isPlayer ? 'Telemetry needs the replay of your lap' : 'Telemetry needs the replay of both laps'
-                  : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
-              }
-              aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
-              className={`${ICON_BUTTON} text-lmu-muted enabled:hover:text-lmu-info-soft disabled:text-lmu-faint disabled:cursor-default ${reveal}`}
-            >
-              <Activity className="w-3.5 h-3.5" />
-            </button>
+            telemetryPath ? (
+              <Link
+                to={telemetryPath}
+                onClick={(e) => {
+                  if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    onTelemetry(entry);
+                  }
+                }}
+                title={entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`}
+                aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
+                className={`${ICON_BUTTON} text-lmu-muted hover:text-lmu-info-soft ${reveal}`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onTelemetry(entry)}
+                disabled={!hasTelemetry}
+                title={
+                  !hasTelemetry
+                    ? entry.isPlayer ? 'Telemetry needs the replay of your lap' : 'Telemetry needs the replay of both laps'
+                    : entry.isPlayer ? 'Open the telemetry of your best lap' : `Open the telemetry of your best lap against ${entry.driverName}'s`
+                }
+                aria-label={entry.isPlayer ? 'Telemetry of your best lap' : `Telemetry against ${entry.driverName}`}
+                className={`${ICON_BUTTON} text-lmu-muted enabled:hover:text-lmu-info-soft disabled:text-lmu-faint disabled:cursor-default ${reveal}`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+              </button>
+            )
           )}
           {!entry.isPlayer && onCompare && (
             <button

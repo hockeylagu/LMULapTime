@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { useDashboardTrends } from './useDashboardTrends.js';
 import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
@@ -93,7 +94,19 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-bold text-white tracking-tight truncate">{latestOuting.trackName}</h3>
+                    <Link
+                      to={`/session/${encodeURIComponent(latestOuting.id)}`}
+                      onClick={(e) => {
+                        if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                          e.preventDefault();
+                          onSelectSession(latestOuting.id);
+                        }
+                      }}
+                      className="text-xl font-bold text-white tracking-tight truncate hover:text-lmu-accent-text transition-colors"
+                      title={`View ${latestOuting.trackName} session`}
+                    >
+                      {latestOuting.trackName}
+                    </Link>
                     <span
                       data-testid="hero-session-type-badge"
                       className={`px-2 py-0.5 rounded border text-[11px] font-mono font-bold shrink-0 ${
@@ -177,20 +190,26 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
               <ReplayLaunchButton
                 hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
                 replayName={latestOuting.replayName}
+                to={`/telemetry?replayName=${encodeURIComponent(latestOuting.replayName || '')}&session=${encodeURIComponent(latestOuting.id)}${latestOuting.bestLapNum ? `&lap=${latestOuting.bestLapNum}` : ''}`}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}
               />
             )}
-            <button
-              type="button"
-              onClick={() => onSelectSession(latestOuting.id)}
+            <Link
+              to={`/session/${encodeURIComponent(latestOuting.id)}`}
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                  e.preventDefault();
+                  onSelectSession(latestOuting.id);
+                }
+              }}
               className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-raised hover:bg-lmu-rule text-lmu-text border border-lmu-rule font-medium text-xs transition-colors cursor-pointer ${FOCUS_RING}`}
               data-testid="hero-inspect-session-btn"
             >
               Session Details
               <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </Link>
           </div>
         </div>
 

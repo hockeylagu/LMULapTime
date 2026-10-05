@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
@@ -106,19 +106,23 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     ? `Incomplete Lap:\n${eventsTooltip}`
     : 'Incomplete Lap (lap not finished or missing sector timing)';
 
+  const telemetryUrl = session.matchingReplayFile
+    ? (() => {
+        const telemetryParams = new URLSearchParams(searchParams);
+        telemetryParams.set('replayName', session.matchingReplayFile.name);
+        telemetryParams.set('lap', String(l.lapNum));
+        return `/telemetry?${telemetryParams.toString()}`;
+      })()
+    : (() => {
+        const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+        const carClass = selectedDriver?.carClass || 'LMGT3';
+        return `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+          carClass
+        )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
+      })();
+
   const handleOpenTelemetry = () => {
-    if (session.matchingReplayFile) {
-      const telemetryParams = new URLSearchParams(searchParams);
-      telemetryParams.set('replayName', session.matchingReplayFile.name);
-      telemetryParams.set('lap', String(l.lapNum));
-      navigate(`/telemetry?${telemetryParams.toString()}`);
-    } else {
-      const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-      const carClass = selectedDriver?.carClass || 'LMGT3';
-      navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-        carClass
-      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`);
-    }
+    navigate(telemetryUrl);
   };
 
   return (
@@ -156,7 +160,18 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           ) : (
             <span className="w-5" aria-hidden="true" />
           )}
-          {l.lapNum}
+          <Link
+            to={telemetryUrl}
+            onClick={(e) => {
+              if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                handleOpenTelemetry();
+              }
+            }}
+            className="hover:underline hover:text-white"
+          >
+            {l.lapNum}
+          </Link>
         </span>
       </td>
       <td
@@ -224,6 +239,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           session={session}
           lapNum={l.lapNum}
           selectedDriver={selectedDriver}
+          telemetryUrl={telemetryUrl}
           onOpenTelemetry={handleOpenTelemetry}
         />
       </td>

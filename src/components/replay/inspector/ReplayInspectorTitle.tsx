@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { Link } from 'react-router';
 import { ArrowLeft, CloudRain, CloudSun, Info } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
@@ -33,10 +34,19 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
 
   return (
     <div className="flex items-center gap-4 min-w-0">
-      <button type="button" onClick={onClose} title="Return to previous page"
-        className="flex items-center gap-1.5 py-1.5 text-lmu-muted hover:text-white text-xs shrink-0 cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text">
+      <Link
+        to="/dashboard"
+        onClick={(e) => {
+          if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            onClose();
+          }
+        }}
+        title="Return to previous page"
+        className="flex items-center gap-1.5 py-1.5 text-lmu-muted hover:text-white text-xs shrink-0 cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
+      >
         <ArrowLeft className="w-4 h-4" /> Back
-      </button>
+      </Link>
       <div className="min-w-0">
         <h1 className="text-sm font-bold text-white truncate" title={track}>{track}</h1>
         {conditions && <div aria-label="Track conditions" className="flex items-center gap-1.5 text-[11px] leading-4 text-lmu-text-soft" title={conditions}>

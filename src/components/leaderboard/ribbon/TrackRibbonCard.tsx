@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { MapPin } from 'lucide-react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
@@ -15,10 +16,18 @@ export interface TrackRibbonCardProps {
 /** One layout of the ribbon: its outline, when it was driven last, and where the player stands. */
 export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, selected, onSelect }) => {
   const latest = layout.classes.find((c) => c.carClass === layout.lastCarClass) ?? layout.classes[0];
+  const carClass = layout.lastCarClass || latest?.carClass || 'LMGT3';
+  const targetUrl = `/leaderboard?track=${encodeURIComponent(layout.trackName)}&carClass=${encodeURIComponent(carClass)}`;
+
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(layout)}
+    <Link
+      to={targetUrl}
+      onClick={(e) => {
+        if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          onSelect(layout);
+        }
+      }}
       aria-pressed={selected}
       title={`${layout.trackName} — ${layout.layoutName}`}
       className={`snap-start shrink-0 w-56 rounded-xl border p-3 text-left transition-all cursor-pointer ${
@@ -61,6 +70,6 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
           <span className="font-mono text-white">{formatTime(latest.playerBest)}</span>
         </div>
       )}
-    </button>
+    </Link>
   );
 };

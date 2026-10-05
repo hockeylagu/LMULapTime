@@ -34,7 +34,7 @@ describe('LapDebriefPanel', () => {
     expect(await screen.findByTestId('debrief-corner-5')).toHaveTextContent('Brake 12 m later');
     expect(screen.getByText('One lap was recorded at a lower rate.')).toBeInTheDocument();
 
-    const openT5 = screen.getByTestId('debrief-corner-5').querySelector('button') as HTMLButtonElement;
+    const openT5 = screen.getByTestId('debrief-corner-5').querySelector('a, button') as HTMLElement;
     fireEvent.click(openT5);
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     const params = new URLSearchParams(window.location.hash.split('?')[1]);

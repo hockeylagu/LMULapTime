@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FOCUS_RING } from '../common/buttonStyles.js';
@@ -69,6 +70,7 @@ export interface RankedItem {
   /** Small colored mark after the value (a pace category), kept as a dot so the list stays calm. */
   marker?: { className: string; label: string };
   title?: string;
+  to?: string;
   onSelect?: () => void;
 }
 
@@ -84,48 +86,77 @@ const Marker: React.FC<{ marker: RankedItem['marker'] }> = ({ marker }) =>
 export const RankedList: React.FC<{ items: RankedItem[]; expanded: boolean; empty: string }> = ({ items, expanded, empty }) => {
   if (items.length === 0) return <p className="text-xs text-lmu-muted">{empty}</p>;
   const [leader, ...rest] = items;
-  const LeaderTag = leader.onSelect ? 'button' : 'div';
+  const isInteractive = Boolean(leader.to || leader.onSelect);
+  const leaderClassName = `rounded-lg -mx-1.5 px-1.5 py-1 ${isInteractive ? `block w-full text-left cursor-pointer hover:bg-lmu-cardHover transition-colors ${FOCUS_RING}` : ''}`;
+  
+  const leaderContent = (
+    <>
+      <span className="flex items-baseline gap-1.5 h-8 font-mono">
+        <span className={leader.marker ? LEADER_VALUE.replace('text-white', leader.marker.className) : LEADER_VALUE}>{leader.value}</span>
+        {leader.unit && <span className="text-xs text-lmu-muted">{leader.unit}</span>}
+        {leader.marker && (
+          <span className="text-xs font-sans font-semibold text-lmu-text-soft">{leader.marker.label}</span>
+        )}
+      </span>
+      <span className="block text-sm leading-5 font-semibold text-white truncate" title={leader.name}>{leader.name}</span>
+      <span className="block text-[11px] leading-4 text-lmu-muted truncate">{leader.detail ?? ' '}</span>
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-2">
-      <LeaderTag
-        {...(leader.onSelect ? { type: 'button' as const, onClick: leader.onSelect } : {})}
-        title={leader.title}
-        data-testid="summary-leader"
-        className={`rounded-lg -mx-1.5 px-1.5 py-1 ${leader.onSelect ? `w-full text-left cursor-pointer hover:bg-lmu-cardHover transition-colors ${FOCUS_RING}` : ''}`}
-      >
-        <span className="flex items-baseline gap-1.5 h-8 font-mono">
-          <span className={leader.marker ? LEADER_VALUE.replace('text-white', leader.marker.className) : LEADER_VALUE}>{leader.value}</span>
-          {leader.unit && <span className="text-xs text-lmu-muted">{leader.unit}</span>}
-          {leader.marker && (
-            <span className="text-xs font-sans font-semibold text-lmu-text-soft">{leader.marker.label}</span>
-          )}
-        </span>
-        <span className="block text-sm leading-5 font-semibold text-white truncate" title={leader.name}>{leader.name}</span>
-        <span className="block text-[11px] leading-4 text-lmu-muted truncate">{leader.detail ?? ' '}</span>
-      </LeaderTag>
+      {leader.to ? (
+        <Link to={leader.to} title={leader.title} data-testid="summary-leader" className={leaderClassName}>
+          {leaderContent}
+        </Link>
+      ) : leader.onSelect ? (
+        <button type="button" onClick={leader.onSelect} title={leader.title} data-testid="summary-leader" className={leaderClassName}>
+          {leaderContent}
+        </button>
+      ) : (
+        <div title={leader.title} data-testid="summary-leader" className={leaderClassName}>
+          {leaderContent}
+        </div>
+      )}
       {rest.length > 0 && (
         <div className={`border-t border-lmu-border/60 pt-1.5 space-y-0.5 ${expanded ? 'max-h-48 overflow-y-auto overflow-x-hidden custom-scrollbar pr-0.5' : ''}`}>
           {rest.map((item, i) => {
-            const RowTag = item.onSelect ? 'button' : 'div';
+            const rowInteractive = Boolean(item.to || item.onSelect);
+            const rowClassName = `flex items-center justify-between gap-2 text-xs rounded-md px-1.5 py-1 ${expanded ? '' : '-mx-1.5'} ${
+              rowInteractive ? `w-full text-left cursor-pointer hover:bg-lmu-cardHover transition-colors ${FOCUS_RING}` : ''
+            }`;
+            const rowContent = (
+              <>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="w-4 shrink-0 font-mono text-[11px] text-lmu-faint">{i + 2}</span>
+                  <span className="text-lmu-text-soft truncate" title={item.name}>{item.name}</span>
+                </span>
+                <span className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
+                  <Marker marker={item.marker} />
+                  <span className="text-lmu-text-soft tabular-nums">{item.value}</span>
+                  {item.unit && <span className="text-lmu-muted">{item.unit}</span>}
+                </span>
+              </>
+            );
+
+            if (item.to) {
+              return (
+                <Link key={item.key} to={item.to} title={item.title} className={rowClassName}>
+                  {rowContent}
+                </Link>
+              );
+            }
+            if (item.onSelect) {
+              return (
+                <button key={item.key} type="button" onClick={item.onSelect} title={item.title} className={rowClassName}>
+                  {rowContent}
+                </button>
+              );
+            }
             return (
-            <RowTag
-              key={item.key}
-              {...(item.onSelect ? { type: 'button' as const, onClick: item.onSelect } : {})}
-              title={item.title}
-              className={`flex items-center justify-between gap-2 text-xs rounded-md px-1.5 py-1 ${expanded ? '' : '-mx-1.5'} ${
-                item.onSelect ? `w-full text-left cursor-pointer hover:bg-lmu-cardHover transition-colors ${FOCUS_RING}` : ''
-              }`}
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="w-4 shrink-0 font-mono text-[11px] text-lmu-faint">{i + 2}</span>
-                <span className="text-lmu-text-soft truncate" title={item.name}>{item.name}</span>
-              </span>
-              <span className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
-                <Marker marker={item.marker} />
-                <span className="text-lmu-text-soft tabular-nums">{item.value}</span>
-                {item.unit && <span className="text-lmu-muted">{item.unit}</span>}
-              </span>
-            </RowTag>
+              <div key={item.key} title={item.title} className={rowClassName}>
+                {rowContent}
+              </div>
             );
           })}
         </div>

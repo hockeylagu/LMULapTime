@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { formatTime, matchesSessionType, compareSessions, compareSessionsBySortOption, isSessionEmpty } from '../../../shared/domain/formatters.js';
 import { matchesCarClass, matchesSessionCarClass, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
@@ -76,12 +77,18 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         <p className="text-lg font-bold text-white mb-3">{error ? 'Unable to load track details' : 'Track Not Found'}</p>
         {error && <p className="text-xs mb-4 px-6 break-words">{error}</p>}
         {error && <button type="button" onClick={retry} className="px-4 py-2 mr-3 bg-lmu-raised text-lmu-text rounded-xl text-xs focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2">Try again</button>}
-        <button
-          onClick={onBack}
-          className="px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
+        <Link
+          to="/tracks"
+          onClick={(e) => {
+            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              onBack();
+            }
+          }}
+          className="inline-block px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           Return to Tracks
-        </button>
+        </Link>
       </div>
     );
   }

@@ -132,7 +132,7 @@ describe('carClass URL persistence across track navigation', () => {
       expect(window.location.hash).toContain('carClass=LMH');
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: /back to tracks/i }));
+    fireEvent.click(await screen.findByRole('link', { name: /back to tracks/i }));
 
     await waitFor(() => {
       expect(window.location.hash).toContain('#/tracks');

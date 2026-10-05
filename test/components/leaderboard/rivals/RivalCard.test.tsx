@@ -82,7 +82,7 @@ describe('RivalCard', () => {
     const { rival, onCompare, onTelemetry } = renderCard(status());
     fireEvent.click(screen.getByRole('button', { name: /Analyse/ }));
     expect(onCompare).toHaveBeenCalledWith(rivalEntry);
-    fireEvent.click(screen.getByRole('button', { name: /Compare Telemetry/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Compare Telemetry/ }));
     expect(onTelemetry).toHaveBeenCalledWith(rivalEntry);
     expect(screen.queryByRole('button', { name: /Another rival/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Make Next your rival' }));

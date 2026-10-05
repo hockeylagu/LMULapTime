@@ -269,10 +269,10 @@ describe('TrackDetail component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Open replay telemetry/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Open replay telemetry/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Open replay telemetry/i }));
+    fireEvent.click(screen.getByRole('link', { name: /Open replay telemetry/i }));
     expect(onOpenReplay).toHaveBeenCalledWith('sess-hypercar-1');
   });
 
@@ -449,7 +449,7 @@ describe('TrackDetail component', () => {
       expect(screen.getByText('Back to Tracks')).toBeInTheDocument();
     });
 
-    const backBtn = screen.getByRole('button', { name: /back to tracks/i });
+    const backBtn = screen.getByRole('link', { name: /back to tracks/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalled();
   });

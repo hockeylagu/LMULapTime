@@ -72,7 +72,7 @@ describe('SessionList component', () => {
     const user = userEvent.setup();
     const onSelectSession = vi.fn();
     render(<SessionList sessions={mockSessions} onSelectSession={onSelectSession} showTrackColumn={true} />);
-    const open = screen.getAllByRole('button', { name: /^Open session: .*Spa-Francorchamps/ })[0];
+    const open = screen.getAllByRole('link', { name: /^Open session: .*Spa-Francorchamps/ })[0];
     open.focus();
     await user.keyboard('{Enter}');
     expect(onSelectSession).toHaveBeenCalledWith('sess-1');
@@ -122,7 +122,7 @@ describe('SessionList component', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Open replay telemetry/i }));
+    fireEvent.click(screen.getByRole('link', { name: /Open replay telemetry/i }));
 
     expect(onOpenReplay).toHaveBeenCalledWith('sess-1');
     expect(onSelectSession).not.toHaveBeenCalled();

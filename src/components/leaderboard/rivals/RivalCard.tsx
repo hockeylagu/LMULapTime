@@ -1,7 +1,10 @@
 import React from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { Activity, ArrowLeftRight, Ghost, Target } from 'lucide-react';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
+import { boardLapTelemetryRef } from '../board/leaderboardLaps.js';
+import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import type { RivalState } from './useRival.js';
 import { RivalInsights } from './RivalInsights.js';
 import { RivalLadder } from './RivalLadder.js';
@@ -33,6 +36,13 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
   const percent = (gap / target.targetTime) * 100;
   const telemetryReady = Boolean(rivalEntry?.bestLap.replayName && player.bestLap.replayName);
   const closed = progress !== null ? Math.round(progress * 100) : null;
+  const [searchParams] = useSearchParams();
+  const telemetryPath = React.useMemo(() => {
+    if (!telemetryReady || !player || !rivalEntry) return null;
+    const yours = boardLapTelemetryRef(player);
+    const theirs = boardLapTelemetryRef(rivalEntry);
+    return yours && theirs ? buildTelemetryComparePath(searchParams, yours, theirs) : null;
+  }, [telemetryReady, player, rivalEntry, searchParams]);
 
   return (
     <section aria-label="Your rival" className="bg-lmu-card border border-lmu-warn-strong/30 p-6 rounded-2xl space-y-4">
@@ -101,10 +111,26 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
             </button>
           )}
           {rivalEntry && onTelemetry && (
-            <button type="button" className={`${action} ${FOCUS_RING}`} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
-              title={telemetryReady ? 'Speed, pedals, delta and line of the two laps, overlaid' : 'Telemetry needs the replay of both laps'}>
-              <Activity className="w-3.5 h-3.5" /> Compare Telemetry
-            </button>
+            telemetryPath ? (
+              <Link
+                to={telemetryPath}
+                className={`${action} ${FOCUS_RING}`}
+                onClick={(e) => {
+                  if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    onTelemetry(rivalEntry);
+                  }
+                }}
+                title="Speed, pedals, delta and line of the two laps, overlaid"
+              >
+                <Activity className="w-3.5 h-3.5" /> Compare Telemetry
+              </Link>
+            ) : (
+              <button type="button" className={`${action} ${FOCUS_RING}`} disabled={!telemetryReady} onClick={() => onTelemetry(rivalEntry)}
+                title={telemetryReady ? 'Speed, pedals, delta and line of the two laps, overlaid' : 'Telemetry needs the replay of both laps'}>
+                <Activity className="w-3.5 h-3.5" /> Compare Telemetry
+              </button>
+            )
           )}
         </div>
         <RivalLadder beaten={status.beaten} nextUp={status.nextUp} onPin={rival.pin} pending={rival.pending} />

@@ -64,10 +64,11 @@ describe('LeaderboardPage', () => {
 
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
     expect(urlParams().get('carClass')).toBe('LMH');
-    const cards = screen.getAllByRole('button', { pressed: true });
+    const ribbonCard = screen.getByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
+    expect(ribbonCard).toHaveAttribute('aria-pressed', 'true');
     // The circuit, then the layout: never the layout twice, nor a flag.
-    expect(cards[0]).toHaveTextContent('Daytona International SpeedwayDaytona International Speedway (Road Course) layout');
-    expect(cards[0]).not.toHaveTextContent('🇮🇹');
+    expect(ribbonCard).toHaveTextContent('Daytona International SpeedwayDaytona International Speedway (Road Course) layout');
+    expect(ribbonCard).not.toHaveTextContent('🇮🇹');
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
@@ -102,8 +103,8 @@ describe('LeaderboardPage', () => {
     window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3&sessionId=s1&lapNum=4';
     render(<LeaderboardPage sessions={[]} />);
 
-    const daytona = await screen.findByRole('button', { name: /Daytona International Speedway \(Road Course\)/ });
-    expect(screen.getByRole('button', { name: /Monza layout/ })).toHaveAttribute('aria-pressed', 'true');
+    const daytona = await screen.findByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
+    expect(screen.getByRole('link', { name: /Monza layout/ })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(daytona);
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
@@ -136,7 +137,7 @@ describe('LeaderboardPage', () => {
     expect(screen.getByRole('button', { name: "Pick Driver 1's lap to compare" })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: "Pick Driver 2's lap to compare" })).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Telemetry against Driver 1' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Telemetry against Driver 1' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     expect(urlParams().get('replayName')).toBe('Me.Vcr');
     expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
@@ -154,10 +155,10 @@ describe('LeaderboardPage', () => {
     const onSelectSession = vi.fn();
     render(<LeaderboardPage sessions={[]} onSelectSession={onSelectSession} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open the session of your best lap' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Open the session of your best lap' }));
     expect(onSelectSession).toHaveBeenCalledWith('s-Me');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Telemetry of your best lap' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Telemetry of your best lap' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     expect(urlParams().get('replayName')).toBe('Me.Vcr');
     expect(urlParams().get('lap')).toBe('3');

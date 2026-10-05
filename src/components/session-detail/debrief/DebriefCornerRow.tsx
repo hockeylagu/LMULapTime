@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { ChevronRight, Users } from 'lucide-react';
 import type { CornerPhase, DebriefCorner } from '../../../utils/sessionDebrief.js';
 import { describeTrafficSpell } from '../../../utils/lapTrafficText.js';
@@ -13,6 +14,8 @@ const PHASE_LABELS: Record<CornerPhase, string> = {
 export interface DebriefCornerRowProps {
   rank: number;
   corner: DebriefCorner;
+  /** Link generator for the corner in telemetry. */
+  toLink?: (cornerNumber: number, against: 'reference' | 'technique') => string;
   /** Opens the corner in telemetry against the realistic reference, or the technique (fastest) lap. */
   onOpen: (cornerNumber: number, against: 'reference' | 'technique') => void;
   /** Whether there is a separate technique lap: the evidence then describes it. */
@@ -25,11 +28,14 @@ const linkClass = 'shrink-0 inline-flex items-center gap-0.5 px-2 py-1 rounded-l
  * One corner to work on: what it costs against the realistic target, how often, where in the
  * corner, how the fastest lap drives it, and whether another car was close.
  */
-export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner, onOpen, hasTechnique }) => {
+export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner, toLink, onOpen, hasTechnique }) => {
   const frequency = corner.lapsSampled !== null
     ? `lost on ${corner.lapsLosing} of ${corner.lapsSampled} laps`
     : 'measured on this lap only';
   const inTraffic = corner.lapsInTraffic > 0 ? ` (${corner.lapsInTraffic} in traffic left out)` : '';
+
+  const refUrl = toLink?.(corner.cornerNumber, 'reference');
+  const techUrl = toLink?.(corner.cornerNumber, 'technique');
 
   return (
     <li className="flex items-start gap-3 py-2.5 border-t border-lmu-border/40 first:border-t-0" data-testid={`debrief-corner-${corner.cornerNumber}`}>
@@ -70,13 +76,45 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
         )}
       </div>
       <div className="flex flex-col items-end">
-        <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} in telemetry`}>
-          Open <ChevronRight className="w-3.5 h-3.5" />
-        </button>
-        {hasTechnique && (
-          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} against the fastest lap`}>
-            Fastest <ChevronRight className="w-3.5 h-3.5" />
+        {refUrl ? (
+          <Link
+            to={refUrl}
+            onClick={(e) => {
+              if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                onOpen(corner.cornerNumber, 'reference');
+              }
+            }}
+            className={`${linkClass} ${FOCUS_RING}`}
+            aria-label={`Open T${corner.cornerNumber} in telemetry`}
+          >
+            Open <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        ) : (
+          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} in telemetry`}>
+            Open <ChevronRight className="w-3.5 h-3.5" />
           </button>
+        )}
+        {hasTechnique && (
+          techUrl ? (
+            <Link
+              to={techUrl}
+              onClick={(e) => {
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                  e.preventDefault();
+                  onOpen(corner.cornerNumber, 'technique');
+                }
+              }}
+              className={`${linkClass} ${FOCUS_RING}`}
+              aria-label={`Open T${corner.cornerNumber} against the fastest lap`}
+            >
+              Fastest <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} against the fastest lap`}>
+              Fastest <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
       </div>
     </li>

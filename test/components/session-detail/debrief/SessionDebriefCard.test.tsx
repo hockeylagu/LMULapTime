@@ -53,7 +53,7 @@ describe('SessionDebriefCard', () => {
     expect(screen.getByText('Davide Catani')).toBeInTheDocument();
     expect(screen.getByText(/comparison confidence \(80%\)/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open T1 in telemetry' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open T1 in telemetry' }));
 
     await waitFor(() => expect(window.location.hash).toContain('/telemetry?'));
     expect(window.location.hash).toContain('corner=1');
@@ -79,7 +79,7 @@ describe('SessionDebriefCard', () => {
     expect(screen.getByText(/Technique from the fastest/)).toHaveTextContent('Davide Catani');
     expect(screen.getByText(/ranks lower/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open T1 against the fastest lap' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open T1 against the fastest lap' }));
 
     await waitFor(() => expect(window.location.hash).toContain('compareDriver=Davide+Catani'));
   });

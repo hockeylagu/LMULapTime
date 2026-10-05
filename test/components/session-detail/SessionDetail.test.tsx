@@ -36,7 +36,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     const lapPaceBtn = screen.getByRole('button', { name: /^lap pace$/i });
     fireEvent.click(lapPaceBtn);
 
-    const backBtn = screen.getByRole('button', { name: /back to sessions/i });
+    const backBtn = screen.getByRole('link', { name: /back to sessions/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalled();
   });
@@ -115,7 +115,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
       expect(screen.getByRole('heading', { name: /^Laps\s*3$/ })).toBeInTheDocument();
     });
 
-    const compareButtons = screen.getAllByRole('button', { name: /^Compare lap \d+$/i });
+    const compareButtons = screen.getAllByRole('link', { name: /^Compare lap \d+$/i });
     expect(compareButtons.length).toBeGreaterThan(0);
 
     // Click compare on first lap
@@ -128,7 +128,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     // Click Compare Laps in the header: it should target the driver's best lap of this
     // session, not an arbitrary lap.
-    const openStudioBtn = screen.getByRole('button', { name: /Compare Laps/i });
+    const openStudioBtn = screen.getByRole('link', { name: /Compare Laps/i });
     fireEvent.click(openStudioBtn);
     expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');

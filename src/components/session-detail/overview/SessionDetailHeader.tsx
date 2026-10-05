@@ -80,19 +80,26 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     <>
       {/* Top Action Bar */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
+        <Link
+          to="/dashboard"
+          onClick={(e) => {
+            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              onBack();
+            }
+          }}
           className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule transition-colors ${FOCUS_RING}`}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Sessions
-        </button>
+        </Link>
 
         <div className="flex items-center gap-3">
           {session.matchingReplayFile && (
             <ReplayLaunchButton
               hasDuckDb={hasDuckDb}
               replayName={session.matchingReplayFile.name}
+              to={`/telemetry?replayName=${encodeURIComponent(session.matchingReplayFile.name)}&session=${encodeURIComponent(session.id)}&lap=${selectedDriver?.bestLapNum || 1}`}
               onClick={() => handleOpenReplay()}
               title={`Matching Replay: ${session.matchingReplayFile.name}${
                 hasDuckDb ? `
@@ -103,33 +110,40 @@ Click to inspect trajectory and telemetry`}
           )}
 
           {relatedSession && (
-            <button
-              onClick={() => {
-                const targetId = relatedSession.target.id || relatedSession.target.sessionId;
-                if (targetId) {
-                  handleNavigateToSession(targetId);
-                }
-              }}
-              title={
-                relatedSession.type === 'qualifying'
-                  ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
-                  : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
-              }
-              className={`${JUMP_BUTTON} ${FOCUS_RING}`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  getSessionTypeStyle(relatedSession.type === 'qualifying' ? 'Qualifying' : 'Race')?.dot
-                }`}
-                aria-hidden="true"
-              />
-              <span>
-                {relatedSession.type === 'qualifying'
-                  ? `Go to qualifying (${relatedSession.target.sessionName || 'Q1'})`
-                  : `Go to race (${relatedSession.target.sessionName || 'R1'})`}
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
-            </button>
+            (() => {
+              const targetId = relatedSession.target.id || relatedSession.target.sessionId;
+              if (!targetId) return null;
+              return (
+                <Link
+                  to={`/session/${encodeURIComponent(targetId)}`}
+                  onClick={(e) => {
+                    if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                      e.preventDefault();
+                      handleNavigateToSession(targetId);
+                    }
+                  }}
+                  title={
+                    relatedSession.type === 'qualifying'
+                      ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
+                      : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
+                  }
+                  className={`${JUMP_BUTTON} ${FOCUS_RING}`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      getSessionTypeStyle(relatedSession.type === 'qualifying' ? 'Qualifying' : 'Race')?.dot
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {relatedSession.type === 'qualifying'
+                      ? `Go to qualifying (${relatedSession.target.sessionName || 'Q1'})`
+                      : `Go to race (${relatedSession.target.sessionName || 'R1'})`}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
+                </Link>
+              );
+            })()
           )}
         </div>
       </div>

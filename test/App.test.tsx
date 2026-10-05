@@ -205,7 +205,7 @@ describe('App component', () => {
       expect(screen.getByText(/Back to Sessions/i)).toBeInTheDocument();
     });
 
-    const backBtn = screen.getByRole('button', { name: /Back to Sessions/i });
+    const backBtn = screen.getByRole('link', { name: /Back to Sessions/i });
     fireEvent.click(backBtn);
 
     await waitFor(() => {
@@ -223,7 +223,7 @@ describe('App component', () => {
     });
 
     await screen.findByTestId(/track-circuit-layout/);
-    const backBtn = screen.getByRole('button', { name: /Back to Tracks/i });
+    const backBtn = screen.getByRole('link', { name: /Back to Tracks/i });
     fireEvent.click(backBtn);
 
     await waitFor(() => {

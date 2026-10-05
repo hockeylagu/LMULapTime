@@ -54,7 +54,7 @@ describe('SessionTableRow', () => {
     expect(screen.getByText('Alien')).toBeInTheDocument();
 
     // Click analyze button (with stop propagation)
-    const analyzeBtn = screen.getByRole('button', { name: /Analyze Autodromo Nazionale Monza/ });
+    const analyzeBtn = screen.getByRole('link', { name: /Analyze Autodromo Nazionale Monza/ });
     fireEvent.click(analyzeBtn);
     expect(onSelectSession).toHaveBeenCalledWith('session-race-1');
 
@@ -108,7 +108,7 @@ describe('SessionTableRow', () => {
     expect(screen.getByText('BMW M Hybrid V8')).toBeInTheDocument();
 
     // Replay indicator clickable
-    const replayBtn = screen.getByRole('button', { name: /Open replay telemetry/i });
+    const replayBtn = screen.getByRole('link', { name: /Open replay telemetry/i });
     fireEvent.click(replayBtn);
     expect(onOpenReplay).toHaveBeenCalledWith('session-quali-1');
   });
@@ -162,7 +162,7 @@ describe('SessionTableRow', () => {
     await user.keyboard(' ');
     expect(onSelectSession).toHaveBeenCalledTimes(2);
 
-    screen.getByRole('button', { name: /Analyze/ }).focus();
+    screen.getByRole('link', { name: /Analyze/ }).focus();
     await user.keyboard('{Enter}');
     expect(onSelectSession).toHaveBeenCalledTimes(3);
   });

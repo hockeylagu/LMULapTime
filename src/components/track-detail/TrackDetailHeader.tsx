@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
@@ -41,33 +41,37 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
   trackGeometry,
 }) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const navigate = useNavigate();
+  const backUrl = selectedClass !== 'All' ? `/tracks?carClass=${encodeURIComponent(selectedClass)}` : '/tracks';
+  const compareUrl = `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+    selectedClass !== 'All' ? selectedClass : 'LMGT3'
+  )}`;
 
   return (
     <>
       {/* Navigation & Header */}
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
+        <Link
+          to={backUrl}
+          onClick={(e) => {
+            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              onBack();
+            }
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-accent transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Tracks
-        </button>
+        </Link>
 
-        <button
-          type="button"
-          onClick={() => {
-            const carClass = selectedClass !== 'All' ? selectedClass : 'LMGT3';
-            navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(carClass)}`);
-          }}
+        <Link
+          to={compareUrl}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-lmu-card border border-lmu-border text-xs font-medium text-lmu-text-soft hover:text-lmu-text hover:bg-lmu-cardHover transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
           title="Compare laps on this track"
         >
           <ArrowLeftRight className="w-4 h-4 text-lmu-muted" />
           Compare Laps
-        </button>
+        </Link>
       </div>
 
       {/* Track Title Card */}

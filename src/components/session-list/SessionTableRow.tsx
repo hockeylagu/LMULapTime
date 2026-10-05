@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
@@ -27,6 +28,10 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
   const displayTrack = s.trackVenue ? getDisplayTrackName(s.trackVenue, s.trackCourse) : '';
 
   const label = [s.sessionType, displayTrack, s.timeString].filter(Boolean).join(', ');
+  const sessionUrl = `/session/${encodeURIComponent(s.id)}`;
+  const replayUrl = s.matchingReplayFile
+    ? `/telemetry?replayName=${encodeURIComponent(s.matchingReplayFile.name)}&session=${encodeURIComponent(s.id)}`
+    : undefined;
 
   return (
     <tr
@@ -45,7 +50,11 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
     >
       {/* Track */}
       {showTrackColumn && (
-        <td className="px-3.5 py-3 font-semibold text-white">{displayTrack || 'Circuit'}</td>
+        <td className="px-3.5 py-3 font-semibold text-white">
+          <Link to={sessionUrl} className="hover:text-lmu-accent-text transition-colors">
+            {displayTrack || 'Circuit'}
+          </Link>
+        </td>
       )}
 
       {/* Session Type & Name */}
@@ -112,11 +121,12 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
               hasDuckDbTelemetry={s.hasDuckDbTelemetry}
               duckdbFilename={s.duckdbFilename}
               hideIfEmpty
+              to={replayUrl}
               onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
             />
           )}
-          <button
-            type="button"
+          <Link
+            to={sessionUrl}
             onClick={(e) => {
               e.stopPropagation();
               onSelectSession(s.id);
@@ -126,7 +136,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
             aria-label={`Analyze ${displayTrack || 'Session'}`}
           >
             <ChevronRight className="w-4 h-4 transform group-hover/btn:translate-x-0.5 transition-transform" />
-          </button>
+          </Link>
         </div>
       </td>
     </tr>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { Video, Zap, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { FOCUS_RING } from './buttonStyles.js';
@@ -17,6 +18,7 @@ export interface ReplayIndicatorProps {
   duckdbFilename?: string;
   hideIfEmpty?: boolean;
   className?: string;
+  to?: string;
   onClick?: () => void;
 }
 
@@ -26,6 +28,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   duckdbFilename,
   hideIfEmpty = false,
   className = '',
+  to,
   onClick,
 }) => {
   const { scan } = useSessionDataContext();
@@ -70,6 +73,30 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
     ? `${job?.playable ? 'Some replay drivers are unavailable' : 'Replay cache unavailable; DuckDB telemetry is available'}${job?.error ? ` — ${job.error}` : ''}`
     : '';
   const indicatorTitle = partialWarning ? `${title} — ${partialWarning}` : title;
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (onClick) onClick();
+        }}
+        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-gain/20'} transition-colors cursor-pointer ${FOCUS_RING}`}
+        title={`${indicatorTitle} - Open telemetry`}
+        aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}
+      >
+        {isDuckDb ? (
+          <>
+            <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
+          </>
+        ) : (
+          <Video className="w-4 h-4" />
+        )}
+      </Link>
+    );
+  }
 
   if (onClick) {
     return (

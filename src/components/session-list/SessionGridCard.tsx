@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { Car, ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
@@ -27,16 +28,25 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   const displayTrack = s.trackVenue ? getDisplayTrackName(s.trackVenue, s.trackCourse) : '';
 
   const label = [s.sessionType, displayTrack, s.timeString].filter(Boolean).join(', ');
+  const replayUrl = s.matchingReplayFile
+    ? `/telemetry?replayName=${encodeURIComponent(s.matchingReplayFile.name)}&session=${encodeURIComponent(s.id)}`
+    : undefined;
 
   return (
     <div
       onClick={() => onSelectSession(s.id)}
       className={`bg-lmu-card border border-lmu-border transition-all duration-200 ease-in-out hover:bg-lmu-cardHover hover:border-lmu-rule p-4 rounded-xl cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden group`}
     >
-      {/* Keyboard target for the whole card: Enter or Space click it and the click reaches the card handler. */}
-      <button
-        type="button"
+      {/* Keyboard & middle-click target for the whole card */}
+      <Link
+        to={`/session/${encodeURIComponent(s.id)}`}
         aria-label={`Open session: ${label}`}
+        onClick={(e) => {
+          if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            onSelectSession(s.id);
+          }
+        }}
         className={`absolute inset-0 rounded-xl cursor-pointer ${FOCUS_RING}`}
       />
       <div className="flex items-start justify-between gap-3">
@@ -63,6 +73,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
           hasDuckDbTelemetry={s.hasDuckDbTelemetry}
           duckdbFilename={s.duckdbFilename}
           hideIfEmpty={true}
+          to={replayUrl}
           onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
         />
         </span>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/index.js';
@@ -23,7 +23,6 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
   allTimeCategoryTrackPB,
   session,
 }) => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const bestLapNum =
     selectedDriver.bestLapNum ||
@@ -36,20 +35,20 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
 
   const hasReplay = Boolean(session.matchingReplayFile);
 
-  const openBestLap = () => {
-    if (session.matchingReplayFile) {
-      const telemetryParams = new URLSearchParams(searchParams);
-      telemetryParams.set('replayName', session.matchingReplayFile.name);
-      telemetryParams.set('lap', String(bestLapNum));
-      navigate(`/telemetry?${telemetryParams.toString()}`);
-    } else {
-      const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-      const carClass = selectedDriver.carClass || 'LMGT3';
-      navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-        carClass
-      )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`);
-    }
-  };
+  const targetUrl = session.matchingReplayFile
+    ? (() => {
+        const telemetryParams = new URLSearchParams(searchParams);
+        telemetryParams.set('replayName', session.matchingReplayFile.name);
+        telemetryParams.set('lap', String(bestLapNum));
+        return `/telemetry?${telemetryParams.toString()}`;
+      })()
+    : (() => {
+        const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+        const carClass = selectedDriver.carClass || 'LMGT3';
+        return `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
+          carClass
+        )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`;
+      })();
 
   return (
     <div className="min-w-0">
@@ -57,9 +56,8 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
         {isPB ? 'Personal best' : 'Best lap'}
         {bestLapNum ? ` · L${bestLapNum}` : ''}
       </p>
-      <button
-        type="button"
-        onClick={openBestLap}
+      <Link
+        to={targetUrl}
         title={hasReplay ? `Open telemetry for Lap ${bestLapNum}` : `Open Lap ${bestLapNum} on the leaderboard`}
         className={`group mt-0.5 inline-flex items-center gap-1.5 font-mono text-3xl font-extrabold leading-tight cursor-pointer rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent ${
           isPB ? 'text-lmu-personal-best' : 'text-white'
@@ -70,7 +68,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
           className="w-5 h-5 text-lmu-muted group-hover:text-white transition-colors"
           aria-hidden="true"
         />
-      </button>
+      </Link>
       <div className="mt-1.5 flex items-center gap-2 flex-wrap">
         <PaceBadge
           category={selectedDriver.bestLapPaceCategory}

@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
 import { MapPin } from 'lucide-react';
 import { SummaryCard, UnitToggle, RankedList, shareOf } from './DashboardSummaryParts.js';
 
@@ -18,7 +17,6 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
   setShowMoreTracks,
   selectedCarClass = 'All',
 }) => {
-  const navigate = useNavigate();
   const [unit, setUnit] = useState<'laps' | 'km'>('laps');
 
   const sourceTracks = rankedTracks && rankedTracks.length > 0 ? rankedTracks : (visibleTracks || []);
@@ -48,7 +46,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
           unit: unit === 'km' ? 'km' : 'laps',
           detail: i === 0 ? shareOf(unit === 'km' ? item.km : item.laps, total, unit === 'km' ? 'distance' : 'laps') : undefined,
           title: `View ${item.track} Track Details`,
-          onSelect: () => navigate(`/track/${encodeURIComponent(item.track)}${suffix}`),
+          to: `/track/${encodeURIComponent(item.track)}${suffix}`,
         }))}
       />
     </SummaryCard>

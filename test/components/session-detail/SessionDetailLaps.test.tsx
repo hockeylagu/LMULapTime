@@ -186,10 +186,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /go to quali/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /go to quali/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /go to quali/i }));
+    fireEvent.click(screen.getByRole('link', { name: /go to quali/i }));
     expect(onSelectSession).toHaveBeenCalledWith('2026_05_28_Q1');
 
     // Now test navigating from Quali to Race
@@ -215,10 +215,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /go to race/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /go to race/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /go to race/i }));
+    fireEvent.click(screen.getByRole('link', { name: /go to race/i }));
     expect(onSelectSession).toHaveBeenCalledWith('2026_05_28_R1');
   });
 

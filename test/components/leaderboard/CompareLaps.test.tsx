@@ -240,7 +240,7 @@ describe('CompareLaps component', () => {
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
-    const compareTelemetryButtons = screen.getAllByRole('button', { name: /Compare Telemetry/i });
+    const compareTelemetryButtons = screen.getAllByRole('link', { name: /Compare Telemetry/i });
     expect(compareTelemetryButtons).toHaveLength(1);
     fireEvent.click(compareTelemetryButtons[0]);
 

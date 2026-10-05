@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { useSessionDetailData } from './useSessionDetailData.js';
 import { SessionDetailHeader } from './overview/SessionDetailHeader.js';
 import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
@@ -69,12 +70,18 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
       <div className="py-12 text-center text-lmu-muted bg-lmu-card border border-lmu-border rounded-2xl">
         <p className="text-lg font-bold text-white mb-3">{loadError ? 'Could Not Load Session' : 'Session Not Found'}</p>
         {loadError && <p role="alert" className="text-sm text-lmu-loss mb-4">{loadError}</p>}
-        <button
-          onClick={onBack}
-          className={`px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider ${FOCUS_RING}`}
+        <Link
+          to="/dashboard"
+          onClick={(e) => {
+            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+              e.preventDefault();
+              onBack();
+            }
+          }}
+          className={`inline-block px-4 py-2 bg-lmu-accent text-white rounded-xl font-medium text-xs uppercase tracking-wider ${FOCUS_RING}`}
         >
           Return to Dashboard
-        </button>
+        </Link>
       </div>
     );
   }

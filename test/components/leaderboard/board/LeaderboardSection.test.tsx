@@ -48,7 +48,7 @@ describe('LeaderboardSection', () => {
     const { onCompare, onTelemetry } = renderSection();
     fireEvent.click(screen.getByRole('button', { name: 'Compare with Driver 29' }));
     expect(onCompare).toHaveBeenCalledWith(expect.objectContaining({ driverName: 'Driver 29' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Telemetry against Driver 29' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Telemetry against Driver 29' }));
     expect(onTelemetry).toHaveBeenCalledWith(expect.objectContaining({ driverName: 'Driver 29' }));
     expect(screen.queryByRole('button', { name: 'Compare with Me' })).not.toBeInTheDocument();
   });
@@ -56,11 +56,11 @@ describe('LeaderboardSection', () => {
   it("opens the session and the telemetry of the player's own best lap", () => {
     const onOpenSession = vi.fn();
     const { onTelemetry } = renderSection({ onOpenSession });
-    fireEvent.click(screen.getByRole('button', { name: 'Open the session of your best lap' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open the session of your best lap' }));
     expect(onOpenSession).toHaveBeenCalledWith('s-Me');
-    fireEvent.click(screen.getByRole('button', { name: 'Telemetry of your best lap' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Telemetry of your best lap' }));
     expect(onTelemetry).toHaveBeenCalledWith(expect.objectContaining({ driverName: 'Me', isPlayer: true }));
-    expect(screen.getAllByRole('button', { name: /Open the session/ })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: /Open the session/ })).toHaveLength(1);
   });
 
   it('marks the rival, and offers to make any driver ahead the rival', () => {
@@ -79,7 +79,7 @@ describe('LeaderboardSection', () => {
     b.entries[1] = { ...b.entries[1], bestLap: { ...b.entries[1].bestLap, replayName: null } };
     renderSection({ board: b });
     expect(screen.getByRole('button', { name: 'Telemetry against Driver 2' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Telemetry against Driver 1' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Telemetry against Driver 1' })).toBeInTheDocument();
   });
 
   it('switches between the whole class and the player car, and between orders', () => {

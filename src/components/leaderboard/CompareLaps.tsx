@@ -164,6 +164,24 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     );
   };
 
+  const compareTelemetryUrl = React.useMemo(() => {
+    if (selectedLaps.length !== 2) return undefined;
+    const { target: targetLap, base: baseLap } = telemetryPair(selectedLaps, baselineLap);
+    const getReplaySync = (lap: ComparableLap): string | null => {
+      if (lap.matchingReplayFile) return lap.matchingReplayFile;
+      const sess = sessions.find((s) => s.id === lap.sessionId);
+      return sess?.matchingReplayFile?.name ?? null;
+    };
+    const targetReplay = getReplaySync(targetLap);
+    const baseReplay = getReplaySync(baseLap);
+    if (!targetReplay || !baseReplay) return undefined;
+    return buildTelemetryComparePath(
+      searchParams,
+      { replayName: targetReplay, driverName: targetLap.driverName, lapNum: targetLap.lapNum },
+      { replayName: baseReplay, sessionId: baseLap.sessionId, driverName: baseLap.driverName, lapNum: baseLap.lapNum },
+    );
+  }, [selectedLaps, baselineLap, sessions, searchParams]);
+
   return (
     <section aria-label="Compare laps" className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
       <CompareLapsHeader
@@ -177,6 +195,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         rivalLap={rivalPreset}
         onAddRival={rivalPreset ? () => data.handleToggleLap(rivalPreset) : undefined}
         onSwapBaseline={selectedLaps.length === 2 ? swapBaseline : undefined}
+        compareTelemetryUrl={compareTelemetryUrl}
         onCompareTelemetry={selectedLaps.length === 2 ? handleCompareTelemetry : undefined}
         onAddPersonalBest={data.handleAddPersonalBest}
         onAddTheoreticalBest={data.handleAddTheoreticalBest}

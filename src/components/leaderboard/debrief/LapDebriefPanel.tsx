@@ -85,6 +85,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
               rank={i + 1}
               corner={corner}
               hasTechnique={false}
+              toLink={(cornerNumber) => buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber)}
               onOpen={(cornerNumber) => navigate(buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber))}
             />
           ))}
