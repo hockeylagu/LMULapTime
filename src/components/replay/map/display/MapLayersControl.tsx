@@ -56,14 +56,40 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
     {open && <div ref={panel} id={id} aria-label="Map layers" role="group"
       className="absolute top-full right-0 mt-2 w-56 p-3 bg-lmu-card border border-lmu-border rounded-lg shadow-lg z-40">
       <div className="text-sm font-semibold text-lmu-text mb-2">Map layers</div>
-      {(Object.keys(MAP_LAYER_LABELS) as Array<keyof typeof MAP_LAYER_LABELS>).map(key => <label key={key}
-        className={`flex gap-2 items-center py-1.5 text-xs select-none ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
-        <input type="checkbox" checked={available[key] !== false && layers[key]} disabled={available[key] === false}
-          onChange={e => onChange(key === 'runoff'
-            ? { ...layers, runoff: e.target.checked, otherRoad: e.target.checked }
-            : { ...layers, [key]: e.target.checked })}
-          className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
-      </label>)}
+      {(Object.keys(MAP_LAYER_LABELS) as Array<keyof typeof MAP_LAYER_LABELS>).map(key => (
+        <React.Fragment key={key}>
+          <label
+            className={`flex gap-2 items-center py-1.5 text-xs select-none ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
+            <input type="checkbox" checked={available[key] !== false && layers[key]} disabled={available[key] === false}
+              onChange={e => onChange(key === 'runoff'
+                ? { ...layers, runoff: e.target.checked, otherRoad: e.target.checked }
+                : { ...layers, [key]: e.target.checked })}
+              className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
+          </label>
+          {key === 'brakeMarkers' && layers.brakeMarkers && available.brakeMarkers !== false && (
+            <div className="pl-5 py-1 flex flex-col gap-1 border-l-2 border-slate-700/60 ml-2 mb-1" role="group" aria-label="Braking marker types">
+              <label className="flex gap-2 items-center text-[11px] select-none text-lmu-text-soft cursor-pointer hover:text-lmu-text">
+                <input type="checkbox" checked={layers.brakeDistance !== false}
+                  onChange={e => onChange({ ...layers, brakeDistance: e.target.checked })}
+                  className={`accent-lmu-accent w-3 h-3 cursor-pointer ${FOCUS_RING}`} />
+                Distance (100, 50...)
+              </label>
+              <label className="flex gap-2 items-center text-[11px] select-none text-lmu-text-soft cursor-pointer hover:text-lmu-text">
+                <input type="checkbox" checked={layers.brakeAds !== false}
+                  onChange={e => onChange({ ...layers, brakeAds: e.target.checked })}
+                  className={`accent-lmu-accent w-3 h-3 cursor-pointer ${FOCUS_RING}`} />
+                Sponsor ads (TOT, DHL...)
+              </label>
+              <label className="flex gap-2 items-center text-[11px] select-none text-lmu-text-soft cursor-pointer hover:text-lmu-text">
+                <input type="checkbox" checked={layers.brakeDigi !== false}
+                  onChange={e => onChange({ ...layers, brakeDigi: e.target.checked })}
+                  className={`accent-lmu-accent w-3 h-3 cursor-pointer ${FOCUS_RING}`} />
+                Digi boards (DIGI)
+              </label>
+            </div>
+          )}
+        </React.Fragment>
+      ))}
       {(available.pit === false || available.runoff === false || available.brakeMarkers === false) && <p className="text-xs text-lmu-muted mt-2">
         Some optional map layers are unavailable for this layout.</p>}
       {error && <p role="status" className="text-xs text-lmu-warn mt-2">{error}</p>}

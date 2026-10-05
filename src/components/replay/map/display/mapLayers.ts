@@ -1,11 +1,13 @@
 import type { TrackBoundaryGeometry, TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 
 export const DEFAULT_MAP_LAYERS = {
-  road: true, kerb: true, brakeMarkers: false, pit: false, centerline: false, runoff: false, otherRoad: false,
+  road: true, kerb: true, brakeMarkers: false,
+  brakeDistance: true, brakeAds: true, brakeDigi: true,
+  pit: false, centerline: false, runoff: false, otherRoad: false,
 };
 export type MapLayers = typeof DEFAULT_MAP_LAYERS;
 export type MapLayerKey = keyof MapLayers;
-export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, 'otherRoad'>, string> = {
+export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, 'otherRoad' | 'brakeDistance' | 'brakeAds' | 'brakeDigi'>, string> = {
   road: 'Active track', kerb: 'Kerbs', brakeMarkers: 'Braking markers', pit: 'Pit lane and apron',
   centerline: 'Centerline guide', runoff: 'Runoff and other roads',
 };

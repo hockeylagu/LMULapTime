@@ -219,4 +219,53 @@ describe('GPS map display layers', () => {
     expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('provides sub-toggles for distance, sponsor ads, and digi boards and offsets overlapping digi boards', () => {
+    const displayWithMixed: TrackMapDisplay = {
+      ...mapDisplay(),
+      brakeMarkers: [
+        { id: 'm-dist', center: [120, 205], label: '100', stationM: 300, side: 'left' },
+        { id: 'm-digi', center: [120, 205], label: 'DIGI', stationM: 300, side: 'left' },
+        { id: 'm-ad', center: [180, 230], label: 'TOT', stationM: 700, side: 'right' },
+      ],
+    };
+
+    const { container } = renderMap(displayWithMixed);
+    openLayers();
+
+    // Enable braking markers -> sub-toggles appear
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Braking markers' }));
+    const distCheckbox = screen.getByRole('checkbox', { name: /Distance/ });
+    const adsCheckbox = screen.getByRole('checkbox', { name: /Sponsor ads/ });
+    const digiCheckbox = screen.getByRole('checkbox', { name: /Digi boards/ });
+
+    expect(distCheckbox).toBeChecked();
+    expect(adsCheckbox).toBeChecked();
+    expect(digiCheckbox).toBeChecked();
+
+    // All three are visible initially
+    expect(container.querySelector('[data-marker-id="m-dist"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-marker-id="m-digi"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-marker-id="m-ad"]')).toBeInTheDocument();
+
+    // Overlapping digi board is shifted away from distance board
+    const distTransform = container.querySelector('[data-marker-id="m-dist"] g')?.getAttribute('transform');
+    const digiTransform = container.querySelector('[data-marker-id="m-digi"] g')?.getAttribute('transform');
+    expect(distTransform).not.toEqual(digiTransform);
+
+    // Toggle off distance -> only ads and digi remain
+    fireEvent.click(distCheckbox);
+    expect(container.querySelector('[data-marker-id="m-dist"]')).toBeNull();
+    expect(container.querySelector('[data-marker-id="m-digi"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-marker-id="m-ad"]')).toBeInTheDocument();
+
+    // Toggle off digi -> only ads remain
+    fireEvent.click(digiCheckbox);
+    expect(container.querySelector('[data-marker-id="m-digi"]')).toBeNull();
+    expect(container.querySelector('[data-marker-id="m-ad"]')).toBeInTheDocument();
+
+    // Toggle off ads -> no markers
+    fireEvent.click(adsCheckbox);
+    expect(container.querySelector('[data-marker-id="m-ad"]')).toBeNull();
+  });
 });
