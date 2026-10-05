@@ -127,5 +127,22 @@ export class DataPlugin {
     return matches.length===1?structuredClone(matches[0]):null;
   }
 }
+
+export function formatPluginStatusLog(status: DataPluginStatus): string {
+  if (status.state === 'ready') {
+    const details = [
+      `tracks: ${status.tracks ? 'yes' : 'no'}`,
+      `vehicles: ${status.vehicles ? 'yes' : 'no'}`,
+      `revision: ${status.revision.slice(0, 8)}`,
+    ].join(', ');
+    return `[Data Plugin] Plugins loaded: yes (${details})`;
+  }
+  if (status.state === 'invalid') {
+    return '[Data Plugin] Plugins loaded: no (package at LMU_PLUGIN_ROOT is invalid)';
+  }
+  return '[Data Plugin] Plugins loaded: no (LMU_PLUGIN_ROOT not configured)';
+}
+
 export const dataPlugin = new DataPlugin(process.env.LMU_PLUGIN_ROOT);
 setVehicleCatalog(dataPlugin.vehicles());
+

@@ -16,6 +16,7 @@ import { createSessionRouter } from './routes/sessionRoutes.js';
 import { createSystemRouter } from './routes/systemRoutes.js';
 
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
+import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -82,6 +83,7 @@ app.use('/api', createReplayRouter(serverContext));
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
+    console.log(formatPluginStatusLog(dataPlugin.status));
     startReferenceLaptimeRefresh();
   });
 }

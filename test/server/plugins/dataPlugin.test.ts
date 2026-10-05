@@ -4,7 +4,7 @@ import path from 'node:path';
 import {afterEach,describe,it,expect} from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import {DataPlugin,parseVehicleCatalog} from '../../../server/plugins/dataPlugin.js';
+import {DataPlugin,formatPluginStatusLog,parseVehicleCatalog} from '../../../server/plugins/dataPlugin.js';
 import {createDataPluginRouter} from '../../../server/routes/dataPluginRoutes.js';
 import {syntheticTrack} from '../../helpers/syntheticTrack.js';
 import {TrackGeometryStore} from '../../../server/tracks/trackGeometryStore.js';
@@ -27,6 +27,16 @@ function fixture(kind:'vehicles'|'tracks'|'both'='both') {
 }
 describe('local data plugin snapshot',()=>{
   it('has explicit absent and invalid states without paths',()=>{expect(new DataPlugin().status.state).toBe('absent');expect(new DataPlugin('/missing').status).toEqual({state:'invalid',revision:'none',tracks:false,vehicles:false});});
+  it('formats human-readable startup log indicating if plugins are loaded or not', () => {
+    expect(formatPluginStatusLog({ state: 'absent', revision: 'none', tracks: false, vehicles: false }))
+      .toBe('[Data Plugin] Plugins loaded: no (LMU_PLUGIN_ROOT not configured)');
+    expect(formatPluginStatusLog({ state: 'invalid', revision: 'none', tracks: false, vehicles: false }))
+      .toBe('[Data Plugin] Plugins loaded: no (package at LMU_PLUGIN_ROOT is invalid)');
+    expect(formatPluginStatusLog({ state: 'ready', revision: '0123456789abcdef', tracks: true, vehicles: true }))
+      .toBe('[Data Plugin] Plugins loaded: yes (tracks: yes, vehicles: yes, revision: 01234567)');
+    expect(formatPluginStatusLog({ state: 'ready', revision: '0123456789abcdef', tracks: false, vehicles: true }))
+      .toBe('[Data Plugin] Plugins loaded: yes (tracks: no, vehicles: yes, revision: 01234567)');
+  });
   it.each(['vehicles','tracks','both'] as const)('loads %s capabilities independently',kind=>{const {dir}=fixture(kind);const p=new DataPlugin(dir);expect(p.status.state).toBe('ready');expect(p.status.vehicles).toBe(kind!=='tracks');expect(p.status.tracks).toBe(kind!=='vehicles');});
   it('uses exact aliases, unambiguous model fallback and defensive snapshots',()=>{const {dir,write}=fixture();const p=new DataPlugin(dir);expect(p.vehicle({vehicleId:'test_car.veh'})?.model).toBe('Test Car');expect(p.vehicle({carModel:'Test Car'})?.id).toBe('synthetic');expect(p.vehicle({carModel:'Unknown'})).toBeNull();p.vehicles()[0].model='Changed';expect(p.vehicles()[0].model).toBe('Test Car');write('vehicles/index.json',{});expect(p.vehicle({vehicleId:'TEST_CAR'})?.id).toBe('synthetic');expect(new DataPlugin(dir).status.state).toBe('invalid');});
   it('does not choose arbitrary model variants',()=>{const {dir,write}=fixture('vehicles');write('vehicles/index.json',{...catalog,vehicles:[...catalog.vehicles,{...catalog.vehicles[0],id:'variant',vehicleIds:['TEST_VARIANT']}]});const p=new DataPlugin(dir);expect(p.vehicle({carModel:'Test Car'})).toBeNull();expect(p.vehicle({vehicleId:'TEST_VARIANT'})?.id).toBe('variant');});
