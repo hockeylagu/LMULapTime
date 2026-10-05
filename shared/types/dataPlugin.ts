@@ -11,18 +11,23 @@ export interface VehicleDataRecord {
   /** Translation from mesh-local to replay pose origin, established by the data provider. */
   replayOriginOffsetXZ?: [number, number];
 }
+export interface VehicleLogosCatalog {
+  schemaVersion: 1;
+  logos: Record<string, string>;
+}
 export interface DataPluginManifest {
   schemaVersion: 1;
   id: string;
   version: string;
   tracks?: { catalog: string };
-  vehicles?: { catalog: string };
+  vehicles?: { catalog: string; logos?: string };
 }
 export interface DataPluginStatus {
   state: 'absent' | 'invalid' | 'ready';
   revision: string;
   tracks: boolean;
   vehicles: boolean;
+  logos?: boolean;
 }
 export interface PluginTrackResource {
   packageRevision: string;

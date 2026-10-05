@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Car, ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
+import { CarLogo } from '../vehicle/index.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
@@ -84,7 +85,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         {/* Row 1: Car & Best Lap */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 truncate min-w-0">
-            <Car className="w-3.5 h-3.5 text-lmu-muted shrink-0" />
+            <CarLogo carType={p?.carType} size="xs" fallback={<Car className="w-3.5 h-3.5 text-lmu-muted shrink-0" />} />
             <span className="text-white font-medium truncate" title={p?.carType || 'N/A'}>
               {p ? p.carType : 'N/A'}
             </span>

@@ -5,6 +5,7 @@ import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
 import { BenchmarkLadder } from '../common/BenchmarkLadder.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
+import { CarLogo } from '../vehicle/index.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 
 export interface TrackDetailHeaderProps {
@@ -137,12 +138,13 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   aria-pressed={selectedCarModel === car}
                   dir="auto"
                   onClick={() => setSelectedCarModel(car)}
-                  className={`max-w-full [overflow-wrap:anywhere] px-3 py-1 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${selectedCarModel === car
+                  className={`inline-flex items-center gap-1.5 max-w-full [overflow-wrap:anywhere] px-3 py-1 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2 ${selectedCarModel === car
                     ? 'bg-lmu-accent text-white font-bold'
                     : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                     }`}
                 >
-                  {car}
+                  <CarLogo carModel={car} size="xs" />
+                  <span>{car}</span>
                 </button>
               ))}
             </div>

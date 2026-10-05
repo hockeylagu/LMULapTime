@@ -4,7 +4,7 @@ import path from 'node:path';
 import {afterEach,describe,it,expect} from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import {DataPlugin,formatPluginStatusLog,parseVehicleCatalog} from '../../../server/plugins/dataPlugin.js';
+import {DataPlugin,formatPluginStatusLog,parseVehicleCatalog,parseVehicleLogos} from '../../../server/plugins/dataPlugin.js';
 import {createDataPluginRouter} from '../../../server/routes/dataPluginRoutes.js';
 import {syntheticTrack} from '../../helpers/syntheticTrack.js';
 import {TrackGeometryStore} from '../../../server/tracks/trackGeometryStore.js';
@@ -77,5 +77,27 @@ describe('local data plugin snapshot',()=>{
     expect((await request(app).get('/api/data-plugin/status').set('Origin','https://app.example')).status).toBe(200);
     expect((await request(app).get('/api/data-plugin/manifest.json')).status).toBe(404);
     expect((await request(app).get('/api/data-plugin/tracks/unknown')).status).toBe(404);
+  });
+  it('loads and serves optional vehicle logos catalog', async () => {
+    const { dir, write, manifest } = fixture('vehicles');
+    const svgContent = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>';
+    write('vehicles/logos.json', { schemaVersion: 1, logos: { Ferrari: svgContent } });
+    write('manifest.json', { ...manifest, vehicles: { ...manifest.vehicles, logos: 'vehicles/logos.json' } });
+    const plugin = new DataPlugin(dir);
+    expect(plugin.status.logos).toBe(true);
+    expect(plugin.logo('Ferrari')).toBe(svgContent);
+    expect(plugin.logo('Porsche')).toBeNull();
+    expect(plugin.logos()).toEqual({ Ferrari: svgContent });
+
+    const app = express();
+    app.use('/api/data-plugin', createDataPluginRouter(plugin));
+    const res = await request(app).get('/api/data-plugin/vehicles/logos');
+    expect(res.status).toBe(200);
+    expect(res.body.logos.Ferrari).toBe(svgContent);
+
+    // Rejection of invalid logos
+    expect(() => parseVehicleLogos({ schemaVersion: 1, logos: { Ferrari: 'not an svg' } })).toThrow();
+    expect(() => parseVehicleLogos({ schemaVersion: 2, logos: {} })).toThrow();
+    expect(() => parseVehicleLogos({ schemaVersion: 1, logos: { 'invalid/key': svgContent } })).toThrow();
   });
 });

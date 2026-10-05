@@ -73,11 +73,32 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   });
 }
 
+export function parseVehicleLogos(value: unknown): Record<string, string> {
+  const catalog = object(value);
+  keys(catalog, ['schemaVersion', 'logos']);
+  if (catalog.schemaVersion !== 1 || !catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) {
+    throw Error('Invalid vehicle logos');
+  }
+  const result: Record<string, string> = {};
+  for (const [key, svg] of Object.entries(catalog.logos as Record<string, unknown>)) {
+    if (typeof key !== 'string' || !/^[a-zA-Z0-9_ -]+$/.test(key) || typeof svg !== 'string') {
+      throw Error('Invalid logo brand identity');
+    }
+    const trimmed = svg.trim();
+    if (!trimmed.startsWith('<svg') || !trimmed.endsWith('</svg>') || !trimmed.includes('viewBox') || trimmed.length > 2_000_000) {
+      throw Error('Invalid logo SVG content');
+    }
+    result[key] = trimmed;
+  }
+  return result;
+}
+
 /** A fully validated startup snapshot. Package files are never served directly. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry; display:TrackMapDisplay|null}>();
   private readonly records: VehicleDataRecord[] = [];
+  private readonly logoRecords = new Map<string, string>();
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
     if (!root) return;
@@ -114,12 +135,21 @@ export class DataPlugin {
           this.tracks.set(key,{geometry,display});
         }
       }
-      if (manifest.vehicles) {const resource=object(manifest.vehicles); keys(resource,['catalog']); this.records.push(...parseVehicleCatalog(read(text(resource.catalog))));}
-      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles};
-    } catch {this.tracks.clear(); this.records.length=0; /* Generic status never discloses local paths. */}
+      if (manifest.vehicles) {
+        const resource=object(manifest.vehicles); keys(resource,['catalog','logos']);
+        this.records.push(...parseVehicleCatalog(read(text(resource.catalog))));
+        if (resource.logos !== undefined) {
+          const logos = parseVehicleLogos(read(text(resource.logos)));
+          for (const [k, v] of Object.entries(logos)) this.logoRecords.set(k, v);
+        }
+      }
+      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {})};
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); /* Generic status never discloses local paths. */}
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   public vehicles(): VehicleDataRecord[] {return structuredClone(this.records);}
+  public logos(): Record<string, string> {return Object.fromEntries(this.logoRecords);}
+  public logo(brand: string): string|null {return this.logoRecords.get(brand) ?? null;}
   public vehicle(identity: {vehicleId?:string;carModel?:string;carClass?:string}): VehicleDataRecord|null {
     const alias=identity.vehicleId?.trim().replace(/\.veh$/i,'').toUpperCase();
     if (alias) {const match=this.records.find(r=>r.vehicleIds.includes(alias));if(match)return structuredClone(match);}
@@ -133,6 +163,7 @@ export function formatPluginStatusLog(status: DataPluginStatus): string {
     const details = [
       `tracks: ${status.tracks ? 'yes' : 'no'}`,
       `vehicles: ${status.vehicles ? 'yes' : 'no'}`,
+      ...(status.logos ? ['logos: yes'] : []),
       `revision: ${status.revision.slice(0, 8)}`,
     ].join(', ');
     return `[Data Plugin] Plugins loaded: yes (${details})`;
@@ -145,4 +176,3 @@ export function formatPluginStatusLog(status: DataPluginStatus): string {
 
 export const dataPlugin = new DataPlugin(process.env.LMU_PLUGIN_ROOT);
 setVehicleCatalog(dataPlugin.vehicles());
-

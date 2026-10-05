@@ -2,6 +2,7 @@ import React from 'react';
 import { DriverSafetySummary } from './DriverSafetySummary.js';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
+import { CarLogo } from '../../vehicle/index.js';
 import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/formatters.js';
 
 export interface SessionRaceStandingsRowProps {
@@ -102,6 +103,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       </td>
       <td className="px-3.5 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
+          <CarLogo carType={d.carType} size="xs" />
           <span className="text-lmu-muted font-medium truncate" title={d.carType}>{d.carType}</span>
           <CarClassBadge carClass={d.carClass} carType={d.carType} size="xs" />
         </div>

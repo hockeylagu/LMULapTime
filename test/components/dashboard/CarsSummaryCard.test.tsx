@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CarsSummaryCard } from '../../../src/components/dashboard/CarsSummaryCard.js';
+import { setCachedVehicleLogos } from '../../../src/api/vehicleLogosApi.js';
 
 describe('CarsSummaryCard', () => {
   const rankedCars = [
@@ -129,6 +130,28 @@ describe('CarsSummaryCard', () => {
     rowNames = screen.getAllByTitle(/Filter by .*/).map((el) => el.textContent);
     expect(rowNames[0]).toContain('Chevrolet Corvette Z06 LMGT3.R');
     expect(screen.getByText('950')).toBeInTheDocument();
+  });
+
+  it('renders car logos for ranked cars when available', () => {
+    const fakeSvg = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>';
+    setCachedVehicleLogos({
+      BMW: fakeSvg,
+      McLaren: fakeSvg,
+    });
+
+    render(
+      <CarsSummaryCard
+        rankedCars={rankedCars}
+        visibleCars={rankedCars}
+        showMoreCars={false}
+        setShowMoreCars={vi.fn()}
+        onSelectCar={vi.fn()}
+      />
+    );
+
+    const logos = screen.getAllByTestId('car-logo');
+    expect(logos.length).toBeGreaterThanOrEqual(2);
+    expect(logos[0]).toHaveAttribute('alt', 'BMW logo');
   });
 });
 

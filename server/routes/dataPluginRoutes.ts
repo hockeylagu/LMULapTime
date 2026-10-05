@@ -7,7 +7,8 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     res.setHeader('Cache-Control','no-store'); next();
   });
   router.get('/status',(_req,res)=>res.json(provider.status));
-  router.get('/vehicles',(_req,res)=>res.json({packageRevision:provider.status.revision,vehicles:provider.vehicles()}));
+  router.get('/vehicles',(_req,res)=>res.json({packageRevision:provider.status.revision,vehicles:provider.vehicles(),logos:provider.logos()}));
+  router.get('/vehicles/logos',(_req,res)=>res.json({packageRevision:provider.status.revision,logos:provider.logos()}));
   router.get('/tracks/:layoutKey', (req,res)=>{
     const record=provider.track(req.params.layoutKey);
     if(!record){res.status(404).json({error:'Track data unavailable'});return;}

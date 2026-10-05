@@ -271,3 +271,42 @@ export function areComparableCarClasses(a?: string, b?: string): boolean {
   if (!a || !b) return true;
   return matchesCarClass(a, '', b) && matchesCarClass(b, '', a);
 }
+
+/**
+ * Resolves the vehicle manufacturer / brand key for logo lookup from a car type, model name or vehicle ID.
+ */
+export function resolveCarManufacturer(carTypeOrModel?: string | null): string {
+  if (!carTypeOrModel) return '';
+  const s = carTypeOrModel.trim();
+  const lower = s.toLowerCase();
+
+  // Multi-word or specific brands first
+  if (lower.includes('aston martin') || lower.includes('valkyrie') || lower.includes('vantage')) return 'Aston Martin';
+  if (lower.includes('isotta fraschini') || lower.includes('isotta') || lower.includes('tipo6') || lower.includes('tipo 6')) return 'Isotta Fraschini';
+  if (lower.includes('mercedes') || lower.includes('amg')) return 'Mercedes-AMG';
+  if (lower.includes('corvette') || lower.includes('c8') || lower.includes('z06')) return 'Corvette';
+  if (lower.includes('chevrolet')) return 'Chevrolet';
+
+  // Specific single-word brands
+  if (lower.includes('ferrari') || lower.includes('296') || lower.includes('488') || lower.includes('499p')) return 'Ferrari';
+  if (lower.includes('porsche') || lower.includes('911') || lower.includes('963') || lower.includes('992')) return 'Porsche';
+  if (lower.includes('bmw') || lower.includes('m4')) return 'BMW';
+  if (lower.includes('cadillac') || lower.includes('v-series') || lower.includes('vlmdh')) return 'Cadillac';
+  if (lower.includes('alpine') || lower.includes('a424')) return 'Alpine';
+  if (lower.includes('ford') || lower.includes('mustang')) return 'Ford';
+  if (lower.includes('lamborghini') || lower.includes('huracan') || lower.includes('sc63')) return 'Lamborghini';
+  if (lower.includes('lexus') || lower.includes('rc f') || lower.includes('rcf')) return 'Lexus';
+  if (lower.includes('mclaren') || lower.includes('720s')) return 'McLaren';
+  if (lower.includes('peugeot') || lower.includes('9x8')) return 'Peugeot';
+  if (lower.includes('toyota') || lower.includes('gr010') || lower.includes('tr010')) return 'Toyota';
+  if (lower.includes('genesis') || lower.includes('gmr001') || lower.includes('gmr-001')) return 'Genesis';
+  if (lower.includes('glickenhaus') || lower.includes('scg007') || lower.includes('scg 007')) return 'Glickenhaus';
+  if (lower.includes('vanwall') || lower.includes('vandervell')) return 'Vanwall';
+  if (lower.includes('oreca') || lower.includes('07 lmp2') || lower.includes('07_lmp2')) return 'Oreca';
+  if (lower.includes('ligier') || lower.includes('jsp') || lower.includes('js p')) return 'Ligier';
+  if (lower.includes('duqueine') || lower.includes('d09') || lower.includes('d08')) return 'Duqueine';
+  if (lower.includes('ginetta') || lower.includes('g61')) return 'Ginetta';
+  if (lower.includes('adess') || lower.includes('ad25')) return 'ADESS';
+
+  return '';
+}

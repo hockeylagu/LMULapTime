@@ -3,7 +3,7 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked against branch `main` (2026-10-02): 423 TypeScript source files in src/server/shared, 249 test files, 2174 tests (2164 passed, 10 skipped).
+Last checked against branch `main` (2026-10-05): 426 TypeScript source files in src/server/shared, 254 test files, 2268 tests (2212 passed, 56 skipped).
 
 ---
 
@@ -285,8 +285,9 @@ use model shapes when available, with approximate placement until a replay-origi
 `server/plugins/dataPlugin.ts` loads one validated startup snapshot from backend-only
 `LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist,
 rejects degenerate closed routes, and checks declared length against the measured route within 0.01 m.
-`server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair) and
-vehicles, with the same server access behavior as the rest of the API. There is no static package mount.
+`server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair),
+vehicles, and optional manufacturer logos (`GET /api/data-plugin/vehicles/logos`), with the same server access behavior as the rest of the API. There is no static package mount.
+The client loads logos via `src/api/vehicleLogosApi.ts` and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals).
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and
 surface enrichment. Missing geometry clears old road annotations and marks odometer stations;
 `shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to reject odometer stations and require matching station sources and geometry revisions. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge, SectorSplitsRow, CarClassBadge } from '../common';
+import { CarLogo } from '../vehicle/index.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
@@ -92,6 +93,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
                 {benchmarkState === 'loading' ? 'Loading benchmark…' : benchmarkState === 'error' ? 'Benchmark unavailable' : 'No matching benchmark'}
               </p>}
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <CarLogo carType={t.bestLapCar} size="xs" />
                 <span className="text-[11px] text-lmu-text-soft break-words min-w-0" dir="auto">{t.bestLapCar || 'Car not recorded'}</span>
                 {t.bestLapClass && (
                   <CarClassBadge carClass={t.bestLapClass} carType={t.bestLapCar} size="xs" />
@@ -128,10 +130,11 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
           {t.carsUsed.slice(0, 4).map(car => (
             <span
               key={car}
-              className="text-[11px] text-lmu-muted min-w-0 break-words"
+              className="text-[11px] text-lmu-muted min-w-0 break-words inline-flex items-center gap-1"
               dir="auto"
             >
-              {car}
+              <CarLogo carType={car} size="xs" />
+              <span>{car}</span>
             </span>
           ))}
           {t.carsUsed.length > 4 && (

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Car } from 'lucide-react';
 import { SummaryCard, UnitToggle, RankedList, shareOf } from './DashboardSummaryParts.js';
+import { CarLogo } from '../vehicle/index.js';
 
 export interface CarsSummaryCardProps {
   rankedCars: { car: string; laps: number; km: number }[];
@@ -41,6 +42,7 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
         items={displayCars.map((item, i) => ({
           key: item.car,
           name: item.car,
+          icon: <CarLogo carType={item.car} size={i === 0 ? 'sm' : 'xs'} />,
           value: unit === 'km' ? Math.round(item.km).toLocaleString() : item.laps.toLocaleString(),
           unit: unit === 'km' ? 'km' : 'laps',
           detail: i === 0 ? shareOf(unit === 'km' ? item.km : item.laps, total, unit === 'km' ? 'distance' : 'laps') : undefined,

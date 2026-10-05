@@ -5,6 +5,7 @@ import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
+import { CarLogo } from '../../vehicle/index.js';
 import type { LeaderboardRow as Row } from './leaderboardRows.js';
 import { benchmarkPace, formatDrivenAgo, formatGap } from './leaderboardFormat.js';
 import { boardLapTelemetryRef } from './leaderboardLaps.js';
@@ -111,7 +112,12 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
           {entry.isPlayer && <span className="text-[11px] font-bold px-1.5 rounded bg-lmu-accent/20 text-lmu-accent-soft shrink-0">You</span>}
           {isRival && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft shrink-0">Rival</span>}
         </div>
-        <div className="text-[11px] text-lmu-muted truncate" title={entry.bestLap.carType}>{entry.bestLap.carType} · {formatDrivenAgo(entry.bestLap.timestamp)}</div>
+        <div className="text-[11px] text-lmu-muted truncate flex items-center gap-1.5" title={entry.bestLap.carType}>
+          <CarLogo carType={entry.bestLap.carType} size="xs" />
+          <span className="truncate">{entry.bestLap.carType}</span>
+          <span>·</span>
+          <span className="shrink-0">{formatDrivenAgo(entry.bestLap.timestamp)}</span>
+        </div>
       </td>
       <td className="px-3 py-2 font-bold text-right text-white">{formatTime(entry.bestLap.lapTime)}</td>
       <td className="px-3 py-2 text-center font-sans">

@@ -11,6 +11,7 @@ import { RivalLadder } from './RivalLadder.js';
 import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
 import { LoadError } from '../LoadError.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { CarLogo } from '../../vehicle/index.js';
 
 export interface RivalCardProps {
   rival: RivalState;
@@ -60,11 +61,16 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
           ) : (
             <h3 className="text-xl font-extrabold text-white">Your best, 0.2 s faster</h3>
           )}
-          <p className="text-xs text-lmu-muted">
-            {target.kind === 'ghost'
-              ? 'Nobody within 0.6 s ahead: beat this time and the next driver comes into reach.'
-              : `${rivalEntry?.bestLap.carType ?? ''} · ${formatTime(target.targetTime)}`}
-          </p>
+          <div className="text-xs text-lmu-muted flex items-center gap-1.5 mt-0.5">
+            {target.kind === 'ghost' ? (
+              <span>Nobody within 0.6 s ahead: beat this time and the next driver comes into reach.</span>
+            ) : (
+              <>
+                <CarLogo carType={rivalEntry?.bestLap.carType} size="xs" />
+                <span>{rivalEntry?.bestLap.carType ?? ''} · {formatTime(target.targetTime)}</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="text-left md:text-right shrink-0">
           <div className="text-3xl font-extrabold font-mono text-lmu-warn-soft leading-none">

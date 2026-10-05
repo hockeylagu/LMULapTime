@@ -140,12 +140,15 @@ vi.mock('recharts', () => {
 });
 
 import { cleanup } from '@testing-library/react';
+import { setCachedVehicleLogos } from '../src/api/vehicleLogosApi.js';
 
 if (typeof window !== 'undefined') {
+  setCachedVehicleLogos({});
   // Automatically clean up React DOM after each test
   afterEach(() => {
     cleanup();
     window.location.hash = '#/';
+    setCachedVehicleLogos({});
   });
 
   // Mock window.matchMedia for responsive components

@@ -4,6 +4,7 @@ import {
   mapVehicleIdToClass,
   resolveDriverCarClass,
   areComparableCarClasses,
+  resolveCarManufacturer,
 } from '../../shared/domain/vehicleMapping.js';
 
 describe('vehicleMapping utility', () => {
@@ -130,6 +131,54 @@ describe('vehicleMapping utility', () => {
     it('does not block a comparison when a class is unknown', () => {
       expect(areComparableCarClasses('', 'LMGT3')).toBe(true);
       expect(areComparableCarClasses('LMGT3', undefined)).toBe(true);
+    });
+  });
+
+  describe('resolveCarManufacturer', () => {
+    it('resolves manufacturer from model names', () => {
+      expect(resolveCarManufacturer('Ferrari 296 GT3')).toBe('Ferrari');
+      expect(resolveCarManufacturer('Ferrari 499P')).toBe('Ferrari');
+      expect(resolveCarManufacturer('Porsche 911 GT3 R')).toBe('Porsche');
+      expect(resolveCarManufacturer('Porsche 963')).toBe('Porsche');
+      expect(resolveCarManufacturer('BMW M4 GT3')).toBe('BMW');
+      expect(resolveCarManufacturer('BMW M Hybrid V8')).toBe('BMW');
+      expect(resolveCarManufacturer('Cadillac V-Series.R')).toBe('Cadillac');
+      expect(resolveCarManufacturer('Aston Martin Vantage GT3')).toBe('Aston Martin');
+      expect(resolveCarManufacturer('Aston Martin Valkyrie LMH')).toBe('Aston Martin');
+      expect(resolveCarManufacturer('Corvette Z06 GT3.R')).toBe('Corvette');
+      expect(resolveCarManufacturer('Ford Mustang GT3')).toBe('Ford');
+      expect(resolveCarManufacturer('Lamborghini Huracan GT3 Evo2')).toBe('Lamborghini');
+      expect(resolveCarManufacturer('Lamborghini SC63')).toBe('Lamborghini');
+      expect(resolveCarManufacturer('Lexus RC F GT3')).toBe('Lexus');
+      expect(resolveCarManufacturer('McLaren 720S GT3 Evo')).toBe('McLaren');
+      expect(resolveCarManufacturer('Mercedes-AMG GT3')).toBe('Mercedes-AMG');
+      expect(resolveCarManufacturer('Peugeot 9X8')).toBe('Peugeot');
+      expect(resolveCarManufacturer('Toyota GR010 Hybrid')).toBe('Toyota');
+      expect(resolveCarManufacturer('Alpine A424')).toBe('Alpine');
+      expect(resolveCarManufacturer('Isotta Fraschini Tipo 6')).toBe('Isotta Fraschini');
+      expect(resolveCarManufacturer('Genesis GMR001 Hypercar')).toBe('Genesis');
+      expect(resolveCarManufacturer('Oreca 07 LMP2')).toBe('Oreca');
+      expect(resolveCarManufacturer('Ligier JS P325')).toBe('Ligier');
+      expect(resolveCarManufacturer('Duqueine D09 P3')).toBe('Duqueine');
+      expect(resolveCarManufacturer('Ginetta G61-LT-P325 Evo')).toBe('Ginetta');
+      expect(resolveCarManufacturer('ADESS AD25 LMP3')).toBe('ADESS');
+    });
+
+    it('resolves manufacturer from shorthand or game raw carType strings', () => {
+      expect(resolveCarManufacturer('296')).toBe('Ferrari');
+      expect(resolveCarManufacturer('Mustang')).toBe('Ford');
+      expect(resolveCarManufacturer('Valkyrie')).toBe('Aston Martin');
+      expect(resolveCarManufacturer('9X8')).toBe('Peugeot');
+      expect(resolveCarManufacturer('TR010')).toBe('Toyota');
+      expect(resolveCarManufacturer('Vanwall Vandervell')).toBe('Vanwall');
+      expect(resolveCarManufacturer('Glickenhaus 007')).toBe('Glickenhaus');
+    });
+
+    it('returns empty string for null, undefined, or unknown names', () => {
+      expect(resolveCarManufacturer(null)).toBe('');
+      expect(resolveCarManufacturer(undefined)).toBe('');
+      expect(resolveCarManufacturer('')).toBe('');
+      expect(resolveCarManufacturer('Unknown_Fictional_Car')).toBe('');
     });
   });
 });

@@ -67,6 +67,7 @@ export interface RankedItem {
   detail?: string;
   value: string;
   unit?: string;
+  icon?: React.ReactNode;
   /** Small colored mark after the value (a pace category), kept as a dot so the list stays calm. */
   marker?: { className: string; label: string };
   title?: string;
@@ -98,7 +99,10 @@ export const RankedList: React.FC<{ items: RankedItem[]; expanded: boolean; empt
           <span className="text-xs font-sans font-semibold text-lmu-text-soft">{leader.marker.label}</span>
         )}
       </span>
-      <span className="block text-sm leading-5 font-semibold text-white truncate" title={leader.name}>{leader.name}</span>
+      <span className="flex items-center gap-1.5 text-sm leading-5 font-semibold text-white truncate" title={leader.name}>
+        {leader.icon}
+        <span className="truncate">{leader.name}</span>
+      </span>
       <span className="block text-[11px] leading-4 text-lmu-muted truncate">{leader.detail ?? ' '}</span>
     </>
   );
@@ -127,8 +131,9 @@ export const RankedList: React.FC<{ items: RankedItem[]; expanded: boolean; empt
             }`;
             const rowContent = (
               <>
-                <span className="flex items-center gap-2 min-w-0">
+                <span className="flex items-center gap-1.5 min-w-0">
                   <span className="w-4 shrink-0 font-mono text-[11px] text-lmu-faint">{i + 2}</span>
+                  {item.icon}
                   <span className="text-lmu-text-soft truncate" title={item.name}>{item.name}</span>
                 </span>
                 <span className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">

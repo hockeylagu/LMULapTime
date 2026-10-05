@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { CarClassBadge } from '../../../common/CarClassBadge.js';
+import { CarLogo } from '../../../vehicle/index.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface ReplayCompareLapRowProps {
@@ -45,6 +46,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
       <span className="min-w-0">
         <span className="block truncate font-semibold text-white">{lap.driverName}</span>
         <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+          <CarLogo carType={lap.carType} size="xs" />
           <span className="block truncate text-[11px] text-lmu-muted">{lap.carType}</span>
           {lap.carClass && <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />}
         </div>
