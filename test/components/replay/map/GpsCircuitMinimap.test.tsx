@@ -93,4 +93,90 @@ describe('GpsCircuitMinimap', () => {
     expect(paths[0]).toHaveAttribute('d', boundaryPath);
     expect(paths[1]).toHaveAttribute('d', boundaryPath);
   });
+
+  it('calls onPanTo with converted SVG coordinates when clicked', () => {
+    let pannedCoords: { x: number; y: number } | null = null;
+    const { container } = render(
+      <GpsCircuitMinimap
+        trackBoundaryPathD={mockBoundaryPathD}
+        onPanTo={(x, y) => { pannedCoords = { x, y }; }}
+      />
+    );
+
+    const svg = container.querySelector('svg');
+    expect(svg).toBeInTheDocument();
+
+    // Mock getBoundingClientRect so SVG is 200x200 px on screen
+    if (svg) {
+      svg.getBoundingClientRect = () => ({
+        left: 50,
+        top: 50,
+        right: 250,
+        bottom: 250,
+        width: 200,
+        height: 200,
+        x: 50,
+        y: 50,
+        toJSON: () => {},
+      });
+      // Click at clientX = 150 (midpoint X: (150-50)/200 * 800 = 400), clientY = 100 (quarter Y: (100-50)/200 * 800 = 200)
+      const event = new MouseEvent('pointerdown', { bubbles: true, clientX: 150, clientY: 100, button: 0 });
+      svg.dispatchEvent(event);
+    }
+
+    const coords = pannedCoords as { x: number; y: number } | null;
+    expect(coords).not.toBeNull();
+    expect(coords?.x).toBeCloseTo(400, 0);
+    expect(coords?.y).toBeCloseTo(200, 0);
+  });
+
+  it('updates onPanTo coordinates when dragging with pointermove', () => {
+    let pannedCoords: { x: number; y: number } | null = null;
+    const { container } = render(
+      <GpsCircuitMinimap
+        trackBoundaryPathD={mockBoundaryPathD}
+        onPanTo={(x, y) => { pannedCoords = { x, y }; }}
+      />
+    );
+
+    const svg = container.querySelector('svg');
+    expect(svg).toBeInTheDocument();
+
+    if (svg) {
+      svg.getBoundingClientRect = () => ({
+        left: 0,
+        top: 0,
+        right: 200,
+        bottom: 200,
+        width: 200,
+        height: 200,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      });
+
+      // Pointermove with buttons: 1 (drag event)
+      const moveEvent = new MouseEvent('pointermove', { bubbles: true, clientX: 100, clientY: 50, buttons: 1 });
+      svg.dispatchEvent(moveEvent);
+    }
+
+    const coords = pannedCoords as { x: number; y: number } | null;
+    expect(coords).not.toBeNull();
+    // 100/200 * 800 = 400, 50/200 * 800 = 200
+    expect(coords?.x).toBeCloseTo(400, 0);
+    expect(coords?.y).toBeCloseTo(200, 0);
+  });
+
+  it('applies larger full-screen size classes when isExpanded is true', () => {
+    const { container, rerender } = render(
+      <GpsCircuitMinimap trackBoundaryPathD={mockBoundaryPathD} isExpanded={false} />
+    );
+    const minimap = container.querySelector('[data-testid="gps-circuit-minimap"]');
+    expect(minimap).toHaveClass('w-28');
+
+    rerender(
+      <GpsCircuitMinimap trackBoundaryPathD={mockBoundaryPathD} isExpanded={true} />
+    );
+    expect(minimap).toHaveClass('w-48', 'sm:w-56', 'md:w-64');
+  });
 });

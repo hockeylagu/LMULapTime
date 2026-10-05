@@ -22,17 +22,17 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
   showCenterline = false,
 }) => {
   const ribbonD = useMemo(
-    () => buildRoadRibbonSvgPath(leftSvgPoints, rightSvgPoints),
+    () => (leftSvgPoints.length > 0 && rightSvgPoints.length > 0 ? buildRoadRibbonSvgPath(leftSvgPoints, rightSvgPoints) : ''),
     [leftSvgPoints, rightSvgPoints]
   );
 
   const leftEdgeD = useMemo(
-    () => buildClosedSvgPath(leftSvgPoints),
+    () => (leftSvgPoints.length > 0 ? buildClosedSvgPath(leftSvgPoints) : ''),
     [leftSvgPoints]
   );
 
   const rightEdgeD = useMemo(
-    () => buildClosedSvgPath(rightSvgPoints),
+    () => (rightSvgPoints.length > 0 ? buildClosedSvgPath(rightSvgPoints) : ''),
     [rightSvgPoints]
   );
 
@@ -41,12 +41,12 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
     [centerlineSvgPoints]
   );
 
-  if (!ribbonD) return null;
+  if (!ribbonD && !centerlineD && !leftEdgeD && !rightEdgeD) return null;
 
   return (
     <g data-testid="gps-track-road-ribbon" className={`pointer-events-none select-none ${className}`}>
       {/* Dark motorsport asphalt road surface */}
-      {showRoad && <path
+      {showRoad && ribbonD && <path
         d={ribbonD}
         fill={MAP_COLORS.roadSurface}
         fillOpacity="0.88"
@@ -54,16 +54,20 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
         stroke="none"
       />}
 
-      {/* Subtle dashed centerline guide */}
+      {/* High-contrast dashed centerline guide */}
       {showCenterline && centerlineD && (
         <path
+          data-testid="gps-track-centerline"
           d={centerlineD}
           fill="none"
           stroke={MAP_COLORS.centerline}
-          strokeWidth="1"
-          strokeDasharray="8 12"
+          strokeWidth="1.5"
+          strokeDasharray="6 8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
-          opacity="0.4"
+          opacity="0.85"
+          style={{ filter: 'drop-shadow(0 0 1px #080C14)' }}
         />
       )}
 

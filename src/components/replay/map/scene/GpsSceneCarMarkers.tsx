@@ -2,6 +2,7 @@ import React from 'react';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 import { defaultVehicleSize } from '../../../../../shared/domain/vehicleDimensions.js';
+import { GpsCarDynamicsVector } from './GpsCarDynamicsVector.js';
 type Position = { sx: number; sy: number };
 export interface GpsSceneCarMarkersProps {
   viewBox: string;
@@ -11,6 +12,8 @@ export interface GpsSceneCarMarkersProps {
   primaryOpacity: number;
   baselineOpacity: number;
   unitsPerMeter?: number;
+  primaryAccel?: { latG?: number; lonG?: number };
+  baselineAccel?: { latG?: number; lonG?: number };
   primaryVehicleData?: import('../../../../../shared/types/dataPlugin.js').VehicleDataRecord;
   baselineVehicleData?: import('../../../../../shared/types/dataPlugin.js').VehicleDataRecord;
   primaryCarClass?: string;
@@ -43,7 +46,7 @@ export function replayBodyHeading(
  */
 export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
   viewBox, currentPos, baselineGhostPos, markerScale, primaryOpacity, baselineOpacity,
-  unitsPerMeter = 0, primaryHeadingDeg, baselineHeadingDeg, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData,
+  unitsPerMeter = 0, primaryAccel, baselineAccel, primaryHeadingDeg, baselineHeadingDeg, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData,
 }) => {
   const car = (position: Position, heading: number | undefined, color: string, opacity: number, ghost: boolean, carClass?: string) => {
     const vehicle=ghost?baselineVehicleData:primaryVehicleData;
@@ -56,6 +59,7 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
     const length = size.lengthM * unitsPerMeter;
     // Class-sized footprint grows with camera zoom; overview keeps a readable position dot.
     const showFootprint = Number.isFinite(length) && width > 0 && length >= 14 * markerScale;
+    const accel = ghost ? baselineAccel : primaryAccel;
     return (
     <g data-car-role={ghost ? 'baseline' : 'primary'}
       transform={`translate(${position.sx}, ${position.sy})`} opacity={opacity}>
@@ -67,6 +71,16 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
         <path d={`M ${-width * 0.28} ${-length * 0.2} H ${width * 0.28} L ${width * 0.22} ${-length * 0.05} H ${-width * 0.22} Z`}
           fill={CHART_COLORS.white} fillOpacity={ghost ? 0.35 : 0.7} />
         <circle r={Math.min(width * 0.08, 1.5 * markerScale)} fill={CHART_COLORS.white} />
+        {accel && (
+          <GpsCarDynamicsVector
+            accelLatG={accel.latG}
+            accelLonG={accel.lonG}
+            unitsPerMeter={unitsPerMeter}
+            markerScale={markerScale}
+            opacity={ghost ? 0.65 : 0.95}
+            colorOverride={ghost ? TELEMETRY_COLORS.baseline : undefined}
+          />
+        )}
       </g> : <g transform={`scale(${markerScale})`}>
         <circle r={ghost ? 11 : 12} fill="none" stroke={color} strokeWidth="1.5" opacity="0.5" />
         <circle r={ghost ? 6 : 6.5} fill={color} stroke={CHART_COLORS.white} strokeWidth="2"
@@ -84,8 +98,6 @@ export const GpsSceneCarMarkers: React.FC<GpsSceneCarMarkersProps> = ({
         <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={TELEMETRY_COLORS.baseline} floodOpacity="0.9" />
       </filter>
     </defs>
-    {currentPos && baselineGhostPos && <line x1={currentPos.sx} y1={currentPos.sy} x2={baselineGhostPos.sx} y2={baselineGhostPos.sy}
-      stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.5" strokeDasharray="4 4" opacity={0.75 * baselineOpacity} vectorEffect="non-scaling-stroke" />}
     {baselineGhostPos && car(baselineGhostPos, baselineHeadingDeg, TELEMETRY_COLORS.baseline, baselineOpacity, true, baselineCarClass)}
     {currentPos && car(currentPos, primaryHeadingDeg, TELEMETRY_COLORS.primary, primaryOpacity, false, primaryCarClass)}
   </svg>;

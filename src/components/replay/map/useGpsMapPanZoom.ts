@@ -33,12 +33,21 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [followCar, setFollowCar] = useState<boolean>(false);
   const isDraggingRef = useRef<boolean>(false);
-  const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number; factor: number }>({
+  const hasPannedRef = useRef<boolean>(false);
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    factor: number;
+    isFollowCarAtStart: boolean;
+  }>({
     x: 0,
     y: 0,
     panX: 0,
     panY: 0,
     factor: 1,
+    isFollowCarAtStart: false,
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -106,7 +115,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     const centerY = followCar && currentPos ? currentPos.sy : viewBoxSize / 2 + panOffset.y;
     const vx = Math.max(-500, Math.min(1300, centerX - visibleSize / 2));
     const vy = Math.max(-500, Math.min(1300, centerY - visibleSize / 2));
-    return `${vx.toFixed(1)} ${vy.toFixed(1)} ${visibleSize.toFixed(1)} ${visibleSize.toFixed(1)}`;
+    return `${vx.toFixed(3)} ${vy.toFixed(3)} ${visibleSize.toFixed(3)} ${visibleSize.toFixed(3)}`;
   }, [zoomLevel, followCar, currentPos, panOffset, viewBoxSize]);
 
   const zoomAtCoords = (clientX: number, clientY: number, direction: 1 | -1 = 1, steps = 1) => {
@@ -218,40 +227,56 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="map-controls-overlay"]')) return;
     containerRef.current?.focus?.({ preventScroll: true });
-    autoFollowOnScrubRef.current = false;
     isDraggingRef.current = true;
+    hasPannedRef.current = false;
     const el = containerRef.current;
     const rect = el?.getBoundingClientRect();
     const renderedSize = Math.min(rect?.width || 800, rect?.height || 800);
     const visibleSize = viewBoxSize / (zoomLevelRef.current * BASE_ZOOM);
     const factor = visibleSize / (renderedSize || 800);
 
+    const isFollow = followCarRef.current;
     let startPanX = panOffsetRef.current.x;
     let startPanY = panOffsetRef.current.y;
-    if (followCarRef.current && currentPosRef.current) {
-      startPanX = currentPosRef.current.sx + startPanX - viewBoxSize / 2;
-      startPanY = currentPosRef.current.sy + startPanY - viewBoxSize / 2;
-      followCarRef.current = false;
-      setFollowCar(false);
-      panOffsetRef.current = { x: startPanX, y: startPanY };
-      setPanOffset({ x: startPanX, y: startPanY });
+    if (isFollow && currentPosRef.current) {
+      startPanX = currentPosRef.current.sx - viewBoxSize / 2;
+      startPanY = currentPosRef.current.sy - viewBoxSize / 2;
     }
 
-    dragStartRef.current = { x: e.clientX, y: e.clientY, panX: startPanX, panY: startPanY, factor };
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: startPanX,
+      panY: startPanY,
+      factor,
+      isFollowCarAtStart: isFollow,
+    };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current) return;
-    const { panX, panY, x, y, factor } = dragStartRef.current;
-    const newPanX = panX - (e.clientX - x) * factor;
-    const newPanY = panY - (e.clientY - y) * factor;
+    const { panX, panY, x, y, factor, isFollowCarAtStart } = dragStartRef.current;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (!hasPannedRef.current) {
+      if (Math.hypot(dx, dy) < 2) return;
+      hasPannedRef.current = true;
+      autoFollowOnScrubRef.current = false;
+      if (isFollowCarAtStart || followCarRef.current) {
+        followCarRef.current = false;
+        setFollowCar(false);
+      }
+    }
+    const newPanX = panX - dx * factor;
+    const newPanY = panY - dy * factor;
     panOffsetRef.current = { x: newPanX, y: newPanY };
     setPanOffset({ x: newPanX, y: newPanY });
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     isDraggingRef.current = false;
+    hasPannedRef.current = false;
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
   };
 
@@ -288,6 +313,16 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   const centerOnCar = () => {
     const position = currentPosRef.current;
     if (position) focusOnPoint(position.sx, position.sy, zoomLevelRef.current);
+    autoFollowOnScrubRef.current = false;
+  };
+
+  const panTo = (targetX: number, targetY: number) => {
+    const newPanX = Math.max(-1000, Math.min(1000, targetX - viewBoxSize / 2));
+    const newPanY = Math.max(-1000, Math.min(1000, targetY - viewBoxSize / 2));
+    panOffsetRef.current = { x: newPanX, y: newPanY };
+    setPanOffset({ x: newPanX, y: newPanY });
+    setFollowCar(false);
+    followCarRef.current = false;
     autoFollowOnScrubRef.current = false;
   };
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
@@ -337,6 +372,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     resetPanZoom,
     focusOnPoint,
     centerOnCar,
+    panTo,
     zoomIn,
     zoomOut,
     markerScale,

@@ -325,6 +325,47 @@ describe('GpsSceneMarkers', () => {
     const apexCircle = apexGroup?.querySelector('circle[fill="#F43F5E"]');
     expect(apexCircle?.parentElement).toHaveAttribute('transform', 'translate(100, 100) scale(0.25)');
   });
+
+  it('culls corner flags and pedal markers that are outside the viewBox', () => {
+    const corners: CornerMarkerPoint[] = [
+      { cornerNumber: 1, sx: 100, sy: 100, idx: 0, actualSx: 100, actualSy: 100 },
+      { cornerNumber: 2, sx: 800, sy: 800, idx: 1, actualSx: 800, actualSy: 800 },
+    ];
+    const pedals: PedalMarkerPoint[] = [
+      { cornerNumber: 1, kind: 'brake', sx: 100, sy: 100, nx: 0, ny: 1 },
+      { cornerNumber: 2, kind: 'brake', sx: 800, sy: 800, nx: 0, ny: 1 },
+    ];
+
+    const { rerender } = render(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={corners}
+          pedalMarkers={pedals}
+          viewBox="50 50 100 100"
+          markerScale={0.5}
+        />
+      </svg>
+    );
+
+    // Corner 1 is inside viewBox, Corner 2 is far outside
+    expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('corner-flag-2')).toBeNull();
+
+    // Rerender with viewBox covering corner 2
+    rerender(
+      <svg>
+        <GpsSceneMarkers
+          cornerMarkers={corners}
+          pedalMarkers={pedals}
+          viewBox="750 750 100 100"
+          markerScale={0.5}
+        />
+      </svg>
+    );
+
+    expect(screen.queryByTestId('corner-flag-1')).toBeNull();
+    expect(screen.getByTestId('corner-flag-2')).toBeInTheDocument();
+  });
 });
 
 

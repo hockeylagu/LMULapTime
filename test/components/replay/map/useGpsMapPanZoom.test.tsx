@@ -25,13 +25,26 @@ describe('useGpsMapPanZoom', () => {
     surface.remove();
   });
 
-  it('follows a new scrub position while zoomed, then preserves manual map exploration', () => {
+  it('follows a new scrub position while zoomed, preserves follow on click, and clears follow on pan', () => {
     const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),
       { initialProps: { position: { sx: 500, sy: 300 } } });
     act(() => result.current.focusOnPoint(200, 100, 4));
     rerender({ position: { sx: 600, sy: 350 } });
     expect(result.current.followCar).toBe(true);
-    act(() => result.current.handlePointerDown({ button: 0, target: document.createElement('div'), clientX: 100, clientY: 100 } as unknown as React.PointerEvent<HTMLDivElement>));
+
+    // Clicking without panning keeps followCar active
+    act(() => {
+      result.current.handlePointerDown({ button: 0, target: document.createElement('div'), clientX: 100, clientY: 100 } as unknown as React.PointerEvent<HTMLDivElement>);
+      result.current.handlePointerUp({ button: 0, target: document.createElement('div'), clientX: 100, clientY: 100 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    expect(result.current.followCar).toBe(true);
+
+    // Panning (moving mouse while dragging) clears followCar and preserves manual map exploration
+    act(() => {
+      result.current.handlePointerDown({ button: 0, target: document.createElement('div'), clientX: 100, clientY: 100 } as unknown as React.PointerEvent<HTMLDivElement>);
+      result.current.handlePointerMove({ button: 0, target: document.createElement('div'), clientX: 150, clientY: 120 } as unknown as React.PointerEvent<HTMLDivElement>);
+      result.current.handlePointerUp({ button: 0, target: document.createElement('div'), clientX: 150, clientY: 120 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
     expect(result.current.followCar).toBe(false);
     const view = result.current.currentViewBox;
     rerender({ position: { sx: 650, sy: 350 } });

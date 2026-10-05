@@ -205,6 +205,12 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             baselineOpacity={baselineOpacity}
             pedalMarkers={pedalMarkers}
             showPedalMarkers={showPedalMarkers}
+            onChangeColorBy={onChangeColorBy}
+            onTogglePedalMarkers={() => setShowPedalMarkers(v => !v)}
+            fadedLine={fadedLine}
+            onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))}
+            showFrictionCircle={showFrictionCircle}
+            onToggleFrictionCircle={() => setShowFrictionCircle(v => !v)}
             dimNonSelectedTrack={Boolean(selectedCorner)}
             highlightDistRange={highlightDistRange}
             trackVenue={trackVenue}
@@ -218,7 +224,14 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         </div>
       </div>
 
-      {showFrictionCircle && <ReplayFrictionCircle points={trajectory.points} currentIndex={currentIndex} />}
+      {showFrictionCircle && (
+        <ReplayFrictionCircle
+          points={trajectory.points}
+          currentIndex={currentIndex}
+          primaryPoint={currentPoint}
+          baselinePoints={baselinePoints}
+        />
+      )}
       <ReplayTelemetryHud currentPoint={currentPoint} />
     </>
   );

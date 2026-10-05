@@ -36,6 +36,12 @@ export interface GpsTrackMapProps {
   baselineOpacity?: number;
   pedalMarkers?: GpsTrackMapPedalMarker[];
   showPedalMarkers?: boolean;
+  onChangeColorBy?: (mode: MapColorMode) => void;
+  onTogglePedalMarkers?: () => void;
+  fadedLine?: 'none' | 'primary' | 'baseline';
+  onToggleFadedLine?: (line: 'primary' | 'baseline') => void;
+  showFrictionCircle?: boolean;
+  onToggleFrictionCircle?: () => void;
   showMinimap?: boolean;
   showLegend?: boolean;
   showControls?: boolean;

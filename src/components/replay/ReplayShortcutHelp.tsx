@@ -8,8 +8,9 @@ const shortcuts = [
   ['Alt + drag', 'Pan the zoomed chart'], ['← / →', 'Previous / next recorded sample'],
   ['Shift + ← / →', 'Move cursor by 0.5 seconds'], ['Space', 'Play / pause'],
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
-  ['0 / double-click', 'Show full lap'], ['C', 'Center map on car, keep zoom'],
-  ['F', 'Toggle follow car'], ['Esc', 'Cancel gesture / close help'], ['?', 'Show shortcuts'],
+  ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
+  ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['Minimap drag', 'Pan camera to circuit sector'],
+  ['Esc', 'Cancel gesture / close help'], ['?', 'Show shortcuts'],
 ];
 
 export function ReplayShortcutHelp() {

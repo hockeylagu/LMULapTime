@@ -1,5 +1,15 @@
-import React, { useMemo } from 'react';
-import { buildTrackLineRuns, getHeatmapColor, MapColorMode, nearestRunVertex, ProjectedPoint, TrackLineRun } from '../replayMapUtils.js';
+import React, { useMemo, useState } from 'react';
+import {
+  buildTrackLineRuns,
+  getHeatmapColor,
+  isRunInViewBox,
+  MapColorMode,
+  nearestRunVertex,
+  parseViewBox,
+  ProjectedPoint,
+  TrackLineRun,
+} from '../replayMapUtils.js';
+import { GpsTrackHoverTooltip } from '../display/GpsTrackHoverTooltip.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];
@@ -14,6 +24,8 @@ export interface GpsTrackSegmentsProps {
   primaryDists?: number[];
   baselineDists?: number[];
   dimNonSelectedTrack?: boolean;
+  markerScale?: number;
+  viewBox?: string;
 }
 
 function isInDistRange(distM: number | undefined, range: { startDistM: number; endDistM: number } | null | undefined, dim: boolean): boolean {
@@ -44,7 +56,13 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   primaryDists,
   baselineDists,
   dimNonSelectedTrack = false,
+  markerScale = 1,
+  viewBox,
 }) => {
+  const [hoveredPoint, setHoveredPoint] = useState<ProjectedPoint | null>(null);
+
+  const viewBoxRect = useMemo(() => parseViewBox(viewBox), [viewBox]);
+
   const primaryRuns = useMemo(() => buildTrackLineRuns(
     svgPoints,
     p => getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined),
@@ -61,16 +79,34 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   // Keep gaps separate while sharing one wide target along each continuous section.
   const hitRuns = useMemo(() => buildTrackLineRuns(svgPoints, () => '', () => true), [svgPoints]);
 
-  // Clicking the line jumps to the nearest sample of the clicked run.
+  const visiblePrimaryRuns = useMemo(
+    () => (viewBoxRect ? primaryRuns.filter(r => isRunInViewBox(r, viewBoxRect)) : primaryRuns),
+    [primaryRuns, viewBoxRect]
+  );
+  const visibleBaselineRuns = useMemo(
+    () => (viewBoxRect ? baselineRuns.filter(r => isRunInViewBox(r, viewBoxRect)) : baselineRuns),
+    [baselineRuns, viewBoxRect]
+  );
+  const visibleHitRuns = useMemo(
+    () => (viewBoxRect ? hitRuns.filter(r => isRunInViewBox(r, viewBoxRect)) : hitRuns),
+    [hitRuns, viewBoxRect]
+  );
+
   const selectNearest = (run: TrackLineRun, e: React.MouseEvent<SVGPathElement>) => {
     const at = toSvgCoords(e);
     if (!at || !onSelectIndex) return;
     onSelectIndex(svgPoints[nearestRunVertex(svgPoints, run.from, run.to, at.sx, at.sy)].idx);
   };
 
+  const handlePointerHover = (run: TrackLineRun, e: React.PointerEvent<SVGPathElement>) => {
+    const at = toSvgCoords(e as unknown as React.MouseEvent<SVGPathElement>);
+    if (!at) return;
+    setHoveredPoint(svgPoints[nearestRunVertex(svgPoints, run.from, run.to, at.sx, at.sy)]);
+  };
+
   return (
     <>
-      {primaryRuns.map(run => (
+      {visiblePrimaryRuns.map(run => (
         <path
           key={`primary-${run.from}`}
           d={run.d}
@@ -86,7 +122,7 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
           data-track-line="primary"
         />
       ))}
-      {baselineRuns.map(run => (
+      {visibleBaselineRuns.map(run => (
         <path
           key={`baseline-${run.from}`}
           d={run.d}
@@ -102,7 +138,7 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
           pointerEvents="none"
         />
       ))}
-      {onSelectIndex && hitRuns.map(run => (
+      {onSelectIndex && visibleHitRuns.map(run => (
         <path
           key={`hit-${run.from}`}
           d={run.d}
@@ -114,10 +150,20 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
           pointerEvents="stroke"
           className="cursor-pointer stroke-[28px] pointer-coarse:stroke-[44px]"
           onClick={e => selectNearest(run, e)}
+          onPointerMove={e => handlePointerHover(run, e)}
+          onPointerLeave={() => setHoveredPoint(null)}
           data-track-line="hit-target"
           aria-hidden="true"
         />
       ))}
+      {hoveredPoint && (
+        <GpsTrackHoverTooltip
+          point={hoveredPoint}
+          markerScale={markerScale}
+          deltaTimeSec={deltaByIdx ? deltaByIdx[hoveredPoint.idx] : null}
+          distM={primaryDists ? primaryDists[hoveredPoint.idx] : undefined}
+        />
+      )}
     </>
   );
 });

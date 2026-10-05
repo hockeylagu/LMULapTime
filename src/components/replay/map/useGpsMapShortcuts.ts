@@ -12,6 +12,7 @@ export interface UseGpsMapShortcutsOptions {
   onZoomOut: () => void;
   onResetZoom: () => void;
   onTogglePlay?: () => void;
+  onToggleGForce?: () => void;
 }
 
 /**
@@ -21,6 +22,7 @@ export interface UseGpsMapShortcutsOptions {
  * - + / = / -: Zoom in / zoom out
  * - 0: Reset zoom to show full track
  * - Space: Toggle playback
+ * - G: Toggle G-force arrow
  */
 export function useGpsMapShortcuts({
   isExpanded,
@@ -32,6 +34,7 @@ export function useGpsMapShortcuts({
   onZoomOut,
   onResetZoom,
   onTogglePlay,
+  onToggleGForce,
 }: UseGpsMapShortcutsOptions): void {
   const optionsRef = useRef({
     isExpanded,
@@ -43,6 +46,7 @@ export function useGpsMapShortcuts({
     onZoomOut,
     onResetZoom,
     onTogglePlay,
+    onToggleGForce,
   });
   optionsRef.current = {
     isExpanded,
@@ -54,6 +58,7 @@ export function useGpsMapShortcuts({
     onZoomOut,
     onResetZoom,
     onTogglePlay,
+    onToggleGForce,
   };
 
   useEffect(() => {
@@ -69,6 +74,7 @@ export function useGpsMapShortcuts({
         onZoomOut: zoomOut,
         onResetZoom: resetZoom,
         onTogglePlay: togglePlay,
+        onToggleGForce: toggleGForce,
       } = optionsRef.current;
 
       const container = contRef.current;
@@ -108,12 +114,15 @@ export function useGpsMapShortcuts({
       } else if (event.key === '-') {
         event.preventDefault();
         zoomOut();
-      } else if (event.key === '0') {
+      } else if (event.key === '0' || event.key.toLowerCase() === 'r') {
         event.preventDefault();
         resetZoom();
       } else if (event.key === ' ' && expanded) {
         event.preventDefault();
         togglePlay?.();
+      } else if (event.key.toLowerCase() === 'g') {
+        event.preventDefault();
+        toggleGForce?.();
       }
     };
 

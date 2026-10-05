@@ -87,7 +87,7 @@ export const MAP_COLORS = {
   runoffSurface: '#25364A',
   pitSurface: '#34404E',
   outerRoadSurface: '#1B2533',
-  centerline: '#334155',
+  centerline: '#94A3B8',
   trackBoundary: '#475569',
   minimapBorder: '#1E293B',
   markerBg: '#090D16',

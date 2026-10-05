@@ -277,7 +277,7 @@ replay retains the unknown fallback until its own class identity is supplied. Th
 estimates, not measured model footprints. `GpsSceneCarMarkers.tsx` renders each car independently;
 `GpsTrackMapScene.tsx` supplies map scale and replay body yaw (native forward -Z), interpolated
 on the shortest arc. Missing yaw keeps a dot. Local package loading in `server/plugins/` is implemented; model outlines
-still require an established replay-origin offset.
+use model shapes when available, with approximate placement until a replay-origin offset is established.
 
 
 ## Local data packages
@@ -294,8 +294,9 @@ include package revision. Basic SVG layouts remain bundled and thumbnail helpers
 without loading any metric data.
 
 Replay metadata and trajectory services resolve each selected driver's own vehicle record.
-`GpsSceneCarMarkers` uses model footprints only with established replay-origin alignment,
-otherwise labeled class-size defaults. Cloud AI remains available with or without a package and uses the existing summarized evidence contract; missing geometry reduces available detail.
+`GpsSceneCarMarkers` uses available model dimensions/outlines independently of origin calibration.
+Known replay offsets are applied; absent offsets preserve the model origin and label placement
+as approximate. Class estimates are used only when model dimensions are missing. Cloud AI remains available with or without a package and uses the existing summarized evidence contract; missing geometry reduces available detail.
 `tools/release/checkLocalData.mjs` runs before and after builds to reject detailed static
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).

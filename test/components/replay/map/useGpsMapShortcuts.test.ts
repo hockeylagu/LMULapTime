@@ -134,6 +134,9 @@ describe('useGpsMapShortcuts', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '0' }));
     expect(onResetZoom).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
+    expect(onResetZoom).toHaveBeenCalledTimes(2);
   });
 
   it('toggles playback with Space when in full screen', () => {
@@ -156,6 +159,31 @@ describe('useGpsMapShortcuts', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('toggles G-force arrow with G key', () => {
+    const onToggleGForce = vi.fn();
+    const container = document.createElement('div');
+    const containerRef = { current: container };
+
+    renderHook(() =>
+      useGpsMapShortcuts({
+        isExpanded: true,
+        containerRef,
+        points,
+        currentIndex: 0,
+        onZoomIn: vi.fn(),
+        onZoomOut: vi.fn(),
+        onResetZoom: vi.fn(),
+        onToggleGForce,
+      })
+    );
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g' }));
+    expect(onToggleGForce).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'G' }));
+    expect(onToggleGForce).toHaveBeenCalledTimes(2);
   });
 
   it('ignores shortcuts when typing in input or form elements', () => {

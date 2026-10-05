@@ -1,13 +1,13 @@
 import type { TrackBoundaryGeometry, TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 
 export const DEFAULT_MAP_LAYERS = {
-  road: true, kerb: true, runoff: false, pit: false, otherRoad: false, centerline: false, brakeMarkers: false,
+  road: true, kerb: true, brakeMarkers: false, pit: false, centerline: false, runoff: false, otherRoad: false,
 };
 export type MapLayers = typeof DEFAULT_MAP_LAYERS;
 export type MapLayerKey = keyof MapLayers;
 export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, 'otherRoad'>, string> = {
-  road: 'Active track', kerb: 'Kerbs', runoff: 'Runoff and other roads', pit: 'Pit lane and apron',
-  centerline: 'Centerline guide', brakeMarkers: 'Braking markers',
+  road: 'Active track', kerb: 'Kerbs', brakeMarkers: 'Braking markers', pit: 'Pit lane and apron',
+  centerline: 'Centerline guide', runoff: 'Runoff and other roads',
 };
 export const MAP_LAYERS_STORAGE_KEY = 'lmu-map-layers-v1';
 

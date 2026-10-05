@@ -104,8 +104,8 @@ export function computeYawRate(points: ReplayTrajectoryPoint[]): number[] {
 }
 
 /**
- * Computes lateral inertial acceleration (G) from yaw rate.
- * Canonical convention: +G right, -G left, 0G straight.
+ * Computes lateral acceleration (G) from yaw rate following ISO 8855 vehicle coordinates:
+ * Canonical convention: +G left turn (+Y), -G right turn (-Y), 0G straight.
  */
 export function computeLateralG(points: ReplayTrajectoryPoint[], yawRatesDeg: number[]): number[] {
   const n = points.length;

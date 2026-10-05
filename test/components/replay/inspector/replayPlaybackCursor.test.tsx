@@ -24,4 +24,22 @@ describe('playback visual cursor', () => {
     act(() => cursor.clear());
     expect(result.current).toBeNull();
   });
+
+  it('preserves continuity when playback advances to the next sample before React rerenders the index', () => {
+    const points = [0, 0.2, 1].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, speedKmh: 100 }));
+    const cursor = createPlaybackCursor();
+    const { result, rerender } = renderHook(({ index }) => usePlaybackPosition(points, index), {
+      initialProps: { index: 0 },
+      wrapper: ({ children }) => createElement(ReplayPlaybackCursorContext.Provider, { value: cursor }, children),
+    });
+    // Playback advances to sample 1 while React component still holds index 0
+    act(() => cursor.publish(points, { index: 1, timeSec: 0.4 }));
+    expect(result.current).not.toBeNull();
+    expect(result.current?.index).toBe(1);
+    expect(result.current?.fraction).toBeCloseTo(0.25);
+    // Once React catches up and rerenders with index 1, position is maintained seamlessly
+    rerender({ index: 1 });
+    expect(result.current?.index).toBe(1);
+    expect(result.current?.fraction).toBeCloseTo(0.25);
+  });
 });

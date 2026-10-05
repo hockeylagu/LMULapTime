@@ -1,22 +1,16 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { computeLapComparisons } from '../../../../utils/replayComparison.js';
 import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 import {
-  projectTrajectoryPoints,
-  projectBoundaryPoints,
-  computeTrackBoundaryPathD,
-  buildContinuousSvgPath,
-  computeGhostPosition,
-  computeDispersedCornerMarkers,
-  computePedalMarkerPoints,
-  computeEffectiveBounds,
-  computeBaselineDeltaByIdx,
-  projectStartFinishGate,
+  projectTrajectoryPoints, projectBoundaryPoints, computeTrackBoundaryPathD, buildContinuousSvgPath,
+  computeGhostPosition, computeDispersedCornerMarkers, computePedalMarkerPoints,
+  computeEffectiveBounds, computeBaselineDeltaByIdx, projectStartFinishGate,
 } from '../replayMapUtils.js';
 import { HeatmapLegendBar } from '../HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
 import { GpsSceneCarMarkers, replayBodyHeading } from './GpsSceneCarMarkers.js';
+import { resolveCarAcceleration, interpolatePrimaryPoint, computeLineSeparation, interpolateDeltaTime } from './gpsCarDynamicsHelpers.js';
 import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
@@ -24,6 +18,9 @@ import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
 import { GpsMapControls } from '../display/GpsMapControls.js';
+import { GpsMapTelemetryHud } from '../display/GpsMapTelemetryHud.js';
+import { GpsMapModeBar } from '../display/GpsMapModeBar.js';
+import { ReplayFrictionCircle } from '../ReplayFrictionCircle.js';
 import { MapScaleBar } from '../display/MapScaleBar.js';
 import { useMapDisplay } from '../display/useMapDisplay.js';
 import { activeTrackBounds } from '../display/mapLayers.js';
@@ -40,14 +37,17 @@ export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const {
     points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',
-    baselinePoints, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData, corners, selectedCornerNumber, onSelectCornerNumber,
-    primaryOpacity = 1, baselineOpacity = 1, pedalMarkers, showPedalMarkers = false,
-    showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
-    highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true,
-    trackVenue, trackCourse, layoutKey, replayName, dataPluginRevision, trackGeometry, trackLengthM, mapDisplay,
-    isPlaying, onTogglePlay,
+    baselinePoints, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData,
+    corners, selectedCornerNumber, onSelectCornerNumber, primaryOpacity = 1, baselineOpacity = 1,
+    pedalMarkers, showPedalMarkers = false, showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
+    highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true, trackVenue, trackCourse, layoutKey,
+    replayName, dataPluginRevision, trackGeometry, trackLengthM, mapDisplay, isPlaying, onTogglePlay,
+    onChangeColorBy, onTogglePedalMarkers, fadedLine, onToggleFadedLine, showFrictionCircle, onToggleFrictionCircle,
   } = props;
   const [isExpanded, setIsExpanded] = useState(false);
+  const [localShowFriction, setLocalShowFriction] = useState(false);
+  const effectiveShowFriction = showFrictionCircle ?? localShowFriction;
+  const handleToggleFriction = onToggleFrictionCircle ?? (() => setLocalShowFriction(v => !v));
   const VIEWBOX_SIZE = 800;
   const PADDING = 60;
 
@@ -61,6 +61,12 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const effectiveGeometry = trackGeometry !== undefined ? trackGeometry : fetchedGeometry;
   const { display, error: displayError } = useMapDisplay(effectiveGeometry, mapDisplay);
   const { layers, changeLayers } = useMapLayers();
+  const [showGForce, setShowGForce] = useState(() => {
+    try { return localStorage.getItem('lmu-map-gforce-v1') !== 'false'; } catch { return true; }
+  });
+  const handleToggleGForce = useCallback(() => {
+    setShowGForce(v => { const next = !v; try { localStorage.setItem('lmu-map-gforce-v1', String(next)); } catch {} return next; });
+  }, []);
   const activeBounds = useMemo(() => activeTrackBounds(effectiveGeometry), [effectiveGeometry]);
 
   const effectiveBaselinePoints = useMemo(() => baselinePoints ?? [], [baselinePoints]);
@@ -76,9 +82,10 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     [effectiveBaselinePoints, effectiveBounds]
   );
   const playbackPosition = usePlaybackPosition(points, currentIndex);
+  const activeIndex = playbackPosition ? playbackPosition.index : currentIndex;
   const fraction = playbackPosition?.fraction ?? 0;
-  const samplePos = svgPoints[Math.min(currentIndex, svgPoints.length - 1)] || svgPoints[0];
-  const nextPos = svgPoints[currentIndex + 1] ?? samplePos;
+  const samplePos = svgPoints[Math.min(activeIndex, svgPoints.length - 1)] || svgPoints[0];
+  const nextPos = svgPoints[activeIndex + 1] ?? samplePos;
   const currentPos = useMemo(() => samplePos && nextPos ? {
     sx: samplePos.sx + (nextPos.sx - samplePos.sx) * fraction,
     sy: samplePos.sy + (nextPos.sy - samplePos.sy) * fraction,
@@ -112,6 +119,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     onZoomOut: camera.zoomOut,
     onResetZoom: camera.resetPanZoom,
     onTogglePlay,
+    onToggleGForce: handleToggleGForce,
   });
   const fittedLayout = useRef<string | null>(null);
   useEffect(() => {
@@ -134,10 +142,13 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     [effectiveBaselinePoints, points, trackLengthM]
   );
 
-  const deltaByIdx = useMemo(() => {
-    if (colorBy !== 'delta' || !baselinePoints || baselinePoints.length === 0) return null;
-    return computeLapComparisons(points, baselinePoints, trackLengthM).map(c => c.deltaTimeSec);
-  }, [colorBy, points, baselinePoints, trackLengthM]);
+  const comparisons = useMemo(() => (effectiveBaselinePoints.length && points.length
+    ? computeLapComparisons(points, effectiveBaselinePoints, trackLengthM) : null),
+    [effectiveBaselinePoints, points, trackLengthM]);
+  const deltaByIdx = useMemo(() => (comparisons ? comparisons.map(c => c.deltaTimeSec) : null),
+    [comparisons]);
+  const currentDeltaTimeSec = useMemo(() => interpolateDeltaTime(comparisons, activeIndex, fraction), [comparisons, activeIndex, fraction]);
+  const currentPrimaryPoint = useMemo(() => interpolatePrimaryPoint(points, activeIndex, fraction), [points, activeIndex, fraction]);
 
   const baselineDeltaByIdx = useMemo(
     () => (colorBy === 'delta' ? computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists) : null),
@@ -145,19 +156,16 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   );
   const baselineGhostPos = useMemo(() => {
     return computeGhostPosition(
-      primaryDists,
-      baselineDists,
-      effectiveBaselinePoints,
-      currentIndex + fraction,
-      effectiveBounds,
-      VIEWBOX_SIZE,
-      PADDING
+      primaryDists, baselineDists, effectiveBaselinePoints,
+      activeIndex + fraction, effectiveBounds, VIEWBOX_SIZE, PADDING
     );
-  }, [primaryDists, baselineDists, effectiveBaselinePoints, currentIndex, fraction, effectiveBounds]);
+  }, [primaryDists, baselineDists, effectiveBaselinePoints, activeIndex, fraction, effectiveBounds]);
+
+  const currentLineDistM = useMemo(() => computeLineSeparation(currentPrimaryPoint, baselineGhostPos?.point), [currentPrimaryPoint, baselineGhostPos?.point]);
 
   // Use the same distance station as ghost position, with shortest-arc body yaw interpolation.
-  const primaryDistance = (primaryDists[currentIndex] ?? 0)
-    + ((primaryDists[currentIndex + 1] ?? primaryDists[currentIndex] ?? 0) - (primaryDists[currentIndex] ?? 0)) * fraction;
+  const primaryDistance = (primaryDists[activeIndex] ?? 0)
+    + ((primaryDists[activeIndex + 1] ?? primaryDists[activeIndex] ?? 0) - (primaryDists[activeIndex] ?? 0)) * fraction;
   let baselineHeadingIndex = findIndexAtDistance(baselineDists, primaryDistance);
   if (baselineHeadingIndex > 0 && baselineDists[baselineHeadingIndex] > primaryDistance) baselineHeadingIndex--;
   const baselineHeadingSpan = (baselineDists[baselineHeadingIndex + 1] ?? baselineDists[baselineHeadingIndex]) - baselineDists[baselineHeadingIndex];
@@ -198,15 +206,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
 
   return (
     <div
-      ref={containerRef}
-      tabIndex={0}
-      data-replay-surface="map"
-      data-map-expanded={isExpanded ? '' : undefined}
-      aria-label="Track map"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onDoubleClick={handleDoubleClick}
+      ref={containerRef} tabIndex={0} data-replay-surface="map" data-map-expanded={isExpanded ? '' : undefined}
+      aria-label="Track map" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp} onDoubleClick={handleDoubleClick}
       className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen [&[data-map-expanded]]:bg-lmu-bg ${className} ${FOCUS_RING}`}
     >
       {showControls && (
@@ -218,13 +220,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       )}
 
       {showMinimap && (
-        <GpsCircuitMinimap
-          trackBoundaryPathD={trackBoundaryPathD}
-          layoutPathD={trackBoundaryPathD}
-          currentPos={currentPos}
-          baselineGhostPos={baselineGhostPos}
-          currentViewBox={currentViewBox}
-        />
+        <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD}
+          currentPos={currentPos} baselineGhostPos={baselineGhostPos} currentViewBox={currentViewBox} onPanTo={camera.panTo}
+          isExpanded={isExpanded} />
       )}
 
       <div className="relative w-full h-full">
@@ -237,58 +235,38 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
             bounds={effectiveBounds} viewBoxSize={VIEWBOX_SIZE} padding={PADDING} markerScale={markerScale} /> : null}
 
           <GpsTrackSegments
-            svgPoints={svgPoints}
-            baselineSvgPoints={baselineSvgPoints}
-            colorBy={colorBy}
-            deltaByIdx={deltaByIdx}
-            baselineDeltaByIdx={baselineDeltaByIdx}
-            primaryOpacity={primaryOpacity}
-            baselineOpacity={baselineOpacity}
-            onSelectIndex={onSelectIndex}
-            highlightDistRange={highlightDistRange}
-            primaryDists={primaryDists}
-            baselineDists={baselineDists}
-            dimNonSelectedTrack={dimNonSelectedTrack}
+            svgPoints={svgPoints} baselineSvgPoints={baselineSvgPoints} colorBy={colorBy}
+            deltaByIdx={deltaByIdx} baselineDeltaByIdx={baselineDeltaByIdx}
+            primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity} onSelectIndex={onSelectIndex}
+            highlightDistRange={highlightDistRange} primaryDists={primaryDists} baselineDists={baselineDists}
+            dimNonSelectedTrack={dimNonSelectedTrack} markerScale={markerScale}
+            viewBox={zoomLevel >= 2.5 ? currentViewBox : undefined}
           />
 
           <GpsStartFinishLine
-            svgPoints={svgPoints}
-            zoomLevel={zoomLevel}
-            markerScale={markerScale}
-            cornerMarkers={cornerMarkers}
-            pedalMarkers={pedalMarkerPoints}
-            gateLeftSvg={gateLeftSvg}
-            gateRightSvg={gateRightSvg}
+            svgPoints={svgPoints} zoomLevel={zoomLevel} markerScale={markerScale}
+            cornerMarkers={cornerMarkers} pedalMarkers={pedalMarkerPoints}
+            gateLeftSvg={gateLeftSvg} gateRightSvg={gateRightSvg}
           />
 
           <GpsSceneMarkers
-            cornerMarkers={cornerMarkers}
-            pedalMarkers={pedalMarkerPoints}
-            selectedCornerNumber={selectedCornerNumber}
-            onSelectCornerNumber={onSelectCornerNumber}
-            onSelectIndex={onSelectIndex}
-            markerScale={markerScale}
-            zoomLevel={zoomLevel}
-            primaryOpacity={primaryOpacity}
-            baselineOpacity={baselineOpacity}
-            dimNonSelectedTrack={dimNonSelectedTrack}
-            showCornerFlags={showCornerFlags}
+            cornerMarkers={cornerMarkers} pedalMarkers={pedalMarkerPoints}
+            selectedCornerNumber={selectedCornerNumber} onSelectCornerNumber={onSelectCornerNumber}
+            onSelectIndex={onSelectIndex} markerScale={markerScale} zoomLevel={zoomLevel}
+            primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity}
+            dimNonSelectedTrack={dimNonSelectedTrack} showCornerFlags={showCornerFlags}
+            viewBox={zoomLevel >= 2.5 ? currentViewBox : undefined}
           />
         </svg>
         <GpsSceneCarMarkers
-          viewBox={currentViewBox}
-          primaryCarClass={primaryCarClass}
-          primaryVehicleData={primaryVehicleData}
-          baselineVehicleData={baselineVehicleData}
-          baselineCarClass={baselineCarClass}
+          viewBox={currentViewBox} primaryCarClass={primaryCarClass} primaryVehicleData={primaryVehicleData}
+          baselineVehicleData={baselineVehicleData} baselineCarClass={baselineCarClass}
           unitsPerMeter={(VIEWBOX_SIZE - 2 * PADDING) / Math.max(effectiveBounds.spanX, effectiveBounds.spanZ, 1)}
-          primaryHeadingDeg={replayBodyHeading(points, currentIndex, fraction)}
-          baselineHeadingDeg={baselineBodyHeading}
-          currentPos={currentPos}
-          baselineGhostPos={baselineGhostPos}
-          markerScale={markerScale}
-          primaryOpacity={primaryOpacity}
-          baselineOpacity={baselineOpacity}
+          primaryHeadingDeg={replayBodyHeading(points, activeIndex, fraction)} baselineHeadingDeg={baselineBodyHeading}
+          currentPos={currentPos} baselineGhostPos={baselineGhostPos}
+          primaryAccel={showGForce ? resolveCarAcceleration(points, activeIndex, fraction) : undefined}
+          baselineAccel={showGForce && effectiveBaselinePoints.length ? resolveCarAcceleration(effectiveBaselinePoints, baselineHeadingIndex, baselineHeadingFraction) : undefined}
+          markerScale={markerScale} primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity}
         />
       </div>
 
@@ -296,6 +274,24 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       <MapScaleBar markerScale={markerScale} spanM={Math.max(effectiveBounds.spanX, effectiveBounds.spanZ)} />
 
       {showLegend && <HeatmapLegendBar colorBy={colorBy} />}
+
+      {isExpanded && <>
+        <GpsMapTelemetryHud primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM} />
+        {(onChangeColorBy || onTogglePedalMarkers || onToggleFrictionCircle) && (
+          <GpsMapModeBar colorBy={colorBy} onChangeColorBy={onChangeColorBy}
+            showPedalMarkers={showPedalMarkers} onTogglePedalMarkers={onTogglePedalMarkers} hasCorners={Boolean(corners?.length)}
+            isCompareMode={Boolean(baselinePoints)} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
+            onToggleFadedLine={onToggleFadedLine} showGForce={showGForce} onToggleGForce={handleToggleGForce}
+            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />
+        )}
+        {effectiveShowFriction && (
+          <div className="absolute bottom-20 sm:bottom-3.5 right-3 sm:right-3.5 z-30 select-none pointer-events-auto">
+            <ReplayFrictionCircle points={points} currentIndex={activeIndex} onClose={handleToggleFriction}
+              primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point} baselinePoints={effectiveBaselinePoints}
+              className="bg-slate-950/90 border border-white/15 backdrop-blur-md shadow-2xl rounded-xl" />
+          </div>
+        )}
+      </>}
     </div>
   );
 };

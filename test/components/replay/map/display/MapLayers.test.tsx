@@ -78,6 +78,43 @@ describe('GPS map display layers', () => {
     expect(surfacePaths).toEqual(['road', 'kerb']);
   });
 
+  it('renders centerline guide over active track when centerline layer is toggled on', () => {
+    const { container } = renderMap();
+    expect(container.querySelector('[data-testid="gps-track-centerline"]')).toBeNull();
+
+    openLayers();
+    const centerlineCheckbox = screen.getByRole('checkbox', { name: 'Centerline guide' });
+    expect(centerlineCheckbox).toBeEnabled();
+    fireEvent.click(centerlineCheckbox);
+
+    const centerline = container.querySelector('[data-testid="gps-track-centerline"]');
+    expect(centerline).toBeInTheDocument();
+    expect(centerline).toHaveAttribute('stroke', '#94A3B8');
+    // Active track road is still rendered underneath
+    expect(container.querySelector('[data-surface="road"]')).toBeInTheDocument();
+  });
+
+  it('does not include G-force arrow in the map layers selection control', () => {
+    renderMap();
+    openLayers();
+    expect(screen.queryByRole('checkbox', { name: 'G-force arrow' })).toBeNull();
+  });
+
+  it('renders map layer checkboxes in the requested order', () => {
+    renderMap();
+    openLayers();
+    const checkboxes = screen.getAllByRole('checkbox');
+    const labels = checkboxes.map(cb => cb.closest('label')?.textContent?.trim());
+    expect(labels).toEqual([
+      'Active track',
+      'Kerbs',
+      'Braking markers',
+      'Pit lane and apron',
+      'Centerline guide',
+      'Runoff and other roads',
+    ]);
+  });
+
   it('toggles native runoff and pit layers independently without changing the SVG camera', () => {
     const { container } = renderMap();
     const mapSvg = container.querySelector('[data-testid="gps-map-background"]')?.closest('svg');

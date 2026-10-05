@@ -143,4 +143,86 @@ describe('GpsTrackSegments', () => {
     expect(Number(paths[1].getAttribute('stroke-opacity'))).toBeCloseTo(0.45);
     expect(paths[1].getAttribute('stroke')).not.toBe('#334155');
   });
+
+  it('displays telemetry hover tooltip when pointer moves over the track line', () => {
+    const { container } = render(
+      <svg>
+        <GpsTrackSegments
+          svgPoints={mockPrimaryPoints}
+          colorBy="speed"
+          primaryDists={[100, 200, 300]}
+          deltaByIdx={[0, -0.15, 0.2]}
+          onSelectIndex={vi.fn()}
+        />
+      </svg>
+    );
+
+    const hitPath = container.querySelector('path[data-track-line="hit-target"]');
+    expect(hitPath).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="gps-track-hover-tooltip"]')).toBeNull();
+
+    if (hitPath) {
+      fireEvent.pointerMove(withIdentityCtm(hitPath), { clientX: 110, clientY: 110 });
+    }
+    const tooltip = container.querySelector('[data-testid="gps-track-hover-tooltip"]');
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip?.textContent).toContain('120 km/h');
+    expect(tooltip?.textContent).toContain('-0.15s');
+
+    if (hitPath) {
+      fireEvent.pointerLeave(hitPath);
+    }
+    expect(container.querySelector('[data-testid="gps-track-hover-tooltip"]')).toBeNull();
+  });
+
+  it('displays telemetry hover tooltip with delta even when colorBy is pedal mode', () => {
+    const { container } = render(
+      <svg>
+        <GpsTrackSegments
+          svgPoints={mockPrimaryPoints}
+          colorBy="pedal"
+          primaryDists={[100, 200, 300]}
+          deltaByIdx={[0, 0.25, 0.5]}
+          onSelectIndex={vi.fn()}
+        />
+      </svg>
+    );
+
+    const hitPath = container.querySelector('path[data-track-line="hit-target"]');
+    expect(hitPath).toBeInTheDocument();
+    if (hitPath) {
+      fireEvent.pointerMove(withIdentityCtm(hitPath), { clientX: 110, clientY: 110 });
+    }
+    const tooltip = container.querySelector('[data-testid="gps-track-hover-tooltip"]');
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip?.textContent).toContain('+0.25s');
+  });
+
+  it('culls off-screen runs when viewBox is provided', () => {
+    // Points are around sx: 100..120, sy: 100..120
+    const { container, rerender } = render(
+      <svg>
+        <GpsTrackSegments
+          svgPoints={mockPrimaryPoints}
+          colorBy="speed"
+          viewBox="500 500 100 100"
+        />
+      </svg>
+    );
+
+    // Far off-screen: 0 runs rendered
+    expect(container.querySelectorAll('path[data-track-line="primary"]')).toHaveLength(0);
+
+    // Inside viewBox: runs rendered
+    rerender(
+      <svg>
+        <GpsTrackSegments
+          svgPoints={mockPrimaryPoints}
+          colorBy="speed"
+          viewBox="50 50 100 100"
+        />
+      </svg>
+    );
+    expect(container.querySelectorAll('path[data-track-line="primary"]')).toHaveLength(2);
+  });
 });

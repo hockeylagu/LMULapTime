@@ -7,6 +7,9 @@ import {
   computeTrackBoundaryPathD,
   computeGhostPosition,
   computeBaselineDeltaByIdx,
+  parseViewBox,
+  isRunInViewBox,
+  isPointInViewBox,
 } from '../../src/components/replay/map/replayMapUtils.js';
 import type { ReplayTelemetryPoint } from '../../server/core/types.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
@@ -175,6 +178,67 @@ describe('replayMapUtils', () => {
       // Baseline samples at primary-frame distances 9, 21 and 40 m.
       expect(computeBaselineDeltaByIdx([-0.1, -0.2, -0.3], [10, 20, 30], [9, 21, 40])).toEqual([-0.1, -0.2, -0.3]);
       expect(computeBaselineDeltaByIdx(null, [10], [10])).toBeNull();
+    });
+  });
+
+  describe('frustum culling helpers', () => {
+    it('parses SVG viewBox string with margin ratio', () => {
+      const rect = parseViewBox('100 200 400 400', 0.25);
+      expect(rect).not.toBeNull();
+      // vw = 400 -> margin = 100
+      expect(rect!.minX).toBe(0);
+      expect(rect!.maxX).toBe(600);
+      expect(rect!.minY).toBe(100);
+      expect(rect!.maxY).toBe(700);
+
+      // Default margin ratio is 1.2 (wide buffer for hairpins and loops)
+      const defaultRect = parseViewBox('100 200 400 400');
+      expect(defaultRect!.minX).toBe(-380);
+      expect(defaultRect!.maxX).toBe(980);
+    });
+
+    it('returns null for invalid or missing viewBox', () => {
+      expect(parseViewBox(undefined)).toBeNull();
+      expect(parseViewBox('invalid')).toBeNull();
+      expect(parseViewBox('100 200 400')).toBeNull();
+    });
+
+    it('tests point containment in viewBox rect', () => {
+      const rect = { minX: 10, minY: 10, maxX: 100, maxY: 100 };
+      expect(isPointInViewBox(50, 50, rect)).toBe(true);
+      expect(isPointInViewBox(5, 50, rect)).toBe(false);
+      expect(isPointInViewBox(50, 105, rect)).toBe(false);
+      expect(isPointInViewBox(50, 50, null)).toBe(true);
+    });
+
+    it('tests run intersection with viewBox rect', () => {
+      const rect = { minX: 100, minY: 100, maxX: 200, maxY: 200 };
+      const insideRun = {
+        d: 'M 110 110 L 150 150',
+        color: '#fff',
+        isHighlighted: false,
+        from: 0,
+        to: 1,
+        minSx: 110,
+        maxSx: 150,
+        minSy: 110,
+        maxSy: 150,
+      };
+      const outsideRun = {
+        d: 'M 10 10 L 50 50',
+        color: '#fff',
+        isHighlighted: false,
+        from: 0,
+        to: 1,
+        minSx: 10,
+        maxSx: 50,
+        minSy: 10,
+        maxSy: 50,
+      };
+
+      expect(isRunInViewBox(insideRun, rect)).toBe(true);
+      expect(isRunInViewBox(outsideRun, rect)).toBe(false);
+      expect(isRunInViewBox(outsideRun, null)).toBe(true);
     });
   });
 });

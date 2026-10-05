@@ -65,7 +65,7 @@ describe('Computed Telemetry UI Channels', () => {
 
     expect(screen.getByText('LATERAL G')).toBeInTheDocument();
     expect(screen.getByText('COMPUTED')).toBeInTheDocument();
-    expect(screen.getAllByText('+2.15 G R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('+2.15 G L').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetryAccelLonChannel with braking / power indicator', () => {

@@ -121,9 +121,10 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const startTimeSec = sfCrossing?.timeSecOffset ?? (points[0]?.timeSec ?? 0);
   const currentTimeSec = currentPoint ? Math.max(0, (playbackPosition?.timeSec ?? currentPoint.timeSec ?? 0) - startTimeSec) : 0;
   const paths = useMemo(() => computeTelemetryChartPaths(points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples), [points, pointComparisons, viewStart, viewEnd, cumDists, baselineSamples]);
-  const isCursorInView = safeIndex >= viewStart && safeIndex <= viewEnd;
-  const cursorPct = pctForIndex(safeIndex) + (playbackPosition?.fraction ?? 0)
-    * (pctForIndex(Math.min(safeIndex + 1, points.length - 1)) - pctForIndex(safeIndex));
+  const activeIndex = playbackPosition ? playbackPosition.index : safeIndex;
+  const isCursorInView = activeIndex >= viewStart && activeIndex <= viewEnd;
+  const cursorPct = pctForIndex(activeIndex) + (playbackPosition?.fraction ?? 0)
+    * (pctForIndex(Math.min(activeIndex + 1, points.length - 1)) - pctForIndex(activeIndex));
 
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;

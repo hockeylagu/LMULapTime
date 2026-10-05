@@ -150,6 +150,42 @@ export interface TrackLineRun {
   /** Positions in the projected points of the run's first and last vertex. */
   from: number;
   to: number;
+  minSx?: number;
+  maxSx?: number;
+  minSy?: number;
+  maxSy?: number;
+}
+
+export interface ViewBoxRect {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export function parseViewBox(viewBox?: string | null, marginRatio = 1.2): ViewBoxRect | null {
+  if (!viewBox) return null;
+  const parts = viewBox.trim().split(/\s+/).map(Number);
+  if (parts.length !== 4 || parts.some(n => !Number.isFinite(n))) return null;
+  const [vx, vy, vw, vh] = parts;
+  const marginX = vw * marginRatio;
+  const marginY = vh * marginRatio;
+  return {
+    minX: vx - marginX,
+    minY: vy - marginY,
+    maxX: vx + vw + marginX,
+    maxY: vy + vh + marginY,
+  };
+}
+
+export function isRunInViewBox(run: TrackLineRun, box: ViewBoxRect | null): boolean {
+  if (!box || run.minSx === undefined || run.maxSx === undefined || run.minSy === undefined || run.maxSy === undefined) return true;
+  return !(run.maxSx < box.minX || run.minSx > box.maxX || run.maxSy < box.minY || run.minSy > box.maxY);
+}
+
+export function isPointInViewBox(sx: number, sy: number, box: ViewBoxRect | null): boolean {
+  if (!box) return true;
+  return sx >= box.minX && sx <= box.maxX && sy >= box.minY && sy <= box.maxY;
 }
 
 /**
@@ -176,8 +212,22 @@ export function buildTrackLineRuns(
     if (run && run.to === i - 1 && run.color === color && run.isHighlighted === isHighlighted) {
       run.d += ` L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`;
       run.to = i;
+      run.minSx = Math.min(run.minSx!, p.sx);
+      run.maxSx = Math.max(run.maxSx!, p.sx);
+      run.minSy = Math.min(run.minSy!, p.sy);
+      run.maxSy = Math.max(run.maxSy!, p.sy);
     } else {
-      run = { d: `M ${prev.sx.toFixed(2)} ${prev.sy.toFixed(2)} L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`, color, isHighlighted, from: i - 1, to: i };
+      run = {
+        d: `M ${prev.sx.toFixed(2)} ${prev.sy.toFixed(2)} L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`,
+        color,
+        isHighlighted,
+        from: i - 1,
+        to: i,
+        minSx: Math.min(prev.sx, p.sx),
+        maxSx: Math.max(prev.sx, p.sx),
+        minSy: Math.min(prev.sy, p.sy),
+        maxSy: Math.max(prev.sy, p.sy),
+      };
       runs.push(run);
     }
   }

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { GpsScenePedalMarker } from './GpsScenePedalMarker.js';
 import { CHART_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
+import { isPointInViewBox, parseViewBox } from '../replayMapUtils.js';
 
 export interface CornerMarkerPoint {
   cornerNumber: number;
@@ -38,6 +39,7 @@ export interface GpsSceneMarkersProps {
   baselineOpacity?: number;
   dimNonSelectedTrack?: boolean;
   showCornerFlags?: boolean;
+  viewBox?: string;
 }
 
 export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
@@ -53,7 +55,10 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
   baselineOpacity = 1,
   dimNonSelectedTrack = false,
   showCornerFlags = true,
+  viewBox,
 }) => {
+  const viewBoxRect = useMemo(() => parseViewBox(viewBox), [viewBox]);
+
   const cornersToRender = useMemo(() => {
     return cornerMarkers ?? markers ?? [];
   }, [cornerMarkers, markers]);
@@ -97,13 +102,22 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
   }, [cornersToRender, selectedCornerNumber, zoomLevel, markerScale]);
 
   const visiblePedalMarkers = useMemo(() => {
-    if (!dimNonSelectedTrack || selectedCornerNumber == null) return pedalMarkers;
-    return pedalMarkers.filter(p => p.cornerNumber === selectedCornerNumber);
-  }, [pedalMarkers, dimNonSelectedTrack, selectedCornerNumber]);
+    let list = pedalMarkers;
+    if (dimNonSelectedTrack && selectedCornerNumber != null) {
+      list = list.filter(p => p.cornerNumber === selectedCornerNumber);
+    }
+    if (viewBoxRect) {
+      list = list.filter(p => isPointInViewBox(p.sx, p.sy, viewBoxRect));
+    }
+    return list;
+  }, [pedalMarkers, dimNonSelectedTrack, selectedCornerNumber, viewBoxRect]);
 
   const visibleCornerFlags = useMemo(() => {
+    const candidates = viewBoxRect
+      ? cornerPositions.filter(c => isPointInViewBox(c.posX, c.posY, viewBoxRect) || isPointInViewBox(c.actualSx, c.actualSy, viewBoxRect))
+      : cornerPositions;
     // Selected corners win collisions. The screen-space margin reveals more labels as zoom increases.
-    const ordered = [...cornerPositions].sort((a, b) => Number(b.isSelected) - Number(a.isSelected));
+    const ordered = [...candidates].sort((a, b) => Number(b.isSelected) - Number(a.isSelected));
     const kept: typeof cornerPositions = [];
     for (const marker of ordered) {
       if (marker.isSelected || kept.every(other => Math.hypot(marker.posX - other.posX, marker.posY - other.posY) > 34 * markerScale)) {
@@ -111,11 +125,16 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
       }
     }
     return kept;
-  }, [cornerPositions, markerScale]);
+  }, [cornerPositions, markerScale, viewBoxRect]);
+
+  const visibleApexMarkers = useMemo(() => {
+    if (!viewBoxRect) return cornerPositions;
+    return cornerPositions.filter(m => isPointInViewBox(m.actualSx, m.actualSy, viewBoxRect));
+  }, [cornerPositions, viewBoxRect]);
 
   return (
     <>
-      {!showCornerFlags && cornerPositions.map(m => {
+      {!showCornerFlags && visibleApexMarkers.map(m => {
         const dirX = m.sx - m.actualSx;
         const dirY = m.sy - m.actualSy;
         const distWorld = Math.hypot(dirX, dirY);

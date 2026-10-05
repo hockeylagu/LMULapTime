@@ -47,7 +47,9 @@ Vehicle catalogs contain `schemaVersion: 1`,
 Each record has `id`, `model`, `carClass`, `vehicleIds`; optional
 `dimensions` hold `lengthM`, `widthM`, `heightM`. Optional convex
 `outlineXZ` coordinates are metres with forward -Z. A validated
-`replayOriginOffsetXZ` is required before model footprints are placed on replay poses.
+`replayOriginOffsetXZ` establishes calibrated placement on replay poses. Without it,
+the map still displays the model envelope at its preserved local origin, explicitly labeled
+as approximate placement. It does not recenter the outline or invent a provider offset.
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 

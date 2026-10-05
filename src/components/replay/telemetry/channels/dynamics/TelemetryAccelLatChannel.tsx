@@ -60,7 +60,7 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
   const formatG = (g: number | undefined): string => {
     if (g === undefined) return '0.00 G';
     const sign = g > 0 ? '+' : '';
-    const dir = Math.abs(g) < 0.1 ? '' : g > 0 ? ' R' : ' L';
+    const dir = Math.abs(g) < 0.1 ? '' : g > 0 ? ' L' : ' R';
     return `${sign}${g.toFixed(2)} G${dir}`;
   };
 
@@ -80,9 +80,9 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
-        { label: '+3.0G Right', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
+        { label: '+3.0G Left', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
         { label: '0.0G Center', borderClassName: 'border-b border-lmu-info/50', labelClassName: 'text-[10px] text-lmu-info-soft font-mono' },
-        { label: '-3.0G Left', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
+        { label: '-3.0G Right', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
       ]} />
 
       {isCursorInView && hasLatG && (

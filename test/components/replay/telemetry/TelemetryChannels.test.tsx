@@ -468,7 +468,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
       />
     );
 
-    expect(screen.getAllByText('+1.20 G R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('+1.20 G L').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
   });
 
@@ -492,7 +492,7 @@ describe('TelemetryChannelRenderer & Preset Rows', () => {
     const { rerender } = render(
       <TelemetryChannelRenderer channelId="accel-lat" source="duckdb" {...shared} />
     );
-    expect(screen.getAllByText('+1.20 G R').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('+1.20 G L').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('COMPUTED')).not.toBeInTheDocument();
 
     rerender(

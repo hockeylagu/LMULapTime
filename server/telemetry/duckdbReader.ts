@@ -17,8 +17,9 @@ export interface DuckDbSessionMetadata {
 }
 
 /**
- * Maps LMU's exported G-force labels and signs to the application's canonical vehicle axes:
- * lateral positive right, longitudinal positive power and negative braking.
+ * Maps LMU's exported G-force channels to canonical ISO 8855 vehicle coordinate axes:
+ * - Longitudinal (a_x): positive power / acceleration, negative braking.
+ * - Lateral (a_y): positive left turn (+Y), negative right turn (-Y).
  */
 export function normalizeDuckDbGForces(
   exportedLatG: number | undefined,

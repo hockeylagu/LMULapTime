@@ -34,8 +34,11 @@ export const ReplayPlaybackCursorContext = createContext<PlaybackCursor | null>(
 const emptySnapshot = () => null;
 const emptySubscribe = () => () => {};
 
-export function usePlaybackPosition(points: ReplayTrajectoryPoint[], currentIndex: number) {
+export function usePlaybackPosition(points: ReplayTrajectoryPoint[], currentIndex?: number) {
   const cursor = useContext(ReplayPlaybackCursorContext);
   const position = useSyncExternalStore(cursor?.subscribe ?? emptySubscribe, cursor?.getSnapshot ?? emptySnapshot, emptySnapshot);
-  return position?.points === points && position.index === currentIndex ? position : null;
+  if (!position || position.points !== points) return null;
+  if (currentIndex !== undefined && position.index < currentIndex) return null;
+  return position;
 }
+

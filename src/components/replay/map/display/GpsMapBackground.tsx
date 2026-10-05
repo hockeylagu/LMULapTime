@@ -49,9 +49,27 @@ export const GpsMapBackground: React.FC<Props> = React.memo(({ geometry, display
           viewBoxSize={800} padding={60} layers={{ ...layers, road: false, runoff: false, pit: false, otherRoad: false }} /></g>
       </>}
     </>}
-    {left.length > 0 && right.length > 0 ? <GpsTrackRoadRibbon leftSvgPoints={left} rightSvgPoints={right}
-      centerlineSvgPoints={center} showRoad={!display && layers.road} showEdges showCenterline={layers.centerline} />
-      : !display && layers.road && <path d={pathD} fill="none" stroke={MAP_COLORS.roadSurface} strokeWidth="6"
-        strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+    {(left.length > 0 && right.length > 0) || (center.length > 0 && layers.centerline) ? (
+      <GpsTrackRoadRibbon
+        leftSvgPoints={left}
+        rightSvgPoints={right}
+        centerlineSvgPoints={center}
+        showRoad={!display && layers.road}
+        showEdges={left.length > 0 && right.length > 0}
+        showCenterline={layers.centerline}
+      />
+    ) : (
+      !display && layers.road && (
+        <path
+          d={pathD}
+          fill="none"
+          stroke={MAP_COLORS.roadSurface}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )
+    )}
   </g>;
 });
