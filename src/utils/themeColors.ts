@@ -49,6 +49,8 @@ export const CHART_COLORS = {
   white: '#FFFFFF',
   black: '#000000',
   playerHighlight: '#FBBF24',
+  /** The band behind a hovered bar group: one tonal step over the panel, never a light block. */
+  hoverBand: 'rgba(255,255,255,0.05)',
 } as const;
 
 export const TELEMETRY_COLORS = {

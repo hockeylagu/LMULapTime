@@ -1,8 +1,10 @@
 import React from 'react';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, ListPlus } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { CompareLapCard } from './CompareLapCard';
+import { MAX_COMPARED_LAPS } from './useCompareLapsData.js';
+import { SECONDARY_BUTTON } from '../common/buttonStyles.js';
 
 export interface CompareLapsDeckProps {
   /** The compared laps, left to right. */
@@ -12,6 +14,8 @@ export interface CompareLapsDeckProps {
   rivalLapId?: string | null;
   setBaselineLapId: (id: string) => void;
   onToggleLap: (lap: ComparableLap) => void;
+  /** Opens the lap picker: in place of a compared lap, or (null) for the empty slot. */
+  onChooseLap?: (replacing: ComparableLap | null) => void;
   onSelectSession?: (sessionId: string) => void;
   benchmarks: ReferenceLaptimeEntry[];
   allLaps: ComparableLap[];
@@ -26,6 +30,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
   rivalLapId = null,
   setBaselineLapId,
   onToggleLap,
+  onChooseLap,
   onSelectSession,
   benchmarks,
   allLaps,
@@ -40,6 +45,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
         <p className="text-xs text-lmu-muted max-w-md mx-auto">
           Pick two drivers on the leaderboard, compare one with your best, or start from a preset above.
         </p>
+        {onChooseLap && <div className="pt-2"><ChooseLapButton onClick={() => onChooseLap(null)} /></div>}
       </div>
     );
   }
@@ -58,6 +64,7 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
             color={lapColors[index % lapColors.length]}
             onSetBaseline={setBaselineLapId}
             onRemoveLap={onToggleLap}
+            onChangeLap={onChooseLap}
             onSelectSession={onSelectSession}
             benchmarks={benchmarks}
             allLaps={allLaps}
@@ -65,6 +72,19 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
           />
         );
       })}
+      {onChooseLap && laps.length < MAX_COMPARED_LAPS && (
+        <div className="p-4 rounded-2xl border border-dashed border-lmu-rule/60 flex flex-col items-center justify-center gap-3 text-center">
+          <p className="text-xs text-lmu-muted max-w-56">Another of your laps, from qualifying, the race or any session here.</p>
+          <ChooseLapButton onClick={() => onChooseLap(null)} />
+        </div>
+      )}
     </div>
   );
 };
+
+const ChooseLapButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button type="button" onClick={onClick} className={SECONDARY_BUTTON}>
+    <ListPlus className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
+    Choose a lap
+  </button>
+);

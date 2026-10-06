@@ -7,7 +7,7 @@ import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
  * Session name (R1, Q1, P2) in its session type's hue (`SESSION_TYPE_STYLES`), at a fixed minimum
  * width so the names line up down the column. Other types (warm-up) stay neutral.
  */
-export const SessionTypeChip: React.FC<{ session: SessionListItem; className?: string }> = ({ session, className = '' }) => {
+export const SessionTypeChip: React.FC<{ session: Pick<SessionListItem, 'sessionType' | 'sessionName'>; className?: string }> = ({ session, className = '' }) => {
   const style = getSessionTypeStyle(session.sessionType, session.sessionName);
   return (
     <span

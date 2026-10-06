@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Trash2 } from 'lucide-react';
+import { Replace, Target, Trash2 } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
@@ -8,9 +8,10 @@ import { PaceBadge, LapStatusBadge } from '../common';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { CarLogo } from '../vehicle/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { SessionTypeChip } from '../session-list/SessionRowParts.js';
 
 /** A lap's tag without the emoji some stored tags still start with; the card's colour carries the meaning. */
-const plainTag = (tag?: string) => tag?.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '');
+export const plainTag = (tag?: string) => tag?.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '');
 
 export interface CompareLapCardProps {
   lap: ComparableLap;
@@ -21,6 +22,8 @@ export interface CompareLapCardProps {
   color: string;
   onSetBaseline: (id: string) => void;
   onRemoveLap: (lap: ComparableLap) => void;
+  /** Opens the lap picker to put another lap in this card's place. */
+  onChangeLap?: (lap: ComparableLap) => void;
   onSelectSession?: (sessionId: string) => void;
   benchmarks: ReferenceLaptimeEntry[];
   allLaps: ComparableLap[];
@@ -35,6 +38,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   color,
   onSetBaseline,
   onRemoveLap,
+  onChangeLap,
   onSelectSession,
   benchmarks,
   allLaps,
@@ -104,6 +108,17 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
                 Set Baseline
               </button>
             )}
+            {onChangeLap && (
+              <button
+                type="button"
+                onClick={() => onChangeLap(lap)}
+                className={`flex items-center gap-1 text-[10px] text-lmu-muted hover:text-white font-semibold transition-colors px-1.5 py-0.5 rounded hover:bg-lmu-bg cursor-pointer ${FOCUS_RING}`}
+                title="Put another of your laps in place of this one"
+              >
+                <Replace className="w-3 h-3" aria-hidden="true" />
+                Change
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onRemoveLap(lap)}
@@ -129,9 +144,10 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
               <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />
             )}
           </div>
-          {lap.sessionName && (
-            <p className="text-[11px] text-lmu-muted truncate mt-0.5">
-              {lap.sessionName} ({lap.sessionType || 'P'})
+          {(lap.sessionName || lap.sessionType) && (
+            <p className="flex items-center gap-2 mt-1.5 text-[11px] text-lmu-muted min-w-0">
+              <SessionTypeChip session={{ sessionType: lap.sessionType ?? '', sessionName: lap.sessionName }} />
+              {lap.dateString && <span className="font-mono truncate">{lap.dateString.slice(0, 16)}</span>}
             </p>
           )}
           <div className="flex items-baseline gap-2 mt-0.5">

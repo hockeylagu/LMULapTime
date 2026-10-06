@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } from 'lucide-react';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { ComparableLap } from '../../../shared/types/index.js';
-import { FOCUS_RING } from '../common/buttonStyles.js';
+import { FOCUS_RING, SECONDARY_BUTTON } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 
 export interface CompareLapsHeaderProps {
@@ -29,8 +29,10 @@ export interface CompareLapsHeaderProps {
   onClearAll: () => void;
 }
 
-const preset = 'px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-border border border-lmu-border hover:border-lmu-accent/50 text-lmu-muted hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer';
-const headerAction = 'flex items-center gap-1 text-[11px] font-bold text-lmu-muted bg-lmu-card hover:bg-lmu-border hover:text-white border border-lmu-border hover:border-lmu-accent/50 px-2 py-0.5 rounded-lg transition-colors cursor-pointer';
+/** The presets are secondary buttons; an icon keeps a hue only where it means one (rival amber, personal best gold). */
+const preset = SECONDARY_BUTTON;
+/** Quiet outlined, as "Where's the time?": acts on the laps already compared. */
+const headerAction = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-semibold text-lmu-muted hover:text-white hover:border-lmu-rule-strong transition-colors cursor-pointer';
 
 /** The compare card's header: the laps compared, the baseline, and the quick presets. */
 export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
@@ -66,7 +68,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
             className={`${headerAction} ${FOCUS_RING}`}
             title="Measure the deltas against the other lap"
           >
-            <ArrowLeftRight className="w-3 h-3" />
+            <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
             Swap baseline
           </button>
         )}
@@ -78,7 +80,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
               onClick={linkClickHandler(onCompareTelemetry ? () => onCompareTelemetry() : undefined)}
               title="Speed, pedals, delta and line of the two laps, overlaid"
             >
-              <Activity className="w-3 h-3" />
+              <Activity className="w-3.5 h-3.5" aria-hidden="true" />
               Compare Telemetry
             </Link>
           ) : (
@@ -88,7 +90,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
               className={`${headerAction} ${FOCUS_RING}`}
               title="Speed, pedals, delta and line of the two laps, overlaid"
             >
-              <Activity className="w-3 h-3" />
+              <Activity className="w-3.5 h-3.5" aria-hidden="true" />
               Compare Telemetry
             </button>
           )
@@ -98,20 +100,20 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
 
     <div className="flex flex-wrap items-center gap-2">
       {rivalLap && onAddRival && (
-        <button type="button" onClick={onAddRival} className={`${preset} ${FOCUS_RING}`} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
+        <button type="button" onClick={onAddRival} className={preset} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
           <Crosshair className="w-3.5 h-3.5 text-lmu-warn-soft" />
           + Rival ({rivalLap.lapTimeString})
         </button>
       )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
-        <button type="button" onClick={onAddPersonalBest} className={`${preset} ${FOCUS_RING}`} title="Add your Personal Best lap for this track & category">
+        <button type="button" onClick={onAddPersonalBest} className={preset} title="Add your Personal Best lap for this track & category">
           <Trophy className="w-3.5 h-3.5 text-lmu-personal-best" />
           + Personal Best ({formatTime(allTimePBObject.lapTime)})
         </button>
       )}
 
       {theoreticalBestSec && (
-        <button type="button" onClick={onAddTheoreticalBest} className={`${preset} ${FOCUS_RING}`} title="Add your theoretical optimal lap for this track & category">
+        <button type="button" onClick={onAddTheoreticalBest} className={preset} title="Add your theoretical optimal lap for this track & category">
           <Sparkles className="w-3.5 h-3.5 text-lmu-muted" />
           + Theoretical Best ({formatTime(theoreticalBestSec)})
         </button>
@@ -121,7 +123,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <button
           type="button"
           onClick={onAddOverallTrackBest}
-          className={`${preset} ${FOCUS_RING}`}
+          className={preset}
           title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
         >
           <Award className="w-3.5 h-3.5 text-lmu-muted" />
@@ -133,9 +135,9 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
         <button
           type="button"
           onClick={onClearAll}
-          className={`px-3 py-1.5 rounded-xl bg-lmu-card hover:bg-lmu-loss-deep/40 border border-lmu-border hover:border-lmu-loss-strong/40 text-xs text-lmu-muted hover:text-lmu-loss font-semibold transition-all flex items-center gap-1 cursor-pointer ${FOCUS_RING}`}
+          className={SECONDARY_BUTTON}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
           Clear
         </button>
       )}

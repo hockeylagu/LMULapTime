@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ConsistencyMetricStat } from '../../../utils/cornerConsistency.js';
-import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
+import { CHART_COLORS, LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 
 export function consistencyClass(pct: number): string {
   if (pct <= 0.3) return 'text-lmu-gain';
@@ -42,7 +42,7 @@ export function MetricChart({
           />
           <ReferenceLine y={stat.avg} stroke={LMU_COLORS.gold} strokeDasharray="4 4" />
           <Tooltip
-            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+            cursor={{ fill: CHART_COLORS.hoverBand }}
             contentStyle={{ background: LMU_COLORS.strip, border: `1px solid ${LMU_COLORS.border}`, borderRadius: 6, fontSize: 11 }}
             labelStyle={{ color: LMU_COLORS.muted }}
             itemStyle={{ color: LMU_COLORS.text }}

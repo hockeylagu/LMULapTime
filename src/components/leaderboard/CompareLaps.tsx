@@ -13,6 +13,7 @@ import { LapDebriefPanel } from './debrief/LapDebriefPanel.js';
 import { loadLapPairDebrief, LapDebriefUnavailableError } from './debrief/loadLapDebrief.js';
 import { SectorGapSummary } from './debrief/SectorGapSummary.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { CompareLapPicker } from './picker/CompareLapPicker.js';
 
 export type { CompareLapsSessionItem };
 
@@ -232,12 +233,25 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         rivalLapId={rivalLap?.id ?? null}
         setBaselineLapId={setBaselineLapId}
         onToggleLap={data.handleToggleLap}
+        onChooseLap={(lap) => data.setPickerTarget({ replaceId: lap?.id ?? null })}
         onSelectSession={onSelectSession}
         benchmarks={data.apiData.benchmarks}
         allLaps={data.apiData.laps}
         selectedCarClass={data.selectedCarClass}
         lapColors={COMPARE_LAP_COLORS}
       />
+
+      {data.pickerTarget && (
+        <CompareLapPicker
+          laps={data.apiData.laps}
+          anchor={data.pickerAnchor}
+          replacing={data.pickerReplacing}
+          comparedIds={selectedLaps.map((l) => l.id)}
+          personalBestId={data.allTimePBObject?.id ?? null}
+          onPick={data.handlePickLap}
+          onClose={() => data.setPickerTarget(null)}
+        />
+      )}
 
       {debriefPair && (
         <div className="space-y-3">

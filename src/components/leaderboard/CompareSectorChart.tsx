@@ -14,6 +14,7 @@ import { Clock } from 'lucide-react';
 import { ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
+import { plainTag } from './CompareLapCard.js';
 
 export interface CompareSectorChartDataItem {
   metric: string;
@@ -69,7 +70,7 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
       <div className="flex items-center justify-between gap-4 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
         <p className="font-bold text-white">{label} Delta vs Baseline</p>
         <span className="text-[10px] text-lmu-gold">
-          Base: {baselineLap.tag || `Lap ${baselineLap.lapNum || '-'}`}
+          Base: {plainTag(baselineLap.tag) || `Lap ${baselineLap.lapNum || '-'}`}
         </span>
       </div>
       {uniquePayload.map((p) => {
@@ -103,7 +104,7 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
                 style={{ backgroundColor: p.color || deltaColor }}
               />
               <span className="text-white font-medium">
-                {lap?.tag || p.name || key}
+                {plainTag(lap?.tag) || p.name || key}
               </span>
             </span>
             <div className="flex items-center gap-2">
@@ -164,9 +165,9 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
                 val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(3)}s` : `${val.toFixed(3)}s`
               }
             />
-            <Tooltip content={<CompareSectorTooltip chartData={chartData} selectedLaps={selectedLaps} baselineLap={baselineLap} />} />
+            <Tooltip cursor={{ fill: CHART_COLORS.hoverBand }} content={<CompareSectorTooltip chartData={chartData} selectedLaps={selectedLaps} baselineLap={baselineLap} />} />
             {comparedLaps.filter((lap) => lap.id !== baselineLap.id).map((lap) => (
-              <Bar key={lap.id} dataKey={lap.id} name={lap.tag || `Lap ${lap.lapNum || '-'}`} radius={[4, 4, 0, 0]}>
+              <Bar key={lap.id} dataKey={lap.id} name={plainTag(lap.tag) || `Lap ${lap.lapNum || '-'}`} radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, entryIndex) => {
                   const val = Number(entry[lap.id] || 0);
                   const cellColor =

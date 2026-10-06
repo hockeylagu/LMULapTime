@@ -79,6 +79,21 @@ export function toggleComparedLap(laps: ComparableLap[], lap: ComparableLap): Co
   return [...laps, lap];
 }
 
+/**
+ * Puts a picked lap in the comparison: in place of `replaceId` when that lap is compared, otherwise
+ * in the empty slot (or, full, as a leaderboard pick would). A lap already compared stays as it is.
+ */
+export function placeComparedLap(laps: ComparableLap[], lap: ComparableLap, replaceId: string | null): ComparableLap[] {
+  if (laps.some((l) => l.id === lap.id)) return laps;
+  if (replaceId && laps.some((l) => l.id === replaceId)) return laps.map((l) => (l.id === replaceId ? lap : l));
+  return toggleComparedLap(laps, lap);
+}
+
+/** The slot the lap picker fills: the compared lap it replaces, or null for the empty slot. */
+export interface LapPickerTarget {
+  replaceId: string | null;
+}
+
 const NO_COMPARE_LAPS: CompareLapsApiData = {
   laps: [],
   allTimeBestLap: null,
@@ -123,6 +138,7 @@ export function useCompareLapsData({
 
   const [selectedLaps, setSelectedLaps] = useState<ComparableLap[]>([]);
   const [baselineLapId, setBaselineLapId] = useState<string>('');
+  const [pickerTarget, setPickerTarget] = useState<LapPickerTarget | null>(null);
 
   const initializedScopeRef = useRef<string>('');
   // The track and class the laps in apiData were loaded for: laps are only picked from data of the current selection.
@@ -135,6 +151,7 @@ export function useCompareLapsData({
     setSelectionScope(lapScope);
     setSelectedLaps([]);
     setBaselineLapId('');
+    setPickerTarget(null);
   }
 
   useEffect(() => {
@@ -229,6 +246,10 @@ export function useCompareLapsData({
     const initialSlice = candidates.slice(0, MAX_COMPARED_LAPS);
     setSelectedLaps(initialSlice);
     setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
+    // A lap opened from its session (no pair asked for): offer what to set against it right away.
+    if (targetLap && !compareLap) {
+      setPickerTarget({ replaceId: initialSlice.find((l) => l.id !== targetLap.id)?.id ?? null });
+    }
     initializedScopeRef.current = currentScope;
   }, [apiData, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNum, targetCompareSessionId, targetCompareDriver, targetCompareLapNum]);
 
@@ -265,7 +286,24 @@ export function useCompareLapsData({
   const handleClearAll = () => {
     setSelectedLaps([]);
     setBaselineLapId('');
+    setPickerTarget(null);
   };
+
+  /** Fills the picker's slot. The lap replacing the baseline becomes the baseline. */
+  const handlePickLap = (lap: ComparableLap) => {
+    const replaceId = pickerTarget?.replaceId ?? null;
+    const next = placeComparedLap(selectedLaps, lap, replaceId);
+    setSelectedLaps(next);
+    if (replaceId && replaceId === baselineLapId && next.some((l) => l.id === lap.id)) setBaselineLapId(lap.id);
+    else if (!next.some((l) => l.id === baselineLapId)) setBaselineLapId(defaultBaselineId(next));
+    setPickerTarget(null);
+  };
+
+  // The lap staying in the comparison while the picker fills the other slot.
+  const pickerAnchor = pickerTarget
+    ? selectedLaps.find((l) => l.id !== pickerTarget.replaceId) ?? null
+    : null;
+  const pickerReplacing = pickerTarget?.replaceId ? selectedLaps.find((l) => l.id === pickerTarget.replaceId) ?? null : null;
 
   const allTimePBObject: ComparableLap | null = useMemo(() => {
     const fastest = (list: ComparableLap[]) => [...list]
@@ -374,6 +412,11 @@ export function useCompareLapsData({
     setBaselineLapId,
     handleToggleLap,
     handleClearAll,
+    pickerTarget,
+    setPickerTarget,
+    pickerAnchor,
+    pickerReplacing,
+    handlePickLap,
     allTimePBObject,
     isPBInComparison,
     handleAddPersonalBest,
