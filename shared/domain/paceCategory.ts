@@ -38,7 +38,7 @@ export interface CarClassOption {
 
 export const VEHICLE_CLASS_OPTIONS: CarClassOption[] = [
   { id: 'All', label: 'All Classes' },
-  { id: 'LMGT3', label: 'LMGT3' },
+  { id: 'LMGT3', label: 'GT3' },
   { id: 'LMH', label: 'Hypercar' },
   { id: 'LMP3', label: 'LMP3' },
   { id: 'LMP2elms', label: 'LMP2 (ELMS)' },

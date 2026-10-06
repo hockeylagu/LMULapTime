@@ -105,8 +105,8 @@ describe('CarClassBadge', () => {
     expect(allBtn).toBeInTheDocument();
     expect(allBtn).toHaveTextContent('ALL');
 
-    // LMGT3 button is present by aria-label and has GT3 visible text
-    const gt3Btn = screen.getByRole('button', { name: 'LMGT3' });
+    // The LMGT3 class reads GT3, by aria-label and visible text
+    const gt3Btn = screen.getByRole('button', { name: 'GT3' });
     expect(gt3Btn).toBeInTheDocument();
     expect(gt3Btn).toHaveTextContent('GT3');
     // Ensure there is no duplicated 'LMGT3' text node alongside GT3

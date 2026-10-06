@@ -94,10 +94,10 @@ describe('TrackSummaries component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'LMGT3' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'GT3' })).toBeInTheDocument();
     });
 
-    const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
+    const lmgt3Btn = screen.getByRole('button', { name: 'GT3' });
     fireEvent.click(lmgt3Btn);
     expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
 
@@ -229,7 +229,7 @@ describe('TrackSummaries component', () => {
     document.addEventListener('click', event => event.preventDefault(), { once: true });
     fireEvent.click(link, { ctrlKey: true });
     expect(onSelectTrack).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'LMGT3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'GT3' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Hypercar' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('No sessions recorded for this class.')).toBeInTheDocument();
   });

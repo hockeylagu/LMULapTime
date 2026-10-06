@@ -70,7 +70,7 @@ describe('LeaderboardPage', () => {
     expect(ribbonCard).toHaveTextContent('Daytona International SpeedwayDaytona International Speedway (Road Course) layout');
     expect(ribbonCard).not.toHaveTextContent('🇮🇹');
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^GT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH', expect.anything());
   });
@@ -114,7 +114,7 @@ describe('LeaderboardPage', () => {
     expect(urlParams().get('sessionId')).toBeNull();
     expect(urlParams().get('lapNum')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /LMGT3\s*P12\/20/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^GT3\s*P12\/20/ }));
     await waitFor(() => expect(urlParams().get('carClass')).toBe('LMGT3'));
   });
 

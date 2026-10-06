@@ -475,7 +475,7 @@ describe('TrackDetail component', () => {
     fireEvent.click(carModelBtn);
 
     // Switch car class
-    const lmgt3Btn = screen.getByRole('button', { name: 'LMGT3' });
+    const lmgt3Btn = screen.getByRole('button', { name: 'GT3' });
     fireEvent.click(lmgt3Btn);
     expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
   });
