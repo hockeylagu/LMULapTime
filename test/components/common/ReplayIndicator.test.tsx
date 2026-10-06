@@ -45,6 +45,17 @@ describe('ReplayIndicator', () => {
     expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Replay queued/ })).toBeDisabled();
   });
+  it('shows a queued replay as queued even when the session has 100Hz telemetry', () => {
+    const scan = { running: false, replayJobs: [{ name: 'x.Vcr', status: 'queued' }] } as ScanStatus;
+    render(
+      <SessionDataContext.Provider value={{ revision: 0, scan }}>
+        <ReplayIndicator replay={{ name: 'x.Vcr', hasDuckDbTelemetry: true }} onClick={vi.fn()} />
+        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb onClick={vi.fn()} />
+      </SessionDataContext.Provider>
+    );
+    expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Replay queued/ })).toBeDisabled();
+  });
   it('renders nothing or dash when replay is not provided', () => {
     const { container, rerender } = render(<ReplayIndicator replay={null} />);
     expect(screen.getByText('-')).toBeInTheDocument();

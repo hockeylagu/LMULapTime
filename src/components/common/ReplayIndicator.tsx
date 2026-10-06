@@ -39,8 +39,9 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   const isDuckDb = Boolean(hasDuckDbTelemetry || replay?.hasDuckDbTelemetry);
   const usableDespiteFailure = Boolean(job?.playable || isDuckDb);
   const partialFailure = job?.status === 'failed' && usableDespiteFailure;
-  // A replay left queued for a retry (an interrupted driver) still opens if its own laps are stored.
-  const queued = job?.status === 'queued' && !usableDespiteFailure;
+  // A queued replay waits for its turn even with 100Hz telemetry; one left queued for a retry
+  // (an interrupted driver) still opens if its own laps are stored.
+  const queued = job?.status === 'queued' && !job.playable;
 
   if (!replay) {
     if (hideIfEmpty) return null;
