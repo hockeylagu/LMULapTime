@@ -31,7 +31,7 @@ import {
 import { parseStreamEvents } from './sessionXmlStream.js';
 import { applyLapTiming } from './sessionLapTiming.js';
 import { isRacingLap } from '../../shared/domain/lapComparison.js';
-import { annotateLapTraffic } from '../../shared/domain/raceTraffic.js';
+import { annotateLapTraffic, isNonRaceSession } from '../../shared/domain/raceTraffic.js';
 import { classifySessionLaps } from './sessionLapClassification.js';
 import { findMatchingReplay } from './replayMatching.js';
 
@@ -229,8 +229,9 @@ export class LmuParser {
 
       // With contacts and the cars met on track attached to their laps, tag the wet laps and mark
       // the laps that do not show the driver's pace. Rain comes later, with the linked replay's
-      // conditions (server/core/dbSessionConditions.ts).
-      annotateLapTraffic(drivers);
+      // conditions (server/core/dbSessionConditions.ts). Traffic is a race's: qualifying is private
+      // in LMU (each driver runs alone) and practice is no fight, so neither has any (positions still do).
+      if (!isNonRaceSession(sessionType)) annotateLapTraffic(drivers);
       classifySessionLaps(drivers);
 
       // Identify Player driver dynamically

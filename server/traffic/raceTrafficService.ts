@@ -1,5 +1,6 @@
 import type { DetailedSession, ReplayTrafficResponse } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { isNonRaceSession } from '../../shared/domain/raceTraffic.js';
 import { getTrackDefinition } from '../tracks/serverTrackSync.js';
 import { centerlineProjectionRevision } from '../tracks/trackGeometryStore.js';
 import type { ReplayLapRow } from '../core/replay/dbRacePositionStore.js';
@@ -20,7 +21,7 @@ export interface RaceTrafficRequest {
   replayName: string;
   driverSlot: number;
   replayDrivers: Array<{ slot: number; name: string; carClass?: string }>;
-  session?: Pick<DetailedSession, 'trackVenue' | 'trackCourse' | 'trackLengthMeters' | 'drivers'>;
+  session?: Pick<DetailedSession, 'trackVenue' | 'trackCourse' | 'trackLengthMeters' | 'drivers' | 'sessionType'>;
   sceneDesc?: string;
   trackVenue?: string;
   trackCourse?: string;
@@ -47,6 +48,7 @@ export class RaceTrafficService {
   ) {}
 
   public async getDriverTraffic(request: RaceTrafficRequest): Promise<ReplayTrafficResponse> {
+    if (isNonRaceSession(request.session?.sessionType)) return { available: true, laps: [] };
     const venue = request.session?.trackVenue || request.trackVenue;
     const course = request.session?.trackCourse || request.trackCourse;
     const spec = getCircuitSpecification(venue, course, request.sceneDesc, request.replayName, null, request.session?.trackLengthMeters);

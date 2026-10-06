@@ -9,7 +9,7 @@ import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
 import { rateDriversPace } from '../sessions/sessionPaceRating.js';
 
 /** Bumping this re-parses every stored session from its XML. */
-export const DB_PARSER_VERSION = '2.18_wet_best_lap_unrated';
+export const DB_PARSER_VERSION = '2.19_race_only_traffic';
 
 export interface SessionXmlSyncParser {
   addReplayEntry(entry: ReplayFileEntry): void;

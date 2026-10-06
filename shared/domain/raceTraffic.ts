@@ -1,6 +1,13 @@
 import type { LapTraffic, TrafficCar, TrafficGap } from '../types/index.js';
 import { areComparableCarClasses } from './vehicleMapping.js';
 
+/**
+ * Practice and qualifying have no traffic to speak of: qualifying is private in LMU (each driver
+ * runs alone, a replay overlays cars that never shared the road) and practice is no fight.
+ */
+export const isNonRaceSession = (sessionType: string | undefined): boolean =>
+  sessionType === 'Practice' || sessionType === 'Qualifying';
+
 /** A car this close ahead on the road at both ends of a lap was followed through it (dirty air, a fight). */
 export const FOLLOW_GAP_SEC = 1.0;
 

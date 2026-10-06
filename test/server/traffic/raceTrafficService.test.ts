@@ -109,6 +109,14 @@ describe('RaceTrafficService', () => {
     expect(build).toHaveBeenCalledTimes(1);
   });
 
+  it('meets no one in practice or qualifying (private in LMU)', async () => {
+    for (const sessionType of ['Practice', 'Qualifying']) {
+      const nonRace = { ...session, sessionType } as DetailedSession;
+      expect(await service().getDriverTraffic({ ...request, session: nonRace })).toEqual({ available: true, laps: [] });
+    }
+    expect(build).not.toHaveBeenCalled();
+  });
+
   it('says why there is no traffic to show', async () => {
     const noCentreline = new RaceTrafficService(db, build, () => null);
     expect(await noCentreline.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('centreline') });
