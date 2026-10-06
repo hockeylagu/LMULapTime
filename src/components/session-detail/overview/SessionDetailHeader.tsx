@@ -13,6 +13,7 @@ import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
+import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 /** The neutral jump buttons of the header: the icon carries the only color. */
 const JUMP_BUTTON =
@@ -44,11 +45,11 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   const [searchParams] = useSearchParams();
 
   const handleOpenReplay = (targetLap?: number) => {
-    const telemetryParams = new URLSearchParams(searchParams);
-    telemetryParams.set('replayName', session.matchingReplayFile?.name || '');
-    telemetryParams.set('lap', String(targetLap || selectedDriver?.bestLapNum || 1));
-    navigate(`/telemetry?${telemetryParams.toString()}`);
+    navigate(telemetryPath(targetLap));
   };
+  const telemetryPath = (targetLap?: number): string => sessionTelemetryPath(
+    searchParams, session.matchingReplayFile?.name || '', selectedDriver?.name, targetLap || selectedDriver?.bestLapNum || 1
+  );
 
   const [showRulesModal, setShowRulesModal] = React.useState(false);
   const settings = session.settings;
@@ -95,7 +96,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
             <ReplayLaunchButton
               hasDuckDb={hasDuckDb}
               replayName={session.matchingReplayFile.name}
-              to={`/telemetry?replayName=${encodeURIComponent(session.matchingReplayFile.name)}&session=${encodeURIComponent(session.id)}&lap=${selectedDriver?.bestLapNum || 1}`}
+              to={telemetryPath()}
               onClick={() => handleOpenReplay()}
               title={`Matching Replay: ${session.matchingReplayFile.name}${
                 hasDuckDb ? `

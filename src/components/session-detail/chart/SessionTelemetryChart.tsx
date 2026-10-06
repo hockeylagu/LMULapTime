@@ -19,6 +19,7 @@ import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
 import { SessionTelemetrySeries } from './SessionTelemetrySeries.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 export interface SessionTelemetryChartProps {
   session: DetailedSession;
@@ -84,10 +85,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
       const lapNum = parseInt(String(state.activeLabel), 10);
       if (!isNaN(lapNum) && lapNum > 0) {
         if (session.matchingReplayFile) {
-          const telemetryParams = new URLSearchParams(searchParams);
-          telemetryParams.set('replayName', session.matchingReplayFile.name);
-          telemetryParams.set('lap', String(lapNum));
-          navigate(`/telemetry?${telemetryParams.toString()}`);
+          navigate(sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver.name, lapNum));
         } else {
           const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
           const carClass = selectedDriver?.carClass || 'LMGT3';

@@ -1,6 +1,15 @@
 import { DetailedSession } from '../../../shared/types/index.js';
 import { parseDateStringToTimestamp, matchesSessionType } from '../../../shared/domain/formatters.js';
 import { matchesTrack } from '../../../shared/domain/paceCategory.js';
+import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
+
+/**
+ * The /telemetry path of one lap of the session's replay, for the driver selected on the session page:
+ * without the driver name the telemetry view opens the player's lap.
+ */
+export function sessionTelemetryPath(current: URLSearchParams, replayName: string, driverName: string | undefined, lapNum: number): string {
+  return buildTelemetryComparePath(current, { replayName, driverName, lapNum }, null);
+}
 
 export interface CandidateRelatedSession {
   id?: string;

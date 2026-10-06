@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/index.js';
+import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 export interface BestLapBlockProps {
   session: DetailedSession;
@@ -36,12 +37,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
   const hasReplay = Boolean(session.matchingReplayFile);
 
   const targetUrl = session.matchingReplayFile
-    ? (() => {
-        const telemetryParams = new URLSearchParams(searchParams);
-        telemetryParams.set('replayName', session.matchingReplayFile.name);
-        telemetryParams.set('lap', String(bestLapNum));
-        return `/telemetry?${telemetryParams.toString()}`;
-      })()
+    ? sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver.name, bestLapNum)
     : (() => {
         const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
         const carClass = selectedDriver.carClass || 'LMGT3';

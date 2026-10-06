@@ -61,7 +61,7 @@ describe('SessionTelemetryChart navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select lap 2' }));
 
-    expect(window.location.hash).toBe('#/telemetry?replayName=spa_replay.vcr&lap=2');
+    expect(window.location.hash).toBe('#/telemetry?replayName=spa_replay.vcr&lap=2&driverName=Sim+Driver');
   });
 
   it('opens lap comparison with the session context when no replay is available', () => {

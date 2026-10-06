@@ -33,4 +33,14 @@ describe('SessionLapTableRow lap-number link', () => {
     fireEvent.click(link, { metaKey: true });
     expect(navigateMock).not.toHaveBeenCalled();
   });
+
+  // The telemetry view opens the player's lap unless it is told which driver to show.
+  it('opens the telemetry of the driver selected on the session page, not the player', () => {
+    const session = mockDetailedSession as unknown as DetailedSession;
+    const other = session.drivers.find((driver) => driver.name === 'AI Driver 2')!;
+    render(<SessionLapTable session={session} selectedDriver={other} isMultiClass={false}
+      hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
+    fireEvent.click(within(screen.getByTitle('Click to open telemetry for Lap 1')).getByRole('link', { name: '1' }));
+    expect(navigateMock).toHaveBeenCalledWith('/telemetry?replayName=spa_replay.vcr&lap=1&driverName=AI+Driver+2');
+  });
 });
