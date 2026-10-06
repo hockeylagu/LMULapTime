@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router';
 import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Clock } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
-import { computeTheoreticalGap, formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { computeTheoreticalGap, formatTime } from '../../../../shared/domain/formatters.js';
 import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { lapClassPositions } from '../../../../shared/domain/lapPlaces.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
@@ -10,6 +10,7 @@ import { lapDetailSections, type LapDetailSection } from './lapDetailSections.js
 import { lapDetailContext } from './lapPlaces.js';
 import { SessionLapStewardsLine } from './SessionLapStewardsLine.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { sessionLapComparePath } from '../sessionDetailHelpers.js';
 
 /** A neutral 32px header button: the icon carries no color either. */
 const HEADER_BUTTON = `h-8 px-3 rounded-lg bg-lmu-card hover:bg-lmu-raised border border-lmu-border hover:border-lmu-rule text-lmu-text-soft hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${FOCUS_RING}`;
@@ -151,12 +152,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             </button>
           )}
           {(() => {
-            const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-            const carClass = selectedDriver?.carClass || 'LMGT3';
-            const lapNum = selectedDriver?.bestLapNum;
-            const compareUrl = `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-              carClass
-            )}&sessionId=${encodeURIComponent(session.id)}${lapNum ? `&lapNum=${lapNum}` : ''}`;
+            const compareUrl = sessionLapComparePath(session, selectedDriver, selectedDriver?.bestLapNum);
             return (
               <Link
                 to={compareUrl}

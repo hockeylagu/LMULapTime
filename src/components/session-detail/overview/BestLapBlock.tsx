@@ -2,9 +2,9 @@ import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/index.js';
-import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
+import { sessionLapComparePath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 export interface BestLapBlockProps {
   session: DetailedSession;
@@ -38,13 +38,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
 
   const targetUrl = session.matchingReplayFile
     ? sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver.name, bestLapNum)
-    : (() => {
-        const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-        const carClass = selectedDriver.carClass || 'LMGT3';
-        return `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-          carClass
-        )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${bestLapNum}`;
-      })();
+    : sessionLapComparePath(session, selectedDriver, bestLapNum);
 
   return (
     <div className="min-w-0">

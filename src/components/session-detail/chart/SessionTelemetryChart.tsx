@@ -12,14 +12,14 @@ import {
   type LegendPayload,
 } from 'recharts';
 import { DetailedSession, DriverData, FuelStrategyData } from '../../../../shared/types/index.js';
-import { formatTime, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 import { LMU_COLORS } from '../../../utils/themeColors.js';
 import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';
 import { SessionTelemetryTooltip } from './SessionTelemetryTooltip.js';
 import { SessionTelemetrySeries } from './SessionTelemetrySeries.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
+import { sessionLapComparePath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 export interface SessionTelemetryChartProps {
   session: DetailedSession;
@@ -87,11 +87,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
         if (session.matchingReplayFile) {
           navigate(sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver.name, lapNum));
         } else {
-          const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-          const carClass = selectedDriver?.carClass || 'LMGT3';
-          navigate(`/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-            carClass
-          )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`);
+          navigate(sessionLapComparePath(session, selectedDriver, lapNum));
         }
       }
     }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
-import { formatTime, getDisplayTrackName, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
+import { formatTime, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
 import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
@@ -12,7 +12,7 @@ import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapEventsTooltip, type LapDetailSection } from './lapDetailSections.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
-import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
+import { sessionLapComparePath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 /** A row that opens on Enter: the focus ring sits inside the row, so the table's edge does not clip it. */
 const FOCUS_ROW = 'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent';
@@ -110,13 +110,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
 
   const telemetryUrl = session.matchingReplayFile
     ? sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver?.name, l.lapNum)
-    : (() => {
-        const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-        const carClass = selectedDriver?.carClass || 'LMGT3';
-        return `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-          carClass
-        )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${l.lapNum}`;
-      })();
+    : sessionLapComparePath(session, selectedDriver, l.lapNum);
 
   const handleOpenTelemetry = () => {
     navigate(telemetryUrl);

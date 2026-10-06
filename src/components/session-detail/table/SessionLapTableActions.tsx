@@ -2,8 +2,8 @@ import React from 'react';
 import { Link } from 'react-router';
 import { ArrowLeftRight, Activity } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
+import { sessionLapComparePath } from '../sessionDetailHelpers.js';
 
 const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent';
 
@@ -22,11 +22,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
   telemetryUrl,
   onOpenTelemetry,
 }) => {
-  const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-  const carClass = selectedDriver?.carClass || 'LMGT3';
-  const compareUrl = `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-    carClass
-  )}&sessionId=${encodeURIComponent(session.id)}&lapNum=${lapNum}`;
+  const compareUrl = sessionLapComparePath(session, selectedDriver, lapNum);
 
   const telemetryClassName = `p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer ${FOCUS_RING} ${
     session.matchingReplayFile

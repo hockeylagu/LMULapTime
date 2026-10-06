@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   findRelatedSession,
   CandidateRelatedSession,
+  sessionLapComparePath,
 } from '../../src/components/session-detail/sessionDetailHelpers';
 import { DetailedSession } from '../../server/core/types';
 
@@ -236,6 +237,19 @@ describe('sessionDetailHelpers', () => {
       ];
 
       expect(findRelatedSession(onlineRace, candidates)).toBeNull();
+    });
+  });
+
+  describe('sessionLapComparePath', () => {
+    it("opens the lap on the leaderboard under the board's class, not the results file's", () => {
+      const session = { id: 'race 1', trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain International Circuit' };
+      const path = sessionLapComparePath(session, { carClass: 'GT3', carType: 'Ferrari 296 GT3' }, 3);
+      const params = new URLSearchParams(path.split('?')[1]);
+      expect(path.startsWith('/leaderboard?')).toBe(true);
+      expect(params.get('carClass')).toBe('LMGT3');
+      expect(params.get('sessionId')).toBe('race 1');
+      expect(params.get('lapNum')).toBe('3');
+      expect(new URLSearchParams(sessionLapComparePath(session, undefined, null).split('?')[1]).has('lapNum')).toBe(false);
     });
   });
 });

@@ -1,6 +1,6 @@
-import { DetailedSession } from '../../../shared/types/index.js';
-import { parseDateStringToTimestamp, matchesSessionType } from '../../../shared/domain/formatters.js';
-import { matchesTrack } from '../../../shared/domain/paceCategory.js';
+import { DetailedSession, DriverData } from '../../../shared/types/index.js';
+import { parseDateStringToTimestamp, matchesSessionType, getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { matchesTrack, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 
 /**
@@ -9,6 +9,24 @@ import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
  */
 export function sessionTelemetryPath(current: URLSearchParams, replayName: string, driverName: string | undefined, lapNum: number): string {
   return buildTelemetryComparePath(current, { replayName, driverName, lapNum }, null);
+}
+
+/**
+ * The leaderboard's compare card opened on one lap of the session. The class is the leaderboard's
+ * (LMGT3, not the results file's GT3), so the lap is found on its board.
+ */
+export function sessionLapComparePath(
+  session: Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse'>,
+  driver: Pick<DriverData, 'carClass' | 'carType'> | undefined,
+  lapNum: number | null | undefined,
+): string {
+  const params = new URLSearchParams({
+    track: getDisplayTrackName(session.trackVenue, session.trackCourse),
+    carClass: normalizeCarClass(driver?.carClass, driver?.carType) || 'LMGT3',
+    sessionId: session.id,
+  });
+  if (lapNum) params.set('lapNum', String(lapNum));
+  return `/leaderboard?${params.toString()}`;
 }
 
 export interface CandidateRelatedSession {
