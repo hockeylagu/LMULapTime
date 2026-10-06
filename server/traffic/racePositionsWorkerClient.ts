@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { findWorkerBootstrap } from '../replay/worker/replayTrajectoryWorkerClient.js';
+import { findWorkerBootstrap, isWorkerMessage } from '../replay/worker/replayTrajectoryWorkerClient.js';
 import type { StoredLapBlob } from './lapSamples.js';
 import type { RacePositions } from './racePositions.js';
 
@@ -17,7 +17,7 @@ const bootstrapPath = (): string => findWorkerBootstrap(import.meta.url, ['traff
 export function buildRacePositionsInWorker(
   laps: StoredLapBlob[],
   centerline: Array<[number, number]>,
-  workerPath: string = bootstrapPath()
+  workerPath: string | URL = bootstrapPath()
 ): Promise<RacePositions> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(workerPath, { workerData: { laps, centerline } });
@@ -28,9 +28,10 @@ export function buildRacePositionsInWorker(
       outcome();
       void worker.terminate();
     };
-    worker.on('message', (message: WorkerMessage) => finish(() => (
-      message.type === 'result' ? resolve(message.positions) : reject(new Error(message.message))
-    )));
+    worker.on('message', (message: unknown) => {
+      if (!isWorkerMessage<WorkerMessage>(message, ['result', 'error'])) return;
+      finish(() => (message.type === 'result' ? resolve(message.positions) : reject(new Error(message.message))));
+    });
     worker.on('error', (error: Error) => finish(() => reject(error)));
     worker.on('exit', (code) => finish(() => reject(new Error(`Race positions worker exited with code ${code} before returning a result`))));
   });

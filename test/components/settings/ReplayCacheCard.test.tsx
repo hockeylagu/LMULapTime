@@ -111,6 +111,23 @@ describe('ReplayCacheCard', () => {
     expect(table.querySelector('svg.text-lmu-warn')).toBeNull();
   });
 
+  it('writes the error under the replay name, and leaves an unreadable file out of the cached count', async () => {
+    mockApi({
+      replays: [
+        replay('Corrupted R1 1.Vcr', { error: 'invalid header' }),
+        replay('Valid R1 2.Vcr'),
+        replay('Unread R1 3.Vcr', { error: 'not a replay', parserVersion: undefined, replayVersion: undefined, compressedSizeBytes: 0 }),
+      ],
+    });
+    render(<Harness />);
+    await screen.findByText('Corrupted');
+    const errors = screen.getAllByTestId('replay-error').map(element => element.textContent);
+    expect(errors).toEqual(['Could not be decoded: invalid header', 'Could not be read: not a replay']);
+    // One tooltip on the name only: the error is plain text, no hover needed.
+    expect(screen.getByText('Corrupted').parentElement).toHaveAttribute('title', 'Corrupted R1 1.Vcr');
+    expect(screen.getAllByTestId('replay-error')[0].querySelector('[title]')).toBeNull();
+  });
+
   it('keeps the end of a long name visible and the full name in the title', async () => {
     const name = 'Daytona International Speedway Road Course R1 12.Vcr';
     mockApi({ replays: [replay(name)] });

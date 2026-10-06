@@ -3,6 +3,7 @@ import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayCacheSummary } from '../types.js';
 import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
+import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 
@@ -118,7 +119,24 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
     compressed_size: number;
   }[];
 
-  return rows.map(row => {
+  // The error of a driver this file version cannot be decoded for (rejected, or interrupted too often).
+  const unsettledDrivers = db.prepare(`
+    SELECT filename, file_mtime, file_size, parser_version, status, error, attempts
+    FROM replay_ingest_drivers WHERE status != 'stored'
+  `).all() as Array<{ filename: string; file_mtime: number; file_size: number; parser_version: string; status: ReplayDriverIngestStatus; error: string | null; attempts: number }>;
+  const versions = new Map(rows.map(row => [row.filename, row]));
+  const driverErrors = new Map<string, string>();
+  for (const driver of unsettledDrivers) {
+    const version = versions.get(driver.filename);
+    if (!version || driverErrors.has(driver.filename)) continue;
+    const error = settledReplayFailure({
+      fileMtime: driver.file_mtime, fileSize: driver.file_size, parserVersion: driver.parser_version,
+      status: driver.status, error: driver.error, attempts: driver.attempts,
+    }, version.file_mtime, version.file_size);
+    if (error !== null) driverErrors.set(driver.filename, error);
+  }
+
+  const list: ReplayCacheSummary[] = rows.map(row => {
     const meta = readMetadataRow(row);
     const onDisk = Boolean(
       (row.file_path && fs.existsSync(row.file_path)) ||
@@ -138,7 +156,40 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
       parserVersion: row.parser_version,
       replayVersion: row.parser_version,
       isOnDisk: onDisk,
+      error: driverErrors.get(row.filename),
     };
   });
+
+  // Files on disk whose metadata could not be read at the last scan: listed with the reason.
+  if (replaysDir) {
+    const known = new Set(rows.map(row => row.filename.toLowerCase()));
+    const unread = db.prepare("SELECT source_path, error_message FROM ingest_errors WHERE source_type = 'vcr'")
+      .all() as Array<{ source_path: string; error_message: string }>;
+    for (const { source_path: sourcePath, error_message: error } of unread) {
+      const filename = path.basename(sourcePath);
+      if (known.has(filename.toLowerCase())) continue;
+      const filePath = path.join(replaysDir, filename);
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(filePath);
+      } catch {
+        continue;
+      }
+      known.add(filename.toLowerCase());
+      list.push({
+        filename,
+        fileSizeBytes: stat.size,
+        compressedSizeBytes: 0,
+        updatedAt: Math.floor(stat.mtimeMs),
+        replayDateMs: Math.floor(stat.mtimeMs),
+        driversCount: 0,
+        trajectoriesCached: 0,
+        isOnDisk: true,
+        error,
+      });
+    }
+  }
+
+  return list;
 }
 

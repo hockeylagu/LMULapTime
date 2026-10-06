@@ -23,8 +23,10 @@ export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckD
     (scan?.replayUpgrade?.running && scan.replayUpgrade.currentFile === replayName))) || job?.status === 'processing';
   const failed = job?.status === 'failed';
   const usableDespiteFailure = failed && Boolean(job?.playable || hasDuckDb);
-  const blocked = processing || job?.status === 'queued' || (failed && !usableDespiteFailure);
-  const label = processing ? 'Replay processing' : job?.status === 'queued' ? 'Replay queued' : 'Replay failed — Refresh to retry';
+  // A replay left queued for a retry (an interrupted driver) still opens if its own laps are stored.
+  const queued = job?.status === 'queued' && !(job.playable || hasDuckDb);
+  const blocked = processing || queued || (failed && !usableDespiteFailure);
+  const label = processing ? 'Replay processing' : queued ? 'Replay queued' : 'Replay failed — Refresh to retry';
   const partialStatus = failed
     ? job?.playable ? 'Some replay drivers are unavailable' : hasDuckDb ? 'Replay cache unavailable; using 100Hz telemetry' : ''
     : '';

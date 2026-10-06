@@ -11,7 +11,7 @@ interface ReplayWorkerData {
 type ReplayWorkerMessage =
   | { type: 'progress'; progress: ReplayStreamProgress }
   | { type: 'result'; trajectory: ReplayTrajectoryData }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; code?: string };
 
 const port = parentPort;
 const input = workerData as ReplayWorkerData;
@@ -31,5 +31,7 @@ try {
   port.postMessage({
     type: 'error',
     message: error instanceof Error ? error.message : String(error),
+    // A system error (the file locked or gone) is not the decoder rejecting the file.
+    ...(typeof (error as NodeJS.ErrnoException)?.code === 'string' ? { code: (error as NodeJS.ErrnoException).code } : {}),
   } satisfies ReplayWorkerMessage);
 }

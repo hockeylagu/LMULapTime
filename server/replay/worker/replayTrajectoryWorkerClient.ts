@@ -5,14 +5,26 @@ import { fileURLToPath } from 'node:url';
 import { ReplayTrajectoryData } from '../../core/types.js';
 import { ExtractReplayTrajectoryOptions } from '../decode/replayTrajectory.js';
 import { ReplayStreamProgress } from '../replayProgress.js';
+import { ReplayDecodeError } from '../decode/replayDecodeError.js';
 
 type WorkerMessage =
   | { type: 'progress'; progress: ReplayStreamProgress }
   | { type: 'result'; trajectory: ReplayTrajectoryData }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; code?: string };
 
 export interface ReplayWorkerClientOptions {
   workerPath?: string | URL;
+}
+
+/**
+ * True when `message` is one our worker posted: an object whose `type` is one of `types`. Every worker
+ * client reads its port through this. The port also carries messages that are not ours: under
+ * `node --watch` (npm run dev), tsx posts { 'watch:import': [...] } for each module the worker loads.
+ * Taken as an answer, that once failed every replay decode and lost every new session at startup.
+ */
+export function isWorkerMessage<T extends { type: string }>(message: unknown, types: ReadonlyArray<T['type']>): message is T {
+  const type = (message as { type?: unknown } | null)?.type;
+  return typeof type === 'string' && (types as ReadonlyArray<string>).includes(type);
 }
 
 /**
@@ -61,7 +73,8 @@ export async function* extractReplayTrajectoryInWorker(
     notify = undefined;
     waiting?.();
   };
-  worker.on('message', (message: WorkerMessage) => {
+  worker.on('message', (message: unknown) => {
+    if (!isWorkerMessage<WorkerMessage>(message, ['progress', 'result', 'error'])) return;
     if (message.type === 'result') resultReceived = true;
     messages.push(message);
     wake();
@@ -90,7 +103,8 @@ export async function* extractReplayTrajectoryInWorker(
       } else if (message.type === 'result') {
         return message.trajectory;
       } else {
-        throw new Error(message.message);
+        // The decoder rejected the file. An exit, a crash or a system error (code) is not the file's fault.
+        throw message.code ? Object.assign(new Error(message.message), { code: message.code }) : new ReplayDecodeError(message.message);
       }
     }
   } finally {

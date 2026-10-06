@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { ReplayCacheSummary } from '../../../../shared/types/index.js';
 import { formatBytes, formatDateTime, formatNumber } from '../settingsFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
@@ -8,6 +8,7 @@ import {
   isArchived,
   isArchivedBehind,
   isOutdated,
+  isUnread,
   ReplaySort,
   ReplaySortKey,
   splitReplayName,
@@ -49,6 +50,16 @@ const ReplayName: React.FC<{ filename: string }> = ({ filename }) => {
     </span>
   );
 };
+
+/** Why the replay is not (fully) decoded, written out under its name: readable without hovering. */
+const ReplayError: React.FC<{ replay: ReplayCacheSummary }> = ({ replay }) => (
+  <span data-testid="replay-error" className="mt-0.5 flex items-start gap-1 text-[11px] font-normal text-lmu-loss">
+    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" aria-hidden="true" />
+    <span className="min-w-0 break-words">
+      {isUnread(replay) ? 'Could not be read' : 'Could not be decoded'}: {replay.error}
+    </span>
+  </span>
+);
 
 export interface ReplayCacheTableProps {
   rows: ReplayCacheSummary[];
@@ -103,7 +114,10 @@ export const ReplayCacheTable: React.FC<ReplayCacheTableProps> = ({ rows, sort, 
           : kept ? ARCHIVED_VERSION_HINT : undefined;
         return (
           <tr key={r.filename} className="border-b border-lmu-border/50 hover:bg-lmu-card-hover/60">
-            <td className="w-full max-w-0 px-3 py-2 text-lmu-text font-medium"><ReplayName filename={r.filename} /></td>
+            <td className="w-full max-w-0 px-3 py-2 text-lmu-text font-medium">
+              <ReplayName filename={r.filename} />
+              {r.error && <ReplayError replay={r} />}
+            </td>
             <td className="px-3 py-2 whitespace-nowrap" data-testid="replay-source">
               {archived
                 ? <span className="font-semibold text-lmu-gain" title="LMU deleted this replay; the cache holds the only copy">Archived</span>

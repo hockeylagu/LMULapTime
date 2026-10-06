@@ -112,6 +112,7 @@ export interface ReplayCacheSummary {
   parserVersion?: string;
   replayVersion?: string;
   isOnDisk?: boolean;
+  error?: string | null;
 }
 
 export interface DriverData {

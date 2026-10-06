@@ -97,7 +97,8 @@ export function createSystemRouter(context: ServerContext): Router {
       }
     }
     if (hasConfig) context.telemetryCatalog.clear();
-    const sessionScanStarted = context.runSessionSyncInBackground();
+    // A manual refresh: replays that failed every attempt are decoded once more.
+    const sessionScanStarted = context.runSessionSyncInBackground(false, true);
     if (!sessionScanStarted && !hasConfig) {
       context.loadSessions(true);
     }

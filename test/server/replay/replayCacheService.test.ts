@@ -5,6 +5,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
 import { ReplayDriverNotFoundError, ReplayDriverNotRecordedError } from '../../../server/replay/replayServiceTypes.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { MAX_DECODE_ATTEMPTS } from '../../../server/core/replay/dbReplayIngestStore.js';
 
 describe('ReplayCacheService', () => {
   let db: SessionDatabase;
@@ -207,21 +208,44 @@ describe('ReplayCacheService', () => {
       expect(a.points).toEqual(b.points);
     });
 
-    it('is not decoded again after it failed for this file and parser version', async () => {
+    it('is not decoded again after it failed MAX_DECODE_ATTEMPTS times for this file and parser version', async () => {
       const { filePath, mtime, size } = writeReplay();
-      db.recordReplayDriverIngest(replayName, 2, mtime, size, 'failed', 'bad stream');
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(replayName, 2, mtime, size, 'failed', 'bad stream');
       const replace = vi.spyOn(db, 'replaceReplayDriverLaps');
 
       await expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 2 })).rejects.toThrow('bad stream');
       expect(replace).not.toHaveBeenCalled();
     });
 
-    it('records a failed decode', async () => {
+    it('is decoded on demand after an interrupted decode (the server stopped mid-decode)', async () => {
+      const { filePath, mtime, size } = writeReplay();
+      db.recordReplayDriverIngest(replayName, 2, mtime, size, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
+      const replace = vi.spyOn(db, 'replaceReplayDriverLaps');
+
+      const trajectory = await service.getFullTrajectory(filePath, replayName, { driverSlot: 2 });
+      expect(trajectory.points[0].x).toBe(50);
+      expect(replace).toHaveBeenCalledTimes(1);
+      expect(db.getReplayDriverIngest(replayName, 2)?.status).toBe('stored');
+    });
+
+    it('records a storage error as interrupted and decodes again on the next request', async () => {
       const { filePath } = writeReplay();
-      vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation(() => { throw new Error('disk full'); });
+      const replace = vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementationOnce(() => { throw new Error('disk full'); });
 
       await expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 2 })).rejects.toThrow('disk full');
-      expect(db.getReplayDriverIngest(replayName, 2)).toMatchObject({ status: 'failed', error: 'disk full' });
+      expect(db.getReplayDriverIngest(replayName, 2)).toMatchObject({ status: 'interrupted', error: 'disk full' });
+
+      await service.getFullTrajectory(filePath, replayName, { driverSlot: 2 });
+      expect(replace).toHaveBeenCalledTimes(2);
+      expect(db.getReplayDriverIngest(replayName, 2)?.status).toBe('stored');
+    });
+
+    it('records a file the decoder rejects as failed', async () => {
+      const { filePath } = writeReplay();
+      fs.writeFileSync(filePath, Buffer.alloc(64));
+
+      await expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 2 })).rejects.toThrow();
+      expect(db.getReplayDriverIngest(replayName, 2)?.status).toBe('failed');
     });
   });
 });

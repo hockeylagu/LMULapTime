@@ -211,6 +211,28 @@ describe('ServerContext background session sync', () => {
     expect(warn).toHaveBeenCalledWith('[SQLite Cache] Initial sync warning:', expect.any(Error));
   });
 
+  it('retries the replays that failed every attempt on a manual refresh only, not at a server start', async () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: vi.fn(() => []),
+      syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
+      syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
+    } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+    const retryFailed = (call: number) => (vi.mocked(sessionDb.syncReplaysAsyncIterator).mock.calls[call] as unknown[])[1] as { retryFailed?: boolean };
+
+    context.runInitialSessionSyncInBackground();
+    await vi.runAllTimersAsync();
+    expect(retryFailed(0).retryFailed).toBe(false);
+
+    context.runSessionSyncInBackground(false, true);
+    await vi.runAllTimersAsync();
+    expect(retryFailed(1).retryFailed).toBe(true);
+
+    context.runSessionSyncInBackground();
+    await vi.runAllTimersAsync();
+    expect(retryFailed(2).retryFailed).toBe(false);
+  });
+
   it('publishes XML file and stage progress before session scanning completes', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),

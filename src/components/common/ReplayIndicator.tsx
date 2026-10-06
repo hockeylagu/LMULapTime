@@ -39,14 +39,16 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   const isDuckDb = Boolean(hasDuckDbTelemetry || replay?.hasDuckDbTelemetry);
   const usableDespiteFailure = Boolean(job?.playable || isDuckDb);
   const partialFailure = job?.status === 'failed' && usableDespiteFailure;
+  // A replay left queued for a retry (an interrupted driver) still opens if its own laps are stored.
+  const queued = job?.status === 'queued' && !usableDespiteFailure;
 
   if (!replay) {
     if (hideIfEmpty) return null;
     return <span className="text-lmu-muted text-xs">-</span>;
   }
 
-  if (processing || job?.status === 'queued' || (job?.status === 'failed' && !usableDespiteFailure)) {
-    const state = processing ? 'processing' : job?.status === 'queued' ? 'queued' : 'failed';
+  if (processing || queued || (job?.status === 'failed' && !usableDespiteFailure)) {
+    const state = processing ? 'processing' : queued ? 'queued' : 'failed';
     const label = state === 'processing' ? 'Replay processing' : state === 'queued' ? 'Replay queued' : 'Replay processing failed. Refresh to retry.';
     const stage = scan?.running ? scan.currentStage : scan?.replayUpgrade?.currentStage;
     const percent = scan?.running ? scan.filePercent : scan?.replayUpgrade?.filePercent;

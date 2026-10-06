@@ -6,6 +6,8 @@ import { SessionDatabase } from '../../../../server/core/db.js';
 import type { ReplayUpgradeResult } from '../../../../server/core/db.js';
 import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
 import { getReplayFactsVersion } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { ReplayDecodeError } from '../../../../server/replay/decode/replayDecodeError.js';
+import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const name = 'Upgrade_P1.Vcr';
@@ -102,11 +104,11 @@ describe('replay upgrade', () => {
       .toEqual([{ source_version: REPLAY_CACHE_VERSION }]);
   });
 
-  it('records a driver that fails and keeps its older rows, without listing it again', async () => {
+  it('records a driver the decoder rejects and keeps its older rows, listing it again until it failed MAX_DECODE_ATTEMPTS times', async () => {
     ingestAsOlderVersion();
     const replace = db.replaceReplayDriverLaps.bind(db);
     vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation((...args) => {
-      if (args[4] === 2) throw new Error('bad stream');
+      if (args[4] === 2) throw new ReplayDecodeError('bad stream');
       replace(...args);
     });
 
@@ -115,6 +117,10 @@ describe('replay upgrade', () => {
     expect(result).toMatchObject({ upgraded: 1, failed: 1 });
     expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ status: 'failed', error: 'bad stream' });
     expect(versions()).toContainEqual({ driver_slot: 2, parser_version: 'v4' });
+    expect(db.listReplayUpgradeBacklog(dir).map(candidate => candidate.driverSlots)).toEqual([[2]]);
+
+    for (let run = 1; run < MAX_DECODE_ATTEMPTS; run++) await runUpgrade();
+    expect(db.getReplayDriverIngest(name, 2)?.attempts).toBe(MAX_DECODE_ATTEMPTS);
     expect(db.listReplayUpgradeBacklog(dir)).toEqual([]);
   });
 

@@ -23,6 +23,28 @@ describe('ReplayIndicator', () => {
     rerender(display('ready')); fireEvent.click(screen.getByRole('button', { name: 'Open replay telemetry' }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+  it('opens a replay left queued for a retry when its own laps are stored, and blocks it otherwise', () => {
+    const onClick = vi.fn();
+    const scan = (playable: boolean) => ({ running: false, replayJobs: [{ name: 'x.Vcr', status: 'queued', playable }] }) as ScanStatus;
+    const { rerender } = render(
+      <SessionDataContext.Provider value={{ revision: 0, scan: scan(true) }}>
+        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
+        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb={false} onClick={onClick} />
+      </SessionDataContext.Provider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open replay telemetry' }));
+    fireEvent.click(screen.getByRole('button', { name: /Launch Replay/ }));
+    expect(onClick).toHaveBeenCalledTimes(2);
+
+    rerender(
+      <SessionDataContext.Provider value={{ revision: 0, scan: scan(false) }}>
+        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
+        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb={false} onClick={onClick} />
+      </SessionDataContext.Provider>
+    );
+    expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Replay queued/ })).toBeDisabled();
+  });
   it('renders nothing or dash when replay is not provided', () => {
     const { container, rerender } = render(<ReplayIndicator replay={null} />);
     expect(screen.getByText('-')).toBeInTheDocument();

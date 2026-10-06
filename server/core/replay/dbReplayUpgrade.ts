@@ -4,6 +4,7 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, ReplaySyncProgress } from '../dbSchema.js';
 import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus } from './dbReplayIngestStore.js';
+import { recordDriverFailure } from './dbReplaySync.js';
 import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
 import { extractReplayTrajectoryInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 
@@ -154,8 +155,7 @@ export async function* upgradeReplaysAsyncIterator(
         upgraded++;
       } catch (error) {
         failed++;
-        host.recordIngestError('vcr', filePath, error);
-        host.recordReplayDriverIngest(filename, slot, mtime, size, 'failed', error instanceof Error ? error.message : String(error));
+        recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
       }
     }
   }

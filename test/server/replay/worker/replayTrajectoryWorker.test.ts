@@ -3,6 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { extractReplayTrajectoryInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
+import { ReplayDecodeError } from '../../../../server/replay/decode/replayDecodeError.js';
+import { replayFailureStatus } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { createMockVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
@@ -72,6 +74,39 @@ describe('replay trajectory worker', () => {
     });
 
     await expect(extraction.next()).rejects.toThrow('exited with code 0 before returning a result');
+  });
+
+  // Under `node --watch` (npm run dev), tsx posts { 'watch:import': [...] } on the worker's port.
+  it('ignores messages that are not from the decoder, such as the watch-mode module reports of tsx', async () => {
+    const script = `import { parentPort } from 'node:worker_threads';
+      parentPort.postMessage({ 'watch:import': ['file:///loader.mjs'] });
+      parentPort.postMessage({ type: 'result', trajectory: { replayName: 'x.Vcr', pointsCount: 0, points: [] } });`;
+    const extraction = extractReplayTrajectoryInWorker('unused.Vcr', {}, { workerPath: new URL(`data:text/javascript,${encodeURIComponent(script)}`) });
+
+    let step = await extraction.next();
+    while (!step.done) step = await extraction.next();
+    expect(step.value.replayName).toBe('x.Vcr');
+  });
+
+  // Only the decoder rejecting the file settles it (see dbReplayIngestStore): a worker that dies, or a
+  // file LMU holds locked, is tried again.
+  it('marks a worker that exits mid-decode as interrupted, not as a bad file', async () => {
+    const extraction = extractReplayTrajectoryInWorker('unused.Vcr', {}, {
+      workerPath: new URL('data:text/javascript,process.exit(1)', import.meta.url),
+    });
+
+    const error = await extraction.next().catch((caught: unknown) => caught);
+    expect(error).not.toBeInstanceOf(ReplayDecodeError);
+    expect(replayFailureStatus(error)).toBe('interrupted');
+  });
+
+  it('marks the decoder rejecting the file as failed, and a system error as interrupted', async () => {
+    const post = (message: object) => extractReplayTrajectoryInWorker('unused.Vcr', {}, {
+      workerPath: new URL(`data:text/javascript,import { parentPort } from 'node:worker_threads'; parentPort.postMessage(${JSON.stringify(message)})`, import.meta.url),
+    }).next().catch((caught: unknown) => caught);
+
+    expect(replayFailureStatus(await post({ type: 'error', message: 'bad stream' }))).toBe('failed');
+    expect(replayFailureStatus(await post({ type: 'error', message: 'resource busy or locked', code: 'EBUSY' }))).toBe('interrupted');
   });
 
   describe.skipIf(!runRealReplayTests || !fs.existsSync(imolaRaceReplay))('real replay worker', () => {

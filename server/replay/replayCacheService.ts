@@ -2,7 +2,9 @@ import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './decode/replayParser.js';
 import { extractReplayTrajectoryInWorker } from './worker/replayTrajectoryWorkerClient.js';
-import { isReplayDriverSettled } from '../core/replay/dbReplayIngestStore.js';
+import { settledReplayFailure } from '../core/replay/dbReplayIngestStore.js';
+import { recordDriverFailure } from '../core/replay/dbReplaySync.js';
+import { decodeOrThrow } from './decode/replayDecodeError.js';
 import { lapEdgesFromNeighbours } from './decode/replayLapPoints.js';
 import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
@@ -27,7 +29,7 @@ export class ReplayCacheService {
     const mtime = Math.floor(stat.mtimeMs);
     const cached = this.sessionDb.getReplayMetadataCache(replayName, mtime, stat.size, filePath);
     if (cached) return cached;
-    const metadata = parseReplayMetadata(filePath, { playerName });
+    const metadata = decodeOrThrow(() => parseReplayMetadata(filePath, { playerName }));
     this.sessionDb.upsertReplayMetadataCache(replayName, filePath, mtime, stat.size, metadata);
     return metadata;
   }
@@ -80,11 +82,11 @@ export class ReplayCacheService {
     const cached = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, filePath);
     if (cached) return this.withLapEdges(replayName, cached);
 
-    // A decode that already failed for this file and parser version would fail again (see A2 in
-    // dbReplayIngestStore): it is retried only after the parser version changes.
-    const attempt = this.sessionDb.getReplayDriverIngest(replayName, driverSlotKey);
-    if (attempt?.status === 'failed' && isReplayDriverSettled(attempt, mtime, stat.size)) {
-      throw new Error(`Replay ${replayName} could not be decoded for driver ${driverSlotKey}: ${attempt.error ?? 'unknown error'}`);
+    // A file version the decoder rejected would be rejected again, as would one whose decode was
+    // interrupted too many times (see dbReplayIngestStore): retried once the file or parser version changes.
+    const settledError = settledReplayFailure(this.sessionDb.getReplayDriverIngest(replayName, driverSlotKey), mtime, stat.size);
+    if (settledError !== null) {
+      throw new Error(`Replay ${replayName} could not be decoded for driver ${driverSlotKey}: ${settledError}`);
     }
 
     const decoded = await this.decodeDriver(filePath, replayName, driverSlotKey, mtime, stat.size, options.playerName);
@@ -133,8 +135,7 @@ export class ReplayCacheService {
     this.pendingDecodes.set(key, decode);
     return decode
       .catch((error: unknown) => {
-        this.sessionDb.recordIngestError('vcr', filePath, error);
-        this.sessionDb.recordReplayDriverIngest(replayName, driverSlotKey, mtime, size, 'failed', error instanceof Error ? error.message : String(error));
+        recordDriverFailure(this.sessionDb, replayName, filePath, driverSlotKey, mtime, size, error);
         throw error;
       })
       .finally(() => this.pendingDecodes.delete(key));

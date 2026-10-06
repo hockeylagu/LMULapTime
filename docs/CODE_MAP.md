@@ -35,13 +35,19 @@ API JSON requests use `no-store`; detailed geometry comes from the local package
 only mounted same-session data during a revision refresh; switching IDs or remounting fetches fresh.
 Refreshes during a scan are coalesced into one follow-up
 XML scan (preserving a requested force reparse), followed by replay and DuckDB scans.
-`server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker.
+`server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker. A worker that dies fails only the file it was reading (XML is then read on the main thread) and the next file starts a new worker.
+Every worker client (ingest, replay decode, race positions) reads its port through `isWorkerMessage` (`replayTrajectoryWorkerClient.ts`): under `npm run dev`
+(`node --watch`) tsx posts `{ 'watch:import': [...] }` on every worker port, which was once read as an empty answer and lost new sessions and replays.
 XML publishes ten-session transactions before proceeding; cached sessions whose XML is gone survive.
 Each batch rates pace against the current main-thread benchmarks immediately before persistence,
 then reapplies lap conditions, so delayed worker results cannot restore obsolete or wet-best ratings.
 Replay discovery finishes and matches every session before decoding associated recordings; per-replay
 jobs expose queued/processing/ready/failed states and whether a failed decode still has a playable primary trajectory. Launch actions remain available for playable cached data or DuckDB telemetry and report partial failures.
-Manual refresh retries failed driver decodes.
+Driver decode outcomes (`replay_ingest_drivers`, `dbReplayIngestStore.ts`): `failed` when the decoder rejects the file
+(`ReplayDecodeError`, `server/replay/decode/replayDecodeError.ts`), `interrupted` for a worker exit, server shutdown, locked file or
+storage error. Either is retried, and settles (shown as failed) after `MAX_DECODE_ATTEMPTS` failures in a row on one file version;
+until then the replay job shows as queued. Only a manual refresh (`POST /api/scan` → `runSessionSyncInBackground(false, true)`)
+retries settled failures; a server start leaves them alone. Recordings are decoded newest first.
 
 `server/index.ts` builds one `ServerContext` (`server/core/serverContext.ts`), which owns:
 - the scan jobs (`runInitialSessionSyncInBackground`, `runReplaySyncInBackground`, `runSessionSyncInBackground`), pumped one step per

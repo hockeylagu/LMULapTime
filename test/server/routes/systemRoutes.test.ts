@@ -160,7 +160,7 @@ describe('system routes', () => {
       expect(res.body).toMatchObject({ success: true, sessionScanStarted: true, replayScanStarted: true, telemetryScanStarted: true, sessionsCount: 3 });
       expect(context.configureDirectories).toHaveBeenCalledWith(folders);
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
-      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();
+      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalledWith(false, true);
       expect(context.runSessionSyncInBackground).toHaveBeenCalled();
     });
 

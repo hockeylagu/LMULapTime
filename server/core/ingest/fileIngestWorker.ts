@@ -10,15 +10,15 @@ if (!port) throw new Error('File ingest worker requires a parent port');
 port.on('message', (input: { kind: 'xml' | 'replay'; filePath: string; playerName?: string; replays?: ReplayFileEntry[]; referenceCache?: ReferenceLaptimesCache | null }) => {
   try {
     if (input.kind === 'replay') {
-      port.postMessage({ result: parseReplayMetadata(input.filePath, { playerName: input.playerName }) });
+      port.postMessage({ type: 'result', result: parseReplayMetadata(input.filePath, { playerName: input.playerName }) });
     } else {
       setWorkerReferenceLaptimes(input.referenceCache ?? null);
       const parser = new LmuParser(undefined, undefined, { detectPlayer: false, readReplayMetadata: false });
       parser.configuredPlayerName = input.playerName || '';
       parser.addReplayEntries(input.replays || []);
-      port.postMessage({ result: parser.parseSessionXml(input.filePath) });
+      port.postMessage({ type: 'result', result: parser.parseSessionXml(input.filePath) });
     }
   } catch (error: unknown) {
-    port.postMessage({ error: error instanceof Error ? error.message : String(error) });
+    port.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
   }
 });

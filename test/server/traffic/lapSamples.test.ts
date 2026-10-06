@@ -74,6 +74,15 @@ describe('buildRacePositions', () => {
     expect(positions).toEqual(buildRacePositions(laps, circleCenterline()));
   });
 
+  // Under `node --watch` (npm run dev), tsx posts { 'watch:import': [...] } on the worker's port.
+  it('ignores messages that are not from the worker, such as the watch-mode module reports of tsx', async () => {
+    const script = `import { parentPort } from 'node:worker_threads';
+      parentPort.postMessage({ 'watch:import': ['file:///loader.mjs'] });
+      parentPort.postMessage({ type: 'result', positions: { drivers: [] } });`;
+    await expect(buildRacePositionsInWorker([], circleCenterline(), new URL(`data:text/javascript,${encodeURIComponent(script)}`)))
+      .resolves.toEqual({ drivers: [] });
+  });
+
   it('reports a worker that fails', async () => {
     await expect(buildRacePositionsInWorker([{ slot: 0, lapNumber: 1, blob: new Uint8Array([1, 2, 3]) }], circleCenterline()))
       .rejects.toThrow();

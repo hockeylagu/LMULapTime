@@ -62,9 +62,25 @@ describe('XML-first startup pipeline', () => {
       const iterator = db.syncReplaysAsyncIterator(dir, { retryFailed: true, onReplayState: job => jobs.push(job) });
       let step = await iterator.next(); while (!step.done) step = await iterator.next();
     };
-    await run(); expect(jobs[jobs.length - 1]).toMatchObject({ status: 'failed', error: 'Disk busy' });
+    await run(); expect(jobs[jobs.length - 1]).toMatchObject({ status: 'queued' });
+    expect(db.getReplayDriverIngest('retry.Vcr', -1)).toMatchObject({ status: 'interrupted', error: 'Disk busy' });
     store.mockRestore(); await run(); expect(jobs[jobs.length - 1]?.status).toBe('ready');
     expect(db.getStoredReplayTrajectory('retry.Vcr', -1, -1)).not.toBeNull();
+  });
+
+  it('decodes the newest replay first, whatever the filenames', async () => {
+    const bytes = createSliceVcrBuffer({ drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
+      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] });
+    const write = (name: string, date: Date) => { fs.writeFileSync(path.join(dir, name), bytes); fs.utimesSync(path.join(dir, name), date, date); };
+    write('A old.Vcr', new Date('2026-09-01T12:00:00Z'));
+    write('B newest.Vcr', new Date('2026-10-05T12:00:00Z'));
+    write('C middle.Vcr', new Date('2026-09-20T12:00:00Z'));
+    const processing: string[] = [];
+    const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player',
+      onReplayState: job => { if (job.status === 'processing') processing.push(job.name); } });
+    let step = await iterator.next(); while (!step.done) step = await iterator.next();
+
+    expect(processing).toEqual(['B newest.Vcr', 'C middle.Vcr', 'A old.Vcr']);
   });
 
   it('discovers all replay metadata before decoding only associated recordings and reuses cached decodes', async () => {

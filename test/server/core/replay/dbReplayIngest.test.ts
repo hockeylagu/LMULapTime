@@ -4,6 +4,8 @@ import os from 'os';
 import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
+import { upsertReplayMetadataCache } from '../../../../server/core/replay/dbReplayMetadataStore.js';
+import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { decompressTrajectory } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
@@ -137,15 +139,45 @@ describe('replay ingest', () => {
       return { mtime: Math.floor(stat.mtimeMs), size: stat.size };
     };
 
-    it('does not decode again a driver that failed for this file and parser version', () => {
+    it('does not decode again a driver that failed MAX_DECODE_ATTEMPTS times for this file and parser version', () => {
       const { mtime, size } = fileVersion();
-      db.recordReplayDriverIngest(name, 2, mtime, size, 'failed', 'bad stream');
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtime, size, 'failed', 'bad stream');
 
       db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
 
       expect(db.getStoredReplayTrajectory(name, 2, -1)).toBeNull();
       expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ status: 'failed', error: 'bad stream' });
       expect(db.getStoredReplayTrajectory(name, 1, -1)).not.toBeNull();
+    });
+
+    it('decodes an interrupted driver again (a worker that exited with the server)', () => {
+      const { mtime, size } = fileVersion();
+      db.recordReplayDriverIngest(name, 2, mtime, size, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
+
+      db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
+
+      expect(db.getStoredReplayTrajectory(name, 2, -1)).not.toBeNull();
+      expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ status: 'stored', attempts: 1 });
+    });
+
+    it('leaves a driver alone once its decode was interrupted MAX_DECODE_ATTEMPTS times', () => {
+      const { mtime, size } = fileVersion();
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtime, size, 'interrupted', 'out of memory');
+      expect(db.getReplayDriverIngest(name, 2)?.attempts).toBe(MAX_DECODE_ATTEMPTS);
+
+      db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
+
+      expect(db.getStoredReplayTrajectory(name, 2, -1)).toBeNull();
+      expect(db.getStoredReplayTrajectory(name, 1, -1)).not.toBeNull();
+    });
+
+    it('counts attempts per file version: a changed file starts again at one', () => {
+      db.recordReplayDriverIngest(name, 2, 1, 1, 'interrupted', 'x');
+      db.recordReplayDriverIngest(name, 2, 1, 1, 'interrupted', 'x');
+      db.recordReplayDriverIngest(name, 2, 2, 1, 'interrupted', 'x');
+      expect(db.getReplayDriverIngest(name, 2)?.attempts).toBe(1);
+      db.recordReplayDriverIngest(name, 2, 2, 1, 'failed', 'x');
+      expect(db.getReplayDriverIngest(name, 2)?.attempts).toBe(1);
     });
 
     it('tries a failed driver again once the parser version changes', () => {
@@ -160,34 +192,45 @@ describe('replay ingest', () => {
       expect(db.getReplayDriverIngest(name, 2)?.status).toBe('stored');
     });
 
-    it('marks a replay playable when the primary trajectory is cached but a secondary driver fails', async () => {
+    it('keeps a playable replay queued while a secondary driver is retried, then reports it failed', async () => {
       const replace = db.replaceReplayDriverLaps.bind(db);
       vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation((...args) => {
         if (!args[6]) throw new Error('secondary driver write failed');
         replace(...args);
       });
-      const jobs: Array<{ status: string; playable?: boolean; error?: string }> = [];
-      const iterator = db.syncReplaysAsyncIterator(dir, {
-        playerName: 'Player Driver',
-        onReplayState: job => jobs.push(job),
-      });
+      const lastJob = async () => {
+        const jobs: Array<{ status: string; playable?: boolean; error?: string }> = [];
+        const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player Driver', onReplayState: job => jobs.push(job) });
+        let step = await iterator.next();
+        while (!step.done) step = await iterator.next();
+        return jobs[jobs.length - 1];
+      };
+
+      // An interrupted decode is retried at the next scan, up to MAX_DECODE_ATTEMPTS times.
+      for (let attempt = 1; attempt < MAX_DECODE_ATTEMPTS; attempt++) {
+        const job = await lastJob();
+        expect(job).toMatchObject({ status: 'queued', playable: true });
+        expect(job.error).toBeUndefined();
+      }
+      expect(db.getStoredReplayTrajectory(name, -1, -1)).not.toBeNull();
+      expect(await lastJob()).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
+    });
+
+    it('records a storage error as interrupted, so the next scan decodes the driver again', async () => {
+      vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation(() => { throw new Error('database is locked'); });
+      const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player Driver' });
       let step = await iterator.next();
       while (!step.done) step = await iterator.next();
 
+      expect(db.getReplayDriverIngest(name, -1)).toMatchObject({ status: 'interrupted', error: 'database is locked' });
+      vi.restoreAllMocks();
+      const retry = db.syncReplaysAsyncIterator(dir, { playerName: 'Player Driver' });
+      step = await retry.next();
+      while (!step.done) step = await retry.next();
       expect(db.getStoredReplayTrajectory(name, -1, -1)).not.toBeNull();
-      expect(jobs[jobs.length - 1]).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
-
-      const secondRun: Array<{ status: string; playable?: boolean; error?: string }> = [];
-      const retryCheck = db.syncReplaysAsyncIterator(dir, {
-        playerName: 'Player Driver',
-        onReplayState: job => secondRun.push(job),
-      });
-      step = await retryCheck.next();
-      while (!step.done) step = await retryCheck.next();
-      expect(secondRun[secondRun.length - 1]).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
     });
 
-    it('leaves a replay unplayable when its primary trajectory cannot be stored', async () => {
+    it('leaves a replay unplayable and queued for the next scan when its primary trajectory cannot be stored', async () => {
       vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation(() => {
         throw new Error('trajectory write failed');
       });
@@ -200,7 +243,25 @@ describe('replay ingest', () => {
       while (!step.done) step = await iterator.next();
 
       expect(db.getStoredReplayTrajectory(name, -1, -1)).toBeNull();
-      expect(jobs[jobs.length - 1]).toMatchObject({ status: 'failed', playable: false, error: 'trajectory write failed' });
+      expect(jobs[jobs.length - 1]).toMatchObject({ status: 'queued', playable: false });
+    });
+
+    it('lists the error of a driver only once its decode has failed MAX_DECODE_ATTEMPTS times in a row', () => {
+      upsertReplayMetadataCache(db.getDb(), name, path.join(dir, name), 10, 20, { trackName: 'Test', drivers: [] } as never);
+      db.recordReplayDriverIngest(name, 3, 10, 20, 'interrupted', 'worker exited');
+      db.recordReplayDriverIngest(name, 1, 10, 20, 'failed', 'invalid header');
+      expect(db.getReplayCacheList().find(r => r.filename === name)?.error).toBeUndefined();
+
+      for (let i = 1; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 1, 10, 20, 'failed', 'invalid header');
+      expect(db.getReplayCacheList().find(r => r.filename === name)?.error).toBe('invalid header');
+    });
+
+    it('lists a replay on disk whose metadata could not be read, with the reason', () => {
+      db.recordIngestError('vcr', path.join(dir, 'Broken R1 1.Vcr'), new Error('not a replay'));
+      fs.writeFileSync(path.join(dir, 'Broken R1 1.Vcr'), 'x');
+
+      expect(db.getReplayCacheList(dir).find(r => r.filename === 'Broken R1 1.Vcr')).toMatchObject({ error: 'not a replay', isOnDisk: true });
     });
   });
 });
+

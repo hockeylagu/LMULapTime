@@ -28,6 +28,7 @@ export interface SessionSyncHost {
   reclassifyStoredSessions(which: { ids: string[] }): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
+  getIngestErrors(): Array<{ sourceType: string; sourcePath: string }>;
   invalidateSessionCache(): void;
 }
 
@@ -62,6 +63,11 @@ export function *syncSessionsIterator(
   for (const row of existingRows) {
     cacheMap.set(path.normalize(row.file_path).toLowerCase(), row);
   }
+  // Files the last scan could not read are read again even when unchanged: one that failed during a
+  // parser upgrade would otherwise keep the older parse for good (the version is committed regardless).
+  const unread = new Set(host.getIngestErrors()
+    .filter(entry => entry.sourceType === 'xml')
+    .map(entry => path.normalize(entry.sourcePath).toLowerCase()));
 
   // Seed parser's replay index with stored DB replays so deleted VCR files still match
   const storedReplays = host.getAllStoredReplayFiles();
@@ -102,7 +108,7 @@ export function *syncSessionsIterator(
       const cached = cacheMap.get(normalizedPath);
 
       // Check if file is already cached and unmodified
-      if (!reparseAll && cached && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+      if (!reparseAll && cached && !unread.has(normalizedPath) && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
         yield { processed: i + 1, total: files.length, currentFile: f, stage: 'Checking XML session log' };
         continue;
       }
@@ -193,12 +199,21 @@ export async function *syncSessionsAsyncIterator(
   while (!step.done) {
     yield step.value;
     if (step.value.stage === 'Reading XML session log' && parser.parseSessionXmlAsync) {
+      const filePath = path.join(resultsDir, step.value.currentFile);
+      let parsed: DetailedSession | null;
       try {
-        const parsed = await parser.parseSessionXmlAsync(path.join(resultsDir, step.value.currentFile));
-        step = iterator.next(parsed);
+        parsed = await parser.parseSessionXmlAsync(filePath);
       } catch (error: unknown) {
-        step = iterator.throw(error);
+        // The worker failed, not the file: read it here instead of leaving the session out of this scan.
+        console.warn(`[SQLite Cache] XML worker failed on ${filePath}, reading it on the main thread:`, error);
+        try {
+          parsed = parser.parseSessionXml(filePath);
+        } catch (fallbackError: unknown) {
+          step = iterator.throw(fallbackError);
+          continue;
+        }
       }
+      step = iterator.next(parsed);
     } else step = iterator.next();
   }
   return step.value;

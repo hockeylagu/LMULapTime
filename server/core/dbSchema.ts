@@ -369,7 +369,8 @@ export function initDbSchema(db: DatabaseType): void {
     );
 
     -- The outcome of decoding one driver of a replay file, for that file version and parser version:
-    -- a driver already stored or that failed is not decoded again until either changes.
+    -- a driver already stored, or whose decode failed MAX_DECODE_ATTEMPTS times in a row, is not decoded
+    -- again until either changes (see dbReplayIngestStore).
     CREATE TABLE IF NOT EXISTS replay_ingest_drivers (
       filename TEXT NOT NULL,
       driver_slot INTEGER NOT NULL,
@@ -379,6 +380,7 @@ export function initDbSchema(db: DatabaseType): void {
       status TEXT NOT NULL,
       error TEXT,
       attempted_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 1,
       PRIMARY KEY (filename, driver_slot)
     );
 
@@ -401,5 +403,13 @@ export function initDbSchema(db: DatabaseType): void {
   const trajectoryColumns = db.prepare('PRAGMA table_info(replay_trajectories)').all() as Array<{ name: string }>;
   if (!trajectoryColumns.some(column => column.name === 'source_path')) {
     db.exec('ALTER TABLE replay_trajectories ADD COLUMN source_path TEXT');
+  }
+
+  const ingestColumns = db.prepare('PRAGMA table_info(replay_ingest_drivers)').all() as Array<{ name: string }>;
+  if (!ingestColumns.some(column => column.name === 'attempts')) {
+    db.exec('ALTER TABLE replay_ingest_drivers ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1');
+    // Failures stored before decode errors were told apart from interrupted decodes (a worker that
+    // exited with the server) may not be the file's fault: each gets one more decode.
+    db.exec("DELETE FROM replay_ingest_drivers WHERE status = 'failed'");
   }
 }

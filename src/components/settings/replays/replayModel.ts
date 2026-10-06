@@ -65,6 +65,11 @@ export function isOutdated(replay: ReplayCacheSummary, currentVersion: string | 
   return replay.isOnDisk === true && current > 0 && version > 0 && version < current;
 }
 
+/** A file on disk whose replay could not be read at all: listed with its error, nothing of it is cached. */
+export function isUnread(replay: ReplayCacheSummary): boolean {
+  return Boolean(replay.error) && !versionOf(replay);
+}
+
 export function isArchived(replay: ReplayCacheSummary): boolean {
   return replay.isOnDisk === false;
 }
@@ -105,8 +110,9 @@ export interface ReplayCounts {
 }
 
 export function countReplays(replays: ReplayCacheSummary[], currentVersion: string | null): ReplayCounts {
-  const counts: ReplayCounts = { total: replays.length, onDisk: 0, archived: 0, outdated: 0, archivedBehind: 0, fileSizeBytes: 0, compressedSizeBytes: 0 };
-  for (const replay of replays) {
+  const cached = replays.filter(replay => !isUnread(replay));
+  const counts: ReplayCounts = { total: cached.length, onDisk: 0, archived: 0, outdated: 0, archivedBehind: 0, fileSizeBytes: 0, compressedSizeBytes: 0 };
+  for (const replay of cached) {
     if (isArchived(replay)) counts.archived += 1;
     else counts.onDisk += 1;
     if (isOutdated(replay, currentVersion)) counts.outdated += 1;
@@ -148,7 +154,7 @@ export function visibleReplays(
   const factor = options.sort.dir === 'asc' ? 1 : -1;
   return replays
     .filter((replay) => matchesShow(replay, options.show, options.currentVersion))
-    .filter((replay) => !needle || replay.filename.toLowerCase().includes(needle))
+    .filter((replay) => !needle || replay.filename.toLowerCase().includes(needle) || Boolean(replay.error && replay.error.toLowerCase().includes(needle)))
     .sort((a, b) => {
       const av = sortValue(a, options.sort.key);
       const bv = sortValue(b, options.sort.key);

@@ -36,6 +36,8 @@ export class ServerContext {
   private readonly replayJobs = new Map<string, ReplayIngestJob>();
   private pendingSessionRefresh = false;
   private pendingForcedSessionReparse = false;
+  // A manual refresh asked the next replay sync to try again the replays that failed MAX_DECODE_ATTEMPTS times.
+  private retryFailedReplays = false;
   private readonly instanceId = randomUUID();
   // What the cached session list was last enriched against (see loadSessions).
   private enrichedInputs: unknown[] | null = null;
@@ -245,13 +247,15 @@ export class ServerContext {
 
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
+    const retryFailed = this.retryFailedReplays;
+    this.retryFailedReplays = false;
     this.replayUpgrade?.stop();
     this.replayScanStatus = startedScanStatus();
     const replaysDir = this.currentReplaysDir;
     this.replayJobs.clear();
     const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, {
       playerName: this.parser.configuredPlayerName,
-      retryFailed: true,
+      retryFailed,
       onMetadataReady: () => {
         const sessions = this.loadSessions();
         const associated = new Set(sessions.flatMap(session => session.matchingReplayFile ? [session.matchingReplayFile.name] : []));
@@ -295,7 +299,13 @@ export class ServerContext {
     return false;
   }
 
-  public runSessionSyncInBackground(forceReparse = false): boolean {
+  /**
+   * `retryFailedReplays` (a manual refresh) makes the replay sync that follows decode again the replays
+   * that failed MAX_DECODE_ATTEMPTS times; a server start leaves them alone. The request is kept when a
+   * scan is already running, for the replay sync that follows it.
+   */
+  public runSessionSyncInBackground(forceReparse = false, retryFailedReplays = false): boolean {
+    if (retryFailedReplays) this.retryFailedReplays = true;
     if (this.hasActiveFileScan()) return false;
     this.replayUpgrade?.stop();
     const status: SessionScanStatus = startedScanStatus();
