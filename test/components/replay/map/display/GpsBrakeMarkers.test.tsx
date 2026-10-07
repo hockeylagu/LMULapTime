@@ -32,9 +32,11 @@ describe('GpsBrakeMarkers', () => {
     expect(Number(tick.getAttribute('stroke-opacity'))).toBeGreaterThan(0.8);
   });
 
-  it('fades badges in between marker scale 0.48 and 0.36 and shows them fully below', () => {
+  it('switches directly between LOD roadside ticks and full boards without intermediate opacity', () => {
+    // At or above 0.48: LOD tick lines only, badge hidden
     expect(badgeOf(renderMarkers(markers, 0.48).container, 'a')).toHaveAttribute('opacity', '0');
-    expect(Number(badgeOf(renderMarkers(markers, 0.42).container, 'a').getAttribute('opacity'))).toBeCloseTo(0.5, 5);
+    // Below 0.48: full board with opacity 1 (no semi-transparent intermediate levels)
+    expect(badgeOf(renderMarkers(markers, 0.42).container, 'a')).toHaveAttribute('opacity', '1');
     expect(badgeOf(renderMarkers(markers, 0.2).container, 'a')).toHaveAttribute('opacity', '1');
   });
 

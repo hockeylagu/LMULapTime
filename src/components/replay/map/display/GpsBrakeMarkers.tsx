@@ -198,9 +198,10 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
     return results.sort((a, b) => a.marker.stationM - b.marker.stationM);
   }, [markers, projected, markerScale, showDistance, showAds, showDigi]);
 
-  // Zoom-dependent level of detail: badges fade in as the camera zooms into a corner or sector, while the
-  // roadside ticks always show the precise brake stations.
-  const badgeOpacity = Math.max(0, Math.min(1, (0.48 - markerScale) / 0.12));
+  // Level of detail: show either the full board (zoomed in) or the roadside LOD tick line (zoomed out)
+  // without intermediate levels, preventing visual clutter and overlapping semi-transparent artifacts.
+  const showFullBoard = markerScale < 0.48;
+  const badgeOpacity = showFullBoard ? 1 : 0;
 
   return (
     <g data-testid="gps-brake-markers" aria-label="Braking markers" pointerEvents="none">
@@ -215,19 +216,19 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
             aria-label={accessibleLabel}
           >
             <title>{accessibleLabel}</title>
-            {/* Roadside tick: a short stub at full-track zoom, a connection line to the badge once it shows */}
+            {/* Roadside tick: a short stub at full-track zoom (LOD line), a connection line to the badge once it shows (full board) */}
             <line
               x1={item.point.sx}
               y1={item.point.sy}
-              x2={badgeOpacity > 0 ? item.lineEndX : item.point.sx + item.ux * 7 * markerScale}
-              y2={badgeOpacity > 0 ? item.lineEndY : item.point.sy + item.uy * 7 * markerScale}
+              x2={showFullBoard ? item.lineEndX : item.point.sx + item.ux * 7 * markerScale}
+              y2={showFullBoard ? item.lineEndY : item.point.sy + item.uy * 7 * markerScale}
               stroke={item.tickStroke}
-              strokeWidth={badgeOpacity > 0 ? '1.2' : '1.6'}
-              strokeOpacity={badgeOpacity > 0 ? 0.7 : 0.85}
+              strokeWidth={showFullBoard ? '1.2' : '1.6'}
+              strokeOpacity={showFullBoard ? 0.7 : 0.85}
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
-            {/* Badge box, fading in with zoom */}
+            {/* Badge box: hidden at overview zoom, fully visible once zoomed in */}
             <g
               opacity={badgeOpacity}
               transform={`translate(${item.posX}, ${item.posY}) scale(${markerScale})`}
