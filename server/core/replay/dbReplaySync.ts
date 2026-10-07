@@ -87,6 +87,30 @@ function driverNeedsDecode(host: ReplaySyncHost, filename: string, driverSlot: n
   return !host.hasValidReplayTrajectoryCache(filename, driverSlot, -1, mtime, size, filePath);
 }
 
+/** Whether the player's decode or any driver of this replay still has to be decoded for this file version (see driverNeedsDecode). */
+function replayNeedsDecode(
+  host: ReplaySyncHost,
+  file: { filename: string; filePath: string; mtime: number; size: number; metadata: ReplayMetadata },
+  retryFailed = false
+): boolean {
+  if (driverNeedsDecode(host, file.filename, -1, file.mtime, file.size, file.filePath, retryFailed)) {
+    return true;
+  }
+  for (const driver of file.metadata.drivers) {
+    if (typeof driver.slot === 'number' && driverNeedsDecode(host, file.filename, driver.slot, file.mtime, file.size, file.filePath, retryFailed)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The error of the first driver of this replay that failed too often to be tried again, or null. */
+function settledReplayError(host: ReplaySyncHost, filename: string, metadata: ReplayMetadata, mtime: number, size: number): string | null {
+  return [-1, ...metadata.drivers.flatMap(driver => typeof driver.slot === 'number' ? [driver.slot] : [])]
+    .map(slot => settledReplayFailure(host.getReplayDriverIngest(filename, slot), mtime, size))
+    .find(error => error !== null) ?? null;
+}
+
 /** Records a decode that threw, as rejected by the decoder or interrupted; either is tried again (see isReplayDriverSettled). */
 export function recordDriverFailure(host: Pick<ReplaySyncHost, 'recordIngestError' | 'recordReplayDriverIngest'>, filename: string, filePath: string, driverSlot: number, mtime: number, size: number, error: unknown): void {
   const message = replayErrorMessage(error);
@@ -121,13 +145,26 @@ export function* syncReplaysIterator(
   let interrupted = false;
   let processedCount = 0;
 
-  for (let i = 0; i < files.length; i++) {
+  // Only replays with metadata to read or drivers to decode count in the progress.
+  const pending = files.filter(f => {
+    const filePath = path.join(replaysDir, f);
+    try {
+      const stat = fs.statSync(filePath);
+      const mtime = Math.floor(stat.mtimeMs);
+      const metadata = host.getReplayMetadataCache(f, mtime, stat.size, filePath);
+      return !metadata || replayNeedsDecode(host, { filename: f, filePath, mtime, size: stat.size, metadata });
+    } catch {
+      return true; // reported by the loop below
+    }
+  });
+
+  for (let i = 0; i < pending.length; i++) {
     if (options.shouldStop?.()) {
       interrupted = true;
       break;
     }
-    const f = files[i];
-    yield { processed: i, total: files.length, currentFile: f, stage: 'Verifying container and metadata', filePercent: 5 };
+    const f = pending[i];
+    yield { processed: i, total: pending.length, currentFile: f, stage: 'Verifying container and metadata', filePercent: 5 };
     const filePath = path.join(replaysDir, f);
     try {
       const stat = fs.statSync(filePath);
@@ -162,7 +199,7 @@ export function* syncReplaysIterator(
             },
           }));
           defaultDriverSlot = trajectory.driverSlot;
-          yield { processed: i, total: files.length, currentFile: f, stage: 'Persisting trajectory cache', filePercent: 95 };
+          yield { processed: i, total: pending.length, currentFile: f, stage: 'Persisting trajectory cache', filePercent: 95 };
           const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
           host.replaceReplayDriverLaps(f, filePath, mtime, size, primarySlot, trajectory, true);
           anyTrajectoryNewlyCached = true;
@@ -171,7 +208,7 @@ export function* syncReplaysIterator(
         } catch (err) {
           recordDriverFailure(host, f, filePath, -1, mtime, size, err);
         }
-        yield { processed: i, total: files.length, currentFile: f, stage: 'Completed primary driver', filePercent: 100 };
+        yield { processed: i, total: pending.length, currentFile: f, stage: 'Completed primary driver', filePercent: 100 };
       }
 
       for (const driver of metadata.drivers) {
@@ -195,7 +232,7 @@ export function* syncReplaysIterator(
         } catch (err) {
           recordDriverFailure(host, f, filePath, driver.slot, mtime, size, err);
         }
-        yield { processed: i, total: files.length, currentFile: f, stage: `Cached driver ${driver.name}`, filePercent: 100 };
+        yield { processed: i, total: pending.length, currentFile: f, stage: `Cached driver ${driver.name}`, filePercent: 100 };
       }
 
       if (isNewMetadata) {
@@ -212,7 +249,9 @@ export function* syncReplaysIterator(
     if (interrupted) break;
   }
 
-  yield { processed: processedCount, total: files.length, currentFile: '' };
+  if (pending.length > 0) {
+    yield { processed: processedCount, total: pending.length, currentFile: '' };
+  }
 
   const nowIso = new Date().toISOString();
   host.setMetadata('replays_last_synced_at', nowIso);
@@ -244,35 +283,68 @@ export async function* syncReplaysAsyncIterator(
 
   // Discover every recording first, so all XML sessions can be linked before a slow decode.
   const discovered: Array<{ filename: string; filePath: string; mtime: number; size: number; metadata: ReplayMetadata; isNewMetadata: boolean }> = [];
-  const worker = new FileIngestWorker();
-  try {
-    for (let index = 0; index < files.length; index++) {
-      const filename = files[index];
-      const filePath = path.join(replaysDir, filename);
-      yield { processed: index, total: files.length, currentFile: filename, stage: 'Indexing replay metadata', filePercent: 0 };
-      try {
-        const stat = fs.statSync(filePath);
-        const mtime = Math.floor(stat.mtimeMs);
-        const size = stat.size;
-        let metadata = host.getReplayMetadataCache(filename, mtime, size, filePath);
-        const isNewMetadata = !metadata;
-        if (!metadata) {
-          metadata = await worker.parseReplay(filePath, options.playerName);
+  const filesToParse: Array<{ filename: string; filePath: string; mtime: number; size: number }> = [];
+
+  for (let index = 0; index < files.length; index++) {
+    const filename = files[index];
+    const filePath = path.join(replaysDir, filename);
+    try {
+      const stat = fs.statSync(filePath);
+      const mtime = Math.floor(stat.mtimeMs);
+      const size = stat.size;
+      const metadata = host.getReplayMetadataCache(filename, mtime, size, filePath);
+      if (metadata) {
+        discovered.push({ filename, filePath, mtime, size, metadata, isNewMetadata: false });
+      } else {
+        filesToParse.push({ filename, filePath, mtime, size });
+      }
+    } catch (error: unknown) {
+      host.recordIngestError('vcr', filePath, error);
+      skipped++;
+      options.onReplayState?.({ name: filename, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  if (filesToParse.length > 0) {
+    const worker = new FileIngestWorker();
+    try {
+      for (let i = 0; i < filesToParse.length; i++) {
+        const { filename, filePath, mtime, size } = filesToParse[i];
+        yield { processed: i, total: filesToParse.length, currentFile: filename, stage: 'Indexing replay metadata', filePercent: 0 };
+        try {
+          const metadata = await worker.parseReplay(filePath, options.playerName);
           host.upsertReplayMetadataCache(filename, filePath, mtime, size, metadata);
           host.clearIngestError('vcr', filePath);
           added++;
+          discovered.push({ filename, filePath, mtime, size, metadata, isNewMetadata: true });
+        } catch (error: unknown) {
+          host.recordIngestError('vcr', filePath, error);
+          skipped++;
+          options.onReplayState?.({ name: filename, status: 'failed', error: error instanceof Error ? error.message : String(error) });
         }
-        discovered.push({ filename, filePath, mtime, size, metadata, isNewMetadata });
-      } catch (error: unknown) {
-        host.recordIngestError('vcr', filePath, error); skipped++;
-        options.onReplayState?.({ name: filename, status: 'failed', error: error instanceof Error ? error.message : String(error) });
       }
+    } finally {
+      await worker.close();
     }
-  } finally { await worker.close(); }
+  }
+
   const associated = options.onMetadataReady?.();
   // Newest first: the replay of the session just driven is ready before older ones are retried.
-  const queue = (associated ? discovered.filter(file => associated.has(file.filename)) : discovered)
+  const candidates = (associated ? discovered.filter(file => associated.has(file.filename)) : discovered)
     .sort((a, b) => b.mtime - a.mtime);
+  const queue = candidates.filter(file => replayNeedsDecode(host, file, options.retryFailed));
+
+  // Replays with nothing left to decode stay out of the progress count, but one that failed too often
+  // still reports it, so its button keeps saying Refresh to retry.
+  for (const file of candidates) {
+    if (queue.includes(file)) continue;
+    const error = settledReplayError(host, file.filename, file.metadata, file.mtime, file.size);
+    if (error) {
+      options.onReplayState?.({ name: file.filename, status: 'failed', error,
+        playable: host.hasValidReplayTrajectoryCache(file.filename, -1, -1, file.mtime, file.size, file.filePath) });
+    }
+  }
+
   for (const file of queue) options.onReplayState?.({ name: file.filename, status: 'queued' });
   for (let index = 0; index < queue.length; index++) {
     if (options.shouldStop?.()) {
@@ -359,10 +431,7 @@ export async function* syncReplaysAsyncIterator(
       console.error(`Error caching replay file ${filePath}:`, error);
     } finally {
       processedCount = index + 1;
-      const settledError = [-1, ...metadata.drivers.flatMap(driver => typeof driver.slot === 'number' ? [driver.slot] : [])]
-        .map(slot => settledReplayFailure(host.getReplayDriverIngest(filename, slot), mtime, size))
-        .find(error => error !== null);
-      const jobError = fileError ?? settledError ?? undefined;
+      const jobError = fileError ?? settledReplayError(host, filename, metadata, mtime, size) ?? undefined;
       options.onReplayState?.({
         name: filename,
         status: jobError ? 'failed' : interrupted || retrying ? 'queued' : 'ready',
@@ -373,7 +442,9 @@ export async function* syncReplaysAsyncIterator(
     if (interrupted) break;
   }
 
-  yield { processed: processedCount, total: queue.length, currentFile: '' };
+  if (queue.length > 0) {
+    yield { processed: processedCount, total: queue.length, currentFile: '' };
+  }
   const nowIso = new Date().toISOString();
   host.setMetadata('replays_last_synced_at', nowIso);
   host.setMetadata('replays_dir', replaysDir);

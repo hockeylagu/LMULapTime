@@ -57,7 +57,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
 
     if (replayScanStatus.running) {
-      return `Syncing Replays… ${replayScanStatus.processed}/${replayScanStatus.total}`;
+      const p = replayScanStatus.processed ?? 0;
+      const t = replayScanStatus.total ?? 0;
+      return t > 0 ? `Syncing Replays… ${p}/${t}` : 'Syncing Replays…';
     }
 
     if (fullStatus?.telemetryScan?.running) {

@@ -112,4 +112,30 @@ describe('XML-first startup pipeline', () => {
     db.invalidateSessionCache(); expect(first.getScanStatus().dataRevision).not.toBe(old);
     expect(context().getScanStatus().dataRevision).not.toBe(first.getScanStatus().dataRevision);
   });
+
+  it('only counts new or unparsed replays in progress total instead of all on disk', async () => {
+    const bytes = createSliceVcrBuffer({ drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
+      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] });
+    const write = (name: string, date: Date) => { fs.writeFileSync(path.join(dir, name), bytes); fs.utimesSync(path.join(dir, name), date, date); };
+    write('older1.Vcr', new Date('2026-09-01T12:00:00Z'));
+    write('older2.Vcr', new Date('2026-09-10T12:00:00Z'));
+
+    // Cache older1 and older2
+    const seed = db.syncReplaysAsyncIterator(dir, { playerName: 'Player' });
+    let seedStep = await seed.next();
+    while (!seedStep.done) seedStep = await seed.next();
+
+    // Now add a 3rd replay (newest)
+    write('newest.Vcr', new Date('2026-10-06T12:00:00Z'));
+    const totals: number[] = [];
+    const iter = db.syncReplaysAsyncIterator(dir, { playerName: 'Player' });
+    let s = await iter.next();
+    while (!s.done) {
+      totals.push(s.value.total);
+      s = await iter.next();
+    }
+    // Only the 1 new replay is counted in progress total, not all 3 on disk
+    expect(totals.length).toBeGreaterThan(0);
+    expect(totals.every(total => total === 1)).toBe(true);
+  });
 });

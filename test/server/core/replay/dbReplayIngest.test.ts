@@ -214,6 +214,14 @@ describe('replay ingest', () => {
       }
       expect(db.getStoredReplayTrajectory(name, -1, -1)).not.toBeNull();
       expect(await lastJob()).toMatchObject({ status: 'failed', playable: true, error: 'secondary driver write failed' });
+      // Nothing is left to decode, yet the next scan still reports the failure without counting the replay.
+      const totals: number[] = [];
+      const jobs: Array<{ status: string; playable?: boolean; error?: string }> = [];
+      const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player Driver', onReplayState: job => jobs.push(job) });
+      let step = await iterator.next();
+      while (!step.done) { totals.push(step.value.total); step = await iterator.next(); }
+      expect(totals).toEqual([]);
+      expect(jobs).toEqual([{ name, status: 'failed', playable: true, error: 'secondary driver write failed' }]);
     });
 
     it('records a storage error as interrupted, so the next scan decodes the driver again', async () => {
