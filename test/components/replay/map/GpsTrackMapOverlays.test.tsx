@@ -199,7 +199,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     );
 
     const mapContainer = container.firstChild as HTMLDivElement;
-    const svgEl = container.querySelector('svg.drop-shadow-md');
+    const svgEl = container.querySelector('[data-testid="gps-map-scene"]');
     expect(svgEl).toBeInTheDocument();
 
     // Mock container rect as 800x800
@@ -249,7 +249,7 @@ describe('GpsTrackMap overlays and geometry', () => {
       />
     );
 
-    const svgEl = container.querySelector('svg.drop-shadow-md');
+    const svgEl = container.querySelector('[data-testid="gps-map-scene"]');
     expect(svgEl).toBeInTheDocument();
     const defaultViewBox = svgEl?.getAttribute('viewBox');
     expect(screen.getByText('1x')).toBeInTheDocument();
@@ -267,7 +267,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
     // Zoom increases to 4.5x
     expect(screen.getByText('4.5x')).toBeInTheDocument();
-    const cornerViewBox = container.querySelector('svg.drop-shadow-md')?.getAttribute('viewBox');
+    const cornerViewBox = container.querySelector('[data-testid="gps-map-scene"]')?.getAttribute('viewBox');
     expect(cornerViewBox).not.toEqual(defaultViewBox);
     const [, , vw, vh] = (cornerViewBox || '').split(' ').map(Number);
     expect(vw).toBeLessThan(150);

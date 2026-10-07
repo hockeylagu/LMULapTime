@@ -231,7 +231,6 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
             <g
               opacity={badgeOpacity}
               transform={`translate(${item.posX}, ${item.posY}) scale(${markerScale})`}
-              className="transition-opacity duration-150"
             >
               <rect
                 x={-item.width / 2}

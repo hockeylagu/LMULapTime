@@ -226,8 +226,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
       )}
 
       <div className="relative w-full h-full">
-        {/* Static scene on its own layer: the minimap and car markers above it move every frame. */}
-        <svg viewBox={currentViewBox} className="w-full h-full drop-shadow-md will-change-transform">
+        {/* No compositor layer or filter here: a layer keeps its old raster scale after a viewBox zoom, which blurs the badges. */}
+        <svg viewBox={currentViewBox} className="w-full h-full" data-testid="gps-map-scene">
           <GpsMapBackground geometry={effectiveGeometry} display={display} bounds={effectiveBounds} layers={layers}
             left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
 
