@@ -1,6 +1,8 @@
 import { DetailedSession, DriverData } from '../../../shared/types/index.js';
 import { parseDateStringToTimestamp, matchesSessionType, getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { matchesTrack, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { isOnlineSession } from '../../../shared/domain/leaderboard.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 
 /**
@@ -36,103 +38,121 @@ export interface CandidateRelatedSession {
   sessionName?: string;
   trackVenue?: string;
   trackCourse?: string;
+  trackEvent?: string;
   timeString?: string;
   dateString?: string;
   timestamp?: number;
-  filename?: string;
-  settings?: { serverName?: string };
+  settings?: { serverName?: string; modeSetting?: string };
+  playerDriver?: { carClass?: string };
+  carClass?: string;
 }
 
-function findClosestSession<T extends CandidateRelatedSession>(current: DetailedSession, candidates: T[]): T | null {
-  if (candidates.length <= 1) return candidates[0] || null;
+export type WeekendSessionType = 'practice' | 'qualifying' | 'race';
 
-  const currentTime = current.timestamp || parseDateStringToTimestamp(current.timeString);
-  let best: T = candidates[0];
-  let minDiff = Infinity;
+export interface WeekendSessionLink<T = CandidateRelatedSession> {
+  type: WeekendSessionType;
+  target: T;
+}
 
-  for (const cand of candidates) {
-    const candTime = cand.timestamp || parseDateStringToTimestamp(cand.timeString);
-    const diff = Math.abs(currentTime - candTime);
-    if (diff < minDiff) {
-      minDiff = diff;
-      best = cand;
-    }
+/** The furthest an offline session of the same weekend starts from the current one. */
+const MAX_OFFLINE_WEEKEND_GAP_MS = 3.5 * 60 * 60 * 1000;
+/** Sessions of one multiplayer event share the event start; only the session type weight sets them apart. */
+const SAME_EVENT_START_MS = 500;
+
+const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Both sessions run on the same layout (circuitSpecs), or on the same unknown track by name. */
+export function areSameTrackLayout(venueA?: string, courseA?: string, venueB?: string, courseB?: string): boolean {
+  if (!venueA || !venueB) return false;
+  const specA = getCircuitSpecification(venueA, courseA);
+  const specB = getCircuitSpecification(venueB, courseB);
+  if (specA.layoutKey !== 'unknown' && specB.layoutKey !== 'unknown') {
+    return specA.layoutKey === specB.layoutKey;
+  }
+  return squash(`${venueA} ${courseA || ''}`) === squash(`${venueB} ${courseB || ''}`);
+}
+
+/** Start of the session; the parser's timestamp carries the type weight (practice < qualifying < race). */
+function sessionTime(s: CandidateRelatedSession): number {
+  return s.timestamp || parseDateStringToTimestamp(s.timeString || s.dateString);
+}
+
+/**
+ * Whether the candidate belongs to the same weekend event as the current session:
+ * the same layout, both online or both offline, then
+ * - online: the same event start (the results files of one event share its TimeString);
+ * - offline: the same class and event, starting within 3.5 hours.
+ */
+export function isSameWeekendSession(current: CandidateRelatedSession, candidate: CandidateRelatedSession): boolean {
+  const currentId = current.id || current.sessionId;
+  const candId = candidate.id || candidate.sessionId;
+  if (currentId && candId && currentId === candId) return false;
+
+  if (!areSameTrackLayout(current.trackVenue, current.trackCourse, candidate.trackVenue, candidate.trackCourse)) {
+    return false;
   }
 
-  return best;
+  const isCurrentOnline = isOnlineSession(current);
+  if (isCurrentOnline !== isOnlineSession(candidate)) return false;
+
+  const diffMs = Math.abs(sessionTime(current) - sessionTime(candidate));
+
+  if (isCurrentOnline) {
+    const timeA = (current.timeString || current.dateString || '').trim();
+    const timeB = (candidate.timeString || candidate.dateString || '').trim();
+    return Boolean(timeA && timeA === timeB) || diffMs <= SAME_EVENT_START_MS;
+  }
+
+  const classA = current.playerDriver?.carClass || current.carClass;
+  const classB = candidate.playerDriver?.carClass || candidate.carClass;
+  if (classA && classB && normalizeCarClass(classA) !== normalizeCarClass(classB)) return false;
+
+  if (current.trackEvent && candidate.trackEvent && squash(current.trackEvent) !== squash(candidate.trackEvent)) {
+    return false;
+  }
+
+  return diffMs <= MAX_OFFLINE_WEEKEND_GAP_MS;
 }
 
-export function findRelatedSession<T extends CandidateRelatedSession>(
+const WEEKEND_ORDER: Record<WeekendSessionType, number> = { practice: 0, qualifying: 1, race: 2 };
+
+function weekendSessionType(s: CandidateRelatedSession): WeekendSessionType | null {
+  if (matchesSessionType(s.sessionType, s.sessionName, 'Practice')) return 'practice';
+  if (matchesSessionType(s.sessionType, s.sessionName, 'Qualifying')) return 'qualifying';
+  if (matchesSessionType(s.sessionType, s.sessionName, 'Race')) return 'race';
+  return null;
+}
+
+/**
+ * The other sessions of the current session's weekend, one per type, in weekend order. A later
+ * session type is only looked for after the current session and an earlier one only before it,
+ * so a weekend left before its race never points at the previous weekend's race.
+ */
+export function findWeekendSessions<T extends CandidateRelatedSession>(
   current: DetailedSession | null,
   sessions: T[]
-): { type: 'qualifying' | 'race'; target: T } | null {
-  if (!current || !sessions || sessions.length === 0) return null;
+): WeekendSessionLink<T>[] {
+  if (!current || !sessions || sessions.length === 0) return [];
+  const currentType = weekendSessionType(current);
+  if (!currentType) return [];
+  const currentTime = sessionTime(current);
 
-  const isRace = matchesSessionType(current.sessionType, current.sessionName, 'Race');
-  const isQuali = matchesSessionType(current.sessionType, current.sessionName, 'Qualifying');
-  const isPractice = matchesSessionType(current.sessionType, current.sessionName, 'Practice');
-
-  // Race -> Quali; Quali -> Race; Practice -> Race or Quali
-  const targetType: 'qualifying' | 'race' | null = isRace ? 'qualifying' : (isQuali || isPractice) ? 'race' : null;
-  if (!targetType) return null;
-
-  // Online (multiplayer server) and offline sessions are never the same event, even at the
-  // same track and close in time: never link across that boundary.
-  const isCurrentOnline = Boolean(current.settings?.serverName);
-  const sameOnlineStatus = (s: CandidateRelatedSession) => Boolean(s.settings?.serverName) === isCurrentOnline;
-
-  const targetSessions = sessions.filter((s) => {
-    const sId = s.id || s.sessionId;
-    if (sId === current.id) return false;
-    if (!sameOnlineStatus(s)) return false;
-    if (targetType === 'qualifying') {
-      return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
-    }
-    if (targetType === 'race') {
-      return matchesSessionType(s.sessionType, s.sessionName, 'Race');
-    }
-    return false;
-  });
-
-  if (targetSessions.length === 0) {
-    if (isPractice) {
-      const qualiSessions = sessions.filter((s) => {
-        const sId = s.id || s.sessionId;
-        if (sId === current.id) return false;
-        if (!sameOnlineStatus(s)) return false;
-        return matchesSessionType(s.sessionType, s.sessionName, 'Qualifying');
-      });
-      if (qualiSessions.length > 0) {
-        const target = findClosestSession(current, qualiSessions);
-        return target ? { type: 'qualifying', target } : null;
+  const links: WeekendSessionLink<T>[] = [];
+  for (const type of ['practice', 'qualifying', 'race'] as const) {
+    if (type === currentType) continue;
+    const isLater = WEEKEND_ORDER[type] > WEEKEND_ORDER[currentType];
+    let best: T | null = null;
+    let bestDiff = Infinity;
+    for (const cand of sessions) {
+      if (weekendSessionType(cand) !== type || !isSameWeekendSession(current, cand)) continue;
+      const offset = sessionTime(cand) - currentTime;
+      if (isLater ? offset < 0 : offset > 0) continue;
+      if (Math.abs(offset) < bestDiff) {
+        bestDiff = Math.abs(offset);
+        best = cand;
       }
     }
-    return null;
+    if (best) links.push({ type, target: best });
   }
-
-  // 1. Direct filename/ID pattern match: e.g. 2026_05_28_R1 <-> 2026_05_28_Q1
-  const currentId = current.id;
-  const directIdPattern = isRace
-    ? currentId.replace(/([_.-])R(\d*)$/i, '$1Q$2')
-    : currentId.replace(/([_.-])Q(\d*)$/i, '$1R$2');
-
-  if (directIdPattern !== currentId) {
-    const directMatch = targetSessions.find((s) => {
-      const sId = s.id || s.sessionId;
-      return sId === directIdPattern || s.filename === `${directIdPattern}.xml`;
-    });
-    if (directMatch) {
-      return { type: targetType, target: directMatch };
-    }
-  }
-
-  // 2. Same track match, closest in time
-  const sameTrackSessions = targetSessions.filter((s) =>
-    matchesTrack(current.trackVenue, s.trackVenue, s.trackCourse)
-  );
-
-  const candidatePool = sameTrackSessions.length > 0 ? sameTrackSessions : targetSessions;
-  const bestMatch = findClosestSession(current, candidatePool);
-
-  return bestMatch ? { type: targetType, target: bestMatch } : null;
+  return links;
 }

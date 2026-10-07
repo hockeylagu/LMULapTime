@@ -48,7 +48,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     isCurrentSessionAllTimePB,
     refEntry,
     fuelStrategy,
-    relatedSession,
+    relatedSessions,
   } = useSessionDetailData({
     sessionId,
     onSelectSession,
@@ -91,7 +91,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         selectedDriverName={selectedDriverName}
         setSelectedDriverName={setSelectedDriverName}
         onBack={onBack}
-        relatedSession={relatedSession}
+        relatedSessions={relatedSessions}
         handleNavigateToSession={handleNavigateToSession}
         refEntry={refEntry}
       />

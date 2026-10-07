@@ -33,8 +33,9 @@ export interface LeaderboardQuery {
 const isPlayerDriver = (session: DetailedSession, driver: DriverData) =>
   Boolean(driver.isPlayer || (session.playerDriver && session.playerDriver.name === driver.name));
 
-const isOnlineSession = (session: DetailedSession) =>
-  (session.settings?.modeSetting ?? '').trim().toLowerCase() === 'multiplayer';
+/** A multiplayer session: its mode says so, or it names the server it ran on. */
+export const isOnlineSession = (session: { settings?: { modeSetting?: string; serverName?: string } }): boolean =>
+  (session.settings?.modeSetting ?? '').trim().toLowerCase() === 'multiplayer' || Boolean(session.settings?.serverName);
 
 /** A real person: the player, or anyone in an online session. Other drivers offline are AI. */
 export function isHumanDriver(session: DetailedSession, driver: DriverData): boolean {

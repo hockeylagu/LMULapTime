@@ -8,7 +8,7 @@ import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
 import { ReplayLaunchButton } from '../../common/ReplayLaunchButton.js';
 import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
-import { CandidateRelatedSession } from '../sessionDetailHelpers.js';
+import { WeekendSessionLink, WeekendSessionType } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
@@ -19,13 +19,21 @@ import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
 const JUMP_BUTTON =
   'inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-lmu-border bg-lmu-card text-xs font-semibold text-lmu-text-soft hover:text-white hover:border-lmu-rule transition-colors cursor-pointer';
 
+/** Style key, button word and fallback session name of each weekend jump button. */
+const WEEKEND_BUTTONS: Record<WeekendSessionType, { style: string; word: string; fallbackName: string }> = {
+  practice: { style: 'Practice', word: 'practice', fallbackName: 'P1' },
+  qualifying: { style: 'Qualifying', word: 'qualifying', fallbackName: 'Q1' },
+  race: { style: 'Race', word: 'race', fallbackName: 'R1' },
+};
+
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
   selectedDriver?: DriverData;
   selectedDriverName: string;
   setSelectedDriverName: (name: string) => void;
   onBack: () => void;
-  relatedSession: { type: 'qualifying' | 'race'; target: CandidateRelatedSession } | null;
+  /** The other sessions of the weekend: a jump button each. */
+  relatedSessions?: WeekendSessionLink[];
   handleNavigateToSession: (id: string) => void;
   /** Benchmark targets of the layout and class: the circuit's ladder under its name. */
   refEntry?: ReferenceLaptimeEntry | null;
@@ -37,7 +45,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   selectedDriverName,
   setSelectedDriverName,
   onBack,
-  relatedSession,
+  relatedSessions = [],
   handleNavigateToSession,
   refEntry,
 }) => {
@@ -106,37 +114,28 @@ Click to inspect trajectory and telemetry`}
             />
           )}
 
-          {relatedSession && (
-            (() => {
-              const targetId = relatedSession.target.id || relatedSession.target.sessionId;
-              if (!targetId) return null;
-              return (
-                <Link
-                  to={`/session/${encodeURIComponent(targetId)}`}
-                  onClick={linkClickHandler(() => handleNavigateToSession(targetId))}
-                  title={
-                    relatedSession.type === 'qualifying'
-                      ? `View Qualifying session: ${relatedSession.target.sessionName || 'Q1'} (${relatedSession.target.trackVenue})`
-                      : `View Race session: ${relatedSession.target.sessionName || 'R1'} (${relatedSession.target.trackVenue})`
-                  }
-                  className={`${JUMP_BUTTON} ${FOCUS_RING}`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      getSessionTypeStyle(relatedSession.type === 'qualifying' ? 'Qualifying' : 'Race')?.dot
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span>
-                    {relatedSession.type === 'qualifying'
-                      ? `Go to qualifying (${relatedSession.target.sessionName || 'Q1'})`
-                      : `Go to race (${relatedSession.target.sessionName || 'R1'})`}
-                  </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
-                </Link>
-              );
-            })()
-          )}
+          {relatedSessions.map((rel) => {
+            const targetId = rel.target.id || rel.target.sessionId;
+            if (!targetId) return null;
+            const button = WEEKEND_BUTTONS[rel.type];
+            const name = rel.target.sessionName || button.fallbackName;
+            return (
+              <Link
+                key={targetId}
+                to={`/session/${encodeURIComponent(targetId)}`}
+                onClick={linkClickHandler(() => handleNavigateToSession(targetId))}
+                title={`View ${button.style} session: ${name} (${rel.target.trackVenue})`}
+                className={`${JUMP_BUTTON} ${FOCUS_RING}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${getSessionTypeStyle(button.style)?.dot ?? ''}`}
+                  aria-hidden="true"
+                />
+                <span>{`Go to ${button.word} (${name})`}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-lmu-muted" aria-hidden="true" />
+              </Link>
+            );
+          })}
         </div>
       </div>
 

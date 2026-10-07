@@ -1,242 +1,135 @@
 import { describe, it, expect } from 'vitest';
 import {
-  findRelatedSession,
+  findWeekendSessions,
   CandidateRelatedSession,
+  WeekendSessionLink,
   sessionLapComparePath,
 } from '../../src/components/session-detail/sessionDetailHelpers';
 import { DetailedSession } from '../../server/core/types';
 
 describe('sessionDetailHelpers', () => {
-  describe('findRelatedSession', () => {
-    const baseCurrent: DetailedSession = {
-      id: 'session_2026_06_15_R1',
-      sessionType: 'Race',
-      sessionName: 'Race 1',
-      trackVenue: 'Autodromo Nazionale Monza',
-      trackCourse: 'Grand Prix',
-      timeString: '2026-06-15 14:00',
-      timestamp: 1781532000,
-      filename: 'session_2026_06_15_R1.xml',
-      laps: [],
-      drivers: [],
-    } as unknown as DetailedSession;
+  describe('findWeekendSessions', () => {
+    const MIN = 60_000;
+    const T0 = 1_787_580_000_000;
+    const monza = { trackVenue: 'Autodromo Nazionale Monza', trackCourse: 'Grand Prix' };
+    const session = (fields: Partial<CandidateRelatedSession>): DetailedSession =>
+      ({ ...monza, laps: [], drivers: [], ...fields }) as unknown as DetailedSession;
+    const links = (found: WeekendSessionLink[]) => found.map((l) => `${l.type}:${l.target.id}`);
 
-    it('returns null when current session or candidate list is missing/empty', () => {
-      expect(findRelatedSession(null, [])).toBeNull();
-      expect(findRelatedSession(baseCurrent, [])).toBeNull();
-      expect(findRelatedSession(baseCurrent, null as unknown as CandidateRelatedSession[])).toBeNull();
+    it('returns nothing without a current session, candidates or a weekend session type', () => {
+      const race = session({ id: 'r', sessionType: 'Race', timestamp: T0 });
+      expect(findWeekendSessions(null, [])).toEqual([]);
+      expect(findWeekendSessions(race, [])).toEqual([]);
+      expect(findWeekendSessions(race, null as unknown as CandidateRelatedSession[])).toEqual([]);
+      const warmup = session({ id: 'w', sessionType: 'Warmup', sessionName: 'Warmup', timestamp: T0 });
+      expect(findWeekendSessions(warmup, [{ ...monza, id: 'q', sessionType: 'Qualifying', timestamp: T0 - MIN }])).toEqual([]);
     });
 
-    it('returns null when session type is neither race, qualifying, nor practice', () => {
-      const warmup = { ...baseCurrent, sessionType: 'Warmup' as unknown as DetailedSession['sessionType'], sessionName: 'Warmup' };
+    it('links the earlier practice and qualifying of an offline weekend from its race, closest first', () => {
+      const race = session({ id: 'r', sessionType: 'Race', sessionName: 'R1', timestamp: T0 });
       const candidates: CandidateRelatedSession[] = [
-        { id: 'c1', sessionType: 'Qualifying' },
+        { ...monza, id: 'p', sessionType: 'Practice', sessionName: 'P1', timestamp: T0 - 90 * MIN },
+        { ...monza, id: 'q_older', sessionType: 'Qualifying', sessionName: 'Q1', timestamp: T0 - 80 * MIN },
+        { ...monza, id: 'q', sessionType: 'Qualifying', sessionName: 'Q1', timestamp: T0 - 30 * MIN },
+        { id: 'q_spa', trackVenue: 'Circuit de Spa-Francorchamps', sessionType: 'Qualifying', timestamp: T0 - MIN },
       ];
-      expect(findRelatedSession(warmup, candidates)).toBeNull();
+      expect(links(findWeekendSessions(race, candidates))).toEqual(['practice:p', 'qualifying:q']);
     });
 
-    it('finds related qualifying session via direct ID pattern match for race', () => {
+    it('reads the start from the time string when the timestamp is missing', () => {
+      const race = session({ id: 'r', sessionType: 'Race', timestamp: 0, timeString: '2026/06/15 15:00:00' });
       const candidates: CandidateRelatedSession[] = [
-        { id: 'session_2026_06_15_Q1', sessionType: 'Qualifying', sessionName: 'Qualifying' },
-        { id: 'other_session', sessionType: 'Qualifying', sessionName: 'Qualifying' },
+        { ...monza, id: 'q_close', sessionType: 'Qualifying', timeString: '2026/06/15 14:00:00' },
+        { ...monza, id: 'q_far', sessionType: 'Qualifying', timeString: '2026/06/15 08:00:00' },
       ];
-
-      const res = findRelatedSession(baseCurrent, candidates);
-      expect(res).not.toBeNull();
-      expect(res?.type).toBe('qualifying');
-      expect(res?.target.id).toBe('session_2026_06_15_Q1');
+      expect(links(findWeekendSessions(race, candidates))).toEqual(['qualifying:q_close']);
     });
 
-    it('finds related race session via direct filename pattern match for qualifying', () => {
-      const qualiCurrent: DetailedSession = {
-        ...baseCurrent,
-        id: 'session_2026_06_15_Q1',
-        sessionType: 'Qualifying',
-        sessionName: 'Qualifying',
+    it('never links across circuits, even close in time', () => {
+      const practice = session({
+        id: 'atl_p1', sessionType: 'Practice', sessionName: 'P1',
+        trackVenue: 'Michelin Raceway Road Atlanta', trackCourse: 'Michelin Raceway Road Atlanta',
+        timestamp: T0, settings: { modeSetting: 'Race Weekend' },
+      });
+      const candidates: CandidateRelatedSession[] = [
+        {
+          id: 'spa_r1', sessionType: 'Race', trackVenue: 'Circuit de Spa-Francorchamps', trackCourse: 'Circuit de Spa-Francorchamps',
+          timestamp: T0 + 10 * MIN, settings: { modeSetting: 'Race Weekend' },
+        },
+        { id: 'mod_r1', sessionType: 'Race', trackVenue: 'Nonexistent Venue', timestamp: T0 + 10 * MIN },
+      ];
+      expect(findWeekendSessions(practice, candidates)).toEqual([]);
+    });
+
+    it('never links online and offline sessions to each other', () => {
+      const offlinePractice = session({ id: 'p', sessionType: 'Practice', timestamp: T0 });
+      const candidates: CandidateRelatedSession[] = [
+        { ...monza, id: 'r_online', sessionType: 'Race', timestamp: T0 + MIN, settings: { serverName: 'Some Server' } },
+        { ...monza, id: 'q_offline', sessionType: 'Qualifying', timestamp: T0 + 5 * MIN },
+      ];
+      expect(links(findWeekendSessions(offlinePractice, candidates))).toEqual(['qualifying:q_offline']);
+
+      const onlineRace = session({ id: 'r', sessionType: 'Race', timestamp: T0, settings: { modeSetting: 'Multiplayer' } });
+      expect(findWeekendSessions(onlineRace, [{ ...monza, id: 'q', sessionType: 'Qualifying', timestamp: T0 - MIN }])).toEqual([]);
+    });
+
+    it('never links offline sessions of another day or another car class', () => {
+      const practice = session({ id: 'p', sessionType: 'Practice', timestamp: T0, playerDriver: { carClass: 'GT3' } });
+      const candidates: CandidateRelatedSession[] = [
+        { ...monza, id: 'r_next_day', sessionType: 'Race', timestamp: T0 + 24 * 60 * MIN },
+        { ...monza, id: 'r_hypercar', sessionType: 'Race', timestamp: T0 + 40 * MIN, playerDriver: { carClass: 'Hypercar' } },
+      ];
+      expect(findWeekendSessions(practice, candidates)).toEqual([]);
+    });
+
+    it('does not point an offline weekend left before its race at the previous weekend race', () => {
+      // Weekend A: P 12:00, Q 12:40, R 13:00. Weekend B: P 14:30, Q 15:10, then quit.
+      const candidates: CandidateRelatedSession[] = [
+        { ...monza, id: 'a_p', sessionType: 'Practice', timestamp: T0 },
+        { ...monza, id: 'a_q', sessionType: 'Qualifying', timestamp: T0 + 40 * MIN },
+        { ...monza, id: 'a_r', sessionType: 'Race', timestamp: T0 + 60 * MIN },
+        { ...monza, id: 'b_p', sessionType: 'Practice', timestamp: T0 + 150 * MIN },
+        { ...monza, id: 'b_q', sessionType: 'Qualifying', timestamp: T0 + 190 * MIN },
+      ];
+      const current = (id: string) => session(candidates.find((c) => c.id === id) ?? {});
+      expect(links(findWeekendSessions(current('b_q'), candidates))).toEqual(['practice:b_p']);
+      expect(links(findWeekendSessions(current('b_p'), candidates))).toEqual(['qualifying:b_q']);
+      expect(links(findWeekendSessions(current('a_r'), candidates))).toEqual(['practice:a_p', 'qualifying:a_q']);
+    });
+
+    it('links the sessions of one multiplayer event by their shared event start', () => {
+      const spa = {
+        trackVenue: 'Circuit de Spa-Francorchamps', trackCourse: 'Circuit de Spa-Francorchamps',
+        settings: { modeSetting: 'Multiplayer' },
       };
-
+      const practice = session({
+        ...spa, id: '2026_10_06_15_33_33-72P1', sessionType: 'Practice', sessionName: 'P1',
+        timeString: '2026/10/06 15:31:00', timestamp: 1791315060101,
+      });
       const candidates: CandidateRelatedSession[] = [
-        {
-          id: 'session-random',
-          filename: 'session_2026_06_15_R1.xml',
-          sessionType: 'Race',
-          sessionName: 'Race 1',
-        },
+        { ...spa, id: '2026_10_06_15_43_27-90Q1', sessionType: 'Qualifying', sessionName: 'Q1', timeString: '2026/10/06 15:31:00', timestamp: 1791315060201 },
+        { ...spa, id: '2026_10_06_16_09_01-31R1', sessionType: 'Race', sessionName: 'R1', timeString: '2026/10/06 15:31:00', timestamp: 1791315060301 },
+        // The race of the previous week's event on the same circuit
+        { ...spa, id: '2026_09_30_16_24_19-59R1', sessionType: 'Race', sessionName: 'R1', timeString: '2026/09/30 15:46:21', timestamp: 1790797581301 },
       ];
-
-      const res = findRelatedSession(qualiCurrent, candidates);
-      expect(res).not.toBeNull();
-      expect(res?.type).toBe('race');
-      expect(res?.target.filename).toBe('session_2026_06_15_R1.xml');
+      expect(links(findWeekendSessions(practice, candidates))).toEqual([
+        'qualifying:2026_10_06_15_43_27-90Q1',
+        'race:2026_10_06_16_09_01-31R1',
+      ]);
     });
 
-    it('falls back to same track and closest time when ID pattern does not match', () => {
-      const nonPatternCurrent: DetailedSession = {
-        ...baseCurrent,
-        id: 'race_monza_custom',
-        timestamp: 10000,
-      };
-
+    it('does not link the previous event of a cycling multiplayer server', () => {
+      // A server looping every 45 minutes: event N raced, event N+1 left after qualifying.
+      const server = { ...monza, settings: { modeSetting: 'Multiplayer', serverName: 'Sprint Server' } };
       const candidates: CandidateRelatedSession[] = [
-        {
-          id: 'q_diff_track',
-          sessionType: 'Qualifying',
-          trackVenue: 'Spa Francorchamps',
-          timestamp: 9900,
-        },
-        {
-          id: 'q_monza_older',
-          sessionType: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          trackCourse: 'Grand Prix',
-          timestamp: 5000,
-        },
-        {
-          id: 'q_monza_closest',
-          sessionType: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          trackCourse: 'Grand Prix',
-          timestamp: 9500,
-        },
+        { ...server, id: 'n_q', sessionType: 'Qualifying', timeString: '2026/08/24 12:00:00', timestamp: T0 + 201 },
+        { ...server, id: 'n_r', sessionType: 'Race', timeString: '2026/08/24 12:00:00', timestamp: T0 + 301 },
+        { ...server, id: 'n1_p', sessionType: 'Practice', timeString: '2026/08/24 12:45:00', timestamp: T0 + 45 * MIN + 101 },
       ];
-
-      const res = findRelatedSession(nonPatternCurrent, candidates);
-      expect(res).not.toBeNull();
-      expect(res?.target.id).toBe('q_monza_closest');
-    });
-
-    it('handles practice sessions targeting race first, then falling back to qualifying', () => {
-      const practiceCurrent: DetailedSession = {
-        ...baseCurrent,
-        id: 'practice_monza',
-        sessionType: 'Practice',
-        sessionName: 'Practice 1',
-        timestamp: 8000,
-      };
-
-      // Only qualifying available (no race)
-      const candidates: CandidateRelatedSession[] = [
-        {
-          id: 'q_only',
-          sessionType: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          timestamp: 8500,
-        },
-      ];
-
-      const res = findRelatedSession(practiceCurrent, candidates);
-      expect(res).not.toBeNull();
-      expect(res?.type).toBe('qualifying');
-      expect(res?.target.id).toBe('q_only');
-    });
-
-    it('returns null if practice session has neither race nor qualifying candidates', () => {
-      const practiceCurrent: DetailedSession = {
-        ...baseCurrent,
-        id: 'practice_monza',
-        sessionType: 'Practice',
-        sessionName: 'Practice 1',
-      };
-
-      const candidates: CandidateRelatedSession[] = [
-        { id: 'practice_2', sessionType: 'Practice' },
-      ];
-
-      expect(findRelatedSession(practiceCurrent, candidates)).toBeNull();
-    });
-
-    it('falls back to dateString parsing when timestamp is not present', () => {
-      const dateCurrent: DetailedSession = {
-        ...baseCurrent,
-        id: 'race_timeString',
-        timestamp: 0,
-        timeString: '2026-06-15 15:00:00',
-      };
-
-      const candidates: CandidateRelatedSession[] = [
-        {
-          id: 'q_close',
-          sessionType: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          timeString: '2026-06-15 14:00:00',
-        },
-        {
-          id: 'q_far',
-          sessionType: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          timeString: '2026-06-15 08:00:00',
-        },
-      ];
-
-      const res = findRelatedSession(dateCurrent, candidates);
-      expect(res?.target.id).toBe('q_close');
-    });
-
-    it('falls back to candidate pool if no candidate matches track', () => {
-      const currentOtherTrack: DetailedSession = {
-        ...baseCurrent,
-        id: 'race_unknown',
-        trackVenue: 'Nonexistent Venue',
-        timestamp: 1000,
-      };
-
-      const candidates: CandidateRelatedSession[] = [
-        { id: 'q_any', sessionType: 'Qualifying', trackVenue: 'Spa', timestamp: 1200 },
-      ];
-
-      const res = findRelatedSession(currentOtherTrack, candidates);
-      expect(res?.target.id).toBe('q_any');
-    });
-
-    it('never links an offline session to an online session, even at the same track and closest in time', () => {
-      const offlinePractice: DetailedSession = {
-        ...baseCurrent,
-        id: 'practice_monza_offline',
-        sessionType: 'Practice',
-        sessionName: 'Practice 1',
-        timestamp: 8000,
-      } as unknown as DetailedSession;
-      // No settings.serverName: offline session.
-
-      const candidates: CandidateRelatedSession[] = [
-        {
-          id: 'r_online_monza',
-          sessionType: 'Race',
-          sessionName: 'Race 1',
-          trackVenue: 'Autodromo Nazionale Monza',
-          timestamp: 8100,
-          settings: { serverName: 'Some Multiplayer Server' },
-        },
-        {
-          id: 'q_offline_monza',
-          sessionType: 'Qualifying',
-          sessionName: 'Qualifying',
-          trackVenue: 'Autodromo Nazionale Monza',
-          timestamp: 8500,
-        },
-      ];
-
-      const res = findRelatedSession(offlinePractice, candidates);
-      expect(res).not.toBeNull();
-      expect(res?.type).toBe('qualifying');
-      expect(res?.target.id).toBe('q_offline_monza');
-    });
-
-    it('never links an online session to an offline session', () => {
-      const onlineRace: DetailedSession = {
-        ...baseCurrent,
-        id: 'race_online_monza',
-        sessionType: 'Race',
-        sessionName: 'Race 1',
-        timestamp: 9000,
-        settings: { serverName: 'Some Multiplayer Server' },
-      } as unknown as DetailedSession;
-
-      const candidates: CandidateRelatedSession[] = [
-        { id: 'q_offline_monza', sessionType: 'Qualifying', trackVenue: 'Autodromo Nazionale Monza', timestamp: 8900 },
-      ];
-
-      expect(findRelatedSession(onlineRace, candidates)).toBeNull();
+      const qualiN1 = session({
+        ...server, id: 'n1_q', sessionType: 'Qualifying', timeString: '2026/08/24 12:45:00', timestamp: T0 + 45 * MIN + 201,
+      });
+      expect(links(findWeekendSessions(qualiN1, candidates))).toEqual(['practice:n1_p']);
     });
   });
 

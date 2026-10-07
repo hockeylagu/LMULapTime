@@ -163,7 +163,9 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       theoreticalGap,
       consistencyScore,
       matchingReplayFile: s.matchingReplayFile?.name,
-      settings: s.settings?.serverName ? { serverName: s.settings.serverName } : undefined,
+      settings: s.settings?.serverName || s.settings?.modeSetting
+        ? { serverName: s.settings?.serverName, modeSetting: s.settings?.modeSetting }
+        : undefined,
     };
   });
 }

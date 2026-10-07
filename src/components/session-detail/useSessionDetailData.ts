@@ -3,7 +3,7 @@ import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
-import { findRelatedSession, CandidateRelatedSession } from './sessionDetailHelpers.js';
+import { findWeekendSessions, CandidateRelatedSession } from './sessionDetailHelpers.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
@@ -119,9 +119,11 @@ export function useSessionDetailData({
               sessionName: s.sessionName,
               trackVenue: s.trackVenue,
               trackCourse: s.trackCourse,
+              trackEvent: s.trackEvent,
               timeString: s.timeString,
               timestamp: s.timestamp,
-              settings: s.settings ? { serverName: s.settings.serverName } : undefined,
+              settings: s.settings ? { serverName: s.settings.serverName, modeSetting: s.settings.modeSetting } : undefined,
+              playerDriver: s.playerDriver ? { carClass: s.playerDriver.carClass } : undefined,
             }));
             setFetchedSessions(stripped as unknown as DetailedSession[]);
           }
@@ -265,8 +267,8 @@ export function useSessionDetailData({
   }, [selectedDriver]);
 
   const candidatePool: CandidateRelatedSession[] = allSessions.length > 0 ? allSessions : progression;
-  const relatedSession = useMemo(() => {
-    return findRelatedSession(session, candidatePool);
+  const relatedSessions = useMemo(() => {
+    return findWeekendSessions(session, candidatePool);
   }, [session, candidatePool]);
 
   const handleNavigateToSession = (targetId: string) => {
@@ -296,6 +298,6 @@ export function useSessionDetailData({
     isCurrentSessionAllTimePB,
     refEntry,
     fuelStrategy,
-    relatedSession,
+    relatedSessions,
   };
 }
