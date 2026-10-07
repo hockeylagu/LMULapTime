@@ -61,9 +61,15 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   const driverLabel = selectedDriver ? `${selectedDriver.carNumber ? `#${selectedDriver.carNumber} ` : ''}${selectedDriver.name}${selectedDriver.isPlayer ? ' (You)' : ''}` : '';
 
   return (
-    <header className="relative h-14 px-4 bg-lmu-strip border-b border-lmu-border grid grid-cols-[minmax(320px,1fr)_auto_auto] gap-6 items-center shrink-0 z-[80]">
+    <header className="relative min-h-14 py-1.5 px-4 bg-lmu-strip border-b border-lmu-border grid grid-cols-[minmax(320px,1fr)_auto_auto] gap-6 items-center shrink-0 z-[80]">
       {/* Left: Back button + Title & Info */}
-      <ReplayInspectorTitle onClose={onClose} replayName={replayName} metadata={metadata} trajectory={trajectory} />
+      <ReplayInspectorTitle
+        onClose={onClose}
+        replayName={replayName}
+        metadata={metadata}
+        trajectory={trajectory}
+        selectedDriver={selectedDriver}
+      />
 
       {/* Center: Driver Selector, Lap Selector & Live State */}
       <div className="flex items-center gap-2 justify-self-center min-w-0">
