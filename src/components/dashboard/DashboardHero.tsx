@@ -6,8 +6,7 @@ import { DashboardPaceSparkline } from './DashboardPaceSparkline.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 import type { TrackBoundaryGeometry } from '../replay/map/index.js';
 import { PaceBadge } from '../common/PaceBadge.js';
-import { CarClassBadge } from '../common/CarClassBadge.js';
-import { CarLogo } from '../vehicle/index.js';
+import { CarIdentity } from '../vehicle/index.js';
 import { ReplayLaunchButton } from '../common/ReplayLaunchButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
@@ -113,18 +112,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                       {latestOuting.sessionType}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm text-lmu-muted mt-1.5 truncate">
-                    <CarLogo carType={latestOuting.carName} size="xs" />
-                    <span className="truncate">{latestOuting.carName}</span>
-                    {latestOuting.carClass && (
-                      <CarClassBadge
-                        carClass={latestOuting.carClass}
-                        carType={latestOuting.carName}
-                        size="xs"
-                        className="ml-1"
-                      />
-                    )}
-                  </div>
+                  <CarIdentity carType={latestOuting.carName} carClass={latestOuting.carClass} className="text-sm text-lmu-muted mt-1.5" />
                 </div>
               </div>
             </div>

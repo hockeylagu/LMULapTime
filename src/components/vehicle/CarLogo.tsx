@@ -10,6 +10,8 @@ export interface CarLogoProps {
   className?: string;
   title?: string;
   fallback?: React.ReactNode;
+  /** The car name is shown next to it: no alt text or tooltip, so the brand is not announced twice. */
+  decorative?: boolean;
 }
 
 const SIZE_CLASSES: Record<CarLogoSize, string> = {
@@ -26,6 +28,7 @@ export const CarLogo: React.FC<CarLogoProps> = ({
   className = '',
   title,
   fallback,
+  decorative = false,
 }) => {
   const target = carType || carModel;
   const { getLogoSvg } = useVehicleLogos();
@@ -46,8 +49,9 @@ export const CarLogo: React.FC<CarLogoProps> = ({
   return (
     <img
       src={dataUri}
-      alt={`${match.brand} logo`}
-      title={tooltip}
+      alt={decorative ? '' : `${match.brand} logo`}
+      title={decorative ? undefined : tooltip}
+      aria-hidden={decorative ? 'true' : undefined}
       data-testid="car-logo"
       className={`inline-block object-contain shrink-0 select-none ${sizeClass} ${className}`}
     />

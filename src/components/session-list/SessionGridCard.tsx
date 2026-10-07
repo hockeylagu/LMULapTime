@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { Car, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
-import { CarLogo } from '../vehicle/index.js';
+import { PaceBadge, ReplayIndicator } from '../common/index.js';
+import { CarIdentity } from '../vehicle/index.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
@@ -79,15 +79,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
       <div className="pt-2.5 border-t border-lmu-border/60 space-y-1.5 text-xs">
         {/* Row 1: Car & Best Lap */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 truncate min-w-0">
-            <CarLogo carType={p?.carType} size="xs" fallback={<Car className="w-3.5 h-3.5 text-lmu-muted shrink-0" />} />
-            <span className="text-white font-medium truncate" title={p?.carType || 'N/A'}>
-              {p ? p.carType : 'N/A'}
-            </span>
-            {p?.carClass && (
-              <CarClassBadge carClass={p.carClass} carType={p.carType} size="xs" />
-            )}
-          </div>
+          <CarIdentity carType={p?.carType} carClass={p?.carClass} nameClassName="text-white font-medium" emptyLabel="N/A" fallbackIcon />
           <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
             <span className="text-[10px] text-lmu-muted uppercase tracking-wider">Best:</span>
             <span className="font-bold text-sm text-white tabular-nums">

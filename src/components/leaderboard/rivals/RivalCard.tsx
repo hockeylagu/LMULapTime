@@ -67,7 +67,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
               <span>Nobody within 0.6 s ahead: beat this time and the next driver comes into reach.</span>
             ) : (
               <>
-                <CarLogo carType={rivalEntry?.bestLap.carType} size="xs" />
+                <CarLogo carType={rivalEntry?.bestLap.carType} size="xs" decorative />
                 <span>{rivalEntry?.bestLap.carType ?? ''} · {formatTime(target.targetTime)}</span>
               </>
             )}

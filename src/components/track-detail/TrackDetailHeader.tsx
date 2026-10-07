@@ -139,7 +139,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                     : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                     }`}
                 >
-                  <CarLogo carModel={car} size="xs" />
+                  <CarLogo carModel={car} size="xs" decorative />
                   <span>{car}</span>
                 </button>
               ))}

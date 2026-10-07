@@ -3,8 +3,7 @@ import { Timer } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 import { computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
-import { CarClassBadge } from '../../common/CarClassBadge.js';
-import { CarLogo } from '../../vehicle/index.js';
+import { CarIdentity } from '../../vehicle/index.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';
 import { BestLapBlock } from './BestLapBlock.js';
@@ -107,9 +106,7 @@ export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
             </h3>
             <span className="text-xs text-lmu-muted">·</span>
             <span className="text-xs text-lmu-text-soft font-semibold truncate flex items-center gap-1.5" title={selectedDriver.carType}>
-              <CarLogo carType={selectedDriver.carType} size="xs" />
-              <span className="truncate">{selectedDriver.carType}</span>
-              <CarClassBadge carClass={selectedDriver.carClass} carType={selectedDriver.carType} size="xs" />
+              <CarIdentity carType={selectedDriver.carType} carClass={selectedDriver.carClass} />
               <span className="text-lmu-muted font-normal">#{selectedDriver.carNumber}</span>
             </span>
           </div>

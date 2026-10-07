@@ -311,7 +311,7 @@ vehicles (without logos), and optional manufacturer logos (`GET /api/data-plugin
 entry is skipped, not fatal), with the same server access behavior as the rest of the API. There is no static package mount.
 `resolveCarManufacturer` (`shared/domain/vehicleMapping.ts`) matches car names against a word-bounded rule table.
 The client loads logos via `src/api/vehicleLogosApi.ts` (one shared request; a failure is cached for
-`LOGO_RETRY_COOLDOWN_MS` before retrying) and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals).
+`LOGO_RETRY_COOLDOWN_MS` before retrying) and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals). Rows that name a car use `src/components/vehicle/CarIdentity.tsx` (logo, name and class badge with one spacing and tooltip; the logo is decorative next to the visible name).
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and
 surface enrichment. Missing geometry clears old road annotations and marks odometer stations;
 `shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to reject odometer stations and require matching station sources and geometry revisions. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches

@@ -114,7 +114,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
           {isRival && <span className="text-[10px] font-bold uppercase tracking-wider px-1 rounded border border-lmu-warn/50 text-lmu-warn-soft shrink-0">Rival</span>}
         </div>
         <div className="text-[11px] text-lmu-muted truncate flex items-center gap-1.5" title={entry.bestLap.carType}>
-          <CarLogo carType={entry.bestLap.carType} size="xs" />
+          <CarLogo carType={entry.bestLap.carType} size="xs" decorative />
           <span className="truncate">{entry.bestLap.carType}</span>
           <span>·</span>
           <span className="shrink-0">{formatDrivenAgo(entry.bestLap.timestamp)}</span>

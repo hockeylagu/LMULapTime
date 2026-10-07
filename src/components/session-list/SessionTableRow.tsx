@@ -2,8 +2,8 @@ import React from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { PaceBadge, ReplayIndicator, CarClassBadge } from '../common/index.js';
-import { CarLogo } from '../vehicle/index.js';
+import { PaceBadge, ReplayIndicator } from '../common/index.js';
+import { CarIdentity } from '../vehicle/index.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
@@ -78,19 +78,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
 
       {/* Car & Class */}
       <td className="px-3.5 py-3">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <CarLogo carType={p?.carType} size="xs" />
-          <span className="text-white font-medium truncate max-w-[180px]" title={p?.carType || 'N/A'}>
-            {p?.carType || 'N/A'}
-          </span>
-          {p?.carClass && (
-            <CarClassBadge
-              carClass={p.carClass}
-              carType={p.carType}
-              size="xs"
-            />
-          )}
-        </div>
+        <CarIdentity carType={p?.carType} carClass={p?.carClass} nameClassName="text-white font-medium max-w-[180px]" emptyLabel="N/A" />
       </td>
 
       {/* Laps */}

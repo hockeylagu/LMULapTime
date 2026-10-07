@@ -5,8 +5,7 @@ import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/inde
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { matchesCarClass, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { PaceBadge, LapStatusBadge } from '../common';
-import { CarClassBadge } from '../common/CarClassBadge.js';
-import { CarLogo } from '../vehicle/index.js';
+import { CarIdentity } from '../vehicle/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { SessionTypeChip } from '../session-list/SessionRowParts.js';
 
@@ -135,15 +134,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           <p className="text-xs text-lmu-muted truncate" title={lap.driverName}>
             {lap.driverName}
           </p>
-          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-            <CarLogo carType={lap.carType} size="xs" />
-            <span className="text-xs font-medium text-white truncate" title={lap.carType}>
-              {lap.carType}
-            </span>
-            {lap.carClass && (
-              <CarClassBadge carClass={lap.carClass} carType={lap.carType} size="xs" />
-            )}
-          </div>
+          <CarIdentity carType={lap.carType} carClass={lap.carClass} nameClassName="text-xs font-medium text-white" className="mt-0.5" />
           {(lap.sessionName || lap.sessionType) && (
             <p className="flex items-center gap-2 mt-1.5 text-[11px] text-lmu-muted min-w-0">
               <SessionTypeChip session={{ sessionType: lap.sessionType ?? '', sessionName: lap.sessionName }} />

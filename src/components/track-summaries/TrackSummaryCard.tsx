@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { formatTime } from '../../../shared/domain/formatters.js';
-import { PaceBadge, SectorSplitsRow, CarClassBadge } from '../common';
-import { CarLogo } from '../vehicle/index.js';
+import { PaceBadge, SectorSplitsRow } from '../common';
+import { CarIdentity, CarLogo } from '../vehicle/index.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
@@ -92,13 +92,8 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
               {!paceInfo && <p className="text-[11px] text-lmu-muted mt-1.5">
                 {benchmarkState === 'loading' ? 'Loading benchmark…' : benchmarkState === 'error' ? 'Benchmark unavailable' : 'No matching benchmark'}
               </p>}
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <CarLogo carType={t.bestLapCar} size="xs" />
-                <span className="text-[11px] text-lmu-text-soft break-words min-w-0" dir="auto">{t.bestLapCar || 'Car not recorded'}</span>
-                {t.bestLapClass && (
-                  <CarClassBadge carClass={t.bestLapClass} carType={t.bestLapCar} size="xs" />
-                )}
-              </div>
+              <CarIdentity carType={t.bestLapCar} carClass={t.bestLapClass} nameClassName="text-[11px] text-lmu-text-soft"
+                className="mt-1 flex-wrap" emptyLabel="Car not recorded" wrap />
             </div>
           </div>
 
@@ -133,7 +128,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
               className="text-[11px] text-lmu-muted min-w-0 break-words inline-flex items-center gap-1"
               dir="auto"
             >
-              <CarLogo carType={car} size="xs" />
+              <CarLogo carType={car} size="xs" decorative />
               <span>{car}</span>
             </span>
           ))}
