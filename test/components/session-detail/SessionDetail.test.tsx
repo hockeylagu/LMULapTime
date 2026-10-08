@@ -49,15 +49,15 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     });
 
     const getLapTitles = () => screen
-      .getAllByTitle(/Click to open telemetry for Lap/)
+      .getAllByTitle(/Details for Lap/)
       .map((row) => row.getAttribute('title'));
     const lapHeader = screen.getByTitle('Sort by Lap');
     const lapTimeHeader = screen.getByTitle('Sort by Lap Time');
 
     expect(getLapTitles()).toEqual([
-      'Click to open telemetry for Lap 1',
-      'Click to open telemetry for Lap 2',
-      'Click to open telemetry for Lap 3',
+      'Details for Lap 1',
+      'Details for Lap 2',
+      'Details for Lap 3',
     ]);
     expect(lapHeader.querySelector('svg')).not.toBeNull();
     expect(lapTimeHeader.querySelector('svg')).toBeNull();
@@ -65,9 +65,9 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     fireEvent.click(lapTimeHeader);
 
     expect(getLapTitles()).toEqual([
-      'Click to open telemetry for Lap 2',
-      'Click to open telemetry for Lap 1',
-      'Click to open telemetry for Lap 3',
+      'Details for Lap 2',
+      'Details for Lap 1',
+      'Details for Lap 3',
     ]);
     expect(lapHeader.querySelector('svg')).toBeNull();
     expect(lapTimeHeader.querySelector('svg')).not.toBeNull();

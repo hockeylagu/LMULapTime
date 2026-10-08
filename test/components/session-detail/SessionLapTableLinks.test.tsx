@@ -10,28 +10,73 @@ vi.mock('react-router', async (importOriginal) => ({
   useNavigate: () => navigateMock,
 }));
 
-describe('SessionLapTableRow lap-number link', () => {
+describe('SessionLapTableRow expansion and actions', () => {
   beforeEach(() => navigateMock.mockClear());
-  const renderTable = () => {
-    const session = mockDetailedSession as unknown as DetailedSession;
+  const renderTable = (session = mockDetailedSession as unknown as DetailedSession) => {
     render(<SessionLapTable session={session} selectedDriver={session.playerDriver} isMultiClass={false}
       hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
-    const row = screen.getByTitle('Click to open telemetry for Lap 2');
-    return within(row).getByRole('link', { name: '2' });
+    return screen.getByTitle('Details for Lap 3');
   };
 
-  it('opens the telemetry once on a plain click, not again through the row', () => {
-    fireEvent.click(renderTable());
-    expect(navigateMock).toHaveBeenCalledTimes(1);
+  it.each([true, false])('toggles details from the row and lap number with replay=%s', (hasReplay) => {
+    const session = { ...mockDetailedSession,
+      matchingReplayFile: hasReplay ? mockDetailedSession.matchingReplayFile : undefined,
+    } as unknown as DetailedSession;
+    const row = renderTable(session);
+    fireEvent.click(row);
+    expect(screen.getByTestId('lap-details-3')).toBeInTheDocument();
+    expect(row).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(row).getByText('3', { exact: true }));
+    expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('leaves ctrl and meta clicks to the browser without reaching the row', () => {
-    const link = renderTable();
+  it('supports Enter and Space on the row without toggling from nested controls', () => {
+    const row = renderTable();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(screen.getByTestId('lap-details-3')).toBeInTheDocument();
+    fireEvent.keyDown(within(row).getByRole('link', { name: 'Compare lap 3' }), { key: 'Enter' });
+    expect(screen.getByTestId('lap-details-3')).toBeInTheDocument();
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate or expose an expansion state for laps without events', () => {
+    renderTable();
+    const row = screen.getByTitle('Details for Lap 1');
+    fireEvent.click(row);
+    expect(row).not.toHaveAttribute('tabindex');
+    expect(row).not.toHaveAttribute('aria-expanded');
+    expect(screen.queryByTestId('lap-details-1')).not.toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('opens telemetry once through its action without expanding the row', () => {
+    const row = renderTable();
+    fireEvent.click(within(row).getByRole('link', { name: 'Telemetry for lap 3' }));
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/telemetry?replayName=spa_replay.vcr&lap=3&driverName=Sim+Driver');
+    expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
+  });
+
+  it('keeps comparison on its dedicated link without expanding the row', () => {
+    const row = renderTable();
+    const link = within(row).getByRole('link', { name: 'Compare lap 3' });
+    expect(link).toHaveAttribute('href', '/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=3');
+    fireEvent.click(link);
+    expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
+  });
+
+  it('leaves ctrl and meta clicks on telemetry to the browser without expanding the row', () => {
+    const row = renderTable();
+    const link = within(row).getByRole('link', { name: 'Telemetry for lap 3' });
     // jsdom cannot open a new tab; swallow the browser default after React has seen the click.
     link.addEventListener('click', (e) => e.preventDefault());
     fireEvent.click(link, { ctrlKey: true });
     fireEvent.click(link, { metaKey: true });
     expect(navigateMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
   });
 
   // The telemetry view opens the player's lap unless it is told which driver to show.
@@ -40,7 +85,7 @@ describe('SessionLapTableRow lap-number link', () => {
     const other = session.drivers.find((driver) => driver.name === 'AI Driver 2')!;
     render(<SessionLapTable session={session} selectedDriver={other} isMultiClass={false}
       hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
-    fireEvent.click(within(screen.getByTitle('Click to open telemetry for Lap 1')).getByRole('link', { name: '1' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Telemetry for lap 1' }));
     expect(navigateMock).toHaveBeenCalledWith('/telemetry?replayName=spa_replay.vcr&lap=1&driverName=AI+Driver+2');
   });
 });

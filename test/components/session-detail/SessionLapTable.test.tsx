@@ -35,8 +35,8 @@ describe('SessionLapTable optimal delta', () => {
     render(<SessionLapTable session={session} selectedDriver={selectedDriver} isMultiClass
       hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
     fireEvent.click(screen.getByTitle('Sort by Pos'));
-    expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
-      'Click to open telemetry for Lap 2', 'Click to open telemetry for Lap 1',
+    expect(screen.getAllByTitle(/Details for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Details for Lap 2', 'Details for Lap 1',
     ]);
   });
   it('keeps the optimal gap visible on the best lap, sorts it, and spans the resource columns in details', () => {
@@ -46,17 +46,17 @@ describe('SessionLapTable optimal delta', () => {
       <SessionLapTable session={session} selectedDriver={selectedDriver} isMultiClass={false}
         hasTireWearData hasFuelData hasVirtualEnergyData isCurrentSessionAllTimePB={false} />
     );
-    const bestRow = screen.getByTitle('Click to open telemetry for Lap 2');
+    const bestRow = screen.getByTitle('Details for Lap 2');
     expect(within(bestRow).getByText('Session best')).toBeInTheDocument();
     expect(within(bestRow).getByText('+1.000s')).toBeInTheDocument();
     expect(within(bestRow).getAllByRole('cell')).toHaveLength(14);
     expect(screen.getByRole('columnheader', { name: 'Benchmark Pace' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle('Sort by Δ vs optimal'));
-    expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
-      'Click to open telemetry for Lap 2',
-      'Click to open telemetry for Lap 1',
-      'Click to open telemetry for Lap 3',
+    expect(screen.getAllByTitle(/Details for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Details for Lap 2',
+      'Details for Lap 1',
+      'Details for Lap 3',
     ]);
     fireEvent.click(screen.getByRole('button', { name: 'Show what happened on lap 3' }));
     expect(screen.getByTestId('lap-details-3').querySelector('td')).toHaveAttribute('colspan', '14');
@@ -106,10 +106,10 @@ describe('SessionLapTable inferred timing', () => {
 
     fireEvent.click(screen.getByTitle('Sort by Lap Time'));
 
-    expect(screen.getAllByTitle(/Click to open telemetry for Lap/).map(row => row.getAttribute('title'))).toEqual([
-      'Click to open telemetry for Lap 2',
-      'Click to open telemetry for Lap 1',
-      'Click to open telemetry for Lap 3',
+    expect(screen.getAllByTitle(/Details for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Details for Lap 2',
+      'Details for Lap 1',
+      'Details for Lap 3',
     ]);
   });
 });

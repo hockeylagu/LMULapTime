@@ -795,7 +795,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('opens telemetry when clicking a lap table row or the best lap time in the summary', async () => {
+  it('expands a lap row and opens telemetry from the best lap time in the summary', async () => {
     window.location.hash = '#/session/sess123';
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
@@ -831,11 +831,11 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    // 1. Click row for Lap 1
-    const lap1Row = screen.getByTitle('Click to open telemetry for Lap 1');
-    fireEvent.click(lap1Row);
+    // The pit lap has events to expand; the session route stays open.
+    fireEvent.click(screen.getByTitle('Details for Lap 3'));
 
-    expect(window.location.hash).toContain('lap=1');
+    expect(screen.getByTestId('lap-details-3')).toBeInTheDocument();
+    expect(window.location.hash).toBe('#/session/sess123');
 
     // 2. Click the best lap time in the summary (best lap is Lap 2 with time 122.0)
     fireEvent.click(screen.getByTitle('Open telemetry for Lap 2'));

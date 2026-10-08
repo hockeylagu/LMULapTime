@@ -166,7 +166,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
           })()}
         </div>
         <div className="sm:col-span-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <p className="text-xs text-lmu-muted">Select a lap for telemetry; expand it for events.</p>
+          <p className="text-xs text-lmu-muted">Click a lap to show its events. Use the actions to open telemetry or compare.</p>
           {selectedDriver && <SessionLapStewardsLine driver={selectedDriver} />}
         </div>
       </div>

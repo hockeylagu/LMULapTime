@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
@@ -11,7 +11,6 @@ import { SessionLapTableActions } from './SessionLapTableActions.js';
 import { SessionLapDetailsRow } from './SessionLapDetailsRow.js';
 import { lapEventsTooltip, type LapDetailSection } from './lapDetailSections.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { linkClickHandler } from '../../../utils/linkClick.js';
 import { sessionLapComparePath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 /** A row that opens on Enter: the focus ring sits inside the row, so the table's edge does not clip it. */
@@ -103,6 +102,10 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
 
   const eventsTooltip = lapEventsTooltip(l);
+  const hasDetails = detailSections.length > 0;
+  const handleToggleExpanded = () => {
+    if (hasDetails) onToggleExpanded(l.lapNum);
+  };
 
   const incompleteTooltip = eventsTooltip
     ? `Incomplete Lap:\n${eventsTooltip}`
@@ -119,18 +122,19 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   return (
     <>
     <tr
-      onClick={handleOpenTelemetry}
+      onClick={handleToggleExpanded}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
         event.preventDefault();
-        handleOpenTelemetry();
+        handleToggleExpanded();
       }}
-      tabIndex={0}
-      aria-label={`Lap ${l.lapNum}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: open its telemetry`}
-      className={`transition-colors cursor-pointer group ${FOCUS_ROW} ${
+      tabIndex={hasDetails ? 0 : undefined}
+      aria-expanded={hasDetails ? isExpanded : undefined}
+      aria-label={`Lap ${l.lapNum}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: ${hasDetails ? 'show or hide lap details' : 'no lap events'}`}
+      className={`transition-colors ${hasDetails ? 'cursor-pointer' : ''} group ${FOCUS_ROW} ${
         isLapAllTimePB ? 'bg-lmu-personal-best/8 hover:bg-lmu-personal-best/12' : isSessionBest ? 'bg-lmu-session-best-strong/10 hover:bg-lmu-session-best-strong/15' : 'hover:bg-lmu-cardHover'
       } ${FOCUS_RING}`}
-      title={`Click to open telemetry for Lap ${l.lapNum}`}
+      title={`Details for Lap ${l.lapNum}`}
     >
       <td
         className="px-3 py-2.5 font-semibold text-lmu-text-soft whitespace-nowrap"
@@ -151,13 +155,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           ) : (
             <span className="w-5" aria-hidden="true" />
           )}
-          <Link
-            to={telemetryUrl}
-            onClick={linkClickHandler(handleOpenTelemetry, { stop: true })}
-            className="hover:underline hover:text-white"
-          >
-            {l.lapNum}
-          </Link>
+          <span>{l.lapNum}</span>
         </span>
       </td>
       <td
