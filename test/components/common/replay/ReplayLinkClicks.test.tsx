@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
-import type { ScanStatus } from '../../../shared/types/index.js';
-import { ReplayIndicator } from '../../../src/components/common/ReplayIndicator.js';
-import { ReplayLaunchButton } from '../../../src/components/common/ReplayLaunchButton.js';
+import { SessionDataContext } from '../../../../src/api/sessionDataContext.js';
+import type { ScanStatus } from '../../../../shared/types/index.js';
+import { ReplayIndicator } from '../../../../src/components/common/replay/ReplayIndicator.js';
+import { ReplayLaunchButton } from '../../../../src/components/common/replay/ReplayLaunchButton.js';
 
 /** jsdom cannot open a new tab: swallow the browser default after React has seen the click. */
 function modifierClick(el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }): void {

@@ -111,7 +111,7 @@ describe('DashboardHero', () => {
     expect(onSelectSession).toHaveBeenCalledWith('session-new');
   });
 
-  it('fires callbacks when clicking Replay and Session Details buttons with green standard replay styling', () => {
+  it('fires callbacks when clicking Replay and Session Details buttons with the plain replay glyph', () => {
     const onSelectSession = vi.fn();
     const onOpenReplay = vi.fn();
 
@@ -126,9 +126,8 @@ describe('DashboardHero', () => {
 
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
-    expect(replayBtn).toHaveTextContent('Launch Replay');
-    expect(replayBtn.className).toContain('text-lmu-gain');
-    expect(replayBtn.className).toContain('border-lmu-gain-strong/30');
+    expect(replayBtn).toHaveTextContent(/^Replay$/);
+    expect(replayBtn.querySelector('svg')).toHaveAttribute('data-replay-glyph', 'replay');
 
     fireEvent.click(replayBtn);
     expect(onOpenReplay).toHaveBeenCalledWith('session-new', 2);
@@ -147,7 +146,7 @@ describe('DashboardHero', () => {
     expect(badge.className).toContain('text-lmu-accent-soft');
   });
 
-  it('renders yellow 100Hz replay button when session has DuckDB telemetry', () => {
+  it('renders the Replay + telemetry button when the session has DuckDB telemetry', () => {
     const duckSessions = [
       {
         ...mockSessions[1],
@@ -166,9 +165,8 @@ describe('DashboardHero', () => {
 
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
-    expect(replayBtn).toHaveTextContent('Launch 100Hz Replay');
-    expect(replayBtn.className).toContain('text-lmu-warn-soft');
-    expect(replayBtn.className).toContain('border-lmu-warn-strong/40');
+    expect(replayBtn).toHaveTextContent('Replay + telemetry');
+    expect(replayBtn.querySelector('svg')).toHaveAttribute('data-replay-glyph', 'telemetry');
   });
 
   it('renders pace sparkline and recent momentum metrics', () => {

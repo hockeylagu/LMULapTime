@@ -6,7 +6,7 @@ import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
-import { ReplayLaunchButton } from '../../common/ReplayLaunchButton.js';
+import { ReplayLaunchButton } from '../../common/replay/ReplayLaunchButton.js';
 import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
 import { WeekendSessionLink, WeekendSessionType } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
@@ -106,9 +106,9 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               replayName={session.matchingReplayFile.name}
               to={telemetryPath()}
               onClick={() => handleOpenReplay()}
-              title={`Matching Replay: ${session.matchingReplayFile.name}${
+              title={`Replay: ${session.matchingReplayFile.name}${
                 hasDuckDb ? `
-⚡ Native 100 Hz DuckDB Telemetry: ${duckFilename || 'active'}` : ''
+Telemetry: ${duckFilename || 'active'}` : ''
               }
 Click to inspect trajectory and telemetry`}
             />

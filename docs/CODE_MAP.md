@@ -34,7 +34,7 @@ Client freshness is coordinated in `src/api/useAppData.ts`. It polls while sessi
 telemetry, upgrades or the startup benchmark check are active. `/scan/status` exposes a process-scoped
 `dataRevision` from DB session/replay/telemetry revisions; completion timestamps catch fast scans.
 Changed snapshots reload counts and the atomic `/session-snapshot` session/progression payload together. `sessionDataContext.ts` refreshes
-open track/session details and lets `ReplayIndicator` show the current replay's processing spinner.
+open track/session details and lets `common/replay/ReplayIndicator` show the current replay's processing spinner.
 Recovered scan-status polling errors clear independently of session snapshot or manual-refresh errors.
 API JSON requests use `no-store`; detailed geometry comes from the local package API. Session detail retains
 only mounted same-session data during a revision refresh; switching IDs or remounting fetches fresh.
@@ -91,7 +91,7 @@ retries settled failures; a server start leaves them alone. Recordings are decod
 5. **Load in the client**: `src/components/session-detail/useSessionDetailData.ts` (`fetchJson('/api/session/…')`).
 6. **Show**: `src/components/session-detail/SessionDetail.tsx`, then:
    - `overview/` (header, session summary: `DriverPerformancePanel` = `BestLapBlock` + `SummaryStat` rows + sectors; the header card holds the `BenchmarkLadder`, conditions), `standings/` (race result row, classification, fuel, rules); the stewards' tally sits under the lap table's heading (`table/SessionLapStewardsLine`), the events themselves on each lap's expanded row;
-   - `table/`: the lap table memoizes class ranks and expanded-event sections per session/driver; `shared/domain/lapPlaces.ts` indexes rival lap positions once, and sorting/expansion reuse the prepared entries. The expanded row text comes from `lapDetailSections.ts` (sections), `lapPlaces.ts`
+   - `table/`: clicking a lap row or its number toggles its event details when available; telemetry and comparison use the dedicated action links. The lap table memoizes class ranks and expanded-event sections per session/driver; `shared/domain/lapPlaces.ts` indexes rival lap positions once, and sorting/expansion reuse the prepared entries. The expanded row text comes from `lapDetailSections.ts` (sections), `lapPlaces.ts`
      (class places, the stop a lap belongs to), `SessionLapDetailsRow.tsx` (grouped event debrief, semantic colors and recorded lap/session clocks), `pitStopText.ts` (pit lines per lap), `src/utils/lapTrafficText.ts` (traffic and
      "left out of average" wording);
    - `debrief/`: the on-demand debrief (`loadSessionDebrief.ts` → `/api/compare/laps` + replay trajectories/traffic; ranking in `src/utils/sessionDebrief.ts`). `useSessionDebrief.ts` keeps results only in mounted hook state, clears them on session/driver changes, and refreshes requested results when the session data revision changes; an unavailable result can recover after ingestion settles. It aborts and ignores obsolete requests;
@@ -280,7 +280,7 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 
 **Size limits close to the edge**
 - Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (775, a data file: one entry per layout).
-- Folders near 20 files (17 files each; no obvious semantic group to split off): `src/components/common/`, `test/utils/`;
+- Folders near 20 files: `src/components/common/` (19 with `index.ts`; the replay action already lives in `common/replay/`), `test/utils/` (17);
   `src/components/replay/inspector/` is at 17 (comparison picker split into `compare/`) and `test/components/replay/telemetry/` at 17.
 - Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
 

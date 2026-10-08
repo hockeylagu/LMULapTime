@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { ArrowLeftRight, Activity } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
+import { ReplayGlyph, REPLAY_ACTION } from '../../common/replay/ReplayGlyph.js';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
 import { sessionLapComparePath } from '../sessionDetailHelpers.js';
@@ -24,39 +25,37 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
 }) => {
   const compareUrl = sessionLapComparePath(session, selectedDriver, lapNum);
 
-  const telemetryClassName = `p-1.5 rounded-lg text-xs transition-all flex items-center justify-center cursor-pointer ${FOCUS_RING} ${
-    session.matchingReplayFile
-      ? 'bg-lmu-gain-strong/15 hover:bg-lmu-gain-strong/30 text-lmu-gain-soft hover:text-lmu-gain-soft border border-lmu-gain-strong/40'
-      : 'bg-lmu-accent/20 hover:bg-lmu-accent/35 text-lmu-accent-text hover:text-white border border-lmu-accent/40'
-  }`;
-
-  const telemetryTitle = session.matchingReplayFile
-    ? `Inspect Replay for Lap ${lapNum} Telemetry`
-    : `Open Lap ${lapNum} in Telemetry`;
+  // With a replay, the lap opens in it with the same glyph as the session's replay button. Without one there is
+  // nothing to open: the compare button leads to the lap's comparison.
+  const hasReplay = Boolean(session.matchingReplayFile);
+  const hasTelemetry = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
+  const replayClassName = `${REPLAY_ACTION} p-1.5`;
+  const replayTitle = `${hasTelemetry ? 'Replay + telemetry' : 'Replay'} for Lap ${lapNum}`;
+  const replayIcon = <ReplayGlyph telemetry={hasTelemetry} size={14} />;
 
   return (
     <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-      {telemetryUrl ? (
+      {hasReplay && (telemetryUrl ? (
         <Link
           to={telemetryUrl}
           onClick={linkClickHandler(() => onOpenTelemetry())}
           aria-label={`Telemetry for lap ${lapNum}`}
-          className={telemetryClassName}
-          title={telemetryTitle}
+          className={replayClassName}
+          title={replayTitle}
         >
-          <Activity className="w-3.5 h-3.5" aria-hidden="true" />
+          {replayIcon}
         </Link>
       ) : (
         <button
           type="button"
           onClick={onOpenTelemetry}
           aria-label={`Telemetry for lap ${lapNum}`}
-          className={telemetryClassName}
-          title={telemetryTitle}
+          className={replayClassName}
+          title={replayTitle}
         >
-          <Activity className="w-3.5 h-3.5" aria-hidden="true" />
+          {replayIcon}
         </button>
-      )}
+      ))}
 
       <Link
         to={compareUrl}

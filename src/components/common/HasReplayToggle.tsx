@@ -1,6 +1,6 @@
 import React from 'react';
-import { Video } from 'lucide-react';
 import { FOCUS_RING } from './buttonStyles.js';
+import { ReplayGlyph } from './replay/ReplayGlyph.js';
 
 export interface HasReplayToggleProps {
   hasReplayOnly: boolean;
@@ -36,7 +36,7 @@ export const HasReplayToggle: React.FC<HasReplayToggleProps> = ({
       } ${className} ${FOCUS_RING}`}
       title={hasReplayOnly ? titleActive : titleInactive}
     >
-      <Video className="w-3.5 h-3.5 shrink-0" />
+      <ReplayGlyph size={14} />
       <span>{label}</span>
       {replayCount > 0 && (
         <span

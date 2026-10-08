@@ -44,3 +44,23 @@ describe('SessionLapTableRow lap-number link', () => {
     expect(navigateMock).toHaveBeenCalledWith('/telemetry?replayName=spa_replay.vcr&lap=1&driverName=AI+Driver+2');
   });
 });
+
+describe('SessionLapTableActions replay button', () => {
+  const renderTable = (session: DetailedSession) =>
+    render(<SessionLapTable session={session} selectedDriver={session.playerDriver} isMultiClass={false}
+      hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
+
+  it('shows the replay glyph on every lap when the session has a replay', () => {
+    renderTable(mockDetailedSession as unknown as DetailedSession);
+    const buttons = screen.getAllByRole('link', { name: /^Telemetry for lap/ });
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons[0].querySelector('svg')).toHaveAttribute('data-replay-glyph');
+  });
+
+  // Without a replay there is nothing to open: only the compare button stays, no button in its place.
+  it('leaves the replay button out when the session has no replay', () => {
+    renderTable({ ...mockDetailedSession, matchingReplayFile: undefined } as unknown as DetailedSession);
+    expect(screen.queryAllByRole('link', { name: /^Telemetry for lap/ })).toHaveLength(0);
+    expect(screen.getAllByRole('link', { name: /^Compare lap/ }).length).toBeGreaterThan(0);
+  });
+});

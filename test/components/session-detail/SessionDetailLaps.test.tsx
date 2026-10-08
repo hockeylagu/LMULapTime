@@ -747,7 +747,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       expect(screen.getByText('Back to Sessions')).toBeInTheDocument();
     });
 
-    const replayButtons = screen.getAllByTitle(/Inspect Replay for Lap/i);
+    const replayButtons = screen.getAllByTitle(/^Replay( \+ telemetry)? for Lap/);
     expect(replayButtons.length).toBeGreaterThan(0);
 
     // Click replay for Lap 2

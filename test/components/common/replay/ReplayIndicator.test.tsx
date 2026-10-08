@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
-import type { ScanStatus } from '../../../shared/types/index.js';
-import { ReplayIndicator } from '../../../src/components/common/ReplayIndicator.js';
-import { ReplayLaunchButton } from '../../../src/components/common/ReplayLaunchButton.js';
+import { SessionDataContext } from '../../../../src/api/sessionDataContext.js';
+import type { ScanStatus } from '../../../../shared/types/index.js';
+import { ReplayIndicator } from '../../../../src/components/common/replay/ReplayIndicator.js';
+import { ReplayLaunchButton } from '../../../../src/components/common/replay/ReplayLaunchButton.js';
 
 describe('ReplayIndicator', () => {
   it('shows queued, processing and failure states without launching an unfinished replay', () => {
@@ -33,7 +33,7 @@ describe('ReplayIndicator', () => {
       </SessionDataContext.Provider>
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open replay telemetry' }));
-    fireEvent.click(screen.getByRole('button', { name: /Launch Replay/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
     expect(onClick).toHaveBeenCalledTimes(2);
 
     rerender(
@@ -64,7 +64,7 @@ describe('ReplayIndicator', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders default replay icon and green styling, unaltered when raining', () => {
+  it('renders the plain replay glyph on a neutral surface, unaltered when raining', () => {
     const wetReplay = {
       name: 'Spa_Race_Replay.Vcr',
       hasRain: true,
@@ -74,20 +74,18 @@ describe('ReplayIndicator', () => {
 
     const { container } = render(<ReplayIndicator replay={wetReplay} />);
 
-    const indicator = screen.getByTitle('Replay VCR: Spa_Race_Replay.Vcr');
+    const indicator = screen.getByTitle('Replay: Spa_Race_Replay.Vcr');
     expect(indicator).toBeInTheDocument();
-    // Styling should remain standard green and not blue
-    expect(indicator.className).toContain('text-lmu-gain');
-    expect(indicator.className).not.toContain('text-blue');
-    expect(indicator.className).not.toContain('bg-blue');
+    expect(indicator.className).toContain('text-lmu-text');
 
-    // Should only have the video icon SVG, no rain cloud icon
+    // Only the replay glyph, no rain cloud icon
     const svgs = container.querySelectorAll('svg');
     expect(svgs).toHaveLength(1);
-    expect(svgs[0].classList.contains('lucide-video')).toBe(true);
+    expect(svgs[0]).toHaveAttribute('data-replay-glyph', 'replay');
+    expect(svgs[0].getAttribute('class')).not.toContain('text-lmu-gain');
   });
 
-  it('renders 100Hz duckdb icon and amber styling, unaltered when raining', () => {
+  it('renders the green telemetry glyph when the session has DuckDB telemetry, unaltered when raining', () => {
     const wetDuckDbReplay = {
       name: 'Monza_Practice.Vcr',
       hasDuckDbTelemetry: true,
@@ -98,15 +96,12 @@ describe('ReplayIndicator', () => {
 
     const { container } = render(<ReplayIndicator replay={wetDuckDbReplay} />);
 
-    const indicator = screen.getByTitle('⚡ 100Hz DuckDB Telemetry & Replay: Monza_Practice.Vcr');
-    expect(indicator).toBeInTheDocument();
-    expect(indicator.className).toContain('text-lmu-warn-soft');
-    expect(indicator.className).not.toContain('text-blue');
+    expect(screen.getByTitle('Replay + telemetry: Monza_Practice.Vcr')).toBeInTheDocument();
 
-    // Check for zap icon
     const svgs = container.querySelectorAll('svg');
     expect(svgs).toHaveLength(1);
-    expect(svgs[0].classList.contains('lucide-zap')).toBe(true);
+    expect(svgs[0]).toHaveAttribute('data-replay-glyph', 'telemetry');
+    expect(svgs[0].getAttribute('class')).toContain('text-lmu-gain');
   });
 
   it('renders interactive button and handles onClick unaltered by rain', () => {
@@ -121,12 +116,11 @@ describe('ReplayIndicator', () => {
 
     const button = screen.getByRole('button', { name: /Open replay telemetry/i });
     expect(button).toBeInTheDocument();
-    expect(button.className).toContain('hover:bg-lmu-gain/20');
-    expect(button.className).not.toContain('hover:bg-blue');
+    expect(button.className).toContain('hover:bg-lmu-cardHover');
 
     const svgs = container.querySelectorAll('svg');
     expect(svgs).toHaveLength(1);
-    expect(svgs[0].classList.contains('lucide-video')).toBe(true);
+    expect(svgs[0]).toHaveAttribute('data-replay-glyph', 'replay');
 
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -166,14 +160,15 @@ describe('ReplayIndicator', () => {
       </SessionDataContext.Provider>
     );
     const { rerender } = render(button(true, false));
-    expect(screen.getByRole('button', { name: /Launch Replay/ })).toBeEnabled();
-    expect(screen.getByText('Some replay drivers are unavailable')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Launch Replay/ }));
+    // A partial failure keeps the normal button; what is missing goes in the tooltip
+    expect(screen.getByRole('button', { name: 'Replay' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Replay' })).toHaveAttribute('title', expect.stringContaining('Some replay drivers are unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
     expect(onClick).toHaveBeenCalledOnce();
 
     rerender(button(false, true));
-    expect(screen.getByRole('button', { name: /Launch 100Hz Replay/ })).toBeEnabled();
-    expect(screen.getByText('Replay cache unavailable; using 100Hz telemetry')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replay + telemetry' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Replay + telemetry' })).toHaveAttribute('title', expect.stringContaining('Replay cache unavailable; using 100Hz telemetry'));
     rerender(button(false, false));
     expect(screen.getByRole('button', { name: /Replay failed/ })).toBeDisabled();
   });

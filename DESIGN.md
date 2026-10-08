@@ -294,7 +294,7 @@ Two cases fail and must not be used:
 
 **The One Red Rule.** Pit Lane Red marks identity and the current selection. A screen shows it on the active tab, the selected control, your own row and at most a handful of alerts. It never fills a panel. Identity is red, never gold or amber: gold belongs to P1 and personal bests, amber to the rival.
 
-**The Meaning Before Calm Rule.** When removing color, keep every distinction a color draws: two states that had two colors keep two looks (the replay button stays amber for 100 Hz telemetry and green for a replay only). Only a color that separates nothing may go neutral. Headers, icons and names that separate nothing are neutral.
+**The Meaning Before Calm Rule.** When removing color, keep every distinction a color draws: two states that had two colors keep two looks (a replay with the car's own telemetry keeps a green glyph with the trace cut out, a replay only keeps the white one). Only a color that separates nothing may go neutral. Headers, icons and names that separate nothing are neutral.
 
 **The No Dimmed Text Rule.** Never dim text with `opacity-*` to show an off, unselected or secondary state. Step down a text tier instead (`lmu-faint` for off), or fade a colored control through its family's `faded` step, full color when selected or hovered.
 
@@ -369,12 +369,13 @@ The shared class strings live in `common/buttonStyles.ts` (`PRIMARY_BUTTON`, `SE
 - **External link:** the secondary shape with a `lmu-border` hairline, muted text and an external-link icon, brightening on hover ("Get a Gemini key"). An inline external link is `lmu-text-soft` text with a 12px icon that underlines on hover ("View sheet").
 - **Quiet outlined:** hairline border, muted semibold 12px text, white text and `lmu-rule` border on hover ("Where's the time?", the leaderboard "Compare").
 - **Icon:** a 6px-padded square on `lmu-bg` with a hairline border and muted icon. On hover it fills red (destructive or primary) or lifts one tonal step (neutral).
-- **Tinted:** a signal color at 10% background, 20% border and its text step (`bg-lmu-accent/10 border-lmu-accent/20 text-lmu-accent-text`), filling solid on hover. The replay launcher (`common/ReplayLaunchButton`) is the canonical one: amber "Launch 100Hz Replay" with DuckDB telemetry, green "Launch Replay" without.
+- **Tinted:** a signal color at 10% background, 20% border and its text step (`bg-lmu-accent/10 border-lmu-accent/20 text-lmu-accent-text`), filling solid on hover. (The replay action is not tinted: see Replay action.)
 - **Busy:** a running action stays at full strength with a default cursor and a spinning icon rather than fading.
 
 ### Segmented Pills
 The signature filter control (session type, car class, sort, chart view). A 36px `lmu-bg` well with a hairline border and 12px radius holds 24px-tall monospace uppercase segments with a 5px radius (32px wells for chart view switches).
 - **Red means the list is narrowed.** A selected segment that filters is solid red with white text. A selected "All" rests neutral (`lmu-raised` fill, `lmu-rule` hairline, white text; `SEGMENT_RESTING` / `SEGMENT_NARROWED` in `common/SessionTypePills.tsx`).
+- **Replay action** (`common/replay/`): one glyph everywhere a replay opens (dashboard hero, session header, session rows and cards, lap rows, the Has Replay filter). A neutral `lmu-card` button with a hairline and a white bold label; the glyph carries the meaning. A replay only is the solid white play triangle, "Replay". A replay with the car's own telemetry is the same triangle in gain green with a trace knocked out of it, "Replay + telemetry" with the label in the same `lmu-gain`. Rows use the compact 28px icon button, headers the 32px labelled one. Processing, queued and failed keep the shape, muted, with their own icon. A partly failed replay that still opens keeps its normal button and says what is missing in the tooltip.
 - **Toggles are neutral.** On/off toggles (Hide Empty, Has Replay), the grid/table switch, chart view switches, unit toggles and the current page are `lmu-raised` when on, never red.
 - **Off segments** have a hairline and `lmu-faint` text at full opacity, brightening to white on hover.
 - **Colored filters** keep their color when selected (car class, session type); off, they fade to the family's `faded` step with a 30% border and no fill, returning to full color on hover. Session type pills show the dot when off and the chip when chosen, so the filter doubles as the legend.

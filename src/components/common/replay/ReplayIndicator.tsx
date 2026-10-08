@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { Video, Zap, LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
-import { useSessionDataContext } from '../../api/sessionDataContext.js';
-import { FOCUS_RING } from './buttonStyles.js';
-import { linkClickHandler } from '../../utils/linkClick.js';
+import { LoaderCircle, Clock3, AlertCircle } from 'lucide-react';
+import { useSessionDataContext } from '../../../api/sessionDataContext.js';
+import { linkClickHandler } from '../../../utils/linkClick.js';
+import { ReplayGlyph, REPLAY_ACTION, REPLAY_BUSY, REPLAY_COMPACT } from './ReplayGlyph.js';
 
 export interface ReplayIndicatorProps {
   replay?: {
@@ -23,6 +23,7 @@ export interface ReplayIndicatorProps {
   onClick?: () => void;
 }
 
+/** The compact replay action of a session row: the replay glyph alone, or the replay's decoding status. */
 export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
   replay,
   hasDuckDbTelemetry = false,
@@ -56,45 +57,35 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
     return (
       <span role="status" aria-label={label} title={`${label}: ${replay.name}${processing && stage ? ` — ${stage}${percent != null ? ` (${Math.round(percent)}%)` : ''}` : ''}${job?.error ? ` — ${job.error}` : ''}`}
         onClick={event => event.stopPropagation()}
-        className={`inline-flex p-1.5 rounded-lg bg-lmu-raised text-lmu-info border border-lmu-border shrink-0 ${className}`}>
-        {processing ? <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin motion-reduce:animate-none" />
-          : state === 'queued' ? <Clock3 aria-hidden="true" className="w-4 h-4" />
-          : <AlertCircle aria-hidden="true" className="w-4 h-4 text-lmu-warn" />}
+        className={`${REPLAY_BUSY} ${REPLAY_COMPACT} ${className}`}>
+        {processing ? <LoaderCircle aria-hidden="true" className="w-3.5 h-3.5 text-lmu-info animate-spin motion-reduce:animate-none" />
+          : state === 'queued' ? <Clock3 aria-hidden="true" className="w-3.5 h-3.5" />
+          : <AlertCircle aria-hidden="true" className="w-3.5 h-3.5 text-lmu-warn" />}
       </span>
     );
   }
 
   const activeDuckFilename = duckdbFilename || replay.duckdbFilename;
-
-  const indicatorClassName = isDuckDb
-    ? `inline-flex items-center gap-1 p-1.5 rounded-lg bg-lmu-warn-strong/15 text-lmu-warn-soft border border-lmu-warn-strong/40 shrink-0 ${className}`
-    : `inline-flex p-1.5 rounded-lg bg-lmu-gain/10 text-lmu-gain border border-lmu-gain/20 shrink-0 ${className}`;
-
   const title = isDuckDb
-    ? `⚡ 100Hz DuckDB Telemetry & Replay: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}`
-    : `Replay VCR: ${replay.name}`;
+    ? `Replay + telemetry: ${replay.name}${activeDuckFilename ? ` (${activeDuckFilename})` : ''}`
+    : `Replay: ${replay.name}`;
   const partialWarning = partialFailure
     ? `${job?.playable ? 'Some replay drivers are unavailable' : 'Replay cache unavailable; DuckDB telemetry is available'}${job?.error ? ` — ${job.error}` : ''}`
     : '';
   const indicatorTitle = partialWarning ? `${title} — ${partialWarning}` : title;
+  const ariaLabel = partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry';
+  const glyph = <ReplayGlyph telemetry={isDuckDb} />;
 
   if (to) {
     return (
       <Link
         to={to}
         onClick={linkClickHandler(onClick, { stop: true })}
-        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-gain/20'} transition-colors cursor-pointer ${FOCUS_RING}`}
+        className={`${REPLAY_ACTION} ${REPLAY_COMPACT} ${className}`}
         title={`${indicatorTitle} - Open telemetry`}
-        aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}
+        aria-label={ariaLabel}
       >
-        {isDuckDb ? (
-          <>
-            <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
-          </>
-        ) : (
-          <Video className="w-4 h-4" />
-        )}
+        {glyph}
       </Link>
     );
   }
@@ -107,32 +98,18 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
           event.stopPropagation();
           onClick();
         }}
-        className={`${indicatorClassName} ${isDuckDb ? 'hover:bg-lmu-warn-strong/25' : 'hover:bg-lmu-gain/20'} transition-colors cursor-pointer ${FOCUS_RING}`}
+        className={`${REPLAY_ACTION} ${REPLAY_COMPACT} ${className}`}
         title={`${indicatorTitle} - Open telemetry`}
-        aria-label={partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry'}
+        aria-label={ariaLabel}
       >
-        {isDuckDb ? (
-          <>
-            <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
-          </>
-        ) : (
-          <Video className="w-4 h-4" />
-        )}
+        {glyph}
       </button>
     );
   }
 
   return (
-    <span className={indicatorClassName} title={indicatorTitle}>
-      {isDuckDb ? (
-        <>
-          <Zap className="w-3.5 h-3.5 text-lmu-warn fill-lmu-warn/20" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider hidden sm:inline">100Hz</span>
-        </>
-      ) : (
-        <Video className="w-4 h-4" />
-      )}
+    <span className={`inline-flex items-center justify-center text-lmu-text ${REPLAY_COMPACT} ${className}`} title={indicatorTitle}>
+      {glyph}
     </span>
   );
 };
