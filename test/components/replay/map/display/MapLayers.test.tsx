@@ -109,10 +109,36 @@ describe('GPS map display layers', () => {
       'Active track',
       'Kerbs',
       'Braking markers',
-      'Pit lane and apron',
+      'Pit lane',
       'Centerline guide',
       'Runoff and other roads',
     ]);
+  });
+
+  it('switches apron, gravel and grass with runoff and keys their colours', () => {
+    const { container } = renderMap(mapDisplay({ apron: [polygon(150)], gravel: [polygon(160)], grass: [polygon(170)] }));
+    openLayers();
+    expect(screen.queryByRole('list', { name: 'Runoff colours' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
+    const drawn = [...container.querySelectorAll('[data-surface]')].map(path => path.getAttribute('data-surface'));
+    expect(drawn).toEqual(['grass', 'gravel', 'runoff', 'apron', 'otherRoad', 'road', 'kerb']);
+    expect(screen.getAllByRole('listitem').map(item => item.textContent))
+      .toEqual(['Paved runoff', 'Painted apron', 'Gravel', 'Grass', 'Other roads']);
+  });
+
+  it('keys only the runoff kinds the layout has', () => {
+    renderMap(mapDisplay({ gravel: [polygon(160)] }));
+    openLayers();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
+    expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['Paved runoff', 'Gravel', 'Other roads']);
+  });
+
+  it('migrates a stored gravel, grass or apron preference into the combined runoff toggle', () => {
+    localStorage.setItem(MAP_LAYERS_STORAGE_KEY, JSON.stringify({ runoff: false, grass: true }));
+    const { container } = renderMap(mapDisplay({ apron: [polygon(150)] }));
+    openLayers();
+    expect(screen.getByRole('checkbox', { name: 'Runoff and other roads' })).toBeChecked();
+    expect(container.querySelector('[data-surface="apron"]')).toBeInTheDocument();
   });
 
   it('toggles native runoff and pit layers independently without changing the SVG camera', () => {
@@ -128,7 +154,7 @@ describe('GPS map display layers', () => {
     expect(container.querySelector('[data-surface="pit"]')).toBeNull();
     expect(mapSvg?.getAttribute('viewBox')).toBe(initialViewBox);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Pit lane and apron' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Pit lane' }));
     expect(container.querySelector('[data-surface="runoff"]')).toBeInTheDocument();
     expect(container.querySelector('[data-surface="pit"]')).toBeInTheDocument();
     expect(mapSvg?.getAttribute('viewBox')).toBe(initialViewBox);
@@ -211,7 +237,7 @@ describe('GPS map display layers', () => {
     renderMap(mapDisplay({ pit: [] }));
     const trigger = screen.getByRole('button', { name: 'Layers' });
     const panel = openLayers();
-    expect(screen.getByRole('checkbox', { name: 'Pit lane and apron' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Pit lane' })).toBeDisabled();
     expect(screen.getByText(/Some optional map layers are unavailable/)).toBeInTheDocument();
     expect(panel.querySelector('input:not(:disabled)')).toHaveFocus();
 

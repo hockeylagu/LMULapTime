@@ -6,7 +6,7 @@ import { projectBoundaryPoints } from '../replayMapUtils.js';
 import { MapLayersControl } from './MapLayersControl.js';
 import { MapFullscreenButton } from './MapFullscreenButton.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
-import { visibleSurfacePoints, type MapLayers } from './mapLayers.js';
+import { RUNOFF_GROUP, visibleSurfacePoints, type MapLayers } from './mapLayers.js';
 import { projectedPointBounds } from './useMapLayers.js';
 
 type Point = { sx: number; sy: number };
@@ -39,10 +39,11 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
     orientation={orientation} className="top-2 right-2 bottom-auto">
     <MapLayersControl layers={layers} onChange={onChange} error={error}
       available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
-        runoff: Boolean(display?.surfaces.runoff.length || display?.surfaces.otherRoad.length || geometry?.mapSurfaces?.runoff.length || geometry?.mapSurfaces?.otherRoad?.length),
+        runoff: RUNOFF_GROUP.some(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length),
         pit: Boolean(display?.surfaces.pit.length), otherRoad: Boolean(display?.surfaces.otherRoad.length),
         brakeMarkers: Boolean(display?.brakeMarkers?.length),
         centerline: center.length > 0 }}
+      runoffKinds={RUNOFF_GROUP.filter(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length)}
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(display?.surfaces ?? geometry?.mapSurfaces,
           { ...layers, road: Boolean(display) && layers.road, kerb: Boolean(display) && layers.kerb }), bounds, 800, 60)])} />

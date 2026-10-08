@@ -115,7 +115,7 @@ retries settled failures; a server start leaves them alone. Recordings are decod
   (`racePositions.ts`, built on a worker by `racePositionsWorkerClient.ts`, stored by `dbRacePositionStore.ts`) → `trafficSpells.ts`.
 - Client: `src/api/replayApi.ts` → `src/components/replay/ReplayInspectorPage.tsx` (route `/telemetry`):
   `inspector/` (data hook `useReplayInspectorData.ts`, `replayPlaybackCursor.ts` publishes frame-by-frame visual interpolation to the charts and map without rerendering the whole inspector between recorded samples; telemetry readouts remain on real samples, `useReplayPersonalBest.ts` (canonical same-layout/class leaderboard identity for the gold lap time), sidebar, timeline, `compare/` (Compare button, comparison lap picker and its rows); HUD assist labels reserve height so TC/ABS toggles do not resize the map), `map/` (GPS map; the SVG scene pieces are in `map/scene/`, racing lines share one non-scaling 28px hit stroke (44px on touch) per continuous section for nearest-sample selection; selected-corner ranges stay stable during playback to avoid rebuilding static paths, boundaries via
-  `useTrackBoundaryGeometry.ts` from `/api/data-plugin/tracks/:layoutKey`; optional `mapSurfaces` road/kerb/runoff polygons are drawn by
+  `useTrackBoundaryGeometry.ts` from `/api/data-plugin/tracks/:layoutKey`; optional `mapSurfaces` road/kerb/runoff (plus optional apron, gravel and grass) polygons are drawn by
   `scene/GpsTrackSurfaceLayers.tsx` as compound paths preserving holes. Coordinates are local x/z meters; these
   display layers leave centerline projection and timing gates unchanged. `map/display/` owns persistent Layers
   preferences, optional revision-matched `/tracks-display/<layoutKey>.json` assets, quiet active-route backgrounds,
@@ -124,7 +124,7 @@ retries settled failures; a server start leaves them alone. Recordings are decod
   labels report printed board distances; unknown distances use a generic brake label.
   `useStableCullViewBox.ts` (rule `nextCullViewBox` in `replayMapUtils.ts`) keeps the culling view box unchanged while
   the live view stays inside its margin, so the memoised `TrackPathLayers` in `scene/GpsTrackSegments.tsx` skip
-  re-rendering during pans; `useGpsMapShortcuts.ts` acts only on the focused or expanded map, never on chart keys. Active road and kerbs are the defaults; runoff, pits, other circuit roads,
+  re-rendering during pans; `useGpsMapShortcuts.ts` acts only on the focused or expanded map, never on chart keys. Active road and kerbs are the defaults; runoff (one toggle for paved runoff, apron, gravel, grass and other circuit roads, with a colour key for the kinds present), pits,
   road edges and the centerline guide are opt-ins. Legacy files use a seam-free measured ribbon and measured kerb
   clipping; unavailable pit/outer-road controls are disabled. Layer toggles preserve camera and playback. Maps without
   surfaces retain the road ribbon),
@@ -256,6 +256,8 @@ LMU's swapped `G Force Lat`/`Long` labels; unmarked cached rows flipped on read)
 ---
 
 ## 9. Smells that need attention
+
+Fullscreen GPS map audit: focus/background isolation, keyboard corner/pan access and missing-channel HUD truth need hardening. Nested Escape also closes both shortcut help and fullscreen; secondary overlay states, tokens and constrained desktop layouts need follow-up. Evidence, priorities and verification limits are in [fullscreen-gps-map-audit.md](fullscreen-gps-map-audit.md).
 
 Session-detail accessibility hardening: `SessionRulesModal` portals into the body, isolates background content with `inert`, traps focus and restores the trigger and scrolling on close. Circuit navigation is a React Router link; chart legend visibility uses native toggle buttons. Debrief status/errors are announced through status/alert regions. See `session-detail-audit.md` for the remaining findings.
 

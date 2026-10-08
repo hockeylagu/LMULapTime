@@ -206,11 +206,20 @@ describe('track map display validation', () => {
     expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2')).not.toHaveProperty('brakeMarkers');
   });
 
+  it('accepts optional apron, gravel and grass layers and displays without them', () => {
+    const display = mapDisplay();
+    display.surfaces = { ...display.surfaces, apron: display.surfaces.road, gravel: [], grass: display.surfaces.road };
+    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2')).toBe(display);
+    expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2').surfaces).not.toHaveProperty('grass');
+  });
+
   it.each([
     ['wrong layout', { ...mapDisplay(), layoutKey: 'test_short' }, 'test_gp', 'mesh-v2'],
     ['wrong revision', { ...mapDisplay(), sourceRevision: 'old-mesh' }, 'test_gp', 'mesh-v2'],
     ['malformed polygon ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
     ['nonfinite coordinate', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [10, 0], [Infinity, 10]]]] } }, 'test_gp', 'mesh-v2'],
+    ['malformed grass ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, grass: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
+    ['apron that is not an array', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, apron: {} } }, 'test_gp', 'mesh-v2'],
     ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: -5, side: 'left' }] }, 'test_gp', 'mesh-v2'],
     ['unknown marker side', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: 5, side: 'center' }] }, 'test_gp', 'mesh-v2'],
   ])('rejects sidecar data with %s', (_label, value, layoutKey, revision) => {

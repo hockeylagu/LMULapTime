@@ -17,6 +17,8 @@ const PROFILE_COLUMNS = [
 ] as const satisfies readonly (keyof TrackSurfaceProfileColumns)[];
 const KERB_TYPE_COLUMNS = ['leftKerbType', 'rightKerbType'] as const;
 const KERB_TYPES: readonly TrackKerbType[] = ['flat', 'sawtooth', 'other'];
+/** Surface layers added after the first packages; older packages omit them. */
+const OPTIONAL_SURFACES: readonly string[] = ['apron', 'gravel', 'grass'];
 
 function invalid(path: string): never {
   throw new Error(`Invalid track geometry: ${path}`);
@@ -83,8 +85,8 @@ export function parseTrackBoundaryGeometry(value: unknown, expectedLayoutKey?: s
 
   if (geometry.mapSurfaces !== undefined) {
     const surfaces = object(geometry.mapSurfaces, 'mapSurfaces');
-    for (const key of ['road', 'kerb', 'runoff', 'pit', 'otherRoad']) {
-      if ((key === 'pit' || key === 'otherRoad') && surfaces[key] === undefined) continue;
+    for (const key of ['road', 'kerb', 'runoff', ...OPTIONAL_SURFACES, 'pit', 'otherRoad']) {
+      if ((key === 'pit' || key === 'otherRoad' || OPTIONAL_SURFACES.includes(key)) && surfaces[key] === undefined) continue;
       array(surfaces[key], `mapSurfaces.${key}`).forEach((polygon, index) => {
         const path = `mapSurfaces.${key}[${index}]`;
         array(polygon, path, 1).forEach((ring, ringIndex) => pairs(ring, `${path}[${ringIndex}]`, 3));
@@ -187,7 +189,8 @@ export function parseTrackMapDisplay(value: unknown, layoutKey: string, sourceRe
     if (total > MAX_TOTAL_ITEMS) invalid('display total array size');
     return candidate;
   };
-  for (const key of ['road', 'kerb', 'runoff', 'pit', 'otherRoad']) {
+  for (const key of ['road', 'kerb', 'runoff', ...OPTIONAL_SURFACES, 'pit', 'otherRoad']) {
+    if (OPTIONAL_SURFACES.includes(key) && surfaces[key] === undefined) continue;
     const path = `display.surfaces.${key}`;
     for (const polygon of array(surfaces[key], path)) {
       for (const ring of array(polygon, path, 1)) {

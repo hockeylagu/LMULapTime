@@ -4,7 +4,7 @@ import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { buildRoadRibbonSvgPath, projectBoundaryPoints } from '../replayMapUtils.js';
 import { GpsTrackRoadRibbon } from '../scene/GpsTrackRoadRibbon.js';
 import { GpsTrackSurfaceLayers } from '../scene/GpsTrackSurfaceLayers.js';
-import type { MapLayers } from './mapLayers.js';
+import { DEFAULT_MAP_LAYERS, type MapLayers } from './mapLayers.js';
 
 interface Props {
   geometry?: TrackBoundaryGeometry | null;
@@ -46,7 +46,7 @@ export const GpsMapBackground: React.FC<Props> = React.memo(({ geometry, display
       {kerbClip && layers.kerb && geometry?.mapSurfaces && <>
         <defs><clipPath id={clipId}><path d={kerbClip} clipRule="evenodd" fillRule="evenodd" /></clipPath></defs>
         <g clipPath={`url(#${clipId})`}><GpsTrackSurfaceLayers surfaces={geometry.mapSurfaces} bounds={bounds}
-          viewBoxSize={800} padding={60} layers={{ ...layers, road: false, runoff: false, pit: false, otherRoad: false }} /></g>
+          viewBoxSize={800} padding={60} layers={{ ...DEFAULT_MAP_LAYERS, road: false, kerb: true }} /></g>
       </>}
     </>}
     {(left.length > 0 && right.length > 0) || (center.length > 0 && layers.centerline) ? (

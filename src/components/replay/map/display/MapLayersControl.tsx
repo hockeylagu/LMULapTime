@@ -1,18 +1,20 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Layers } from 'lucide-react';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
-import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, type MapLayers, type MapLayerKey } from './mapLayers.js';
+import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, type MapLayers, type MapLayerKey } from './mapLayers.js';
 
 interface Props {
   layers: MapLayers;
   onChange: (layers: MapLayers) => void;
   available: Partial<Record<MapLayerKey, boolean>>;
+  /** Runoff kinds this layout has, keyed for the colour legend. */
+  runoffKinds?: readonly MapLayerKey[];
   error?: string | null;
   onFitTrack: () => void;
   onFitVisible: () => void;
 }
 
-export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, error, onFitTrack, onFitVisible }) => {
+export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], error, onFitTrack, onFitVisible }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -62,10 +64,19 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
             className={`flex gap-2 items-center py-1.5 text-xs select-none ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
             <input type="checkbox" checked={available[key] !== false && layers[key]} disabled={available[key] === false}
               onChange={e => onChange(key === 'runoff'
-                ? { ...layers, runoff: e.target.checked, otherRoad: e.target.checked }
+                ? { ...layers, ...Object.fromEntries(RUNOFF_GROUP.map(layer => [layer, e.target.checked])) }
                 : { ...layers, [key]: e.target.checked })}
               className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
           </label>
+          {key === 'runoff' && layers.runoff && runoffKinds.length > 1 && (
+            <ul className="pl-5 py-1 flex flex-col gap-1 border-l-2 border-slate-700/60 ml-2 mb-1" aria-label="Runoff colours">
+              {RUNOFF_LEGEND.filter(item => runoffKinds.includes(item.key)).map(item => (
+                <li key={item.key} className="flex gap-2 items-center text-[11px] text-lmu-muted">
+                  <span aria-hidden className="w-3 h-3 rounded-sm border border-slate-600/70" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </li>))}
+            </ul>
+          )}
           {key === 'brakeMarkers' && layers.brakeMarkers && available.brakeMarkers !== false && (
             <div className="pl-5 py-1 flex flex-col gap-1 border-l-2 border-slate-700/60 ml-2 mb-1" role="group" aria-label="Braking marker types">
               <label className="flex gap-2 items-center text-[11px] select-none text-lmu-text-soft cursor-pointer hover:text-lmu-text">

@@ -13,6 +13,10 @@ export interface TrackMapSurfaces {
   road: TrackSurfacePolygon[];
   kerb: TrackSurfacePolygon[];
   runoff: TrackSurfacePolygon[];
+  /** Painted and artificial-turf runoff, split from `runoff` for display only. */
+  apron?: TrackSurfacePolygon[];
+  gravel?: TrackSurfacePolygon[];
+  grass?: TrackSurfacePolygon[];
   pit?: TrackSurfacePolygon[];
   otherRoad?: TrackSurfacePolygon[];
 }
