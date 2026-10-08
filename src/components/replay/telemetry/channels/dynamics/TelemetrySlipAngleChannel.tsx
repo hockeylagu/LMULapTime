@@ -81,11 +81,11 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
           className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-violet/80 font-mono font-bold text-[11px] text-lmu-violet-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-violet/80 font-mono font-bold text-[11px] text-lmu-violet-soft shadow-marker-lift whitespace-nowrap">
             {slipAngle !== undefined ? `${slipAngle > 0 ? `+${slipAngle.toFixed(2)}` : slipAngle.toFixed(2)}°` : '0.00°'}
           </span>
           {baseSlipAngle !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-marker-lift whitespace-nowrap">
               B: {baseSlipAngle.toFixed(2)}°
             </span>
           )}

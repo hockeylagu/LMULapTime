@@ -127,7 +127,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
           className={`absolute pointer-events-none z-50 flex items-center top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-marker-lift whitespace-nowrap border ${
             (currentComparison?.deltaTimeSec ?? 0) <= 0 ? 'border-lmu-gain/80 text-lmu-gain-soft' : 'border-lmu-loss/80 text-lmu-loss-soft'
           }`}>
             Δt: {(currentComparison?.deltaTimeSec ?? 0) <= 0 ? '' : '+'}

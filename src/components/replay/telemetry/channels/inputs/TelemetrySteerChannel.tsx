@@ -112,13 +112,14 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
       {visibleBands.map((band) => {
         const isUS = band.type === 'understeer';
         const isScrub = showScrub && band.isTireScrub;
-        const fill = !isUS ? 'rgba(245, 158, 11, 0.22)' : isScrub ? 'rgba(244, 63, 94, 0.24)' : 'rgba(56, 189, 248, 0.18)';
+        const fill = !isUS ? TELEMETRY_COLORS.oversteer : isScrub ? TELEMETRY_COLORS.tireScrub : TELEMETRY_COLORS.understeer;
+        const fillOpacity = !isUS ? 0.22 : isScrub ? 0.24 : 0.18;
         const stroke = !isUS ? TELEMETRY_COLORS.oversteer : isScrub ? TELEMETRY_COLORS.tireScrub : TELEMETRY_COLORS.understeer;
         const strokeOpacity = isScrub ? 0.85 : 0.65;
 
         return (
           <g key={band.id} className="pointer-events-none">
-            <rect x={band.xStart} y={0} width={band.width} height={100} fill={fill} />
+            <rect x={band.xStart} y={0} width={band.width} height={100} fill={fill} fillOpacity={fillOpacity} />
             <line x1={band.xStart} y1={0} x2={band.xStart} y2={100} stroke={stroke} strokeWidth={0.8} strokeOpacity={strokeOpacity} vectorEffect="non-scaling-stroke" />
             <line x1={band.xEnd} y1={0} x2={band.xEnd} y2={100} stroke={stroke} strokeWidth={0.8} strokeOpacity={strokeOpacity} vectorEffect="non-scaling-stroke" />
           </g>
@@ -236,11 +237,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-indigo/80 font-mono font-bold text-[11px] text-lmu-indigo-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-indigo/80 font-mono font-bold text-[11px] text-lmu-indigo-soft shadow-marker-lift whitespace-nowrap">
             {steerPercent > 0 ? `+${steerPercent.toFixed(0)}%` : `${steerPercent.toFixed(0)}%`}
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-marker-lift whitespace-nowrap">
               B: {baseSteerPercent.toFixed(0)}%
             </span>
           )}

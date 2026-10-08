@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { TrackBrakeMarker, TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
-import { LMU_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
+import { LMU_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { projectBoundaryPoints } from '../replayMapUtils.js';
 
 interface Props {
@@ -121,9 +121,9 @@ export const GpsBrakeMarkers: React.FC<Props> = React.memo(({
         uy,
         tx: -uy,
         ty: ux,
-        strokeColor: isDigi ? '#38bdf8' : isNum ? MAP_COLORS.markerMuted : '#f59e0b',
-        textColor: isDigi ? '#38bdf8' : isNum ? LMU_COLORS.text : '#f59e0b',
-        tickStroke: isDigi ? '#0284c7' : isNum ? MAP_COLORS.markerMuted : '#d97706',
+        strokeColor: isDigi ? TELEMETRY_COLORS.primary : isNum ? MAP_COLORS.markerMuted : TELEMETRY_COLORS.baseline,
+        textColor: isDigi ? TELEMETRY_COLORS.primary : isNum ? LMU_COLORS.text : TELEMETRY_COLORS.baseline,
+        tickStroke: isDigi ? MAP_COLORS.digitalMarkerTick : isNum ? MAP_COLORS.markerMuted : MAP_COLORS.referenceMarkerTick,
       });
     });
 

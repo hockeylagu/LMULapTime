@@ -344,7 +344,7 @@ Flat and tonal. Depth comes from stepping between the neutral surfaces: the deep
 
 ### Shadow Vocabulary
 These are the only shadows the app uses:
-- **Marker lift** (`shadow-[0_2px_10px_rgba(0,0,0,0.85)]`, `drop-shadow-*` on SVG): only where a marker or cursor readout floats over busy geometry, the track map or a telemetry trace.
+- **Marker lift** (`shadow-marker-lift`, defined in `src/index.css`, `drop-shadow-*` on SVG): only where a marker or cursor readout floats over busy geometry, the track map or a telemetry trace.
 - **Overlay** (`shadow-lg` to `shadow-2xl`): popovers, dropdowns, tooltips, modals, toasts and the controls floating over the map, which genuinely sit above the page.
 
 ### Named Rules

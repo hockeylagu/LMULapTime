@@ -76,11 +76,11 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
           className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className="px-2 py-0.5 rounded-md bg-lmu-badge text-lmu-info-soft border border-lmu-info/80 font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+          <span className="px-2 py-0.5 rounded-md bg-lmu-badge text-lmu-info-soft border border-lmu-info/80 font-mono font-bold text-[11px] shadow-marker-lift whitespace-nowrap">
             {currentPoint?.speedKmh ?? 0} <span className="text-[10px] font-normal text-lmu-info/70">km/h</span>
           </span>
           {currentComparison && (
-            <span className={`px-1.5 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+            <span className={`px-1.5 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[10px] shadow-marker-lift whitespace-nowrap border ${
               currentComparison.deltaSpeedKmh >= 0 ? 'border-lmu-gain-strong/80 text-lmu-gain-soft' : 'border-lmu-loss-strong/80 text-lmu-loss-soft'
             }`}>
               <span className="text-lmu-warn font-semibold mr-1">B: {currentComparison.baseline.speedKmh}</span>

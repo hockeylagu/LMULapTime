@@ -2,18 +2,10 @@ import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
-import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { SPEED_GRADIENT_STOPS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis/index.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
-
-// Continuous thermal gradient stops (0..1): blue -> cyan -> green -> amber -> orange -> purple.
-const SPEED_GRADIENT: Array<[number, [number, number, number]]> = [
-  [0, [2, 132, 199]],     // blue (apex/slow)
-  [0.35, [16, 185, 129]], // emerald (mid)
-  [0.65, [245, 158, 11]], // amber (high)
-  [1, [192, 38, 211]],    // purple/fuchsia (top speed)
-];
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -89,7 +81,7 @@ export function getHeatmapColor(
 
   // Speed: continuous thermal heatmap, Blue (slow) -> Green -> Amber -> Purple (top speed)
   const spd = p.speedKmh || 0;
-  return sampleGradient(SPEED_GRADIENT, spd / MAX_SPEED_KMH);
+  return sampleGradient(SPEED_GRADIENT_STOPS, spd / MAX_SPEED_KMH);
 }
 
 export interface ProjectedPoint extends ReplayTelemetryPoint {

@@ -100,6 +100,8 @@ export const MAP_COLORS = {
   markerUnselected: '#0F172A',
   markerDimmed: '#64748B',
   markerMuted: '#94A3B8',
+  digitalMarkerTick: '#0284C7',
+  referenceMarkerTick: '#D97706',
   apex: '#F43F5E',
   apexText: '#FB7185',
   baselineBrake: '#F87171',
@@ -108,6 +110,14 @@ export const MAP_COLORS = {
   gripLimit: '#34D399',
   gripBuilding: '#22D3EE',
 } as const;
+
+/** Quantized racing-line speed gradient stops, expressed as RGB for interpolation. */
+export const SPEED_GRADIENT_STOPS: Array<[number, [number, number, number]]> = [
+  [0, [2, 132, 199]],     // apex/slow
+  [0.35, [16, 185, 129]], // mid
+  [0.65, [245, 158, 11]], // high
+  [1, [192, 38, 211]],    // top speed
+];
 
 export const COMPARE_LAP_COLORS = [
   LMU_COLORS.gold,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHART_COLORS, LMU_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import type { ProjectedPoint } from '../replayMapUtils.js';
 
 export interface GpsTrackHoverTooltipProps {
@@ -22,8 +23,8 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
     ? `${deltaTimeSec > 0 ? '+' : ''}${deltaTimeSec.toFixed(2)}s`
     : null;
   const deltaColor = deltaTimeSec !== null && deltaTimeSec !== undefined
-    ? (deltaTimeSec < -0.01 ? '#34d399' : deltaTimeSec > 0.01 ? '#f87171' : '#94a3b8')
-    : '#94a3b8';
+    ? (deltaTimeSec < -0.01 ? MAP_COLORS.gripLimit : deltaTimeSec > 0.01 ? MAP_COLORS.baselineBrake : MAP_COLORS.markerMuted)
+    : MAP_COLORS.markerMuted;
 
   const badgeY = point.sy - 26 * markerScale;
   const badgeW = 115 * markerScale;
@@ -36,9 +37,9 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
         cx={point.sx}
         cy={point.sy}
         r={5.5 * markerScale}
-        fill="#38bdf8"
+        fill={TELEMETRY_COLORS.primary}
         fillOpacity="0.4"
-        stroke="#ffffff"
+        stroke={CHART_COLORS.white}
         strokeWidth="1.5"
         vectorEffect="non-scaling-stroke"
       />
@@ -50,9 +51,9 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
           width={badgeW}
           height={badgeH}
           rx={5 * markerScale}
-          fill="#090d16"
+          fill={MAP_COLORS.markerBg}
           fillOpacity="0.94"
-          stroke="#475569"
+          stroke={MAP_COLORS.trackBoundary}
           strokeWidth="1.2"
           vectorEffect="non-scaling-stroke"
         />
@@ -60,7 +61,7 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
         <text
           x={-badgeW * 0.42}
           y={-badgeH * 0.1}
-          fill="#f8fafc"
+          fill={LMU_COLORS.text}
           fontSize={11 * markerScale}
           fontFamily="Consolas, monospace"
           fontWeight="bold"
@@ -84,16 +85,16 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
         <text
           x={-badgeW * 0.42}
           y={badgeH * 0.32}
-          fill="#94a3b8"
+          fill={MAP_COLORS.markerMuted}
           fontSize={10 * markerScale}
           fontFamily="Consolas, monospace"
         >
           {brake > 5 ? (
-            <tspan fill="#f87171" fontWeight="bold">BRK {brake}%</tspan>
+            <tspan fill={MAP_COLORS.baselineBrake} fontWeight="bold">BRK {brake}%</tspan>
           ) : throttle > 5 ? (
-            <tspan fill="#34d399" fontWeight="bold">THR {throttle}%</tspan>
+            <tspan fill={MAP_COLORS.gripLimit} fontWeight="bold">THR {throttle}%</tspan>
           ) : (
-            <tspan fill="#64748b">COAST</tspan>
+            <tspan fill={MAP_COLORS.markerDimmed}>COAST</tspan>
           )}
           {distM !== undefined ? ` · ${Math.round(distM)}m` : ''}
         </text>

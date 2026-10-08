@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GpsCarDynamicsVector } from '../../../../../src/components/replay/map/scene/GpsCarDynamicsVector.js';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
 
 describe('GpsCarDynamicsVector', () => {
   it('returns null when total G force is below threshold (< 0.2G)', () => {
@@ -48,9 +49,9 @@ describe('GpsCarDynamicsVector', () => {
     const vector = screen.getByTestId('gps-car-dynamics-vector');
     expect(vector).toBeInTheDocument();
     const line = container.querySelector('line');
-    expect(line).toHaveAttribute('stroke', '#38bdf8');
+    expect(line).toHaveAttribute('stroke', TELEMETRY_COLORS.primary);
     const polygon = container.querySelector('polygon');
-    expect(polygon).toHaveAttribute('fill', '#38bdf8');
+    expect(polygon).toHaveAttribute('fill', TELEMETRY_COLORS.primary);
   });
 
   it('renders amber color for high G (1.4G - 2.2G)', () => {
@@ -66,7 +67,7 @@ describe('GpsCarDynamicsVector', () => {
     );
 
     const line = container.querySelector('line');
-    expect(line).toHaveAttribute('stroke', '#fbbf24');
+    expect(line).toHaveAttribute('stroke', CHART_COLORS.playerHighlight);
   });
 
   it('renders red color for extreme G (>= 2.2G)', () => {
@@ -82,7 +83,7 @@ describe('GpsCarDynamicsVector', () => {
     );
 
     const line = container.querySelector('line');
-    expect(line).toHaveAttribute('stroke', '#f87171');
+    expect(line).toHaveAttribute('stroke', MAP_COLORS.baselineBrake);
   });
 
   it('renders informative tooltip title with G-force channels', () => {

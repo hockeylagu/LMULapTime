@@ -20,6 +20,7 @@ import {
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { computeTelemetryChartPaths } from '../../../../src/components/replay/telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../../../src/components/replay/telemetry/TelemetryChannelRenderer.js';
+import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 
 describe('Authentic VCR Telemetry Channels', () => {
   const mockPoint: ReplayTrajectoryPoint = {
@@ -154,7 +155,7 @@ describe('Authentic VCR Telemetry Channels', () => {
 
     // SVG rect with understeer fill is present
     const rects = container.querySelectorAll('rect');
-    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18');
     expect(hasUSFill).toBe(true);
 
     // Click toggle button to disable overlay
@@ -162,13 +163,13 @@ describe('Authentic VCR Telemetry Channels', () => {
 
     // After disabling, SVG rects for US/OS should be hidden
     const updatedRects = container.querySelectorAll('rect');
-    const hasUSFillAfter = Array.from(updatedRects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    const hasUSFillAfter = Array.from(updatedRects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18');
     expect(hasUSFillAfter).toBe(false);
 
     // Click again to re-enable
     fireEvent.click(toggleBtn);
     const reenabledRects = container.querySelectorAll('rect');
-    expect(Array.from(reenabledRects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'))).toBe(true);
+    expect(Array.from(reenabledRects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18')).toBe(true);
   });
 
   it('renders tire scrub (SCRUB) overlay with rose/red shaded regions and badges', () => {
@@ -207,7 +208,7 @@ describe('Authentic VCR Telemetry Channels', () => {
 
     // SVG rect with rose tire scrub fill (244, 63, 94) is present
     let rects = container.querySelectorAll('rect');
-    let hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    let hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24');
     expect(hasScrubFill).toBe(true);
 
     // Click + SCRUB button to toggle scrub mode off (switching to pure US / OS mode)
@@ -216,16 +217,16 @@ describe('Authentic VCR Telemetry Channels', () => {
 
     // Scrub fill should now be gone, converted to clean sky blue understeer
     rects = container.querySelectorAll('rect');
-    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24');
     expect(hasScrubFill).toBe(false);
-    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18');
     expect(hasUSFill).toBe(true);
 
     // Click + SCRUB again to restore scrub zones
     const addScrubBtn = screen.getByTitle(/Add Tire Scrub Zones/i);
     fireEvent.click(addScrubBtn);
     rects = container.querySelectorAll('rect');
-    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24');
     expect(hasScrubFill).toBe(true);
   });
 
@@ -270,11 +271,11 @@ describe('Authentic VCR Telemetry Channels', () => {
 
     // Rose scrub rects should still exist!
     let rects = container.querySelectorAll('rect');
-    const hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'));
+    const hasScrubFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24');
     expect(hasScrubFill).toBe(true);
 
     // Sky blue normal US rects should NOT exist
-    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'));
+    const hasUSFill = Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18');
     expect(hasUSFill).toBe(false);
 
     // Top badge still displays SCRUB
@@ -283,13 +284,13 @@ describe('Authentic VCR Telemetry Channels', () => {
     // Disable scrub as well -> all rects hidden
     fireEvent.click(scrubToggleBtn);
     rects = container.querySelectorAll('rect');
-    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'))).toBe(false);
+    expect(Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24')).toBe(false);
 
     // Re-enable SCRUB only
     fireEvent.click(scrubToggleBtn);
     rects = container.querySelectorAll('rect');
-    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('244, 63, 94'))).toBe(true);
-    expect(Array.from(rects).some((r) => r.getAttribute('fill')?.includes('56, 189, 248'))).toBe(false);
+    expect(Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.tireScrub && r.getAttribute('fill-opacity') === '0.24')).toBe(true);
+    expect(Array.from(rects).some((r) => r.getAttribute('fill') === TELEMETRY_COLORS.understeer && r.getAttribute('fill-opacity') === '0.18')).toBe(false);
   });
 
   it('renders TelemetryRpmChannel with engine RPM value and violet/purple styling', () => {

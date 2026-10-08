@@ -82,7 +82,7 @@ export const TelemetryTirePressuresChannel: React.FC<TelemetryTirePressuresChann
           className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-info-strong/80 font-mono font-bold text-[10px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap">
+          <div className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-info-strong/80 font-mono font-bold text-[10px] shadow-marker-lift flex items-center gap-1.5 whitespace-nowrap">
             <span className="text-lmu-aqua-soft">FL:{tp[0].toFixed(1)}</span>
             <span className="text-lmu-azure-soft">FR:{tp[1].toFixed(1)}</span>
             <span className="text-lmu-warn-soft">RL:{tp[2].toFixed(1)}</span>

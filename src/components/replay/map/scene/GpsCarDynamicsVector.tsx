@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 export interface GpsCarDynamicsVectorProps {
   accelLatG?: number;
@@ -34,7 +35,7 @@ export const GpsCarDynamicsVector: React.FC<GpsCarDynamicsVectorProps> = ({
   const length = Math.hypot(tipX, tipY);
   if (length < 2 * markerScale) return null;
 
-  const color = colorOverride ?? (totalG >= 2.2 ? '#f87171' : totalG >= 1.4 ? '#fbbf24' : '#38bdf8');
+  const color = colorOverride ?? (totalG >= 2.2 ? MAP_COLORS.baselineBrake : totalG >= 1.4 ? CHART_COLORS.playerHighlight : TELEMETRY_COLORS.primary);
   const uX = tipX / length;
   const uY = tipY / length;
   const arrowSize = Math.max(3.5 * markerScale, Math.min(8 * markerScale, length * 0.4));

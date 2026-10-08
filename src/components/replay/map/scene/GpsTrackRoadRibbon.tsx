@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { MAP_COLORS } from '../../../../utils/themeColors.js';
+import { LMU_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
 import { buildRoadRibbonSvgPath, buildClosedSvgPath } from '../replayMapUtils.js';
 
 export interface GpsTrackRoadRibbonProps {
@@ -67,7 +67,7 @@ export const GpsTrackRoadRibbon: React.FC<GpsTrackRoadRibbonProps> = React.memo(
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
           opacity="0.85"
-          style={{ filter: 'drop-shadow(0 0 1px #080C14)' }}
+          style={{ filter: `drop-shadow(0 0 1px ${LMU_COLORS.surface})` }}
         />
       )}
 

@@ -6,6 +6,7 @@
  * running (spinners, skeletons, the scan in progress).
  */
 @theme {
+  --shadow-marker-lift: 0 2px 10px color-mix(in srgb, var(--color-black) 85%, transparent);
   --animate-fade-in: fade-in 150ms ease-out;
   --animate-pop-in: pop-in 150ms ease-out;
 
@@ -45,7 +46,7 @@
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #232A36 #0B0E14;
+  scrollbar-color: theme('colors.lmu.border') theme('colors.lmu.bg');
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -54,16 +55,16 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0B0E14;
+  @apply bg-lmu-bg;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #232A36;
+  @apply bg-lmu-border;
   border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #DC3441;
+  @apply bg-lmu-accent;
 }
 
 /* Reduced motion: state changes land instantly and loops stop; a spinner keeps turning, slower, so work still reads as running. */

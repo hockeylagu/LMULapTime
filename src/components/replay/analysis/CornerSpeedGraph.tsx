@@ -117,11 +117,12 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
         <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="w-full h-full">
           {/* Handling Balance Shaded Regions */}
           {visibleBands.map(band => {
-            const fill = band.isTireScrub ? 'rgba(244, 63, 94, 0.22)' : band.type === 'understeer' ? 'rgba(56, 189, 248, 0.18)' : 'rgba(245, 158, 11, 0.20)';
+            const fill = band.isTireScrub ? TELEMETRY_COLORS.tireScrub : band.type === 'understeer' ? TELEMETRY_COLORS.understeer : TELEMETRY_COLORS.oversteer;
+            const fillOpacity = band.isTireScrub ? 0.22 : band.type === 'understeer' ? 0.18 : 0.20;
             const stroke = band.isTireScrub ? TELEMETRY_COLORS.tireScrub : band.type === 'understeer' ? TELEMETRY_COLORS.understeer : TELEMETRY_COLORS.oversteer;
             return (
               <g key={band.id} className="pointer-events-none">
-                <rect x={band.xStart} y={0} width={band.width} height={100} fill={fill} />
+                <rect x={band.xStart} y={0} width={band.width} height={100} fill={fill} fillOpacity={fillOpacity} />
                 <line x1={band.xStart} y1={0} x2={band.xStart} y2={100} stroke={stroke} strokeWidth={0.8} strokeOpacity={0.7} vectorEffect="non-scaling-stroke" />
                 <line x1={band.xEnd} y1={0} x2={band.xEnd} y2={100} stroke={stroke} strokeWidth={0.8} strokeOpacity={0.7} vectorEffect="non-scaling-stroke" />
               </g>
@@ -176,7 +177,7 @@ export const CornerSpeedGraph: React.FC<CornerSpeedGraphProps> = ({
           <div style={{ left: `${scrubPct}%` }} className="absolute top-0 bottom-0 w-[1px] bg-white pointer-events-none -translate-x-1/2 z-20">
             {currentSpeed !== null && (
               <div className="absolute top-1 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 pointer-events-none">
-                <span className="px-1.5 py-0.5 rounded bg-lmu-badge border border-white/80 text-white text-[10px] font-mono font-bold shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+                <span className="px-1.5 py-0.5 rounded bg-lmu-badge border border-white/80 text-white text-[10px] font-mono font-bold shadow-marker-lift whitespace-nowrap">
                   {currentSpeed} km/h
                 </span>
                 {currentHandling && (

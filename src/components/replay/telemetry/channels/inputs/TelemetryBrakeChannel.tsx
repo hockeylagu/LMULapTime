@@ -99,13 +99,13 @@ export const TelemetryBrakeChannel: React.FC<TelemetryBrakeChannelProps> = React
           className={`absolute pointer-events-none z-50 flex items-center gap-1 top-9 ${cursorPct > 85 ? '-translate-x-full -ml-2.5' : 'ml-2.5'}`}
           style={{ left: `${cursorPct}%` }}
         >
-          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap border ${
+          <span className={`px-2 py-0.5 rounded-md bg-lmu-badge font-mono font-bold text-[11px] shadow-marker-lift whitespace-nowrap border ${
             currentPoint?.absActive ? 'border-lmu-aqua text-lmu-aqua-soft' : 'border-lmu-loss/80 text-lmu-loss-soft'
           }`}>
             {(currentPoint?.brake ?? 0).toFixed(0)}%
           </span>
           {currentComparison && (
-            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-[0_2px_10px_rgba(0,0,0,0.85)] whitespace-nowrap">
+            <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-marker-lift whitespace-nowrap">
               B: {currentComparison.baseline.brake.toFixed(0)}%
             </span>
           )}
