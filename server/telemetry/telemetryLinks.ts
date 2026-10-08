@@ -21,7 +21,7 @@ import {
  * The matching rule the stored matches were decided under. Changing it clears the stored matches
  * once so they are decided again (SessionDatabase.resetTelemetryLinksForRule).
  */
-export const TELEMETRY_LINK_RULE = 'session-span-v1';
+export const TELEMETRY_LINK_RULE = 'session-span-v2';
 
 /** Clock slack between the file name's timestamp and the session or replay times. */
 const SLACK_MS = 120_000;
@@ -50,6 +50,9 @@ interface Span<T> {
 /**
  * The owner running when the file started: among owners whose span holds the file's timestamp,
  * the one that started last. The 0-lap sessions LMU saves after a session start after its files.
+ * Restarted races can retain the same XML start: prefer the first of those sessions that has
+ * not ended when recording begins, before considering the end-time slack. This gives files
+ * before the restart to the original attempt and files after it to the restarted race.
  * A file with no timestamp goes to its only candidate, if it has exactly one.
  */
 function ownerAt<T>(file: DuckDbFileInfo, spans: Span<T>[], accepts: (owner: T) => boolean): T | undefined {
@@ -61,8 +64,18 @@ function ownerAt<T>(file: DuckDbFileInfo, spans: Span<T>[], accepts: (owner: T) 
   for (const span of spans) {
     if (span.startMs <= 0) continue;
     if (file.timestampEpochMs < span.startMs - SLACK_MS || file.timestampEpochMs > span.endMs + SLACK_MS) continue;
-    if (best && span.startMs <= best.startMs) continue;
-    if (accepts(span.owner)) best = span;
+    if (best && span.startMs < best.startMs) continue;
+    if (!accepts(span.owner)) continue;
+    if (best && span.startMs === best.startMs) {
+      const ended = span.endMs < file.timestampEpochMs;
+      const bestEnded = best.endMs < file.timestampEpochMs;
+      if (ended !== bestEnded) {
+        if (ended) continue;
+      } else if (ended ? span.endMs <= best.endMs : span.endMs >= best.endMs) {
+        continue;
+      }
+    }
+    best = span;
   }
   return best?.owner;
 }

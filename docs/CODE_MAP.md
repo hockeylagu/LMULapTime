@@ -22,6 +22,11 @@ All DDL is in `server/core/dbSchema.ts`.
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
 
+DuckDB ownership (`server/telemetry/telemetryLinks.ts`, `TELEMETRY_LINK_RULE = session-span-v2`) uses
+session spans. Restarted offline races can share their XML start timestamp; ties go to the earliest
+session still running when recording begins, before end-time slack, so the empty attempt does not
+claim the restarted race's files. Changing this rule recalculates stored links once, retaining telemetry caches.
+
 The route loader keeps its suspended component separate from the preloaded fast path, so resolving a page chunk never skips a previously suspended `use()` call.
 
 ### Background orchestration

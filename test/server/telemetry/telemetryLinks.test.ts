@@ -115,6 +115,31 @@ describe('decideTelemetryLinks', () => {
     expect(links).toEqual([]);
   });
 
+  it.each([false, true])('separates restarted races sharing their XML start (reverse order: %s)', reverse => {
+    // Road Atlanta, 2026-10-08: Restart Race retains 17:59:52.301 in both result logs.
+    // The new recording starts ten seconds after the empty attempt ends, inside clock slack.
+    const attempts = [
+      { ...session('empty', '2026-10-08T17:59:52.301Z', 'R1 2.Vcr'), sessionType: 'Race' as const, sessionName: 'R1' },
+      { ...session('completed', '2026-10-08T17:59:52.301Z', 'R1 3.Vcr'), sessionType: 'Race' as const, sessionName: 'R1' },
+    ];
+    const links = decideTelemetryLinks({
+      ...none,
+      files: [
+        duck('before-restart.duckdb', '2026-10-08T18:00:40Z', 'R', 0),
+        duck('after-restart.duckdb', '2026-10-08T18:03:41Z', 'R', 22),
+        duck('second-stint.duckdb', '2026-10-08T18:20:00Z', 'R', 8),
+      ],
+      sessions: reverse ? attempts.reverse() : attempts,
+      sessionEndMs: endsAt({ empty: '2026-10-08T18:03:31.718Z', completed: '2026-10-08T18:36:45.170Z' }),
+    });
+
+    expect(links).toEqual([
+      { filename: 'before-restart.duckdb', sessionId: 'empty', replayName: 'R1 2.Vcr' },
+      { filename: 'after-restart.duckdb', sessionId: 'completed', replayName: 'R1 3.Vcr' },
+      { filename: 'second-stint.duckdb', sessionId: 'completed', replayName: 'R1 3.Vcr' },
+    ]);
+  });
+
   it('matches a replay with no session, when the file was recorded during it', () => {
     const file = duck('replay-only.duckdb', '2026-09-14T18:02:00Z', 'OTHER');
     const loaded: string[] = [];
