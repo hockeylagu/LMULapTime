@@ -7,6 +7,7 @@ export interface SessionListItem {
   filename?: string;
   trackVenue?: string;
   trackCourse?: string;
+  trackLengthMeters?: number | null;
   timeString: string;
   sessionType: string;
   sessionName?: string;

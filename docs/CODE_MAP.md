@@ -195,6 +195,13 @@ and type onto each projected lap point.
 
 Track detail keeps successful data keyed to its requested track, shows loading when switching back to a previously visited track, and offers an inline retry warning when a same-track refresh fails. Route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
 
+Session cards (`session-list/SessionGridCard.tsx`) show bundled track SVGs to the left of session details,
+resolved directly by venue, course, replay name and track length, with visible benchmark pace percentages. Unknown layouts
+and unavailable SVGs omit the thumbnail without fetching metric geometry.
+Card headers keep the outline at the left and stack the session badge and replay control at the right;
+layout names allow two lines before an ellipsis. Best-lap and pace readouts align above a shared row
+with laps and finishing position grouped on the left and car identity on the right. The full-card link keeps its keyboard outline
+visible, with replay controls independently focusable beneath the session badge.
 `TrackCircuitLayout.tsx` uses lightweight white `/track-outlines/<layoutKey>.svg` outlines at every size,
 falling back to an inline SVG fitted to the active centerline if an asset is unavailable. It never renders
 detailed map surfaces; the information modal still loads physical profiles independently. Static geometry,
