@@ -1,6 +1,7 @@
 import React from 'react';
 import { Car } from 'lucide-react';
 import { CarLogo } from './CarLogo.js';
+import type { CarLogoSize } from './CarLogo.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 
 export interface CarIdentityProps {
@@ -10,6 +11,8 @@ export interface CarIdentityProps {
   /** Colour and size of the name, the one thing that differs between views. */
   nameClassName?: string;
   className?: string;
+  /** Compact by default; larger in card headings. */
+  logoSize?: CarLogoSize;
   /** Shown when the car is unknown; without it nothing renders. */
   emptyLabel?: string;
   /** A generic car icon when the brand has no logo. */
@@ -24,6 +27,7 @@ export const CarIdentity: React.FC<CarIdentityProps> = ({
   carClass,
   nameClassName = '',
   className = '',
+  logoSize = 'xs',
   emptyLabel,
   fallbackIcon = false,
   wrap = false,
@@ -33,7 +37,7 @@ export const CarIdentity: React.FC<CarIdentityProps> = ({
     <span className={`flex items-center gap-1.5 min-w-0 ${className}`} title={carType || undefined}>
       <CarLogo
         carType={carType}
-        size="xs"
+        size={logoSize}
         decorative
         fallback={fallbackIcon ? <Car aria-hidden="true" className="w-3.5 h-3.5 text-lmu-muted shrink-0" /> : undefined}
       />

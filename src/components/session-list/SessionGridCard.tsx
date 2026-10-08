@@ -51,8 +51,8 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         onClick={linkClickHandler(() => onSelectSession(s.id), { stop: true })}
         className={`absolute inset-0 rounded-xl cursor-pointer ${FOCUS_RING}`}
       />
-      <div className="flex items-center gap-2 min-h-16">
-        {showOutline && (
+      <div className={`flex items-center gap-2 ${showTrackColumn ? 'min-h-16' : 'min-h-12'}`}>
+        {showTrackColumn && showOutline && (
           <img
             src={getTrackOutlineUrl(layoutKey)}
             alt=""
@@ -69,8 +69,22 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
               {displayTrack}
             </h4>
           )}
+          {!showTrackColumn && (
+            <h4>
+              <CarIdentity
+                carType={p?.carType}
+                carClass={p?.carClass}
+                nameClassName="text-lmu-text text-base font-bold leading-tight line-clamp-2"
+                className="gap-3"
+                logoSize="lg"
+                wrap
+                emptyLabel="N/A"
+                fallbackIcon
+              />
+            </h4>
+          )}
 
-          <p className={`text-[11px] font-mono tabular-nums text-lmu-muted ${showTrackColumn && displayTrack ? 'mt-1' : ''}`}>
+          <p className={`text-[11px] font-mono tabular-nums text-lmu-muted ${displayTrack || !showTrackColumn ? 'mt-1' : ''}`}>
             {s.timeString}
           </p>
           {empty && <div className="mt-1"><EmptyChip /></div>}
@@ -125,14 +139,16 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             </span>
             <FinishPosition session={s} label />
           </div>
-          <CarIdentity
-            carType={p?.carType}
-            carClass={p?.carClass}
-            nameClassName="text-lmu-text-soft font-medium"
-            className="justify-end"
-            emptyLabel="N/A"
-            fallbackIcon
-          />
+          {showTrackColumn && (
+            <CarIdentity
+              carType={p?.carType}
+              carClass={p?.carClass}
+              nameClassName="text-lmu-text-soft font-medium"
+              className="justify-end"
+              emptyLabel="N/A"
+              fallbackIcon
+            />
+          )}
         </div>
       </div>
     </div>

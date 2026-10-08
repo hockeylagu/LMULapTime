@@ -199,8 +199,10 @@ Session cards (`session-list/SessionGridCard.tsx`) show bundled track SVGs to th
 resolved directly by venue, course, replay name and track length, with visible benchmark pace percentages. Unknown layouts
 and unavailable SVGs omit the thumbnail without fetching metric geometry.
 Card headers keep the outline at the left and stack the session badge and replay control at the right;
-layout names allow two lines before an ellipsis. Best-lap and pace readouts align above a shared row
-with laps and finishing position grouped on the left and car identity on the right. The full-card link keeps its keyboard outline
+layout names allow two lines before an ellipsis. Track-scoped cards replace the repeated circuit name and outline
+with a car identity heading and larger manufacturer logo above the date, and omit the duplicate car identity in the footer.
+Best-lap and pace readouts align above a shared row
+with laps and finishing position grouped on the left and, on the dashboard, car identity on the right. The full-card link keeps its keyboard outline
 visible, with replay controls independently focusable beneath the session badge.
 `TrackCircuitLayout.tsx` uses lightweight white `/track-outlines/<layoutKey>.svg` outlines at every size,
 falling back to an inline SVG fitted to the active centerline if an asset is unavailable. It never renders

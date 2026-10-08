@@ -202,7 +202,7 @@ describe('SessionList component', () => {
     expect(localStorage.getItem('lmu_dashboard_view')).toBe('grid');
   });
 
-  it('hides track column when showTrackColumn is false', () => {
+  it('uses car headings in track-scoped cards and hides the track column in tables', () => {
     render(
       <SessionList
         sessions={mockSessions}
@@ -210,6 +210,11 @@ describe('SessionList component', () => {
         showTrackColumn={false}
       />
     );
+
+    expect(screen.queryByRole('heading', { name: 'Spa-Francorchamps' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Ferrari 499P/ })).toBeInTheDocument();
+    expect(screen.getAllByText('Ferrari 499P')).toHaveLength(1);
+    expect(document.querySelector('img[src^="/track-outlines/"]')).toBeNull();
 
     const tableButton = screen.getByRole('button', { name: /Table view/i });
     fireEvent.click(tableButton);
