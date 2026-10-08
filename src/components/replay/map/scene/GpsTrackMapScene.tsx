@@ -18,9 +18,7 @@ import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
 import { GpsMapControls } from '../display/GpsMapControls.js';
-import { GpsMapTelemetryHud } from '../display/GpsMapTelemetryHud.js';
-import { GpsMapModeBar } from '../display/GpsMapModeBar.js';
-import { ReplayFrictionCircle } from '../ReplayFrictionCircle.js';
+import { GpsMapExpandedOverlays } from '../display/GpsMapExpandedOverlays.js';
 import { MapScaleBar } from '../display/MapScaleBar.js';
 import { useMapDisplay } from '../display/useMapDisplay.js';
 import { activeTrackBounds } from '../display/mapLayers.js';
@@ -119,6 +117,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     onResetZoom: camera.resetPanZoom,
     onTogglePlay,
     onToggleGForce: handleToggleGForce,
+    onPan: camera.panBy,
   });
   const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
   const fittedLayout = useRef<string | null>(null);
@@ -278,23 +277,20 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
 
       {showLegend && <HeatmapLegendBar colorBy={colorBy} />}
 
-      {isExpanded && <>
-        <GpsMapTelemetryHud primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM} />
-        {(onChangeColorBy || onTogglePedalMarkers || onToggleFrictionCircle) && (
-          <GpsMapModeBar colorBy={colorBy} onChangeColorBy={onChangeColorBy}
+      {isExpanded && <GpsMapExpandedOverlays points={points} currentIndex={activeIndex}
+            primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point ?? null}
+            baselinePoints={effectiveBaselinePoints} deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM}
+            colorBy={colorBy} onChangeColorBy={onChangeColorBy}
+            corners={corners} selectedCornerNumber={selectedCornerNumber}
+            onSelectCornerNumber={onSelectCornerNumber || onSelectIndex ? number => {
+              const marker = cornerMarkers.find(corner => corner.cornerNumber === number);
+              if (marker) { onSelectIndex?.(marker.idx); focusOnPoint(marker.actualSx, marker.actualSy, 4.5); }
+              onSelectCornerNumber?.(number);
+            } : undefined}
             showPedalMarkers={showPedalMarkers} onTogglePedalMarkers={onTogglePedalMarkers} hasCorners={Boolean(corners?.length)}
             isCompareMode={Boolean(baselinePoints)} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
             onToggleFadedLine={onToggleFadedLine} showGForce={showGForce} onToggleGForce={handleToggleGForce}
-            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />
-        )}
-        {effectiveShowFriction && (
-          <div className="absolute bottom-20 sm:bottom-3.5 right-3 sm:right-3.5 z-30 select-none pointer-events-auto">
-            <ReplayFrictionCircle points={points} currentIndex={activeIndex} onClose={handleToggleFriction}
-              primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point} baselinePoints={effectiveBaselinePoints}
-              className="bg-slate-950/90 border border-white/15 backdrop-blur-md shadow-2xl rounded-xl" />
-          </div>
-        )}
-      </>}
+            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />}
     </div>
   );
 };

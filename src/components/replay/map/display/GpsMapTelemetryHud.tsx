@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../../shared/domain/formatters.js';
-import { formatRain } from '../../../../../shared/domain/lapConditions.js';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { formatGear, formatReading, getStatusLabel, getStatusSubtext, hasReading, totalAcceleration } from './telemetryReadouts.js';
 
 export interface GpsMapTelemetryHudProps {
   primaryPoint?: ReplayTelemetryPoint | null;
@@ -12,76 +13,65 @@ export interface GpsMapTelemetryHudProps {
   className?: string;
 }
 
-function getStatusLabel(p?: ReplayTelemetryPoint | null): string {
-  if (p?.pitLimiter) return 'LIMITER';
-  if (p?.isOffTrack) return 'OFF TRACK';
-  if ((p?.rainIntensity ?? 0) > 0) return `WET (${formatRain(p?.rainIntensity ?? 0)})`;
-  return p?.inPit ? 'PIT LANE' : 'ON TRACK';
-}
-
-function getStatusSubtext(p?: ReplayTelemetryPoint | null): string {
-  if (p?.pitLimiter) return '60 km/h';
-  if (p?.isOffTrack) return 'limits cut';
-  if ((p?.rainIntensity ?? 0) > 0) return p?.ambientTemp ? `${p.ambientTemp.toFixed(1)}°C` : 'wet';
-  return p?.inPit ? 'in pits' : p?.ambientTemp ? `${p.ambientTemp.toFixed(1)}°C` : 'green';
-}
-
 export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(({
   primaryPoint,
   baselinePoint,
-  deltaTimeSec,
+  deltaTimeSec: rawDeltaTimeSec,
   lineDistanceM,
   className = '',
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const contentId = useId();
   const isComparing = Boolean(baselinePoint);
+  const deltaTimeSec = hasReading(rawDeltaTimeSec) ? rawDeltaTimeSec : null;
 
   if (!primaryPoint) return null;
 
-  const computedLineDist = (primaryPoint.x != null && baselinePoint?.x != null && primaryPoint.z != null && baselinePoint?.z != null)
+  const computedLineDist = (hasReading(primaryPoint.x) && hasReading(baselinePoint?.x) && hasReading(primaryPoint.z) && hasReading(baselinePoint?.z))
     ? Math.hypot(primaryPoint.x - baselinePoint.x, primaryPoint.z - baselinePoint.z) : null;
-  const effectiveLineDist = lineDistanceM ?? computedLineDist;
+  const lineDist = lineDistanceM ?? computedLineDist;
+  const effectiveLineDist = hasReading(lineDist) ? lineDist : null;
 
   const deltaColor = deltaTimeSec == null
-    ? 'text-slate-400'
+    ? 'text-lmu-muted'
     : deltaTimeSec < -0.005
-    ? 'text-emerald-400'
+    ? 'text-lmu-gain'
     : deltaTimeSec > 0.005
-    ? 'text-rose-400'
-    : 'text-slate-300';
+    ? 'text-lmu-loss'
+    : 'text-lmu-text-soft';
   const deltaLabel = deltaTimeSec == null
-    ? 'gap'
+    ? 'no delta'
     : deltaTimeSec < -0.005
-    ? 'gaining'
+    ? 'ahead'
     : deltaTimeSec > 0.005
-    ? 'losing'
+    ? 'behind'
     : 'even';
 
   const renderCells = (p?: ReplayTelemetryPoint | null, isGhost = false) => {
-    const gear = Math.min(7, Math.max(1, p?.gear ?? 1));
-    const steerDeg = p?.steerYaw ?? 0;
-    const steerPct = Math.abs(getSteerPercent(steerDeg));
-    const steerDir = steerDeg > 5 ? 'L' : steerDeg < -5 ? 'R' : 'C';
-    const latG = p?.accelLatG ?? 0;
-    const lonG = p?.accelLonG ?? 0;
-    const totalG = Math.hypot(latG, lonG);
+    const gear = formatGear(p?.gear);
+    const steerDeg = p?.steerYaw;
+    const steering = hasReading(steerDeg)
+      ? `${Math.abs(getSteerPercent(steerDeg)).toFixed(1)}% ${steerDeg > 5 ? 'L' : steerDeg < -5 ? 'R' : 'C'}` : '--';
+    const latG = p?.accelLatG;
+    const lonG = p?.accelLonG;
+    const totalG = totalAcceleration(p);
 
     return (
       <>
         {/* Delta (when comparing) */}
         {isComparing && (
-          <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
+          <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono tabular-nums whitespace-nowrap overflow-hidden">
             {!isGhost ? (
               <>
-                <span className={`text-xs sm:text-sm font-bold ${deltaColor}`}>
+                <span className={`text-sm font-bold ${deltaColor}`}>
                   {deltaTimeSec != null ? `${deltaTimeSec > 0 ? '+' : ''}${deltaTimeSec.toFixed(2)}s` : '--'}
                 </span>
-                <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">{deltaLabel}</span>
+                <span className="text-[10px] text-lmu-muted leading-[1.4]">{deltaLabel}</span>
               </>
             ) : (
               <>
-                <span className="text-xs sm:text-sm font-bold text-white">REF</span>
-                <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">baseline</span>
+                <span className="text-sm font-bold text-lmu-text">REF</span>
+                <span className="text-[10px] text-lmu-muted leading-[1.4]">reference</span>
               </>
             )}
           </div>
@@ -89,21 +79,21 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
 
         {/* Line separation distance (when comparing) */}
         {isComparing && (
-          <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
+          <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono tabular-nums whitespace-nowrap overflow-hidden">
             {!isGhost ? (
               <>
                 <div className="flex items-baseline gap-0.5">
-                  <span className="text-xs sm:text-sm font-bold text-white">
+                  <span className="text-sm font-bold text-lmu-text">
                     {effectiveLineDist !== null ? effectiveLineDist.toFixed(1) : '--'}
                   </span>
-                  <span className="text-[9px] sm:text-[10px] text-lmu-muted font-medium">m</span>
+                  <span className="text-[10px] text-lmu-muted font-medium">m</span>
                 </div>
-                <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">line gap</span>
+                <span className="text-[10px] text-lmu-muted leading-[1.4]">line gap</span>
               </>
             ) : (
               <>
-                <span className="text-xs sm:text-sm font-bold text-white">--</span>
-                <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">line</span>
+                <span className="text-sm font-bold text-lmu-text">--</span>
+                <span className="text-[10px] text-lmu-muted leading-[1.4]">line</span>
               </>
             )}
           </div>
@@ -111,73 +101,65 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
 
         {/* Speed & Gear */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 whitespace-nowrap overflow-hidden">
-          <div className="flex items-baseline gap-0.5 font-mono">
-            <span className="text-xs sm:text-sm font-bold text-white">{p?.speedKmh ?? 0}</span>
-            <span className="text-[9px] sm:text-[10px] text-lmu-muted font-medium">km/h</span>
+          <div className="flex items-baseline gap-0.5 font-mono tabular-nums">
+            <span className="text-sm font-bold text-lmu-text">{formatReading(p?.speedKmh)}</span>
+            <span className="text-[10px] text-lmu-muted font-medium">km/h</span>
           </div>
-          <span className={`text-[9px] sm:text-[10px] font-mono font-semibold ${isGhost ? 'text-amber-400/90' : 'text-sky-400'}`}>
+          <span className={`text-[10px] font-mono font-semibold ${isGhost ? 'text-lmu-warn' : 'text-lmu-info'}`}>
             GEAR {gear}
           </span>
         </div>
 
         {/* Throttle */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 whitespace-nowrap overflow-hidden">
-          <div className="flex items-center gap-1 font-mono">
-            <span className="text-xs sm:text-sm font-bold text-white">
-              {(p?.throttle ?? 0).toFixed(0)}%
+          <div className="flex items-center gap-1 font-mono tabular-nums">
+            <span className="text-sm font-bold text-lmu-text">
+              {formatReading(p?.throttle, 0)}%
             </span>
-            {p?.tcActive && (
-              <span className="inline-flex h-3 items-center px-0.5 rounded text-[8px] leading-none font-bold bg-amber-400 text-black">
-                TC
-              </span>
-            )}
+
           </div>
-          <span className="text-[9px] sm:text-[10px] text-lmu-muted font-mono leading-tight">
-            {p?.tcActive ? 'tc' : 'pedal'}
+          <span className="text-[10px] text-lmu-muted font-mono leading-[1.4]">
+            {p?.tcActive ? <span className="inline-flex min-h-3.5 items-center px-1 rounded text-[10px] leading-[1.4] font-bold bg-lmu-warn text-lmu-deep">TC</span> : 'pedal'}
           </span>
         </div>
 
         {/* Brake */}
         <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 whitespace-nowrap overflow-hidden">
-          <div className="flex items-center gap-1 font-mono">
-            <span className="text-xs sm:text-sm font-bold text-white">
-              {(p?.brake ?? 0).toFixed(0)}%
+          <div className="flex items-center gap-1 font-mono tabular-nums">
+            <span className="text-sm font-bold text-lmu-text">
+              {formatReading(p?.brake, 0)}%
             </span>
-            {p?.absActive && (
-              <span className="inline-flex h-3 items-center px-0.5 rounded text-[8px] leading-none font-bold bg-sky-400 text-black">
-                ABS
-              </span>
-            )}
+
           </div>
-          <span className="text-[9px] sm:text-[10px] text-lmu-muted font-mono leading-tight">
-            {p?.absActive ? 'abs' : 'pedal'}
+          <span className="text-[10px] text-lmu-muted font-mono leading-[1.4]">
+            {p?.absActive ? <span className="inline-flex min-h-3.5 items-center px-1 rounded text-[10px] leading-[1.4] font-bold bg-lmu-info text-lmu-deep">ABS</span> : 'pedal'}
           </span>
         </div>
 
         {/* Steering */}
-        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className="text-xs sm:text-sm font-bold text-white tabular-nums">
-            {steerPct.toFixed(1)}% {steerDir}
+        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono tabular-nums whitespace-nowrap overflow-hidden">
+          <span className="text-sm font-bold text-lmu-text tabular-nums">
+            {steering}
           </span>
-          <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">input</span>
+          <span className="text-[10px] text-lmu-muted leading-[1.4]">input</span>
         </div>
 
         {/* G-Force */}
-        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className="text-xs sm:text-sm font-bold text-white tabular-nums">
-            {p ? `${totalG.toFixed(2)}G` : '--'}
+        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono tabular-nums whitespace-nowrap overflow-hidden">
+          <span className="text-sm font-bold text-lmu-text tabular-nums">
+            {hasReading(totalG) ? `${totalG.toFixed(2)}G` : '--'}
           </span>
-          <span className="text-[9px] sm:text-[10px] text-lmu-muted tabular-nums leading-tight">
-            {p ? `${Math.abs(latG).toFixed(1)}${latG > 0.05 ? 'L' : latG < -0.05 ? 'R' : ''} · ${Math.abs(lonG).toFixed(1)}${lonG < -0.05 ? 'B' : 'A'}` : 'total'}
+          <span className="text-[10px] text-lmu-muted tabular-nums leading-[1.4]">
+            {hasReading(latG) && hasReading(lonG) ? `${Math.abs(latG).toFixed(1)}${latG > 0.05 ? 'L' : latG < -0.05 ? 'R' : ''} · ${Math.abs(lonG).toFixed(1)}${lonG < -0.05 ? 'B' : 'A'}` : 'unavailable'}
           </span>
         </div>
 
         {/* Status */}
-        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono whitespace-nowrap overflow-hidden">
-          <span className="text-[10px] sm:text-[11px] font-bold tracking-tight text-white">
+        <div className="flex flex-col items-center justify-center px-1 sm:px-1.5 py-0.5 sm:py-1 font-mono tabular-nums whitespace-nowrap overflow-hidden">
+          <span className="text-[11px] font-bold tracking-tight text-lmu-text">
             {getStatusLabel(p)}
           </span>
-          <span className="text-[9px] sm:text-[10px] text-lmu-muted leading-tight">
+          <span className="text-[10px] text-lmu-muted leading-[1.4]">
             {getStatusSubtext(p)}
           </span>
         </div>
@@ -186,12 +168,12 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
   };
 
   const gridColsClass = isComparing
-    ? 'grid-cols-[46px_64px_58px_66px_54px_54px_72px_76px_82px]'
-    : 'grid-cols-[70px_58px_58px_74px_78px_88px]';
+    ? 'grid-cols-[60px_64px_58px_66px_54px_54px_80px_76px_74px]'
+    : 'grid-cols-[70px_58px_58px_82px_78px_80px]';
 
   const containerWidthClass = isCollapsed
     ? 'w-auto'
-    : isComparing ? 'w-[596px] max-w-[calc(100vw-24px)]' : 'w-[450px] max-w-[calc(100vw-24px)]';
+    : isComparing ? 'w-[614px] max-w-[calc(100vw-24px)]' : 'w-[454px] max-w-[calc(100vw-24px)]';
 
   return (
     <div
@@ -199,14 +181,14 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
-      className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-30 select-none bg-slate-950/90 backdrop-blur-md rounded-xl border border-white/15 shadow-xl pointer-events-auto ${containerWidthClass} ${className}`}
+      className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-30 select-none bg-lmu-strip/95 backdrop-blur-md rounded-xl border border-lmu-border shadow-xl pointer-events-auto ${containerWidthClass} ${className}`}
     >
       <div className="flex items-stretch">
         {isCollapsed ? (
-          <div className="flex items-center gap-2.5 px-3 py-1 font-mono text-[11px] sm:text-xs text-lmu-muted whitespace-nowrap">
+          <div id={contentId} className="flex items-center gap-2.5 px-3 py-1 font-mono text-xs leading-5 tabular-nums text-lmu-muted whitespace-nowrap">
             {isComparing && deltaTimeSec != null && (
               <>
-                <span className={`font-bold ${deltaColor}`}>
+                <span title="Primary lap time minus baseline lap time at the same track distance; negative is ahead." className={`font-bold ${deltaColor}`}>
                   {deltaTimeSec > 0 ? '+' : ''}{deltaTimeSec.toFixed(2)}s
                 </span>
                 <span>·</span>
@@ -214,57 +196,57 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             )}
             {isComparing && effectiveLineDist != null && (
               <>
-                <span className="text-white font-bold">{effectiveLineDist.toFixed(1)}m line</span>
+                <span className="text-lmu-text font-bold">{effectiveLineDist.toFixed(1)}m line</span>
                 <span>·</span>
               </>
             )}
-            <span className="text-white font-bold">{primaryPoint.speedKmh ?? 0} km/h</span>
+            <span className="text-lmu-text font-bold">{formatReading(primaryPoint.speedKmh)} km/h</span>
             <span>·</span>
-            <span className="text-white font-bold">THR {(primaryPoint.throttle ?? 0).toFixed(0)}%</span>
+            <span className="text-lmu-text font-bold">THR {formatReading(primaryPoint.throttle, 0)}%</span>
             <span>·</span>
-            <span className="text-white font-bold">BRK {(primaryPoint.brake ?? 0).toFixed(0)}%</span>
+            <span className="text-lmu-text font-bold">BRK {formatReading(primaryPoint.brake, 0)}%</span>
             <span>·</span>
-            <span className="text-white font-bold">{Math.hypot(primaryPoint.accelLatG ?? 0, primaryPoint.accelLonG ?? 0).toFixed(1)}G</span>
+            <span className="text-lmu-text font-bold">{formatReading(totalAcceleration(primaryPoint), 1)}G</span>
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-white/10">
+          <div id={contentId} className="flex flex-col divide-y divide-lmu-border">
             {/* Header row */}
-            <div className={`grid ${gridColsClass} divide-x divide-white/10 bg-white/5 py-0.5 text-center text-[9px] sm:text-[10px] font-semibold tracking-wider uppercase whitespace-nowrap`}>
-              {isComparing && <span className="text-slate-400 px-1">CAR</span>}
-              {isComparing && <span className="text-amber-400 px-1">DELTA</span>}
-              {isComparing && <span className="text-sky-300 px-1">LINE</span>}
-              <span className="text-sky-400 px-1">SPEED</span>
-              <span className="text-emerald-400 px-1">THR</span>
-              <span className="text-rose-400 px-1">BRK</span>
-              <span className="text-indigo-400 px-1">STEER</span>
-              <span className="text-amber-400 px-1">G-FORCE</span>
-              <span className="text-purple-400 px-1">STATUS</span>
+            <div className={`grid ${gridColsClass} divide-x divide-lmu-border bg-lmu-raised/40 py-0.5 text-center text-[10px] text-lmu-muted font-semibold tracking-wider uppercase whitespace-nowrap`}>
+              {isComparing && <span className="text-lmu-muted px-1">LAP</span>}
+              {isComparing && <span title="Primary lap time minus baseline lap time at the same track distance; negative is ahead." className="px-1">DELTA</span>}
+              {isComparing && <span title="Distance between racing lines at the same track distance, not a race gap." className="px-1">LINE</span>}
+              <span className="px-1">SPEED</span>
+              <span className="px-1">THR</span>
+              <span className="px-1">BRK</span>
+              <span className="px-1">STEER</span>
+              <span className="px-1">G-FORCE</span>
+              <span title="Car location, pit limiter and weather; not race-control flags." className="px-1">STATUS</span>
             </div>
 
-            {/* Row 1: ME / Primary Car */}
+            {/* Row 1: selected primary lap */}
             <div
               data-testid="telemetry-hud-primary"
-              className={`grid ${gridColsClass} divide-x divide-white/10 items-center py-0.5 sm:py-1 whitespace-nowrap`}
+              className={`grid ${gridColsClass} divide-x divide-lmu-border items-center py-0.5 sm:py-1 whitespace-nowrap`}
             >
               {isComparing && (
-                <div className="flex items-center justify-center px-1">
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-sky-500/20 text-white border border-sky-500/30">
-                    ME
+                <div className="flex items-center justify-center px-0.5">
+                  <span title="The selected lap being inspected." className="px-1 py-0.5 rounded text-[10px] leading-[1.4] font-bold tracking-normal bg-lmu-info/15 text-lmu-text border border-lmu-info/30">
+                    Primary
                   </span>
                 </div>
               )}
               {renderCells(primaryPoint, false)}
             </div>
 
-            {/* Row 2: THE OTHER / Baseline Ghost Car (when comparing) */}
+            {/* Row 2: comparison baseline lap */}
             {isComparing && (
               <div
                 data-testid="telemetry-hud-baseline"
-                className={`grid ${gridColsClass} divide-x divide-white/10 items-center py-0.5 sm:py-1 bg-amber-500/[0.04]`}
+                className={`grid ${gridColsClass} divide-x divide-lmu-border items-center py-0.5 sm:py-1 bg-lmu-warn/5`}
               >
-                <div className="flex items-center justify-center px-1">
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-bold font-mono tracking-wider bg-amber-500/20 text-white border border-amber-500/30">
-                    RIVAL
+                <div className="flex items-center justify-center px-0.5">
+                  <span title="The lap selected as the comparison reference." className="px-1 py-0.5 rounded text-[10px] leading-[1.4] font-bold tracking-normal bg-lmu-warn/15 text-lmu-text border border-lmu-warn/30">
+                    Baseline
                   </span>
                 </div>
                 {renderCells(baselinePoint, true)}
@@ -278,8 +260,9 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
           type="button"
           onClick={() => setIsCollapsed(c => !c)}
           aria-label={isCollapsed ? 'Expand telemetry bar' : 'Collapse telemetry bar'}
-          title={isCollapsed ? 'Expand HUD' : 'Collapse HUD'}
-          className="flex items-center justify-center w-6 shrink-0 bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors cursor-pointer border-l border-white/10 rounded-r-xl"
+          aria-expanded={!isCollapsed} aria-controls={contentId}
+          title={isCollapsed ? 'Expand telemetry bar' : 'Collapse telemetry bar'}
+          className={`flex items-center justify-center w-7 shrink-0 bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer border-l border-lmu-border rounded-r-xl ${FOCUS_RING}`}
         >
           {isCollapsed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>

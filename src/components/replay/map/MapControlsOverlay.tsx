@@ -38,7 +38,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
       data-testid="map-controls-overlay"
       className={`absolute bottom-3 right-3 z-30 flex ${
         isVert ? 'flex-col items-center gap-1 p-1' : 'items-center gap-1.5 p-1.5'
-      } bg-lmu-strip/90 backdrop-blur-md rounded-xl border border-white/10 shadow-xl ${className}`}
+      } bg-lmu-strip/90 backdrop-blur-md rounded-xl border border-lmu-border shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
@@ -51,8 +51,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           title={isPlaying ? 'Pause · Space' : 'Play · Space'}
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             isPlaying
-              ? 'bg-lmu-accent text-white hover:bg-lmu-accent/80'
-              : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
+              ? 'bg-lmu-accent text-lmu-text hover:bg-lmu-accent/80'
+              : 'bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text'
           } ${FOCUS_RING}`}
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 translate-x-0.5" />}
@@ -62,7 +62,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onZoomIn}
         aria-label="Zoom in"
-        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Zoom In"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -71,7 +71,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onZoomOut}
         aria-label="Zoom out"
-        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Zoom Out"
       >
         <Minus className="w-3.5 h-3.5" />
@@ -83,7 +83,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           onClick={onCenterCar}
           aria-label="Center car"
           title="Center car · C"
-          className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
+          className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         >
           <LocateFixed className="w-3.5 h-3.5" />
         </button>
@@ -96,8 +96,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           aria-pressed={Boolean(followCar)}
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             followCar
-              ? 'bg-lmu-accent text-white'
-              : 'bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white'
+              ? 'bg-lmu-accent text-lmu-text'
+              : 'bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text'
           } ${FOCUS_RING}`}
           title={followCar ? 'Follow car · F (active)' : 'Follow car · F'}
         >
@@ -109,7 +109,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         type="button"
         onClick={onReset}
         aria-label="Reset zoom and pan"
-        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-lmu-muted hover:text-white transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
+        className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         title="Reset View"
       >
         <RotateCcw className="w-3.5 h-3.5" />

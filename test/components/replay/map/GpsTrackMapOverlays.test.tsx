@@ -5,6 +5,26 @@ import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { mockPoints, mockBounds, mockGeometry } from './gpsTrackMapFixtures.js';
 
 describe('GpsTrackMap overlays and geometry', () => {
+  it('keeps scrub, pan and turn selection operable inside the fullscreen dialog', () => {
+    const onSelectIndex = vi.fn(), onSelectCornerNumber = vi.fn();
+    render(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0}
+      trackGeometry={null} mapDisplay={null} corners={[{ cornerNumber: 1, minDistM: 0 }]}
+      onSelectIndex={onSelectIndex} onSelectCornerNumber={onSelectCornerNumber} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    const map = screen.getByRole('dialog', { name: 'Track map' });
+    expect(map).toHaveFocus();
+    const scene = screen.getByTestId('gps-map-scene');
+    const before = scene.getAttribute('viewBox');
+    fireEvent.keyDown(map, { key: 'd' });
+    expect(scene.getAttribute('viewBox')).not.toBe(before);
+    expect(onSelectIndex).not.toHaveBeenCalled();
+    fireEvent.keyDown(map, { key: 'ArrowRight' });
+    expect(onSelectIndex).toHaveBeenCalledWith(1);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select map turn' }), { target: { value: '1' } });
+    expect(onSelectCornerNumber).toHaveBeenCalledWith(1);
+    expect(onSelectIndex).toHaveBeenLastCalledWith(0);
+  });
+
   it('renders perpendicular pedal marker lines and outside badges when showPedalMarkers is true', () => {
     const { container } = render(
       <GpsTrackMap

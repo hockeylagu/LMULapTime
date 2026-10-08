@@ -82,7 +82,7 @@ export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker
       {/* Indicator badge outside racing line */}
       <g transform={`translate(${tagX.toFixed(1)}, ${tagY.toFixed(1)})`}>
         <circle r="9.5" fill={MAP_COLORS.markerDotBase} stroke={strokeColor} strokeWidth="1.8" strokeDasharray={isBase ? '3.5 2.5' : undefined} />
-        <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={textColor} fontSize="10.5" fontFamily="monospace" fontWeight="bold">
+        <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={textColor} fontSize="10.5" fontFamily="Consolas, monospace" fontWeight="bold">
           {label}
         </text>
       </g>

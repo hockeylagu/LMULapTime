@@ -138,7 +138,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
-                title={fadedLine === 'primary' ? 'Show my line' : 'Fade my line'}
+                aria-label={fadedLine === 'primary' ? 'Restore primary line' : 'Fade primary line'}
+                title={fadedLine === 'primary' ? 'Restore primary line' : 'Fade primary line'}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'primary'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
@@ -146,11 +147,12 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 } ${FOCUS_RING}`}
               >
                 <span className="w-2.5 h-1 rounded-sm bg-lmu-info shrink-0" />
-                Mine
+                Primary
               </button>
               <button
                 onClick={() => setFadedLine(f => (f === 'baseline' ? 'none' : 'baseline'))}
-                title={fadedLine === 'baseline' ? 'Show baseline line' : 'Fade baseline line'}
+                aria-label={fadedLine === 'baseline' ? 'Restore baseline line' : 'Fade baseline line'}
+                title={fadedLine === 'baseline' ? 'Restore baseline line' : 'Fade baseline line'}
                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                   fadedLine === 'baseline'
                     ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'

@@ -13,6 +13,7 @@ export interface UseGpsMapShortcutsOptions {
   onResetZoom: () => void;
   onTogglePlay?: () => void;
   onToggleGForce?: () => void;
+  onPan?: (horizontal: number, vertical: number) => void;
 }
 
 /**
@@ -24,6 +25,7 @@ export interface UseGpsMapShortcutsOptions {
  * - 0: Reset zoom to show full track
  * - Space: Toggle playback
  * - G: Toggle G-force arrow
+ * - W/A/S/D: Pan up/left/down/right without changing the scrub cursor
  */
 export function useGpsMapShortcuts({
   isExpanded,
@@ -36,6 +38,7 @@ export function useGpsMapShortcuts({
   onResetZoom,
   onTogglePlay,
   onToggleGForce,
+  onPan,
 }: UseGpsMapShortcutsOptions): void {
   const optionsRef = useRef({
     isExpanded,
@@ -48,6 +51,7 @@ export function useGpsMapShortcuts({
     onResetZoom,
     onTogglePlay,
     onToggleGForce,
+    onPan,
   });
   optionsRef.current = {
     isExpanded,
@@ -60,6 +64,7 @@ export function useGpsMapShortcuts({
     onResetZoom,
     onTogglePlay,
     onToggleGForce,
+    onPan,
   };
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export function useGpsMapShortcuts({
         onResetZoom: resetZoom,
         onTogglePlay: togglePlay,
         onToggleGForce: toggleGForce,
+        onPan: pan,
       } = optionsRef.current;
 
       const container = contRef.current;
@@ -91,7 +97,12 @@ export function useGpsMapShortcuts({
       if (total === 0) return;
       const safeIndex = Math.max(0, Math.min(total - 1, idx));
 
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      const panDirections: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
+      const panDirection = panDirections[event.key.toLowerCase()];
+      if (pan && panDirection) {
+        event.preventDefault();
+        pan(...panDirection);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault();
         const direction = event.key === 'ArrowLeft' ? -1 : 1;
         if (!event.shiftKey) {

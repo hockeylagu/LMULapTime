@@ -325,6 +325,12 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     followCarRef.current = false;
     autoFollowOnScrubRef.current = false;
   };
+  const panBy = (horizontal: number, vertical: number) => {
+    const visibleSize = viewBoxSize / (zoomLevelRef.current * BASE_ZOOM);
+    const center = followCarRef.current && currentPosRef.current
+      ? currentPosRef.current : { sx: viewBoxSize / 2 + panOffsetRef.current.x, sy: viewBoxSize / 2 + panOffsetRef.current.y };
+    panTo(center.sx + horizontal * visibleSize * 0.1, center.sy + vertical * visibleSize * 0.1);
+  };
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   keyHandlerRef.current = event => {
     if (replayShortcutBlocked(event) || !isReplaySurfaceTarget(event) || event.repeat) return;
@@ -373,6 +379,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
     focusOnPoint,
     centerOnCar,
     panTo,
+    panBy,
     zoomIn,
     zoomOut,
     markerScale,

@@ -146,27 +146,27 @@ describe('ReplayMapContainer', () => {
     expect(screen.getByLabelText('Estimated friction circle')).toBeInTheDocument();
   });
 
-  it('renders Mine and Baseline toggle buttons without eye icons and toggles line fading', () => {
+  it('renders Primary and Baseline toggle buttons without eye icons and toggles line fading', () => {
     render(<ReplayMapContainer {...baseProps} isCompareMode={true} baselineTrajectory={trajectory} />);
 
-    const mineBtn = screen.getByRole('button', { name: 'Mine' });
-    const baselineBtn = screen.getByRole('button', { name: 'Baseline' });
+    const mineBtn = screen.getByRole('button', { name: 'Fade primary line' });
+    const baselineBtn = screen.getByRole('button', { name: 'Fade baseline line' });
 
     expect(mineBtn).toBeInTheDocument();
     expect(baselineBtn).toBeInTheDocument();
-    expect(mineBtn).toHaveAttribute('title', 'Fade my line');
+    expect(mineBtn).toHaveAttribute('title', 'Fade primary line');
     expect(baselineBtn).toHaveAttribute('title', 'Fade baseline line');
 
-    // Click Mine button to fade
+    // Click Primary button to fade
     fireEvent.click(mineBtn);
-    expect(mineBtn).toHaveAttribute('title', 'Show my line');
+    expect(mineBtn).toHaveAttribute('title', 'Restore primary line');
 
     // Click again to restore
     fireEvent.click(mineBtn);
-    expect(mineBtn).toHaveAttribute('title', 'Fade my line');
+    expect(mineBtn).toHaveAttribute('title', 'Fade primary line');
 
     // Click Baseline button to fade
     fireEvent.click(baselineBtn);
-    expect(baselineBtn).toHaveAttribute('title', 'Show baseline line');
+    expect(baselineBtn).toHaveAttribute('title', 'Restore baseline line');
   });
 });

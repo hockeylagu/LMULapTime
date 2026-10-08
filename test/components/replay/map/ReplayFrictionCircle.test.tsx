@@ -4,6 +4,22 @@ import { ReplayFrictionCircle } from '../../../../src/components/replay/map/Repl
 import type { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 
 describe('ReplayFrictionCircle', () => {
+  it('does not infer grip or draw a dot from absent or non-finite acceleration', () => {
+    const { rerender } = render(<ReplayFrictionCircle points={[{ x: 0, y: 0, z: 0 }]} currentIndex={0} />);
+    expect(screen.getByText('UNAVAILABLE')).toBeInTheDocument();
+    expect(screen.queryByText('Grip available')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('friction-circle-dot')).not.toBeInTheDocument();
+    rerender(<ReplayFrictionCircle points={[{ x: 0, y: 0, z: 0, accelLatG: NaN, accelLonG: 0 }]} currentIndex={0} />);
+    expect(screen.getByText('UNAVAILABLE')).toBeInTheDocument();
+    expect(screen.queryByTestId('friction-circle-dot')).not.toBeInTheDocument();
+  });
+
+  it('respects an explicitly unavailable aligned baseline instead of guessing from its array', () => {
+    const point = { x: 0, y: 0, z: 0, distM: 100, accelLatG: 0, accelLonG: 0 };
+    render(<ReplayFrictionCircle points={[point]} currentIndex={0} baselinePoint={null} baselinePoints={[point]} />);
+    expect(screen.queryByTestId('friction-circle-baseline-dot')).not.toBeInTheDocument();
+    expect(screen.getByTestId('friction-circle-dot')).toBeInTheDocument();
+  });
   const basePoint: ReplayTelemetryPoint = {
     x: 0,
     y: 0,
@@ -102,8 +118,8 @@ describe('ReplayFrictionCircle', () => {
     expect(Number(primaryDot.getAttribute('cx'))).toBeLessThan(64);
     expect(Number(baselineDot.getAttribute('cx'))).toBeGreaterThan(64);
 
-    // Displays both Driver and Baseline labels in the readout
-    expect(screen.getByText('Driver')).toBeInTheDocument();
+    // Displays both Primary and Baseline labels in the readout
+    expect(screen.getByText('Primary')).toBeInTheDocument();
     expect(screen.getByText('Baseline')).toBeInTheDocument();
   });
 

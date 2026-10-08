@@ -4,7 +4,7 @@ export function replayShortcutBlocked(event: KeyboardEvent): boolean {
   const target = event.target instanceof Element ? event.target : null;
   if (target?.closest('input, textarea, select, button, a, [contenteditable="true"], [role="textbox"], details[open]')) return true;
   return [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
-    .some(dialog => !dialog.querySelector('[data-replay-surface]'));
+    .some(dialog => !dialog.matches('[data-replay-surface]') && !dialog.querySelector('[data-replay-surface]'));
 }
 
 export function isReplaySurfaceTarget(event: KeyboardEvent): boolean {

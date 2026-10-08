@@ -56,7 +56,7 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
       <Layers className="w-3.5 h-3.5" />Layers
     </button>
     {open && <div ref={panel} id={id} aria-label="Map layers" role="group"
-      className="absolute top-full right-0 mt-2 w-56 p-3 bg-lmu-card border border-lmu-border rounded-lg shadow-lg z-40">
+      className="absolute top-full right-0 mt-2 w-56 max-h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain p-3 bg-lmu-card border border-lmu-border rounded-lg shadow-lg z-40">
       <div className="text-sm font-semibold text-lmu-text mb-2">Map layers</div>
       {(Object.keys(MAP_LAYER_LABELS) as Array<keyof typeof MAP_LAYER_LABELS>).map(key => (
         <React.Fragment key={key}>
@@ -69,16 +69,16 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
               className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
           </label>
           {key === 'runoff' && layers.runoff && runoffKinds.length > 1 && (
-            <ul className="pl-5 py-1 flex flex-col gap-1 border-l-2 border-slate-700/60 ml-2 mb-1" aria-label="Runoff colours">
+            <ul className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" aria-label="Runoff colours">
               {RUNOFF_LEGEND.filter(item => runoffKinds.includes(item.key)).map(item => (
                 <li key={item.key} className="flex gap-2 items-center text-[11px] text-lmu-muted">
-                  <span aria-hidden className="w-3 h-3 rounded-sm border border-slate-600/70" style={{ backgroundColor: item.color }} />
+                  <span aria-hidden className="w-3 h-3 rounded-sm border border-lmu-rule" style={{ backgroundColor: item.color }} />
                   {item.label}
                 </li>))}
             </ul>
           )}
           {key === 'brakeMarkers' && layers.brakeMarkers && available.brakeMarkers !== false && (
-            <div className="pl-5 py-1 flex flex-col gap-1 border-l-2 border-slate-700/60 ml-2 mb-1" role="group" aria-label="Braking marker types">
+            <div className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" role="group" aria-label="Braking marker types">
               <label className="flex gap-2 items-center text-[11px] select-none text-lmu-text-soft cursor-pointer hover:text-lmu-text">
                 <input type="checkbox" checked={layers.brakeDistance !== false}
                   onChange={e => onChange({ ...layers, brakeDistance: e.target.checked })}

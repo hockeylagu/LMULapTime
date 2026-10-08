@@ -3,6 +3,18 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsMapModeBar } from '../../../../../src/components/replay/map/display/GpsMapModeBar.js';
 
 describe('GpsMapModeBar', () => {
+  it('selects a turn with a native labeled keyboard control', () => {
+    const onSelectCornerNumber = vi.fn();
+    render(<GpsMapModeBar corners={[{ cornerNumber: 3, minDistM: 100 }]} onSelectCornerNumber={onSelectCornerNumber} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select map turn' }), { target: { value: '3' } });
+    expect(onSelectCornerNumber).toHaveBeenCalledWith(3);
+  });
+
+  it('exposes which comparison line is faded', () => {
+    render(<GpsMapModeBar hasBaseline onToggleFadedLine={vi.fn()} fadedLine="baseline" />);
+    expect(screen.getByRole('button', { name: 'Fade primary line' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Restore baseline line' })).toHaveAttribute('aria-pressed', 'true');
+  });
   it('renders Pedal and Speed buttons and triggers onChangeColorBy', () => {
     const onChangeColorBy = vi.fn();
     render(<GpsMapModeBar colorBy="pedal" onChangeColorBy={onChangeColorBy} />);
@@ -65,7 +77,7 @@ describe('GpsMapModeBar', () => {
     expect(pedalPtsBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('renders Mine and Baseline line fade toggles when hasBaseline is true', () => {
+  it('renders Primary and Baseline line fade toggles when hasBaseline is true', () => {
     const onToggleFadedLine = vi.fn();
     render(
       <GpsMapModeBar
@@ -75,7 +87,7 @@ describe('GpsMapModeBar', () => {
       />
     );
 
-    const mineBtn = screen.getByRole('button', { name: /mine/i });
+    const mineBtn = screen.getByRole('button', { name: /primary/i });
     const baselineBtn = screen.getByRole('button', { name: /baseline/i });
 
     expect(mineBtn).toBeInTheDocument();

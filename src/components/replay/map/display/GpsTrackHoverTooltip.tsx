@@ -62,7 +62,7 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
           y={-badgeH * 0.1}
           fill="#f8fafc"
           fontSize={11 * markerScale}
-          fontFamily="monospace"
+          fontFamily="Consolas, monospace"
           fontWeight="bold"
         >
           {speed} km/h
@@ -74,7 +74,7 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
             textAnchor="end"
             fill={deltaColor}
             fontSize={10 * markerScale}
-            fontFamily="monospace"
+            fontFamily="Consolas, monospace"
             fontWeight="bold"
           >
             {deltaText}
@@ -85,8 +85,8 @@ export const GpsTrackHoverTooltip: React.FC<GpsTrackHoverTooltipProps> = ({
           x={-badgeW * 0.42}
           y={badgeH * 0.32}
           fill="#94a3b8"
-          fontSize={9.5 * markerScale}
-          fontFamily="monospace"
+          fontSize={10 * markerScale}
+          fontFamily="Consolas, monospace"
         >
           {brake > 5 ? (
             <tspan fill="#f87171" fontWeight="bold">BRK {brake}%</tspan>

@@ -162,8 +162,8 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               <circle r="4" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
             </g>
             <g transform={`translate(${labelX}, ${labelY}) scale(${markerScale})`}>
-              <rect x="-16" y="-7" width="32" height="14" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity={m.isDimmed ? 0.75 : 0.95} className="transition-transform group-hover:scale-110" />
-              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
+              <rect x="-20" y="-9" width="40" height="18" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity={m.isDimmed ? 0.75 : 0.95} className="transition-transform group-hover:scale-110" />
+              <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="10" fontFamily="Consolas, monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none pointer-events-none">
                 APEX
               </text>
             </g>
@@ -205,9 +205,9 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
             >
               <circle r="8" fill={MAP_COLORS.apex} opacity="0.3" />
               <circle r="4.5" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
-              <g transform="translate(0, 14)">
-                <rect x="-16" y="-7" width="32" height="14" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity="0.95" />
-                <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="7.5" fontFamily="monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
+              <g transform="translate(0, 18)">
+                <rect x="-20" y="-9" width="40" height="18" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity="0.95" />
+                <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="10" fontFamily="Consolas, monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
                   APEX
                 </text>
               </g>

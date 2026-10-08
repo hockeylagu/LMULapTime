@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { X } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { formatReading, hasReading } from './display/telemetryReadouts.js';
 
 export interface ReplayFrictionCircleProps {
   points: ReplayTelemetryPoint[];
@@ -18,6 +20,9 @@ const ENVELOPE_RADIUS = 47;
 const MAX_DISPLAY_RATIO = 1.2;
 
 function getGripState(point?: ReplayTelemetryPoint) {
+  if (!hasReading(point?.accelLatG) || !hasReading(point?.accelLonG)) {
+    return { label: 'UNAVAILABLE', detail: 'Acceleration channels unavailable', color: MAP_COLORS.markerMuted, utilization: null };
+  }
   const longitudinalRatio = Math.abs(point?.accelLonG ?? 0) / 2.5;
   const lateralRatio = Math.abs(point?.accelLatG ?? 0) / 2.8;
   const utilization = Math.round(Math.hypot(longitudinalRatio, lateralRatio) * 100);
@@ -38,7 +43,8 @@ function getGripState(point?: ReplayTelemetryPoint) {
   return { label: 'RESERVE', detail: 'Grip available', color: MAP_COLORS.markerMuted, utilization };
 }
 
-function projectPoint(point: ReplayTelemetryPoint): { x: number; y: number } {
+function projectPoint(point: ReplayTelemetryPoint): { x: number; y: number } | null {
+  if (!hasReading(point.accelLatG) || !hasReading(point.accelLonG)) return null;
   // Inertial load transfer (where the weight goes):
   // - Turning right (accelLatG < 0) transfers load to outside left tires (x < CENTER, 'L')
   // - Turning left (accelLatG > 0) transfers load to outside right tires (x > CENTER, 'R')
@@ -57,11 +63,11 @@ function resolveBaselinePoint(
   baselinePoint?: ReplayTelemetryPoint | null,
   baselinePoints?: ReplayTelemetryPoint[]
 ): ReplayTelemetryPoint | undefined {
-  if (baselinePoint) return baselinePoint;
+  if (baselinePoint !== undefined) return baselinePoint ?? undefined;
   if (!baselinePoints || baselinePoints.length === 0 || !primaryPt) return undefined;
   const targetDist = primaryPt.distM ?? primaryPt.stationM;
   if (targetDist !== undefined) {
-    let closest = baselinePoints[0];
+    let closest: ReplayTelemetryPoint | undefined;
     let minDiff = Infinity;
     for (let i = 0; i < baselinePoints.length; i++) {
       const bp = baselinePoints[i];
@@ -103,19 +109,23 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
 
   const trail = useMemo(() => {
     const currentTime = currentPoint?.timeSec;
-    let startIndex = Math.max(0, currentIndex - 20);
+    const safeIndex = Math.max(0, Math.min(points.length - 1, currentIndex));
+    let startIndex = Math.max(0, safeIndex - 20);
     if (currentTime !== undefined) {
-      startIndex = currentIndex;
+      startIndex = safeIndex;
       while (startIndex > 0 && (points[startIndex - 1].timeSec ?? currentTime) >= currentTime - 2) {
         startIndex--;
       }
     }
 
-    return points
-      .slice(startIndex, currentIndex + 1)
-      .map(projectPoint)
-      .map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
-      .join(' ');
+    let path = '', connected = false;
+    for (const sample of points.slice(startIndex, safeIndex + 1)) {
+      const point = projectPoint(sample);
+      if (!point) { connected = false; continue; }
+      path += `${connected ? 'L' : 'M'}${point.x.toFixed(1)},${point.y.toFixed(1)} `;
+      connected = true;
+    }
+    return path;
   }, [currentIndex, currentPoint?.timeSec, points]);
 
   return (
@@ -131,7 +141,7 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
         <circle cx={CENTER} cy={CENTER} r={ENVELOPE_RADIUS * 0.75} fill="none" stroke={MAP_COLORS.centerline} strokeDasharray="3 3" />
         <line x1="8" y1={CENTER} x2="120" y2={CENTER} stroke={MAP_COLORS.centerline} />
         <line x1={CENTER} y1="8" x2={CENTER} y2="120" stroke={MAP_COLORS.centerline} />
-        {trail && <polyline points={trail} fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />}
+        {trail && <path d={trail} fill="none" stroke={TELEMETRY_COLORS.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />}
 
         {baselineCurrent && (
           <circle
@@ -146,7 +156,7 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
           />
         )}
 
-        {activeBaseline && (
+        {activeBaseline && current && (
           <circle
             cx={current.x}
             cy={current.y}
@@ -158,7 +168,7 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
           />
         )}
 
-        <circle
+        {current && <circle
           data-testid="friction-circle-dot"
           cx={current.x}
           cy={current.y}
@@ -166,12 +176,12 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
           fill={activeBaseline ? TELEMETRY_COLORS.primary : gripState.color}
           stroke={CHART_COLORS.white}
           strokeWidth="1.5"
-        />
+        />}
 
-        <text x="4" y="61" fill={MAP_COLORS.markerDimmed} fontSize="11">L</text>
-        <text x="119" y="61" fill={MAP_COLORS.markerDimmed} fontSize="11">R</text>
-        <text x="64" y="12" textAnchor="middle" fill={MAP_COLORS.markerDimmed} fontSize="10" fontWeight="bold">BRAKE</text>
-        <text x="64" y="124" textAnchor="middle" fill={MAP_COLORS.markerDimmed} fontSize="10" fontWeight="bold">DRIVE</text>
+        <text x="4" y="61" fill={MAP_COLORS.markerMuted} fontSize="12">L</text>
+        <text x="119" y="61" fill={MAP_COLORS.markerMuted} fontSize="12">R</text>
+        <text x="64" y="12" textAnchor="middle" fill={MAP_COLORS.markerMuted} fontSize="12" fontWeight="bold">BRAKE</text>
+        <text x="64" y="124" textAnchor="middle" fill={MAP_COLORS.markerMuted} fontSize="12" fontWeight="bold">DRIVE</text>
       </svg>
 
       <div className="relative min-w-0 flex-1">
@@ -181,14 +191,14 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
             onClick={onClose}
             aria-label="Close friction circle"
             title="Close friction circle"
-            className="absolute -top-1 -right-1 p-0.5 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className={`absolute -top-1 -right-1 w-7 h-7 flex items-center justify-center rounded text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised/70 transition-colors cursor-pointer ${FOCUS_RING}`}
           >
             <X className="w-3.5 h-3.5" />
           </button>
         )}
-        <div className="text-[10px] font-bold tracking-wider text-lmu-muted">EST. GRIP UTILIZATION</div>
+        <div className={`text-[10px] font-bold tracking-wider text-lmu-muted ${onClose ? 'pr-7' : ''}`}>EST. GRIP UTILIZATION</div>
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-2xl font-black font-mono text-white">{gripState.utilization}%</span>
+          <span className="text-2xl font-black font-mono text-lmu-text">{gripState.utilization === null ? '--' : `${gripState.utilization}%`}</span>
           <span className="text-[10px] font-black tracking-wide" style={{ color: gripState.color }}>
             {gripState.label}
           </span>
@@ -197,19 +207,19 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
         {activeBaseline ? (
           <div className="mt-1.5 space-y-1 text-[10px] font-mono">
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-sky-400 font-bold">
-                <span className="w-2 h-2 rounded-full bg-sky-400 ring-1 ring-white/60" /> Driver
+              <span className="inline-flex items-center gap-1.5 text-lmu-info font-bold">
+                <span className="w-2 h-2 rounded-full bg-lmu-info ring-1 ring-lmu-text/60" /> Primary
               </span>
-              <span className="text-white font-semibold">
-                {(currentPoint?.accelLatG ?? 0).toFixed(2)} <span className="text-lmu-muted font-normal">lat</span> / {(currentPoint?.accelLonG ?? 0).toFixed(2)} <span className="text-lmu-muted font-normal">lon</span>
+              <span className="text-lmu-text font-semibold">
+                {formatReading(currentPoint?.accelLatG, 2)} <span className="text-lmu-muted font-normal">lat</span> / {formatReading(currentPoint?.accelLonG, 2)} <span className="text-lmu-muted font-normal">lon</span>
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-amber-400 font-bold">
-                <span className="w-2 h-2 rounded-full bg-amber-400 ring-1 ring-white/60" /> Baseline
+              <span className="inline-flex items-center gap-1.5 text-lmu-warn font-bold">
+                <span className="w-2 h-2 rounded-full bg-lmu-warn ring-1 ring-lmu-text/60" /> Baseline
               </span>
-              <span className="text-amber-200/90 font-semibold">
-                {(activeBaseline?.accelLatG ?? 0).toFixed(2)} <span className="text-lmu-muted font-normal">lat</span> / {(activeBaseline?.accelLonG ?? 0).toFixed(2)} <span className="text-lmu-muted font-normal">lon</span>
+              <span className="text-lmu-text font-semibold">
+                {formatReading(activeBaseline?.accelLatG, 2)} <span className="text-lmu-muted font-normal">lat</span> / {formatReading(activeBaseline?.accelLonG, 2)} <span className="text-lmu-muted font-normal">lon</span>
               </span>
             </div>
           </div>
@@ -217,8 +227,8 @@ export const ReplayFrictionCircle: React.FC<ReplayFrictionCircleProps> = React.m
           <>
             <div className="mt-0.5 text-[10px] text-lmu-muted">{gripState.detail}</div>
             <div className="mt-2 grid grid-cols-2 gap-x-3 text-[10px] font-mono">
-              <span className="text-lmu-muted">LAT <strong className="text-white">{(currentPoint?.accelLatG ?? 0).toFixed(2)} G</strong></span>
-              <span className="text-lmu-muted">LON <strong className="text-white">{(currentPoint?.accelLonG ?? 0).toFixed(2)} G</strong></span>
+              <span className="text-lmu-muted">LAT <strong className="text-lmu-text">{formatReading(currentPoint?.accelLatG, 2)} G</strong></span>
+              <span className="text-lmu-muted">LON <strong className="text-lmu-text">{formatReading(currentPoint?.accelLonG, 2)} G</strong></span>
             </div>
           </>
         )}

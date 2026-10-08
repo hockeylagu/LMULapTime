@@ -3,6 +3,18 @@ import { renderHook, act } from '@testing-library/react';
 import { useGpsMapPanZoom } from '../../../../src/components/replay/map/useGpsMapPanZoom.js';
 
 describe('useGpsMapPanZoom', () => {
+  it('pans relative to the followed car and keeps the manual view during playback', () => {
+    const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),
+      { initialProps: { position: { sx: 550, sy: 100 } } });
+    act(() => result.current.setFollowCar(true));
+    act(() => result.current.panBy(1, -1));
+    expect(result.current.followCar).toBe(false);
+    expect(result.current.panOffset.x).toBeCloseTo(203.333);
+    expect(result.current.panOffset.y).toBeCloseTo(-353.333);
+    const view = result.current.currentViewBox;
+    rerender({ position: { sx: 600, sy: 150 } });
+    expect(result.current.currentViewBox).toBe(view);
+  });
   it('centers once with C at the same zoom and toggles follow with F from the chart', () => {
     const surface = document.createElement('div'); surface.dataset.replaySurface = 'chart'; document.body.append(surface);
     const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),

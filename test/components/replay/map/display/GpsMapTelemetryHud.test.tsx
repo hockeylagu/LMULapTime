@@ -14,6 +14,8 @@ describe('GpsMapTelemetryHud', () => {
     brake: 0,
     steerYaw: 0.3,
     timeSec: 42.5,
+    inPit: false,
+    isOffTrack: false,
   };
 
   const mockBaseline: ReplayTelemetryPoint = {
@@ -61,7 +63,7 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('ABS')).toBeInTheDocument();
   });
 
-  it('renders two rows (ME and RIVAL) when baselinePoint is provided', () => {
+  it('renders two rows (Primary and Baseline) when baselinePoint is provided', () => {
     render(
       <GpsMapTelemetryHud
         primaryPoint={mockPrimary}
@@ -72,8 +74,11 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByTestId('telemetry-hud-primary')).toBeInTheDocument();
     expect(screen.getByTestId('telemetry-hud-baseline')).toBeInTheDocument();
 
-    expect(screen.getByText('ME')).toBeInTheDocument();
-    expect(screen.getByText('RIVAL')).toBeInTheDocument();
+    expect(screen.getByText('Primary')).toBeInTheDocument();
+    expect(screen.getByText('Baseline')).toBeInTheDocument();
+    expect(screen.queryByText('ME')).not.toBeInTheDocument();
+    expect(screen.queryByText('RIVAL')).not.toBeInTheDocument();
+    expect(screen.getByText('LINE')).toHaveAttribute('title', 'Distance between racing lines at the same track distance, not a race gap.');
 
     // Primary speed
     expect(screen.getByText('227')).toBeInTheDocument();
@@ -109,12 +114,12 @@ describe('GpsMapTelemetryHud', () => {
 
     expect(screen.getByText('DELTA')).toBeInTheDocument();
     expect(screen.getByText('+0.53s')).toBeInTheDocument();
-    expect(screen.getByText('losing')).toBeInTheDocument();
+    expect(screen.getByText('behind')).toBeInTheDocument();
     expect(screen.getByText('REF')).toBeInTheDocument();
-    expect(screen.getByText('baseline')).toBeInTheDocument();
+    expect(screen.getByText('reference')).toBeInTheDocument();
   });
 
-  it('renders negative delta correctly when gaining time against rival', () => {
+  it('renders negative delta correctly when ahead of the baseline', () => {
     render(
       <GpsMapTelemetryHud
         primaryPoint={mockPrimary}
@@ -124,7 +129,7 @@ describe('GpsMapTelemetryHud', () => {
     );
 
     expect(screen.getByText('-0.24s')).toBeInTheDocument();
-    expect(screen.getByText('gaining')).toBeInTheDocument();
+    expect(screen.getByText('ahead')).toBeInTheDocument();
   });
 
   it('renders delta in collapsed HUD bar when comparing laps', () => {
@@ -177,10 +182,10 @@ describe('GpsMapTelemetryHud', () => {
   it('maintains fixed width in comparing and single car modes to prevent resizing on steering changes', () => {
     const { rerender } = render(<GpsMapTelemetryHud primaryPoint={mockPrimary} />);
     const hud = screen.getByTestId('gps-map-telemetry-hud');
-    expect(hud).toHaveClass('w-[450px]');
+    expect(hud).toHaveClass('w-[454px]');
 
     rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} />);
-    expect(hud).toHaveClass('w-[596px]');
+    expect(hud).toHaveClass('w-[614px]');
   });
 
   it('renders steering input with tabular-nums and fixed one-decimal format', () => {
@@ -214,7 +219,46 @@ describe('GpsMapTelemetryHud', () => {
 
     // STATUS remains clean (not polluted with G-force)
     expect(screen.getByText('ON TRACK')).toBeInTheDocument();
-    expect(screen.getByText('green')).toBeInTheDocument();
+    expect(screen.getByText('air --')).toBeInTheDocument();
+  });
+
+  it('keeps missing and non-finite channels unavailable in both HUD states', () => {
+    render(<GpsMapTelemetryHud primaryPoint={{ x: 0, y: 0, z: 0, speedKmh: NaN, throttle: Infinity }} />);
+    const row = screen.getByTestId('telemetry-hud-primary');
+    expect(row).toHaveTextContent('GEAR --');
+    expect(row).toHaveTextContent('UNKNOWN');
+    expect(row).not.toHaveTextContent('0.00G');
+    expect(row).not.toHaveTextContent('NaN');
+    const toggle = screen.getByRole('button', { name: 'Collapse telemetry bar' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByText('-- km/h')).toBeInTheDocument();
+    expect(screen.getByText('THR --%')).toBeInTheDocument();
+    expect(screen.getByText('BRK --%')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it.each([[0, 'N'], [-1, 'R'], [8, '8']])('preserves recorded gear %s as %s', (gear, label) => {
+    render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, gear }} />);
+    expect(screen.getByText(`GEAR ${label}`)).toBeInTheDocument();
+  });
+
+  it('does not invent a pit speed or penalty validity from status flags', () => {
+    const { rerender } = render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, pitLimiter: true }} />);
+    expect(screen.getByText('enabled')).toBeInTheDocument();
+    expect(screen.queryByText('60 km/h')).not.toBeInTheDocument();
+    rerender(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, isOffTrack: true }} />);
+    expect(screen.getByText('outside road')).toBeInTheDocument();
+    expect(screen.queryByText('limits cut')).not.toBeInTheDocument();
+  });
+
+  it('retains real zero channels and zero ambient temperature', () => {
+    render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, ambientTemp: 0, gear: 0,
+      speedKmh: 0, throttle: 0, brake: 0, steerYaw: 0, accelLatG: 0, accelLonG: 0 }} />);
+    expect(screen.getByText('0.00G')).toBeInTheDocument();
+    expect(screen.getByText('air 0.0°C')).toBeInTheDocument();
+    expect(screen.getByText('0.0% C')).toBeInTheDocument();
   });
 });
 
