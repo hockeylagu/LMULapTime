@@ -281,12 +281,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
             primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point ?? null}
             baselinePoints={effectiveBaselinePoints} deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM}
             colorBy={colorBy} onChangeColorBy={onChangeColorBy}
-            corners={corners} selectedCornerNumber={selectedCornerNumber}
-            onSelectCornerNumber={onSelectCornerNumber || onSelectIndex ? number => {
-              const marker = cornerMarkers.find(corner => corner.cornerNumber === number);
-              if (marker) { onSelectIndex?.(marker.idx); focusOnPoint(marker.actualSx, marker.actualSy, 4.5); }
-              onSelectCornerNumber?.(number);
-            } : undefined}
             showPedalMarkers={showPedalMarkers} onTogglePedalMarkers={onTogglePedalMarkers} hasCorners={Boolean(corners?.length)}
             isCompareMode={Boolean(baselinePoints)} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
             onToggleFadedLine={onToggleFadedLine} showGForce={showGForce} onToggleGForce={handleToggleGForce}

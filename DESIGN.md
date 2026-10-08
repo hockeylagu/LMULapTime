@@ -465,6 +465,8 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **On demand:** analysis that costs time (the debrief comparison) starts when requested, not on load.
 
 ### Telemetry Traces & Track Map (signature)
+
+- **Fullscreen GPS HUD:** retain colored column headers for fast scanning (user preference, 2026-10-08): sky speed, green throttle, red brake, indigo steering, amber delta/G-force, cyan line separation and purple status. Use existing semantic tokens. This is an intentional exception to neutral ordinary labels; do not remove these colors in a polish pass.
 - **Charts:** Recharts on the dark base with horizontal `CHART_COLORS.grid` gridlines only and `lmu-muted` axes; 2px traces with small unringed dots (the ring and a 4px point show only on hover); averages as a thinner dashed line of their series, or `lmu-muted` when they average several; an opaque tooltip marking each value with a short stroke of its line color over white text. Headings are short (Lap trends, Class positions, Tire wear, Fuel & energy); the metric controls carry the detail.
 - **Series hues:** every series takes the hue it has elsewhere: sectors in `SECTOR_COLORS`, tyres in `WHEEL_CORNER_COLORS`, channels in `TELEMETRY_COLORS` (speed sky, baseline amber, throttle emerald, brake red, steering indigo), fuel and virtual energy as in the replay telemetry.
 - **Positions chart:** you in red, the field in thin `lmu-muted` lines; hovering or focusing a legend name lifts that driver out in white.

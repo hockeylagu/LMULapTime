@@ -3,6 +3,63 @@ import { fuseDuckDbWithVcrTrajectory } from '../../../server/telemetry/telemetry
 import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../../server/core/types.js';
 
 describe('telemetryFusion', () => {
+  it('preserves replay status throughout a fused lap and changes it at recorded frame boundaries', () => {
+    const vcr: ReplayTrajectoryData = {
+      replayName: 'Status.Vcr', timeReference: 'session', lapStartTimeSec: 10, pointsCount: 3,
+      bounds: { minX: 0, maxX: 20, minZ: 0, maxZ: 0, spanX: 20, spanZ: 0 },
+      points: [
+        { x: 0, y: 0, z: 0, timeSec: 10, inPit: false, isOffTrack: false, pitLimiter: false,
+          tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 25 },
+        { x: 10, y: 0, z: 0, timeSec: 11, inPit: false, isOffTrack: true, pitLimiter: false,
+          tcActive: true, absActive: true, rainIntensity: 0.5, ambientTemp: 10, trackTemp: 20 },
+        { x: 20, y: 0, z: 0, timeSec: 12, inPit: true, isOffTrack: false, pitLimiter: true,
+          inGarage: true, isTeleport: true },
+      ],
+    };
+    const times = [0, 0.5, 0.999, 1, 1.5, 2];
+    const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 2, sampleRateHz: 100,
+      pointsCount: times.length, points: times.map(timeSec => ({ x: 0, y: 0, z: 0, timeSec })) };
+    const snapshot = structuredClone({ vcr, duck });
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
+    for (const index of [0, 1, 2]) {
+      expect(fused.points[index]).toMatchObject({ inPit: false, isOffTrack: false, pitLimiter: false,
+        tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 25 });
+    }
+    for (const index of [3, 4]) {
+      expect(fused.points[index]).toMatchObject({ inPit: false, isOffTrack: true, pitLimiter: false,
+        tcActive: true, absActive: true, rainIntensity: 0.5, ambientTemp: 10, trackTemp: 20 });
+    }
+    expect(fused.points[5]).toMatchObject({ inPit: true, isOffTrack: false, pitLimiter: true,
+      inGarage: true, isTeleport: true });
+    expect({ vcr, duck }).toEqual(snapshot);
+  });
+
+  it('keeps native false states and zero weather values instead of overwriting them from replay', () => {
+    const vcr: ReplayTrajectoryData = {
+      replayName: 'Status.Vcr', pointsCount: 1,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: true, isOffTrack: true, pitLimiter: true,
+        tcActive: true, absActive: true, rainIntensity: 1, ambientTemp: 20, trackTemp: 30 }],
+    };
+    const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1, sampleRateHz: 100,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: false, isOffTrack: false, pitLimiter: false,
+        tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 0 }] };
+    expect(fuseDuckDbWithVcrTrajectory(duck, vcr).points[0]).toMatchObject({ inPit: false,
+      isOffTrack: false, pitLimiter: false, tcActive: false, absActive: false,
+      rainIntensity: 0, ambientTemp: 0, trackTemp: 0 });
+  });
+
+  it('does not invent status when neither recording provides it', () => {
+    const point = { x: 0, y: 0, z: 0, timeSec: 0 };
+    const vcr: ReplayTrajectoryData = { replayName: 'Missing.Vcr', pointsCount: 1, points: [point],
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 } };
+    const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1,
+      sampleRateHz: 100, points: [point] };
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr).points[0];
+    for (const key of ['inPit', 'isOffTrack', 'pitLimiter', 'tcActive', 'absActive',
+      'rainIntensity', 'ambientTemp', 'trackTemp'] as const) expect(fused[key]).toBeUndefined();
+  });
+
   it.each([40, 100])('aligns an early race lap starting at session time %s, including retained rows', start => {
     const vcr: ReplayTrajectoryData = {
       replayName: 'Race.Vcr', currentLap: 2, pointsCount: 3,

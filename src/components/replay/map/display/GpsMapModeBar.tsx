@@ -2,7 +2,6 @@ import React from 'react';
 import { CircleDot, Compass, Disc } from 'lucide-react';
 import type { MapColorMode } from '../replayMapUtils.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
-import type { GpsTrackMapCorner } from '../gpsTrackMapTypes.js';
 
 export interface GpsMapModeBarProps {
   colorBy?: MapColorMode;
@@ -19,9 +18,6 @@ export interface GpsMapModeBarProps {
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
   className?: string;
-  corners?: GpsTrackMapCorner[];
-  selectedCornerNumber?: number | null;
-  onSelectCornerNumber?: (cornerNumber: number) => void;
 }
 
 export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
@@ -39,7 +35,6 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   showFrictionCircle = false,
   onToggleFrictionCircle,
   className = '',
-  corners, selectedCornerNumber, onSelectCornerNumber,
 }) => {
   const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta'] as const) : [])] as const;
 
@@ -51,14 +46,6 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
       onDoubleClick={e => e.stopPropagation()}
       className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl select-none pointer-events-auto max-2xl:top-16 max-2xl:left-72 max-2xl:right-3 max-2xl:translate-x-0 max-2xl:justify-end ${className}`}
     >
-      {corners?.length && onSelectCornerNumber ? (
-        <select aria-label="Select map turn" value={selectedCornerNumber ?? ''}
-          onChange={event => onSelectCornerNumber(Number(event.target.value))}
-          className={`max-w-32 bg-lmu-card text-lmu-text text-xs rounded px-2 py-1 cursor-pointer ${FOCUS_RING}`}>
-          <option value="" disabled>Select turn</option>
-          {corners.map(corner => <option key={corner.cornerNumber} value={corner.cornerNumber}>Turn {corner.cornerNumber}</option>)}
-        </select>
-      ) : null}
       {onChangeColorBy && (
         <div className="flex items-center gap-1">
           {modes.map(mode => (

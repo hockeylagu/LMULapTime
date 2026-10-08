@@ -123,9 +123,22 @@ export function fuseDuckDbWithVcrTrajectory(
     const rotX = p0.rotX !== undefined && p1.rotX !== undefined ? interpolateAngle(p0.rotX, p1.rotX, alpha) : p0.rotX;
     const rotY = p0.rotY !== undefined && p1.rotY !== undefined ? interpolateAngle(p0.rotY, p1.rotY, alpha) : p0.rotY;
     const rotZ = p0.rotZ !== undefined && p1.rotZ !== undefined ? interpolateAngle(p0.rotZ, p1.rotZ, alpha) : p0.rotZ;
+    // Discrete replay states hold until the next recorded frame, including exact boundaries.
+    // Native DuckDB states take precedence; false is a recorded value, not missing data.
+    const statePoint = alpha >= 1 ? p1 : p0;
 
     fusedPoints.push({
       ...withoutPointGeometry(dp),
+      inPit: dp.inPit ?? statePoint.inPit,
+      inGarage: dp.inGarage ?? statePoint.inGarage,
+      isTeleport: dp.isTeleport ?? statePoint.isTeleport,
+      isOffTrack: dp.isOffTrack ?? statePoint.isOffTrack,
+      pitLimiter: dp.pitLimiter ?? statePoint.pitLimiter,
+      tcActive: dp.tcActive ?? statePoint.tcActive,
+      absActive: dp.absActive ?? statePoint.absActive,
+      rainIntensity: dp.rainIntensity ?? statePoint.rainIntensity,
+      ambientTemp: dp.ambientTemp ?? statePoint.ambientTemp,
+      trackTemp: dp.trackTemp ?? statePoint.trackTemp,
       brakeTemps: dp.brakeTemps ?? p0.brakeTemps,
       rideHeight: dp.rideHeight,
       fuel: dp.fuel ?? p0.fuel,

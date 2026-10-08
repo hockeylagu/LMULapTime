@@ -5,7 +5,7 @@ import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { mockPoints, mockBounds, mockGeometry } from './gpsTrackMapFixtures.js';
 
 describe('GpsTrackMap overlays and geometry', () => {
-  it('keeps scrub, pan and turn selection operable inside the fullscreen dialog', () => {
+  it('keeps fullscreen scrub and pan operable without a turn selector', () => {
     const onSelectIndex = vi.fn(), onSelectCornerNumber = vi.fn();
     render(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0}
       trackGeometry={null} mapDisplay={null} corners={[{ cornerNumber: 1, minDistM: 0 }]}
@@ -20,9 +20,9 @@ describe('GpsTrackMap overlays and geometry', () => {
     expect(onSelectIndex).not.toHaveBeenCalled();
     fireEvent.keyDown(map, { key: 'ArrowRight' });
     expect(onSelectIndex).toHaveBeenCalledWith(1);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Select map turn' }), { target: { value: '1' } });
-    expect(onSelectCornerNumber).toHaveBeenCalledWith(1);
-    expect(onSelectIndex).toHaveBeenLastCalledWith(0);
+    expect(screen.queryByRole('combobox', { name: 'Select map turn' })).not.toBeInTheDocument();
+    expect(onSelectCornerNumber).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Track map' })).toBeInTheDocument();
   });
 
   it('renders perpendicular pedal marker lines and outside badges when showPedalMarkers is true', () => {

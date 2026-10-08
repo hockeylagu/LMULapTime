@@ -28,6 +28,20 @@ A synthetic preview found a small HUD/friction collision at 1280px. The friction
 
 Verification: browser DOM checks at **1280×720 and 2560×1440** confirmed no overflowing HUD readout cells, separate HUD/friction bounds, scrollable menu styling, shortcut Escape/focus restoration and a **2px red** keyboard outline. Token contrast calculations give **5.10:1** for muted text on the raised surface, **11.54:1** for TC and **9.07:1** for ABS; these are checks of those pairs, not a full map contrast certification. Focused map/help tests passed **26 files / 224 tests**; the full suite passed **268 files / 2368 tests**, with **5 files / 56 tests skipped**, and the production build passed without warnings. Automated detector validation remains unavailable because its bundled engine is absent. The original audit score is historical.
 
+## Fullscreen turn selector removal — 2026-10-08
+
+Removed the fullscreen toolbar's turn selector at the user's request after they reported that selecting a turn exits fullscreen. The toolbar no longer accepts turn-selection props or invokes the parent corner-selection callback. Existing map corner markers remain. The native selector no longer provides the keyboard corner-selection alternative described in finding **2**; W/A/S/D camera pan remains available. Earlier follow-ups describe the implementation at their respective dates.
+
+## Fused telemetry status repair — 2026-10-08
+
+The user reported ON TRACK at the first fullscreen frame and UNKNOWN later, with a screenshot showing UNKNOWN during the lap. `telemetryFusion.ts` copied DuckDB samples and VCR coordinates without transferring replay-only status or weather fields. Timing-line interpolation can restore channels from the VCR edge recording on the boundary point, explaining the inconsistent first-frame behavior. Fusion now keeps native status/weather values when present and otherwise uses the current recorded VCR frame; discrete states change at exact frame boundaries rather than being blended or taken early from a future frame. Recorded false flags and zero weather values remain intact. Truly missing fields still remain unavailable.
+
+Regression tests cover the full lap timeline, frame transitions, native-value precedence and missing data. Fusion runs on each trajectory request, so no stored-cache invalidation or replay reparse is needed; an already-loaded lap must be fetched again to receive the repaired points. The normal inspector HUD's permissive ON TRACK fallback remains separate from the stricter fullscreen display.
+
+## HUD header color preference — 2026-10-08
+
+Restored the user's preferred colored HUD column headers for faster scanning: sky speed, green throttle, red brake, indigo steering, amber G-force/delta, cyan line separation and purple status. The colors use existing `lmu-*` tokens; typography, accurate comparison labels and status handling remain intact. This overrides the neutral-header choice in the earlier polish follow-up.
+
 ## Implementation integrity verdict
 
 **Fail pending corrections.** The map has a coherent racing-specific architecture: layout-specific geometry, independent vehicle footprints, distance-aligned comparison, recorded-channel interpolation and shared map colors. However, the fullscreen HUD fabricates values when optional channels are absent, assumes a pit speed, clamps recorded gears and describes every comparison as a rival. Those behaviors conflict with PRODUCT.md's requirement that numbers and identity be correct or explicitly unavailable.

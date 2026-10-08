@@ -213,14 +213,14 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
             {/* Header row */}
             <div className={`grid ${gridColsClass} divide-x divide-lmu-border bg-lmu-raised/40 py-0.5 text-center text-[10px] text-lmu-muted font-semibold tracking-wider uppercase whitespace-nowrap`}>
               {isComparing && <span className="text-lmu-muted px-1">LAP</span>}
-              {isComparing && <span title="Primary lap time minus baseline lap time at the same track distance; negative is ahead." className="px-1">DELTA</span>}
-              {isComparing && <span title="Distance between racing lines at the same track distance, not a race gap." className="px-1">LINE</span>}
-              <span className="px-1">SPEED</span>
-              <span className="px-1">THR</span>
-              <span className="px-1">BRK</span>
-              <span className="px-1">STEER</span>
-              <span className="px-1">G-FORCE</span>
-              <span title="Car location, pit limiter and weather; not race-control flags." className="px-1">STATUS</span>
+              {isComparing && <span title="Primary lap time minus baseline lap time at the same track distance; negative is ahead." className="text-lmu-warn px-1">DELTA</span>}
+              {isComparing && <span title="Distance between racing lines at the same track distance, not a race gap." className="text-lmu-cyan px-1">LINE</span>}
+              <span className="text-lmu-info px-1">SPEED</span>
+              <span className="text-lmu-gain px-1">THR</span>
+              <span className="text-lmu-loss px-1">BRK</span>
+              <span className="text-lmu-indigo px-1">STEER</span>
+              <span className="text-lmu-warn px-1">G-FORCE</span>
+              <span title="Car location, pit limiter and weather; not race-control flags." className="text-lmu-purple px-1">STATUS</span>
             </div>
 
             {/* Row 1: selected primary lap */}
