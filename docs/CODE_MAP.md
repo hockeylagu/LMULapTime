@@ -78,7 +78,7 @@ separate from completed lap count. Partial valid/eligible lap-time indexes suppo
 comparison personal-best lookups. Bump the projection version when changing stored aggregate rules.
 Do not add an index that leads with `driver_class` or `driver_id` on `session_drivers`: the planner then starts the leaderboard from every driver of the
 class (measured 520 ms against 5 ms starting from the layout). The sessions of a layout are found through `idx_sessions_layout_timestamp`, then their drivers by primary key.
-Reading any `sessions` column added after `data_json` walks the row's overflow pages (the layout list, track summaries and progression still do, about 120 ms each on the local cache); phase 3 removes the cause.
+Reading any `sessions` column added after `data_json` walks the row's overflow pages (the layout list, track summaries and progression still do, about 120 ms each on the local cache); phase 3 removes the cause (phase 3b `server/core/sessionRows/conversion.ts` provides sidecar JSON backup, table rebuild dropping JSON columns, and rollback restore).
 
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.

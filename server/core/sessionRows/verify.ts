@@ -5,6 +5,7 @@ import { readSession } from './reader.js';
 import { NORMALIZED_SESSION_VERSION } from './schema.js';
 import type { SessionSummaryProjection } from '../../../shared/types/sessionSummaries.js';
 import { deleteSessionRows, writeSessionRows } from './writer.js';
+import { isSessionJsonRemoved } from './conversion.js';
 
 /** The paths where the session read back from its rows differs from its canonical form; empty when it matches. */
 export function verifySessionRows(db: DatabaseType, session: DetailedSession, limit = 20): string[] {
@@ -53,6 +54,7 @@ export function countStaleNormalizedSessions(db: DatabaseType): number {
 
 /** Writes and verifies the rows of up to `batchSize` sessions from their stored JSON. */
 export function backfillNormalizedSessions(db: DatabaseType, batchSize = 10): NormalizedBackfillBatch {
+  if (isSessionJsonRemoved(db)) return { processed: 0, failed: [] };
   const ids = db.prepare(`SELECT id FROM sessions WHERE ${STALE_ROWS} ORDER BY timestamp LIMIT ?`)
     .all(NORMALIZED_SESSION_VERSION, -NORMALIZED_SESSION_VERSION, Math.max(1, batchSize)) as Array<{ id: string }>;
   const select = db.prepare('SELECT data_json FROM sessions WHERE id = ?');

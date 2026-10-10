@@ -180,22 +180,14 @@ Each targeted update path is tested and verifies that normalized rows read back 
 
 ### 3b. Conversion (one time, irreversible)
 
-Runs at startup, after the normalized backfill finishes, and only when **every** row has the current `normalized_version`. One
-negative (unverified) row blocks it: Settings lists the blocked sessions with their mismatch, and the app keeps running on phase 2
-code paths. (The local cache has zero today.) Steps, logged in Settings with progress:
-
-1. **Keep a JSON copy.** Copy `id, data_json` into a sidecar database `server/lmu_cache.sessions-json.db` (`ATTACH`, then
-   `INSERT ... SELECT`, about 150 MB). Copying the whole cache is not an option: it is 5.7 GB, almost all replay data. The sidecar
-   is the rollback: a tool restores the column from it. Settings can delete it once the user is satisfied.
-2. **Rebuild `sessions`** without `metadata_json`, `data_json` and `summary_json`. SQLite drops columns by copying the table:
-   `CREATE TABLE sessions_new`, `INSERT ... SELECT` of the kept columns, `DROP`, `RENAME`, then recreate every `idx_sessions_*`
-   index. All in one transaction, so a crash leaves the old table. The kept columns are about 1 MB in total, so the copy takes seconds.
-   Column order puts the columns read by history queries first (id, timestamp, layout, kind, revisions, player ordinal); without the
-   JSON the order matters little.
-3. **Record it** in `cache_metadata` (`session_json_removed_at`). Startup reads that key, not the table layout.
-
-**No automatic `VACUUM`.** The freed ~150 MB of pages are reused by later writes. Vacuuming a 5.7 GB file blocks the event loop for
-minutes and needs as much free disk space again. If it is wanted, it becomes a separate Settings action.
+Implemented in `server/core/sessionRows/conversion.ts` and tested in `test/server/core/sessionRows/conversion.test.ts`:
+- **Prerequisite validation**: `canConvertSessions(db)` blocks rebuild if any session has `normalized_version !== NORMALIZED_SESSION_VERSION` (unverified or negative).
+- **Sidecar JSON safety copy**: `backupSessionsJsonToSidecar(db, sidecarPath)` uses `ATTACH DATABASE` to replicate `(id, data_json, metadata_json)` into `sidecar.sessions_json` (~150 MB), ensuring full rollback capability without whole-database copies.
+- **Atomic table rebuild**: `rebuildSessionsTableWithoutJson(db)` creates `sessions_new` placing hot history columns first, drops `metadata_json`, `data_json`, and `summary_json`, copies all 58 retained scalar columns, swaps the table via `ALTER TABLE ... RENAME`, recreates all 9 indexes, and records `session_json_removed_at` in `cache_metadata`.
+- **Atomic rollback on failure**: An error before commit cleanly rolls back the transaction, keeping the existing `sessions` table and schema untouched.
+- **Rollback tooling**: `restoreSessionsJsonFromSidecar(db, sidecarPath)` restores JSON columns and clears `session_json_removed_at`.
+- **Dual-path adapter**: Until 3c removes the legacy JSON paths, writes (`upsertSession`, `insertSessionRow`, `patchSessionJson`, `writeSessionJson`, `persistSessionProjection`, `markProjectionFailed`) and reads/backfills (`loadSession`, `readStoredLinkState`, `backfillNormalizedSessions`) check `isSessionJsonRemoved(db)` so converted and unconverted databases operate seamlessly.
+- **No automatic `VACUUM`**: Reused pages are preserved without blocking event loops.
 
 ### 3c. Remove the JSON paths (after 3b has run on the local cache)
 

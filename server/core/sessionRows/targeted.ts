@@ -8,6 +8,7 @@ import { serializeSessionCard } from '../sessionSummaries/store.js';
 import { updateDerivedColumns } from './writer.js';
 import { writeSessionJson } from './access.js';
 import { withSessionTelemetry } from './canonical.js';
+import { isSessionJsonRemoved } from './conversion.js';
 
 type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
 
@@ -30,6 +31,7 @@ export function patchSessionJson(
   updater: (session: DetailedSession, meta: SessionMetadata) => void,
   updatedAt?: number
 ): void {
+  if (isSessionJsonRemoved(db)) return;
   const row = db.prepare('SELECT metadata_json, data_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string; data_json: string } | undefined;
   if (!row) return;
   try {
@@ -247,14 +249,25 @@ export function updateTargetedConditions(
     updateDerivedColumns(db, session.id, projection);
 
     // 5. Update session row metadata
-    db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
-      source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
-      recording_name=?, summary_json=?, projection_error=NULL WHERE id=?`)
-      .run(
-        projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
-        Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
-        projection.recordingName, serializeSessionCard(session, projection), session.id
-      );
+    if (isSessionJsonRemoved(db)) {
+      db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
+        source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
+        recording_name=?, projection_error=NULL WHERE id=?`)
+        .run(
+          projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
+          Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
+          projection.recordingName, session.id
+        );
+    } else {
+      db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
+        source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
+        recording_name=?, summary_json=?, projection_error=NULL WHERE id=?`)
+        .run(
+          projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
+          Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
+          projection.recordingName, serializeSessionCard(session, projection), session.id
+        );
+    }
 
     bumpSessionDataRevision(db);
     writeSessionJson(db, session, updatedAt);

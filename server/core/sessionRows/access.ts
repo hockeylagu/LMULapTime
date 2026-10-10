@@ -3,6 +3,7 @@ import type { DetailedSession, SessionMetadata } from '../types.js';
 import type { Row } from './fields.js';
 import { recordingLink, readSession } from './reader.js';
 import { NORMALIZED_SESSION_VERSION } from './schema.js';
+import { isSessionJsonRemoved } from './conversion.js';
 import { stableKey } from './writer.js';
 
 type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
@@ -15,6 +16,7 @@ export function loadSession(db: DatabaseType, id: string): DetailedSession | nul
   const row = db.prepare('SELECT normalized_version AS version FROM sessions WHERE id = ?').get(id) as { version: number } | undefined;
   if (!row) return null;
   if (row.version === NORMALIZED_SESSION_VERSION) return readSession(db, id);
+  if (isSessionJsonRemoved(db)) return null;
   const json = db.prepare('SELECT data_json FROM sessions WHERE id = ?').get(id) as { data_json: string } | undefined;
   return json ? JSON.parse(json.data_json) as DetailedSession : null;
 }
@@ -43,6 +45,7 @@ export function readStoredLinkState(db: DatabaseType, id: string): StoredLinkSta
   const session = db.prepare('SELECT normalized_version AS version, has_duckdb_telemetry, duckdb_filename FROM sessions WHERE id = ?').get(id) as Row | undefined;
   if (!session) return undefined;
   if (session.version !== NORMALIZED_SESSION_VERSION) {
+    if (isSessionJsonRemoved(db)) return undefined;
     const loaded = loadSession(db, id);
     return loaded ? { link: loaded.matchingReplayFile, duckdbFilename: loaded.duckdbFilename } : undefined;
   }
@@ -58,6 +61,7 @@ export function readStoredLinkState(db: DatabaseType, id: string): StoredLinkSta
  * back is a code revert until phase 3 removes it).
  */
 export function writeSessionJson(db: DatabaseType, session: DetailedSession, updatedAt?: number): void {
+  if (isSessionJsonRemoved(db)) return;
   const { drivers: _drivers, ...meta } = session;
   if (updatedAt === undefined) {
     db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ? WHERE id = ?').run(JSON.stringify(meta), JSON.stringify(session), session.id);

@@ -135,6 +135,10 @@ import {
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
 import { backfillNormalizedSessions, type NormalizedBackfillBatch } from './sessionRows/verify.js';
+import {
+  isSessionJsonRemoved, canConvertSessions, convertSessionsToNormalizedStorage,
+  restoreSessionsJsonFromSidecar,
+} from './sessionRows/conversion.js';
 import { loadSessions } from './sessionRows/access.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
 import {
@@ -519,6 +523,20 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   /** Writes and verifies the normalized rows of the next sessions that lack them, from their stored JSON. */
   public backfillNormalizedSessionBatch(batchSize = 10): NormalizedBackfillBatch { return backfillNormalizedSessions(this.db, batchSize); }
+
+  public isSessionJsonRemoved(): boolean { return isSessionJsonRemoved(this.db); }
+
+  public canConvertSessions() { return canConvertSessions(this.db); }
+
+  public convertSessionsToNormalizedStorage(sidecarPath?: string): { converted: boolean; rowsBackedUp: number } {
+    const targetPath = sidecarPath ?? path.join(path.dirname(this.dbPath), 'lmu_cache.sessions-json.db');
+    return convertSessionsToNormalizedStorage(this.db, targetPath);
+  }
+
+  public restoreSessionsJsonFromSidecar(sidecarPath?: string): number {
+    const targetPath = sidecarPath ?? path.join(path.dirname(this.dbPath), 'lmu_cache.sessions-json.db');
+    return restoreSessionsJsonFromSidecar(this.db, targetPath);
+  }
 
   /** Whether history reads can be served: no session waits for its summaries. */
   public isSessionSummaryReady(): boolean { return isSessionSummaryReady(this.db); }

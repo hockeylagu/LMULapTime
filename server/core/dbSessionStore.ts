@@ -7,6 +7,7 @@ import { loadSession, readStoredLinkState, sameReplayLink } from './sessionRows/
 
 import { upsertTargetedReplayLink, updateTargetedTelemetry } from './sessionRows/targeted.js';
 import { withSessionTelemetry } from './sessionRows/canonical.js';
+import { isSessionJsonRemoved } from './sessionRows/conversion.js';
 
 
 /** Ingestion's persisted XML end timestamp; a different path must not reuse it. */
@@ -53,69 +54,121 @@ export function upsertSession(
   if (session.matchingReplayFile && isReplayLinkWithdrawn(db, session.id, session.matchingReplayFile.name)) {
     delete session.matchingReplayFile;
   }
-  const { drivers, ...meta } = session;
-  const metadataJson = JSON.stringify(meta);
-  const dataJson = JSON.stringify(session);
+  const jsonRemoved = isSessionJsonRemoved(db);
   const now = Date.now();
 
-  const stmt = db.prepare(`
-    INSERT INTO sessions (
-      id, filename, file_path, file_mtime, file_size, timestamp,
-      track_venue, track_course, session_type, session_name,
-      player_driver_name, player_car_class, player_car_type,
-      player_best_lap_time, player_laps_count, drivers_count,
-      metadata_json, data_json, updated_at
-    ) VALUES (
-      @id, @filename, @filePath, @fileMtime, @fileSize, @timestamp,
-      @trackVenue, @trackCourse, @sessionType, @sessionName,
-      @playerDriverName, @playerCarClass, @playerCarType,
-      @playerBestLapTime, @playerLapsCount, @driversCount,
-      @metadataJson, @dataJson, @updatedAt
-    )
-    ON CONFLICT(id) DO UPDATE SET
-      filename = excluded.filename,
-      file_path = excluded.file_path,
-      file_mtime = excluded.file_mtime,
-      file_size = excluded.file_size,
-      timestamp = excluded.timestamp,
-      track_venue = excluded.track_venue,
-      track_course = excluded.track_course,
-      session_type = excluded.session_type,
-      session_name = excluded.session_name,
-      player_driver_name = excluded.player_driver_name,
-      player_car_class = excluded.player_car_class,
-      player_car_type = excluded.player_car_type,
-      player_best_lap_time = excluded.player_best_lap_time,
-      player_laps_count = excluded.player_laps_count,
-      drivers_count = excluded.drivers_count,
-      metadata_json = excluded.metadata_json,
-      data_json = excluded.data_json,
-      updated_at = excluded.updated_at
-  `);
-
   const write = db.transaction(() => {
-  stmt.run({
-    id: session.id,
-    filename: session.filename,
-    filePath,
-    fileMtime: mtime,
-    fileSize: size,
-    timestamp: session.timestamp,
-    trackVenue: session.trackVenue,
-    trackCourse: session.trackCourse,
-    sessionType: session.sessionType,
-    sessionName: session.sessionName,
-    playerDriverName: session.playerDriver?.name || null,
-    playerCarClass: session.playerDriver?.carClass || null,
-    playerCarType: session.playerDriver?.carType || null,
-    playerBestLapTime: session.playerDriver?.bestLapTime ?? null,
-    playerLapsCount: session.playerDriver?.lapsCount ?? 0,
-    driversCount: session.driversCount,
-    metadataJson,
-    dataJson,
-    updatedAt: now,
-  });
-  persistSessionProjection(db, session);
+    if (jsonRemoved) {
+      db.prepare(`
+        INSERT INTO sessions (
+          id, filename, file_path, file_mtime, file_size, timestamp,
+          track_venue, track_course, session_type, session_name,
+          player_driver_name, player_car_class, player_car_type,
+          player_best_lap_time, player_laps_count, drivers_count,
+          updated_at
+        ) VALUES (
+          @id, @filename, @filePath, @fileMtime, @fileSize, @timestamp,
+          @trackVenue, @trackCourse, @sessionType, @sessionName,
+          @playerDriverName, @playerCarClass, @playerCarType,
+          @playerBestLapTime, @playerLapsCount, @driversCount,
+          @updatedAt
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          filename = excluded.filename,
+          file_path = excluded.file_path,
+          file_mtime = excluded.file_mtime,
+          file_size = excluded.file_size,
+          timestamp = excluded.timestamp,
+          track_venue = excluded.track_venue,
+          track_course = excluded.track_course,
+          session_type = excluded.session_type,
+          session_name = excluded.session_name,
+          player_driver_name = excluded.player_driver_name,
+          player_car_class = excluded.player_car_class,
+          player_car_type = excluded.player_car_type,
+          player_best_lap_time = excluded.player_best_lap_time,
+          player_laps_count = excluded.player_laps_count,
+          drivers_count = excluded.drivers_count,
+          updated_at = excluded.updated_at
+      `).run({
+        id: session.id,
+        filename: session.filename,
+        filePath,
+        fileMtime: mtime,
+        fileSize: size,
+        timestamp: session.timestamp,
+        trackVenue: session.trackVenue,
+        trackCourse: session.trackCourse,
+        sessionType: session.sessionType,
+        sessionName: session.sessionName,
+        playerDriverName: session.playerDriver?.name || null,
+        playerCarClass: session.playerDriver?.carClass || null,
+        playerCarType: session.playerDriver?.carType || null,
+        playerBestLapTime: session.playerDriver?.bestLapTime ?? null,
+        playerLapsCount: session.playerDriver?.lapsCount ?? 0,
+        driversCount: session.driversCount,
+        updatedAt: now,
+      });
+    } else {
+      const { drivers, ...meta } = session;
+      const metadataJson = JSON.stringify(meta);
+      const dataJson = JSON.stringify(session);
+      db.prepare(`
+        INSERT INTO sessions (
+          id, filename, file_path, file_mtime, file_size, timestamp,
+          track_venue, track_course, session_type, session_name,
+          player_driver_name, player_car_class, player_car_type,
+          player_best_lap_time, player_laps_count, drivers_count,
+          metadata_json, data_json, updated_at
+        ) VALUES (
+          @id, @filename, @filePath, @fileMtime, @fileSize, @timestamp,
+          @trackVenue, @trackCourse, @sessionType, @sessionName,
+          @playerDriverName, @playerCarClass, @playerCarType,
+          @playerBestLapTime, @playerLapsCount, @driversCount,
+          @metadataJson, @dataJson, @updatedAt
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          filename = excluded.filename,
+          file_path = excluded.file_path,
+          file_mtime = excluded.file_mtime,
+          file_size = excluded.file_size,
+          timestamp = excluded.timestamp,
+          track_venue = excluded.track_venue,
+          track_course = excluded.track_course,
+          session_type = excluded.session_type,
+          session_name = excluded.session_name,
+          player_driver_name = excluded.player_driver_name,
+          player_car_class = excluded.player_car_class,
+          player_car_type = excluded.player_car_type,
+          player_best_lap_time = excluded.player_best_lap_time,
+          player_laps_count = excluded.player_laps_count,
+          drivers_count = excluded.drivers_count,
+          metadata_json = excluded.metadata_json,
+          data_json = excluded.data_json,
+          updated_at = excluded.updated_at
+      `).run({
+        id: session.id,
+        filename: session.filename,
+        filePath,
+        fileMtime: mtime,
+        fileSize: size,
+        timestamp: session.timestamp,
+        trackVenue: session.trackVenue,
+        trackCourse: session.trackCourse,
+        sessionType: session.sessionType,
+        sessionName: session.sessionName,
+        playerDriverName: session.playerDriver?.name || null,
+        playerCarClass: session.playerDriver?.carClass || null,
+        playerCarType: session.playerDriver?.carType || null,
+        playerBestLapTime: session.playerDriver?.bestLapTime ?? null,
+        playerLapsCount: session.playerDriver?.lapsCount ?? 0,
+        driversCount: session.driversCount,
+        metadataJson,
+        dataJson,
+        updatedAt: now,
+      });
+    }
+    persistSessionProjection(db, session);
   });
   write();
 }

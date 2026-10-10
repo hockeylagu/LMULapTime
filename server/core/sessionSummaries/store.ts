@@ -7,6 +7,7 @@ import { persistSessionAggregate } from './aggregateStore.js';
 import { writeAndVerifySessionRows } from '../sessionRows/verify.js';
 import { clearDerivedColumns } from '../sessionRows/writer.js';
 import { NORMALIZED_SESSION_VERSION } from '../sessionRows/schema.js';
+import { isSessionJsonRemoved } from '../sessionRows/conversion.js';
 import { loadSession } from '../sessionRows/access.js';
 import { readSessionCards } from './cards.js';
 const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
@@ -34,8 +35,13 @@ export function persistSessionProjection(db: DatabaseType, session: DetailedSess
     db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
       source_revision=?, projection_revision=?, projection_version=? WHERE id=?`)
       .run(projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal, Number(projection.isEmpty), revision, revision, projection.projectionVersion, session.id);
-    db.prepare('UPDATE sessions SET recording_name=?, summary_json=?, projection_error=NULL WHERE id=?')
-      .run(projection.recordingName, serializeSessionCard(session, projection), session.id);
+    if (isSessionJsonRemoved(db)) {
+      db.prepare('UPDATE sessions SET recording_name=?, projection_error=NULL WHERE id=?')
+        .run(projection.recordingName, session.id);
+    } else {
+      db.prepare('UPDATE sessions SET recording_name=?, summary_json=?, projection_error=NULL WHERE id=?')
+        .run(projection.recordingName, serializeSessionCard(session, projection), session.id);
+    }
     db.prepare(`INSERT INTO cache_metadata(key,value) VALUES('session_data_revision','1')
       ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT)`).run();
     return true;
@@ -112,9 +118,15 @@ function markProjectionFailed(db: DatabaseType, id: string, error: unknown): voi
       timeString: row.time_string ?? '',
       sessionType: row.session_type, sessionName: row.session_name, driversCount: 0, drivers: [] };
     persistSessionAggregate(db, empty, buildSessionSummaryProjection(empty, 0));
-    db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
-      summary_json = ?, projection_error = ? WHERE id = ?`)
-      .run(SESSION_SUMMARY_PROJECTION_VERSION, JSON.stringify(card), message, id);
+    if (isSessionJsonRemoved(db)) {
+      db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
+        projection_error = ? WHERE id = ?`)
+        .run(SESSION_SUMMARY_PROJECTION_VERSION, message, id);
+    } else {
+      db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
+        summary_json = ?, projection_error = ? WHERE id = ?`)
+        .run(SESSION_SUMMARY_PROJECTION_VERSION, JSON.stringify(card), message, id);
+    }
   })();
 }
 
