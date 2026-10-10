@@ -1,8 +1,9 @@
 # Normalized session storage
 
-Status: phases 0, 1 and 2 implemented 2026-10-10 (`server/core/sessionRows/`, `server/core/sessionSummaries/cards.ts`); phase 2 awaits review; phase 3 planned. Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
+Status: phases 0, 1, 2, and 3a implemented 2026-10-10 (`server/core/sessionRows/`, `server/core/sessionSummaries/cards.ts`); phase 3a done (targeted updates in `sessionRows/targeted.ts`), phase 3b (conversion) and 3c planned. Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
 computes per-session facts at ingestion but still keeps the session itself, its card and a second copy
 as JSON on the `sessions` row.
+
 
 ## Why
 
@@ -161,19 +162,21 @@ they cannot be parsed again. Three consequences follow, and the steps below are 
 
 ### 3a. Targeted updates (reversible, JSON still written)
 
+Done 2026-10-10 (`server/core/sessionRows/targeted.ts`, tested in `test/server/core/sessionRows/targetedUpdates.test.ts`).
 Updates stop rewriting the whole session. Each writes the rows and columns it changes, bumps `updated_at`, and runs the projection only
 when derived figures depend on the change.
 
-| Update | Today | After 3a |
-|---|---|---|
-| Replay link set / withdrawn (`dbReplayLinkStore`, `sessionReplayLinks`) | load, change, `writeSessionJson`, full projection | upsert or delete the `session_recordings` row, set `sessions.recording_name` |
-| Replay rename (`dbReplayIdentity`) | same | update `session_recordings.replay_filename` and `recording_name` |
-| DuckDB file attached (`updateSessionTelemetryFile`) | same | set `duckdb_filename`, `has_duckdb_telemetry` |
-| Conditions reclassification (`dbSessionConditions`) | same | lap condition columns, then the projection (off pace and consistency change) |
-| Reparse (`upsertSession`) | whole session | whole session, unchanged |
+| Update | Status / After 3a |
+|---|---|
+| Replay link set / withdrawn (`dbReplayLinkStore`, `sessionReplayLinks`, `dbSessionStore`) | upsert or delete the `session_recordings` row, set `sessions.recording_name` via `upsertTargetedReplayLink` / `deleteTargetedReplayLink` |
+| Replay rename (`dbReplayIdentity`) | update `session_recordings.recording_name`, `path` and `sessions.recording_name`, incrementing revisions via `renameTargetedReplay` |
+| DuckDB file attached (`updateSessionTelemetryFile`) | set `duckdb_filename`, `has_duckdb_telemetry` via `updateTargetedTelemetry` |
+| Conditions reclassification (`dbSessionConditions`) | update `session_recordings`, `session_drivers` and `session_laps` condition columns, then update derived projection columns in place via `updateTargetedConditions` / `updateDerivedColumns` |
+| Reparse (`upsertSession`) | whole session, unchanged |
 
-The JSON copy is still refreshed in 3a, by one helper called after the targeted write, so rolling back stays a code revert. Each
-targeted path gets a test that the rows read back equal to the whole-session rewrite it replaces.
+The JSON copy is refreshed in 3a by `patchSessionJson` called after each targeted write, so rolling back stays a code revert until 3b removes the columns.
+Each targeted update path is tested and verifies that normalized rows read back equal to their canonical form without calling `writeSessionRows`.
+
 
 ### 3b. Conversion (one time, irreversible)
 

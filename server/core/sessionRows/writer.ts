@@ -232,3 +232,21 @@ export function clearDerivedColumns(db: DatabaseType, sessionId: string): void {
   db.prepare(`UPDATE session_drivers SET ${derivedNames(DRIVER_DERIVED_DEFS).map(column => `${column} = NULL`).join(', ')} WHERE session_id = ?`).run(sessionId);
   db.prepare(`UPDATE session_laps SET ${derivedNames(LAP_DERIVED_DEFS).map(column => `${column} = NULL`).join(', ')} WHERE session_id = ?`).run(sessionId);
 }
+
+/** Updates only the derived projection columns of a session's drivers and laps. */
+export function updateDerivedColumns(db: DatabaseType, sessionId: string, projection: SessionSummaryProjection): void {
+  const driverStmt = db.prepare(`UPDATE session_drivers SET
+    ${derivedNames(DRIVER_DERIVED_DEFS).map(col => `${col} = @${col}`).join(', ')}
+    WHERE session_id = @session_id AND driver_ordinal = @driver_ordinal`);
+  const lapStmt = db.prepare(`UPDATE session_laps SET
+    ${derivedNames(LAP_DERIVED_DEFS).map(col => `${col} = @${col}`).join(', ')}
+    WHERE session_id = @session_id AND driver_ordinal = @driver_ordinal AND lap_ordinal = @lap_ordinal`);
+
+  projection.drivers.forEach((driver, driverOrdinal) => {
+    driverStmt.run({ session_id: sessionId, driver_ordinal: driverOrdinal, ...driverDerived(driver) });
+  });
+  for (const lap of projection.laps) {
+    lapStmt.run({ session_id: sessionId, driver_ordinal: lap.driverOrdinal, lap_ordinal: lap.lapOrdinal, ...lapDerived(lap) });
+  }
+}
+

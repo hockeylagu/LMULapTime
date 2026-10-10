@@ -58,6 +58,13 @@ export function sessionTelemetry(session: { hasDuckDbTelemetry?: boolean; duckdb
   return { hasDuckDbTelemetry: hasDuckDbTelemetry ?? undefined, duckdbFilename };
 }
 
+/** A replay link carries its session's DuckDB attachment, whichever of the two was decided first. */
+export function withSessionTelemetry<T extends Record<string, unknown>>(link: T, duckdbFilename: string | undefined): T {
+  const { hasDuckDbTelemetry: _flag, duckdbFilename: _file, ...rest } = link;
+  return (duckdbFilename ? { ...rest, hasDuckDbTelemetry: true, duckdbFilename } : rest) as T;
+}
+
+
 function liftLinkTelemetry(copy: Row): void {
   const lifted = sessionTelemetry(copy as Parameters<typeof sessionTelemetry>[0]);
   if (lifted.duckdbFilename !== undefined) copy.duckdbFilename = lifted.duckdbFilename;

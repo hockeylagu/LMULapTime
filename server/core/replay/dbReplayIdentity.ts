@@ -3,8 +3,8 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata } from '../types.js';
 import { getStoredReplayFileInfo, StoredReplayFileInfo } from './dbReplayMetadataStore.js';
 import { renameReplayFacts } from './dbReplayLapStore.js';
-import { persistSessionProjection } from '../sessionSummaries/store.js';
-import { loadSession, writeSessionJson } from '../sessionRows/access.js';
+import { renameTargetedReplay } from '../sessionRows/targeted.js';
+
 
 // A replay's rows are keyed by its filename, but a filename does not name one recording: LMU can
 // write a new recording under a name already in the cache (a restarted practice keeps its file, a
@@ -73,18 +73,10 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
     db.prepare('UPDATE rejected_replay_links SET replay_filename = ? WHERE replay_filename = ?').run(newName, filename);
 
     // The sessions matched to the stored recording keep it under its new name.
-    const linked = db.prepare(
-      'SELECT id FROM sessions WHERE recording_name = ?'
-    ).all(filename) as Array<{ id: string }>;
-    for (const { id } of linked) {
-      const data = loadSession(db, id);
-      if (!data) continue;
-      if (data.matchingReplayFile) data.matchingReplayFile = { ...data.matchingReplayFile, name: newName, path: newPath };
-      writeSessionJson(db, data, Date.now());
-      persistSessionProjection(db, data);
-    }
+    renameTargetedReplay(db, filename, newName, newPath);
   })();
 }
+
 
 /**
  * Called before `filename` is stored as the recording described by `next`: when the stored rows

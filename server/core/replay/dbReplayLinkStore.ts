@@ -1,7 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { RejectedReplayLink, ReplayLinkRejectionReason, SessionMetadata } from '../types.js';
-import { writeAndVerifySessionRows } from '../sessionRows/verify.js';
-import { loadSession, writeSessionJson } from '../sessionRows/access.js';
+import { deleteTargetedReplayLink } from '../sessionRows/targeted.js';
 
 // Withdrawn session -> replay links (see rejected_replay_links in dbSchema.ts).
 
@@ -17,15 +16,11 @@ export function rejectSessionReplayLink(
   link: ReplayLink,
   reason: ReplayLinkRejectionReason
 ): RejectedReplayLink | null {
+  const sessionExists = db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId);
+  if (!sessionExists) return null;
   const rejectedAt = Date.now();
-  const withdraw = db.transaction((): boolean => {
-    const data = loadSession(db, sessionId);
-    if (!data) return false;
-    delete data.matchingReplayFile;
-    writeSessionJson(db, data, rejectedAt);
-    // The withdrawal does not rebuild summaries, but the normalized rows must lose the link too.
-    writeAndVerifySessionRows(db, data);
-    db.prepare('UPDATE sessions SET recording_name = NULL WHERE id = ?').run(sessionId);
+  db.transaction(() => {
+    deleteTargetedReplayLink(db, sessionId, rejectedAt);
     db.prepare(`
       INSERT INTO rejected_replay_links (session_id, replay_filename, reason, previous_link_json, rejected_at)
       VALUES (?, ?, ?, ?, ?)
@@ -34,10 +29,10 @@ export function rejectSessionReplayLink(
         previous_link_json = excluded.previous_link_json,
         rejected_at = excluded.rejected_at
     `).run(sessionId, link.name, reason, JSON.stringify(link), rejectedAt);
-    return true;
-  });
-  return withdraw() ? { replayName: link.name, reason, rejectedAt } : null;
+  })();
+  return { replayName: link.name, reason, rejectedAt };
 }
+
 
 /** Every withdrawal per session, oldest first. */
 export function getRejectedReplayLinks(db: DatabaseType, sessionIds?: readonly string[]): Map<string, RejectedReplayLink[]> {

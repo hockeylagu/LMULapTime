@@ -22,19 +22,21 @@ Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (
 DDL is coordinated by `server/core/dbSchema.ts`; additive session projection tables and indexes
 live in `server/core/sessionSummaries/schema.ts` and `aggregateStore.ts`, and replay matching columns/indexes in
 `server/core/replay/dbReplayMatchingStore.ts`.
-Normalized session rows (`server/core/sessionRows/`, plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md), phase 2) are the
-stored session; reads come from them, and the JSON columns are only still written so that rolling back is a code revert (phase 3 removes them).
+Normalized session rows (`server/core/sessionRows/`, plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md), phase 3a) are the
+stored session; reads come from them, and the JSON columns are only still written so that rolling back is a code revert (phase 3b removes them).
 `specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, the extra `sessions` columns (weather, `settings_*`, best session
 lap, game version, DuckDB flag and file, `player_driver_ordinal`, `normalized_version`), the derived-column lists and `NORMALIZED_SESSION_VERSION`
-(it also drops the version-one layout: the two merged summary tables and the old row tables); `writer.ts` (`writeSessionRows`) replaces a session's rows in
-one transaction and takes the session's projection for the derived columns; `dictionaries.ts` does the get-or-insert of driver names, vehicles and teams;
+(it also drops the version-one layout: the two merged summary tables and the old row tables); `writer.ts` (`writeSessionRows`, `updateDerivedColumns`) writes
+or updates a session's rows and takes the session's projection for the derived columns; `dictionaries.ts` does the get-or-insert of driver names, vehicles and teams;
 `reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`) assembles the `DetailedSession`; `access.ts` is what other code calls: `loadSession`
 (rows, or the JSON of a session whose `normalized_version` is not current), `readStoredLinkState` (link and DuckDB file from two small row reads),
-`sameReplayLink`, `writeSessionJson` (keeps the JSON copies in step); `canonical.ts` (`canonicalSession`, `diffValues`, `sessionTelemetry`) is the form that must round-trip;
-`verify.ts` writes and verifies (`writeAndVerifySessionRows`) and backfills (`backfillNormalizedSessions`); `stub.ts` inserts a bare `sessions` row for tests and tools.
-`persistSessionProjection` calls `writeAndVerifySessionRows` in its transaction, and every JSON write path reaches it (upsert, link update, telemetry file,
-reclassification, replay rename) except the link withdrawal, which calls it itself. Those paths read the stored session with `loadSession`, change it in memory,
-and rewrite JSON and rows from it: a column-only update would leave the JSON copies stale, so it waits for phase 3.
+`sameReplayLink`, `writeSessionJson` (keeps the JSON copies in step); `targeted.ts` (`upsertTargetedReplayLink`, `deleteTargetedReplayLink`, `renameTargetedReplay`,
+`updateTargetedTelemetry`, `updateTargetedConditions`, `patchSessionJson`) implements phase 3a granular updates; `canonical.ts` (`canonicalSession`, `diffValues`, `sessionTelemetry`,
+`withSessionTelemetry`) is the form that must round-trip; `verify.ts` writes and verifies (`writeAndVerifySessionRows`) and backfills (`backfillNormalizedSessions`);
+`stub.ts` inserts a bare `sessions` row for tests and tools. Ingestion (`upsertSession`) calls `writeAndVerifySessionRows` in its transaction; targeted updates
+(link update, withdrawal, telemetry file, reclassification, replay rename) modify only their specific rows and update derived metrics in place, with `patchSessionJson`
+maintaining the JSON copy until phase 3b.
+
 `normalized_version` is the current version only when the rows read back as the session; its negative marks an attempt that did not match (readers keep to the
 JSON; the rows stay because their derived columns feed history reads; not retried until the version changes). **Dictionaries**: `drivers` is keyed by the exact name (never
 merged by case or spacing; a name is not a person, so the player and human flags stay on the session's driver row), `vehicles` by the raw XML car type and class,

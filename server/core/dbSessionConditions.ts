@@ -4,8 +4,9 @@ import { getReplayConditions } from './replay/dbReplayLapStore.js';
 import { classifySessionLaps } from '../sessions/sessionLapClassification.js';
 import { replayWeatherCondition, type RainOverLap } from '../../shared/domain/lapConditions.js';
 import type { ReplayConditionFact } from '../replay/decode/replayFacts.js';
-import { persistSessionProjection } from './sessionSummaries/store.js';
-import { loadSession, writeSessionJson } from './sessionRows/access.js';
+import { loadSession } from './sessionRows/access.js';
+import { updateTargetedConditions } from './sessionRows/targeted.js';
+
 
 /** The rainy spans of a replay's stored conditions; undefined when it has none stored yet. */
 function storedRainSpans(db: DatabaseType, replayName: string | undefined): ReplayConditionFact[] | undefined {
@@ -69,16 +70,13 @@ export function reclassifyStoredSessions(db: DatabaseType, which: { ids: string[
   const ids = 'ids' in which
     ? which.ids
     : (db.prepare('SELECT id FROM sessions WHERE recording_name = ?').all(which.replayName) as Array<{ id: string }>).map(row => row.id);
-  // The rows are rewritten whole: classification can change lap conditions and reasons, the link's
-  // weather and the best-lap flags, and the derived lap columns and summaries follow from them.
+  // Conditions and weather are updated in place, followed by targeted projection update.
   return ids.flatMap((id) => {
     const session = loadSession(db, id);
     if (!session) return [];
     classifySessionConditions(db, session);
-    db.transaction(() => {
-      writeSessionJson(db, session, Date.now());
-      persistSessionProjection(db, session);
-    })();
+    updateTargetedConditions(db, session, Date.now());
     return [session];
   });
 }
+

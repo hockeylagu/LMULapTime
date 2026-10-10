@@ -3,7 +3,11 @@ import { DetailedSession, SessionMetadata } from './types.js';
 import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
 import { persistSessionProjection } from './sessionSummaries/store.js';
 import { NORMALIZED_SESSION_VERSION, SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';
-import { loadSession, readStoredLinkState, sameReplayLink, writeSessionJson } from './sessionRows/access.js';
+import { loadSession, readStoredLinkState, sameReplayLink } from './sessionRows/access.js';
+
+import { upsertTargetedReplayLink, updateTargetedTelemetry } from './sessionRows/targeted.js';
+import { withSessionTelemetry } from './sessionRows/canonical.js';
+
 
 /** Ingestion's persisted XML end timestamp; a different path must not reuse it. */
 export function getSessionXmlMtime(db: DatabaseType, sessionId: string, filePath: string): number | undefined {
@@ -129,27 +133,16 @@ export function updateSessionMatchingReplay(
     if (stored.link && sameReplayLink(stored.link, matchingReplayFile)) {
       return { updated: false };
     }
+    const updatedAt = Date.now();
+    upsertTargetedReplayLink(db, sessionId, matchingReplayFile, updatedAt);
     const data = loadSession(db, sessionId);
-    if (!data) return { updated: false };
-    data.matchingReplayFile = matchingReplayFile;
-    db.transaction(() => {
-      writeSessionJson(db, data, Date.now());
-      persistSessionProjection(db, data);
-    })();
+    if (!data) return { updated: true };
     const { drivers: _drivers, ...metadata } = data;
     return { updated: true, session: data, metadata };
   } catch (err) {
     console.warn('[SessionDb] Failed to update session matching replay:', err);
     return { updated: false };
   }
-}
-
-type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
-
-/** A replay link carries its session's DuckDB attachment, whichever of the two was decided first. */
-function withSessionTelemetry(link: ReplayLink, duckdbFilename: string | undefined): ReplayLink {
-  const { hasDuckDbTelemetry: _flag, duckdbFilename: _file, ...rest } = link;
-  return duckdbFilename ? { ...rest, hasDuckDbTelemetry: true, duckdbFilename } : rest;
 }
 
 /**
@@ -163,22 +156,10 @@ export function updateSessionTelemetryFile(db: DatabaseType, sessionId: string, 
   if (!state) return false;
   // Verified rows mirror the session's attachment onto the link, so the session columns decide.
   if (state.version === NORMALIZED_SESSION_VERSION && (state.file ?? undefined) === duckdbFilename && Boolean(state.flag) === Boolean(duckdbFilename)) return false;
-  const session = loadSession(db, sessionId);
-  if (!session) return false;
-  const linkCurrent = !session.matchingReplayFile ||
-    sameReplayLink(session.matchingReplayFile, withSessionTelemetry(session.matchingReplayFile, duckdbFilename));
-  if (session.duckdbFilename === duckdbFilename && Boolean(session.hasDuckDbTelemetry) === Boolean(duckdbFilename) && linkCurrent) return false;
-  session.hasDuckDbTelemetry = Boolean(duckdbFilename);
-  if (duckdbFilename) session.duckdbFilename = duckdbFilename;
-  else delete session.duckdbFilename;
-  if (session.matchingReplayFile) session.matchingReplayFile = withSessionTelemetry(session.matchingReplayFile, duckdbFilename);
-  // updated_at stays: it marks changes the replay links must re-check, and this is not one.
-  db.transaction(() => {
-    writeSessionJson(db, session);
-    persistSessionProjection(db, session);
-  })();
+  updateTargetedTelemetry(db, sessionId, duckdbFilename);
   return true;
 }
+
 
 export function getSessionsCount(db: DatabaseType): number {
   const row = db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number };
