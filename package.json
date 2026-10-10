@@ -16,7 +16,7 @@
   "scripts": {
     "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "node --env-file-if-exists=.env.local --import tsx --watch-path=server --watch-path=shared server/index.ts",
+    "dev:server": "tsx watch --clear-screen=false --exclude \"server/lmu_cache.db*\" --env-file-if-exists=.env.local server/index.ts",
     "dev:client": "vite",
     "build": "npm run check:local-data && tsc && vite build && node tools/release/checkLocalData.mjs --built",
     "preview": "vite preview",
