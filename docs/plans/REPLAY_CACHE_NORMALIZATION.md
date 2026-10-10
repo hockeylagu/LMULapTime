@@ -312,7 +312,7 @@ transaction:
   filename = ?` for the four new tables.
 - `dbReplayIngestStore.ts` `deleteReplayDriverLaps`: delete that driver's `replay_laps` and
   `replay_driver_events`.
-- The cache clear / replay removal in `replayCacheService.ts` and `db.ts` (search for
+- The cache clear / replay removal in `replayRecordingService.ts` and `db.ts` (search for
   `DELETE FROM replay_`): delete all rows of the replay in the new tables.
 - Tests: extend `dbReplayIdentity.test.ts` and `dbReplayIngest.test.ts`.
 

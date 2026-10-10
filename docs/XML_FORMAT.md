@@ -11,6 +11,18 @@ Session result logs are written by the simulation upon session completion to:
 UserData/Log/Results/YYYY_MM_DD_HH_MM_SS-XX[PQR]\d+.xml
 ```
 
+**Application assumption: result XML files are write-once.** After a completed result is written,
+LMU does not edit or replace it at the same path. Ordinary discovery scans therefore skip paths
+already stored in SQLite without statting, fingerprinting or parsing them again. New paths and
+previously failed reads are ingested; a parser-version change or explicit force reparse revisits
+stored files still on disk. Sessions whose XML was deleted remain in SQLite.
+
+Replay matching reads ingestion's persisted XML modification time from SQLite as the session end
+timestamp. Only missing stored values fall back to disk; failed timestamp reads are retried. This assumption is specific
+to results XMLs: replays can reuse filenames and DuckDB recordings can change while recording, so
+their file-version checks remain necessary. If an XML is edited externally, explicitly force a
+reparse (or clear parsed sessions) to update its stored end timestamp.
+
 ### 1.1 Root Document Schema
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -26,7 +38,7 @@ UserData/Log/Results/YYYY_MM_DD_HH_MM_SS-XX[PQR]\d+.xml
     <TrackCourse>Monza Curva Grande Circuit</TrackCourse>
     <TrackEvent>6 Hours of Monza</TrackEvent>
     <TrackLength>5793.0</TrackLength>
-    
+
     <!-- 2. Session Type Container (Practice1 / Qualify / Race / Warmup) -->
     <Race>
       <DateTime>1779987194</DateTime>
@@ -34,11 +46,11 @@ UserData/Log/Results/YYYY_MM_DD_HH_MM_SS-XX[PQR]\d+.xml
       <Laps>25</Laps>
       <Minutes>60</Minutes>
       <FormationAndStart>1</FormationAndStart>
-      
+
       <!-- 3. Driver Records -->
       <Driver> ... </Driver>
       <Driver> ... </Driver>
-      
+
       <!-- 4. Live Event Stream -->
       <Stream>
         <Incident et="15.8"> ... </Incident>

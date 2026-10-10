@@ -124,6 +124,7 @@ When adding features, fixing bugs, or refactoring code, adhere strictly to these
 - Never cross-pollinate track geometries across distinct layout variants of the same facility.
 
 ### F. Telemetry & Replay Ingestion Integrity
+- **Write-Once Results XMLs**: Completed session result XMLs are immutable at their paths (`docs/XML_FORMAT.md`). Ordinary scans skip already stored paths without stat/fingerprint checks. Revisit them only for a parser-version change, an explicit force reparse, or a previously failed read. Replay matching reads ingestion's persisted XML modification time from SQLite; only missing values fall back to disk, retrying failed reads. This assumption does not apply to VCR or DuckDB files, whose version checks remain mandatory.
 - **Multi-File Session Ownership**: Sessions may generate multiple DuckDB telemetry files over long multi-stint sessions. A session owns all corresponding DuckDB files (`telemetryLinks.ts`), and every lap must resolve directly to the specific file containing its timestamp range.
 - **Strict Session-to-Replay Matching & Link Withdrawal**: Replays must be matched strictly against session metadata (layout, driver, timestamp constraints). Any invalid or mismatched link must be withdrawn (`replayMatching.ts` rules, applied by `sessionReplayLinks.ts`, recorded by `dbReplayLinkStore.ts`), never guessed.
 - **Replay Identity Collision Protection**: Reused replay filenames must never overwrite existing cached sessions. Name collisions must be detected and archived with versioned timestamps (`dbReplayIdentity.ts`).

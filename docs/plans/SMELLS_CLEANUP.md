@@ -281,7 +281,7 @@ Split the folder by role:
   `replayLapPoints.ts`, `garageState.ts`, `trajectoryDownsampler.ts`, `replayFacts.ts`;
 - `server/replay/worker/`: `replayTrajectoryWorker.ts`, `replayTrajectoryWorkerBootstrap.mjs`,
   `replayTrajectoryWorkerClient.ts`;
-- the services stay in `server/replay/`: `replayCacheService.ts`, `replayMetadataService.ts`,
+- the services stay in `server/replay/`: `replayRecordingService.ts`, `replayMetadataService.ts`,
   `replayTelemetryService.ts`, `replayTrajectoryService.ts`, `replayServiceTypes.ts`, `replayProgress.ts`,
   `replayUpgradeRunner.ts`.
 
