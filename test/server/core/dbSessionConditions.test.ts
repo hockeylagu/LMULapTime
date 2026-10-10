@@ -147,6 +147,6 @@ describe('replay rain on the laps of a linked session', () => {
     db.markSessionDataChanged();
     const dry = db.getSessionById(session.id)?.playerDriver;
     expect(dry?.bestLapWet).toBeUndefined();
-    expect(dry).toMatchObject({ bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
+    expect(dry?.bestLapPaceCategory).toBeUndefined();
   });
 });

@@ -15,6 +15,7 @@ import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQ
 import { queryCompactComparableLaps } from '../../../../server/core/sessionSummaries/comparisonQueries.js';
 import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/reader.js';
 import { queryTrackDetailSummary } from '../../../../server/core/sessionSummaries/trackQueries.js';
+import { loadSession } from '../../../../server/core/sessionRows/access.js';
 
 const SESSION_COUNT = 10_000;
 const LAPS_PER_SESSION = 20;
@@ -52,9 +53,9 @@ function insertScaleFixture(db: Database.Database): number {
   const insertSession = db.prepare(`INSERT INTO sessions (
     id,filename,file_path,file_mtime,file_size,timestamp,track_venue,track_course,session_type,session_name,
     player_driver_name,player_car_class,player_car_type,player_best_lap_time,player_laps_count,drivers_count,
-    metadata_json,data_json,updated_at,layout_key,source_revision,projection_revision,projection_version,
-    summary_json,recording_name,session_kind,primary_driver_ordinal,is_empty
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    updated_at,layout_key,source_revision,projection_revision,projection_version,
+    recording_name,session_kind,primary_driver_ordinal,is_empty
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const insertCondition = db.prepare(`INSERT INTO session_driver_condition_summaries VALUES
     (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   db.transaction(() => {
@@ -62,15 +63,9 @@ function insertScaleFixture(db: Database.Database): number {
       const id = `scale-${String(index).padStart(5, '0')}`;
       const timestamp = 1_700_000_000_000 + index * 60_000;
       const bestLap = 100 + (index % 50) / 100;
-      const card = cardFor(index);
-      const cardData = JSON.parse(card) as DetailedSession;
-      const detailed: DetailedSession = { ...cardData,
-        playerDriver: { ...cardData.playerDriver!, laps: lapFacts } as DetailedSession['playerDriver'],
-        drivers: [{ ...cardData.playerDriver!, laps: lapFacts } as NonNullable<DetailedSession['drivers']>[number]],
-      };
       insertSession.run(id, `${id}.xml`, `${id}.xml`, timestamp, 1, timestamp, venue, course, 'Race', 'R1',
-        driverName, 'LMH', carType, bestLap, LAPS_PER_SESSION, 1, '{}', JSON.stringify(detailed), timestamp,
-        'monza_gp', 1, 1, SESSION_SUMMARY_PROJECTION_VERSION, card, null, 'race', 0, 0);
+        driverName, 'LMH', carType, bestLap, LAPS_PER_SESSION, 1, timestamp,
+        'monza_gp', 1, 1, SESSION_SUMMARY_PROJECTION_VERSION, null, 'race', 0, 0);
     }
   })();
   const sourceBytes = pageStorageBytes(db);
@@ -113,8 +108,7 @@ describe('10k session query scale fixture', () => {
     const hydratedIds: string[] = [];
     const compare = measure(() => queryCompactComparableLaps(db, id => {
       hydratedIds.push(id);
-      const row = db.prepare('SELECT data_json FROM sessions WHERE id=?').get(id) as { data_json: string } | undefined;
-      return row ? JSON.parse(row.data_json) as DetailedSession : null;
+      return loadSession(db, id);
     }, { trackName: 'Monza', playerOnly: false }, { page: 2, pageSize: 5 }));
     const totalStorageBytes = pageStorageBytes(db);
     const pagePlan = db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM sessions

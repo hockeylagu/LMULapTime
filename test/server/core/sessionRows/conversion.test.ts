@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
+import type { DetailedSession } from '../../../../server/core/types.js';
 import { memoryDb, session, driver, lap } from './builders.js';
 import {
   isSessionJsonRemoved,
@@ -26,9 +27,20 @@ describe('Phase 3b: Normalized session storage conversion', () => {
 
   beforeEach(() => {
     db = memoryDb();
+    // Simulate pre-conversion database with legacy JSON columns
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN data_json TEXT;
+      ALTER TABLE sessions ADD COLUMN metadata_json TEXT;
+      ALTER TABLE sessions ADD COLUMN summary_json TEXT;
+    `);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-conv-test-'));
     sidecarPath = path.join(tmpDir, 'test-sidecar.db');
   });
+
+  const seedLegacySessionJson = (targetDb: DatabaseType, s: DetailedSession) => {
+    targetDb.prepare('UPDATE sessions SET data_json = ?, metadata_json = ? WHERE id = ?')
+      .run(JSON.stringify(s), JSON.stringify(s), s.id);
+  };
 
   afterEach(() => {
     try {
@@ -73,6 +85,8 @@ describe('Phase 3b: Normalized session storage conversion', () => {
     const s2 = session([driver('Driver 2', [lap(1)])], { id: 's2' });
     upsertSession(db, s1, s1.filePath, 0, 1000);
     upsertSession(db, s2, s2.filePath, 0, 1000);
+    seedLegacySessionJson(db, s1);
+    seedLegacySessionJson(db, s2);
 
     const count = backupSessionsJsonToSidecar(db, sidecarPath);
     expect(count).toBe(2);
@@ -149,6 +163,7 @@ describe('Phase 3b: Normalized session storage conversion', () => {
   it('rolls back atomically if an error occurs during table rebuild', () => {
     const s1 = session([driver('Driver 1', [lap(1)])], { id: 's1' });
     upsertSession(db, s1, s1.filePath, 0, 1000);
+    seedLegacySessionJson(db, s1);
 
     // Inject an error mid-rebuild by creating sessions_new beforehand with conflicting schema
     db.exec('CREATE TABLE sessions_new (id INTEGER PRIMARY KEY);');
@@ -166,6 +181,7 @@ describe('Phase 3b: Normalized session storage conversion', () => {
   it('full convertSessionsToNormalizedStorage end-to-end and post-conversion operations', () => {
     const s1 = session([driver('Player', [lap(1)], { isPlayer: true })], { id: 's1', trackVenue: 'Spa' });
     upsertSession(db, s1, s1.filePath, 0, 1000);
+    seedLegacySessionJson(db, s1);
 
     // Perform conversion
     const result = convertSessionsToNormalizedStorage(db, sidecarPath);
@@ -204,6 +220,7 @@ describe('Phase 3b: Normalized session storage conversion', () => {
   it('restoreSessionsJsonFromSidecar restores JSON columns and clears conversion flag', () => {
     const s1 = session([driver('Player', [lap(1)], { isPlayer: true })], { id: 's1', trackVenue: 'Spa' });
     upsertSession(db, s1, s1.filePath, 0, 1000);
+    seedLegacySessionJson(db, s1);
 
     // Convert
     convertSessionsToNormalizedStorage(db, sidecarPath);
@@ -223,9 +240,7 @@ describe('Phase 3b: Normalized session storage conversion', () => {
     const row = db.prepare('SELECT data_json FROM sessions WHERE id = ?').get('s1') as { data_json: string };
     expect(JSON.parse(row.data_json).id).toBe('s1');
 
-    // Reset normalized_version to test phase 2 fallback to data_json
-    db.prepare('UPDATE sessions SET normalized_version = 0 WHERE id = ?').run('s1');
-    const loadedFromFallback = loadSession(db, 's1');
-    expect(loadedFromFallback?.id).toBe('s1');
+    const loaded = loadSession(db, 's1');
+    expect(loaded?.id).toBe('s1');
   });
 });

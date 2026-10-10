@@ -55,6 +55,8 @@ export function countStaleNormalizedSessions(db: DatabaseType): number {
 /** Writes and verifies the rows of up to `batchSize` sessions from their stored JSON. */
 export function backfillNormalizedSessions(db: DatabaseType, batchSize = 10): NormalizedBackfillBatch {
   if (isSessionJsonRemoved(db)) return { processed: 0, failed: [] };
+  const hasDataJson = db.prepare("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'data_json'").get();
+  if (!hasDataJson) return { processed: 0, failed: [] };
   const ids = db.prepare(`SELECT id FROM sessions WHERE ${STALE_ROWS} ORDER BY timestamp LIMIT ?`)
     .all(NORMALIZED_SESSION_VERSION, -NORMALIZED_SESSION_VERSION, Math.max(1, batchSize)) as Array<{ id: string }>;
   const select = db.prepare('SELECT data_json FROM sessions WHERE id = ?');

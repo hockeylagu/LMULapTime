@@ -32,9 +32,9 @@ function addSession(db: Database.Database, session: DetailedSession): void {
   const course = session.trackCourse;
   const layout = venue === 'Spa' ? 'spa_gp' : 'silverstone_national';
   db.prepare(`INSERT INTO sessions (id,filename,file_path,file_mtime,file_size,timestamp,track_venue,track_course,
-    session_type,session_name,metadata_json,data_json,updated_at,layout_key,recording_name,session_kind,is_empty)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(session.id, session.filename, session.filePath, session.timestamp, 1,
-    session.timestamp, venue, course, 'Race', 'R1', '{}', JSON.stringify(session), session.timestamp, layout, null, 'race', 0);
+    session_type,session_name,updated_at,layout_key,recording_name,session_kind,is_empty)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(session.id, session.filename, session.filePath, session.timestamp, 1,
+    session.timestamp, venue, course, 'Race', 'R1', session.timestamp, layout, null, 'race', 0);
   // The rows and their derived columns come from the writer, as in ingestion.
   writeSessionRows(db, session);
 }

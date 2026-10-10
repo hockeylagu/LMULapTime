@@ -13,7 +13,7 @@ Last checked 2026-10-10: 482 TypeScript source files in src/server/shared, 287 t
 
 | Source | Files on disk | Ingest entry | Stored in (SQLite, `server/lmu_cache.db`) |
 |---|---|---|---|
-| XML results log | `UserData/LOG/Results/*.xml` | `server/core/dbSessionSync.ts` → `LmuParser.parseSessionXml` (`server/sessions/parser.ts`) | `sessions` (scalar columns, plus the JSON copies `metadata_json` / `data_json` / `summary_json`, still written for rollback but no longer read) and its rows: `session_recordings`, `session_drivers`, `session_laps`, `session_lap_passes`, `session_events`, with the dictionaries `drivers`, `vehicles`, `teams` |
+| XML results log | `UserData/LOG/Results/*.xml` | `server/core/dbSessionSync.ts` → `LmuParser.parseSessionXml` (`server/sessions/parser.ts`) | `sessions` (58 scalar columns, legacy JSON columns removed in Phase 3) and its rows: `session_recordings`, `session_drivers`, `session_laps`, `session_lap_passes`, `session_events`, with the dictionaries `drivers`, `vehicles`, `teams` |
 | Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/worker/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
 | DuckDB 100 Hz telemetry | `UserData/Telemetry/*.duckdb` | `server/telemetry/telemetryCatalog.ts` → `duckdbReader.ts` | `telemetry_metadata`, `telemetry_lap_cache` |
 
@@ -22,7 +22,7 @@ Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (
 DDL is coordinated by `server/core/dbSchema.ts`; additive session projection tables and indexes
 live in `server/core/sessionSummaries/schema.ts` and `aggregateStore.ts`, and replay matching columns/indexes in
 `server/core/replay/dbReplayMatchingStore.ts`.
-Normalized session rows (`server/core/sessionRows/`, plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md), phase 3a) are the
+Normalized session rows (`server/core/sessionRows/`, plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md), phase 3c) are the
 stored session; reads come from them, and the JSON columns are only still written so that rolling back is a code revert (phase 3b removes them).
 `specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, the extra `sessions` columns (weather, `settings_*`, best session
 lap, game version, DuckDB flag and file, `player_driver_ordinal`, `normalized_version`), the derived-column lists and `NORMALIZED_SESSION_VERSION`
@@ -65,11 +65,11 @@ current-target calculations. Failed projections retain a zero-player fact row fo
 The layout, session kind, primary driver ordinal,
 empty flag, source/projection revisions and projection version live on `sessions`. Rebuild old rows
 through `loadSession` in bounded batches (`backfillSessionSummaries`); never load full history to backfill.
-`persistSessionProjection` is the only writer of the derived columns and of `summary_json`, so a current projection always has its card.
+`persistSessionProjection` is the only writer of the derived columns (cards are built directly from columns), so a current projection always has its card.
 A session whose summaries cannot be built is marked done with `projection_error`, its condition summaries and derived columns cleared, and a
 card without player figures, so one bad row never holds the rebuild. Readiness (`isSessionSummaryReady`)
-reads the covering `idx_sessions_ready` index (projection version/revisions and `normalized_version`): columns added after `data_json` are never read from rows
-on a hot path. While summaries or rows rebuild, `server/routes/summaryReadiness.ts` answers 503 on history paths only
+reads the covering `idx_sessions_ready` index (projection version/revisions and `normalized_version`): hot columns sit first in `sessions_new`.
+While summaries or rows rebuild, `server/routes/summaryReadiness.ts` answers 503 on history paths only
 (lists, dashboard, tracks, boards, comparisons); routers share `/api`, so it is mounted per path, never router-wide.
 Projection version 4 (`shared/types/sessionSummaries.ts`) rebuilds these shared facts onto the merged tables from the stored
 rows in bounded batches. Source updates and replay
@@ -78,7 +78,7 @@ separate from completed lap count. Partial valid/eligible lap-time indexes suppo
 comparison personal-best lookups. Bump the projection version when changing stored aggregate rules.
 Do not add an index that leads with `driver_class` or `driver_id` on `session_drivers`: the planner then starts the leaderboard from every driver of the
 class (measured 520 ms against 5 ms starting from the layout). The sessions of a layout are found through `idx_sessions_layout_timestamp`, then their drivers by primary key.
-Reading any `sessions` column added after `data_json` walks the row's overflow pages (the layout list, track summaries and progression still do, about 120 ms each on the local cache); phase 3 removes the cause (phase 3b `server/core/sessionRows/conversion.ts` provides sidecar JSON backup, table rebuild dropping JSON columns, and rollback restore).
+Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were dropped in Phase 3b/3c; all 58 scalar columns live directly in `sessions`, placing hot history columns first.
 
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
@@ -391,7 +391,6 @@ Found while writing this map. Remove an item when it is fixed; add new ones as t
 - Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
 
 **Logic in the wrong place / duplicated**
-- The session JSON columns (`metadata_json`, `data_json`, `summary_json`) are still written next to the rows (rollback safety); only the rebuild backfills and `loadSession`'s fallback still read `data_json`. Phase 3 of the normalized storage plan removes them and the whole-session rewrite on a link change.
 - `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
 - Version constants are spread across five files; the table in section 5 is the index.
 - `lapClassPosition` (`shared/domain/lapPlaces.ts`) matches car classes by lowercased name instead of `mapVehicleIdToClass`.

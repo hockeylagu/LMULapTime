@@ -1,6 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { initSessionAggregateSchema } from './aggregateStore.js';
-import { isSessionJsonRemoved } from '../sessionRows/conversion.js';
 
 export function initSessionSummarySchema(db: DatabaseType): void {
   initSessionAggregateSchema(db);
@@ -10,9 +9,6 @@ export function initSessionSummarySchema(db: DatabaseType): void {
   addColumn('source_revision', 'source_revision INTEGER NOT NULL DEFAULT 0');
   addColumn('projection_revision', 'projection_revision INTEGER NOT NULL DEFAULT 0');
   addColumn('projection_version', 'projection_version INTEGER NOT NULL DEFAULT 0');
-  if (!isSessionJsonRemoved(db)) {
-    addColumn('summary_json', 'summary_json TEXT');
-  }
   addColumn('recording_name', 'recording_name TEXT');
   addColumn('session_kind', 'session_kind TEXT NOT NULL DEFAULT \'unknown\'');
   addColumn('primary_driver_ordinal', 'primary_driver_ordinal INTEGER');

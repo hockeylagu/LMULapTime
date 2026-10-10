@@ -4,11 +4,7 @@ import { RECORDING_FIELDS } from './specs.js';
 import { packFields, type Row, type SqlValue } from './fields.js';
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/index.js';
 import { persistSessionAggregate } from '../sessionSummaries/aggregateStore.js';
-import { serializeSessionCard } from '../sessionSummaries/store.js';
 import { updateDerivedColumns } from './writer.js';
-import { writeSessionJson } from './access.js';
-import { withSessionTelemetry } from './canonical.js';
-import { isSessionJsonRemoved } from './conversion.js';
 
 type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
 
@@ -19,34 +15,6 @@ const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
 function bumpSessionDataRevision(db: DatabaseType): void {
   db.prepare(`INSERT INTO cache_metadata(key,value) VALUES('session_data_revision','1')
     ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT)`).run();
-}
-
-/**
- * Patches the legacy JSON columns in 3a so rolling back remains a code revert until phase 3b
- * rebuilds the table without them. Safe when JSON columns are absent or corrupt.
- */
-export function patchSessionJson(
-  db: DatabaseType,
-  sessionId: string,
-  updater: (session: DetailedSession, meta: SessionMetadata) => void,
-  updatedAt?: number
-): void {
-  if (isSessionJsonRemoved(db)) return;
-  const row = db.prepare('SELECT metadata_json, data_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string; data_json: string } | undefined;
-  if (!row) return;
-  try {
-    const meta = JSON.parse(row.metadata_json) as SessionMetadata;
-    const session = JSON.parse(row.data_json) as DetailedSession;
-    updater(session, meta);
-    if (updatedAt === undefined) {
-      db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ? WHERE id = ?').run(JSON.stringify(meta), JSON.stringify(session), sessionId);
-    } else {
-      db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?')
-        .run(JSON.stringify(meta), JSON.stringify(session), updatedAt, sessionId);
-    }
-  } catch {
-    // If JSON columns are absent or malformed, proceed without throwing.
-  }
 }
 
 /**
@@ -90,10 +58,6 @@ export function upsertTargetedReplayLink(
       .run(link.name, updatedAt, sessionId);
 
     bumpSessionDataRevision(db);
-    patchSessionJson(db, sessionId, (s, m) => {
-      s.matchingReplayFile = link;
-      m.matchingReplayFile = link;
-    }, updatedAt);
   })();
 }
 
@@ -111,10 +75,6 @@ export function deleteTargetedReplayLink(
     db.prepare('UPDATE sessions SET recording_name = NULL, updated_at = ? WHERE id = ?').run(updatedAt, sessionId);
 
     bumpSessionDataRevision(db);
-    patchSessionJson(db, sessionId, (s, m) => {
-      delete s.matchingReplayFile;
-      delete m.matchingReplayFile;
-    }, updatedAt);
   })();
 }
 
@@ -130,7 +90,6 @@ export function renameTargetedReplay(
   updatedAt = Date.now()
 ): void {
   db.transaction(() => {
-    const linked = db.prepare('SELECT id FROM sessions WHERE recording_name = ?').all(oldFilename) as Array<{ id: string }>;
     db.prepare('UPDATE session_recordings SET recording_name = ?, path = ? WHERE recording_name = ?')
       .run(newFilename, newPath, oldFilename);
     db.prepare(`UPDATE sessions SET recording_name = ?, source_revision = source_revision + 1,
@@ -138,12 +97,6 @@ export function renameTargetedReplay(
       .run(newFilename, updatedAt, oldFilename);
 
     bumpSessionDataRevision(db);
-    for (const { id } of linked) {
-      patchSessionJson(db, id, (s, m) => {
-        if (s.matchingReplayFile) s.matchingReplayFile = { ...s.matchingReplayFile, name: newFilename, path: newPath };
-        if (m.matchingReplayFile) m.matchingReplayFile = { ...m.matchingReplayFile, name: newFilename, path: newPath };
-      }, updatedAt);
-    }
   })();
 }
 
@@ -162,19 +115,6 @@ export function updateTargetedTelemetry(
       .run(duckdbFilename ?? null, duckdbFilename ? 1 : 0, sessionId);
 
     bumpSessionDataRevision(db);
-    patchSessionJson(db, sessionId, (s, m) => {
-      s.hasDuckDbTelemetry = Boolean(duckdbFilename);
-      m.hasDuckDbTelemetry = Boolean(duckdbFilename);
-      if (duckdbFilename) {
-        s.duckdbFilename = duckdbFilename;
-        m.duckdbFilename = duckdbFilename;
-      } else {
-        delete s.duckdbFilename;
-        delete m.duckdbFilename;
-      }
-      if (s.matchingReplayFile) s.matchingReplayFile = withSessionTelemetry(s.matchingReplayFile, duckdbFilename);
-      if (m.matchingReplayFile) m.matchingReplayFile = withSessionTelemetry(m.matchingReplayFile, duckdbFilename);
-    });
   })();
 }
 
@@ -249,27 +189,15 @@ export function updateTargetedConditions(
     updateDerivedColumns(db, session.id, projection);
 
     // 5. Update session row metadata
-    if (isSessionJsonRemoved(db)) {
-      db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
-        source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
-        recording_name=?, projection_error=NULL WHERE id=?`)
-        .run(
-          projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
-          Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
-          projection.recordingName, session.id
-        );
-    } else {
-      db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
-        source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
-        recording_name=?, summary_json=?, projection_error=NULL WHERE id=?`)
-        .run(
-          projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
-          Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
-          projection.recordingName, serializeSessionCard(session, projection), session.id
-        );
-    }
+    db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
+      source_revision=?, projection_revision=?, projection_version=?, updated_at=?,
+      recording_name=?, projection_error=NULL WHERE id=?`)
+      .run(
+        projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal,
+        Number(projection.isEmpty), revision, revision, projection.projectionVersion, updatedAt,
+        projection.recordingName, session.id
+      );
 
     bumpSessionDataRevision(db);
-    writeSessionJson(db, session, updatedAt);
   })();
 }

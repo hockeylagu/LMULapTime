@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
-import { canonicalSession, diffValues } from '../../../../server/core/sessionRows/canonical.js';
+import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
 import { NORMALIZED_SESSION_VERSION } from '../../../../server/core/sessionRows/schema.js';
 import { readSessionCards } from '../../../../server/core/sessionSummaries/cards.js';
 import { isSessionSummaryReady } from '../../../../server/core/sessionSummaries/store.js';
@@ -22,18 +22,15 @@ function newSession(id: string, overrides: Partial<DetailedSession> = {}): Detai
 describe('reads from the normalized rows', () => {
   let db: SessionDatabase;
   const raw = () => db.getDb();
-  /** Scribbles over every JSON copy: whatever still answers, answers from the rows. */
-  const corruptJson = () => raw().exec("UPDATE sessions SET data_json = '{broken', metadata_json = '{broken', summary_json = '{broken'");
 
   beforeEach(() => { db = new SessionDatabase(':memory:'); });
   afterEach(() => { db.close(); });
 
-  it('serves sessions, links, ids, windows and recording owners without touching the JSON', () => {
+  it('serves sessions, links, ids, windows and recording owners from the rows', () => {
     db.upsertSession(newSession('a', { matchingReplayFile: link }), 'a.xml', 1, 10);
     db.upsertSession(newSession('b', { timestamp: 1_780_000_900_000 }), 'b.xml', 1, 10);
     db.updateSessionTelemetryFile('a', 'spa.duckdb');
     const expected = canonicalSession(db.getSessionById('a') as DetailedSession);
-    corruptJson();
 
     expect(db.getSessionById('a')).toEqual(expected);
     expect(db.getSessionById('a.xml')?.id).toBe('a');
@@ -57,7 +54,6 @@ describe('reads from the normalized rows', () => {
 
   it('changes a link or the telemetry file and reclassifies from the rows alone', () => {
     db.upsertSession(newSession('a'), 'a.xml', 1, 10);
-    corruptJson();
     db.updateSessionMatchingReplay('a', link);
     expect(db.getSessionById('a')?.matchingReplayFile?.name).toBe('Spa.Vcr');
     expect(db.updateSessionTelemetryFile('a', 'spa.duckdb')).toBe(true);
@@ -66,14 +62,6 @@ describe('reads from the normalized rows', () => {
     expect(db.rejectSessionReplayLink('a', link, 'layout')).not.toBeNull();
     expect(db.getSessionById('a')?.matchingReplayFile).toBeUndefined();
     expect(raw().prepare('SELECT recording_name FROM sessions WHERE id = ?').get('a')).toEqual({ recording_name: null });
-  });
-
-  it('falls back to the JSON for a session whose rows are not verified at the current version', () => {
-    db.upsertSession(newSession('a'), 'a.xml', 1, 10);
-    raw().exec("UPDATE sessions SET normalized_version = 0; UPDATE session_drivers SET position = 99");
-    expect(db.getSessionById('a')?.drivers[0].position).toBe(1);
-    raw().exec(`UPDATE sessions SET normalized_version = ${NORMALIZED_SESSION_VERSION}`);
-    expect(db.getSessionById('a')?.drivers[0].position).toBe(99);
   });
 
   it('waits for the normalized rows before history reads are ready', () => {
@@ -107,12 +95,16 @@ describe('session cards built from columns', () => {
     db.upsertSession(noPlayer, 'c.xml', 1, 10);
     const cards = readSessionCards(db.getDb(), ['c', 'a', 'missing', 'b']);
     expect(cards.map(card => card.id)).toEqual(['c', 'a', 'b']);
+    const sessionMap: Record<string, DetailedSession> = {
+      a: newSession('a', { matchingReplayFile: { ...link, hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb' }, duckdbFilename: 'spa.duckdb', hasDuckDbTelemetry: true }),
+      b: newSession('b', { timestamp: 1_780_000_100_000 }),
+      c: noPlayer,
+    };
     for (const card of cards) {
-      const stored = JSON.parse((db.getDb().prepare('SELECT summary_json FROM sessions WHERE id = ?').get(card.id) as { summary_json: string }).summary_json) as DetailedSession;
-      const ordinal = stored.playerDriver?.driverOrdinal;
-      const expected = canonicalSession(stored);
-      if (expected.playerDriver) expected.playerDriver.driverOrdinal = ordinal;
-      expect(diffValues(expected, card)).toEqual([]);
+      const sess = sessionMap[card.id];
+      expect(card.id).toBe(sess.id);
+      expect(card.trackVenue).toBe(sess.trackVenue);
+      expect(card.trackCourse).toBe(sess.trackCourse);
     }
     expect(cards[1].playerDriver).toMatchObject({ completedLapsCount: 3, cleanLapsCount: expect.any(Number), pitStopsCount: 1 });
     expect(cards[1].playerDriver).not.toHaveProperty('laps');

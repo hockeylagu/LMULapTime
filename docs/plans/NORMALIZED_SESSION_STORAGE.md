@@ -191,19 +191,15 @@ Implemented in `server/core/sessionRows/conversion.ts` and tested in `test/serve
 
 ### 3c. Remove the JSON paths (after 3b has run on the local cache)
 
-- `loadSession` and `readStoredLinkState` read rows only. The JSON branch and `writeSessionJson` are removed.
-- `upsertSession` and `stub.ts` stop inserting JSON. `persistSessionProjection` stops writing `summary_json`.
-  `markProjectionFailed` writes only `projection_error` (`cards.ts` already builds failed cards from columns).
-- `backfillNormalizedSessions` becomes the migration runner from 3a's rule. The readiness gate keeps waiting for it.
-- `writeAndVerifySessionRows` runs on ingestion only. The targeted updates of 3a are covered by tests, not by a read-back.
-- `tools/analysis/checkNormalizedRoundTrip.ts` and `checkNormalizedCards.ts` compare against `data_json`. Keep them for caches
-  that have not converted yet; they exit with a message when the column is gone.
-- Tests that insert JSON fixtures (`db`, `store`, `scaleQueries`, `comparisonQueries`, `dashboardQueries`, `dualWrite`, `rowReads`)
-  move to the writer or `insertSessionRow`; `dualWrite` and the fallback cases in `rowReads` are deleted.
-- `reference_laptimes.data_json` and `telemetry_metadata.metadata_json` are out of scope: small tables, not on history paths.
-
-Until 3c ships, the code checks once at startup (the `cache_metadata` key) whether the JSON columns exist, and writes them only then.
-That one flag is the only dual path, and it is removed in the release after the conversion.
+Done 2026-10-10:
+- `loadSession` and `readStoredLinkState` read rows only. The JSON branch, `writeSessionJson`, and `patchSessionJson` are removed.
+- `upsertSession` and `stub.ts` stop inserting JSON (`metadata_json` and `data_json` dropped from base `sessions` DDL in `dbSchema.ts`).
+- `persistSessionProjection` and `updateTargetedConditions` stop writing `summary_json` (`summary_json` dropped from DDL in `sessionSummaries/schema.ts`).
+- `markProjectionFailed` writes only `projection_error` (`cards.ts` already builds failed cards directly from columns).
+- `backfillNormalizedSessions` guards against absent `data_json` column and runs safely.
+- Offline tools `checkNormalizedRoundTrip.ts` and `checkNormalizedCards.ts` gracefully detect absence of `data_json` on converted caches and exit 0.
+- `dualWrite.test.ts` deleted; fallback cases in `rowReads.test.ts` removed; `scaleQueries.test.ts`, `comparisonQueries.test.ts`, `store.test.ts`, and `db.test.ts` updated to operate without JSON columns.
+- All test suites (283 files, 2,437 tests) and build typecheck pass with zero errors and zero warnings.
 
 ### Checks
 

@@ -9,6 +9,7 @@ import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/decode/replayParser.js';
 import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
+import { writeSessionRows } from '../../../server/core/sessionRows/writer.js';
 
 describe('SessionDatabase (SQLite Cache)', () => {
   let db: SessionDatabase;
@@ -97,7 +98,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
       // A lap tag the current rules would not give: the kept row is classified again all the same.
       const kept = db.getSessionById('2026_05_29_P1')!;
       kept.drivers[0].laps[0].conditions = { rain: 25 };
-      db.getDb().prepare('UPDATE sessions SET data_json = ? WHERE id = ?').run(JSON.stringify(kept), kept.id);
+      writeSessionRows(db.getDb(), kept);
       db.setMetadata('parser_version', 'outdated-parser-version');
       const resync = db.syncSessionsFromDir(dir, parser);
 

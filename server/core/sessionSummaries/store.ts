@@ -7,7 +7,6 @@ import { persistSessionAggregate } from './aggregateStore.js';
 import { writeAndVerifySessionRows } from '../sessionRows/verify.js';
 import { clearDerivedColumns } from '../sessionRows/writer.js';
 import { NORMALIZED_SESSION_VERSION } from '../sessionRows/schema.js';
-import { isSessionJsonRemoved } from '../sessionRows/conversion.js';
 import { loadSession } from '../sessionRows/access.js';
 import { readSessionCards } from './cards.js';
 const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
@@ -15,8 +14,7 @@ const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
  @bestS1,@bestS2,@bestS3,@fastestThreeCount,@fastestThreeTimeSum)`;
 
 /**
- * Replaces a session's summary rows and its card in one transaction. Callers never write
- * summary_json themselves, so a current projection always has a matching card.
+ * Replaces a session's summary rows and its card in one transaction.
  */
 export function persistSessionProjection(db: DatabaseType, session: DetailedSession, sourceRevision?: number): SessionSummaryProjection {
   const row = db.prepare('SELECT source_revision FROM sessions WHERE id = ?').get(session.id) as { source_revision: number } | undefined;
@@ -30,18 +28,12 @@ export function persistSessionProjection(db: DatabaseType, session: DetailedSess
     for (const value of projection.conditions) conditionStmt.run(value);
     persistSessionAggregate(db, session, projection);
     // The normalized rows carry the per-driver and per-lap derived columns, so they are written with the projection.
-    // JSON is still written by every caller, so a session whose rows do not verify keeps being served from it.
     writeAndVerifySessionRows(db, session, projection);
     db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
       source_revision=?, projection_revision=?, projection_version=? WHERE id=?`)
       .run(projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal, Number(projection.isEmpty), revision, revision, projection.projectionVersion, session.id);
-    if (isSessionJsonRemoved(db)) {
-      db.prepare('UPDATE sessions SET recording_name=?, projection_error=NULL WHERE id=?')
-        .run(projection.recordingName, session.id);
-    } else {
-      db.prepare('UPDATE sessions SET recording_name=?, summary_json=?, projection_error=NULL WHERE id=?')
-        .run(projection.recordingName, serializeSessionCard(session, projection), session.id);
-    }
+    db.prepare('UPDATE sessions SET recording_name=?, projection_error=NULL WHERE id=?')
+      .run(projection.recordingName, session.id);
     db.prepare(`INSERT INTO cache_metadata(key,value) VALUES('session_data_revision','1')
       ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT)`).run();
     return true;
@@ -105,9 +97,6 @@ function markProjectionFailed(db: DatabaseType, id: string, error: unknown): voi
       FROM sessions WHERE id = ?`).get(id) as { id: string; filename: string; file_path: string; timestamp: number;
       track_venue: string; track_course: string; session_type: DetailedSession['sessionType']; session_name: string; time_string: string | null } | undefined;
     if (!row) return;
-    const card = { id: row.id, filename: row.filename, filePath: row.file_path, timestamp: row.timestamp,
-      trackVenue: row.track_venue, trackCourse: row.track_course, sessionType: row.session_type,
-      sessionName: row.session_name, isEmpty: true };
     for (const table of ['session_driver_condition_summaries', 'session_summary_facts']) {
       db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(id);
     }
@@ -118,15 +107,9 @@ function markProjectionFailed(db: DatabaseType, id: string, error: unknown): voi
       timeString: row.time_string ?? '',
       sessionType: row.session_type, sessionName: row.session_name, driversCount: 0, drivers: [] };
     persistSessionAggregate(db, empty, buildSessionSummaryProjection(empty, 0));
-    if (isSessionJsonRemoved(db)) {
-      db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
-        projection_error = ? WHERE id = ?`)
-        .run(SESSION_SUMMARY_PROJECTION_VERSION, message, id);
-    } else {
-      db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
-        summary_json = ?, projection_error = ? WHERE id = ?`)
-        .run(SESSION_SUMMARY_PROJECTION_VERSION, JSON.stringify(card), message, id);
-    }
+    db.prepare(`UPDATE sessions SET projection_version = ?, projection_revision = source_revision, is_empty = 1,
+      projection_error = ? WHERE id = ?`)
+      .run(SESSION_SUMMARY_PROJECTION_VERSION, message, id);
   })();
 }
 

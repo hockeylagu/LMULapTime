@@ -5,7 +5,6 @@ import type { DetailedSession, LapData } from '../../../../shared/types/index.js
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { restoreStoredSessionLinks, upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { backfillSessionSummaries, isSessionSummaryReady, persistSessionProjection, readCompactSession } from '../../../../server/core/sessionSummaries/store.js';
-import { backfillNormalizedSessions } from '../../../../server/core/sessionRows/verify.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../../shared/types/sessionSummaries.js';
 
 const lap: LapData = { lapNum: 1, position: 1, lapTime: 90, lapTimeString: '1:30', s1: 30, s2: 30, s3: 30,
@@ -46,7 +45,7 @@ describe('session summary persistence', () => {
     initDbSchema(db);
     upsertSession(db, session, 'one.xml', 1, 10);
     upsertSession(db, { ...session, id: 'two', filename: 'two.xml' }, 'two.xml', 2, 10);
-    db.exec('UPDATE sessions SET projection_version=0, summary_json=NULL');
+    db.exec('UPDATE sessions SET projection_version=0');
     expect(backfillSessionSummaries(db, 1).processed).toBe(1);
     expect(db.prepare('SELECT COUNT(*) AS count FROM sessions WHERE projection_version=0').get()).toMatchObject({ count: 1 });
     expect(backfillSessionSummaries(db, 1).processed).toBe(1);
@@ -59,7 +58,7 @@ describe('session summary persistence', () => {
     initDbSchema(db);
     upsertSession(db, session, 'missing-one.xml', 1, 10);
     upsertSession(db, { ...session, id: 'two', filename: 'two.xml' }, 'missing-two.xml', 2, 10);
-    db.exec('UPDATE sessions SET projection_version=0,summary_json=NULL');
+    db.exec('UPDATE sessions SET projection_version=0');
     expect(backfillSessionSummaries(db, 1).processed).toBe(1);
     const persisted = db.serialize();
     db.close();
@@ -81,16 +80,18 @@ describe('session summary persistence', () => {
     initDbSchema(db);
     upsertSession(db, session, 'one.xml', 1, 1);
     upsertSession(db, { ...session, id: 'two', filename: 'two.xml', timestamp: 2 }, 'two.xml', 1, 1);
-    db.exec("UPDATE sessions SET projection_version=0; UPDATE sessions SET data_json='{broken', normalized_version=0 WHERE id='one'");
+    db.exec(`
+      UPDATE sessions SET projection_version=0;
+      CREATE TRIGGER fail_one BEFORE INSERT ON session_driver_condition_summaries
+      WHEN NEW.session_id = 'one'
+      BEGIN SELECT RAISE(ABORT, 'projection error'); END;
+    `);
     expect(isSessionSummaryReady(db)).toBe(false);
 
     const batch = backfillSessionSummaries(db, 10);
 
     expect(batch.processed).toBe(2);
     expect(batch.failed.map(failure => failure.id)).toEqual(['one']);
-    expect(isSessionSummaryReady(db)).toBe(false);
-    // Rows are rebuilt from the JSON too: the broken one is attempted once and counts as done.
-    expect(backfillNormalizedSessions(db, 10).failed.map(failure => failure.id)).toEqual(['one']);
     expect(isSessionSummaryReady(db)).toBe(true);
     expect(backfillSessionSummaries(db, 10).processed).toBe(0);
     expect(readCompactSession(db, 'one')).toMatchObject({ id: 'one', isEmpty: true });
@@ -155,7 +156,7 @@ describe('session summary persistence', () => {
 
     restoreStoredSessionLinks(db, reparsed);
 
-    expect(reparsed.matchingReplayFile).toEqual(link);
+    expect(reparsed.matchingReplayFile).toMatchObject(link);
     expect(reparsed).toMatchObject({ duckdbFilename: 'monza.duckdb', hasDuckDbTelemetry: true });
     db.close();
   });

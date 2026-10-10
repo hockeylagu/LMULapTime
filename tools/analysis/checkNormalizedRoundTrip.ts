@@ -23,6 +23,11 @@ const memory = new Database(':memory:');
 initDbSchema(memory);
 
 const ids = (source.prepare('SELECT id FROM sessions ORDER BY timestamp').all() as Array<{ id: string }>).map(row => row.id).slice(0, limit);
+const hasDataJson = source.prepare("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'data_json'").get();
+if (!hasDataJson) {
+  console.log(`[checkNormalizedRoundTrip] sessions table in ${file} has no data_json column (converted to normalized storage). Nothing to compare.`);
+  process.exit(0);
+}
 // The base columns exist in every cache version; the new ones may not, so they are never selected.
 const select = source.prepare('SELECT id, data_json, filename, file_path, timestamp, track_venue, track_course, session_type, session_name, drivers_count FROM sessions WHERE id = ?');
 const kinds = new Map<string, { count: number; sessions: Set<string>; examples: string[] }>();

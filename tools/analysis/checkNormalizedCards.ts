@@ -17,6 +17,11 @@ const limitIndex = rest.indexOf('--limit');
 const limit = limitIndex >= 0 ? Number(rest[limitIndex + 1]) : Infinity;
 
 const source = new Database(file, { readonly: true, fileMustExist: true });
+const hasDataJson = source.prepare("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'data_json'").get();
+if (!hasDataJson) {
+  console.log(`[checkNormalizedCards] sessions table in ${file} has no data_json column (converted to normalized storage). Nothing to compare.`);
+  process.exit(0);
+}
 const memory = new Database(':memory:');
 initDbSchema(memory);
 const ids = (source.prepare('SELECT id FROM sessions ORDER BY timestamp').all() as Array<{ id: string }>).map(row => row.id).slice(0, limit);

@@ -111,8 +111,6 @@ export function initDbSchema(db: DatabaseType): void {
       player_best_lap_time REAL,
       player_laps_count INTEGER,
       drivers_count INTEGER,
-      metadata_json TEXT NOT NULL,
-      data_json TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
 
