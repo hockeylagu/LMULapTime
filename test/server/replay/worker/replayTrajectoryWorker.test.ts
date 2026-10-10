@@ -30,6 +30,7 @@ describe('replay trajectory worker', () => {
     let step = await extraction.next();
     while (!step.done) {
       stages.push(step.value.stage);
+      if (step.value.stage === 'metadata') expect(step.value.driverSlot).toBe(1);
       step = await extraction.next();
     }
 

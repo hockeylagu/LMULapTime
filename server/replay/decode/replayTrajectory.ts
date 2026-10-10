@@ -135,7 +135,6 @@ export function extractReplayTrajectory(
     }
 
     // Stage 2: Metadata Block & Driver Roster
-    tracker.report('metadata', 10);
     const effectivePlayerName = options.playerName || detectPlayerName(filePath);
     const meta = parseReplayMetadata(filePath, { playerName: effectivePlayerName });
 
@@ -170,6 +169,7 @@ export function extractReplayTrajectory(
     }
 
     const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
+    tracker.report('metadata', 10, { driverSlot: targetSlot });
     const driverName = matchedDriver?.name || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
     const carDesc = matchedDriver?.carModel || matchedDriver?.vehicleId || 'Unknown Car';
 

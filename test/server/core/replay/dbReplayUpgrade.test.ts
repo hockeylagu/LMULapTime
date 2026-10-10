@@ -32,7 +32,13 @@ describe('replay upgrade', () => {
   const runUpgrade = async (shouldStop?: () => boolean): Promise<ReplayUpgradeResult> => {
     const iterator = db.upgradeReplaysAsyncIterator(dir, { playerName: 'Player Driver', shouldStop });
     let step = await iterator.next();
-    while (!step.done) step = await iterator.next();
+    const percents: number[] = [];
+    while (!step.done) {
+      if (step.value.filePercent !== undefined) percents.push(step.value.filePercent);
+      if (step.value.filePercent === 100) expect(step.value.driversDone).toBe(step.value.driversTotal);
+      step = await iterator.next();
+    }
+    expect(percents).toEqual([...percents].sort((a, b) => a - b));
     return step.value;
   };
 

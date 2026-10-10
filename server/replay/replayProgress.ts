@@ -20,6 +20,8 @@ export interface ReplayStreamProgress {
   slicesParsed?: number;
   currentTimeSec?: number;
   lapsDetected?: number;
+  /** Resolved primary slot, available before decoding starts so callers can count driver work once. */
+  driverSlot?: number;
 }
 
 export type ReplayProgressCallback = (progress: ReplayStreamProgress) => void;
@@ -73,6 +75,7 @@ export class ReplayProgressTracker {
       slicesParsed?: number;
       currentTimeSec?: number;
       lapsDetected?: number;
+      driverSlot?: number;
     }
   ): void {
     const clampedPercent = Math.min(100, Math.max(0, Math.round(percent)));

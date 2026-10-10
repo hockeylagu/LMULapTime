@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { ReplayFileProgress } from './replayFileProgress.js';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
@@ -117,6 +118,7 @@ export async function* upgradeReplaysAsyncIterator(
   for (let index = 0; index < backlog.length && !interrupted; index++) {
     const candidate = backlog[index];
     const { filename, filePath, mtime, size } = candidate;
+    const fileProgress = new ReplayFileProgress(candidate.driverSlots.length);
     if (!isFileUnchanged(candidate)) continue;
 
     if (candidate.metadataOutdated) {
@@ -144,19 +146,21 @@ export async function* upgradeReplaysAsyncIterator(
         });
         let step = await extraction.next();
         while (!step.done) {
-          yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: ${step.value.stageDescription}`, filePercent: step.value.percent });
+          yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: ${step.value.stageDescription}`, filePercent: fileProgress.decoding(step.value.percent) });
           step = await extraction.next();
         }
         // LMU may have rewritten the file while it was decoded: leave it to the next sync.
         if (!isFileUnchanged(candidate)) break;
         const isPrimary = slot === -1 || slot === candidate.primarySlot;
         const slotKey = slot === -1 ? (step.value.driverSlot ?? -1) : slot;
+        yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: Persisting trajectory cache`, filePercent: fileProgress.saving() });
         host.replaceReplayDriverLaps(filename, filePath, mtime, size, slotKey, step.value, isPrimary);
         upgraded++;
       } catch (error) {
         failed++;
         recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
       }
+      yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Finished driver ${slot}`, filePercent: fileProgress.complete() });
     }
   }
 

@@ -356,10 +356,15 @@ describe('SessionDatabase replay cache', () => {
     const filename = 'Async_Sync_P1.Vcr';
     const filePath = path.join(tempDir, filename);
     fs.writeFileSync(filePath, createSliceVcrBuffer({
-      drivers: [{ name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' }],
+      drivers: [
+        { name: 'Player Driver', vehicleId: '21_26_AFCO95641716', team: 'Ferrari Team AF', carNumber: '21' },
+        { name: 'Rival Driver', vehicleId: '21_26_AFCO95641716', team: 'B', carNumber: '22' },
+      ],
       slices: [
         { sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 },
         { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 },
+        { sTime: 0, driverSlot: 2, x: 5, y: 0, z: 0 },
+        { sTime: 1, driverSlot: 2, x: 15, y: 0, z: 10 },
       ],
     }));
 
@@ -368,14 +373,21 @@ describe('SessionDatabase replay cache', () => {
     let step = await iterator.next();
     while (!step.done) {
       progress.push(step.value);
+      if (step.value.filePercent === 100) {
+        expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
+        expect(db.getStoredReplayTrajectory(filename, 2, -1)).not.toBeNull();
+      }
       step = await iterator.next();
     }
 
     const stat = fs.statSync(filePath);
     const mtime = Math.floor(stat.mtimeMs);
     expect(step.value).toMatchObject({ added: 1, skipped: 0, interrupted: false });
-    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Decoding telemetry and events' }));
-    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Persisting trajectory cache', filePercent: 95 }));
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Primary driver: Decoding telemetry and events' }));
+    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Rival Driver: Persisting trajectory cache' }));
+    const percents = progress.flatMap(item => item.filePercent === undefined ? [] : [item.filePercent]);
+    expect(percents).toEqual([...percents].sort((a, b) => a - b));
+    expect(percents.filter(percent => percent === 100)).toHaveLength(1);
     expect(db.getReplayTrajectoryCache(filename, -1, -1, mtime, stat.size)).not.toBeNull();
   });
 

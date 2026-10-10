@@ -48,6 +48,9 @@ Each batch rates pace against the current main-thread benchmarks immediately bef
 then reapplies lap conditions, so delayed worker results cannot restore obsolete or wet-best ratings.
 Replay discovery finishes and matches every session before decoding associated recordings; per-replay
 jobs expose queued/processing/ready/failed states and whether a failed decode still has a playable primary trajectory. Launch actions remain available for playable cached data or DuckDB telemetry and report partial failures.
+Async replay scans and upgrades use `server/core/replay/replayFileProgress.ts` to report one file percentage
+across all pending drivers, reserving storage work before 100%; worker percentages never reset the file progress.
+The worker reports its primary slot before stream decoding, so that driver's work is counted once from the start.
 Driver decode outcomes (`replay_ingest_drivers`, `dbReplayIngestStore.ts`): `failed` when the decoder rejects the file
 (`ReplayDecodeError`, `server/replay/decode/replayDecodeError.ts`), `interrupted` for a worker exit, server shutdown, locked file or
 storage error. Either is retried, and settles (shown as failed) after `MAX_DECODE_ATTEMPTS` failures in a row on one file version;
