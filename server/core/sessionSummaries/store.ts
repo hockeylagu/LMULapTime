@@ -42,22 +42,6 @@ export function persistSessionProjection(db: DatabaseType, session: DetailedSess
   return projection;
 }
 
-export function serializeSessionCard(session: DetailedSession, projection: SessionSummaryProjection): string {
-  const metadata = { ...session } as Record<string, unknown>;
-  metadata.isEmpty = projection.isEmpty;
-  delete metadata.drivers;
-  if (session.playerDriver) {
-    const playerSummary = projection.drivers.find(driver => driver.isPlayer) ?? projection.drivers[projection.primaryDriverOrdinal ?? -1];
-    const { laps: _laps, incidents: _incidents, trackLimits: _limits, penalties: _penalties, ...player } = session.playerDriver;
-    metadata.playerDriver = { ...player, driverOrdinal: playerSummary?.driverOrdinal,
-      bestLapOrdinal: playerSummary?.bestLapOrdinal ?? null, completedLapsCount: playerSummary?.lapsCount ?? 0,
-      cleanLapsCount: playerSummary?.cleanLapsCount ?? 0, drivingTimeSeconds: playerSummary?.drivingTimeSum ?? 0,
-      pitStopsCount: playerSummary?.pitCount ?? 0, maxTopSpeed: playerSummary?.maxSpeed ?? null,
-      consistencyScore: playerSummary?.consistencyScore ?? null, topThreeAverage: playerSummary?.topThreeAverage ?? null };
-  }
-  return JSON.stringify(metadata);
-}
-
 export function projectionState(db: DatabaseType, sessionId: string): SessionProjectionState | null {
   const row = db.prepare('SELECT source_revision, projection_revision, projection_version FROM sessions WHERE id = ?').get(sessionId) as { source_revision: number; projection_revision: number; projection_version: number } | undefined;
   return row ? { sourceRevision: row.source_revision, projectionRevision: row.projection_revision, projectionVersion: row.projection_version } : null;
@@ -72,8 +56,7 @@ const STALE_PROJECTION = 'projection_version != ? OR projection_revision != sour
 
 /**
  * True when no session waits for its summaries or its normalized rows (a negative version was attempted
- * and counts as done, like a failed projection). Reads only the covering idx_sessions_ready index:
- * these columns sit after data_json in each row, so reading the row would walk its JSON.
+ * and counts as done, like a failed projection). Reads only the covering idx_sessions_ready index.
  */
 export function isSessionSummaryReady(db: DatabaseType): boolean {
   return !db.prepare(`SELECT 1 FROM sessions WHERE ${STALE_PROJECTION} OR normalized_version NOT IN (?, ?) LIMIT 1`)

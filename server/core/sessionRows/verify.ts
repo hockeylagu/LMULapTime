@@ -19,8 +19,8 @@ export interface SessionRowsResult { ok: boolean; mismatches: string[]; error?: 
 /**
  * Writes a session's rows and checks they read back as the session. `normalized_version` is the
  * current version only on a match; it is its negative after a mismatch or an error (attempted, not
- * to be trusted). Rows that mismatch stay, because their derived columns still feed history reads, but
- * readers keep to the session's JSON; rows an error left behind are removed. Never throws.
+ * to be trusted). Rows that mismatch stay because their derived columns still feed history reads;
+ * rows an error left behind are removed. Never throws.
  */
 export function writeAndVerifySessionRows(db: DatabaseType, session: DetailedSession, projection?: SessionSummaryProjection): SessionRowsResult {
   let result: SessionRowsResult;
